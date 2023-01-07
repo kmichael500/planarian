@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian", "Planarian\Planarian.csproj", "{7D3A1495-8EEB-4C26-9A24-7305EC2B2C94}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Model", "Planarian.Model\Planarian.Model.csproj", "{39D1988D-ABC9-49BF-A80A-B656E65D336D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Migrations", "Planarian.Migrations\Planarian.Migrations.csproj", "{696FCA95-AF09-4B38-9910-D168BB5A5115}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Library", "Planarian.Library\Planarian.Library.csproj", "{216B7FAF-1AE8-4F50-B6CE-14966D35637D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7D3A1495-8EEB-4C26-9A24-7305EC2B2C94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D3A1495-8EEB-4C26-9A24-7305EC2B2C94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D3A1495-8EEB-4C26-9A24-7305EC2B2C94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D3A1495-8EEB-4C26-9A24-7305EC2B2C94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39D1988D-ABC9-49BF-A80A-B656E65D336D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39D1988D-ABC9-49BF-A80A-B656E65D336D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39D1988D-ABC9-49BF-A80A-B656E65D336D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39D1988D-ABC9-49BF-A80A-B656E65D336D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{696FCA95-AF09-4B38-9910-D168BB5A5115}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{696FCA95-AF09-4B38-9910-D168BB5A5115}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{696FCA95-AF09-4B38-9910-D168BB5A5115}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{696FCA95-AF09-4B38-9910-D168BB5A5115}.Release|Any CPU.Build.0 = Release|Any CPU
+		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

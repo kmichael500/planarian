@@ -199,3 +199,6 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/react,dotnetcore,visualstudiocode,rider,macos,windows,linux
+Planarian/Planarian.sln.DotSettings.user
+Planarian/Planarian/appsettings.Development.json
+Planarian/Planarian.Migrations/appsettings.Migrations.json
