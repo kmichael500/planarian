@@ -1,0 +1,159 @@
+import { Button, Card, Popconfirm, Space, Table } from "antd";
+import { ColumnsType } from "antd/lib/table";
+import { v4 as uuidv4 } from "uuid";
+import { useEffect, useState } from "react";
+import { TripObjectiveService } from "../../Modules/Objective/Services/trip.objective.service";
+import { ProjectService } from "../../Modules/Project/Services/project.service";
+import { TripSerice } from "../../Modules/Trip/Services/trip.service";
+import { nameof } from "../Helpers/StringHelpers";
+import { SelectListItem } from "../Models/SelectListItem";
+import { PlusCircleOutlined } from "@ant-design/icons";
+import { MemberGridAddMemberComponent } from "./member.grid.add.member.component";
+
+export interface MemberGridComponentProps {
+  type: MemberGridType;
+  projectId: string;
+  tripId?: string;
+  tripObjectiveId?: string;
+}
+const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
+  const [teamMemberData, setTeamMemberData] = useState<UserTableColumn[]>();
+  const [teamMembersLoading, setTeamMembersLoading] = useState(true);
+
+  useEffect(() => {
+    if (teamMemberData === undefined) {
+      const getTripObjectiveName = async () => {
+        await refreshData();
+      };
+      getTripObjectiveName();
+    }
+  });
+
+  const refreshData = async () => {
+    const getTripObjectiveName = async () => {
+      let members = [] as SelectListItem<string>[];
+      switch (props.type) {
+        case MemberGridType.Project:
+          members = await ProjectService.GetProjectMembers(
+            props.projectId as string
+          );
+          break;
+        case MemberGridType.Trip:
+          members = await TripSerice.GetTripMembers(props.tripId as string);
+          break;
+        case MemberGridType.TripObjective:
+          members = await TripObjectiveService.GetTripObjectiveMembers(
+            props.tripObjectiveId as string
+          );
+          break;
+      }
+
+      setTeamMemberData(
+        members.map((e) => {
+          return { name: e.display, id: e.value } as UserTableColumn;
+        })
+      );
+      setTeamMembersLoading(false);
+    };
+    getTripObjectiveName();
+  };
+
+  const handleDelete = async (userId: string) => {
+    try {
+      setTeamMembersLoading(true);
+      switch (props.type) {
+        case MemberGridType.Project:
+          await ProjectService.DeleteProjectMember(
+            userId,
+            props.projectId as string
+          );
+          break;
+
+        case MemberGridType.TripObjective:
+          await TripObjectiveService.DeleteTripObjectiveMember(
+            userId,
+            props.tripObjectiveId as string
+          );
+          break;
+      }
+      refreshData();
+    } catch (error) {
+      console.error(error);
+      setTeamMembersLoading(false);
+    }
+  };
+
+  const addMember = (e: any) => {};
+
+  const teamMemberColumns: ColumnsType<UserTableColumn> = [
+    {
+      title: "Name",
+      dataIndex: nameof<UserTableColumn>("name"),
+      key: nameof<UserTableColumn>("name"),
+      render: (text) => <a>{text}</a>,
+    },
+    {
+      title: "Action",
+      key: nameof<UserTableColumn>("action"),
+      render: (text: string, record: any) => (
+        <Space size="middle">
+          {props.type !== MemberGridType.Trip && (
+            <Popconfirm
+              title={`Are you sure to delete this ${props.type.toLowerCase()} member?`}
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button type="primary" danger>
+                Delete
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  const onAddedSuccess = async () => {
+    await refreshData();
+  };
+
+  return (
+    <>
+      <Card
+        loading={teamMembersLoading || teamMemberData === undefined}
+        title={`${props.type} Members`}
+        extra={
+          <>
+            <MemberGridAddMemberComponent
+              onAddedSuccess={onAddedSuccess}
+              {...props}
+            />
+          </>
+        }
+      >
+        <Table
+          columns={teamMemberColumns}
+          dataSource={teamMemberData}
+          rowKey={(e) => {
+            return e.id;
+          }}
+        ></Table>
+      </Card>
+    </>
+  );
+};
+
+export enum MemberGridType {
+  Project = "Project",
+  Trip = "Trip",
+  TripObjective = "Trip Objective",
+}
+
+interface UserTableColumn {
+  name: string;
+  id: string;
+  action?: any;
+}
+
+export { MemberGridComponent };
