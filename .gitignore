@@ -202,3 +202,5 @@ $RECYCLE.BIN/
 Planarian/Planarian.sln.DotSettings.user
 Planarian/Planarian/appsettings.Development.json
 Planarian/Planarian.Migrations/appsettings.Migrations.json
+
+Planarian/.idea/
