@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Settings.Services;
 using Planarian.Shared.Base;
 
@@ -9,7 +10,7 @@ namespace Planarian.Modules.Settings.Controllers;
 [Route("api/settings")]
 public class SettingsController : PlanarianControllerBase<SettingsService>
 {
-    public SettingsController(RequestUser requestUser, SettingsService service) : base(requestUser, service)
+    public SettingsController(RequestUser requestUser, SettingsService service, TokenService tokenService) : base(requestUser, tokenService, service)
     {
     }
 

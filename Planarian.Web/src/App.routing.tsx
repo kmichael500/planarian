@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { LoginComponent } from "./Modules/Authentication/Components/login.component";
+import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
 import { LeadAddComponent } from "./Modules/Components/lead.add.component";
 import { TripObjectiveDetailComponent } from "./Modules/Objective/Components/objective.detail.component";
 import { ObjectivePhotoUploadComponent } from "./Modules/Objective/Components/objective.photo.upload.component";
@@ -13,6 +14,7 @@ export const AppRouting: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginComponent />}></Route>
+        <Route path="/register" element={<RegisterComponent />}></Route>
         <Route path="/projects" element={<ProjectListComponent />}></Route>
         <Route
           path="/projects/:projectId"
@@ -39,3 +41,7 @@ export const AppRouting: React.FC = () => {
     </Router>
   );
 };
+
+export interface HasRoute {
+  route: string;
+}

@@ -23,12 +23,11 @@
 
     <ItemGroup>
       <Folder Include="Modules\Project\Models" />
-      <Folder Include="Modules\Tags\Controllers" />
-      <Folder Include="Modules\Tags\Services" />
       <Folder Include="Modules\TripObjectives\Models" />
       <Folder Include="Modules\TripPhotos\Repositories" />
       <Folder Include="Modules\TripPhotos\Services" />
       <Folder Include="Modules\Trips\Models" />
+      <Folder Include="Shared\Options" />
     </ItemGroup>
 
 </Project>

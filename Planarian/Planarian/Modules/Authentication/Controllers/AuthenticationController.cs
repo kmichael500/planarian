@@ -10,23 +10,18 @@ namespace Planarian.Modules.Authentication.Controllers;
 [Route("api/authentication")]
 public class AuthenticationController : PlanarianControllerBase<AuthenticationService>
 {
-    public AuthenticationController(RequestUser requestUser, AuthenticationService service) : base(requestUser, service)
+    public AuthenticationController(RequestUser requestUser, TokenService tokenService, AuthenticationService service) :
+        base(requestUser, tokenService, service)
     {
     }
-    
+
     [HttpPost("login")]
     public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values)
     {
         var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password, HttpContext);
         return new JsonResult(token);
     }
-    
-    [HttpPost("register")]
-    public async Task<ActionResult<string>> Register([FromBody] RegisterUserVm values)
-    {
-        throw new NotImplementedException();
-    }
-    
+
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout()

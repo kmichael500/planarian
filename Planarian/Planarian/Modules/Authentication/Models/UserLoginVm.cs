@@ -17,5 +17,6 @@ public class UserLoginVm
     public string EmailAddress { get; set; } = null!;
     [Required]
     public string Password { get; set; } = null!;
+    public bool? Remember { get; set; }
 
 }

@@ -8,6 +8,12 @@ namespace Planarian.Model.Database.Entities;
 
 public class Tag : EntityBaseNameId
 {
+    public Tag(string name, string key)
+    {
+        Name = name;
+        Key = key;
+    }
+    public Tag(){}
     public string Key { get; set; } = null!;
     public string? ProjectId { get; set; } = null!;
     public virtual ICollection<TripObjective> TripObjectives { get; set; } = new HashSet<TripObjective>();

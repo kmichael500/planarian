@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
 
@@ -10,7 +11,7 @@ namespace Planarian.Modules.Trips.Controllers;
 [Route("api/trips")]
 public class TripController : PlanarianControllerBase<TripService>
 {
-    public TripController(RequestUser requestUser, TripService service) : base(requestUser, service)
+    public TripController(RequestUser requestUser, TripService service, TokenService tokenService) : base(requestUser, tokenService, service)
     {
     }
 

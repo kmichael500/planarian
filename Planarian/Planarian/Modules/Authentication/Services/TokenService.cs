@@ -17,7 +17,7 @@ public class TokenService
         _authOptions = authOptions;
     }
 
-    public string BuildToken(AuthenticationRepository.UserToken user)
+    public string BuildToken(UserToken user)
     {
         var claims = new[] {    
             new Claim(ClaimTypes.Name, user.FullName),
@@ -57,5 +57,12 @@ public class TokenService
             return false;
         }
         return true;    
+    }
+    
+    public string GetUserIdFromToken(string token)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var jwtToken = tokenHandler.ReadJwtToken(token);
+        return jwtToken.Claims.First(claim => claim.Type == nameof(UserToken.Id)).Value;
     }
 }
