@@ -21,7 +21,7 @@ import { TripObjectiveTagComponent } from "../../../Shared/Components/TripObject
 import { UserAvatarGroupComponent } from "../../../Shared/Components/UserAvatarGroupComponent";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { SettingsService } from "../../../Shared/Services/SettingsService";
+import { SettingsService } from "../../Settings/Services/settings.service";
 import { TripObjectiveCreateButton } from "../../Objective/Components/objective.create.button.component";
 import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";
 import { TripVm } from "../Models/TripVm";

@@ -22,7 +22,7 @@ import { TripObjectiveService } from "../Services/trip.objective.service";
 import { TripObjectiveDetailPhotoComponent } from "./objective.detail.photo.component";
 import LeadTableComponent from "../../Components/lead.table.component";
 import { ObjectiveTypeTagComponent } from "../../ObjectiveTypes/Components/objective.type.tag.component";
-import { SettingsService } from "../../../Shared/Services/SettingsService";
+import { SettingsService } from "../../Settings/Services/settings.service";
 
 const { Option } = Select;
 const { Title, Paragraph } = Typography;

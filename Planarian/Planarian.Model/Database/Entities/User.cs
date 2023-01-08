@@ -26,7 +26,7 @@ public class User : EntityBase
     [Required] [MaxLength(PropertyLength.Name)] public string LastName { get; set; } = null!;
     public string FullName => $"{FirstName} {LastName}";
 
-    [MaxLength(PropertyLength.EmailAddress)] public string? EmailAddress { get; set; } = null!;
+    [MaxLength(PropertyLength.EmailAddress)] public string EmailAddress { get; set; } = null!;
     [MaxLength(PropertyLength.PhoneNumber)] public string? PhoneNumber { get; set; } = null!;
 
     [MaxLength(PropertyLength.BlobKey)]public string? ProfilePhotoBlobKey { get; set; }

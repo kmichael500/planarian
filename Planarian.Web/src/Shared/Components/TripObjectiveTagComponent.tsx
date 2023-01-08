@@ -3,7 +3,7 @@ import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useState, useEffect } from "react";
 import { TripDetailComponent } from "../../Modules/Trip/Components/trip.detail.component";
-import { SettingsService } from "../Services/SettingsService";
+import { SettingsService } from "../../Modules/Settings/Services/settings.service";
 
 export interface TripObjectiveTagComponentProps {
   tripObjectiveId: string;

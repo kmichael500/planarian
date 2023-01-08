@@ -1,35 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { Form, Input, Button, Card, Col, Divider, Row, Typography } from "antd";
 import { Link } from "react-router-dom";
-import {
-  MemberGridComponent,
-  MemberGridType,
-} from "../../../Shared/Components/MemberGridComponent";
-import { TripCreateButton } from "../../Trip/Components/trip.create.button.component";
+import { UserVm } from "../../User/Models/UserVm";
+import { UserService } from "../../User/user.service";
+import UserUpdateComponent from "../../User/Componenets/user.update.component";
 
 const { Title } = Typography;
-interface User {
-  firstName: string;
-  lastName: string;
-  email: string;
-}
 
-const UserUpdateForm: React.FC = () => {
+const SettingsComponent: React.FC = () => {
   const [form] = Form.useForm();
-  const [user, setUser] = useState<User>({
-    firstName: "",
-    lastName: "",
-    email: "",
-  });
+  const [user, setUser] = useState<UserVm>();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
       setIsLoading(true);
       try {
-        const response = await fetch("/api/user");
-        const data = await response.json();
-        setUser(data);
+        const response = await UserService.GetCurrentUser();
+        setUser(response);
       } catch (error) {
         console.error(error);
       }
@@ -41,11 +29,7 @@ const UserUpdateForm: React.FC = () => {
   const onFinish = async (values: any) => {
     setIsLoading(true);
     try {
-      await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      await UserService.UpdateCurrentUser(values);
     } catch (error) {
       console.error(error);
     }
@@ -69,34 +53,9 @@ const UserUpdateForm: React.FC = () => {
       </Row>
       <Divider />
       <Row align="middle"></Row>
-      <Card title="Your information">
-        <Form
-          layout="vertical"
-          form={form}
-          onFinish={onFinish}
-          initialValues={user}
-        >
-          <Form.Item label="Name" name="name" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, type: "email" }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={isLoading}>
-              Update
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+      <UserUpdateComponent />
     </>
   );
 };
 
-export default UserUpdateForm;
-
-export { UserUpdateForm as SettingsComponent };
+export { SettingsComponent };

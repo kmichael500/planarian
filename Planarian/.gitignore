@@ -1,5 +1,14 @@
-# Created by https://www.toptal.com/developers/gitignore/api/macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains
-# Edit at https://www.toptal.com/developers/gitignore?templates=macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains
+# Created by https://www.toptal.com/developers/gitignore/api/macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains,dotnetcore
+# Edit at https://www.toptal.com/developers/gitignore?templates=macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains,dotnetcore
+
+### DotnetCore ###
+# .NET Core build folders
+bin/
+obj/
+
+# Common node modules locations
+/node_modules
+/wwwroot/node_modules
 
 ### JetBrains ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
@@ -645,8 +654,4 @@ FodyWeavers.xsd
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 
-# End of https://www.toptal.com/developers/gitignore/api/macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains
-Planarian/Planarian/appsettings.Development.json
-Planarian/Planarian.Migrations/appsettings.Migrations.json
-
-Planarian/.idea/
+# End of https://www.toptal.com/developers/gitignore/api/macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains,dotnetcore

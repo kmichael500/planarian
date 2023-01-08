@@ -1,5 +1,5 @@
-import { HttpClient } from "../..";
-import { SelectListItem } from "../Models/SelectListItem";
+import { HttpClient } from "../../..";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 const baseUrl = "api/settings";
 const SettingsService = {

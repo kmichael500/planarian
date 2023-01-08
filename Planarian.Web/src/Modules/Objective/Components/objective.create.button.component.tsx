@@ -4,7 +4,7 @@ import { DefaultOptionType } from "antd/lib/select";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PropertyLength } from "../../../Shared/Constants";
-import { SettingsService } from "../../../Shared/Services/SettingsService";
+import { SettingsService } from "../../Settings/Services/settings.service";
 import { ProjectService } from "../../Project/Services/project.service";
 import { CreateOrEditTripObjectiveVm } from "../Models/CreateOrEditTripObjectiveVm";
 import { TripObjectiveService } from "../Services/trip.objective.service";
