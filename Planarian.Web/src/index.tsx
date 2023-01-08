@@ -5,6 +5,7 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import axios from "axios";
 import { message } from "antd";
+import { AuthenticationService } from "./Modules/Authentication/Services/authentication.service";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -25,6 +26,9 @@ export const baseUrl = "https://localhost:7111";
 const HttpClient = axios.create({
   // .. where we make our configurations
   baseURL: baseUrl,
+  headers: {
+    Authorization: `Bearer ${AuthenticationService.GetToken()}`,
+  },
 });
 
 // Override default axios error handler to throw custom error data

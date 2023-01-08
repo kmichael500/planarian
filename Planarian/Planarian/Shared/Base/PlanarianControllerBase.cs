@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Planarian.Model.Shared;
@@ -20,13 +21,13 @@ public abstract class PlanarianControllerBase : ControllerBase, IAsyncActionFilt
     [NonAction]
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var token = context.HttpContext.Session.Get(SessionStorageKeys.TokenKey);
+        var token = context.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         
-        // if (!string.IsNullOrWhiteSpace(token))
-        // {
-        //     var userId = TokenService.GetUserIdFromToken(token);
-        //     await RequestUser.Initialize(userId);
-        // }
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            var userId = TokenService.GetUserIdFromToken(token);
+            await RequestUser.Initialize(userId);
+        }
 
         await next();
     }

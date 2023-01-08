@@ -15,6 +15,7 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
     {
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values)
     {

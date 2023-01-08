@@ -11,6 +11,7 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Project.Controllers;
 
 [Route("api/projects")]
+[Authorize]
 public class ProjectController : PlanarianControllerBase<ProjectService>
 {
     private readonly TripService _tripService;
