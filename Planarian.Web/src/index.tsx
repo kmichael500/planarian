@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import axios from "axios";
+import { message } from "antd";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -25,5 +26,20 @@ const HttpClient = axios.create({
   // .. where we make our configurations
   baseURL: baseUrl,
 });
+
+// Override default axios error handler to throw custom error data
+HttpClient.interceptors.response.use(
+  function (response) {
+    // Do something with response data
+    return response;
+  },
+  function (error) {
+    if (error.response) {
+      return Promise.reject(error.response.data);
+    }
+    // Do something with response error
+    return Promise.reject(error);
+  }
+);
 
 export { HttpClient };

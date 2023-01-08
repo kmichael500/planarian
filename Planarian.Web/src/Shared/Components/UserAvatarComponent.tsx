@@ -2,7 +2,7 @@ import { Avatar, Spin, Tooltip, Typography } from "antd";
 import { AvatarSize } from "antd/lib/avatar/SizeContext";
 import { useState, useEffect } from "react";
 import { StringHelpers } from "../Helpers/StringHelpers";
-import { SettingsService } from "../Services/SettingsService";
+import { SettingsService } from "../../Modules/Settings/Services/settings.service";
 
 const { Text } = Typography;
 export interface UserAvatarComponentProps {

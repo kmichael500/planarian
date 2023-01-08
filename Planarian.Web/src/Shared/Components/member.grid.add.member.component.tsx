@@ -5,7 +5,7 @@ import { MemberGridType } from "./MemberGridComponent";
 import { PlusCircleOutlined, MailOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../Models/SelectListItem";
 import { ProjectService } from "../../Modules/Project/Services/project.service";
-import { SettingsService } from "../Services/SettingsService";
+import { SettingsService } from "../../Modules/Settings/Services/settings.service";
 import { nameof } from "../Helpers/StringHelpers";
 import { AddMember } from "./AddMember";
 import { InviteMember as InviteMember } from "./InviteMember";

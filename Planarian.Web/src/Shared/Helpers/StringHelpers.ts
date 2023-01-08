@@ -18,3 +18,11 @@ export function isNullOrWhiteSpace(input: string | null | undefined): boolean {
 }
 
 export const nameof = <T>(name: Extract<keyof T, string>): string => name;
+
+export function formatPhoneNumber(phoneNumber?: string): string {
+  const formattedPhoneNumber = phoneNumber?.replace(
+    /^(\+1)(\d{3})(\d{3})(\d{4})$/,
+    "$1 ($2) $3-$4"
+  );
+  return formattedPhoneNumber ?? "";
+}

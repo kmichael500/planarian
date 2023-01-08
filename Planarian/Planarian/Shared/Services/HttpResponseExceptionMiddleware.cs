@@ -28,7 +28,7 @@ public class HttpResponseExceptionMiddleware
         }
         catch (Exception e)
         {
-            var error = new ApiErrorResponse(e.Message, -1);
+            var error = new ApiErrorResponse("There was an unexpected issue! Please try again or contact support!", -1);
 
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             context.Response.ContentType = "application/json";
@@ -64,7 +64,7 @@ public class ApiException : Exception
     public int ErrorCode { get; }
 }
 
-public class ApiExceptionDictionary
+public static class ApiExceptionDictionary
 {
     #region Default 1-100
 
