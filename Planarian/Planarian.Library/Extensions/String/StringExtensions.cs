@@ -51,4 +51,39 @@ public static class StringExtensions
             return false;
         }
     }
+    
+    public static bool IsValidPhoneNumber(this string phoneNumber)
+    {
+        // Check if the string is null or empty
+        if (string.IsNullOrEmpty(phoneNumber))
+        {
+            return false;
+        }
+
+        // Check if the string is in the correct format
+        var regex = new Regex(@"^\+1\d{10}$");
+        return regex.IsMatch(phoneNumber);
+    }
+    
+    public static string ExtractPhoneNumber(this string phoneNumber)
+    {
+        // Remove all non-numeric characters
+        string rawNumber = Regex.Replace(phoneNumber, @"\D", "");
+
+        // Check if the number is a US number
+        if (rawNumber.Length == 11 && rawNumber[0] == '1')
+        {
+            return "+" + rawNumber;
+        }
+        else if (rawNumber.Length == 10)
+        {
+            return "+1" + rawNumber;
+        }
+        else
+        {
+            // Return an empty string if the number is not a valid US number
+            throw new ArgumentException("The phone number is not a valid US number.",nameof(phoneNumber));
+        }
+    }
+
 }

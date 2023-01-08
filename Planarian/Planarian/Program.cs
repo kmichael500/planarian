@@ -1,5 +1,7 @@
+using System.Net.Mime;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
@@ -19,6 +21,7 @@ using Planarian.Modules.TripPhotos.Controllers;
 using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
+using Planarian.Modules.Users.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 
@@ -67,12 +70,24 @@ builder.Services.AddSwaggerGen(c =>
 #region Options
 
 var serverOptions = builder.Configuration.GetSection(ServerOptions.Key).Get<ServerOptions>();
+if (serverOptions == null)
+{
+    throw new Exception("Server options not found");
+}
 builder.Services.AddSingleton(serverOptions);
 
 var authOptions = builder.Configuration.GetSection(AuthOptions.Key).Get<AuthOptions>();
+if (authOptions == null)
+{
+    throw new Exception("Auth options not found");
+}
 builder.Services.AddSingleton(authOptions);
 
 var blobOptions = builder.Configuration.GetSection(BlobOptions.Key).Get<BlobOptions>();
+if (blobOptions == null)
+{
+    throw new Exception("Blob options not found");
+}
 builder.Services.AddSingleton(blobOptions);
 
 
@@ -89,6 +104,7 @@ builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<TripPhotoService>();
+builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<MemoryCache>();
 
 #endregion
@@ -161,6 +177,32 @@ builder.Services.AddSession();
 
 var app = builder.Build();
 
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        // using static System.Net.Mime.MediaTypeNames;
+        context.Response.ContentType = MediaTypeNames.Text.Plain;
+
+        await context.Response.WriteAsync("An exception was thrown.");
+
+        var exceptionHandlerPathFeature =
+            context.Features.Get<IExceptionHandlerPathFeature>();
+
+        if (exceptionHandlerPathFeature?.Error is FileNotFoundException)
+        {
+            await context.Response.WriteAsync(" The file was not found.");
+        }
+
+        if (exceptionHandlerPathFeature?.Path == "/")
+        {
+            await context.Response.WriteAsync(" Page: Home.");
+        }
+    });
+});
+
 app.UseSession();
 
 app.Use(AuthenticationService.AddAuthHeader);
@@ -178,6 +220,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().WithOrigins("http://localhost:3000"));
+
+app.UseMiddleware<HttpResponseExceptionMiddleware>();
 
 app.MapControllers();
 

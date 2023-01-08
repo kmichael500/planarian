@@ -37,5 +37,5 @@ public class PlanarianDbContext : DbContext
     public DbSet<TripObjectiveTag> TripObjectiveTag { get; set; } = null!;
     public DbSet<TripObjectiveMember> TripObjectiveMembers { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
-    public DbSet<User> Users { get; set; } = null!;
+    public DbSet<User?> Users { get; set; } = null!;
 }
