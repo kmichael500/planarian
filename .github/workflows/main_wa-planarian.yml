@@ -23,10 +23,10 @@ jobs:
           include-prerelease: true
 
       - name: Build with dotnet
-        run: cd Planarian && dotnet build --configuration Release
+        run: ls && cd Planarian && ls && dotnet build --configuration Release && ls
 
       - name: dotnet publish
-        run: cd Planarian && dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+        run: ls && cd Planarian && ls && && dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp && ls
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v2
