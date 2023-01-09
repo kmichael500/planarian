@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.Data.SqlClient.Server;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
@@ -20,6 +21,16 @@ public class User : EntityBase
         EmailAddress = email.Trim();
     }
     
+    public User(string firstName, string lastName, string emailAddress, string phoneNumber): this(firstName, lastName, emailAddress)
+    {
+        phoneNumber = phoneNumber.ExtractPhoneNumber();
+        if (!phoneNumber.IsValidPhoneNumber())
+        {
+            throw new ArgumentException("Invalid phone number", nameof(phoneNumber));
+        }
+        PhoneNumber = phoneNumber;
+    }
+    
     public User(){}
 
     [Required] [MaxLength(PropertyLength.Name)] public string FirstName { get; set; } = null!;
@@ -27,8 +38,8 @@ public class User : EntityBase
     public string FullName => $"{FirstName} {LastName}";
 
     [MaxLength(PropertyLength.EmailAddress)] public string EmailAddress { get; set; } = null!;
-    [MaxLength(PropertyLength.PhoneNumber)] public string? PhoneNumber { get; set; } = null!;
-
+    [MaxLength(PropertyLength.PhoneNumber)] public string? PhoneNumber { get; set; }
+    [MaxLength(PropertyLength.PasswordHash)] public string? HashedPassword { get; set; }
     [MaxLength(PropertyLength.BlobKey)]public string? ProfilePhotoBlobKey { get; set; }
     
     public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new HashSet<ProjectMember>();
@@ -41,6 +52,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 {
     public void Configure(EntityTypeBuilder<User> builder)
     {
-
+        builder.HasIndex(e => e.EmailAddress).IsUnique();
     }
 }

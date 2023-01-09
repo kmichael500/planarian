@@ -18,6 +18,6 @@ public abstract class EntityBase
     [Key][MaxLength(10)] [Required] public string Id { get; set; } = null!;
     [Required] public DateTime CreatedOn { get; set; } 
     public DateTime? ModifiedOn { get; set; } = null!;
-    [Required] public string CreatedByUserId { get; set; } = null!;
-    [Required] public string CreatedByName { get; set; } = null!;
+     public string? CreatedByUserId { get; set; } = null!;
+    public string? CreatedByName { get; set; } = null!;
 }

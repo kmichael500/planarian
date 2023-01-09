@@ -38,11 +38,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -82,11 +80,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -112,11 +108,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -144,11 +138,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -183,11 +175,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -213,11 +203,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -252,11 +240,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -291,11 +277,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -343,11 +327,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -378,11 +360,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -431,11 +411,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -470,22 +448,25 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("EmailAddress")
+                        .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("HashedPassword")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -506,6 +487,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(255)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmailAddress")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });

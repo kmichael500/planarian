@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Planarian.Library.Constants;
 
 namespace Planarian.Library.Extensions.String;
 
@@ -84,6 +85,11 @@ public static class StringExtensions
             // Return an empty string if the number is not a valid US number
             throw new ArgumentException("The phone number is not a valid US number.",nameof(phoneNumber));
         }
+    }
+    
+    public static bool IsValidPassword(this string password)
+    {
+        return Regex.IsMatch(password, RegularExpressions.PasswordValidation);
     }
 
 }

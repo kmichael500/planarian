@@ -24,8 +24,6 @@ public class CustomJwtSecurityTokenHandler : ISecurityTokenValidator
 
     public ClaimsPrincipal ValidateToken(string securityToken, TokenValidationParameters validationParameters, out SecurityToken validatedToken)
     {
-        //How to access HttpContext/IP address from here?
-
         var principal = _tokenHandler.ValidateToken(securityToken, validationParameters, out validatedToken);
 
         return principal;

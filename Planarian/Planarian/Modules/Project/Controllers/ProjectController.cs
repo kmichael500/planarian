@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Project.Services;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
@@ -10,12 +11,14 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Project.Controllers;
 
 [Route("api/projects")]
+[Authorize]
 public class ProjectController : PlanarianControllerBase<ProjectService>
 {
     private readonly TripService _tripService;
 
-    public ProjectController(RequestUser requestUser, ProjectService service, TripService tripService) : base(
-        requestUser, service)
+    public ProjectController(RequestUser requestUser, ProjectService service, TokenService tokenService,
+        TripService tripService) : base(
+        requestUser, tokenService, service)
     {
         _tripService = tripService;
     }

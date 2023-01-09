@@ -1,7 +1,8 @@
-using System.Text;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Repositories;
+using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Exceptions;
 using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Authentication.Services;
@@ -9,46 +10,41 @@ namespace Planarian.Modules.Authentication.Services;
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
     private readonly TokenService _tokenService;
+    private readonly UserRepository _userRepository;
     private readonly AuthOptions _options;
-    public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser, TokenService tokenService, AuthOptions options) : base(repository, requestUser)
+
+    public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
+        TokenService tokenService, AuthOptions options, UserRepository userRepository) : base(repository, requestUser)
     {
         _tokenService = tokenService;
         _options = options;
+        _userRepository = userRepository;
     }
-
-    public static async Task AddAuthHeader(HttpContext context, Func<Task> next)
+    
+    public async Task<string> AuthenticateEmailPassword(string email, string password)
     {
-        var token = context.Session.GetString(SessionStorageKeys.TokenKey);
-        if (!string.IsNullOrWhiteSpace(token))
+        var user = await _userRepository.GetUserByEmail(email);
+
+        if (user == null)
         {
-            context.Request.Headers.TryAdd("Authorization", "Bearer " + token);
+            throw ApiExceptionDictionary.EmailDoesNotExist;
         }
 
-        await next();
-    }
+        if (string.IsNullOrWhiteSpace(user.HashedPassword))
+        {
+            throw ApiExceptionDictionary.InvalidPassword;
+        }
 
-    // public static async Task AddAuthHeader(HttpContent context, Func<Task> next)
-    // {
-    //     var token = context.Session.GetString(SessionStorageKeys.TokenKey);
-    //     if (!string.IsNullOrWhiteSpace(token))
-    //     {
-    //         context.Request.Headers.TryAdd("Authorization", "Bearer " + token);
-    //     }
-    //     await next();
-    //
-    // }
-    public async Task<string> AuthenticateEmailPassword(string email, string password, HttpContext httpContext)
-    {
-        // TODO: Verify password and get userId;
-        var userId = "uJ9a1oaA10";
+        var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
+        if (!isValid)
+        {
+            throw ApiExceptionDictionary.InvalidPassword;
+        }
 
-        var user = await Repository.GetUserForToken(userId) ?? throw new NullReferenceException();
-
-        var token = _tokenService.BuildToken(user);
-
-        var bytes = Encoding.UTF8.GetBytes(token);
-        httpContext.Session.Set(SessionStorageKeys.TokenKey,bytes );
-
+        var userForToken = new UserToken(user.FullName, user.Id);
+        
+        var token = _tokenService.BuildToken(userForToken);
+        
         return token;
     }
 
@@ -62,6 +58,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
     public async Task Logout(HttpContext httpContext)
     {
-        httpContext.Session.Remove(SessionStorageKeys.TokenKey);
     }
+
+    
 }

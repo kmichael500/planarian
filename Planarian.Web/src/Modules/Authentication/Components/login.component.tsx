@@ -1,59 +1,83 @@
-import { Form, Input, Checkbox, Button, Row, Card } from "antd";
+import { Form, Card, Input, Checkbox, Button, message } from "antd";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  isNullOrWhiteSpace,
+  nameof,
+} from "../../../Shared/Helpers/StringHelpers";
+
 import { UserLoginVm } from "../Models/UserLoginVm";
+import { AuthenticationService } from "../Services/authentication.service";
 
 const LoginComponent: React.FC = () => {
-  const onSubmit = (values: UserLoginVm) => {};
+  const [form] = Form.useForm<UserLoginVm>();
 
-  const onFinishFailed = (errorInfo: any) => {
-    console.log("Failed:", errorInfo);
+  const location = useLocation();
+  const encodedRedirectUrl = new URLSearchParams(location.search).get(
+    "redirectUrl"
+  );
+
+  let redirectUrl = "/projects";
+  if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
+    redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
+  }
+  console.log(encodedRedirectUrl);
+
+  const navigate = useNavigate();
+
+  const onSubmit = async (values: UserLoginVm) => {
+    try {
+      await AuthenticationService.Login(values);
+      navigate(redirectUrl);
+    } catch (e: any) {
+      message.error(e.message);
+    }
   };
 
   return (
-    <Row>
-      <Card>
-        <Form
-          name="basic"
-          labelCol={{ span: 8 }}
-          wrapperCol={{ span: 16 }}
-          initialValues={{ remember: true }}
-          onFinish={onSubmit}
-          onFinishFailed={onFinishFailed}
-          autoComplete="off"
+    <Card
+      title="Login"
+      actions={[
+        <Button type="primary" onClick={(e) => form.submit()}>
+          Login
+        </Button>,
+        <Link to={"../register"}>
+          <Button>Register</Button>
+        </Link>,
+      ]}
+    >
+      <Form
+        form={form}
+        name="basic"
+        layout="vertical"
+        initialValues={{ remember: true }}
+        onFinish={onSubmit}
+        autoComplete="off"
+      >
+        <Form.Item
+          label="Email Address"
+          name={nameof<UserLoginVm>("emailAddress")}
+          rules={[
+            { required: true, message: "Please enter your email address!" },
+          ]}
         >
-          <Form.Item
-            label="Email Address"
-            name="emailAddress"
-            rules={[
-              { required: true, message: "Please input your email address!" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
+          <Input />
+        </Form.Item>
 
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: "Please input your password!" }]}
-          >
-            <Input.Password />
-          </Form.Item>
+        <Form.Item
+          label="Password"
+          name={nameof<UserLoginVm>("password")}
+          rules={[{ required: true, message: "Please enter your password!" }]}
+        >
+          <Input.Password />
+        </Form.Item>
 
-          <Form.Item
-            name="remember"
-            valuePropName="checked"
-            wrapperCol={{ offset: 8, span: 16 }}
-          >
-            <Checkbox>Remember me</Checkbox>
-          </Form.Item>
+        <Form.Item name="remember" valuePropName="checked">
+          <Checkbox>Remember me</Checkbox>
+        </Form.Item>
 
-          <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
-            <Button type="primary" htmlType="submit">
-              Submit
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-    </Row>
+        <Form.Item></Form.Item>
+      </Form>
+    </Card>
   );
 };
 

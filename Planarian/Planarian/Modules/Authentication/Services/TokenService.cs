@@ -10,14 +10,14 @@ namespace Planarian.Modules.Authentication.Services;
 public class TokenService
 {
     private readonly AuthOptions _authOptions;
-    private const double ExpiryDurationMinutes = 30;
+    private const double ExpiryDurationMinutes = 60;
 
     public TokenService(AuthOptions authOptions)
     {
         _authOptions = authOptions;
     }
 
-    public string BuildToken(AuthenticationRepository.UserToken user)
+    public string BuildToken(UserToken user)
     {
         var claims = new[] {    
             new Claim(ClaimTypes.Name, user.FullName),
@@ -27,7 +27,7 @@ public class TokenService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));        
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);           
         var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims, 
-            expires: DateTime.Now.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);        
+            expires: DateTime.UtcNow.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);        
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);  
     }
     public bool IsTokenValid(string token)
@@ -57,5 +57,12 @@ public class TokenService
             return false;
         }
         return true;    
+    }
+    
+    public string GetUserIdFromToken(string token)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var jwtToken = tokenHandler.ReadJwtToken(token);
+        return jwtToken.Claims.First(claim => claim.Type == nameof(UserToken.Id)).Value;
     }
 }

@@ -2,6 +2,7 @@ using System.Net.Mime;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
@@ -15,6 +16,7 @@ using Planarian.Modules.Project.Repositories;
 using Planarian.Modules.Project.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Settings.Services;
+using Planarian.Modules.Tags.Services;
 using Planarian.Modules.TripObjectives.Repositories;
 using Planarian.Modules.TripObjectives.Services;
 using Planarian.Modules.TripPhotos.Controllers;
@@ -40,7 +42,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { 
-        Title = "My API", 
+        Title = "Planarian API", 
         Version = "v1" 
     });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
@@ -105,6 +107,7 @@ builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<TripPhotoService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<TagService>();
 builder.Services.AddSingleton<MemoryCache>();
 
 #endregion
@@ -173,40 +176,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 builder.Services.AddMvc().AddSessionStateTempDataProvider();
 builder.Services.AddSession();
 
+
+
 #endregion
 
 var app = builder.Build();
 
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-
-        // using static System.Net.Mime.MediaTypeNames;
-        context.Response.ContentType = MediaTypeNames.Text.Plain;
-
-        await context.Response.WriteAsync("An exception was thrown.");
-
-        var exceptionHandlerPathFeature =
-            context.Features.Get<IExceptionHandlerPathFeature>();
-
-        if (exceptionHandlerPathFeature?.Error is FileNotFoundException)
-        {
-            await context.Response.WriteAsync(" The file was not found.");
-        }
-
-        if (exceptionHandlerPathFeature?.Path == "/")
-        {
-            await context.Response.WriteAsync(" Page: Home.");
-        }
-    });
-});
-
 app.UseSession();
-
-app.Use(AuthenticationService.AddAuthHeader);
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

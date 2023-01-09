@@ -12,7 +12,7 @@ public class AuthenticationRepository : RepositoryBase
     {
     }
     
-    public record UserToken(string FullName, string Id);
+ 
 
     public async Task<UserToken?> GetUserForToken(string userId)
     {

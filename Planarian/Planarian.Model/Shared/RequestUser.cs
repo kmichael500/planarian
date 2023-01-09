@@ -16,13 +16,19 @@ public class RequestUser
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string FullName => $"{FirstName} {LastName}";
+    public bool IsAuthenticated { get; private set; } = false;
 
     public async Task Initialize(string userId)
     {
         var user = await _dbContext.Users.FirstOrDefaultAsync(e => e.Id == userId);
-        if (user == null) throw new ArgumentOutOfRangeException(nameof(user));
+        if (user == null)
+        {
+            IsAuthenticated = false;
+            return;
+        };
         Id = user.Id;
         FirstName = user.FirstName;
         LastName = user.LastName;
+        IsAuthenticated = true;
     }
 }
