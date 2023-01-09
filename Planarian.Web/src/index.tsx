@@ -23,12 +23,17 @@ reportWebVitals();
 
 export const baseUrl = "https://localhost:7111";
 
+let headers = {};
+if (AuthenticationService.IsAuthenticated()) {
+  headers = {
+    Authorization: `Bearer ${AuthenticationService.GetToken()}`,
+  };
+}
+
 const HttpClient = axios.create({
   // .. where we make our configurations
   baseURL: baseUrl,
-  headers: {
-    Authorization: `Bearer ${AuthenticationService.GetToken()}`,
-  },
+  headers: headers,
 });
 
 // Override default axios error handler to throw custom error data

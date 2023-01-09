@@ -1,6 +1,9 @@
 import { Form, Card, Input, Checkbox, Button, message } from "antd";
-import { Link, useNavigate } from "react-router-dom";
-import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  isNullOrWhiteSpace,
+  nameof,
+} from "../../../Shared/Helpers/StringHelpers";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/authentication.service";
@@ -8,12 +11,23 @@ import { AuthenticationService } from "../Services/authentication.service";
 const LoginComponent: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
 
+  const location = useLocation();
+  const encodedRedirectUrl = new URLSearchParams(location.search).get(
+    "redirectUrl"
+  );
+
+  let redirectUrl = "/projects";
+  if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
+    redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
+  }
+  console.log(encodedRedirectUrl);
+
   const navigate = useNavigate();
 
   const onSubmit = async (values: UserLoginVm) => {
     try {
       await AuthenticationService.Login(values);
-      navigate("../projects");
+      navigate(redirectUrl);
     } catch (e: any) {
       message.error(e.message);
     }
