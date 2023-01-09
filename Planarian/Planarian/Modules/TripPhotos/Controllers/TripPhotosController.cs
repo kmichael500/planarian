@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared;
@@ -7,6 +8,7 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.TripPhotos.Controllers;
 
 [Route("api/tripPhotos")]
+[Authorize]
 public class TripPhotosController : PlanarianControllerBase<TripPhotoService>
 {
   

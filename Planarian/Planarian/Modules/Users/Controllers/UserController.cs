@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Planarian.Shared.Base;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
@@ -8,6 +9,7 @@ using Planarian.Modules.Users.Services;
 namespace Planarian.Modules.Users.Controllers;
 
 [Route("api/users")]
+[Authorize]
 public class UserController : PlanarianControllerBase<UserService>
 {
     public UserController(RequestUser requestUser, UserService service, TokenService tokenService) : base(requestUser, tokenService, service)

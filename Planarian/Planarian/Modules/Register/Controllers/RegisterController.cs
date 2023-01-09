@@ -17,7 +17,7 @@ public class RegisterController : PlanarianControllerBase
     }
 
     [HttpPost()]
-    public async Task<ActionResult<string>> Login([FromBody] RegisterUserVm user)
+    public async Task<ActionResult<string>> Register([FromBody] RegisterUserVm user)
     {
         await _userService.RegisterUser(user);
         return Ok();

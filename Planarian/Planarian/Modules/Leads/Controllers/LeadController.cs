@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
@@ -9,6 +10,7 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Leads.Controllers;
 
 [Route("api/leads")]
+[Authorize]
 public class LeadController : PlanarianControllerBase<LeadService>
 {
 

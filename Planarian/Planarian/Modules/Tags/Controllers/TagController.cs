@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
@@ -10,13 +11,13 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Tags.Controllers;
 
 [Route("api/tags")]
+[Authorize]
 public class TagController : PlanarianControllerBase<TagService>
 {
     public TagController(RequestUser requestUser, TagService service, TokenService tokenService) : base(requestUser, tokenService, service)
     {
     }
 
-    #region Objective Types
 
     [HttpPost]
     public async Task<ActionResult> CreateTag([FromBody] CreateOrEditTagVm tag)
@@ -26,5 +27,4 @@ public class TagController : PlanarianControllerBase<TagService>
         return new OkResult();
     }
 
-    #endregion
 }
