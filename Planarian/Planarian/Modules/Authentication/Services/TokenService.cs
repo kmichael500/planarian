@@ -10,7 +10,7 @@ namespace Planarian.Modules.Authentication.Services;
 public class TokenService
 {
     private readonly AuthOptions _authOptions;
-    private const double ExpiryDurationMinutes = 1;
+    private const double ExpiryDurationMinutes = 60;
 
     public TokenService(AuthOptions authOptions)
     {
@@ -27,7 +27,7 @@ public class TokenService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));        
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);           
         var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims, 
-            expires: DateTime.Now.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);        
+            expires: DateTime.UtcNow.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);        
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);  
     }
     public bool IsTokenValid(string token)

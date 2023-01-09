@@ -42,7 +42,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { 
-        Title = "My API", 
+        Title = "Planarian API", 
         Version = "v1" 
     });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
@@ -182,11 +182,7 @@ builder.Services.AddSession();
 
 var app = builder.Build();
 
-
 app.UseSession();
-
-app.Use(AuthenticationService.AddAuthHeader);
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

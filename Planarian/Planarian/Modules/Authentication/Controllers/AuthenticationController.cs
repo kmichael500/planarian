@@ -19,7 +19,7 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
     [HttpPost("login")]
     public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values)
     {
-        var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password, HttpContext);
+        var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password);
         return new JsonResult(token);
     }
 

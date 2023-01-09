@@ -12,8 +12,3 @@ public static class PropertyLength
     public const int StationName = 100;
     public const int PasswordHash = 100;
 }
-
-public static class SessionStorageKeys
-{
-    public const string TokenKey = "Token";
-}

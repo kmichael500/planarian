@@ -39,8 +39,9 @@ const AuthenticationService = {
       const token = this.GetToken();
       if (!token) return true;
       const decodedToken = jwt_decode(token) as { exp: number };
-      const currentTime = Date.now() / 1000;
-      return decodedToken.exp < currentTime;
+      const expiresAt = new Date(decodedToken.exp * 1000);
+      const now = new Date();
+      return expiresAt < now;
     } catch (err) {
       return true;
     }
