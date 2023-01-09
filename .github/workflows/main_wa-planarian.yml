@@ -26,7 +26,7 @@ jobs:
         run: ls && cd Planarian && ls && dotnet build --configuration Release && ls
 
       - name: dotnet publish
-        run: ls && cd Planarian && ls && && dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp && ls
+        run: ls && cd Planarian && ls && dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp && ls
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v2
