@@ -22,8 +22,6 @@ root.render(
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-console.log(process.env);
-
 let baseUrl: string | undefined;
 
 if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
