@@ -1,4 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  Navigate,
+} from "react-router-dom";
 import { LoginComponent } from "./Modules/Authentication/Components/login.component";
 import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.routes.component";
 import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
@@ -43,6 +49,7 @@ export const AppRouting: React.FC = () => {
             element={<LeadAddComponent />}
           ></Route>
           <Route path="/settings" element={<SettingsComponent />}></Route>
+          <Route path="*" element={<Navigate to="/projects" replace />} />{" "}
         </Route>
       </Routes>
     </Router>
