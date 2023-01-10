@@ -1,8 +1,5 @@
-using System.Net.Mime;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
@@ -28,13 +25,16 @@ using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-// Add services to the container.
-var basePath = Directory.GetCurrentDirectory();
-var configBuilder = new ConfigurationBuilder()
-    .SetBasePath(basePath)
-    .AddJsonFile("appsettings.Development.json")
-    .AddEnvironmentVariables();
 
+var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
+
+builder.Configuration.AddAzureAppConfiguration(appConfigConnectionString);
+
+var isDevelopment = builder.Environment.IsDevelopment();
+if (isDevelopment)
+{
+    builder.Configuration.AddJsonFile("appsettings.Development.json", optional: false);
+}
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
