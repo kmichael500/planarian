@@ -26,8 +26,10 @@ let baseUrl: string | undefined;
 
 if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = process.env.REACT_APP_SERVER_URL;
-} else {
+} else if (process.env.NODE_ENV === "development") {
   baseUrl = "https://localhost:7111";
+} else {
+  baseUrl = "https://planarian.azurewebsites.net";
 }
 
 let headers = {};
