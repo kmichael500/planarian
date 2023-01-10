@@ -6,6 +6,7 @@ import reportWebVitals from "./reportWebVitals";
 import axios from "axios";
 import { message } from "antd";
 import { AuthenticationService } from "./Modules/Authentication/Services/authentication.service";
+import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -21,7 +22,15 @@ root.render(
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-export const baseUrl = "https://localhost:7111";
+console.log(process.env);
+
+let baseUrl: string | undefined;
+
+if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
+  baseUrl = process.env.REACT_APP_SERVER_URL;
+} else {
+  baseUrl = "https://localhost:7111";
+}
 
 let headers = {};
 if (AuthenticationService.IsAuthenticated()) {
@@ -51,4 +60,4 @@ HttpClient.interceptors.response.use(
   }
 );
 
-export { HttpClient };
+export { HttpClient, baseUrl };
