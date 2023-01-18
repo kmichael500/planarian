@@ -68,7 +68,7 @@ const TripCreateButton: React.FC<ITripCreateButtonPRops> = (
             name={"tripDate"}
             rules={[{ required: true, message: "'Trip Date' is required" }]}
           >
-            <DatePicker showTime format="YYYY-MM-DD hh:mm:ss A Z" />
+            <DatePicker format="YYYY-MM-DD hh:mm:ss A Z" />
           </Form.Item>
         </Form>
       </Modal>
