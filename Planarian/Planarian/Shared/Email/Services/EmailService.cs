@@ -13,16 +13,19 @@ namespace Planarian.Shared.Email;
 public class EmailService : ServiceBase<MessageTypeRepository>
 {
     private readonly IEmailMessageFactory _emailMessageFactory;
-    
+
+    public EmailService(MessageTypeRepository repository, RequestUser requestUser,
+        IEmailMessageFactory emailMessageFactory) : base(repository, requestUser)
+    {
+        _emailMessageFactory = emailMessageFactory;
+    }
+
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
         GenericEmailSubstitutions substitutions)
     {
         var messageType = await Repository.GetMessageTypeVm(MessageKey.GenericEmail, MessageTypeKey.Email);
 
-        if (messageType == null)
-        {
-            throw ApiExceptionDictionary.MessageTypeNotFound;
-        }
+        if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
         var html = Handlebars.Compile(messageType.Html)(substitutions.Substitutions);
 
@@ -33,10 +36,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             .AddToAddress(toEmailAddress, toName)
             .Send();
 
-        if (results.Any(e => !e.IsSuccessful))
-        {
-            throw ApiExceptionDictionary.EmailFailedToSend;
-        }
+        if (results.Any(e => !e.IsSuccessful)) throw ApiExceptionDictionary.EmailFailedToSend;
 
         var messageLog = new MessageLog(MessageKey.GenericEmail, MessageTypeKey.Email, subject, toEmailAddress, toName,
             messageType.FromName, messageType.FromEmail, JsonConvert.SerializeObject(substitutions.Substitutions));
@@ -44,12 +44,6 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         Repository.Add(messageLog);
 
         await Repository.SaveChangesAsync();
-    }
-
-    public EmailService(MessageTypeRepository repository, RequestUser requestUser,
-        IEmailMessageFactory emailMessageFactory) : base(repository, requestUser)
-    {
-        _emailMessageFactory = emailMessageFactory;
     }
 }
 

@@ -4,25 +4,18 @@ namespace Planarian.Shared.Email.Substitutions;
 
 public class GenericEmailSubstitutions : ISubstitution
 {
-    public Dictionary<string, object> Substitutions { get; set; }
-
     public GenericEmailSubstitutions(string header, string message, string? buttonText = null, string? buttonUrl = null)
     {
-
         Substitutions = new Dictionary<string, object>
         {
             ["message"] = message,
-            ["header"] = header,
+            ["header"] = header
         };
-        
-        if (!string.IsNullOrWhiteSpace(buttonText))
-        {
-            Substitutions.Add("buttonText", buttonText);
-        }
 
-        if (!string.IsNullOrWhiteSpace(buttonUrl))
-        {
-            Substitutions.Add("buttonUrl", buttonUrl);
-        }
+        if (!string.IsNullOrWhiteSpace(buttonText)) Substitutions.Add("buttonText", buttonText);
+
+        if (!string.IsNullOrWhiteSpace(buttonUrl)) Substitutions.Add("buttonUrl", buttonUrl);
     }
+
+    public Dictionary<string, object> Substitutions { get; set; }
 }

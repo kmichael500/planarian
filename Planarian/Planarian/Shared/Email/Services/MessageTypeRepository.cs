@@ -9,7 +9,8 @@ public class MessageTypeRepository : RepositoryBase
 {
     private readonly MjmlService _mjmlService;
 
-    public MessageTypeRepository(PlanarianDbContext dbContext, RequestUser requestUser, MjmlService mjmlService) : base(dbContext, requestUser)
+    public MessageTypeRepository(PlanarianDbContext dbContext, RequestUser requestUser, MjmlService mjmlService) : base(
+        dbContext, requestUser)
     {
         _mjmlService = mjmlService;
     }
@@ -32,7 +33,7 @@ public class MessageTypeRepository : RepositoryBase
         foreach (var messageType in messageTypes)
         {
             if (messageType.Mjml == null) continue;
-            
+
             var html = await _mjmlService.MjmlToHtml(messageType.Mjml);
             messageType.Html = html;
         }

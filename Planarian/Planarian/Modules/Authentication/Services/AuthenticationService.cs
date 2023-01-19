@@ -9,9 +9,9 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
+    private readonly AuthOptions _options;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
-    private readonly AuthOptions _options;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
         TokenService tokenService, AuthOptions options, UserRepository userRepository) : base(repository, requestUser)
@@ -20,31 +20,22 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         _options = options;
         _userRepository = userRepository;
     }
-    
+
     public async Task<string> AuthenticateEmailPassword(string email, string password)
     {
         var user = await _userRepository.GetUserByEmail(email);
 
-        if (user == null)
-        {
-            throw ApiExceptionDictionary.EmailDoesNotExist;
-        }
+        if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
 
-        if (string.IsNullOrWhiteSpace(user.HashedPassword))
-        {
-            throw ApiExceptionDictionary.InvalidPassword;
-        }
+        if (string.IsNullOrWhiteSpace(user.HashedPassword)) throw ApiExceptionDictionary.InvalidPassword;
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
-        if (!isValid)
-        {
-            throw ApiExceptionDictionary.InvalidPassword;
-        }
+        if (!isValid) throw ApiExceptionDictionary.InvalidPassword;
 
         var userForToken = new UserToken(user.FullName, user.Id);
-        
+
         var token = _tokenService.BuildToken(userForToken);
-        
+
         return token;
     }
 
@@ -59,6 +50,4 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
     public async Task Logout(HttpContext httpContext)
     {
     }
-
-    
 }

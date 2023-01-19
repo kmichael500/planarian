@@ -8,7 +8,11 @@ public class InviteMember
         LastName = lastName;
         Email = email;
     }
-    public InviteMember(){}
+
+    public InviteMember()
+    {
+    }
+
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string Email { get; set; }

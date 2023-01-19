@@ -17,10 +17,7 @@ public class TagService : ServiceBase<TagRepository>
     {
         var key = tag.Key;
 
-        if (!TagKey.IsValidTagKey(key))
-        {
-            throw ApiExceptionDictionary.BadRequest("Invalid tag key");
-        }
+        if (!TagKey.IsValidTagKey(key)) throw ApiExceptionDictionary.BadRequest("Invalid tag key");
 
         var entity = new Tag(tag.Name, key);
 

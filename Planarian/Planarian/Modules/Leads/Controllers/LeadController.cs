@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Leads.Models;
-using Planarian.Modules.TripObjectives.Controllers;
-using Planarian.Modules.TripObjectives.Services;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Leads.Controllers;
@@ -13,8 +11,8 @@ namespace Planarian.Modules.Leads.Controllers;
 [Authorize]
 public class LeadController : PlanarianControllerBase<LeadService>
 {
-
-    public LeadController(RequestUser requestUser, TokenService tokenService, LeadService service) : base(requestUser, tokenService, service)
+    public LeadController(RequestUser requestUser, TokenService tokenService, LeadService service) : base(requestUser,
+        tokenService, service)
     {
     }
 
@@ -24,12 +22,11 @@ public class LeadController : PlanarianControllerBase<LeadService>
         var leads = await Service.GetLeads(leadId);
         return new JsonResult(leads);
     }
-    
+
     [HttpDelete("{leadId:length(10)}")]
     public async Task<ActionResult> DeleteLead(string leadId)
     {
         await Service.DeleteLead(leadId);
         return new OkResult();
     }
-
 }

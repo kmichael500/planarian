@@ -12,15 +12,15 @@ public class Project : EntityBase
     [Required]
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; } = null!;
-    
-    public virtual  ICollection<ProjectMember> ProjectMembers { get; set; } = null!;
-    public virtual  ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
+
+    public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = null!;
+    public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<Tag> CustomTags { get; set; } = new HashSet<Tag>();
 }
 
-public class ProjectConfiguration : IEntityTypeConfiguration<Project>{
+public class ProjectConfiguration : IEntityTypeConfiguration<Project>
+{
     public void Configure(EntityTypeBuilder<Project> builder)
     {
-        
     }
 }

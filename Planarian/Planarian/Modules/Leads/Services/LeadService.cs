@@ -1,7 +1,5 @@
-using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Modules.Leads.Models;
-using Planarian.Modules.TripObjectives.Controllers;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Leads.Controllers;
@@ -22,10 +20,7 @@ public class LeadService : ServiceBase<LeadRepository>
     {
         var lead = await Repository.Get(leadId);
 
-        if (lead == null)
-        {
-            throw new ArgumentOutOfRangeException(nameof(lead), "Lead not found");
-        }
+        if (lead == null) throw new ArgumentOutOfRangeException(nameof(lead), "Lead not found");
         Repository.Delete(lead);
 
         await Repository.SaveChangesAsync();

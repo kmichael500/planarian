@@ -26,10 +26,7 @@ public class UserRepository : RepositoryBase
     public async Task<bool> EmailExists(string email, bool ignoreCurrentUser = false)
     {
         var query = DbContext.Users.Where(e => e.EmailAddress == email);
-        if (ignoreCurrentUser)
-        {
-            query = query.Where(e => e.Id != RequestUser.Id);
-        }
+        if (ignoreCurrentUser) query = query.Where(e => e.Id != RequestUser.Id);
 
         return await query.AnyAsync();
     }

@@ -12,6 +12,29 @@ public class TripService : ServiceBase<TripRepository>
     {
     }
 
+    #region Trip Objectives
+
+    public async Task<IEnumerable<TripObjectiveVm>> GetTripObjectives(string tripId)
+    {
+        var tripObjectives = await Repository.GetTripObjectives(tripId);
+
+        return tripObjectives;
+    }
+
+    #endregion
+
+
+    #region Trip Members
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
+    {
+        var tripMembers = await Repository.GetTripMembers(tripId);
+
+        return tripMembers;
+    }
+
+    #endregion
+
     #region Trip
 
     public async Task<TripVm> CreateOrUpdateTrip(CreateOrEditTripVm values)
@@ -51,14 +74,11 @@ public class TripService : ServiceBase<TripRepository>
             await Repository.SaveChangesAsync();
         }
     }
-    
+
     public async Task UpdateTripDate(DateTime date, string tripId)
     {
         var trip = await Repository.GetTrip(tripId);
-        if (trip == null)
-        {
-            throw new NullReferenceException("Trip not found");
-        }
+        if (trip == null) throw new NullReferenceException("Trip not found");
 
         trip.TripDate = date;
 
@@ -68,10 +88,7 @@ public class TripService : ServiceBase<TripRepository>
     public async Task UpdateTripName(string name, string tripId)
     {
         var trip = await Repository.GetTrip(tripId);
-        if (trip == null)
-        {
-            throw new NullReferenceException("Trip not found");
-        }
+        if (trip == null) throw new NullReferenceException("Trip not found");
 
         trip.Name = name;
 
@@ -79,28 +96,4 @@ public class TripService : ServiceBase<TripRepository>
     }
 
     #endregion
-
-    #region Trip Objectives
-
-    public async Task<IEnumerable<TripObjectiveVm>> GetTripObjectives(string tripId)
-    {
-        var tripObjectives = await Repository.GetTripObjectives(tripId);
-
-        return tripObjectives;
-    }
-
-    #endregion
-
-
-    #region Trip Members
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
-    {
-        var tripMembers = await Repository.GetTripMembers(tripId);
-
-        return tripMembers;
-    }
-
-    #endregion
-    
 }

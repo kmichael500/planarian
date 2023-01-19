@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Settings.Services;
@@ -10,7 +9,8 @@ namespace Planarian.Modules.Settings.Controllers;
 [Route("api/settings")]
 public class SettingsController : PlanarianControllerBase<SettingsService>
 {
-    public SettingsController(RequestUser requestUser, SettingsService service, TokenService tokenService) : base(requestUser, tokenService, service)
+    public SettingsController(RequestUser requestUser, SettingsService service, TokenService tokenService) : base(
+        requestUser, tokenService, service)
     {
     }
 
@@ -23,6 +23,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(objectiveTypes);
     }
+
     [HttpGet("objectiveTypes/{objectiveTypeId:length(10)}")]
     public async Task<ActionResult<string>> GetObjectiveTypeName(string objectiveTypeId)
     {
@@ -34,7 +35,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
     #endregion
 
     #region Users
-    
+
     [HttpGet("users/{userId:length(10)}")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetUsersName(string userId)
     {
@@ -42,8 +43,8 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(objectiveType);
     }
-    
-    
+
+
     [HttpGet("users")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetUsers()
     {

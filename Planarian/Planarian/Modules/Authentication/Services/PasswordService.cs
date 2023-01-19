@@ -28,10 +28,8 @@ public static class PasswordService
         var parts = hash.Split('.', 3);
 
         if (parts.Length != 3)
-        {
             throw new FormatException("Unexpected hash format. " +
                                       "Should be formatted as `{iterations}.{salt}.{hash}`");
-        }
 
         var iterations = Convert.ToInt32(parts[0]);
         var salt = Convert.FromBase64String(parts[1]);

@@ -9,10 +9,9 @@ public class MessageTypeVm
         FromEmail = fromEmail;
         FromName = fromName;
     }
-    
+
     public string Subject { get; }
     public string Html { get; }
     public string FromEmail { get; }
     public string FromName { get; }
-    
 }

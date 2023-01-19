@@ -8,7 +8,7 @@ public class ApiException : Exception
         StatusCode = statusCode;
         ErrorCode = errorCode;
     }
-    
+
     public int StatusCode { get; }
     public int ErrorCode { get; }
 }

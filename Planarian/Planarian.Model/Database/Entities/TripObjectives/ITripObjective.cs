@@ -12,7 +12,7 @@ public interface ITripObjective
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripId { get; set; }
-    
+
     [Required]
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; }

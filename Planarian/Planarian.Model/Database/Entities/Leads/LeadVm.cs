@@ -15,9 +15,11 @@ public class LeadVm
     public LeadVm(Lead lead) : this(lead.Id, lead.Description, lead.Classification, lead.ClosestStation)
     {
     }
-    
-    public LeadVm(){}
-    
+
+    public LeadVm()
+    {
+    }
+
     public string Id { get; set; }
     public string Description { get; set; }
     public string Classification { get; set; }

@@ -21,7 +21,6 @@ public class MjmlService
 
     public async Task<string> MjmlToHtml(string mjml)
     {
-
         var request = new HttpRequestMessage(HttpMethod.Post, "render")
         {
             Content = new StringContent(JsonConvert.SerializeObject(new { Mjml = mjml }), Encoding.UTF8,
@@ -31,16 +30,11 @@ public class MjmlService
         var response = await _httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)
-        {
             throw ApiExceptionDictionary.BadRequest(response.ReasonPhrase ?? "Mjml error");
-        }
 
         var result = await response.Content.ReadFromJsonAsync<MjmlResponse>();
 
-        if (result == null)
-        {
-            throw ApiExceptionDictionary.BadRequest("Mjml error");
-        }
+        if (result == null) throw ApiExceptionDictionary.BadRequest("Mjml error");
 
         return result.Html;
     }

@@ -3,7 +3,6 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared;
-using Planarian.Model.Shared.Base;
 using Planarian.Modules.Leads.Models;
 using Planarian.Modules.TripObjectives.Controllers;
 using Planarian.Shared.Base;
@@ -12,36 +11,9 @@ namespace Planarian.Modules.TripObjectives.Repositories;
 
 public class TripObjectiveRepository : RepositoryBase
 {
-
     public TripObjectiveRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
-
-    #region Trip Objective
-
-    public async Task<TripObjectiveVm?> GetTripObjectiveVm(string tripObjectiveId)
-    {
-        var query = DbContext.TripObjectives.Where(e => e.Id == tripObjectiveId);
-
-        return await ToTripObjectiveVm(query).FirstOrDefaultAsync();
-    }
-
-    private static IQueryable<TripObjectiveVm> ToTripObjectiveVm(IQueryable<TripObjective> query)
-    {
-        return
-            query
-                .Select(e =>
-                    new TripObjectiveVm(e, e.TripObjectiveTags.Select(ee => ee.TagId),
-                        e.TripObjectiveMembers.Select(ee => ee.UserId))
-                );
-    }
-
-    public async Task<TripObjective?> GetTripObjective(string tripObjectivesId)
-    {
-        return await DbContext.TripObjectives.Where(e => e.Id == tripObjectivesId).FirstOrDefaultAsync();
-    }
-
-    #endregion
 
     #region Trip Objective Member
 
@@ -110,6 +82,32 @@ public class TripObjectiveRepository : RepositoryBase
                 e.TripObjective.Trip.Project.ProjectMembers.Any(e => e.UserId == RequestUser.Id))
             .FirstOrDefaultAsync();
     }
+
+    #region Trip Objective
+
+    public async Task<TripObjectiveVm?> GetTripObjectiveVm(string tripObjectiveId)
+    {
+        var query = DbContext.TripObjectives.Where(e => e.Id == tripObjectiveId);
+
+        return await ToTripObjectiveVm(query).FirstOrDefaultAsync();
+    }
+
+    private static IQueryable<TripObjectiveVm> ToTripObjectiveVm(IQueryable<TripObjective> query)
+    {
+        return
+            query
+                .Select(e =>
+                    new TripObjectiveVm(e, e.TripObjectiveTags.Select(ee => ee.TagId),
+                        e.TripObjectiveMembers.Select(ee => ee.UserId))
+                );
+    }
+
+    public async Task<TripObjective?> GetTripObjective(string tripObjectivesId)
+    {
+        return await DbContext.TripObjectives.Where(e => e.Id == tripObjectivesId).FirstOrDefaultAsync();
+    }
+
+    #endregion
 }
 
 public class TripObjectiveIds
@@ -119,7 +117,11 @@ public class TripObjectiveIds
         ProjectId = projectId;
         TripId = tripId;
     }
-    public TripObjectiveIds(){}
+
+    public TripObjectiveIds()
+    {
+    }
+
     public string ProjectId { get; set; } = null!;
     public string TripId { get; set; } = null!;
 }

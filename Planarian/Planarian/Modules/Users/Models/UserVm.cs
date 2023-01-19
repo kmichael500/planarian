@@ -6,22 +6,21 @@ namespace Planarian.Modules.Users.Models;
 
 public class UserVm
 {
+    private string? _phoneNumber;
+
     public UserVm(string firstName, string lastName, string emailAddress, string? phoneNumber = null) : this()
     {
         if (!emailAddress.IsValidEmail())
-        {
             throw new ArgumentOutOfRangeException(nameof(emailAddress), "Email address is not valid");
-        }
-        
+
         if (!string.IsNullOrWhiteSpace(phoneNumber))
         {
             phoneNumber = phoneNumber.ExtractPhoneNumber();
             if (!phoneNumber.IsValidPhoneNumber())
-            {
                 throw new ArgumentOutOfRangeException(nameof(phoneNumber), "Phone number is not valid");
-            }
             PhoneNumber = phoneNumber.Trim();
         }
+
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
         EmailAddress = emailAddress.Trim();
@@ -31,13 +30,18 @@ public class UserVm
         firstName.PhoneNumber)
     {
     }
-    
-    public UserVm(){}
+
+    public UserVm()
+    {
+    }
 
     [Required] public string EmailAddress { get; set; }
     [Required] public string FirstName { get; set; }
     [Required] public string LastName { get; set; }
-    
-    private string? _phoneNumber;
-    public string? PhoneNumber { get => _phoneNumber?.ExtractPhoneNumber(); set=> _phoneNumber = value; }
+
+    public string? PhoneNumber
+    {
+        get => _phoneNumber?.ExtractPhoneNumber();
+        set => _phoneNumber = value;
+    }
 }

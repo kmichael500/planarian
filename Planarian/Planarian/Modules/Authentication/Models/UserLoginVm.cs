@@ -10,13 +10,16 @@ public class UserLoginVm
         EmailAddress = emailAddress;
         Password = password;
     }
-    public UserLoginVm(){}
+
+    public UserLoginVm()
+    {
+    }
 
     [Required]
     [MaxLength(PropertyLength.EmailAddress)]
     public string EmailAddress { get; set; } = null!;
-    [Required]
-    public string Password { get; set; } = null!;
-    public bool? Remember { get; set; }
 
+    [Required] public string Password { get; set; } = null!;
+
+    public bool? Remember { get; set; }
 }

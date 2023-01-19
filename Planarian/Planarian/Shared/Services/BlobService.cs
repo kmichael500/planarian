@@ -1,18 +1,16 @@
-using System.Drawing;
-using System.Text;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Microsoft.Extensions.Caching.Memory;
 using Planarian.Shared.Options;
-using System.Net.Mime;
 
 namespace Planarian.Shared.Services;
 
 public class BlobService
 {
-    private readonly BlobContainerClient _containerClient;
     private readonly MemoryCache _cache;
+    private readonly BlobContainerClient _containerClient;
+
     public BlobService(BlobOptions blobOptions, MemoryCache cache)
     {
         _cache = cache;
@@ -36,17 +34,19 @@ public class BlobService
         string tripObjectiveId, string photoId, Stream stream, string fileExtension)
     {
         var blobKey = $"project/{projectId}/trips/{tripId}/objectives/{tripObjectiveId}/photos/{photoId}";
-        
-        var options = new BlobUploadOptions(){HttpHeaders = new BlobHttpHeaders
+
+        var options = new BlobUploadOptions
         {
-            ContentType = "image/jpeg",
-            CacheControl = "public, max-age=31536000",
-            ContentEncoding = "gzip",
-            ContentLanguage = "en-US",
-            
-        }};
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = "image/jpeg",
+                CacheControl = "public, max-age=31536000",
+                ContentEncoding = "gzip",
+                ContentLanguage = "en-US"
+            }
+        };
         var result = await _containerClient.UploadBlobAsync(blobKey, stream);
-        
+
         return blobKey;
     }
 
@@ -63,9 +63,9 @@ public class BlobService
 
         var blobSasBuilder = new BlobSasBuilder(BlobSasPermissions.Read, expiresOn)
         {
-            ContentType = $"image/jpg",
+            ContentType = "image/jpg",
             CacheControl = "public, max-age=31536000",
-            ContentLanguage = "en-US",
+            ContentLanguage = "en-US"
         };
         var sasUrl = blobClient.GenerateSasUri(blobSasBuilder);
         _cache.Set(blobKey, sasUrl, new MemoryCacheEntryOptions
@@ -83,5 +83,4 @@ public class BlobService
         var blobClient = _containerClient.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
     }
-    
 }

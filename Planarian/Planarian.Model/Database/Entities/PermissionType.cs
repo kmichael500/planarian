@@ -6,7 +6,6 @@ namespace Planarian.Model.Database.Entities;
 
 public class PermissionType : EntityBaseNameId
 {
-    
 }
 
 public class PermissionTypeConfiguration : IEntityTypeConfiguration<PermissionType>

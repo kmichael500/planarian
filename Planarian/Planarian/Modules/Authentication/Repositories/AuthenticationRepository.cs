@@ -11,8 +11,7 @@ public class AuthenticationRepository : RepositoryBase
         requestUser)
     {
     }
-    
- 
+
 
     public async Task<UserToken?> GetUserForToken(string userId)
     {
