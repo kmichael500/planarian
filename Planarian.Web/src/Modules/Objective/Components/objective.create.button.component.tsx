@@ -1,4 +1,13 @@
-import { Button, Modal, Input, Form, Select, SelectProps } from "antd";
+import {
+  Button,
+  Modal,
+  Input,
+  Form,
+  Select,
+  SelectProps,
+  Row,
+  Col,
+} from "antd";
 import TextArea from "antd/lib/input/TextArea";
 import { DefaultOptionType } from "antd/lib/select";
 import { useEffect, useState } from "react";
@@ -91,13 +100,16 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
         open={open}
         onOk={form.submit}
         confirmLoading={confirmLoading}
+        okText="Create"
+        bodyStyle={{ width: "100%" }}
         onCancel={handleCancel}
+        style={{ width: "100%" }}
       >
         <Form
           form={form}
           labelCol={{ span: 4 }}
           wrapperCol={{ span: 14 }}
-          layout="horizontal"
+          layout="vertical"
           onFinish={onSubmit}
         >
           <Form.Item
