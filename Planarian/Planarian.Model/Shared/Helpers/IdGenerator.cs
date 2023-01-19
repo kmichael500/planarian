@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Planarian.Model.Shared.Helpers;
 
 public class IdGenerator
@@ -13,6 +15,19 @@ public class IdGenerator
         base64Guid = base64Guid[..^2];
 
         return base64Guid[..10];
+    }
+
+    public static string Generate(int length)
+    {
+        var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".ToCharArray();
+        
+        var bytes = new byte[length];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(bytes);
+        }
+
+        return new string(bytes.Select(x => base64Chars[x % base64Chars.Length]).ToArray());
     }
 
     private static char RandomChar()

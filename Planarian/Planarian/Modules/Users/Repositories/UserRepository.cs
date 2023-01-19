@@ -34,10 +34,15 @@ public class UserRepository : RepositoryBase
         return await query.AnyAsync();
     }
 
-    public async Task<UserVm> GetUserVm(string id)
+    public async Task<UserVm?> GetUserVm(string id)
     {
         return await DbContext.Users.Where(e => e.Id == id && RequestUser.Id == id)
             .Select(e => new UserVm(e))
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<User?> GetUserByPasswordResetCode(string code)
+    {
+        return await DbContext.Users.Where(e => e.PasswordResetCode == code).FirstOrDefaultAsync();
     }
 }
