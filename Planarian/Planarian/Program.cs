@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Planarian.Model.Database;
@@ -21,8 +22,13 @@ using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Modules.Users.Services;
+using Planarian.Shared.Email;
+using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
+using Southport.Messaging.Email.Core;
+using Southport.Messaging.Email.SendGrid.Interfaces;
+using Southport.Messaging.Email.SendGrid.Message;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,6 +98,15 @@ if (blobOptions == null)
 }
 builder.Services.AddSingleton(blobOptions);
 
+var emailOptions = builder.Configuration.GetSection(EmailOptions.Key).Get<EmailOptions>();
+if (emailOptions == null)
+{
+    throw new Exception("Email options not found");
+}
+
+builder.Services.AddSingleton(Options.Create<SendGridOptions>(emailOptions));
+builder.Services.AddSingleton(emailOptions);
+
 
 #endregion
 
@@ -108,7 +123,11 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<TripPhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TagService>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
+
+builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
 
 #endregion
 
@@ -123,6 +142,7 @@ builder.Services.AddScoped<LeadRepository>();
 builder.Services.AddScoped<TripPhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<MessageTypeRepository>();
 
 #endregion
 

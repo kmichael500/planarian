@@ -8,6 +8,8 @@ using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Email;
+using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
 using Planarian.Shared.Services;
 
@@ -15,8 +17,12 @@ namespace Planarian.Modules.Users.Services;
 
 public class UserService : ServiceBase<UserRepository>
 {
-    public UserService(UserRepository repository, RequestUser requestUser) : base(repository, requestUser)
+    private readonly EmailService _emailService;
+
+    public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService) : base(repository,
+        requestUser)
     {
+        _emailService = emailService;
     }
 
     public async Task UpdateCurrentUser(UserVm user)
@@ -95,5 +101,20 @@ public class UserService : ServiceBase<UserRepository>
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();
+    }
+
+    public async Task ResetPassword(string email)
+    {
+        var user = await Repository.GetUserByEmail(email);
+
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.EmailDoesNotExist;
+        }
+
+        await _emailService.SendGenericEmail("Password Reset", email, user.FullName,
+            new GenericEmailSubstitutions("Password Reset", "Test Message", buttonText: "Click me!",
+                "https://www.google.com"));
+
     }
 }
