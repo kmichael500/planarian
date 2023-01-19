@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 
 namespace Planarian.Modules.Authentication.Services;
 
@@ -47,5 +49,10 @@ public static class PasswordService
         var verified = keyToCheck.SequenceEqual(key);
 
         return (verified, needsUpgrade);
+    }
+
+    public static string GenerateResetCode()
+    {
+        return IdGenerator.Generate(PropertyLength.PasswordResetCode);
     }
 }

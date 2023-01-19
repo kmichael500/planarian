@@ -44,10 +44,18 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #region Password Reset
     [AllowAnonymous]
-    [HttpPost("resetPassword/{email}")]
-    public async Task<ActionResult> ResetPassword(string email)
+    [HttpPost("reset-password/email/{email}")]
+    public async Task<ActionResult> SendPasswordReset(string email)
     {
-        await Service.ResetPassword(email);
+        await Service.SendResetPasswordEmail(email);
+
+        return new OkResult();
+    }
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<ActionResult> ResetPassword(string code, [FromBody] string password)
+    {
+        await Service.ResetPassword(code, password);
 
         return new OkResult();
     }

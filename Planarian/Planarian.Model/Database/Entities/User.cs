@@ -40,6 +40,8 @@ public class User : EntityBase
     [MaxLength(PropertyLength.EmailAddress)] public string EmailAddress { get; set; } = null!;
     [MaxLength(PropertyLength.PhoneNumber)] public string? PhoneNumber { get; set; }
     [MaxLength(PropertyLength.PasswordHash)] public string? HashedPassword { get; set; }
+    [MaxLength(PropertyLength.PasswordResetCode)] public string? PasswordResetCode { get; set; }
+    public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)]public string? ProfilePhotoBlobKey { get; set; }
     
     public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new HashSet<ProjectMember>();

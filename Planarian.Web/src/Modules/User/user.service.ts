@@ -19,6 +19,21 @@ const UserService = {
       }
     );
   },
+  async SendPasswordResetEmail(email: string): Promise<void> {
+    const response = await HttpClient.post(
+      `${baseUrl}/reset-password/email/${encodeURIComponent(email)}`,
+      {}
+    );
+  },
+  async RersetPassword(code: string, password: string): Promise<void> {
+    const response = await HttpClient.post(
+      `${baseUrl}/reset-password?code=${code}`,
+      password,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  },
 };
 
 export { UserService };

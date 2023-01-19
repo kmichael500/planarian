@@ -40,8 +40,12 @@ const LoginComponent: React.FC = () => {
         <Button type="primary" onClick={(e) => form.submit()}>
           Login
         </Button>,
+
         <Link to={"../register"}>
           <Button>Register</Button>
+        </Link>,
+        <Link to={"../reset-password"}>
+          <Button type="dashed">Forgot Password?</Button>
         </Link>,
       ]}
     >
