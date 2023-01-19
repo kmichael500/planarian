@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import { LoginComponent } from "./Modules/Authentication/Components/login.component";
 import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.routes.component";
+import { ResetPasswordComponent } from "./Modules/Authentication/Components/reset.password.component";
 import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
 import { LeadAddComponent } from "./Modules/Components/lead.add.component";
 import { TripObjectiveDetailComponent } from "./Modules/Objective/Components/objective.detail.component";
@@ -22,6 +23,10 @@ export const AppRouting: React.FC = () => {
       <Routes>
         <Route path="/login" element={<LoginComponent />}></Route>
         <Route path="/register" element={<RegisterComponent />}></Route>
+        <Route
+          path="/reset-password"
+          element={<ResetPasswordComponent />}
+        ></Route>
         <Route element={<ProtectedRoutes />}>
           <Route path="/projects" element={<ProjectListComponent />}></Route>{" "}
           <Route
