@@ -13,9 +13,7 @@ namespace Planarian.Shared.Email;
 public class EmailService : ServiceBase<MessageTypeRepository>
 {
     private readonly IEmailMessageFactory _emailMessageFactory;
-
-
-
+    
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
         GenericEmailSubstitutions substitutions)
     {
