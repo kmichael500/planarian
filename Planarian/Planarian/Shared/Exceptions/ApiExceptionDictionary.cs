@@ -29,8 +29,20 @@ public static class ApiExceptionDictionary
 
     public static ApiException EmailDoesNotExist =>
         new(StatusCodes.Status401Unauthorized, 200, "Email does not exist");
+
     public static ApiException InvalidPassword =>
         new(StatusCodes.Status401Unauthorized, 201, "Password is invalid");
-    
+
+
+    #endregion
+
+    #region Email Issues 300-399
+
+    public static ApiException MessageTypeNotFound =>
+        new(StatusCodes.Status500InternalServerError, 300, "There was an issue");
+
+    public static ApiException EmailFailedToSend =>
+        new(StatusCodes.Status500InternalServerError, 301, "The email failed to send");
+
     #endregion
 }

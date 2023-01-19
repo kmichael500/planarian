@@ -1,0 +1,24 @@
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+
+        <mj-text font-size="24px" color="#F45E43" font-family="helvetica">
+          {{header}}
+        </mj-text>
+
+        <mj-divider border-color="#F45E43"></mj-divider>
+
+        <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
+          {{message}}
+        </mj-text>
+
+        {{#if buttonText}}}
+        <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
+          {{buttonText}}
+        </mj-button>
+        {{/if}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

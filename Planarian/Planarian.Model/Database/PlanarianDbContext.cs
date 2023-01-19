@@ -32,10 +32,12 @@ public class PlanarianDbContext : DbContext
     public DbSet<ProjectInvitation> ProjectInvitations { get; set; } = null!;
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     public DbSet<Trip> Trip { get; set; } = null!;
-    public DbSet<Lead?> Lead { get; set; } = null!;
+    public DbSet<Lead> Lead { get; set; } = null!;
     public DbSet<TripObjective> TripObjectives { get; set; } = null!;
     public DbSet<TripObjectiveTag> TripObjectiveTag { get; set; } = null!;
     public DbSet<TripObjectiveMember> TripObjectiveMembers { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
-    public DbSet<User?> Users { get; set; } = null!;
+    public DbSet<MessageType> MessageTypes { get; set; } = null!;
+    public DbSet<MessageLog> MessageLogs { get; set; } = null!;
+    public DbSet<User> Users { get; set; } = null!;
 }
