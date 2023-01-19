@@ -13,12 +13,16 @@ public class Tag : EntityBaseNameId
         Name = name;
         Key = key;
     }
-    public Tag(){}
+
+    public Tag()
+    {
+    }
+
     public string Key { get; set; } = null!;
     public string? ProjectId { get; set; } = null!;
     public virtual ICollection<TripObjective> TripObjectives { get; set; } = new HashSet<TripObjective>();
     public virtual ICollection<TripObjectiveTag> TripObjectiveTags { get; set; } = new HashSet<TripObjectiveTag>();
-    public virtual Project? Project { get; set; } 
+    public virtual Project? Project { get; set; }
 }
 
 public class TagConfiguration : IEntityTypeConfiguration<Tag>

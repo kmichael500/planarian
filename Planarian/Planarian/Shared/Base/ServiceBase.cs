@@ -4,9 +4,6 @@ namespace Planarian.Shared.Base;
 
 public abstract class ServiceBase
 {
-    protected ServiceBase()
-    {
-    }
 }
 
 public abstract class ServiceBase<TRepository> : ServiceBase where TRepository : RepositoryBase

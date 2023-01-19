@@ -12,17 +12,18 @@ public class CustomJwtSecurityTokenHandler : ISecurityTokenValidator
     {
         _tokenHandler = new JwtSecurityTokenHandler();
     }
-    
+
     public bool CanValidateToken => true;
 
     public int MaximumTokenSizeInBytes { get; set; } = TokenValidationParameters.DefaultMaximumTokenSizeInBytes;
 
     public bool CanReadToken(string securityToken)
     {
-        return _tokenHandler.CanReadToken(securityToken);            
+        return _tokenHandler.CanReadToken(securityToken);
     }
 
-    public ClaimsPrincipal ValidateToken(string securityToken, TokenValidationParameters validationParameters, out SecurityToken validatedToken)
+    public ClaimsPrincipal ValidateToken(string securityToken, TokenValidationParameters validationParameters,
+        out SecurityToken validatedToken)
     {
         var principal = _tokenHandler.ValidateToken(securityToken, validationParameters, out validatedToken);
 

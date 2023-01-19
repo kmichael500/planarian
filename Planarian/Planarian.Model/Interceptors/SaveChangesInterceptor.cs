@@ -31,16 +31,19 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
         var context = (PlanarianDbContext)eventData.Context;
         foreach (var entity in eventData.Context.ChangeTracker.Entries())
-        {
             if (entity.Entity.GetType().BaseType == typeof(EntityBase) ||
                 entity.Entity.GetType().BaseType == typeof(EntityBaseNameId))
-            {
                 switch (entity.State)
                 {
                     case EntityState.Added:
                         ((EntityBase)entity.Entity).CreatedOn = DateTime.UtcNow;
-                        ((EntityBase)entity.Entity).CreatedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id) ? context.RequestUser.Id : null;
-                        ((EntityBase)entity.Entity).CreatedByName = !string.IsNullOrWhiteSpace(context.RequestUser.FullName) ? context.RequestUser.FullName : null;
+                        ((EntityBase)entity.Entity).CreatedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id)
+                            ? context.RequestUser.Id
+                            : null;
+                        ((EntityBase)entity.Entity).CreatedByName =
+                            !string.IsNullOrWhiteSpace(context.RequestUser.FullName)
+                                ? context.RequestUser.FullName
+                                : null;
                         ((EntityBase)entity.Entity).Id = IdGenerator.Generate();
                         break;
                     case EntityState.Modified:
@@ -55,8 +58,6 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
-            }
-        }
 
         return new ValueTask<InterceptionResult<int>>(result);
     }

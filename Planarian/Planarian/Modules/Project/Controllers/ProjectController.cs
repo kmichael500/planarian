@@ -23,6 +23,30 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         _tripService = tripService;
     }
 
+    #region Trips
+
+    [HttpGet("{projectId:length(10)}/trips")]
+    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
+    {
+        var trips = await _tripService.GetTripsByProjectId(projectId);
+
+        return new JsonResult(trips);
+    }
+
+    #endregion
+
+    #region Invitations
+
+    [HttpPost("{projectId:length(10)}/members/invite")]
+    public async Task<ActionResult> InviteProjectMember(string projectId, [FromBody] InviteMember invitation)
+    {
+        await Service.InviteProjectMember(projectId, invitation);
+
+        return new OkResult();
+    }
+
+    #endregion
+
     #region Project
 
     [HttpGet("{projectId:length(10)}")]
@@ -40,7 +64,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new JsonResult(result);
     }
-    
+
     [HttpPost]
     public async Task<ActionResult<ProjectVm>> CreateProject([FromBody] CreateOrEditProject project)
     {
@@ -56,6 +80,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new JsonResult(result);
     }
+
     [HttpDelete("{projectId:length(10)}")]
     public async Task<IActionResult> DeleteProject(string projectId)
     {
@@ -63,22 +88,9 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new OkResult();
     }
-    
 
     #endregion
 
-    #region Trips
-
-    [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
-    {
-        var trips = await _tripService.GetTripsByProjectId(projectId);
-
-        return new JsonResult(trips);
-    }
-
-    #endregion
-    
     #region Project Member
 
     [HttpGet("{projectId:length(10)}/members")]
@@ -96,7 +108,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new OkResult();
     }
-    
+
     [HttpPost("{projectId:length(10)}/members")]
     public async Task<ActionResult> AddProjectMembers(string projectId, [FromBody] IEnumerable<string> userIds)
     {
@@ -105,7 +117,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         return new OkResult();
     }
 
-    
+
     [HttpDelete("{projectId:length(10)}/members/{userId:length(10)}")]
     public async Task<ActionResult> DeleteProjectMember(string projectId, string userId)
     {
@@ -115,17 +127,4 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
     }
 
     #endregion
-
-    #region Invitations
-
-    [HttpPost("{projectId:length(10)}/members/invite")]
-    public async Task<ActionResult> InviteProjectMember(string projectId, [FromBody] InviteMember invitation)
-    {
-        await Service.InviteProjectMember(projectId, invitation);
-
-        return new OkResult();
-    }
-
-    #endregion
-    
 }

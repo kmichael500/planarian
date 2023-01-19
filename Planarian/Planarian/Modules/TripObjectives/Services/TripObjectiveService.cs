@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.TripObjectives;
@@ -28,6 +27,104 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
         _userRepository = userRepository;
     }
 
+    #region Photos
+
+    public async Task UploadPhotos(IEnumerable<TripPhotoUpload> photos, string tripObjectiveId)
+    {
+        var ids = await Repository.GetIds(tripObjectiveId);
+        if (ids == null) throw new ArgumentNullException(nameof(tripObjectiveId));
+
+        foreach (var photo in photos)
+        {
+            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : photo.File.FileName;
+
+            var fileType = Path.GetExtension(photo.File.FileName);
+
+            if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
+            // TODO alert user
+            var entity = new TripPhoto(RequestUser.Id, tripObjectiveId, title, photo.Description, fileType);
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync();
+            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, tripObjectiveId, entity.Id,
+                photo.File.OpenReadStream(), fileType);
+            entity.BlobKey = blobKey;
+            await Repository.SaveChangesAsync();
+        }
+    }
+
+    #endregion
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetTripObjectiveMembers(string tripObjectiveId)
+    {
+        var tripObjectiveMembers = await Repository.GetTripObjectiveMembers(tripObjectiveId);
+
+        return tripObjectiveMembers;
+    }
+
+    public async Task AddOrUpdateTripReport(string tripObjectiveId, string tripReport)
+    {
+        var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
+
+        if (tripObjective == null) throw new NullReferenceException("Trip objective does not exist");
+
+        tripObjective.TripReport = tripReport;
+        await Repository.SaveChangesAsync();
+    }
+
+    public async Task<IEnumerable<TripPhotoVm>> GetPhotos(string tripObjectiveId)
+    {
+        var photos = (await Repository.GetTripObjectivePhotos(tripObjectiveId)).ToList();
+
+        foreach (var photo in photos)
+        {
+            var uri = _blobService.GetSasUrl(photo.Url, 24);
+            if (uri?.AbsolutePath != null) photo.Url = uri.AbsoluteUri;
+        }
+
+        return photos;
+    }
+
+    public async Task UpdateObjectiveName(string tripObjectiveId, string name)
+    {
+        var entity = await Repository.GetTripObjective(tripObjectiveId);
+
+        if (entity == null) throw new NullReferenceException("Trip objective does not exist");
+
+        entity.Name = name;
+        await Repository.SaveChangesAsync();
+    }
+
+    public async Task UpdateObjectiveDescription(string tripObjectiveId, string description)
+    {
+        var entity = await Repository.GetTripObjective(tripObjectiveId);
+
+        if (entity == null) throw new NullReferenceException("Trip objective does not exist");
+
+        entity.Description = description;
+        await Repository.SaveChangesAsync();
+    }
+
+
+    public async Task InviteTripObjectiveMember(string tripObjectiveId, InviteMember invitation)
+    {
+        var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
+
+        if (tripObjective == null) throw new NullReferenceException("Trip objective not found");
+
+        var user = await _userRepository.GetUserByEmail(invitation.Email);
+        if (user != null)
+        {
+            await AddTripObjectiveMember(tripObjectiveId, user.Id);
+        }
+        else
+        {
+            var entity = new User(invitation.FirstName, invitation.LastName, invitation.Email);
+            _userRepository.Add(entity);
+            await Repository.SaveChangesAsync();
+            await AddTripObjectiveMember(tripObjectiveId, entity.Id);
+        }
+    }
+
     #region Project
 
     public async Task<TripObjectiveVm> CreateOrUpdateTripObjective(CreateOrEditTripObjectiveVm values)
@@ -42,10 +139,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
         foreach (var tripObjectiveTypeId in values.TripObjectiveTypeIds)
         {
             var tripObjectiveType = Repository.GetTripObjectiveType(tripObjectiveTypeId);
-            if (tripObjectiveType == null)
-            {
-                throw new NullReferenceException("Tag not found");
-            }
+            if (tripObjectiveType == null) throw new NullReferenceException("Tag not found");
 
             var tripObjectiveTag = new TripObjectiveTag
             {
@@ -65,9 +159,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
         }
 
         foreach (var tripObjectiveMemberId in values.TripObjectiveMemberIds)
-        {
             await AddTripObjectiveMember(tripObjective.Id, tripObjectiveMemberId, false);
-        }
 
         await Repository.SaveChangesAsync();
         return new TripObjectiveVm(tripObjective, values.TripObjectiveTypeIds, values.TripObjectiveMemberIds);
@@ -95,17 +187,13 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     public async Task AddTripObjectiveMember(string tripObjectiveId, string userId, bool saveChanges = true)
     {
         await AddTripObjectiveMember(tripObjectiveId, new List<string> { userId }, saveChanges);
-
     }
 
     public async Task AddTripObjectiveMember(string tripObjectiveId, IEnumerable<string> userIds,
         bool saveChanges = true)
     {
         var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
-        if (tripObjective == null)
-        {
-            throw new NullReferenceException("Trip Objective not found");
-        }
+        if (tripObjective == null) throw new NullReferenceException("Trip Objective not found");
 
         foreach (var userId in userIds)
         {
@@ -117,10 +205,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
             tripObjective.TripObjectiveMembers.Add(tripObjectiveMember);
         }
 
-        if (saveChanges)
-        {
-            await Repository.SaveChangesAsync();
-        }
+        if (saveChanges) await Repository.SaveChangesAsync();
     }
 
     public async Task DeleteTripObjectiveMember(string tripObjectiveId, string userId)
@@ -134,73 +219,6 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     }
 
     #endregion
-
-    #region Photos
-
-    public async Task UploadPhotos(IEnumerable<TripPhotoUpload> photos, string tripObjectiveId)
-    {
-        var ids = await Repository.GetIds(tripObjectiveId);
-        if (ids == null)
-        {
-            throw new ArgumentNullException(nameof(tripObjectiveId));
-        }
-
-        foreach (var photo in photos)
-        {
-            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : photo.File.FileName;
-
-            var fileType = Path.GetExtension(photo.File.FileName);
-
-            if (!FileValidation.IsValidPhotoFileType(fileType))
-            {
-                continue;
-                // TODO alert user
-            }
-
-            var entity = new TripPhoto(RequestUser.Id, tripObjectiveId, title, photo.Description, fileType);
-            Repository.Add(entity);
-            await Repository.SaveChangesAsync();
-            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, tripObjectiveId, entity.Id,
-                photo.File.OpenReadStream(), fileType);
-            entity.BlobKey = blobKey;
-            await Repository.SaveChangesAsync();
-        }
-    }
-
-    #endregion
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetTripObjectiveMembers(string tripObjectiveId)
-    {
-        var tripObjectiveMembers = await Repository.GetTripObjectiveMembers(tripObjectiveId);
-
-        return tripObjectiveMembers;
-    }
-
-    public async Task AddOrUpdateTripReport(string tripObjectiveId, string tripReport)
-    {
-        var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
-
-        if (tripObjective == null)
-        {
-            throw new NullReferenceException("Trip objective does not exist");
-        }
-
-        tripObjective.TripReport = tripReport;
-        await Repository.SaveChangesAsync();
-    }
-
-    public async Task<IEnumerable<TripPhotoVm>> GetPhotos(string tripObjectiveId)
-    {
-        var photos = (await Repository.GetTripObjectivePhotos(tripObjectiveId)).ToList();
-
-        foreach (var photo in photos)
-        {
-            var uri = _blobService.GetSasUrl(photo.Url, 24);
-            if (uri?.AbsolutePath != null) photo.Url = uri.AbsoluteUri;
-        }
-
-        return photos;
-    }
 
     #region Leads
 
@@ -222,32 +240,6 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
 
     #endregion
 
-    public async Task UpdateObjectiveName(string tripObjectiveId, string name)
-    {
-        var entity = await Repository.GetTripObjective(tripObjectiveId);
-
-        if (entity == null)
-        {
-            throw new NullReferenceException("Trip objective does not exist");
-        }
-
-        entity.Name = name;
-        await Repository.SaveChangesAsync();
-    }
-
-    public async Task UpdateObjectiveDescription(string tripObjectiveId, string description)
-    {
-        var entity = await Repository.GetTripObjective(tripObjectiveId);
-
-        if (entity == null)
-        {
-            throw new NullReferenceException("Trip objective does not exist");
-        }
-
-        entity.Description = description;
-        await Repository.SaveChangesAsync();
-    }
-
     #region Tags
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTripObjectiveTags(string tripObjectiveId)
@@ -259,19 +251,13 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     {
         var tagType = await _tagRepository.GetTag(tagId);
 
-        if (tagType == null)
-        {
-            throw new NullReferenceException("Tag type does not exist");
-        }
+        if (tagType == null) throw new NullReferenceException("Tag type does not exist");
 
         var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
 
-        if (tripObjective == null)
-        {
-            throw new NullReferenceException("Trip objective does not exist");
-        }
+        if (tripObjective == null) throw new NullReferenceException("Trip objective does not exist");
 
-        var tripObjectiveTag = new TripObjectiveTag()
+        var tripObjectiveTag = new TripObjectiveTag
         {
             TripObjectiveId = tripObjectiveId,
             Tag = tagType
@@ -285,10 +271,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     {
         var tag = await Repository.GetTripObjectiveTag(tagId, tripObjectiveId);
 
-        if (tag == null)
-        {
-            throw new NullReferenceException("Tag does not exist");
-        }
+        if (tag == null) throw new NullReferenceException("Tag does not exist");
 
         Repository.Delete(tag);
 
@@ -296,29 +279,4 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     }
 
     #endregion
-
-
-    public async Task InviteTripObjectiveMember(string tripObjectiveId, InviteMember invitation)
-    {
-        var tripObjective = await Repository.GetTripObjective(tripObjectiveId);
-
-        if (tripObjective == null)
-        {
-            throw new NullReferenceException("Trip objective not found");
-        }
-
-        var user = await _userRepository.GetUserByEmail(invitation.Email);
-        if (user != null)
-        {
-            await AddTripObjectiveMember(tripObjectiveId, user.Id);
-        }
-        else
-        {
-            var entity = new User(invitation.FirstName, invitation.LastName, invitation.Email);
-            _userRepository.Add(entity);
-            await Repository.SaveChangesAsync();
-            await AddTripObjectiveMember(tripObjectiveId, entity.Id);
-
-        }
-    }
 }

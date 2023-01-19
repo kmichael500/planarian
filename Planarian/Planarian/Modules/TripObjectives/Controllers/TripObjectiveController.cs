@@ -14,10 +14,23 @@ namespace Planarian.Modules.TripObjectives.Controllers;
 [Authorize]
 public class TripObjectiveController : PlanarianControllerBase<TripObjectiveService>
 {
-  
-    public TripObjectiveController(RequestUser requestUser, TripObjectiveService service, TokenService tokenService) : base(requestUser, tokenService, service)
+    public TripObjectiveController(RequestUser requestUser, TripObjectiveService service, TokenService tokenService) :
+        base(requestUser, tokenService, service)
     {
     }
+
+    #region Invitations
+
+    [HttpPost("{tripObjectiveId:length(10)}/members/invite")]
+    public async Task<ActionResult> InviteTripObjectiveMember(string tripObjectiveId,
+        [FromBody] InviteMember invitation)
+    {
+        await Service.InviteTripObjectiveMember(tripObjectiveId, invitation);
+
+        return new OkResult();
+    }
+
+    #endregion
 
     #region Trip Objective
 
@@ -28,7 +41,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new JsonResult(result);
     }
-    
+
     [HttpGet("{tripObjectiveId:length(10)}/tags")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetTripObjectiveTags(string tripObjectiveId)
     {
@@ -36,7 +49,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new JsonResult(result);
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/tags/{tagId:length(10)}")]
     public async Task<ActionResult> AddTripObjectiveTag(string tripObjectiveId, string tagId)
     {
@@ -44,7 +57,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new OkResult();
     }
-    
+
     [HttpDelete("{tripObjectiveId:length(10)}/tags/{tagId:length(10)}")]
     public async Task<ActionResult> DeleteTripObjectiveTag(string tripObjectiveId, string tagId)
     {
@@ -54,7 +67,8 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
     }
 
     [HttpPost]
-    public async Task<ActionResult<TripObjectiveVm>> CreateTripObjective([FromBody] CreateOrEditTripObjectiveVm tripObjective)
+    public async Task<ActionResult<TripObjectiveVm>> CreateTripObjective(
+        [FromBody] CreateOrEditTripObjectiveVm tripObjective)
     {
         var result = await Service.CreateOrUpdateTripObjective(tripObjective);
 
@@ -69,7 +83,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new OkResult();
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/name")]
     public async Task<ActionResult> UpdateObjectiveName(string tripObjectiveId,
         [FromBody] string name)
@@ -78,7 +92,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new OkResult();
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/description")]
     public async Task<ActionResult> UpdateObjectiveDescription(string tripObjectiveId,
         [FromBody] string description)
@@ -100,17 +114,19 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
     [HttpGet("{tripObjectiveId:length(10)}/photos")]
     public async Task<ActionResult<IEnumerable<TripPhotoVm>>> GetPhotos(string tripObjectiveId)
     {
-        IEnumerable<TripPhotoVm> photos = await Service.GetPhotos(tripObjectiveId);
+        var photos = await Service.GetPhotos(tripObjectiveId);
         return new JsonResult(photos);
     }
-    
+
     [HttpPut]
-    public async Task<ActionResult<TripObjectiveVm>> UpdateTripObjective([FromBody] CreateOrEditTripObjectiveVm tripObjective)
+    public async Task<ActionResult<TripObjectiveVm>> UpdateTripObjective(
+        [FromBody] CreateOrEditTripObjectiveVm tripObjective)
     {
         var result = await Service.CreateOrUpdateTripObjective(tripObjective);
 
         return new JsonResult(result);
     }
+
     [HttpDelete("{tripObjectiveId:length(10)}")]
     public async Task<IActionResult> DeleteTripObjective(string tripObjectiveId)
     {
@@ -118,7 +134,6 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new OkResult();
     }
-    
 
     #endregion
 
@@ -131,7 +146,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new JsonResult(tripObjectiveMembers);
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/members/{userId:length(10)}")]
     public async Task<ActionResult> AddTripObjectiveMember(string tripObjectiveId, string userId)
     {
@@ -139,15 +154,16 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
         return new OkResult();
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/members")]
-    public async Task<ActionResult> AddTripObjectiveMembers(string tripObjectiveId, [FromBody] IEnumerable<string> userIds)
+    public async Task<ActionResult> AddTripObjectiveMembers(string tripObjectiveId,
+        [FromBody] IEnumerable<string> userIds)
     {
         await Service.AddTripObjectiveMember(tripObjectiveId, userIds);
 
         return new OkResult();
     }
-    
+
     [HttpDelete("{tripObjectiveId:length(10)}/members/{userId:length(10)}")]
     public async Task<ActionResult> DeleteTripObjectiveMember(string tripObjectiveId, string userId)
     {
@@ -166,7 +182,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
         var leads = await Service.GetLeads(tripObjectiveId);
         return new JsonResult(leads);
     }
-    
+
     [HttpPost("{tripObjectiveId:length(10)}/leads")]
     public async Task<ActionResult> AddLeads(string tripObjectiveId, [FromBody] IEnumerable<CreateLeadVm> leads)
     {
@@ -175,19 +191,6 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
     }
 
     #endregion
-    
-    #region Invitations
-
-    [HttpPost("{tripObjectiveId:length(10)}/members/invite")]
-    public async Task<ActionResult> InviteTripObjectiveMember(string tripObjectiveId, [FromBody] InviteMember invitation)
-    {
-        await Service.InviteTripObjectiveMember(tripObjectiveId, invitation);
-
-        return new OkResult();
-    }
-
-    #endregion
-
 }
 
 public class TripPhotoVm
@@ -202,12 +205,10 @@ public class TripPhotoVm
 
     public TripPhotoVm()
     {
-        
     }
 
     public string Id { get; set; } = null!;
     public string? Title { get; set; }
     public string? Description { get; set; }
     public string Url { get; set; }
-    
 }

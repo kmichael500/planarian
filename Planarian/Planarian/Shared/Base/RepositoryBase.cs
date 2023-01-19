@@ -8,6 +8,7 @@ public abstract class RepositoryBase
 {
     protected readonly PlanarianDbContext DbContext;
     protected readonly RequestUser RequestUser;
+
     protected RepositoryBase(PlanarianDbContext dbContext, RequestUser requestUser)
     {
         DbContext = dbContext;
@@ -19,13 +20,14 @@ public abstract class RepositoryBase
     {
         await DbContext.SaveChangesAsync();
     }
+
     public void Add(EntityBase entity)
     {
         DbContext.Add(entity);
     }
+
     public void Delete(EntityBase entity)
     {
         DbContext.Remove(entity);
     }
-    
 }

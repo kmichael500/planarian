@@ -8,8 +8,10 @@ public class CreateLeadVm
         Classification = classification;
         ClosestStation = closestStation;
     }
-    
-    public CreateLeadVm(){}
+
+    public CreateLeadVm()
+    {
+    }
 
     public string Description { get; set; }
     public string Classification { get; set; }

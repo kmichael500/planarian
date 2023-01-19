@@ -5,11 +5,11 @@ namespace Planarian.Shared.Services;
 
 public class HttpResponseExceptionMiddleware
 {
+    private readonly RequestDelegate _next;
+
     public HttpResponseExceptionMiddleware(bool isDevelopment)
     {
-        
     }
-    private readonly RequestDelegate _next;
 
     public HttpResponseExceptionMiddleware(RequestDelegate next)
     {
@@ -40,19 +40,18 @@ public class HttpResponseExceptionMiddleware
 
             await context.Response.WriteAsync(JsonSerializer.Serialize(error,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-
         }
     }
 }
 
 public class ApiErrorResponse
 {
-    public ApiErrorResponse(string message, int errorCode) :base ()
+    public ApiErrorResponse(string message, int errorCode)
     {
         Message = message;
         ErrorCode = errorCode;
     }
-  
+
     public string Message { get; }
     public int ErrorCode { get; }
 }

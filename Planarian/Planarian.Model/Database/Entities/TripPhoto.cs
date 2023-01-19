@@ -9,7 +9,9 @@ namespace Planarian.Model.Database.Entities;
 
 public class TripPhoto : EntityBase
 {
-    public TripPhoto(){}
+    public TripPhoto()
+    {
+    }
 
     public TripPhoto(string userId, string tripObjectiveId, string name, string description, string fileType)
     {
@@ -19,18 +21,27 @@ public class TripPhoto : EntityBase
         Description = description;
         FileType = fileType;
     }
-    [Required] [MaxLength(PropertyLength.Id)] public string UserId { get; set; } = null!;
-    [Required] [MaxLength(PropertyLength.Id)] public string TripObjectiveId { get; set; } = null!;
+
+    [Required]
+    [MaxLength(PropertyLength.Id)]
+    public string UserId { get; set; } = null!;
+
+    [Required]
+    [MaxLength(PropertyLength.Id)]
+    public string TripObjectiveId { get; set; } = null!;
 
     [Required]
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; } = null!;
-    [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; } = null!;
+
+    [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
+
     [Required]
     [MaxLength(PropertyLength.FileType)]
     public string FileType { get; set; } = null!;
+
     [MaxLength(PropertyLength.BlobKey)] public string? BlobKey { get; set; } = null!;
-    
+
     public virtual TripObjective TripObjective { get; set; } = null!;
     public virtual User User { get; set; } = null!;
 }
@@ -42,10 +53,9 @@ public class PhotoConfiguration : IEntityTypeConfiguration<TripPhoto>
         builder.HasOne(e => e.TripObjective)
             .WithMany(e => e.Photos)
             .HasForeignKey(e => e.TripObjectiveId);
-        
+
         builder.HasOne(e => e.User)
             .WithMany(e => e.TripPhotos)
             .HasForeignKey(e => e.UserId);
-
     }
 }

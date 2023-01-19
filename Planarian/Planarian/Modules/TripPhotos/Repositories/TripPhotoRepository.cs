@@ -15,6 +15,6 @@ public class TripPhotoRepository : RepositoryBase
     public async Task<TripPhoto> GetTripPhoto(string tripPhotoId)
     {
         return await DbContext.Photos.FirstOrDefaultAsync(e =>
-            e.Id == tripPhotoId && Enumerable.Any<ProjectMember>(e.TripObjective.Trip.Project.ProjectMembers, e => e.UserId == RequestUser.Id));
+            e.Id == tripPhotoId && e.TripObjective.Trip.Project.ProjectMembers.Any(e => e.UserId == RequestUser.Id));
     }
 }

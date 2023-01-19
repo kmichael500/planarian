@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
-using Planarian.Modules.Leads.Models;
 using Planarian.Modules.TripObjectives.Controllers;
 
 namespace Planarian.Model.Database.Entities;
@@ -18,7 +17,6 @@ public class Lead : EntityBase
     public Lead(CreateLeadVm lead, string tripObjectiveId, string userId) : this(lead.Description,
         lead.Classification, lead.ClosestStation, userId, tripObjectiveId)
     {
-
     }
 
     public Lead(string description,
@@ -65,6 +63,5 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
         builder.HasOne(e => e.User)
             .WithMany(e => e.Leads)
             .HasForeignKey(e => e.UserId);
-
     }
 }

@@ -18,13 +18,10 @@ public class TripPhotoService : ServiceBase<TripPhotoRepository>
     {
         var photo = await Repository.GetTripPhoto(tripPhotoId);
 
-        if (photo == null)
-        {
-            throw new ArgumentException("Photo not found", nameof(tripPhotoId));
-        }
-        
+        if (photo == null) throw new ArgumentException("Photo not found", nameof(tripPhotoId));
+
         await _blobService.DeleteBlob(photo.BlobKey);
-        
+
         Repository.Delete(photo);
         await Repository.SaveChangesAsync();
     }

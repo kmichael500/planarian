@@ -9,8 +9,10 @@ public class RegisterUserVm
         EmailAddress = emailAddress;
         Password = password;
     }
-    
-    public RegisterUserVm(){}
+
+    public RegisterUserVm()
+    {
+    }
 
     public string FirstName { get; set; }
     public string LastName { get; set; }

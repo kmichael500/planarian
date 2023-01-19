@@ -10,8 +10,8 @@ public class SelectListItem<TValue> where TValue : class
 
     public SelectListItem()
     {
-        
     }
+
     public string Display { get; set; } = null!;
     public TValue Value { get; set; } = null!;
 }

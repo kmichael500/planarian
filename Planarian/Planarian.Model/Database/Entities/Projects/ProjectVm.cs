@@ -3,7 +3,6 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Model.Database.Entities.Projects;
 
-
 public class ProjectVm : IProject
 {
     public ProjectVm(string id, string name, int numberOfProjectMembers, int numberOfTrips)
@@ -21,10 +20,16 @@ public class ProjectVm : IProject
         NumberOfProjectMembers = numberOfProjectMembers;
         NumberOfTrips = numberOfTrips;
     }
-    public ProjectVm(){}
 
-    [Required] [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
+    public ProjectVm()
+    {
+    }
+
+    [Required]
+    [MaxLength(PropertyLength.Id)]
+    public string Id { get; set; } = null!;
+
+    public int NumberOfProjectMembers { get; set; }
+    public int NumberOfTrips { get; set; }
     [Required] public string Name { get; set; } = null!;
-    public int NumberOfProjectMembers { get; set; } = default!;
-    public int NumberOfTrips { get; set; } = default!;
 }

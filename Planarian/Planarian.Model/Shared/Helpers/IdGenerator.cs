@@ -20,7 +20,7 @@ public class IdGenerator
     public static string Generate(int length)
     {
         var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".ToCharArray();
-        
+
         var bytes = new byte[length];
         using (var rng = RandomNumberGenerator.Create())
         {

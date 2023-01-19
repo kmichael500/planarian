@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-using Planarian.Library.Constants;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
@@ -12,16 +10,14 @@ using Planarian.Shared.Email;
 using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
 using Planarian.Shared.Options;
-using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Users.Services;
 
 public class UserService : ServiceBase<UserRepository>
 {
+    private const int PasswordResetExpirationMinutes = 30;
     private readonly EmailService _emailService;
     private readonly ServerOptions _serverOptions;
-    
-    private const int PasswordResetExpirationMinutes = 30;
 
     public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService,
         ServerOptions serverOptions) : base(repository,
@@ -35,17 +31,11 @@ public class UserService : ServiceBase<UserRepository>
     {
         var entity = await Repository.Get(RequestUser.Id);
 
-        if (entity == null)
-        {
-            throw new NullReferenceException("User not found");
-        }
+        if (entity == null) throw new NullReferenceException("User not found");
 
         var emailExists = await Repository.EmailExists(user.EmailAddress, true);
 
-        if (emailExists)
-        {
-            throw ApiExceptionDictionary.EmailAlreadyExists;
-        }
+        if (emailExists) throw ApiExceptionDictionary.EmailAlreadyExists;
 
         entity.FirstName = user.FirstName;
         entity.LastName = user.LastName;
@@ -64,18 +54,12 @@ public class UserService : ServiceBase<UserRepository>
 
     public async Task UpdateCurrentUserPassword(string password)
     {
-        if (!password.IsValidPassword())
-        {
-            throw ApiExceptionDictionary.InvalidPasswordComplexity;
-        }
+        if (!password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
         var entity = await Repository.Get(RequestUser.Id);
 
-        if (entity == null)
-        {
-            throw ApiExceptionDictionary.NotFound("User");
-        }
-        
+        if (entity == null) throw ApiExceptionDictionary.NotFound("User");
+
         entity.HashedPassword = PasswordService.Hash(password);
 
         await Repository.SaveChangesAsync();
@@ -85,22 +69,13 @@ public class UserService : ServiceBase<UserRepository>
     {
         var exists = await Repository.EmailExists(user.EmailAddress);
 
-        if (exists)
-        {
-            throw ApiExceptionDictionary.EmailAlreadyExists;
-        }
+        if (exists) throw ApiExceptionDictionary.EmailAlreadyExists;
 
         user.PhoneNumber = user.PhoneNumber.ExtractPhoneNumber();
 
-        if (!user.PhoneNumber.IsValidPhoneNumber())
-        {
-            throw ApiExceptionDictionary.InvalidPhoneNumber;
-        }
+        if (!user.PhoneNumber.IsValidPhoneNumber()) throw ApiExceptionDictionary.InvalidPhoneNumber;
 
-        if (!user.Password.IsValidPassword())
-        {
-            throw ApiExceptionDictionary.InvalidPasswordComplexity;
-        }
+        if (!user.Password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
         var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
         {
@@ -110,17 +85,12 @@ public class UserService : ServiceBase<UserRepository>
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();
-        
-        
     }
-    
+
     public async Task SendResetPasswordEmail(string email)
     {
         var user = await Repository.GetUserByEmail(email);
-        if (user == null)
-        {
-            throw ApiExceptionDictionary.EmailDoesNotExist;
-        }
+        if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
 
         var resetCode = PasswordService.GenerateResetCode();
         var expiresOn = DateTime.UtcNow.AddMinutes(PasswordResetExpirationMinutes);
@@ -135,36 +105,27 @@ public class UserService : ServiceBase<UserRepository>
         var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
 
         await _emailService.SendGenericEmail("Planarian Password Reset", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions("Password Reset", message, buttonText: "Reset Password", link));
-
+            new GenericEmailSubstitutions("Password Reset", message, "Reset Password", link));
     }
 
     public async Task ResetPassword(string code, string password)
     {
         var user = await Repository.GetUserByPasswordResetCode(code);
-        if (user == null)
-        {
-            throw ApiExceptionDictionary.InvalidPasswordResetCode;
-        }
-        
-        if(user.PasswordResetCodeExpiration < DateTime.UtcNow)
-        {
-            throw ApiExceptionDictionary.PasswordResetCodeExpired;
-        }
+        if (user == null) throw ApiExceptionDictionary.InvalidPasswordResetCode;
 
-        if (!password.IsValidPassword())
-        {
-            throw ApiExceptionDictionary.InvalidPasswordComplexity;
-        }
+        if (user.PasswordResetCodeExpiration < DateTime.UtcNow) throw ApiExceptionDictionary.PasswordResetCodeExpired;
+
+        if (!password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
         user.PasswordResetCode = null;
         user.PasswordResetCodeExpiration = null;
         user.HashedPassword = PasswordService.Hash(password);
-        
+
         await Repository.SaveChangesAsync();
 
-        const string message = "You're password was just changed. If you did not make this request, please contact us immediately.";
-        
+        const string message =
+            "You're password was just changed. If you did not make this request, please contact us immediately.";
+
         await _emailService.SendGenericEmail("Planarian Password Changed", user.EmailAddress, user.FullName,
             new GenericEmailSubstitutions("Planarian Password Changed", message));
     }

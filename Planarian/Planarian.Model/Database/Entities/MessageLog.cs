@@ -19,7 +19,9 @@ public class MessageLog : EntityBase
         Substitutions = substitutions;
     }
 
-    public MessageLog(){}
+    public MessageLog()
+    {
+    }
 
     public string MessageKey { get; set; } = null!;
     public string MessageType { get; set; } = null!;
@@ -35,6 +37,5 @@ public class MessageLogConfiguration : IEntityTypeConfiguration<MessageLog>
 {
     public void Configure(EntityTypeBuilder<MessageLog> builder)
     {
-    
     }
 }

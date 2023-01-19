@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
-using Planarian.Shared.Base;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Services;
+using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Users.Controllers;
 
@@ -12,11 +12,13 @@ namespace Planarian.Modules.Users.Controllers;
 [Authorize]
 public class UserController : PlanarianControllerBase<UserService>
 {
-    public UserController(RequestUser requestUser, UserService service, TokenService tokenService) : base(requestUser, tokenService, service)
+    public UserController(RequestUser requestUser, UserService service, TokenService tokenService) : base(requestUser,
+        tokenService, service)
     {
     }
 
     #region Users
+
     [HttpGet("current")]
     public async Task<ActionResult<UserVm>> GetCurrentUser()
     {
@@ -31,7 +33,7 @@ public class UserController : PlanarianControllerBase<UserService>
 
         return new OkResult();
     }
-    
+
     [HttpPut("current/password")]
     public async Task<ActionResult> UpdateCurrentUserPassword([FromBody] string password)
     {
@@ -43,6 +45,7 @@ public class UserController : PlanarianControllerBase<UserService>
     #endregion
 
     #region Password Reset
+
     [AllowAnonymous]
     [HttpPost("reset-password/email/{email}")]
     public async Task<ActionResult> SendPasswordReset(string email)
@@ -51,6 +54,7 @@ public class UserController : PlanarianControllerBase<UserService>
 
         return new OkResult();
     }
+
     [AllowAnonymous]
     [HttpPost("reset-password")]
     public async Task<ActionResult> ResetPassword(string code, [FromBody] string password)

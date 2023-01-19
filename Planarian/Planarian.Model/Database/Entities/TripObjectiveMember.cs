@@ -12,6 +12,7 @@ public class TripObjectiveMember : EntityBase
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripObjectiveId { get; set; } = null!;
+
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string UserId { get; set; } = null!;
@@ -27,7 +28,7 @@ public class TripObjectiveMemberConfiguration : IEntityTypeConfiguration<TripObj
         builder.HasOne(e => e.TripObjective)
             .WithMany(e => e.TripObjectiveMembers)
             .HasForeignKey(e => e.TripObjectiveId);
-        
+
         builder.HasOne(e => e.User)
             .WithMany(e => e.TripObjectiveMembers)
             .HasForeignKey(e => e.UserId);

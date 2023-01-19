@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.TripObjectives;
@@ -10,7 +9,6 @@ namespace Planarian.Modules.Trips.Repositories;
 
 public class TripRepository : RepositoryBase
 {
-
     public TripRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
@@ -50,7 +48,6 @@ public class TripRepository : RepositoryBase
         var tripNumber = await GetTripNumber(tripId);
         return query.Select(e => new TripVm(e, tripNumber));
     }
-
 
 
     public async Task<Trip?> GetTrip(string tripId)

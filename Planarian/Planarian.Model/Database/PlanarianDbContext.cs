@@ -12,20 +12,11 @@ public class PlanarianDbContext : DbContext
 {
     private readonly SaveChangesInterceptor _changesInterceptor = new();
     public RequestUser RequestUser = null!;
+
     public PlanarianDbContext(DbContextOptions<PlanarianDbContext> contextOptions) : base(contextOptions)
     {
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.AddInterceptors(_changesInterceptor);
-    }
-    
     public DbSet<PermissionType> PermissionTypes { get; set; } = null!;
     public DbSet<TripPhoto> Photos { get; set; } = null!;
     public DbSet<Project> Projects { get; set; } = null!;
@@ -40,4 +31,14 @@ public class PlanarianDbContext : DbContext
     public DbSet<MessageType> MessageTypes { get; set; } = null!;
     public DbSet<MessageLog> MessageLogs { get; set; } = null!;
     public DbSet<User> Users { get; set; } = null!;
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.AddInterceptors(_changesInterceptor);
+    }
 }

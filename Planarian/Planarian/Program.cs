@@ -37,40 +37,39 @@ var appConfigConnectionString = builder.Configuration.GetConnectionString("AppCo
 builder.Configuration.AddAzureAppConfiguration(appConfigConnectionString);
 
 var isDevelopment = builder.Environment.IsDevelopment();
-if (isDevelopment)
-{
-    builder.Configuration.AddJsonFile("appsettings.Development.json", optional: false);
-}
+if (isDevelopment) builder.Configuration.AddJsonFile("appsettings.Development.json", false);
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { 
-        Title = "Planarian API", 
-        Version = "v1" 
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Planarian API",
+        Version = "v1"
     });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
-        In = ParameterLocation.Header, 
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
         Description = "Please insert JWT with Bearer into field",
         Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey 
+        Type = SecuritySchemeType.ApiKey
     });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
-        { 
-            new OpenApiSecurityScheme 
-            { 
-                Reference = new OpenApiReference 
-                { 
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer" 
-                } 
+                    Id = "Bearer"
+                }
             },
-            new string[] { } 
-        } 
+            new string[] { }
+        }
     });
-
 });
 
 #region DI
@@ -78,35 +77,22 @@ builder.Services.AddSwaggerGen(c =>
 #region Options
 
 var serverOptions = builder.Configuration.GetSection(ServerOptions.Key).Get<ServerOptions>();
-if (serverOptions == null)
-{
-    throw new Exception("Server options not found");
-}
+if (serverOptions == null) throw new Exception("Server options not found");
 builder.Services.AddSingleton(serverOptions);
 
 var authOptions = builder.Configuration.GetSection(AuthOptions.Key).Get<AuthOptions>();
-if (authOptions == null)
-{
-    throw new Exception("Auth options not found");
-}
+if (authOptions == null) throw new Exception("Auth options not found");
 builder.Services.AddSingleton(authOptions);
 
 var blobOptions = builder.Configuration.GetSection(BlobOptions.Key).Get<BlobOptions>();
-if (blobOptions == null)
-{
-    throw new Exception("Blob options not found");
-}
+if (blobOptions == null) throw new Exception("Blob options not found");
 builder.Services.AddSingleton(blobOptions);
 
 var emailOptions = builder.Configuration.GetSection(EmailOptions.Key).Get<EmailOptions>();
-if (emailOptions == null)
-{
-    throw new Exception("Email options not found");
-}
+if (emailOptions == null) throw new Exception("Email options not found");
 
 builder.Services.AddSingleton(Options.Create<SendGridOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
-
 
 #endregion
 
@@ -161,7 +147,6 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
 
 #region Authentication
 
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     var tokenValidationParameters = new TokenValidationParameters
@@ -180,9 +165,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         // If you want to allow a certain amount of clock drift, set that here:
         ClockSkew = TimeSpan.Zero
     };
-    
+
     options.TokenValidationParameters = tokenValidationParameters;
-    
+
     // Required if using custom token handler
     // options.SecurityTokenValidators.Clear();
     //
@@ -190,13 +175,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     // options.SecurityTokenValidators.Clear();
     //
     // options.SecurityTokenValidators.Add(new CustomJwtSecurityTokenHandler());
-
 });
 
 builder.Services.AddMvc().AddSessionStateTempDataProvider();
 builder.Services.AddSession();
-
-
 
 #endregion
 
@@ -215,7 +197,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed((o => true )));
+app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(o => true));
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();
 

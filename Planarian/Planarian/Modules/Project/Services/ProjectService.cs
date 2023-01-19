@@ -1,6 +1,5 @@
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
-using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Project.Controllers;
 using Planarian.Modules.Project.Repositories;
@@ -18,6 +17,35 @@ public class ProjectService : ServiceBase<ProjectRepository>
     {
         _userRepository = userRepository;
     }
+
+    public async Task<IEnumerable<ProjectVm>> GetProjects()
+    {
+        return await Repository.GetProjects();
+    }
+
+    #region Invitations
+
+    public async Task InviteProjectMember(string projectId, InviteMember invitation)
+    {
+        var project = await Repository.GetProject(projectId);
+
+        if (project == null) throw new NullReferenceException("Project not found");
+
+        var user = await _userRepository.GetUserByEmail(invitation.Email);
+        if (user != null)
+        {
+            await AddProjectMember(projectId, user.Id);
+        }
+        else
+        {
+            var entity = new User(invitation.FirstName, invitation.LastName, invitation.Email);
+            _userRepository.Add(entity);
+            await Repository.SaveChangesAsync();
+            await AddProjectMember(projectId, entity.Id);
+        }
+    }
+
+    #endregion
 
     #region Project
 
@@ -58,17 +86,16 @@ public class ProjectService : ServiceBase<ProjectRepository>
     #endregion
 
     #region Project Member
+
     public async Task<IEnumerable<SelectListItem<string>>> GetProjectMembers(string projectId)
     {
         return await Repository.GetProjectMembers(projectId);
     }
+
     public async Task AddProjectMember(string projectId, string userId, bool saveChanges = true)
     {
         var project = await Repository.GetProject(projectId);
-        if (project == null)
-        {
-            throw new NullReferenceException("Project not found");
-        }
+        if (project == null) throw new NullReferenceException("Project not found");
         var projectMember = new ProjectMember
         {
             UserId = userId,
@@ -77,15 +104,11 @@ public class ProjectService : ServiceBase<ProjectRepository>
         Repository.Add(projectMember);
 
         if (saveChanges) await Repository.SaveChangesAsync();
-
     }
 
     public async Task AddProjectMember(string projectId, IEnumerable<string> userIds, bool saveChanges = true)
     {
-        foreach (var userId in userIds)
-        {
-            await AddProjectMember(projectId, userId, false);
-        }
+        foreach (var userId in userIds) await AddProjectMember(projectId, userId, false);
 
         if (saveChanges) await Repository.SaveChangesAsync();
     }
@@ -97,38 +120,6 @@ public class ProjectService : ServiceBase<ProjectRepository>
         {
             Repository.Delete(projectMember);
             await Repository.SaveChangesAsync();
-        }
-    }
-
-    #endregion
-
-    public async Task<IEnumerable<ProjectVm>> GetProjects()
-    {
-        return await Repository.GetProjects();
-    }
-
-    #region Invitations
-
-    public async Task InviteProjectMember(string projectId, InviteMember invitation)
-    {
-        var project = await Repository.GetProject(projectId);
-        
-        if (project == null)
-        {
-            throw new NullReferenceException("Project not found");
-        }
-        
-        var user = await _userRepository.GetUserByEmail(invitation.Email);
-        if (user != null)
-        {
-            await AddProjectMember(projectId, user.Id);
-        }
-        else
-        {
-            var entity = new User(invitation.FirstName, invitation.LastName, invitation.Email);
-            _userRepository.Add(entity);
-            await Repository.SaveChangesAsync();
-            await AddProjectMember(projectId, entity.Id);
         }
     }
 

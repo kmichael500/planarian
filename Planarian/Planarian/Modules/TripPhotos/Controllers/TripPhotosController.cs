@@ -11,8 +11,8 @@ namespace Planarian.Modules.TripPhotos.Controllers;
 [Authorize]
 public class TripPhotosController : PlanarianControllerBase<TripPhotoService>
 {
-  
-    public TripPhotosController(RequestUser requestUser, TripPhotoService service, TokenService tokenService) : base(requestUser, tokenService, service)
+    public TripPhotosController(RequestUser requestUser, TripPhotoService service, TokenService tokenService) : base(
+        requestUser, tokenService, service)
     {
     }
 
@@ -27,5 +27,4 @@ public class TripPhotosController : PlanarianControllerBase<TripPhotoService>
     }
 
     #endregion
-    
 }
