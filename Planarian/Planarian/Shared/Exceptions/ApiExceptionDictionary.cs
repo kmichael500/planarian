@@ -33,7 +33,9 @@ public static class ApiExceptionDictionary
     public static ApiException InvalidPassword =>
         new(StatusCodes.Status401Unauthorized, 201, "Password is invalid");
 
-    public static ApiException PasswordResetCodeExpired => new(StatusCodes.Status401Unauthorized, 201, "Password reset code expired");
+    public static ApiException PasswordResetCodeExpired => new(StatusCodes.Status401Unauthorized, 202, "Password reset code expired");
+    public static ApiException InvalidPasswordResetCode => new(StatusCodes.Status500InternalServerError, 203, "The code does not exist");
+
 
 
     #endregion
@@ -45,6 +47,7 @@ public static class ApiExceptionDictionary
 
     public static ApiException EmailFailedToSend =>
         new(StatusCodes.Status500InternalServerError, 301, "The email failed to send");
+
 
 
     #endregion

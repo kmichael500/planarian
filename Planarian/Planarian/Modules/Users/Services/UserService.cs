@@ -144,7 +144,7 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByPasswordResetCode(code);
         if (user == null)
         {
-            throw ApiExceptionDictionary.EmailDoesNotExist;
+            throw ApiExceptionDictionary.InvalidPasswordResetCode;
         }
         
         if(user.PasswordResetCodeExpiration < DateTime.UtcNow)
