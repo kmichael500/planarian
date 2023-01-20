@@ -9,7 +9,7 @@ import {
   Select,
   Space,
 } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
 import type { ColumnsType } from "antd/es/table";
@@ -23,6 +23,7 @@ import { TripObjectiveDetailPhotoComponent } from "./objective.detail.photo.comp
 import LeadTableComponent from "../../Components/lead.table.component";
 import { ObjectiveTypeTagComponent } from "../../ObjectiveTypes/Components/objective.type.tag.component";
 import { SettingsService } from "../../Settings/Services/settings.service";
+import { LeadVm } from "../../Leads/Models/Lead";
 
 const { Option } = Select;
 const { Title, Paragraph } = Typography;
@@ -210,18 +211,9 @@ const TripObjectiveDetailComponent: React.FC = () => {
 
       <Divider />
 
-      <Card
-        title="Leads"
-        extra={
-          <Link to={"addLeads"}>
-            <Button>+</Button>
-          </Link>
-        }
-      >
-        <LeadTableComponent
-          tripObjectiveId={tripObjectiveId as string}
-        ></LeadTableComponent>
-      </Card>
+      <LeadTableComponent
+        tripObjectiveId={tripObjectiveId as string}
+      ></LeadTableComponent>
 
       <Divider />
       <Card

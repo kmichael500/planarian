@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Table, Spin, Button, Popconfirm } from "antd";
+import { Table, Spin, Button, Popconfirm, Card, Row, Col } from "antd";
 import { LeadVm } from "../Leads/Models/Lead";
 import { TripObjectiveService } from "../Objective/Services/trip.objective.service";
 import { nameof } from "../../Shared/Helpers/StringHelpers";
 import { LeadService } from "../Leads/Services/lead.service";
+import { Link } from "react-router-dom";
+import { downloadCSV } from "../../Shared/Helpers/FileHelpers";
+
+import { CloudDownloadOutlined, PlusCircleOutlined } from "@ant-design/icons";
 
 interface LeadTableProps {
   tripObjectiveId: string;
@@ -84,13 +88,40 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
   };
 
   return (
-    <Spin spinning={loading}>
+    <Card
+      title="Leads"
+      loading={loading}
+      extra={[
+        <>
+          <Row gutter={10}>
+            <Col>
+              <Link to={"./addLeads"}>
+                <Button type="primary" icon={<PlusCircleOutlined />}>
+                  Add
+                </Button>
+              </Link>
+            </Col>
+            <Col>
+              <Button
+                icon={<CloudDownloadOutlined />}
+                onClick={() => {
+                  downloadCSV(leads, true);
+                }}
+              >
+                Download
+              </Button>
+            </Col>
+          </Row>
+        </>,
+      ]}
+    >
+      {" "}
       <Table
         dataSource={leads}
         columns={columns}
         rowKey={nameof<LeadVm>("id")}
       />
-    </Spin>
+    </Card>
   );
 };
 

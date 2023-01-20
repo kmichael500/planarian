@@ -180,6 +180,7 @@ const LeadAddComponent: React.FC = () => {
                       }
                     >
                       <Option value={LeadClassification.GOOD}>Good</Option>
+                      <Option value={LeadClassification.DECENT}>Decent</Option>
                       <Option value={LeadClassification.BAD}>Bad</Option>
                       <Option value={LeadClassification.UNKNOWN}>
                         Unknown
