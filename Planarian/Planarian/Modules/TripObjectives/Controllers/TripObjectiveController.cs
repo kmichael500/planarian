@@ -66,6 +66,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
         return new OkResult();
     }
 
+    // TODO Move this to the trip controller
     [HttpPost]
     public async Task<ActionResult<TripObjectiveVm>> CreateTripObjective(
         [FromBody] CreateOrEditTripObjectiveVm tripObjective)
