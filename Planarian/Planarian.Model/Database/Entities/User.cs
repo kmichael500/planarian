@@ -50,6 +50,8 @@ public class User : EntityBase
 
     [MaxLength(PropertyLength.PasswordResetCode)]
     public string? PasswordResetCode { get; set; }
+    [MaxLength(PropertyLength.EmailConfirmationCode)] public string? EmailConfirmationCode { get; set; }
+    public bool? IsEmailConfirmed { get; set; }
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }

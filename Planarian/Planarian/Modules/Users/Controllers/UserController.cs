@@ -44,6 +44,19 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #endregion
 
+    #region Confirm
+
+    [AllowAnonymous]
+    [HttpPost("confirm-email")]
+    public async Task<ActionResult> ConfirmEmail(string code)
+    {
+        await Service.ConfirmEmail(code);
+
+        return new OkResult();
+    }
+
+    #endregion
+
     #region Password Reset
 
     [AllowAnonymous]

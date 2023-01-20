@@ -1,13 +1,13 @@
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email;
-using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
 using Planarian.Shared.Options;
 
@@ -79,12 +79,17 @@ public class UserService : ServiceBase<UserRepository>
 
         var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
         {
-            HashedPassword = PasswordService.Hash(user.Password)
+            HashedPassword = PasswordService.Hash(user.Password),
+            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode),
+            IsEmailConfirmed = false
         };
 
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();
+
+        await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
+            entity.EmailConfirmationCode);
     }
 
     public async Task SendResetPasswordEmail(string email)
@@ -99,13 +104,7 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        var message =
-            "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
-
-        var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
-
-        await _emailService.SendGenericEmail("Planarian Password Reset", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions("Password Reset", message, "Reset Password", link));
+        await    _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }
 
     public async Task ResetPassword(string code, string password)
@@ -123,10 +122,17 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        const string message =
-            "You're password was just changed. If you did not make this request, please contact us immediately.";
+        await _emailService.SendPasswordChangedEmail(user.EmailAddress, user.FullName);
+    }
+    
+    public async Task ConfirmEmail(string code)
+    {
+        var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);
+        if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
 
-        await _emailService.SendGenericEmail("Planarian Password Changed", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions("Planarian Password Changed", message));
+        user.EmailConfirmationCode = null;
+        user.IsEmailConfirmed = true;
+
+        await Repository.SaveChangesAsync();
     }
 }
