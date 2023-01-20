@@ -1,6 +1,7 @@
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
@@ -79,12 +80,27 @@ public class UserService : ServiceBase<UserRepository>
 
         var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
         {
-            HashedPassword = PasswordService.Hash(user.Password)
+            HashedPassword = PasswordService.Hash(user.Password),
+            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode),
+            IsEmailConfirmed = false
         };
 
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();
+
+        var link = $"{_serverOptions.ClientBaseUrl}/confirm-email?code={entity.EmailConfirmationCode}";
+
+        var paragraphs = new List<string>
+        {
+            "Welcome to Planarian, the ultimate tool for managing your cave project data.",
+            "With unlimited projects, team member management, photos, trip reports and tags, lead tracking and more, Planarian makes it easy to stay organized and share your data with your team.",
+            "To get started, please confirm your email address by clicking the link below. If you did not sign up for Planarian, please ignore this email."
+        };
+
+        await _emailService.SendGenericEmail("Confirm your email address", entity.EmailAddress, entity.FullName,
+            new GenericEmailSubstitutions(paragraphs,
+                "Confirm your email address", "Confirm Email", link));
     }
 
     public async Task SendResetPasswordEmail(string email)
@@ -99,13 +115,12 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        var message =
-            "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
+        const string message = "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
 
         var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
 
         await _emailService.SendGenericEmail("Planarian Password Reset", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions("Password Reset", message, "Reset Password", link));
+            new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
     }
 
     public async Task ResetPassword(string code, string password)
@@ -127,6 +142,17 @@ public class UserService : ServiceBase<UserRepository>
             "You're password was just changed. If you did not make this request, please contact us immediately.";
 
         await _emailService.SendGenericEmail("Planarian Password Changed", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions("Planarian Password Changed", message));
+            new GenericEmailSubstitutions(message, "Planarian Password Changed"));
+    }
+    
+    public async Task ConfirmEmail(string code)
+    {
+        var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);
+        if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
+        
+        user.EmailConfirmationCode = null;
+        user.IsEmailConfirmed = true;
+
+        await Repository.SaveChangesAsync();
     }
 }

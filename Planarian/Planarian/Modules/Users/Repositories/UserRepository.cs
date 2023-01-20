@@ -42,4 +42,9 @@ public class UserRepository : RepositoryBase
     {
         return await DbContext.Users.Where(e => e.PasswordResetCode == code).FirstOrDefaultAsync();
     }
+
+    public async Task<User?> GetUserByPasswordEmailConfirmationCode(string code)
+    {
+        throw new NotImplementedException();
+    }
 }

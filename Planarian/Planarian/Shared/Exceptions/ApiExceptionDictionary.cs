@@ -44,7 +44,10 @@ public static class ApiExceptionDictionary
         "The password does not meet the complexity requirements");
 
     public static ApiException InvalidPhoneNumber =>
-        new(StatusCodes.Status400BadRequest, 103, "Phone number is invalid");
+        new(StatusCodes.Status400BadRequest, 102, "Phone number is invalid");
+    public static ApiException InvalidEmailConfirmationCode =>
+        new(StatusCodes.Status400BadRequest, 103, "The email confirmation code does not exist");
+
 
     #endregion
 
@@ -71,6 +74,7 @@ public static class ApiExceptionDictionary
 
     public static ApiException EmailFailedToSend =>
         new(StatusCodes.Status500InternalServerError, 301, "The email failed to send");
+
 
     #endregion
 }

@@ -12,4 +12,5 @@ public static class PropertyLength
     public const int StationName = 100;
     public const int PasswordHash = 100;
     public const int PasswordResetCode = 20;
+    public const int EmailConfirmationCode = 20;
 }

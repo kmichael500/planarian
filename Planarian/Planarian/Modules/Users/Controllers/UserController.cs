@@ -44,13 +44,26 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #endregion
 
+    #region Confirm
+
+    [AllowAnonymous]
+    [HttpPost("confirm-email")]
+    public async Task<ActionResult> ConfirmEmail(string code)
+    {
+        await Service.ConfirmEmail(code);
+
+        return new OkResult();
+    }
+
+    #endregion
+
     #region Password Reset
 
     [AllowAnonymous]
     [HttpPost("reset-password/email/{email}")]
     public async Task<ActionResult> SendPasswordReset(string email)
     {
-        await Service.SendResetPasswordEmail(email);
+        await Service.SendResetPasswor dEmail(email);
 
         return new OkResult();
     }

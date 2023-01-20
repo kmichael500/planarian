@@ -7,16 +7,19 @@
           {{header}}
         </mj-text>
 
-        <mj-divider border-color="#F45E43"></mj-divider>
+        {{#if messages}}
+          {{#each messages}}
+            <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
+              {{this}}
+            </mj-text>
 
-        <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
-          {{message}}
-        </mj-text>
+          {{/each}}
+        {{/if}}
 
-        {{#if buttonText}}}
-        <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
-          {{buttonText}}
-        </mj-button>
+        {{#if buttonText}}
+          <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
+            {{buttonText}}
+          </mj-button>
         {{/if}}
       </mj-column>
     </mj-section>
