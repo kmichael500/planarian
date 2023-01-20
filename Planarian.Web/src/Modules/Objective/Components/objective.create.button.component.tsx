@@ -81,12 +81,12 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
     values.tripId = props.tripId;
 
     setConfirmLoading(true);
-    const newObjectiveId = await TripObjectiveService.AddTripObjective(values);
+    const objective = await TripObjectiveService.AddTripObjective(values);
 
     setOpen(false);
     setConfirmLoading(false);
     navigate(
-      `/projects/${props.projectId}/trip/${props.tripId}/objective/${newObjectiveId}`
+      `/projects/${props.projectId}/trip/${props.tripId}/objective/${objective.id}`
     );
   };
 

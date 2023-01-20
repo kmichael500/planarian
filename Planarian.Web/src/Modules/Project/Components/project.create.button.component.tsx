@@ -23,7 +23,6 @@ const ProjectCreateButton: React.FC = () => {
   const onSubmit = async (values: CreateOrEditProject): Promise<void> => {
     setConfirmLoading(true);
     const newProject = await ProjectService.CreateProject(values);
-
     setOpen(false);
     setConfirmLoading(false);
     navigate(`${newProject.id}`);

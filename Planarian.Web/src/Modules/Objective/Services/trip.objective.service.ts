@@ -43,8 +43,13 @@ const TripObjectiveService = {
     );
     return response.data;
   },
-  async AddTripObjective(values: CreateOrEditTripObjectiveVm): Promise<string> {
-    const response = await HttpClient.post<string>(`${baseUrl}`, values);
+  async AddTripObjective(
+    values: CreateOrEditTripObjectiveVm
+  ): Promise<TripObjectiveVm> {
+    const response = await HttpClient.post<TripObjectiveVm>(
+      `${baseUrl}`,
+      values
+    );
     return response.data;
   },
 
