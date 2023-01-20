@@ -8,7 +8,6 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email;
-using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
 using Planarian.Shared.Options;
 
@@ -89,17 +88,8 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        var link = $"{_serverOptions.ClientBaseUrl}/confirm-email?code={entity.EmailConfirmationCode}";
-
-        var paragraphs = new List<string>
-        {
-            "Welcome to Planarian!",
-            "Please confirm your email address by clicking the link below. If you did not sign up for Planarian, please ignore this email."
-        };
-
-        await _emailService.SendGenericEmail("Confirm your email address", entity.EmailAddress, entity.FullName,
-            new GenericEmailSubstitutions(paragraphs,
-                "Confirm your email address", "Confirm Email", link));
+        await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
+            entity.EmailConfirmationCode);
     }
 
     public async Task SendResetPasswordEmail(string email)
@@ -114,12 +104,7 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        const string message = "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
-
-        var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
-
-        await _emailService.SendGenericEmail("Planarian Password Reset", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
+        await    _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }
 
     public async Task ResetPassword(string code, string password)
@@ -137,11 +122,7 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        const string message =
-            "You're password was just changed. If you did not make this request, please contact us immediately.";
-
-        await _emailService.SendGenericEmail("Planarian Password Changed", user.EmailAddress, user.FullName,
-            new GenericEmailSubstitutions(message, "Planarian Password Changed"));
+        await _emailService.SendPasswordChangedEmail(user.EmailAddress, user.FullName);
     }
     
     public async Task ConfirmEmail(string code)

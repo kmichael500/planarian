@@ -45,9 +45,12 @@ public static class ApiExceptionDictionary
 
     public static ApiException InvalidPhoneNumber =>
         new(StatusCodes.Status400BadRequest, 102, "Phone number is invalid");
+
     public static ApiException InvalidEmailConfirmationCode =>
         new(StatusCodes.Status400BadRequest, 103, "The email confirmation code does not exist");
 
+    public static ApiException EmailNotConfirmed => new(StatusCodes.Status400BadRequest, 14,
+        "Please confirm your email! A new confirmation code has been sent to your email address.");
 
     #endregion
 
