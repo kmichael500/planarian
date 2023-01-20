@@ -37,7 +37,7 @@ const ResetPasswordComponent: React.FC = () => {
       if (isNullOrWhiteSpace(code) || code === null) {
         throw new Error("Invalid code");
       }
-      await UserService.RersetPassword(code, values.password);
+      await UserService.ResetPassword(code, values.password);
       message.success("Updated successfully");
       setIsChangingPassword(false);
       passwordForm.resetFields();

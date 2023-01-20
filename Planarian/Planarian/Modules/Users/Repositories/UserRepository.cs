@@ -45,6 +45,6 @@ public class UserRepository : RepositoryBase
 
     public async Task<User?> GetUserByPasswordEmailConfirmationCode(string code)
     {
-        throw new NotImplementedException();
+        return await DbContext.Users.FirstOrDefaultAsync(e => e.EmailConfirmationCode == code);
     }
 }

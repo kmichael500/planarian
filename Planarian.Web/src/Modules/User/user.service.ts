@@ -25,10 +25,19 @@ const UserService = {
       {}
     );
   },
-  async RersetPassword(code: string, password: string): Promise<void> {
+  async ResetPassword(code: string, password: string): Promise<void> {
     const response = await HttpClient.post(
       `${baseUrl}/reset-password?code=${code}`,
       password,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  },
+  async ConfirmEmail(code: string): Promise<void> {
+    const response = await HttpClient.post(
+      `${baseUrl}/confirm-email?code=${code}`,
+      {},
       {
         headers: { "Content-Type": "application/json" },
       }

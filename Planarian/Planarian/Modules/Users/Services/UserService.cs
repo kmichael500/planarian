@@ -93,9 +93,8 @@ public class UserService : ServiceBase<UserRepository>
 
         var paragraphs = new List<string>
         {
-            "Welcome to Planarian, the ultimate tool for managing your cave project data.",
-            "With unlimited projects, team member management, photos, trip reports and tags, lead tracking and more, Planarian makes it easy to stay organized and share your data with your team.",
-            "To get started, please confirm your email address by clicking the link below. If you did not sign up for Planarian, please ignore this email."
+            "Welcome to Planarian!",
+            "Please confirm your email address by clicking the link below. If you did not sign up for Planarian, please ignore this email."
         };
 
         await _emailService.SendGenericEmail("Confirm your email address", entity.EmailAddress, entity.FullName,
@@ -149,7 +148,7 @@ public class UserService : ServiceBase<UserRepository>
     {
         var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);
         if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
-        
+
         user.EmailConfirmationCode = null;
         user.IsEmailConfirmed = true;
 

@@ -5,6 +5,7 @@ import {
   Link,
   Navigate,
 } from "react-router-dom";
+import { ConfirmEmailComponent } from "./Modules/Authentication/Components/confirm.email.component";
 import { LoginComponent } from "./Modules/Authentication/Components/login.component";
 import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.routes.component";
 import { ResetPasswordComponent } from "./Modules/Authentication/Components/reset.password.component";
@@ -26,6 +27,10 @@ export const AppRouting: React.FC = () => {
         <Route
           path="/reset-password"
           element={<ResetPasswordComponent />}
+        ></Route>
+        <Route
+          path="/confirm-email"
+          element={<ConfirmEmailComponent />}
         ></Route>
         <Route element={<ProtectedRoutes />}>
           <Route path="/projects" element={<ProjectListComponent />}></Route>{" "}
