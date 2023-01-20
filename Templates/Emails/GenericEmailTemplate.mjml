@@ -7,20 +7,28 @@
           {{header}}
         </mj-text>
 
-        {{#if messages}}
-          {{#each messages}}
-            <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
-              {{this}}
-            </mj-text>
+        <mj-raw>
+          {{#if messages}}
+            {{#each messages}}
+        </mj-raw>
+        <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
+          {{this}}
+        </mj-text>
+        <mj-raw>
 
           {{/each}}
-        {{/if}}
+          {{/if}}
+        </mj-raw>
+        <mj-raw>
+          {{#if buttonText}}
+        </mj-raw>
+        <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
+          {{buttonText}}
+        </mj-button>
+        <mj-raw>
 
-        {{#if buttonText}}
-          <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
-            {{buttonText}}
-          </mj-button>
-        {{/if}}
+          {{/if}}
+        </mj-raw>
       </mj-column>
     </mj-section>
   </mj-body>
