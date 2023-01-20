@@ -6,27 +6,23 @@ import {
   Spin,
   Card,
   Typography,
-  Tag,
   DatePicker,
 } from "antd";
 import moment from "moment";
 import { Fragment, useEffect, useState } from "react";
-import { Helmet } from "react-helmet";
 import { Link, useParams } from "react-router-dom";
 import {
   MemberGridComponent,
   MemberGridType,
 } from "../../../Shared/Components/MemberGridComponent";
 import { TripObjectiveTagComponent } from "../../../Shared/Components/TripObjectiveTagComponent";
-import { UserAvatarGroupComponent } from "../../../Shared/Components/UserAvatarGroupComponent";
+import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { SettingsService } from "../../Settings/Services/settings.service";
 import { TripObjectiveCreateButton } from "../../Objective/Components/objective.create.button.component";
 import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";
 import { TripVm } from "../Models/TripVm";
 import { TripSerice } from "../Services/trip.service";
-import { TripCreateButton } from "./trip.create.button.component";
 const { Title, Text } = Typography;
 
 const TripDetailComponent: React.FC = () => {
@@ -136,17 +132,7 @@ const TripDetailComponent: React.FC = () => {
                       <UserAvatarGroupComponent
                         size={"small"}
                         maxCount={4}
-                        userIds={[
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                          "uJ9a1oaA10",
-                        ]}
+                        userIds={objective.tripObjectiveMemberIds}
                       />
                     </Row>
                   </>
