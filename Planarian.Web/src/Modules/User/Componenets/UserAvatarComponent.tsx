@@ -1,8 +1,9 @@
 import { Avatar, Spin, Tooltip, Typography } from "antd";
 import { AvatarSize } from "antd/lib/avatar/SizeContext";
 import { useState, useEffect } from "react";
-import { StringHelpers } from "../Helpers/StringHelpers";
-import { SettingsService } from "../../Modules/Settings/Services/settings.service";
+import { StringHelpers } from "../../../Shared/Helpers/StringHelpers";
+import { NameProfilePhotoVm } from "../Models/NameProfilePhotoVm";
+import { SettingsService } from "../../Settings/Services/settings.service";
 
 const { Text } = Typography;
 export interface UserAvatarComponentProps {
@@ -10,7 +11,7 @@ export interface UserAvatarComponentProps {
   size?: AvatarSize | undefined;
 }
 const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
-  let [usersName, setUsersName] = useState<string>();
+  let [usersName, setUsersName] = useState<NameProfilePhotoVm>();
   let [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -19,6 +20,7 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
         const tripObjectiveNameResponse = await SettingsService.GetUsersName(
           props.userId
         );
+        console.log(tripObjectiveNameResponse);
         setUsersName(tripObjectiveNameResponse);
         setIsLoading(false);
       };
@@ -28,14 +30,13 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
 
   return (
     <Spin spinning={isLoading}>
-      <Tooltip title={usersName} placement="top">
-        <Avatar
-          src="https://avatars.githubusercontent.com/u/4175685?v=4"
-          size={props.size}
-        >
-          {StringHelpers.NameToInitials(usersName)}
-        </Avatar>
-      </Tooltip>
+      {usersName !== undefined && (
+        <Tooltip title={usersName.name} placement="top">
+          <Avatar src={usersName.profilePhotoUrl} size={props.size}>
+            {StringHelpers.NameToInitials(usersName.name)}
+          </Avatar>
+        </Tooltip>
+      )}
     </Spin>
   );
 };

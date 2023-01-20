@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Settings.Repositories;
@@ -21,13 +22,15 @@ public class SettingsRepository : RepositoryBase
         return await DbContext.Tags.Where(e => e.Id == objectiveTypeId).Select(e => e.Name).FirstAsync();
     }
 
-    public async Task<string> GetUsersName(string userId)
+    public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)
     {
-        return await DbContext.Users.Where(e => e.Id == userId).Select(e => e.FullName).FirstAsync();
+        return await DbContext.Users.Where(e => e.Id == userId)
+            .Select(e => new NameProfilePhotoVm(e.FullName, e.ProfilePhotoBlobKey)).FirstAsync();
     }
-
+    
     public async Task<IEnumerable<SelectListItem<string>>> GetUsers()
     {
         return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
     }
+    
 }
