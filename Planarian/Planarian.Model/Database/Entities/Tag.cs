@@ -22,6 +22,7 @@ public class Tag : EntityBaseNameId
     public string? ProjectId { get; set; } = null!;
     public virtual ICollection<TripObjective> TripObjectives { get; set; } = new HashSet<TripObjective>();
     public virtual ICollection<TripObjectiveTag> TripObjectiveTags { get; set; } = new HashSet<TripObjectiveTag>();
+    public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
     public virtual Project? Project { get; set; }
 }
 

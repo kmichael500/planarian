@@ -46,10 +46,11 @@ public class Lead : EntityBase
     public string ClosestStation { get; set; } = null!;
 
     public string Classification { get; set; }
-
+    public bool IsAlive { get; set; } = true;
 
     public virtual TripObjective TripObjective { get; set; } = null!;
     public virtual User User { get; set; } = null!;
+    public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
 }
 
 public class LeadConfiguration : IEntityTypeConfiguration<Lead>
