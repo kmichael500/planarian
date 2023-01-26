@@ -18,8 +18,6 @@ using Planarian.Modules.Tags.Services;
 using Planarian.Modules.TripObjectives.Repositories;
 using Planarian.Modules.TripObjectives.Services;
 using Planarian.Modules.TripPhotos.Controllers;
-using Planarian.Modules.Trips.Repositories;
-using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Modules.Users.Services;
 using Planarian.Shared.Email;
@@ -99,7 +97,6 @@ builder.Services.AddSingleton(emailOptions);
 #region Services
 
 builder.Services.AddScoped<ProjectService>();
-builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<TripObjectiveService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
@@ -120,7 +117,6 @@ builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
 #region Repositories
 
 builder.Services.AddScoped<ProjectRepository>();
-builder.Services.AddScoped<TripRepository>();
 builder.Services.AddScoped<TripObjectiveRepository>();
 builder.Services.AddScoped<AuthenticationRepository>();
 builder.Services.AddScoped<SettingsRepository>();

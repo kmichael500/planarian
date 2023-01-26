@@ -5,13 +5,13 @@ namespace Planarian.Model.Database.Entities.TripObjectives;
 
 public class TripObjectiveVm : ITripObjective
 {
-    public TripObjectiveVm(string id, string tripId, IEnumerable<string> tripObjectiveTypeIds,
+    public TripObjectiveVm(string id, string projectId, IEnumerable<string> tripObjectiveTypeIds,
         IEnumerable<string> tripObjectiveMemberIds, string name,
         string description,
         string? tripReport)
     {
         Id = id;
-        TripId = tripId;
+        ProjectId = projectId;
         TripObjectiveTypeIds = tripObjectiveTypeIds;
         TripObjectiveMemberIds = tripObjectiveMemberIds;
         TripReport = tripReport;
@@ -21,7 +21,7 @@ public class TripObjectiveVm : ITripObjective
         IEnumerable<string> tripObjectiveMemberIds)
     {
         Id = tripObjective.Id;
-        TripId = tripObjective.TripId;
+        ProjectId = tripObjective.ProjectId;
         TripObjectiveTypeIds = tripObjectiveTypeIds;
         TripObjectiveMemberIds = tripObjectiveMemberIds;
         Name = tripObjective.Name;
@@ -44,7 +44,7 @@ public class TripObjectiveVm : ITripObjective
 
     [Required]
     [MaxLength(PropertyLength.Id)]
-    public string TripId { get; set; } = null!;
+    public string ProjectId { get; set; } = null!;
 
     [Required]
     [MaxLength(PropertyLength.Name)]

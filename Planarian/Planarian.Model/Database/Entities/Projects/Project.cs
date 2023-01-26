@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Planarian.Model.Database.Entities.Trips;
+using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -14,7 +14,7 @@ public class Project : EntityBase
     public string Name { get; set; } = null!;
 
     public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = null!;
-    public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
+    public virtual ICollection<TripObjective> Trips { get; set; } = new HashSet<TripObjective>();
     public virtual ICollection<Tag> CustomTags { get; set; } = new HashSet<Tag>();
 }
 

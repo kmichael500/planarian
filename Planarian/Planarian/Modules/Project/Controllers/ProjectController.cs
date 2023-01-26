@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.Projects;
-using Planarian.Model.Database.Entities.Trips;
+using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Project.Services;
-using Planarian.Modules.Trips.Services;
+using Planarian.Modules.TripObjectives.Services;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Project.Controllers;
@@ -14,21 +14,21 @@ namespace Planarian.Modules.Project.Controllers;
 [Authorize]
 public class ProjectController : PlanarianControllerBase<ProjectService>
 {
-    private readonly TripService _tripService;
+    private readonly TripObjectiveService _tripObjectiveService;
 
     public ProjectController(RequestUser requestUser, ProjectService service, TokenService tokenService,
-        TripService tripService) : base(
+        TripObjectiveService tripObjectiveService) : base(
         requestUser, tokenService, service)
     {
-        _tripService = tripService;
+        _tripObjectiveService = tripObjectiveService;
     }
 
     #region Trips
 
     [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
+    public async Task<ActionResult<IEnumerable<TripObjectiveVm>>> GetTrips(string projectId)
     {
-        var trips = await _tripService.GetTripsByProjectId(projectId);
+        var trips = await _tripObjectiveService.GetTripsByProjectId(projectId);
 
         return new JsonResult(trips);
     }

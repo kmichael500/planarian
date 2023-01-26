@@ -133,9 +133,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
         var tripObjective = values.Id != null
             ? await Repository.GetTripObjective(values.Id) ?? new TripObjective()
             : new TripObjective();
-
-        tripObjective.TripId = values.TripId;
-
+        
         foreach (var tripObjectiveTypeId in values.TripObjectiveTypeIds)
         {
             var tripObjectiveType = Repository.GetTripObjectiveType(tripObjectiveTypeId);
@@ -279,4 +277,9 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
     }
 
     #endregion
+
+    public async Task<IEnumerable<TripObjectiveVm>> GetTripsByProjectId(string projectId)
+    {
+        return await Repository.GetTripsByProjectId(projectId);
+    }
 }

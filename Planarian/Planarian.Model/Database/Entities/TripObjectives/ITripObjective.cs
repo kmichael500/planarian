@@ -11,7 +11,7 @@ public interface ITripObjective
 
     [Required]
     [MaxLength(PropertyLength.Id)]
-    public string TripId { get; set; }
+    public string ProjectId { get; set; }
 
     [Required]
     [MaxLength(PropertyLength.Name)]

@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Planarian.Model.Database.Entities.TripObjectives;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities;

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Planarian.Model.Database;
 
@@ -11,9 +12,10 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20230126022847_v20")]
+    partial class v20
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
