@@ -4,8 +4,7 @@ import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import axios from "axios";
-import { message } from "antd";
-import { AuthenticationService } from "./Modules/Authentication/Services/authentication.service";
+import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 
 const root = ReactDOM.createRoot(

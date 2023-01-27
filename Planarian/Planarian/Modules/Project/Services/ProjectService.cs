@@ -1,7 +1,7 @@
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
-using Planarian.Modules.Project.Controllers;
+using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Project.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
@@ -65,7 +65,10 @@ public class ProjectService : ServiceBase<ProjectRepository>
         }
 
         await Repository.SaveChangesAsync();
-        return new ProjectVm(project, 1, 0); // TODO These values are only correct on create
+
+        var numberOfTrips = await Repository.GetNumberOfTrips(project.Id);
+
+        return new ProjectVm(project, 1, numberOfTrips);
     }
 
     public async Task<ProjectVm?> GetProject(string projectId)

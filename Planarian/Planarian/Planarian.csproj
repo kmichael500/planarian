@@ -5,30 +5,23 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-        <LangVersion>11</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
-        <PackageReference Include="Handlebars.Net" Version="2.1.2" />
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
-        <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="5.2.0" />
-        <PackageReference Include="Southport.Messaging.Email.Core" Version="1.19.1" />
-        <PackageReference Include="Southport.Messaging.Email.SendGrid" Version="2.3.1" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.2-mauipre.1.22102.15" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.2-mauipre.1.22102.15" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.2-mauipre.1.22102.15" />
+        <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1"/>
+        <PackageReference Include="Handlebars.Net" Version="2.1.2"/>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10"/>
+        <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="5.2.0"/>
+        <PackageReference Include="Southport.Messaging.Email.Core" Version="1.19.1"/>
+        <PackageReference Include="Southport.Messaging.Email.SendGrid" Version="2.3.1"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.2-mauipre.1.22102.15"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.2-mauipre.1.22102.15"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.2-mauipre.1.22102.15"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Modules\Project\Models" />
-        <Folder Include="Modules\TripObjectives\Models" />
-        <Folder Include="Modules\Trips\Models" />
+        <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj"/>
     </ItemGroup>
 
 </Project>

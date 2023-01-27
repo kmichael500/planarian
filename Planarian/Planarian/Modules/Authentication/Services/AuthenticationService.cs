@@ -3,16 +3,16 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Email;
+using Planarian.Shared.Email.Services;
 using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Authentication.Services;
 
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
+    private readonly EmailService _emailService;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
-    private readonly EmailService _emailService;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
         TokenService tokenService, UserRepository userRepository, EmailService emailService) :

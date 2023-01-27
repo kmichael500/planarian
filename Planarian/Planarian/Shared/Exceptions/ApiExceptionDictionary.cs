@@ -6,32 +6,32 @@ public static class ApiExceptionDictionary
 
     public static ApiException BadRequest(string message)
     {
-        return new(StatusCodes.Status400BadRequest, 1, message);
+        return new ApiException(StatusCodes.Status400BadRequest, 1, message);
     }
 
     public static ApiException Unauthorized(string message)
     {
-        return new(StatusCodes.Status401Unauthorized, 2, message);
+        return new ApiException(StatusCodes.Status401Unauthorized, 2, message);
     }
 
     public static ApiException Forbidden(string message)
     {
-        return new(StatusCodes.Status403Forbidden, 3, message);
+        return new ApiException(StatusCodes.Status403Forbidden, 3, message);
     }
 
     public static ApiException NotFound(string type)
     {
-        return new(StatusCodes.Status404NotFound, 4, $"{type} not found");
+        return new ApiException(StatusCodes.Status404NotFound, 4, $"{type} not found");
     }
 
     public static ApiException Conflict(string message)
     {
-        return new(StatusCodes.Status409Conflict, 5, message);
+        return new ApiException(StatusCodes.Status409Conflict, 5, message);
     }
 
     public static ApiException InternalServerError(string message)
     {
-        return new(500, 6, message);
+        return new ApiException(500, 6, message);
     }
 
     #endregion
@@ -77,7 +77,6 @@ public static class ApiExceptionDictionary
 
     public static ApiException EmailFailedToSend =>
         new(StatusCodes.Status500InternalServerError, 301, "The email failed to send");
-
 
     #endregion
 }

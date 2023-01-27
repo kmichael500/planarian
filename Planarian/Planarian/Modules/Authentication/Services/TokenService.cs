@@ -2,8 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using Planarian.Modules.Authentication.Repositories;
-using Planarian.Shared.Options;
+using Planarian.Library.Options;
 
 namespace Planarian.Modules.Authentication.Services;
 

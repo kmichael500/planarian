@@ -1,15 +1,14 @@
 using HandlebarsDotNet;
 using Newtonsoft.Json;
+using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
-using Planarian.Shared.Email.Services;
 using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
-using Planarian.Shared.Options;
 using Southport.Messaging.Email.Core;
 
-namespace Planarian.Shared.Email;
+namespace Planarian.Shared.Email.Services;
 
 public class EmailService : ServiceBase<MessageTypeRepository>
 {
@@ -26,7 +25,8 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
         GenericEmailSubstitutions substitutions)
     {
-        var messageType = await Repository.GetMessageTypeVm(MessageKey.GenericEmail, MessageTypeKey.Email);
+        var messageType =
+            await Repository.GetMessageTypeVm(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
 
         if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
@@ -41,22 +41,24 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         if (results.Any(e => !e.IsSuccessful)) throw ApiExceptionDictionary.EmailFailedToSend;
 
-        var messageLog = new MessageLog(MessageKey.GenericEmail, MessageTypeKey.Email, subject, toEmailAddress, toName,
+        var messageLog = new MessageLog(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, subject,
+            toEmailAddress, toName,
             messageType.FromName, messageType.FromEmail, JsonConvert.SerializeObject(substitutions.Substitutions));
 
         Repository.Add(messageLog);
 
         await Repository.SaveChangesAsync();
     }
-    
-    public async Task SendPasswordResetEmail(string emailAddress, string fullName, string resetCode){
-        const string message = "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
+
+    public async Task SendPasswordResetEmail(string emailAddress, string fullName, string resetCode)
+    {
+        const string message =
+            "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
 
         var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
 
         await SendGenericEmail("Planarian Password Reset", emailAddress, fullName,
             new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
-
     }
 
     public async Task SendEmailConfirmationEmail(string emailAddress, string fullName, string emailConfirmationCode)
@@ -72,7 +74,6 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         await SendGenericEmail("Confirm your email address", emailAddress, fullName,
             new GenericEmailSubstitutions(paragraphs,
                 "Confirm your email address", "Confirm Email", link));
-
     }
 
     public async Task SendPasswordChangedEmail(string emailAddress, string fullName)
@@ -83,15 +84,4 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         await SendGenericEmail("Planarian Password Changed", emailAddress, fullName,
             new GenericEmailSubstitutions(message, "Planarian Password Changed"));
     }
-}
-
-public class MessageKey
-{
-    public const string GenericEmail = "GenericEmail";
-}
-
-public class MessageTypeKey
-{
-    public const string Email = "Email";
-    public const string Sms = "Sms";
 }

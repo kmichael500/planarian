@@ -5,35 +5,52 @@ namespace Planarian.Model.Database.Entities.Trips;
 
 public class TripVm : ITrip
 {
-    public TripVm(string name, string id, string projectId, DateTime tripDate, int tripNumber)
+    public TripVm(string id, string projectId, IEnumerable<string> tripTagTypeIds,
+        IEnumerable<string> tripMemberIds, string name,
+        string? description,
+        string? tripReport)
     {
         Id = id;
-        Name = name;
         ProjectId = projectId;
-        TripDate = tripDate;
-        TripNumber = tripNumber;
+        TripTagTypeIds = tripTagTypeIds;
+        TripMemberIds = tripMemberIds;
+        TripReport = tripReport;
     }
 
-    public TripVm(Trip trip, int tripNumber)
+    public TripVm(Trip trip, IEnumerable<string> tripTagTypeIds,
+        IEnumerable<string> tripMemberIds)
     {
         Id = trip.Id;
         ProjectId = trip.ProjectId;
-        TripDate = trip.TripDate;
+        TripTagTypeIds = tripTagTypeIds;
+        TripMemberIds = tripMemberIds;
         Name = trip.Name;
-        TripNumber = tripNumber;
+        Description = trip.Description;
+        TripReport = trip.TripReport;
     }
+
 
     public TripVm()
     {
     }
 
-    [Required] public int TripNumber { get; set; }
+    [Required] public IEnumerable<string> TripTagTypeIds { get; set; } = new HashSet<string>();
+
+    [Required] public IEnumerable<string> TripMemberIds { get; set; } = new HashSet<string>();
 
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string Id { get; set; } = null!;
 
-    [Required] public string ProjectId { get; set; } = null!;
-    [Required] public DateTime TripDate { get; set; }
-    [Required] public string Name { get; set; } = null!;
+    [Required]
+    [MaxLength(PropertyLength.Id)]
+    public string ProjectId { get; set; } = null!;
+
+    [Required]
+    [MaxLength(PropertyLength.Name)]
+    public string Name { get; set; } = null!;
+
+    [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
+
+    public string? TripReport { get; set; }
 }

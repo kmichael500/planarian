@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Authentication.Repositories;

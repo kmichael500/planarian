@@ -1,4 +1,4 @@
-namespace Planarian.Shared.Options;
+namespace Planarian.Library.Options;
 
 public class BlobOptions
 {

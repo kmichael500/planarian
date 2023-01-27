@@ -1,64 +1,45 @@
 import {
   BrowserRouter as Router,
-  Routes,
-  Route,
-  Link,
   Navigate,
+  Route,
+  Routes,
 } from "react-router-dom";
-import { ConfirmEmailComponent } from "./Modules/Authentication/Components/confirm.email.component";
-import { LoginComponent } from "./Modules/Authentication/Components/login.component";
-import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.routes.component";
-import { ResetPasswordComponent } from "./Modules/Authentication/Components/reset.password.component";
-import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
-import { LeadAddComponent } from "./Modules/Components/lead.add.component";
-import { TripObjectiveDetailComponent } from "./Modules/Objective/Components/objective.detail.component";
-import { ObjectivePhotoUploadComponent } from "./Modules/Objective/Components/objective.photo.upload.component";
-import { ProjectDetailComponent } from "./Modules/Project/Components/project.detail.component";
-import { ProjectListComponent } from "./Modules/Project/Components/project.list.component";
-import { SettingsComponent } from "./Modules/Settings/Components/settings.component";
-import { TripDetailComponent } from "./Modules/Trip/Components/trip.detail.component";
+import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/ProtectedRoutesComponent";
+import { ConfirmEmailPage } from "./Modules/Authentication/Pages/ConfirmEmailPage";
+import { LoginPage } from "./Modules/Authentication/Pages/LoginPage";
+import { ResetPasswordPage } from "./Modules/Authentication/Pages/ResetPasswordPage";
+import { RegisterPage } from "./Modules/Authentication/Register/Components/RegisterPage";
+import { ProjectPage } from "./Modules/Project/Pages/ProjectPage";
+import { ProjectsPage } from "./Modules/Project/Pages/ProjectsPage";
+import { SettingsPage } from "./Modules/Setting/Pages/SettingsPage";
+import { LeadAddPage } from "./Modules/Trip/Pages/LeadAddPage";
+import { TripPage } from "./Modules/Trip/Pages/TripPage";
+import { TripPhotoUploadPage } from "./Modules/Trip/Pages/TripPhotoUploadPage";
 
 export const AppRouting: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginComponent />}></Route>
-        <Route path="/register" element={<RegisterComponent />}></Route>
-        <Route
-          path="/reset-password"
-          element={<ResetPasswordComponent />}
-        ></Route>
-        <Route
-          path="/confirm-email"
-          element={<ConfirmEmailComponent />}
-        ></Route>
-        <Route element={<ProtectedRoutes />}>
-          <Route path="/projects" element={<ProjectListComponent />}></Route>{" "}
-          <Route
-            path="/projects/:projectId"
-            element={<ProjectDetailComponent />}
-          ></Route>
-          <Route
-            path="/projects/:projectId"
-            element={<ProjectDetailComponent />}
-          ></Route>
+        <Route path="/login" element={<LoginPage />}></Route>
+        <Route path="/register" element={<RegisterPage />}></Route>
+        <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
+        <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
+        <Route element={<ProtectedRoutesComponent />}>
+          <Route path="/projects" element={<ProjectsPage />}></Route>{" "}
+          <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
           <Route
             path="/projects/:projectId/trip/:tripId"
-            element={<TripDetailComponent />}
+            element={<TripPage />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId"
-            element={<TripObjectiveDetailComponent />}
+            path="/projects/:projectId/trip/:tripId/uploadPhotos"
+            element={<TripPhotoUploadPage />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId/uploadPhotos"
-            element={<ObjectivePhotoUploadComponent />}
+            path="/projects/:projectId/trip/:tripId/addLeads"
+            element={<LeadAddPage />}
           ></Route>
-          <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId/addLeads"
-            element={<LeadAddComponent />}
-          ></Route>
-          <Route path="/settings" element={<SettingsComponent />}></Route>
+          <Route path="/settings" element={<SettingsPage />}></Route>
           <Route path="*" element={<Navigate to="/projects" replace />} />{" "}
         </Route>
       </Routes>

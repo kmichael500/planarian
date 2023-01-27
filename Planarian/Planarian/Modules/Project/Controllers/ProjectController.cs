@@ -4,6 +4,7 @@ using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Project.Services;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
@@ -23,18 +24,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         _tripService = tripService;
     }
 
-    #region Trips
-
-    [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
-    {
-        var trips = await _tripService.GetTripsByProjectId(projectId);
-
-        return new JsonResult(trips);
-    }
-
-    #endregion
-
     #region Invitations
 
     [HttpPost("{projectId:length(10)}/members/invite")]
@@ -43,6 +32,26 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         await Service.InviteProjectMember(projectId, invitation);
 
         return new OkResult();
+    }
+
+    #endregion
+
+    #region Trips
+
+    [HttpPost("{projectId:length(10)}/trips")]
+    public async Task<ActionResult<TripVm>> AddTrip(string projectId, [FromBody] CreateOrEditTripVm trip)
+    {
+        var trips = await _tripService.CreateOrUpdateTrip(trip);
+
+        return new JsonResult(trips);
+    }
+
+    [HttpGet("{projectId:length(10)}/trips")]
+    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
+    {
+        var trips = await _tripService.GetTripsByProjectId(projectId);
+
+        return new JsonResult(trips);
     }
 
     #endregion

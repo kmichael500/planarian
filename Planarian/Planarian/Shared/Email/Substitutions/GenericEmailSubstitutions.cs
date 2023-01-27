@@ -1,4 +1,4 @@
-using Planarian.Shared.Services.Substitutions;
+using Planarian.Shared.Email.Models;
 
 namespace Planarian.Shared.Email.Substitutions;
 
@@ -21,7 +21,6 @@ public class GenericEmailSubstitutions : ISubstitution
         if (!string.IsNullOrWhiteSpace(buttonText)) Substitutions.Add("buttonText", buttonText);
 
         if (!string.IsNullOrWhiteSpace(buttonUrl)) Substitutions.Add("buttonUrl", buttonUrl);
-
     }
 
     public Dictionary<string, object> Substitutions { get; set; }

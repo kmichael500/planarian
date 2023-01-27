@@ -1,4 +1,4 @@
-namespace Planarian.Modules.TripObjectives.Controllers;
+namespace Planarian.Model.Database.Entities.Leads;
 
 public class CreateLeadVm
 {

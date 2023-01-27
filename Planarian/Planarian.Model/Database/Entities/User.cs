@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
+using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -50,7 +51,10 @@ public class User : EntityBase
 
     [MaxLength(PropertyLength.PasswordResetCode)]
     public string? PasswordResetCode { get; set; }
-    [MaxLength(PropertyLength.EmailConfirmationCode)] public string? EmailConfirmationCode { get; set; }
+
+    [MaxLength(PropertyLength.EmailConfirmationCode)]
+    public string? EmailConfirmationCode { get; set; }
+
     public bool? IsEmailConfirmed { get; set; }
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
@@ -58,10 +62,10 @@ public class User : EntityBase
 
     public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new HashSet<ProjectMember>();
 
-    public virtual ICollection<TripObjectiveMember> TripObjectiveMembers { get; set; } =
-        new HashSet<TripObjectiveMember>();
+    public virtual ICollection<TripMember> TripMembers { get; set; } =
+        new HashSet<TripMember>();
 
-    public virtual ICollection<TripPhoto> TripPhotos { get; set; } = new HashSet<TripPhoto>();
+    public virtual ICollection<Photo> Photos { get; set; } = new HashSet<Photo>();
     public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
 }
 

@@ -15,7 +15,7 @@ public class Project : EntityBase
 
     public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = null!;
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
-    public virtual ICollection<Tag> CustomTags { get; set; } = new HashSet<Tag>();
+    public virtual ICollection<TagType> CustomTagTypes { get; set; } = new HashSet<TagType>();
 }
 
 public class ProjectConfiguration : IEntityTypeConfiguration<Project>
