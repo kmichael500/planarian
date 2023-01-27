@@ -72,8 +72,6 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
     }
   };
 
-  const addMember = (e: any) => {};
-
   const teamMemberColumns: ColumnsType<UserTableColumn> = [
     {
       title: "Name",

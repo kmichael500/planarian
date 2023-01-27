@@ -19,6 +19,7 @@ import { UserService } from "../UserService";
 import { MaskedInput } from "antd-mask-input";
 import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
 import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 const { Title } = Typography;
 
@@ -56,7 +57,9 @@ const UserUpdateComponent: React.FC = () => {
       await UserService.UpdateCurrentUser(values);
 
       message.success("Updated successfully");
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+
       message.error(error.message);
     }
     setIsLoading(false);
@@ -66,12 +69,12 @@ const UserUpdateComponent: React.FC = () => {
   const onChangePassword = async (values: UpdatePasswordVm) => {
     setIsSubmitting(true);
     try {
-      console.log(values);
       await UserService.UpdateCurrentUserPassword(values.password);
       message.success("Updated successfully");
       setIsChangingPassword(false);
       passwordForm.resetFields();
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as ApiErrorResponse;
       message.error(error.message);
     }
     setIsLoading(false);

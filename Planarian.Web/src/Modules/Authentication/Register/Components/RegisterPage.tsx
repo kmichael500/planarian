@@ -6,6 +6,7 @@ import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionCon
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
 import { Link, useNavigate } from "react-router-dom";
+import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 
 const RegisterPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -28,7 +29,9 @@ const RegisterPage: React.FC = () => {
         // const response = await UserService.GetCurrentUser();
         // response.phoneNumber = formatPhoneNumber(response.phoneNumber);
         // setUser(response);
-      } catch (error: any) {
+      } catch (e) {
+        const error = e as ApiErrorResponse;
+
         message.error(error.message);
       }
       setIsLoading(false);
@@ -47,7 +50,9 @@ const RegisterPage: React.FC = () => {
       );
 
       navigate("../login");
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+
       message.error(error.message);
     }
     setIsLoading(false);

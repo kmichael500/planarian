@@ -4,6 +4,7 @@ import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
@@ -20,7 +21,6 @@ const LoginPage: React.FC = () => {
   if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
     redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
   }
-  console.log(encodedRedirectUrl);
 
   const navigate = useNavigate();
 
@@ -29,7 +29,8 @@ const LoginPage: React.FC = () => {
       await AuthenticationService.Login(values);
       navigate(redirectUrl);
     } catch (e: any) {
-      message.error(e.message);
+      const error = e as ApiErrorResponse;
+      message.error(error.message);
     }
   };
 

@@ -123,8 +123,9 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
       message.success("Uploaded successfully");
 
       navigate("./../");
-    } catch {
-      message.error("Upload failed");
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+      message.error(error.message);
     }
 
     setUploading(false);
@@ -142,9 +143,6 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
 
     return false;
   };
-  useEffect(() => {
-    console.log("Do something after counter has changed", fileList);
-  }, [fileList]);
 
   //#endregion
 
