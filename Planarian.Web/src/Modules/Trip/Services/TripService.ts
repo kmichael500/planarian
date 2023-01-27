@@ -51,15 +51,13 @@ const TripService = {
     tripId: string,
     tripReport: string
   ): Promise<void> {
-    const response = await HttpClient.post(
-      `${baseUrl}/${tripId}/tripReport`,
-      tripReport,
-      { headers: { "Content-Type": "application/json" } }
-    );
+    await HttpClient.post(`${baseUrl}/${tripId}/trip-report`, tripReport, {
+      headers: { "Content-Type": "application/json" },
+    });
   },
 
   async UpdateTripName(name: string, tripId: string): Promise<void> {
-    const response = await HttpClient.post(`${baseUrl}/${tripId}/name`, name, {
+    await HttpClient.post(`${baseUrl}/${tripId}/name`, name, {
       headers: { "Content-Type": "application/json" },
     });
   },
@@ -67,11 +65,9 @@ const TripService = {
     description: string,
     tripId: string
   ): Promise<void> {
-    const response = await HttpClient.post(
-      `${baseUrl}/${tripId}/description`,
-      description,
-      { headers: { "Content-Type": "application/json" } }
-    );
+    await HttpClient.post(`${baseUrl}/${tripId}/description`, description, {
+      headers: { "Content-Type": "application/json" },
+    });
   },
   //#endregion
 
@@ -160,10 +156,7 @@ const TripService = {
   },
 
   async AddLeads(leads: CreateLeadVm[], tripId: string): Promise<void> {
-    const response = await HttpClient.post<void>(
-      `${baseUrl}/${tripId}/leads`,
-      leads
-    );
+    await HttpClient.post<void>(`${baseUrl}/${tripId}/leads`, leads);
   },
 
   //#endregion

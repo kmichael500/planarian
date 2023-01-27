@@ -78,7 +78,7 @@ public class TripController : PlanarianControllerBase<TripService>
         return new JsonResult(result);
     }
 
-    [HttpPost("{tripId:length(10)}/tripReport")]
+    [HttpPost("{tripId:length(10)}/trip-report")]
     public async Task<ActionResult> AddOrUpdateTripReport(string tripId,
         [FromBody] string tripReport)
     {

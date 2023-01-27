@@ -25,7 +25,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
         GenericEmailSubstitutions substitutions)
     {
-        var messageType = await Repository.GetMessageTypeVm(MessageKey.GenericEmail, MessageTypeKey.Email);
+        var messageType = await Repository.GetMessageTypeVm(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
 
         if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
@@ -40,7 +40,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         if (results.Any(e => !e.IsSuccessful)) throw ApiExceptionDictionary.EmailFailedToSend;
 
-        var messageLog = new MessageLog(MessageKey.GenericEmail, MessageTypeKey.Email, subject, toEmailAddress, toName,
+        var messageLog = new MessageLog(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, subject, toEmailAddress, toName,
             messageType.FromName, messageType.FromEmail, JsonConvert.SerializeObject(substitutions.Substitutions));
 
         Repository.Add(messageLog);
@@ -82,15 +82,4 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         await SendGenericEmail("Planarian Password Changed", emailAddress, fullName,
             new GenericEmailSubstitutions(message, "Planarian Password Changed"));
     }
-}
-
-public class MessageKey
-{
-    public const string GenericEmail = "GenericEmail";
-}
-
-public class MessageTypeKey
-{
-    public const string Email = "Email";
-    public const string Sms = "Sms";
 }
