@@ -1,11 +1,11 @@
 import { Button, Form, Input, Modal } from "antd";
 import { ReactComponentElement, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PropertyLength } from "../../../Shared/Constants";
+import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { CreateOrEditProject } from "../Models/CreateOrEditProject";
-import { ProjectService } from "../Services/project.service";
+import { ProjectService } from "../Services/ProjectService";
 
-const ProjectCreateButton: React.FC = () => {
+const ProjectCreateButtonComponent: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [form] = Form.useForm();
@@ -61,4 +61,4 @@ const ProjectCreateButton: React.FC = () => {
   );
 };
 
-export { ProjectCreateButton };
+export { ProjectCreateButtonComponent };

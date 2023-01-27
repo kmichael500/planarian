@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { ProjectVm } from "../Models/ProjectVm";
-import { ProjectService } from "../Services/project.service";
+import { ProjectService } from "../Services/ProjectService";
 import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
 import moment from "moment";
 import {

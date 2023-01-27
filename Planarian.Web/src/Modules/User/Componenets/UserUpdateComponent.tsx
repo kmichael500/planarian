@@ -12,15 +12,15 @@ import {
   message,
   InputRef,
 } from "antd";
-import { UserVm } from "../../User/Models/UserVm";
+import { UserVm } from "../Models/UserVm";
 import {
   formatPhoneNumber,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
-import { UserService } from "../../User/user.service";
+import { UserService } from "../UserService";
 import { MaskedInput } from "antd-mask-input";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { PasswordRegex } from "../../../Shared/RegEx/RegularExpressions";
+import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
 import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
 
 const { Title } = Typography;

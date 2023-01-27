@@ -5,16 +5,16 @@ import {
   Link,
   Navigate,
 } from "react-router-dom";
-import { ConfirmEmailComponent } from "./Modules/Authentication/Components/confirm.email.component";
-import { LoginComponent } from "./Modules/Authentication/Components/login.component";
-import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.routes.component";
-import { ResetPasswordComponent } from "./Modules/Authentication/Components/reset.password.component";
-import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
-import { LeadAddComponent } from "./Modules/Components/lead.add.component";
+import { ConfirmEmailComponent } from "./Modules/Authentication/Components/ConfirmEmailComponent";
+import { LoginComponent } from "./Modules/Authentication/Components/LoginComponent";
+import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/ProtectedRoutesComponent";
+import { ResetPasswordComponent } from "./Modules/Authentication/Components/ResetPasswordComponent";
+import { RegisterComponent } from "./Modules/Authentication/Register/Components/RegisterComponent";
+import { LeadAddComponent } from "./Modules/Components/LeadAddComponent";
 import { PhotoUploadComponent } from "./Modules/Trips/Components/PhotoUploadComponent";
-import { ProjectDetailComponent } from "./Modules/Project/Components/project.detail.component";
-import { ProjectListComponent } from "./Modules/Project/Components/project.list.component";
-import { SettingsComponent } from "./Modules/Settings/Components/settings.component";
+import { ProjectDetailComponent } from "./Modules/Project/Components/ProjectDetailComponent";
+import { ProjectListComponent } from "./Modules/Project/Components/ProjectListComponent";
+import { SettingsComponent } from "./Modules/Settings/Components/SettingsComponent";
 import { TripDetailComponent } from "./Modules/Trips/Components/TripDetailComponent";
 
 export const AppRouting: React.FC = () => {
@@ -31,7 +31,7 @@ export const AppRouting: React.FC = () => {
           path="/confirm-email"
           element={<ConfirmEmailComponent />}
         ></Route>
-        <Route element={<ProtectedRoutes />}>
+        <Route element={<ProtectedRoutesComponent />}>
           <Route path="/projects" element={<ProjectListComponent />}></Route>{" "}
           <Route
             path="/projects/:projectId"

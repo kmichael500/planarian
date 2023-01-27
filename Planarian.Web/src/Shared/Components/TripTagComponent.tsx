@@ -2,7 +2,7 @@ import { Spin, Tag } from "antd";
 import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useState, useEffect } from "react";
-import { SettingsService } from "../../Modules/Settings/Services/settings.service";
+import { SettingsService } from "../../Modules/Settings/Services/SettingsService";
 
 export interface TripTagComponentProps {
   tagId: string;

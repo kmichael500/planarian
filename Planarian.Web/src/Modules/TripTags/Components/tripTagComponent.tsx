@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Tag, Select, Tooltip, Spin } from "antd";
 
 import { PlusOutlined } from "@ant-design/icons";
-import { SettingsService } from "../../Settings/Services/settings.service";
+import { SettingsService } from "../../Settings/Services/SettingsService";
 import { TripService } from "../../Trips/Services/TripService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 export interface TripTagComponentProps {

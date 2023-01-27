@@ -4,11 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
 import { PlusCircleOutlined, MailOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../Models/SelectListItem";
-import { ProjectService } from "../../Modules/Project/Services/project.service";
-import { SettingsService } from "../../Modules/Settings/Services/settings.service";
+import { ProjectService } from "../../Modules/Project/Services/ProjectService";
+import { SettingsService } from "../../Modules/Settings/Services/SettingsService";
 import { nameof } from "../Helpers/StringHelpers";
-import { AddMember } from "./AddMember";
-import { InviteMember as InviteMember } from "./InviteMember";
+import { AddMember } from "../Models/AddMember";
+import { InviteMember as InviteMember } from "../Models/InviteMember";
 import { TripService } from "../../Modules/Trips/Services/TripService";
 
 interface MemberGridAddMemberComponentProps {

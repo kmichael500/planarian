@@ -16,8 +16,8 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { LeadClassification } from "../Leads/Models/LeadClassification";
 import { CreateLeadVm } from "../Leads/Models/CreateLeadVm";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { TextFileInput } from "../../Shared/Components/file.input.component";
-import { TherionService } from "../Therion/Services/therion.service";
+import { TextFileInputComponent } from "../../Shared/Components/TextFileInputComponent";
+import { TherionService } from "../Therion/Services/TherionService";
 import { TripService } from "../Trips/Services/TripService";
 
 const { Option } = Select;
@@ -136,10 +136,10 @@ const LeadAddComponent: React.FC = () => {
           </Button>,
         ]}
         actions={[
-          <TextFileInput
+          <TextFileInputComponent
             buttonText="Extract from TH2"
             onTextChange={extractFromTh2}
-          ></TextFileInput>,
+          ></TextFileInputComponent>,
           <Button onClick={handleSubmit} type="primary" htmlType="submit">
             Submit
           </Button>,

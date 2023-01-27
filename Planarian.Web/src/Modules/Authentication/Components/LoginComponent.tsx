@@ -6,7 +6,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
-import { AuthenticationService } from "../Services/authentication.service";
+import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginComponent: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();

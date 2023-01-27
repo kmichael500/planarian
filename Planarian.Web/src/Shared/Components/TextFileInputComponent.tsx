@@ -7,7 +7,10 @@ interface Props {
   buttonText: string;
 }
 
-const TextFileInput: React.FC<Props> = ({ onTextChange, buttonText }) => {
+const TextFileInputComponent: React.FC<Props> = ({
+  onTextChange,
+  buttonText,
+}) => {
   const [fileList, setFileList] = useState<any[]>([]);
 
   const handleChange = (info: any) => {
@@ -56,4 +59,4 @@ const TextFileInput: React.FC<Props> = ({ onTextChange, buttonText }) => {
   );
 };
 
-export { TextFileInput };
+export { TextFileInputComponent };

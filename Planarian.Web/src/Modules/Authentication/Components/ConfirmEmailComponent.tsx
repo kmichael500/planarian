@@ -1,7 +1,7 @@
 import { message, Spin } from "antd";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { UserService } from "../../User/user.service";
+import { UserService } from "../../User/UserService";
 
 function ConfirmEmailComponent() {
   const [isVerifing, setIsVerifing] = useState(true);

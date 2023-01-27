@@ -3,11 +3,11 @@ import { ColumnsType } from "antd/lib/table";
 import { v4 as uuidv4 } from "uuid";
 import { useEffect, useState } from "react";
 import { TripService } from "../../Modules/Trips/Services/TripService";
-import { ProjectService } from "../../Modules/Project/Services/project.service";
+import { ProjectService } from "../../Modules/Project/Services/ProjectService";
 import { nameof } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
 import { PlusCircleOutlined } from "@ant-design/icons";
-import { MemberGridAddMemberComponent } from "./member.grid.add.member.component";
+import { MemberGridAddMemberComponent } from "./MemberGridAddMemberComponent";
 
 export interface MemberGridComponentProps {
   type: MemberGridType;

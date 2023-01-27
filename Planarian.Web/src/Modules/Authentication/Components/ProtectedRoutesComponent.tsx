@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { AuthenticationService } from "../Services/authentication.service";
+import { AuthenticationService } from "../Services/AuthenticationService";
 
-const ProtectedRoutes = () => {
+const ProtectedRoutesComponent = () => {
   const location = useLocation();
 
   const redirectUrl = encodeURIComponent(location.pathname);
@@ -15,4 +15,4 @@ const ProtectedRoutes = () => {
     return <Navigate to={url} />;
   }
 };
-export { ProtectedRoutes };
+export { ProtectedRoutesComponent };

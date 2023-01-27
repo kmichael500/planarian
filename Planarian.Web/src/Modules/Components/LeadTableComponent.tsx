@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Table, Spin, Button, Popconfirm, Card, Row, Col } from "antd";
-import { LeadVm } from "../Leads/Models/Lead";
+import { LeadVm } from "../Leads/Models/LeadVm";
 import { TripService } from "../Trips/Services/TripService";
 import { nameof } from "../../Shared/Helpers/StringHelpers";
-import { LeadService } from "../Leads/Services/lead.service";
+import { LeadService } from "../Leads/Services/LeadService";
 import { Link } from "react-router-dom";
 import { downloadCSV } from "../../Shared/Helpers/FileHelpers";
 

@@ -5,13 +5,11 @@ import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
-import { PasswordRegex } from "../../../Shared/RegEx/RegularExpressions";
-import {
-  ResetPasswordEmailVm,
-  UpdatePasswordVm,
-} from "../../User/Models/UpdatePasswordVm";
+import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
+import { UpdatePasswordVm } from "../../User/Models/UpdatePasswordVm";
+import { ResetPasswordEmailVm } from "../../User/Models/ResetPasswordEmailVm";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { UserService } from "../../User/user.service";
+import { UserService } from "../../User/UserService";
 
 const ResetPasswordComponent: React.FC = () => {
   const [passwordForm] = Form.useForm();

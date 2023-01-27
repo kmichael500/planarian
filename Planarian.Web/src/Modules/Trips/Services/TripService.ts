@@ -1,11 +1,11 @@
 import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
-import { InviteMember } from "../../../Shared/Components/InviteMember";
+import { InviteMember } from "../../../Shared/Models/InviteMember";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { CreateLeadVm } from "../../Leads/Models/CreateLeadVm";
-import { LeadVm } from "../../Leads/Models/Lead";
+import { LeadVm } from "../../Leads/Models/LeadVm";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripVm } from "../Models/TripVm";
 import { TripPhotosUpload, TripPhotoUpload } from "../Models/TripPhotoUpload";

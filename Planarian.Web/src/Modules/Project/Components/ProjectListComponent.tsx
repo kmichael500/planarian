@@ -2,8 +2,8 @@ import { Row, Col, Card, Spin, Divider, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ProjectVm } from "../Models/ProjectVm";
-import { ProjectService } from "../Services/project.service";
-import { ProjectCreateButton } from "./project.create.button.component";
+import { ProjectService } from "../Services/ProjectService";
+import { ProjectCreateButtonComponent } from "./ProjectCreateButtonComponent";
 
 const { Title, Paragraph } = Typography;
 
@@ -32,7 +32,7 @@ const ProjectListComponent: React.FC = () => {
         <Col flex="auto"></Col>
         <Col>
           {" "}
-          <ProjectCreateButton />
+          <ProjectCreateButtonComponent />
         </Col>
       </Row>
       <Divider />

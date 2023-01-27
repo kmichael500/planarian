@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Form, Input, Button, Card, Col, Divider, Row, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserVm } from "../../User/Models/UserVm";
-import { UserService } from "../../User/user.service";
-import UserUpdateComponent from "../../User/Componenets/user.update.component";
+import { UserService } from "../../User/UserService";
+import UserUpdateComponent from "../../User/Componenets/UserUpdateComponent";
 
 const { Title } = Typography;
 

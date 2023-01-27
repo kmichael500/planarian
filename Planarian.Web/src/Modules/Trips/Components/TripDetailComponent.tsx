@@ -19,10 +19,10 @@ import {
 } from "../../../Shared/Components/MemberGridComponent";
 import { TripVm } from "../Models/TripVm";
 import { TripService } from "../Services/TripService";
-import LeadTableComponent from "../../Components/lead.table.component";
-import { TripTagComponent } from "../../TripTags/Components/tripTagComponent";
-import { SettingsService } from "../../Settings/Services/settings.service";
-import { LeadVm } from "../../Leads/Models/Lead";
+import LeadTableComponent from "../../Components/LeadTableComponent";
+import { TripTagComponent } from "../../TripTags/Components/TripTagComponent";
+import { SettingsService } from "../../Settings/Services/SettingsService";
+import { LeadVm } from "../../Leads/Models/LeadVm";
 import { TripDetailPhotoComponent } from "./TripDetailPhotoComponent";
 
 const { Option } = Select;

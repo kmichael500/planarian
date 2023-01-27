@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Form, Input, Col, Row, ColProps, message, Card, Button } from "antd";
-import { UserVm } from "../../../User/Models/UserVm";
-import {
-  formatPhoneNumber,
-  nameof,
-} from "../../../../Shared/Helpers/StringHelpers";
-import { UserService } from "../../../User/user.service";
+import { nameof } from "../../../../Shared/Helpers/StringHelpers";
 import { MaskedInput } from "antd-mask-input";
-import { UpdatePasswordVm } from "../../../User/Models/UpdatePasswordVm";
-import { PasswordRegex } from "../../../../Shared/RegEx/RegularExpressions";
+import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionConstants";
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
-import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
-import { RegisterService } from "../Services/register.service";
+import { RegisterService } from "../Services/RegisterService";
 import { Link, useNavigate } from "react-router-dom";
 
 const RegisterComponent: React.FC = () => {

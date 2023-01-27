@@ -1,5 +1,5 @@
 import { HttpClient } from "../../..";
-import { TOKEN_KEY } from "../../../Shared/Constants/constants";
+import { TOKEN_KEY } from "../../../Shared/Constants/TokenKeyConstant";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
