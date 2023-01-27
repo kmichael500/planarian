@@ -15,10 +15,10 @@ import {
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { LeadClassification } from "../Leads/Models/LeadClassification";
 import { CreateLeadVm } from "../Leads/Models/CreateLeadVm";
-import { TripObjectiveService } from "../Objective/Services/trip.objective.service";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { TextFileInput } from "../../Shared/Components/file.input.component";
 import { TherionService } from "../Therion/Services/therion.service";
+import { TripService } from "../Trips/Services/TripService";
 
 const { Option } = Select;
 
@@ -26,7 +26,7 @@ const LeadAddComponent: React.FC = () => {
   const [leads, setLeads] = useState<CreateLeadVm[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const { tripObjectiveId } = useParams();
+  const { tripId } = useParams();
   const navigate = useNavigate();
 
   const addLead = () => {
@@ -84,7 +84,7 @@ const LeadAddComponent: React.FC = () => {
 
     try {
       setIsLoading(true);
-      await TripObjectiveService.AddLeads(leads, tripObjectiveId as string);
+      await TripService.AddLeads(leads, tripId as string);
       message.success("Leads added successfully");
       navigate("./../");
     } catch (e: any) {

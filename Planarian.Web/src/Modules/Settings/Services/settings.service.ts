@@ -4,16 +4,14 @@ import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
 
 const baseUrl = "api/settings";
 const SettingsService = {
-  async GetTripObjectiveTypes(): Promise<SelectListItem<string>[]> {
+  async GetTripTags(): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
-      `${baseUrl}/objectiveTypes`
+      `${baseUrl}/tags/trip`
     );
     return response.data;
   },
-  async GetObjectiveTypeName(objectiveTypeId: string): Promise<string> {
-    const response = await HttpClient.get<string>(
-      `${baseUrl}/objectiveTypes/${objectiveTypeId}`
-    );
+  async GetTagName(tagId: string): Promise<string> {
+    const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
     return response.data;
   },
   async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {

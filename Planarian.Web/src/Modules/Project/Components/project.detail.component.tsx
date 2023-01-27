@@ -9,15 +9,15 @@ import {
   MemberGridComponent,
   MemberGridType,
 } from "../../../Shared/Components/MemberGridComponent";
-import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";
-import { TripObjectiveCreateButton } from "../../Objective/Components/objective.create.button.component";
+import { TripVm } from "../../Trips/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
-import { TripObjectiveTagComponent } from "../../../Shared/Components/TripObjectiveTagComponent";
+import { TripTagComponent } from "../../../Shared/Components/TripTagComponent";
+import { TripCreateButtonComponent } from "../../Trips/Components/TripCreateButtonComponent";
 const { Title, Text } = Typography;
 
 const ProjectDetailComponent: React.FC = () => {
   let [project, setProject] = useState<ProjectVm>();
-  let [trips, setTrips] = useState<TripObjectiveVm[]>();
+  let [trips, setTrips] = useState<TripVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
   const { projectId } = useParams();
@@ -52,8 +52,7 @@ const ProjectDetailComponent: React.FC = () => {
           </Link>
         </Col>
         <Col>
-          {" "}
-          <TripObjectiveCreateButton projectId={projectId} />
+          <TripCreateButtonComponent projectId={projectId} />
         </Col>
       </Row>
       <Divider />
@@ -79,17 +78,17 @@ const ProjectDetailComponent: React.FC = () => {
             { xs: 8, sm: 8, md: 24, lg: 32 },
           ]}
         >
-          {trips?.map((objective, index) => (
+          {trips?.map((trip, index) => (
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Card
                 title={
                   <>
-                    {objective.name}{" "}
+                    {trip.name}{" "}
                     <Row>
                       <UserAvatarGroupComponent
                         size={"small"}
                         maxCount={4}
-                        userIds={objective.tripObjectiveMemberIds}
+                        userIds={trip.tripMemberIds}
                       />
                     </Row>
                   </>
@@ -97,29 +96,24 @@ const ProjectDetailComponent: React.FC = () => {
                 loading={isTripsLoading}
                 bordered={false}
                 actions={[
-                  <Link to={`trip/${objective.id}`}>
+                  <Link to={`trip/${trip.id}`}>
                     <Button>View</Button>
                   </Link>,
                 ]}
               >
                 <>
                   <Row>
-                    {objective.tripObjectiveTypeIds.map(
-                      (objectiveTypeId, index) => (
-                        <Col>
-                          <TripObjectiveTagComponent
-                            key={index}
-                            tripObjectiveId={objectiveTypeId}
-                          />
-                        </Col>
-                      )
-                    )}
+                    {trip.tripTagIds.map((tagId, index) => (
+                      <Col>
+                        <TripTagComponent key={index} tagId={tagId} />
+                      </Col>
+                    ))}
                   </Row>
                   <Divider />
 
                   <Row>
                     {" "}
-                    <Text>Description: {objective.description}</Text>
+                    <Text>Description: {trip.description}</Text>
                   </Row>
                 </>
               </Card>

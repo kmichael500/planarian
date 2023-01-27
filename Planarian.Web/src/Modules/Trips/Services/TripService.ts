@@ -6,16 +6,16 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { CreateLeadVm } from "../../Leads/Models/CreateLeadVm";
 import { LeadVm } from "../../Leads/Models/Lead";
-import { CreateOrEditTripObjectiveVm } from "../Models/CreateOrEditTripObjectiveVm";
-import { TripObjectiveVm } from "../Models/TripObjectiveVm";
+import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
+import { TripVm } from "../Models/TripVm";
 import { TripPhotosUpload, TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { TripPhotoVm } from "../Models/TripPhotoVm";
 
-const baseUrl = "api/tripObjectives";
-const TripObjectiveService = {
-  //#region Objectives
-  async GetObjective(id: string): Promise<TripObjectiveVm> {
-    const response = await HttpClient.get<TripObjectiveVm>(`${baseUrl}/${id}`);
+const baseUrl = "api/trips";
+const TripService = {
+  //#region Trips
+  async GetTrip(id: string): Promise<TripVm> {
+    const response = await HttpClient.get<TripVm>(`${baseUrl}/${id}`);
     return response.data;
   },
   async GetTags(id: string): Promise<SelectListItem<string>[]> {
@@ -26,60 +26,50 @@ const TripObjectiveService = {
   },
   async AddTag(
     tagId: string,
-    tripObjectiveId: string
+    tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${tripObjectiveId}/tags/${tagId}`,
+      `${baseUrl}/${tripId}/tags/${tagId}`,
       {}
     );
     return response.data;
   },
   async DeleteTag(
     tagId: string,
-    tripObjectiveId: string
+    tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.delete<SelectListItem<string>[]>(
-      `${baseUrl}/${tripObjectiveId}/tags/${tagId}`
+      `${baseUrl}/${tripId}/tags/${tagId}`
     );
     return response.data;
   },
-  async AddTripObjective(
-    values: CreateOrEditTripObjectiveVm
-  ): Promise<TripObjectiveVm> {
-    const response = await HttpClient.post<TripObjectiveVm>(
-      `${baseUrl}`,
-      values
-    );
+  async AddTrip(values: CreateOrEditTripVm): Promise<TripVm> {
+    const response = await HttpClient.post<TripVm>(`${baseUrl}`, values);
     return response.data;
   },
 
   async AddOrUpdateTripReport(
-    tripObjectiveId: string,
+    tripId: string,
     tripReport: string
   ): Promise<void> {
     const response = await HttpClient.post(
-      `${baseUrl}/${tripObjectiveId}/tripReport`,
+      `${baseUrl}/${tripId}/tripReport`,
       tripReport,
       { headers: { "Content-Type": "application/json" } }
     );
   },
 
-  async UpdateObjectiveName(
-    name: string,
-    tripObjectiveId: string
-  ): Promise<void> {
-    const response = await HttpClient.post(
-      `${baseUrl}/${tripObjectiveId}/name`,
-      name,
-      { headers: { "Content-Type": "application/json" } }
-    );
+  async UpdateTripName(name: string, tripId: string): Promise<void> {
+    const response = await HttpClient.post(`${baseUrl}/${tripId}/name`, name, {
+      headers: { "Content-Type": "application/json" },
+    });
   },
-  async UpdateObjectiveDescription(
+  async UpdateTripDescription(
     description: string,
-    tripObjectiveId: string
+    tripId: string
   ): Promise<void> {
     const response = await HttpClient.post(
-      `${baseUrl}/${tripObjectiveId}/description`,
+      `${baseUrl}/${tripId}/description`,
       description,
       { headers: { "Content-Type": "application/json" } }
     );
@@ -87,10 +77,7 @@ const TripObjectiveService = {
   //#endregion
 
   //#region Photos
-  async UploadPhotos(
-    values: TripPhotoUpload[],
-    tripObjectiveId: string
-  ): Promise<void> {
+  async UploadPhotos(values: TripPhotoUpload[], tripId: string): Promise<void> {
     const formData = new FormData();
 
     values.forEach((e, i) => {
@@ -109,58 +96,56 @@ const TripObjectiveService = {
     });
 
     const response = await HttpClient.post<void>(
-      `${baseUrl}/${tripObjectiveId}/photos`,
+      `${baseUrl}/${tripId}/photos`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
     return response.data;
   },
 
-  async GetTripObjectivePhotos(objectiveId: string): Promise<TripPhotoVm[]> {
+  async GetTripPhotos(tripId: string): Promise<TripPhotoVm[]> {
     const response = await HttpClient.get<TripPhotoVm[]>(
-      `${baseUrl}/${objectiveId}/photos`
+      `${baseUrl}/${tripId}/photos`
     );
     return response.data;
   },
 
   //#endregion
 
-  //#region Trip Objective Members
-  async GetTripObjectiveMembers(
-    objectiveId: string
-  ): Promise<SelectListItem<string>[]> {
+  //#region Trip Members
+  async GetTripMembers(tripId: string): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
-      `${baseUrl}/${objectiveId}/members`
+      `${baseUrl}/${tripId}/members`
     );
     return response.data;
   },
-  async AddTripObjectiveMember(
+  async AddTripMember(
     userId: string,
-    objectiveId: string
+    tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${objectiveId}/members/${userId}`,
+      `${baseUrl}/${tripId}/members/${userId}`,
       {}
     );
     return response.data;
   },
-  async AddTripObjectiveMembers(
+  async AddTripMembers(
     userIds: string[],
-    objectiveId: string
+    tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${objectiveId}/members`,
+      `${baseUrl}/${tripId}/members`,
       userIds
     );
     return response.data;
   },
 
-  async DeleteTripObjectiveMember(
+  async DeleteTripMember(
     userId: string,
-    objectiveId: string
+    tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.delete<SelectListItem<string>[]>(
-      `${baseUrl}/${objectiveId}/members/${userId}`,
+      `${baseUrl}/${tripId}/members/${userId}`,
       {}
     );
     return response.data;
@@ -168,16 +153,16 @@ const TripObjectiveService = {
   //#endregion
 
   //#region Leads
-  async GetLeads(objectiveId: string): Promise<LeadVm[]> {
+  async GetLeads(tripId: string): Promise<LeadVm[]> {
     const response = await HttpClient.get<LeadVm[]>(
-      `${baseUrl}/${objectiveId}/leads`
+      `${baseUrl}/${tripId}/leads`
     );
     return response.data;
   },
 
-  async AddLeads(leads: CreateLeadVm[], objectiveId: string): Promise<void> {
+  async AddLeads(leads: CreateLeadVm[], tripId: string): Promise<void> {
     const response = await HttpClient.post<void>(
-      `${baseUrl}/${objectiveId}/leads`,
+      `${baseUrl}/${tripId}/leads`,
       leads
     );
   },
@@ -186,12 +171,9 @@ const TripObjectiveService = {
 
   //#region
 
-  async InviteTripObjectiveMembers(
-    values: InviteMember,
-    objectiveId: string
-  ): Promise<void> {
+  async InviteTripMembers(values: InviteMember, tripId: string): Promise<void> {
     const response = await HttpClient.post<void>(
-      `${baseUrl}/${objectiveId}/members/invite`,
+      `${baseUrl}/${tripId}/members/invite`,
       values
     );
     return response.data;
@@ -199,4 +181,4 @@ const TripObjectiveService = {
   //#endregion
 };
 
-export { TripObjectiveService };
+export { TripService };

@@ -15,10 +15,8 @@ const TripTagComponent: React.FC<TripTagComponentProps> = (props) => {
   useEffect(() => {
     if (tagName === undefined) {
       const getTagName = async () => {
-        const tripObjectiveNameResponse = await SettingsService.GetTagName(
-          props.tagId
-        );
-        setTagName(tripObjectiveNameResponse);
+        const tripNameResponse = await SettingsService.GetTagName(props.tagId);
+        setTagName(tripNameResponse);
         setIsTagNameLoading(false);
       };
       getTagName();

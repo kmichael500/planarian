@@ -11,11 +11,11 @@ import { ProtectedRoutes } from "./Modules/Authentication/Components/protected.r
 import { ResetPasswordComponent } from "./Modules/Authentication/Components/reset.password.component";
 import { RegisterComponent } from "./Modules/Authentication/Register/Components/register.component";
 import { LeadAddComponent } from "./Modules/Components/lead.add.component";
-import { TripObjectiveDetailComponent } from "./Modules/Objective/Components/objective.detail.component";
-import { ObjectivePhotoUploadComponent } from "./Modules/Objective/Components/objective.photo.upload.component";
+import { PhotoUploadComponent } from "./Modules/Trips/Components/PhotoUploadComponent";
 import { ProjectDetailComponent } from "./Modules/Project/Components/project.detail.component";
 import { ProjectListComponent } from "./Modules/Project/Components/project.list.component";
 import { SettingsComponent } from "./Modules/Settings/Components/settings.component";
+import { TripDetailComponent } from "./Modules/Trips/Components/TripDetailComponent";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -42,15 +42,15 @@ export const AppRouting: React.FC = () => {
             element={<ProjectDetailComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripObjectiveId"
-            element={<TripObjectiveDetailComponent />}
+            path="/projects/:projectId/trip/:tripId"
+            element={<TripDetailComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripObjectiveId/uploadPhotos"
-            element={<ObjectivePhotoUploadComponent />}
+            path="/projects/:projectId/trip/:tripId/uploadPhotos"
+            element={<PhotoUploadComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripObjectiveId/addLeads"
+            path="/projects/:projectId/trip/:tripId/addLeads"
             element={<LeadAddComponent />}
           ></Route>
           <Route path="/settings" element={<SettingsComponent />}></Route>

@@ -10,26 +10,26 @@ import {
 } from "antd";
 import TextArea from "antd/lib/input/TextArea";
 import { DefaultOptionType } from "antd/lib/select";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PropertyLength } from "../../../Shared/Constants";
 import { SettingsService } from "../../Settings/Services/settings.service";
 import { ProjectService } from "../../Project/Services/project.service";
-import { CreateOrEditTripObjectiveVm } from "../Models/CreateOrEditTripObjectiveVm";
-import { TripObjectiveService } from "../Services/trip.objective.service";
+import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
+import { TripService } from "../Services/TripService";
+import { nameof } from "../../../Shared/Helpers/StringHelpers";
 
-interface IObjectiveCreateButtonPRops {
+interface TripCreateButtonProps {
   projectId: string;
 }
-const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
-  props: IObjectiveCreateButtonPRops
+const TripCreateButtonComponent: React.FC<TripCreateButtonProps> = (
+  props: TripCreateButtonProps
 ) => {
   const [open, setOpen] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [projectMembers, setProjectMembers] =
     useState<SelectProps["options"]>();
-  const [tripObjectiveTypes, setTripObjectiveTypes] =
-    useState<SelectProps["options"]>();
+  const [tripTags, setTripTags] = useState<SelectProps["options"]>();
 
   const [form] = Form.useForm();
 
@@ -48,17 +48,17 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
       };
       GetProjectMembers();
     }
-    if (tripObjectiveTypes == undefined) {
-      const GetTripObjectiveTypes = async (): Promise<void> => {
-        const response = await SettingsService.GetTripObjectiveTypes();
+    if (tripTags == undefined) {
+      const GetTripTags = async (): Promise<void> => {
+        const response = await SettingsService.GetTripTags();
 
-        setTripObjectiveTypes(
+        setTripTags(
           response.map(
             (e) => ({ value: e.value, label: e.display } as DefaultOptionType)
           )
         );
       };
-      GetTripObjectiveTypes();
+      GetTripTags();
     }
   });
 
@@ -73,26 +73,24 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
     setOpen(false);
   };
 
-  const onSubmit = async (
-    values: CreateOrEditTripObjectiveVm
-  ): Promise<void> => {
+  const onSubmit = async (values: CreateOrEditTripVm): Promise<void> => {
     values.projectId = props.projectId;
 
     setConfirmLoading(true);
-    const objective = await TripObjectiveService.AddTripObjective(values);
+    const trip = await TripService.AddTrip(values);
 
     setOpen(false);
     setConfirmLoading(false);
-    navigate(`/projects/${props.projectId}/trip/${objective.id}`);
+    navigate(`/projects/${props.projectId}/trip/${trip.id}`);
   };
 
   return (
     <>
       <Button type="primary" onClick={showModal}>
-        New Objective
+        New Trip
       </Button>
       <Modal
-        title="New Objective"
+        title="New Trip"
         open={open}
         onOk={form.submit}
         confirmLoading={confirmLoading}
@@ -110,7 +108,7 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
         >
           <Form.Item
             required
-            name={"Name"}
+            name={nameof<CreateOrEditTripVm>("name")}
             label="Name"
             rules={[{ required: true, message: "'Name' is required" }]}
           >
@@ -118,23 +116,26 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
           </Form.Item>
           <Form.Item
             required
-            name="TripObjectiveTypeIds"
-            label="Objective Type"
+            name={nameof<CreateOrEditTripVm>("tripTagIds")}
+            label="Tags"
             rules={[
               {
                 required: true,
-                message: "At least one 'Objective Type' is required",
+                message: "At least one 'Tag' is required",
               },
             ]}
           >
             <Select
-              options={tripObjectiveTypes}
+              options={tripTags}
               mode="tags"
               placeholder="Please select"
               style={{ width: "100%" }}
             />
           </Form.Item>
-          <Form.Item name="TripObjectiveMembers" label="Team">
+          <Form.Item
+            name={nameof<CreateOrEditTripVm>("tripMemberIds")}
+            label="Team"
+          >
             <Select
               options={projectMembers}
               mode="tags"
@@ -144,7 +145,7 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
           </Form.Item>
           <Form.Item name="Description" label="Description">
             <TextArea
-              placeholder="Write a 1-3 line summary of your objective goals. This is not the trip report."
+              placeholder="Write a 1-3 line summary of your trip goals. This is not the trip report."
               rows={4}
               maxLength={PropertyLength.MEDIUM_TEXT}
             />
@@ -175,4 +176,4 @@ function getTimezoneName() {
   }
 }
 
-export { TripObjectiveCreateButton };
+export { TripCreateButtonComponent };

@@ -25,18 +25,18 @@ import {
 } from "@ant-design/icons";
 
 import { RcFile } from "antd/lib/upload";
-import { useEffect, useState } from "react";
-import { CreateOrEditTripObjectiveVm } from "../Models/CreateOrEditTripObjectiveVm";
-import { TripObjectiveService } from "../Services/trip.objective.service";
-import "./objective.photo.upload.component.scss";
+import React, { useEffect, useState } from "react";
+import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
+import { TripService } from "../Services/TripService";
 import { PhotoMetaData } from "../Models/PhotoMetaData";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import "./PhotoUploadComponent.scss";
 const { TextArea } = Input;
 
-interface IObjectiveCreateButtonProps {}
-const ObjectivePhotoUploadComponent: React.FC<IObjectiveCreateButtonProps> = (
-  props: IObjectiveCreateButtonProps
+interface PhotoUploadComponentProps {}
+const PhotoUploadComponent: React.FC<PhotoUploadComponentProps> = (
+  props: PhotoUploadComponentProps
 ) => {
   //#region Main Modal
 
@@ -54,11 +54,9 @@ const ObjectivePhotoUploadComponent: React.FC<IObjectiveCreateButtonProps> = (
     setOpen(false);
   };
 
-  const onSubmit = async (
-    values: CreateOrEditTripObjectiveVm
-  ): Promise<void> => {
+  const onSubmit = async (values: CreateOrEditTripVm): Promise<void> => {
     setConfirmLoading(true);
-    const newObjectiveId = await TripObjectiveService.AddTripObjective(values);
+    const newTripid = await TripService.AddTrip(values);
 
     setOpen(false);
     setConfirmLoading(false);
@@ -76,7 +74,7 @@ const ObjectivePhotoUploadComponent: React.FC<IObjectiveCreateButtonProps> = (
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const { tripObjectiveId } = useParams();
+  const { tripId } = useParams();
   const navigate = useNavigate();
 
   const handleCancel = () => setPreviewOpen(false);
@@ -113,14 +111,9 @@ const ObjectivePhotoUploadComponent: React.FC<IObjectiveCreateButtonProps> = (
       });
     });
 
-    console.log(fetchBody);
-
     try {
       setUploading(true);
-      await TripObjectiveService.UploadPhotos(
-        fetchBody,
-        tripObjectiveId as string
-      );
+      await TripService.UploadPhotos(fetchBody, tripId as string);
       setFileList([]);
       message.success("Uploaded successfully");
 
@@ -333,4 +326,4 @@ const getBase64 = (file: RcFile): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-export { ObjectivePhotoUploadComponent };
+export { PhotoUploadComponent };

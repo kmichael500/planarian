@@ -2,7 +2,7 @@ import { Button, Card, Popconfirm, Space, Table } from "antd";
 import { ColumnsType } from "antd/lib/table";
 import { v4 as uuidv4 } from "uuid";
 import { useEffect, useState } from "react";
-import { TripObjectiveService } from "../../Modules/Objective/Services/trip.objective.service";
+import { TripService } from "../../Modules/Trips/Services/TripService";
 import { ProjectService } from "../../Modules/Project/Services/project.service";
 import { nameof } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
@@ -13,7 +13,6 @@ export interface MemberGridComponentProps {
   type: MemberGridType;
   projectId: string;
   tripId?: string;
-  tripObjectiveId?: string;
 }
 const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
   const [teamMemberData, setTeamMemberData] = useState<UserTableColumn[]>();
@@ -21,15 +20,15 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
 
   useEffect(() => {
     if (teamMemberData === undefined) {
-      const getTripObjectiveName = async () => {
+      const getTripName = async () => {
         await refreshData();
       };
-      getTripObjectiveName();
+      getTripName();
     }
   });
 
   const refreshData = async () => {
-    const getTripObjectiveName = async () => {
+    const getTripName = async () => {
       let members = [] as SelectListItem<string>[];
       switch (props.type) {
         case MemberGridType.Project:
@@ -37,10 +36,8 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
             props.projectId as string
           );
           break;
-        case MemberGridType.TripObjective:
-          members = await TripObjectiveService.GetTripObjectiveMembers(
-            props.tripObjectiveId as string
-          );
+        case MemberGridType.Trip:
+          members = await TripService.GetTripMembers(props.tripId as string);
           break;
       }
 
@@ -51,7 +48,7 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
       );
       setTeamMembersLoading(false);
     };
-    getTripObjectiveName();
+    getTripName();
   };
 
   const handleDelete = async (userId: string) => {
@@ -65,11 +62,8 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
           );
           break;
 
-        case MemberGridType.TripObjective:
-          await TripObjectiveService.DeleteTripObjectiveMember(
-            userId,
-            props.tripObjectiveId as string
-          );
+        case MemberGridType.Trip:
+          await TripService.DeleteTripMember(userId, props.tripId as string);
           break;
       }
       refreshData();
@@ -140,7 +134,7 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
 
 export enum MemberGridType {
   Project = "Project",
-  TripObjective = "Trip Objective",
+  Trip = "Trip",
 }
 
 interface UserTableColumn {

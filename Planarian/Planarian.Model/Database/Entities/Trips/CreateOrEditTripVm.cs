@@ -10,7 +10,7 @@ public class CreateOrEditTripVm : ITrip
     [MaxLength(PropertyLength.Id)]
     public string ProjectId { get; set; } = null!;
 
-    [Required] public IEnumerable<string> TagIds { get; set; } = new HashSet<string>();
+    [Required] public IEnumerable<string> TripTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> TripMemberIds { get; set; } = new HashSet<string>();
     
     [Required]

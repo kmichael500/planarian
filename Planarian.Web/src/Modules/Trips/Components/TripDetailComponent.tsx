@@ -17,23 +17,23 @@ import {
   MemberGridComponent,
   MemberGridType,
 } from "../../../Shared/Components/MemberGridComponent";
-import { TripObjectiveVm } from "../Models/TripObjectiveVm";
-import { TripObjectiveService } from "../Services/trip.objective.service";
-import { TripObjectiveDetailPhotoComponent } from "./objective.detail.photo.component";
+import { TripVm } from "../Models/TripVm";
+import { TripService } from "../Services/TripService";
 import LeadTableComponent from "../../Components/lead.table.component";
-import { ObjectiveTypeTagComponent } from "../../ObjectiveTypes/Components/objective.type.tag.component";
+import { TripTagComponent } from "../../TripTags/Components/tripTagComponent";
 import { SettingsService } from "../../Settings/Services/settings.service";
 import { LeadVm } from "../../Leads/Models/Lead";
+import { TripDetailPhotoComponent } from "./TripDetailPhotoComponent";
 
 const { Option } = Select;
 const { Title, Paragraph } = Typography;
 
-const TripObjectiveDetailComponent: React.FC = () => {
+const TripDetailComponent: React.FC = () => {
   let [isLoading, setIsLoading] = useState(false);
   let [isEditing, setIsEditing] = useState(false);
-  let [objective, setObjective] = useState<TripObjectiveVm>();
+  let [trip, setTrip] = useState<TripVm>();
 
-  const { tripObjectiveId, projectId } = useParams();
+  const { tripId, projectId } = useParams();
 
   let [tripReport, setTripReport] = useState<string>("");
 
@@ -41,19 +41,16 @@ const TripObjectiveDetailComponent: React.FC = () => {
     setIsEditing(true);
   };
   const onCancelClick = () => {
-    setTripReport(objective?.tripReport ?? "");
+    setTripReport(trip?.tripReport ?? "");
     setIsEditing(false);
   };
 
   const onSaveClick = async () => {
-    await TripObjectiveService.AddOrUpdateTripReport(
-      tripObjectiveId as string,
-      tripReport
-    );
+    await TripService.AddOrUpdateTripReport(tripId as string, tripReport);
 
-    const objectiveCopy = { ...objective } as TripObjectiveVm;
-    objectiveCopy.tripReport = tripReport;
-    setObjective(objectiveCopy);
+    const tripCopy = { ...trip } as TripVm;
+    tripCopy.tripReport = tripReport;
+    setTrip(tripCopy);
     setIsEditing(false);
   };
 
@@ -79,39 +76,31 @@ const TripObjectiveDetailComponent: React.FC = () => {
   ];
 
   useEffect(() => {
-    if (objective === undefined) {
-      const getObjective = async () => {
-        const projectResponse = await TripObjectiveService.GetObjective(
-          tripObjectiveId as string
-        );
-        setObjective(projectResponse);
-        setTripReport(projectResponse.tripReport ?? "");
+    if (trip === undefined) {
+      const getTrip = async () => {
+        const tripResponse = await TripService.GetTrip(tripId as string);
+        setTrip(tripResponse);
+        setTripReport(tripResponse.tripReport ?? "");
         setIsLoading(false);
       };
-      getObjective();
+      getTrip();
     }
   });
 
   const updateName = async (e: string) => {
-    const objectiveCopy = { ...objective } as TripObjectiveVm;
-    objectiveCopy.name = e;
-    setObjective(objectiveCopy);
+    const tripCopy = { ...trip } as TripVm;
+    tripCopy.name = e;
+    setTrip(tripCopy);
 
-    await TripObjectiveService.UpdateObjectiveName(
-      e,
-      tripObjectiveId as string
-    );
+    await TripService.UpdateTripName(e, tripId as string);
   };
 
   const updateDescription = async (e: string) => {
-    const objectiveCopy = { ...objective } as TripObjectiveVm;
-    objectiveCopy.description = e;
-    setObjective(objectiveCopy);
+    const tripCopy = { ...trip } as TripVm;
+    tripCopy.description = e;
+    setTrip(tripCopy);
 
-    await TripObjectiveService.UpdateObjectiveDescription(
-      e,
-      tripObjectiveId as string
-    );
+    await TripService.UpdateTripDescription(e, tripId as string);
   };
 
   const tripReportWithParagraphs = () => {};
@@ -122,22 +111,22 @@ const TripObjectiveDetailComponent: React.FC = () => {
         <Col>
           <Spin spinning={isLoading}>
             <Title editable={{ onChange: updateName }} level={2}>
-              {objective?.name}
+              {trip?.name}
             </Title>
             <Paragraph
               type="secondary"
               editable={{ onChange: updateDescription }}
             >
-              {objective?.description}
+              {trip?.description}
             </Paragraph>
           </Spin>
 
-          <ObjectiveTypeTagComponent
+          <TripTagComponent
             getTags={() => {
-              return TripObjectiveService.GetTags(tripObjectiveId as string);
+              return TripService.GetTags(tripId as string);
             }}
-            getTagTypes={SettingsService.GetTripObjectiveTypes}
-            tripObjectiveId={tripObjectiveId as string}
+            getTagTypes={SettingsService.GetTripTags}
+            tripId={tripId as string}
           />
         </Col>
         {/* take up rest of space to push others to right and left side */}
@@ -152,8 +141,8 @@ const TripObjectiveDetailComponent: React.FC = () => {
       <Divider />
 
       <MemberGridComponent
-        type={MemberGridType.TripObjective}
-        tripObjectiveId={tripObjectiveId}
+        type={MemberGridType.Trip}
+        tripId={tripId}
         projectId={projectId as string}
       ></MemberGridComponent>
       <Divider></Divider>
@@ -211,9 +200,7 @@ const TripObjectiveDetailComponent: React.FC = () => {
 
       <Divider />
 
-      <LeadTableComponent
-        tripObjectiveId={tripObjectiveId as string}
-      ></LeadTableComponent>
+      <LeadTableComponent tripId={tripId as string}></LeadTableComponent>
 
       <Divider />
       <Card
@@ -224,11 +211,11 @@ const TripObjectiveDetailComponent: React.FC = () => {
           </Link>
         }
       >
-        <TripObjectiveDetailPhotoComponent
-          tripObjectiveId={tripObjectiveId as string}
-        ></TripObjectiveDetailPhotoComponent>
+        <TripDetailPhotoComponent
+          tripId={tripId as string}
+        ></TripDetailPhotoComponent>
       </Card>
     </>
   );
 };
-export { TripObjectiveDetailComponent };
+export { TripDetailComponent };

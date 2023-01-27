@@ -9,13 +9,12 @@ import { SettingsService } from "../../Modules/Settings/Services/settings.servic
 import { nameof } from "../Helpers/StringHelpers";
 import { AddMember } from "./AddMember";
 import { InviteMember as InviteMember } from "./InviteMember";
-import { TripObjectiveService } from "../../Modules/Objective/Services/trip.objective.service";
+import { TripService } from "../../Modules/Trips/Services/TripService";
 
 interface MemberGridAddMemberComponentProps {
   type: MemberGridType;
   projectId?: string;
   tripId?: string;
-  tripObjectiveId?: string;
   onAddedSuccess?: () => Promise<void>;
 }
 const MemberGridAddMemberComponent: React.FC<
@@ -86,11 +85,8 @@ const MemberGridAddMemberComponent: React.FC<
           props.projectId as string
         );
         break;
-      case MemberGridType.TripObjective:
-        await TripObjectiveService.AddTripObjectiveMembers(
-          userIds,
-          props.tripObjectiveId as string
-        );
+      case MemberGridType.Trip:
+        await TripService.AddTripMembers(userIds, props.tripId as string);
         break;
     }
 
@@ -109,11 +105,8 @@ const MemberGridAddMemberComponent: React.FC<
           props.projectId as string
         );
         break;
-      case MemberGridType.TripObjective:
-        await TripObjectiveService.InviteTripObjectiveMembers(
-          values,
-          props.tripObjectiveId as string
-        );
+      case MemberGridType.Trip:
+        await TripService.InviteTripMembers(values, props.tripId as string);
         break;
     }
     message.success(`${props.type} invitation sent`);

@@ -116,7 +116,7 @@ public class TripService : ServiceBase<TripRepository>
         
         trip.ProjectId = values.ProjectId;
         
-        foreach (var tagId in values.TagIds)
+        foreach (var tagId in values.TripTagIds)
         {
             var tripTag = Repository.GetTripTag(tagId);
             if (tripTag == null) throw new NullReferenceException("Tag not found");
@@ -142,7 +142,7 @@ public class TripService : ServiceBase<TripRepository>
             await AddTripMember(trip.Id, tripMemberId, false);
 
         await Repository.SaveChangesAsync();
-        return new TripVm(trip, values.TagIds, values.TripMemberIds);
+        return new TripVm(trip, values.TripTagIds, values.TripMemberIds);
     }
 
     public async Task<TripVm?> GetTrip(string projectId)

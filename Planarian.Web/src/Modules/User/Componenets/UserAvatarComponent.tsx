@@ -16,15 +16,15 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
 
   useEffect(() => {
     if (usersName === undefined) {
-      const getTripObjectiveName = async () => {
-        const tripObjectiveNameResponse = await SettingsService.GetUsersName(
+      const getUsersName = async () => {
+        const tripNameResponse = await SettingsService.GetUsersName(
           props.userId
         );
-        console.log(tripObjectiveNameResponse);
-        setUsersName(tripObjectiveNameResponse);
+
+        setUsersName(tripNameResponse);
         setIsLoading(false);
       };
-      getTripObjectiveName();
+      getUsersName();
     }
   });
 

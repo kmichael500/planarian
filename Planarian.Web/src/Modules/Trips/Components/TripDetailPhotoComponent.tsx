@@ -12,19 +12,19 @@ import { EyeOutlined, DeleteOutlined } from "@ant-design/icons";
 
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { TripObjectiveService } from "../Services/trip.objective.service";
+import { TripService } from "../Services/TripService";
 import { TripPhotoVm } from "../Models/TripPhotoVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { TripPhotoService } from "../../TripPhotos/Services/TripPhotoService";
 
 const { Title, Paragraph } = Typography;
 
-interface TripObjectiveDetailPhotoComponentProps {
-  tripObjectiveId: string;
+interface TripDetailPhotoComponentProps {
+  tripId: string;
 }
-const TripObjectiveDetailPhotoComponent: React.FC<
-  TripObjectiveDetailPhotoComponentProps
-> = (props) => {
+const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
+  props
+) => {
   let [isLoading, setIsLoading] = useState(false);
   let [photos, setPhotos] = useState<TripPhotoVm[]>();
 
@@ -36,15 +36,14 @@ const TripObjectiveDetailPhotoComponent: React.FC<
 
   useEffect(() => {
     if (photos === undefined) {
-      const GetTripObjectivePhotos = async () => {
-        const photosResponse =
-          await TripObjectiveService.GetTripObjectivePhotos(
-            props.tripObjectiveId as string
-          );
+      const getTripPhotos = async () => {
+        const photosResponse = await TripService.GetTripPhotos(
+          props.tripId as string
+        );
         setPhotos(photosResponse);
         setIsLoading(false);
       };
-      GetTripObjectivePhotos();
+      getTripPhotos();
     }
   });
 
@@ -132,4 +131,4 @@ const TripObjectiveDetailPhotoComponent: React.FC<
   );
 };
 
-export { TripObjectiveDetailPhotoComponent };
+export { TripDetailPhotoComponent };

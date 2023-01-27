@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Table, Spin, Button, Popconfirm, Card, Row, Col } from "antd";
 import { LeadVm } from "../Leads/Models/Lead";
-import { TripObjectiveService } from "../Objective/Services/trip.objective.service";
+import { TripService } from "../Trips/Services/TripService";
 import { nameof } from "../../Shared/Helpers/StringHelpers";
 import { LeadService } from "../Leads/Services/lead.service";
 import { Link } from "react-router-dom";
@@ -10,7 +10,7 @@ import { downloadCSV } from "../../Shared/Helpers/FileHelpers";
 import { CloudDownloadOutlined, PlusCircleOutlined } from "@ant-design/icons";
 
 interface LeadTableProps {
-  tripObjectiveId: string;
+  tripId: string;
 }
 const LeadTableComponent: React.FC<LeadTableProps> = (
   props: LeadTableProps
@@ -21,9 +21,7 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
   useEffect(() => {
     const fetchLeads = async () => {
       try {
-        const response = await TripObjectiveService.GetLeads(
-          props.tripObjectiveId as string
-        );
+        const response = await TripService.GetLeads(props.tripId as string);
         setLeads(response);
       } catch (error) {
         console.error(error);
@@ -76,9 +74,7 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
       setLoading(true);
       await LeadService.DeleteLead(leadId);
       // refresh the leads data
-      const response = await TripObjectiveService.GetLeads(
-        props.tripObjectiveId as string
-      );
+      const response = await TripService.GetLeads(props.tripId as string);
       setLeads(response);
       setLoading(false);
     } catch (error) {

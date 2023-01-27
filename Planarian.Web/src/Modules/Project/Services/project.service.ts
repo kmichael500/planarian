@@ -3,7 +3,7 @@ import { CreateOrEditProject } from "../Models/CreateOrEditProject";
 import { ProjectVm } from "../Models/ProjectVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { InviteMember } from "../../../Shared/Components/InviteMember";
-import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";
+import { TripVm } from "../../Trips/Models/TripVm";
 
 const baseUrl = "api/projects";
 const ProjectService = {
@@ -41,8 +41,8 @@ const ProjectService = {
 
   //#region Trip
 
-  async GetTrips(projectId: string): Promise<TripObjectiveVm[]> {
-    const response = await HttpClient.get<TripObjectiveVm[]>(
+  async GetTrips(projectId: string): Promise<TripVm[]> {
+    const response = await HttpClient.get<TripVm[]>(
       `${baseUrl}/${projectId}/trips`
     );
     return response.data;
