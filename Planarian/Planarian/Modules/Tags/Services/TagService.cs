@@ -1,6 +1,5 @@
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
-using Planarian.Modules.Tag.Models;
 using Planarian.Modules.Tags.Models;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;

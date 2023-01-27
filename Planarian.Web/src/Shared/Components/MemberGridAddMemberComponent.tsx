@@ -76,7 +76,6 @@ const MemberGridAddMemberComponent: React.FC<
   };
 
   const onSubmit = async (values: AddMember): Promise<void> => {
-    console.log(values);
     setConfirmLoading(true);
     const userIds = values.ids.map((x) => x.value);
     switch (props.type) {
@@ -96,7 +95,6 @@ const MemberGridAddMemberComponent: React.FC<
   };
 
   const onInviteMember = async (values: InviteMember): Promise<void> => {
-    console.log(values);
     setConfirmLoading(true);
 
     switch (props.type) {

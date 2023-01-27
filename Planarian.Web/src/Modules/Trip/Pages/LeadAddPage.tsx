@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { TextFileInputComponent } from "../../../Shared/Components/TextFileInputComponent";
 import { TherionService } from "../../Therion/Services/TherionService";
 import { TripService } from "../Services/TripService";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 const { Option } = Select;
 
@@ -86,8 +87,10 @@ const LeadAddPage: React.FC = () => {
       await TripService.AddLeads(leads, tripId as string);
       message.success("Leads added successfully");
       navigate("./../");
-    } catch (e: any) {
-      message.error(e);
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+
+      message.error(error.message);
     }
   };
 

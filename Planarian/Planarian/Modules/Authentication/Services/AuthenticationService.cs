@@ -1,5 +1,6 @@
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;

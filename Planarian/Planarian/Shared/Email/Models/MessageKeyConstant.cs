@@ -1,4 +1,4 @@
-namespace Planarian.Shared.Email.Services;
+namespace Planarian.Shared.Email.Models;
 
 public class MessageKeyConstant
 {

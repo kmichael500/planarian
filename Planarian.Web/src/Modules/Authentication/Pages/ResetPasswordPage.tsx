@@ -10,6 +10,7 @@ import { UpdatePasswordVm } from "../../User/Models/UpdatePasswordVm";
 import { ResetPasswordEmailVm } from "../../User/Models/ResetPasswordEmailVm";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { UserService } from "../../User/UserService";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 const ResetPasswordPage: React.FC = () => {
   const [passwordForm] = Form.useForm();
@@ -55,7 +56,9 @@ const ResetPasswordPage: React.FC = () => {
       setIsChangingPassword(false);
       emailForm.resetFields();
       navigate("/login");
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+
       message.error(error.message);
     }
     setIsLoading(false);
@@ -69,7 +72,11 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button type="primary" onClick={(e) => passwordForm.submit()}>
+            <Button
+              loading={isSubmitting}
+              type="primary"
+              onClick={(e) => passwordForm.submit()}
+            >
               Reset
             </Button>,
 
@@ -141,7 +148,11 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button type="primary" onClick={(e) => emailForm.submit()}>
+            <Button
+              loading={isSubmitting}
+              type="primary"
+              onClick={(e) => emailForm.submit()}
+            >
               Reset
             </Button>,
 

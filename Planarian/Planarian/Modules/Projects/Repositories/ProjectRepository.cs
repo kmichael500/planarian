@@ -5,7 +5,7 @@ using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Project.Repositories;
+namespace Planarian.Modules.Projects.Repositories;
 
 public class ProjectRepository : RepositoryBase
 {

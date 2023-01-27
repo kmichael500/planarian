@@ -1,6 +1,7 @@
 import { message, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserService } from "../../User/UserService";
 
 function ConfirmEmailPage() {
@@ -18,7 +19,8 @@ function ConfirmEmailPage() {
         }
         const response = await UserService.ConfirmEmail(code);
         message.success("Your email has been verified!");
-      } catch (error: any) {
+      } catch (e) {
+        const error = e as ApiErrorResponse;
         message.error(error.message);
       } finally {
         setIsVerifing(false);

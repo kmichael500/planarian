@@ -6,6 +6,7 @@ import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionCon
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
 import { Link, useNavigate } from "react-router-dom";
+import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 
 const RegisterPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -21,22 +22,6 @@ const RegisterPage: React.FC = () => {
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
 
-  useEffect(() => {
-    async function fetchUser() {
-      setIsLoading(true);
-      try {
-        // const response = await UserService.GetCurrentUser();
-        // response.phoneNumber = formatPhoneNumber(response.phoneNumber);
-        // setUser(response);
-      } catch (error: any) {
-        message.error(error.message);
-      }
-      setIsLoading(false);
-    }
-
-    fetchUser();
-  }, []);
-
   const onFinish = async (values: RegisterUserVm) => {
     setIsSubmitting(true);
     try {
@@ -47,7 +32,9 @@ const RegisterPage: React.FC = () => {
       );
 
       navigate("../login");
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+
       message.error(error.message);
     }
     setIsLoading(false);

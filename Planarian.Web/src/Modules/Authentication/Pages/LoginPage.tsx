@@ -1,15 +1,19 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
+
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
   const location = useLocation();
   const encodedRedirectUrl = new URLSearchParams(location.search).get(
@@ -20,16 +24,19 @@ const LoginPage: React.FC = () => {
   if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
     redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
   }
-  console.log(encodedRedirectUrl);
 
   const navigate = useNavigate();
 
   const onSubmit = async (values: UserLoginVm) => {
+    console.log("click");
     try {
+      setIsLoggingIn(true);
       await AuthenticationService.Login(values);
       navigate(redirectUrl);
     } catch (e: any) {
-      message.error(e.message);
+      const error = e as ApiErrorResponse;
+      message.error(error.message);
+      setIsLoggingIn(false);
     }
   };
 
@@ -37,7 +44,11 @@ const LoginPage: React.FC = () => {
     <Card
       title="Login"
       actions={[
-        <Button type="primary" onClick={(e) => form.submit()}>
+        <Button
+          loading={isLoggingIn}
+          type="primary"
+          onClick={(e) => form.submit()}
+        >
           Login
         </Button>,
 
