@@ -62,7 +62,7 @@ public class User : EntityBase
     public virtual ICollection<TripMember> TripMembers { get; set; } =
         new HashSet<TripMember>();
 
-    public virtual ICollection<TripPhoto> TripPhotos { get; set; } = new HashSet<TripPhoto>();
+    public virtual ICollection<Photo> TripPhotos { get; set; } = new HashSet<Photo>();
     public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
 }
 

@@ -12,7 +12,7 @@ public class PhotoRepository : RepositoryBase
     {
     }
 
-    public async Task<TripPhoto?> GetPhoto(string tripPhotoId)
+    public async Task<Photo?> GetPhoto(string tripPhotoId)
     {
         return await DbContext.Photos.FirstOrDefaultAsync(e =>
             e.Id == tripPhotoId && e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id));

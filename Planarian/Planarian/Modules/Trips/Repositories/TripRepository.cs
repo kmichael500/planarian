@@ -59,7 +59,7 @@ public class TripRepository : RepositoryBase
 
     public async Task<IEnumerable<LeadVm>> GetLeads(string tripId)
     {
-        return await DbContext.Lead.Where(e =>
+        return await DbContext.Leads.Where(e =>
                 e.TripId == tripId &&
                 e.Trip.Project.ProjectMembers.Any(e => e.UserId == RequestUser.Id))
             .Select(e => new LeadVm(e))

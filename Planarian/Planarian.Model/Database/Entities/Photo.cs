@@ -7,13 +7,13 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities;
 
-public class TripPhoto : EntityBase
+public class Photo : EntityBase
 {
-    public TripPhoto()
+    public Photo()
     {
     }
 
-    public TripPhoto(string userId, string tripId, string name, string description, string fileType)
+    public Photo(string userId, string tripId, string name, string description, string fileType)
     {
         UserId = userId;
         TripId = tripId;
@@ -46,9 +46,9 @@ public class TripPhoto : EntityBase
     public virtual User User { get; set; } = null!;
 }
 
-public class PhotoConfiguration : IEntityTypeConfiguration<TripPhoto>
+public class PhotoConfiguration : IEntityTypeConfiguration<Photo>
 {
-    public void Configure(EntityTypeBuilder<TripPhoto> builder)
+    public void Configure(EntityTypeBuilder<Photo> builder)
     {
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Photos)

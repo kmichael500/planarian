@@ -56,7 +56,7 @@ public class TripService : ServiceBase<TripRepository>
 
             if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
             // TODO alert user
-            var entity = new TripPhoto(RequestUser.Id, tripId, title, photo.Description, fileType);
+            var entity = new Photo(RequestUser.Id, tripId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();
             var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,

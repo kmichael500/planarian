@@ -14,7 +14,7 @@ public class LeadRepository : RepositoryBase
 
     public async Task<LeadVm?> GetLead(string leadId)
     {
-        return await DbContext.Lead.Where(e =>
+        return await DbContext.Leads.Where(e =>
                 e.Id == leadId && e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
             .Select(e => new LeadVm(e))
             .FirstOrDefaultAsync();
@@ -22,7 +22,7 @@ public class LeadRepository : RepositoryBase
 
     public async Task<Lead?> Get(string leadId)
     {
-        return await DbContext.Lead.Where(e =>
+        return await DbContext.Leads.Where(e =>
                 e.Id == leadId && e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
             .FirstOrDefaultAsync();
     }

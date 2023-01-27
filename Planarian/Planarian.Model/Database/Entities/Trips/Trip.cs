@@ -29,7 +29,7 @@ public class Trip : EntityBase, ITrip
     public virtual ICollection<TripMember> TripMembers { get; set; } =
         new HashSet<TripMember>();
 
-    public virtual ICollection<TripPhoto> Photos { get; set; } = new HashSet<TripPhoto>();
+    public virtual ICollection<Photo> Photos { get; set; } = new HashSet<Photo>();
     public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
 }
 
