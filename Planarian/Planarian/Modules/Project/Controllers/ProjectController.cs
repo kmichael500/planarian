@@ -26,6 +26,14 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
     #region Trips
 
+    [HttpPost("{projectId:length(10)}/trips")]
+    public async Task<ActionResult<TripVm>> AddTrip(string projectId, [FromBody] CreateOrEditTripVm trip)
+    {
+        var trips = await _tripService.CreateOrUpdateTrip(trip);
+
+        return new JsonResult(trips);
+    }
+    
     [HttpGet("{projectId:length(10)}/trips")]
     public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
     {

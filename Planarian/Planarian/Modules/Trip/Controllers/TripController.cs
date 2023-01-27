@@ -68,16 +68,6 @@ public class TripController : PlanarianControllerBase<TripService>
         return new OkResult();
     }
 
-    // TODO Move this to the trip controller
-    [HttpPost]
-    public async Task<ActionResult<TripVm>> CreateTrip(
-        [FromBody] CreateOrEditTripVm trip)
-    {
-        var result = await Service.UpdateTrip(trip);
-
-        return new JsonResult(result);
-    }
-
     [HttpPost("{tripId:length(10)}/trip-report")]
     public async Task<ActionResult> AddOrUpdateTripReport(string tripId,
         [FromBody] string tripReport)
@@ -125,7 +115,7 @@ public class TripController : PlanarianControllerBase<TripService>
     public async Task<ActionResult<TripVm>> UpdateTrip(
         [FromBody] CreateOrEditTripVm trip)
     {
-        var result = await Service.UpdateTrip(trip);
+        var result = await Service.CreateOrUpdateTrip(trip);
 
         return new JsonResult(result);
     }

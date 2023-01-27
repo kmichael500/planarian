@@ -42,10 +42,6 @@ const TripService = {
     );
     return response.data;
   },
-  async AddTrip(values: CreateOrEditTripVm): Promise<TripVm> {
-    const response = await HttpClient.post<TripVm>(`${baseUrl}`, values);
-    return response.data;
-  },
 
   async AddOrUpdateTripReport(
     tripId: string,

@@ -58,4 +58,13 @@ public class ProjectRepository : RepositoryBase
         return query.Select(e => new ProjectVm(e, e.ProjectMembers.Count, e.Trips.Count));
     }
     #endregion
+
+    #region Trip
+
+    public async Task<int> GetNumberOfTrips(string projectId)
+    {
+        return await DbContext.Trips.Where(e => e.ProjectId == projectId).CountAsync();
+    }
+
+    #endregion
 }

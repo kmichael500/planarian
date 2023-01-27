@@ -55,7 +55,7 @@ public class TripService : ServiceBase<TripRepository>
             var fileType = Path.GetExtension(photo.File.FileName);
 
             if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
-            // TODO alert user
+            // TODO: don't throw exception but alert user
             var entity = new Photo(RequestUser.Id, tripId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();
@@ -107,7 +107,7 @@ public class TripService : ServiceBase<TripRepository>
 
     #region Trip
 
-    public async Task<TripVm> UpdateTrip(CreateOrEditTripVm values)
+    public async Task<TripVm> CreateOrUpdateTrip(CreateOrEditTripVm values)
     {
         var isNew = string.IsNullOrWhiteSpace(values.Id);
         var trip = values.Id != null

@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal, Select, SelectProps } from "antd";
+import { Button, Form, Input, message, Modal, Select, SelectProps } from "antd";
 import TextArea from "antd/lib/input/TextArea";
 import { DefaultOptionType } from "antd/lib/select";
 import React, { useEffect, useState } from "react";
@@ -7,8 +7,8 @@ import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
-import { TripService } from "../Services/TripService";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 interface TripCreateButtonProps {
   projectId: string;
@@ -67,13 +67,17 @@ const TripCreateButtonComponent: React.FC<TripCreateButtonProps> = (
 
   const onSubmit = async (values: CreateOrEditTripVm): Promise<void> => {
     values.projectId = props.projectId;
+    try {
+      setConfirmLoading(true);
+      const trip = await ProjectService.AddTrip(values);
 
-    setConfirmLoading(true);
-    const trip = await TripService.AddTrip(values);
-
-    setOpen(false);
+      setOpen(false);
+      navigate(`/projects/${props.projectId}/trip/${trip.id}`);
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+      message.error(error.message);
+    }
     setConfirmLoading(false);
-    navigate(`/projects/${props.projectId}/trip/${trip.id}`);
   };
 
   return (

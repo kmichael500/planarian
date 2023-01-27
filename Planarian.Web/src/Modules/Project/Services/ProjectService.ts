@@ -4,6 +4,7 @@ import { ProjectVm } from "../Models/ProjectVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { InviteMember } from "../../../Shared/Models/InviteMember";
 import { TripVm } from "../../Trip/Models/TripVm";
+import { CreateOrEditTripVm } from "../../Trip/Models/CreateOrEditTripVm";
 
 const baseUrl = "api/projects";
 const ProjectService = {
@@ -40,6 +41,14 @@ const ProjectService = {
   //#endregion
 
   //#region Trip
+
+  async AddTrip(values: CreateOrEditTripVm): Promise<TripVm> {
+    const response = await HttpClient.post<TripVm>(
+      `${baseUrl}/${values.projectId}/trips`,
+      values
+    );
+    return response.data;
+  },
 
   async GetTrips(projectId: string): Promise<TripVm[]> {
     const response = await HttpClient.get<TripVm[]>(

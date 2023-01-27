@@ -4,55 +4,42 @@ import {
   Route,
   Routes,
 } from "react-router-dom";
-import { ConfirmEmailComponent } from "./Modules/Authentication/Components/ConfirmEmailComponent";
-import { LoginComponent } from "./Modules/Authentication/Components/LoginComponent";
 import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/ProtectedRoutesComponent";
-import { ResetPasswordComponent } from "./Modules/Authentication/Components/ResetPasswordComponent";
-import { RegisterComponent } from "./Modules/Authentication/Register/Components/RegisterComponent";
-import { LeadAddComponent } from "./Modules/Components/LeadAddComponent";
-import { TripPhotoUploadComponent } from "./Modules/Trip/Components/TripPhotoUploadComponent";
-import { ProjectDetailComponent } from "./Modules/Project/Components/ProjectDetailComponent";
-import { ProjectListComponent } from "./Modules/Project/Components/ProjectListComponent";
-import { SettingsComponent } from "./Modules/Setting/Components/SettingsComponent";
-import { TripDetailComponent } from "./Modules/Trip/Components/TripDetailComponent";
+import { ConfirmEmailPage } from "./Modules/Authentication/Pages/ConfirmEmailPage";
+import { LoginPage } from "./Modules/Authentication/Pages/LoginPage";
+import { ResetPasswordPage } from "./Modules/Authentication/Pages/ResetPasswordPage";
+import { RegisterPage } from "./Modules/Authentication/Register/Components/RegisterPage";
+import { ProjectPage } from "./Modules/Project/Pages/ProjectPage";
+import { ProjectsPage } from "./Modules/Project/Pages/ProjectsPage";
+import { SettingsPage } from "./Modules/Setting/Pages/SettingsPage";
+import { LeadAddPage } from "./Modules/Trip/Pages/LeadAddPage";
+import { TripPage } from "./Modules/Trip/Pages/TripPage";
+import { TripPhotoUploadPage } from "./Modules/Trip/Pages/TripPhotoUploadPage";
 
 export const AppRouting: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginComponent />}></Route>
-        <Route path="/register" element={<RegisterComponent />}></Route>
-        <Route
-          path="/reset-password"
-          element={<ResetPasswordComponent />}
-        ></Route>
-        <Route
-          path="/confirm-email"
-          element={<ConfirmEmailComponent />}
-        ></Route>
+        <Route path="/login" element={<LoginPage />}></Route>
+        <Route path="/register" element={<RegisterPage />}></Route>
+        <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
+        <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
         <Route element={<ProtectedRoutesComponent />}>
-          <Route path="/projects" element={<ProjectListComponent />}></Route>{" "}
-          <Route
-            path="/projects/:projectId"
-            element={<ProjectDetailComponent />}
-          ></Route>
-          <Route
-            path="/projects/:projectId"
-            element={<ProjectDetailComponent />}
-          ></Route>
+          <Route path="/projects" element={<ProjectsPage />}></Route>{" "}
+          <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
           <Route
             path="/projects/:projectId/trip/:tripId"
-            element={<TripDetailComponent />}
+            element={<TripPage />}
           ></Route>
           <Route
             path="/projects/:projectId/trip/:tripId/uploadPhotos"
-            element={<TripPhotoUploadComponent />}
+            element={<TripPhotoUploadPage />}
           ></Route>
           <Route
             path="/projects/:projectId/trip/:tripId/addLeads"
-            element={<LeadAddComponent />}
+            element={<LeadAddPage />}
           ></Route>
-          <Route path="/settings" element={<SettingsComponent />}></Route>
+          <Route path="/settings" element={<SettingsPage />}></Route>
           <Route path="*" element={<Navigate to="/projects" replace />} />{" "}
         </Route>
       </Routes>

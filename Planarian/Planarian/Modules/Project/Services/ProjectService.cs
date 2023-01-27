@@ -64,9 +64,12 @@ public class ProjectService : ServiceBase<ProjectRepository>
             await Repository.SaveChangesAsync();
             await AddProjectMember(project.Id, RequestUser.Id, false);
         }
-
+        
         await Repository.SaveChangesAsync();
-        return new ProjectVm(project, 1, 0); // TODO These values are only correct on create
+        
+        var numberOfTrips = await Repository.GetNumberOfTrips(project.Id);
+
+        return new ProjectVm(project, 1, numberOfTrips);
     }
 
     public async Task<ProjectVm?> GetProject(string projectId)
