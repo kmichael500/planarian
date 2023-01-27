@@ -5,24 +5,24 @@ namespace Planarian.Model.Database.Entities.Trips;
 
 public class TripVm : ITrip
 {
-    public TripVm(string id, string projectId, IEnumerable<string> tripTagIds,
+    public TripVm(string id, string projectId, IEnumerable<string> tripTagTypeIds,
         IEnumerable<string> tripMemberIds, string name,
         string? description,
         string? tripReport)
     {
         Id = id;
         ProjectId = projectId;
-        TripTagIds = tripTagIds;
+        TripTagTypeIds = tripTagTypeIds;
         TripMemberIds = tripMemberIds;
         TripReport = tripReport;
     }
 
-    public TripVm(Trip trip, IEnumerable<string> tripTagIds,
+    public TripVm(Trip trip, IEnumerable<string> tripTagTypeIds,
         IEnumerable<string> tripMemberIds)
     {
         Id = trip.Id;
         ProjectId = trip.ProjectId;
-        TripTagIds = tripTagIds;
+        TripTagTypeIds = tripTagTypeIds;
         TripMemberIds = tripMemberIds;
         Name = trip.Name;
         Description = trip.Description;
@@ -34,7 +34,7 @@ public class TripVm : ITrip
     {
     }
 
-    [Required] public IEnumerable<string> TripTagIds { get; set; } = new HashSet<string>();
+    [Required] public IEnumerable<string> TripTagTypeIds { get; set; } = new HashSet<string>();
 
     [Required] public IEnumerable<string> TripMemberIds { get; set; } = new HashSet<string>();
 

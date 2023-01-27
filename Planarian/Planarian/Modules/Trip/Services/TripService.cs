@@ -117,14 +117,14 @@ public class TripService : ServiceBase<TripRepository>
 
         trip.ProjectId = values.ProjectId;
 
-        foreach (var tagId in values.TripTagIds)
+        foreach (var tripTagId in values.TripTagTypeIds)
         {
-            var tripTag = Repository.GetTripTag(tagId);
+            var tripTag = Repository.GetTripTag(tripTagId);
             if (tripTag == null) throw new NullReferenceException("Tag not found");
 
             var entity = new TripTag
             {
-                Tag = tripTag
+                TagType = tripTag
             };
             trip.TripTags.Add(entity);
         }
@@ -143,7 +143,7 @@ public class TripService : ServiceBase<TripRepository>
             await AddTripMember(trip.Id, tripMemberId, false);
 
         await Repository.SaveChangesAsync();
-        return new TripVm(trip, values.TripTagIds, values.TripMemberIds);
+        return new TripVm(trip, values.TripTagTypeIds, values.TripMemberIds);
     }
 
     public async Task<TripVm?> GetTrip(string projectId)
@@ -253,29 +253,29 @@ public class TripService : ServiceBase<TripRepository>
         return await Repository.GetTripTags(tripId);
     }
 
-    public async Task AddTripTag(string tagId, string tripid)
+    public async Task AddTripTag(string tagTypeId, string tripId)
     {
-        var tagType = await _tagRepository.GetTag(tagId);
+        var tagType = await _tagRepository.GetTag(tagTypeId);
 
         if (tagType == null) throw new NullReferenceException("Tag type does not exist");
 
-        var trip = await Repository.GetTrip(tripid);
+        var trip = await Repository.GetTrip(tripId);
 
         if (trip == null) throw new NullReferenceException("Trip does not exist");
 
         var tripTag = new TripTag
         {
-            TripId = tripid,
-            Tag = tagType
+            TripId = tripId,
+            TagType = tagType
         };
         trip.TripTags.Add(tripTag);
 
         await Repository.SaveChangesAsync();
     }
 
-    public async Task DeleteTripTag(string tagId, string tripId)
+    public async Task DeleteTripTag(string tagTypeId, string tripId)
     {
-        var tag = await Repository.GetTripTag(tagId, tripId);
+        var tag = await Repository.GetTripTag(tagTypeId, tripId);
 
         if (tag == null) throw new NullReferenceException("Tag does not exist");
 

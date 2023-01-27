@@ -12,7 +12,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20230127171301_v1")]
+    [Migration("20230127213906_v1")]
     partial class v1
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -80,7 +80,7 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.LeadTag", b =>
                 {
-                    b.Property<string>("TagId")
+                    b.Property<string>("TagTypeId")
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("LeadId")
@@ -102,7 +102,7 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("TagId", "LeadId");
+                    b.HasKey("TagTypeId", "LeadId");
 
                     b.HasIndex("LeadId");
 
@@ -339,7 +339,7 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Projects");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Tag", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(10)
@@ -373,7 +373,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("Tags");
+                    b.ToTable("TagTypes");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripMember", b =>
@@ -445,7 +445,7 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<string>("TagId")
+                    b.Property<string>("TagTypeId")
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("TripReport")
@@ -455,14 +455,14 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("TagId");
+                    b.HasIndex("TagTypeId");
 
                     b.ToTable("Trips");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
                 {
-                    b.Property<string>("TagId")
+                    b.Property<string>("TagTypeId")
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("TripId")
@@ -484,7 +484,7 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("TagId", "TripId");
+                    b.HasKey("TagTypeId", "TripId");
 
                     b.HasIndex("TripId");
 
@@ -585,15 +585,15 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Planarian.Model.Database.Entities.Tag", "Tag")
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
                         .WithMany("LeadTags")
-                        .HasForeignKey("TagId")
+                        .HasForeignKey("TagTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Lead");
 
-                    b.Navigation("Tag");
+                    b.Navigation("TagType");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Photo", b =>
@@ -605,7 +605,7 @@ namespace Planarian.Migrations.Migrations
                         .IsRequired();
 
                     b.HasOne("Planarian.Model.Database.Entities.User", "User")
-                        .WithMany("TripPhotos")
+                        .WithMany("Photos")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -634,10 +634,10 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Tag", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.Projects.Project", "Project")
-                        .WithMany("CustomTags")
+                        .WithMany("CustomTagTypes")
                         .HasForeignKey("ProjectId");
 
                     b.Navigation("Project");
@@ -670,18 +670,18 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Planarian.Model.Database.Entities.Tag", null)
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", null)
                         .WithMany("Trips")
-                        .HasForeignKey("TagId");
+                        .HasForeignKey("TagTypeId");
 
                     b.Navigation("Project");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.Tag", "Tag")
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
                         .WithMany("TripTags")
-                        .HasForeignKey("TagId")
+                        .HasForeignKey("TagTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -691,7 +691,7 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Tag");
+                    b.Navigation("TagType");
 
                     b.Navigation("Trip");
                 });
@@ -703,14 +703,14 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Projects.Project", b =>
                 {
-                    b.Navigation("CustomTags");
+                    b.Navigation("CustomTagTypes");
 
                     b.Navigation("ProjectMembers");
 
                     b.Navigation("Trips");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Tag", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
                     b.Navigation("LeadTags");
 
@@ -734,11 +734,11 @@ namespace Planarian.Migrations.Migrations
                 {
                     b.Navigation("Leads");
 
+                    b.Navigation("Photos");
+
                     b.Navigation("ProjectMembers");
 
                     b.Navigation("TripMembers");
-
-                    b.Navigation("TripPhotos");
                 });
 #pragma warning restore 612, 618
         }

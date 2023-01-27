@@ -25,7 +25,7 @@ public class PlanarianDbContext : DbContext
 
     #region Tag
 
-    public DbSet<Tag> Tags { get; set; } = null!;
+    public DbSet<TagType> TagTypes { get; set; } = null!;
 
     #endregion
 

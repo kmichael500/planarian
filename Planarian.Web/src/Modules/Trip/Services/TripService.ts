@@ -23,22 +23,22 @@ const TripService = {
     );
     return response.data;
   },
-  async AddTag(
-    tagId: string,
+  async AddTripTag(
+    tagTypeId: string,
     tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${tripId}/tags/${tagId}`,
+      `${baseUrl}/${tripId}/tags/${tagTypeId}`,
       {}
     );
     return response.data;
   },
-  async DeleteTag(
-    tagId: string,
+  async DeleteTripTag(
+    tagTypeId: string,
     tripId: string
   ): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.delete<SelectListItem<string>[]>(
-      `${baseUrl}/${tripId}/tags/${tagId}`
+      `${baseUrl}/${tripId}/tags/${tagTypeId}`
     );
     return response.data;
   },

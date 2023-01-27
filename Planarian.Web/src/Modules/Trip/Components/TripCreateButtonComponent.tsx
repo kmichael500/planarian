@@ -112,7 +112,7 @@ const TripCreateButtonComponent: React.FC<TripCreateButtonProps> = (
           </Form.Item>
           <Form.Item
             required
-            name={nameof<CreateOrEditTripVm>("tripTagIds")}
+            name={nameof<CreateOrEditTripVm>("tripTagTypeIds")}
             label="Tags"
             rules={[
               {

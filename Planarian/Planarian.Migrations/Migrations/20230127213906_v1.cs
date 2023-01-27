@@ -98,12 +98,12 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Tags",
+                name: "TagTypes",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ProjectId = table.Column<string>(type: "nvarchar(10)", nullable: true),
+                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -112,9 +112,9 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Tags", x => x.Id);
+                    table.PrimaryKey("PK_TagTypes", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Tags_Projects_ProjectId",
+                        name: "FK_TagTypes_Projects_ProjectId",
                         column: x => x.ProjectId,
                         principalTable: "Projects",
                         principalColumn: "Id");
@@ -158,7 +158,7 @@ namespace Planarian.Migrations.Migrations
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     TripReport = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    TagId = table.Column<string>(type: "nvarchar(10)", nullable: true),
+                    TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -174,9 +174,9 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Trips_Tags_TagId",
-                        column: x => x.TagId,
-                        principalTable: "Tags",
+                        name: "FK_Trips_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
                         principalColumn: "Id");
                 });
 
@@ -279,7 +279,7 @@ namespace Planarian.Migrations.Migrations
                 name: "TripTags",
                 columns: table => new
                 {
-                    TagId = table.Column<string>(type: "nvarchar(10)", nullable: false),
+                    TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     TripId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -289,11 +289,11 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TripTags", x => new { x.TagId, x.TripId });
+                    table.PrimaryKey("PK_TripTags", x => new { x.TagTypeId, x.TripId });
                     table.ForeignKey(
-                        name: "FK_TripTags_Tags_TagId",
-                        column: x => x.TagId,
-                        principalTable: "Tags",
+                        name: "FK_TripTags_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -308,7 +308,7 @@ namespace Planarian.Migrations.Migrations
                 name: "LeadTags",
                 columns: table => new
                 {
-                    TagId = table.Column<string>(type: "nvarchar(10)", nullable: false),
+                    TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     LeadId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -318,7 +318,7 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_LeadTags", x => new { x.TagId, x.LeadId });
+                    table.PrimaryKey("PK_LeadTags", x => new { x.TagTypeId, x.LeadId });
                     table.ForeignKey(
                         name: "FK_LeadTags_Leads_LeadId",
                         column: x => x.LeadId,
@@ -326,9 +326,9 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_LeadTags_Tags_TagId",
-                        column: x => x.TagId,
-                        principalTable: "Tags",
+                        name: "FK_LeadTags_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -369,8 +369,8 @@ namespace Planarian.Migrations.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Tags_ProjectId",
-                table: "Tags",
+                name: "IX_TagTypes_ProjectId",
+                table: "TagTypes",
                 column: "ProjectId");
 
             migrationBuilder.CreateIndex(
@@ -389,9 +389,9 @@ namespace Planarian.Migrations.Migrations
                 column: "ProjectId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Trips_TagId",
+                name: "IX_Trips_TagTypeId",
                 table: "Trips",
-                column: "TagId");
+                column: "TagTypeId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TripTags_TripId",
@@ -438,7 +438,7 @@ namespace Planarian.Migrations.Migrations
                 name: "Users");
 
             migrationBuilder.DropTable(
-                name: "Tags");
+                name: "TagTypes");
 
             migrationBuilder.DropTable(
                 name: "Projects");

@@ -12,8 +12,8 @@ public class TagRepository : RepositoryBase
     {
     }
 
-    public async Task<Tag?> GetTag(string tagId)
+    public async Task<TagType?> GetTag(string tagTypeId)
     {
-        return await DbContext.Tags.FirstOrDefaultAsync(e => e.Id == tagId);
+        return await DbContext.TagTypes.FirstOrDefaultAsync(e => e.Id == tagTypeId);
     }
 }

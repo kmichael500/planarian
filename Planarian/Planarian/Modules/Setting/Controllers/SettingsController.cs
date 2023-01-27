@@ -25,12 +25,12 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
         return new JsonResult(tripTags);
     }
 
-    [HttpGet("tags/{tagId:length(10)}")]
-    public async Task<ActionResult<string>> GetTagName(string tagId)
+    [HttpGet("tags/{tagTypeId:length(10)}")]
+    public async Task<ActionResult<string>> GetTagTypeName(string tagTypeId)
     {
-        var tag = await Service.GetTagName(tagId);
+        var name = await Service.GetTagTypeName(tagTypeId);
 
-        return new JsonResult(tag);
+        return new JsonResult(name);
     }
 
     #endregion

@@ -21,9 +21,9 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetTripTags();
     }
 
-    public async Task<string> GetTagName(string tagId)
+    public async Task<string> GetTagTypeName(string tagTypeId)
     {
-        return await Repository.GetTagName(tagId);
+        return await Repository.GetTagTypeName(tagTypeId);
     }
 
     public async Task<NameProfilePhotoVm> GetUsersName(string userId)

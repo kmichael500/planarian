@@ -1,7 +1,7 @@
 export interface TripVm {
   id: string;
   projectId: string;
-  tripTagIds: string[];
+  tripTagTypeIds: string[];
   tripMemberIds: string[];
   name: string;
   description: string;

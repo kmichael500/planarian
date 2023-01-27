@@ -14,12 +14,12 @@ public class SettingsRepository : RepositoryBase
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
     {
-        return await DbContext.Tags.Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+        return await DbContext.TagTypes.Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<string> GetTagName(string tagId)
+    public async Task<string> GetTagTypeName(string tagTypeId)
     {
-        return await DbContext.Tags.Where(e => e.Id == tagId).Select(e => e.Name).FirstAsync();
+        return await DbContext.TagTypes.Where(e => e.Id == tagTypeId).Select(e => e.Name).FirstAsync();
     }
 
     public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)

@@ -42,7 +42,7 @@ const TripTagComponent = (props: TripTagComponentProps) => {
 
   const handleClose = async (removedTag: SelectListItem<string>) => {
     try {
-      await TripService.DeleteTag(removedTag.value, props.tripId);
+      await TripService.DeleteTripTag(removedTag.value, props.tripId);
       setTags(tags.filter((tag) => tag !== removedTag));
       setTagTypes([...tagTypes, removedTag]);
     } catch (error) {
@@ -60,7 +60,7 @@ const TripTagComponent = (props: TripTagComponentProps) => {
       var selectedTag = tagTypes.find((tag) => tag.value === value);
 
       try {
-        await TripService.AddTag(value, props.tripId);
+        await TripService.AddTripTag(value, props.tripId);
         var selectedTag = tagTypes.find((tag) => tag.value === value);
         if (!selectedTag) {
           return;

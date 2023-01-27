@@ -103,7 +103,7 @@ const ProjectPage: React.FC = () => {
               >
                 <>
                   <Row>
-                    {trip.tripTagIds.map((tagId, index) => (
+                    {trip.tripTagTypeIds.map((tagId, index) => (
                       <Col>
                         <TagComponent key={index} tagId={tagId} />
                       </Col>

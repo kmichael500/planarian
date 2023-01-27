@@ -1,6 +1,6 @@
 namespace Planarian.Modules.Tags.Models;
 
-public static class TagKey
+public static class TagTypeKeyConstant
 {
     public const string Default = "Default";
     public const string Trip = "Trip";

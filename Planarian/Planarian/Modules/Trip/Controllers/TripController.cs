@@ -52,18 +52,18 @@ public class TripController : PlanarianControllerBase<TripService>
         return new JsonResult(result);
     }
 
-    [HttpPost("{tripId:length(10)}/tags/{tagId:length(10)}")]
-    public async Task<ActionResult> AddTripTag(string tripId, string tagId)
+    [HttpPost("{tripId:length(10)}/tags/{tagTypeId:length(10)}")]
+    public async Task<ActionResult> AddTripTag(string tripId, string tagTypeId)
     {
-        await Service.AddTripTag(tagId, tripId);
+        await Service.AddTripTag(tagTypeId, tripId);
 
         return new OkResult();
     }
 
-    [HttpDelete("{tripId:length(10)}/tags/{tagId:length(10)}")]
-    public async Task<ActionResult> DeleteTripTag(string tripId, string tagId)
+    [HttpDelete("{tripId:length(10)}/tags/{tagTypeId:length(10)}")]
+    public async Task<ActionResult> DeleteTripTag(string tripId, string tagTypeId)
     {
-        await Service.DeleteTripTag(tagId, tripId);
+        await Service.DeleteTripTag(tagTypeId, tripId);
 
         return new OkResult();
     }

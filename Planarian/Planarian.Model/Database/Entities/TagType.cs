@@ -6,32 +6,33 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities;
 
-public class Tag : EntityBaseNameId
+public class TagType : EntityBaseNameId
 {
-    public Tag(string name, string key)
+    public TagType(string name, string key)
     {
         Name = name;
         Key = key;
     }
 
-    public Tag()
+    public TagType()
     {
     }
+    public string? ProjectId { get; set; } = null!;
 
     public string Key { get; set; } = null!;
-    public string? ProjectId { get; set; } = null!;
+    
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
     public virtual Project? Project { get; set; }
 }
 
-public class TagConfiguration : IEntityTypeConfiguration<Tag>
+public class TagTypeConfiguration : IEntityTypeConfiguration<TagType>
 {
-    public void Configure(EntityTypeBuilder<Tag> builder)
+    public void Configure(EntityTypeBuilder<TagType> builder)
     {
         builder.HasOne(e => e.Project)
-            .WithMany(e => e.CustomTags)
+            .WithMany(e => e.CustomTagTypes)
             .HasForeignKey(e => e.ProjectId);
     }
 }

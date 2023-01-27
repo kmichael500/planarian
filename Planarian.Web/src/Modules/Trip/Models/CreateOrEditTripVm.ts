@@ -4,6 +4,6 @@ export interface CreateOrEditTripVm {
   name: string;
   description: string;
   tripReport: string | null;
-  tripTagIds: string[];
+  tripTagTypeIds: string[];
   tripMemberIds: string[];
 }

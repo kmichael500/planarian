@@ -1,6 +1,6 @@
-namespace Planarian.Modules.Tags.Models;
+namespace Planarian.Modules.Tag.Models;
 
-public class CreateOrEditTagVm
+public class CreateOrEditTagTypeVm
 {
     public string Name { get; set; }
     public string Key { get; set; }
