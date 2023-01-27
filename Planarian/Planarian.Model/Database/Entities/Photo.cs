@@ -55,7 +55,7 @@ public class PhotoConfiguration : IEntityTypeConfiguration<Photo>
             .HasForeignKey(e => e.TripId);
 
         builder.HasOne(e => e.User)
-            .WithMany(e => e.TripPhotos)
+            .WithMany(e => e.Photos)
             .HasForeignKey(e => e.UserId);
     }
 }

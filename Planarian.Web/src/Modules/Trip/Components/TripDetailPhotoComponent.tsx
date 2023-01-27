@@ -12,9 +12,9 @@ import { DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 
 import { useEffect, useState } from "react";
 import { TripService } from "../Services/TripService";
-import { TripPhotoVm } from "../Models/TripPhotoVm";
+import { PhotoVm } from "../../Photo/Models/PhotoVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { TripPhotoService } from "../../TripPhotos/Services/TripPhotoService";
+import { PhotoService } from "../../Photo/Services/PhotoService";
 
 const { Title, Paragraph } = Typography;
 
@@ -26,7 +26,7 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
   props
 ) => {
   let [isLoading, setIsLoading] = useState(false);
-  let [photos, setPhotos] = useState<TripPhotoVm[]>();
+  let [photos, setPhotos] = useState<PhotoVm[]>();
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
@@ -49,10 +49,10 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
 
   const handleCancel = () => setPreviewOpen(false);
 
-  const onRemoveImageClick = async (photo: TripPhotoVm): Promise<void> => {
+  const onRemoveImageClick = async (photo: PhotoVm): Promise<void> => {
     if (photos === undefined) return;
 
-    await TripPhotoService.DeleteTripPhoto(photo.id as string);
+    await PhotoService.DeleteTripPhoto(photo.id as string);
 
     const index = photos.indexOf(photo);
     const newPhotos = photos?.slice();
@@ -60,7 +60,7 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
     setPhotos(newPhotos);
   };
 
-  const handlePreview = async (photo: TripPhotoVm) => {
+  const handlePreview = async (photo: PhotoVm) => {
     setPreviewImage(photo.url);
     setPreviewDescription(photo.description ?? "");
     setPreviewOpen(true);

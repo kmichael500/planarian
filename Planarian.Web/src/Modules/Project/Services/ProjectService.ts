@@ -3,7 +3,7 @@ import { CreateOrEditProject } from "../Models/CreateOrEditProject";
 import { ProjectVm } from "../Models/ProjectVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { InviteMember } from "../../../Shared/Models/InviteMember";
-import { TripVm } from "../../Trips/Models/TripVm";
+import { TripVm } from "../../Trip/Models/TripVm";
 
 const baseUrl = "api/projects";
 const ProjectService = {

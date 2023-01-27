@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Select, Spin, Tag, Tooltip } from "antd";
-import { TripService } from "../../Trips/Services/TripService";
+import { TripService } from "../Services/TripService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 export interface TripTagComponentProps {

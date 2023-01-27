@@ -5,11 +5,11 @@ import { MemberGridType } from "./MemberGridComponent";
 import { MailOutlined, PlusCircleOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../Models/SelectListItem";
 import { ProjectService } from "../../Modules/Project/Services/ProjectService";
-import { SettingsService } from "../../Modules/Settings/Services/SettingsService";
+import { SettingsService } from "../../Modules/Setting/Services/SettingsService";
 import { nameof } from "../Helpers/StringHelpers";
 import { AddMember } from "../Models/AddMember";
 import { InviteMember as InviteMember } from "../Models/InviteMember";
-import { TripService } from "../../Modules/Trips/Services/TripService";
+import { TripService } from "../../Modules/Trip/Services/TripService";
 
 interface MemberGridAddMemberComponentProps {
   type: MemberGridType;

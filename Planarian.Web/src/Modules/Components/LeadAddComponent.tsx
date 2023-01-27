@@ -12,12 +12,12 @@ import {
 } from "antd";
 
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { LeadClassification } from "../Leads/Models/LeadClassification";
-import { CreateLeadVm } from "../Leads/Models/CreateLeadVm";
+import { LeadClassification } from "../Lead/Models/LeadClassification";
+import { CreateLeadVm } from "../Lead/Models/CreateLeadVm";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { TextFileInputComponent } from "../../Shared/Components/TextFileInputComponent";
 import { TherionService } from "../Therion/Services/TherionService";
-import { TripService } from "../Trips/Services/TripService";
+import { TripService } from "../Trip/Services/TripService";
 
 const { Option } = Select;
 

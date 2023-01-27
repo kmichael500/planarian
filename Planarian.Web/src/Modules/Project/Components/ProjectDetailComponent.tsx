@@ -8,10 +8,10 @@ import {
   MemberGridComponent,
   MemberGridType,
 } from "../../../Shared/Components/MemberGridComponent";
-import { TripVm } from "../../Trips/Models/TripVm";
+import { TripVm } from "../../Trip/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
-import { TripTagComponent } from "../../../Shared/Components/TripTagComponent";
-import { TripCreateButtonComponent } from "../../Trips/Components/TripCreateButtonComponent";
+import { TagComponent } from "../../Tag/Components/TagComponent";
+import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 
 const { Title, Text } = Typography;
 
@@ -105,7 +105,7 @@ const ProjectDetailComponent: React.FC = () => {
                   <Row>
                     {trip.tripTagIds.map((tagId, index) => (
                       <Col>
-                        <TripTagComponent key={index} tagId={tagId} />
+                        <TagComponent key={index} tagId={tagId} />
                       </Col>
                     ))}
                   </Row>

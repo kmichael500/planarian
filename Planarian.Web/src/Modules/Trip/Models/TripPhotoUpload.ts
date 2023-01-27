@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { PhotoMetaData } from "./PhotoMetaData";
+import { PhotoMetaData } from "../../Photo/Models/PhotoMetaData";
 
 export interface TripPhotosUpload {
   photos: TripPhotoUpload[];

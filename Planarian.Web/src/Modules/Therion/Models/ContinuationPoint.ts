@@ -1,5 +1,5 @@
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { LeadClassification } from "../../Leads/Models/LeadClassification";
+import { LeadClassification } from "../../Lead/Models/LeadClassification";
 import { Station } from "./Station";
 import { Coordinates } from "./Coordinates";
 

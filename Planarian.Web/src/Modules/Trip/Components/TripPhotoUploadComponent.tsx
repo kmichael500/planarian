@@ -21,17 +21,17 @@ import { RcFile } from "antd/lib/upload";
 import React, { useEffect, useState } from "react";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripService } from "../Services/TripService";
-import { PhotoMetaData } from "../Models/PhotoMetaData";
+import { PhotoMetaData } from "../../Photo/Models/PhotoMetaData";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "./PhotoUploadComponent.scss";
 
 const { TextArea } = Input;
 
-interface PhotoUploadComponentProps {}
+interface TripPhotoUploadComponentProps {}
 
-const PhotoUploadComponent: React.FC<PhotoUploadComponentProps> = (
-  props: PhotoUploadComponentProps
+const TripPhotoUploadComponent: React.FC<TripPhotoUploadComponentProps> = (
+  props: TripPhotoUploadComponentProps
 ) => {
   //#region Main Modal
 
@@ -321,4 +321,4 @@ const getBase64 = (file: RcFile): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-export { PhotoUploadComponent };
+export { TripPhotoUploadComponent };

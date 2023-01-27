@@ -10,11 +10,11 @@ import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/Pr
 import { ResetPasswordComponent } from "./Modules/Authentication/Components/ResetPasswordComponent";
 import { RegisterComponent } from "./Modules/Authentication/Register/Components/RegisterComponent";
 import { LeadAddComponent } from "./Modules/Components/LeadAddComponent";
-import { PhotoUploadComponent } from "./Modules/Trips/Components/PhotoUploadComponent";
+import { TripPhotoUploadComponent } from "./Modules/Trip/Components/TripPhotoUploadComponent";
 import { ProjectDetailComponent } from "./Modules/Project/Components/ProjectDetailComponent";
 import { ProjectListComponent } from "./Modules/Project/Components/ProjectListComponent";
-import { SettingsComponent } from "./Modules/Settings/Components/SettingsComponent";
-import { TripDetailComponent } from "./Modules/Trips/Components/TripDetailComponent";
+import { SettingsComponent } from "./Modules/Setting/Components/SettingsComponent";
+import { TripDetailComponent } from "./Modules/Trip/Components/TripDetailComponent";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -46,7 +46,7 @@ export const AppRouting: React.FC = () => {
           ></Route>
           <Route
             path="/projects/:projectId/trip/:tripId/uploadPhotos"
-            element={<PhotoUploadComponent />}
+            element={<TripPhotoUploadComponent />}
           ></Route>
           <Route
             path="/projects/:projectId/trip/:tripId/addLeads"

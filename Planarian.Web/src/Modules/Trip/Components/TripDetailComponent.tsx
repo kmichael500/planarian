@@ -20,9 +20,9 @@ import {
 import { TripVm } from "../Models/TripVm";
 import { TripService } from "../Services/TripService";
 import LeadTableComponent from "../../Components/LeadTableComponent";
-import { TripTagComponent } from "../../TripTags/Components/TripTagComponent";
-import { SettingsService } from "../../Settings/Services/SettingsService";
+import { SettingsService } from "../../Setting/Services/SettingsService";
 import { TripDetailPhotoComponent } from "./TripDetailPhotoComponent";
+import { TripTagComponent } from "./TripTagComponent";
 
 const { Option } = Select;
 const { Title, Paragraph } = Typography;

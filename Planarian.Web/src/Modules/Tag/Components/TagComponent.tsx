@@ -2,14 +2,14 @@ import { Spin, Tag } from "antd";
 import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
-import { SettingsService } from "../../Modules/Settings/Services/SettingsService";
+import { SettingsService } from "../../Setting/Services/SettingsService";
 
 export interface TripTagComponentProps {
   tagId: string;
   color?: LiteralUnion<PresetColorType | PresetStatusColorType, string>;
 }
 
-const TripTagComponent: React.FC<TripTagComponentProps> = (props) => {
+const TagComponent: React.FC<TripTagComponentProps> = (props) => {
   let [tagName, setTagName] = useState<string>();
   let [isTagNameLoading, setIsTagNameLoading] = useState(true);
 
@@ -33,4 +33,4 @@ const TripTagComponent: React.FC<TripTagComponentProps> = (props) => {
   );
 };
 
-export { TripTagComponent };
+export { TagComponent };

@@ -3,12 +3,12 @@ import { HttpClient } from "../../..";
 import { InviteMember } from "../../../Shared/Models/InviteMember";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { CreateLeadVm } from "../../Leads/Models/CreateLeadVm";
-import { LeadVm } from "../../Leads/Models/LeadVm";
+import { CreateLeadVm } from "../../Lead/Models/CreateLeadVm";
+import { LeadVm } from "../../Lead/Models/LeadVm";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripVm } from "../Models/TripVm";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
-import { TripPhotoVm } from "../Models/TripPhotoVm";
+import { PhotoVm } from "../../Photo/Models/PhotoVm";
 
 const baseUrl = "api/trips";
 const TripService = {
@@ -102,8 +102,8 @@ const TripService = {
     return response.data;
   },
 
-  async GetTripPhotos(tripId: string): Promise<TripPhotoVm[]> {
-    const response = await HttpClient.get<TripPhotoVm[]>(
+  async GetTripPhotos(tripId: string): Promise<PhotoVm[]> {
+    const response = await HttpClient.get<PhotoVm[]>(
       `${baseUrl}/${tripId}/photos`
     );
     return response.data;

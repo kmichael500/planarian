@@ -3,7 +3,7 @@ import { AvatarSize } from "antd/lib/avatar/SizeContext";
 import { useEffect, useState } from "react";
 import { StringHelpers } from "../../../Shared/Helpers/StringHelpers";
 import { NameProfilePhotoVm } from "../Models/NameProfilePhotoVm";
-import { SettingsService } from "../../Settings/Services/SettingsService";
+import { SettingsService } from "../../Setting/Services/SettingsService";
 
 const { Text } = Typography;
 
