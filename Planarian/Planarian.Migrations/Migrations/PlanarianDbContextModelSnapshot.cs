@@ -73,7 +73,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Leads");
+                    b.ToTable("Leads", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.LeadTag", b =>
@@ -104,7 +104,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("LeadId");
 
-                    b.ToTable("LeadTags");
+                    b.ToTable("LeadTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLog", b =>
@@ -159,7 +159,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MessageLogs");
+                    b.ToTable("MessageLogs", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.MessageType", b =>
@@ -214,7 +214,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MessageTypes");
+                    b.ToTable("MessageTypes", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Photo", b =>
@@ -269,7 +269,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Photos");
+                    b.ToTable("Photos", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.ProjectMember", b =>
@@ -306,7 +306,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ProjectMembers");
+                    b.ToTable("ProjectMembers", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Projects.Project", b =>
@@ -334,7 +334,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Projects");
+                    b.ToTable("Projects", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Tag", b =>
@@ -371,7 +371,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("Tags");
+                    b.ToTable("Tags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripMember", b =>
@@ -408,7 +408,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("TripMembers");
+                    b.ToTable("TripMembers", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Trips.Trip", b =>
@@ -455,7 +455,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TagId");
 
-                    b.ToTable("Trips");
+                    b.ToTable("Trips", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
@@ -486,7 +486,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TripId");
 
-                    b.ToTable("TripTags");
+                    b.ToTable("TripTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
@@ -553,7 +553,7 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("EmailAddress")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
