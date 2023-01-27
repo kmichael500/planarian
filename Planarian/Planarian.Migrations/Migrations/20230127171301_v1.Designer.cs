@@ -12,8 +12,8 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20230108215356_v13")]
-    partial class v13
+    [Migration("20230127171301_v1")]
+    partial class v1
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -24,7 +24,7 @@ namespace Planarian.Migrations.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Lead", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(10)
@@ -40,11 +40,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -55,10 +53,13 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<bool>("IsAlive")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("TripObjectiveId")
+                    b.Property<string>("TripId")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
@@ -70,29 +71,181 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TripObjectiveId");
+                    b.HasIndex("TripId");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Lead");
+                    b.ToTable("Leads");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.PermissionType", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.LeadTag", b =>
+                {
+                    b.Property<string>("TagId")
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("LeadId")
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TagId", "LeadId");
+
+                    b.HasIndex("LeadId");
+
+                    b.ToTable("LeadTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLog", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("FromEmailAddress")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FromName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MessageKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Substitutions")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToEmailAddress")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MessageLogs");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.MessageType", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FromEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FromName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Html")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Mjml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MessageTypes");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Photo", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("BlobKey")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
 
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
@@ -102,41 +255,23 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.HasKey("Id");
-
-                    b.ToTable("PermissionTypes");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.ProjectInvitation", b =>
-                {
-                    b.Property<string>("Id")
+                    b.Property<string>("TripId")
+                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<string>("CreatedByName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ProjectId")
+                    b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId");
+                    b.HasIndex("TripId");
 
-                    b.ToTable("ProjectInvitations");
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Photos");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.ProjectMember", b =>
@@ -146,11 +281,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -185,11 +318,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -215,11 +346,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -247,18 +376,16 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectiveMember", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TripMember", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -266,152 +393,12 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("TripObjectiveId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TripObjectiveId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TripObjectiveMembers");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectives.TripObjective", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("CreatedByName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("TagId")
-                        .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("TripId")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<string>("TripReport")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TagId");
-
-                    b.HasIndex("TripId");
-
-                    b.ToTable("TripObjectives");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectiveTag", b =>
-                {
-                    b.Property<string>("TagId")
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("TripObjectiveId")
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("CreatedByName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("TagId", "TripObjectiveId");
-
-                    b.HasIndex("TripObjectiveId");
-
-                    b.ToTable("TripObjectiveTag");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripPhoto", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("BlobKey")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("CreatedByName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("FileType")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("TripObjectiveId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -419,11 +406,11 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TripObjectiveId");
+                    b.HasIndex("TripId");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Photos");
+                    b.ToTable("TripMembers");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Trips.Trip", b =>
@@ -433,36 +420,75 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("ProjectId")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<DateTime>("TripDate")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("TagId")
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("TripReport")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("Trip");
+                    b.HasIndex("TagId");
+
+                    b.ToTable("Trips");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
+                {
+                    b.Property<string>("TagId")
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("TripId")
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CreatedByName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TagId", "TripId");
+
+                    b.HasIndex("TripId");
+
+                    b.ToTable("TripTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
@@ -472,11 +498,9 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("CreatedByName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedOn")
@@ -487,6 +511,10 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
 
+                    b.Property<string>("EmailConfirmationCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -496,12 +524,22 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<bool?>("IsEmailConfirmed")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PasswordResetCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("PasswordResetCodeExpiration")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("PhoneNumber")
@@ -520,11 +558,11 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Lead", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.TripObjectives.TripObjective", "TripObjective")
+                    b.HasOne("Planarian.Model.Database.Entities.Trips.Trip", "Trip")
                         .WithMany("Leads")
-                        .HasForeignKey("TripObjectiveId")
+                        .HasForeignKey("TripId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -534,20 +572,47 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("TripObjective");
+                    b.Navigation("Trip");
 
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.ProjectInvitation", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.LeadTag", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.Projects.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
+                    b.HasOne("Planarian.Model.Database.Entities.Leads.Lead", "Lead")
+                        .WithMany("LeadTags")
+                        .HasForeignKey("LeadId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Project");
+                    b.HasOne("Planarian.Model.Database.Entities.Tag", "Tag")
+                        .WithMany("LeadTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Photo", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.Trips.Trip", "Trip")
+                        .WithMany("Photos")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "User")
+                        .WithMany("TripPhotos")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.ProjectMember", b =>
@@ -578,74 +643,21 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectiveMember", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TripMember", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.TripObjectives.TripObjective", "TripObjective")
-                        .WithMany("TripObjectiveMembers")
-                        .HasForeignKey("TripObjectiveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "User")
-                        .WithMany("TripObjectiveMembers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TripObjective");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectives.TripObjective", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.Tag", null)
-                        .WithMany("TripObjectives")
-                        .HasForeignKey("TagId");
-
                     b.HasOne("Planarian.Model.Database.Entities.Trips.Trip", "Trip")
-                        .WithMany("TripObjectives")
+                        .WithMany("TripMembers")
                         .HasForeignKey("TripId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Trip");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectiveTag", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.Tag", "Tag")
-                        .WithMany("TripObjectiveTags")
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.TripObjectives.TripObjective", "TripObjective")
-                        .WithMany("TripObjectiveTags")
-                        .HasForeignKey("TripObjectiveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tag");
-
-                    b.Navigation("TripObjective");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripPhoto", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.TripObjectives.TripObjective", "TripObjective")
-                        .WithMany("Photos")
-                        .HasForeignKey("TripObjectiveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Planarian.Model.Database.Entities.User", "User")
-                        .WithMany("TripPhotos")
+                        .WithMany("TripMembers")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("TripObjective");
+                    b.Navigation("Trip");
 
                     b.Navigation("User");
                 });
@@ -658,7 +670,35 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Planarian.Model.Database.Entities.Tag", null)
+                        .WithMany("Trips")
+                        .HasForeignKey("TagId");
+
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.Tag", "Tag")
+                        .WithMany("TripTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.Trips.Trip", "Trip")
+                        .WithMany("TripTags")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tag");
+
+                    b.Navigation("Trip");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
+                {
+                    b.Navigation("LeadTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Projects.Project", b =>
@@ -672,25 +712,22 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Tag", b =>
                 {
-                    b.Navigation("TripObjectiveTags");
+                    b.Navigation("LeadTags");
 
-                    b.Navigation("TripObjectives");
+                    b.Navigation("TripTags");
+
+                    b.Navigation("Trips");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.TripObjectives.TripObjective", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.Trips.Trip", b =>
                 {
                     b.Navigation("Leads");
 
                     b.Navigation("Photos");
 
-                    b.Navigation("TripObjectiveMembers");
+                    b.Navigation("TripMembers");
 
-                    b.Navigation("TripObjectiveTags");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.Trips.Trip", b =>
-                {
-                    b.Navigation("TripObjectives");
+                    b.Navigation("TripTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
@@ -699,7 +736,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("ProjectMembers");
 
-                    b.Navigation("TripObjectiveMembers");
+                    b.Navigation("TripMembers");
 
                     b.Navigation("TripPhotos");
                 });

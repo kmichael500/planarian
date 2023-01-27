@@ -20,7 +20,6 @@ public class PlanarianDbContext : DbContext
     #region Project
     
     public DbSet<Project> Projects { get; set; } = null!;
-    public DbSet<ProjectInvitation> ProjectInvitations { get; set; } = null!;
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     
     #endregion
