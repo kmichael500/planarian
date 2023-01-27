@@ -1,4 +1,5 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   isNullOrWhiteSpace,
@@ -11,6 +12,8 @@ import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
+
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
   const location = useLocation();
   const encodedRedirectUrl = new URLSearchParams(location.search).get(
@@ -25,12 +28,15 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (values: UserLoginVm) => {
+    console.log("click");
     try {
+      setIsLoggingIn(true);
       await AuthenticationService.Login(values);
       navigate(redirectUrl);
     } catch (e: any) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
+      setIsLoggingIn(false);
     }
   };
 
@@ -38,7 +44,11 @@ const LoginPage: React.FC = () => {
     <Card
       title="Login"
       actions={[
-        <Button type="primary" onClick={(e) => form.submit()}>
+        <Button
+          loading={isLoggingIn}
+          type="primary"
+          onClick={(e) => form.submit()}
+        >
           Login
         </Button>,
 

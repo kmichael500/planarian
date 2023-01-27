@@ -72,7 +72,11 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button type="primary" onClick={(e) => passwordForm.submit()}>
+            <Button
+              loading={isSubmitting}
+              type="primary"
+              onClick={(e) => passwordForm.submit()}
+            >
               Reset
             </Button>,
 
@@ -144,7 +148,11 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button type="primary" onClick={(e) => emailForm.submit()}>
+            <Button
+              loading={isSubmitting}
+              type="primary"
+              onClick={(e) => emailForm.submit()}
+            >
               Reset
             </Button>,
 

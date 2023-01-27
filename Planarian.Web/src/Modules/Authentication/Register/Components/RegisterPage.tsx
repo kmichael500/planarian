@@ -22,24 +22,6 @@ const RegisterPage: React.FC = () => {
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
 
-  useEffect(() => {
-    async function fetchUser() {
-      setIsLoading(true);
-      try {
-        // const response = await UserService.GetCurrentUser();
-        // response.phoneNumber = formatPhoneNumber(response.phoneNumber);
-        // setUser(response);
-      } catch (e) {
-        const error = e as ApiErrorResponse;
-
-        message.error(error.message);
-      }
-      setIsLoading(false);
-    }
-
-    fetchUser();
-  }, []);
-
   const onFinish = async (values: RegisterUserVm) => {
     setIsSubmitting(true);
     try {
