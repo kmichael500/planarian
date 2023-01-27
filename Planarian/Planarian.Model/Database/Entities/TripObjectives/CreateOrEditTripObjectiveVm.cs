@@ -5,13 +5,13 @@ namespace Planarian.Model.Database.Entities.TripObjectives;
 
 public class CreateOrEditTripObjectiveVm : ITripObjective
 {
+    [MaxLength(PropertyLength.Id)] public string? Id { get; set; }
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string ProjectId { get; set; } = null!;
 
     [Required] public IEnumerable<string> TripObjectiveTypeIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> TripObjectiveMemberIds { get; set; } = new HashSet<string>();
-    [MaxLength(PropertyLength.Id)] public string? Id { get; set; }
     
     [Required]
     [MaxLength(PropertyLength.Name)]

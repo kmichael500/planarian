@@ -1,6 +1,6 @@
 export interface TripObjectiveVm {
   id: string;
-  tripId: string;
+  projectId: string;
   tripObjectiveTypeIds: string[];
   tripObjectiveMemberIds: string[];
   name: string;

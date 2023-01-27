@@ -134,6 +134,8 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
             ? await Repository.GetTripObjective(values.Id) ?? new TripObjective()
             : new TripObjective();
         
+        tripObjective.ProjectId = values.ProjectId;
+        
         foreach (var tripObjectiveTypeId in values.TripObjectiveTypeIds)
         {
             var tripObjectiveType = Repository.GetTripObjectiveType(tripObjectiveTypeId);

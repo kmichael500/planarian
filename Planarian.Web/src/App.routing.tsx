@@ -16,7 +16,6 @@ import { ObjectivePhotoUploadComponent } from "./Modules/Objective/Components/ob
 import { ProjectDetailComponent } from "./Modules/Project/Components/project.detail.component";
 import { ProjectListComponent } from "./Modules/Project/Components/project.list.component";
 import { SettingsComponent } from "./Modules/Settings/Components/settings.component";
-import { TripDetailComponent } from "./Modules/Trip/Components/trip.detail.component";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -43,19 +42,15 @@ export const AppRouting: React.FC = () => {
             element={<ProjectDetailComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripId"
-            element={<TripDetailComponent />}
-          ></Route>
-          <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId"
+            path="/projects/:projectId/trip/:tripObjectiveId"
             element={<TripObjectiveDetailComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId/uploadPhotos"
+            path="/projects/:projectId/trip/:tripObjectiveId/uploadPhotos"
             element={<ObjectivePhotoUploadComponent />}
           ></Route>
           <Route
-            path="/projects/:projectId/trip/:tripId/objective/:tripObjectiveId/addLeads"
+            path="/projects/:projectId/trip/:tripObjectiveId/addLeads"
             element={<LeadAddComponent />}
           ></Route>
           <Route path="/settings" element={<SettingsComponent />}></Route>

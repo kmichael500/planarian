@@ -1,7 +1,6 @@
 import { HttpClient } from "../../..";
 import { CreateOrEditProject } from "../Models/CreateOrEditProject";
 import { ProjectVm } from "../Models/ProjectVm";
-import { TripVm } from "../../Trip/Models/TripVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { InviteMember } from "../../../Shared/Components/InviteMember";
 import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";

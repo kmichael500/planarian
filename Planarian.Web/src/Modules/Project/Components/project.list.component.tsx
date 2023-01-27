@@ -1,7 +1,6 @@
 import { Row, Col, Card, Spin, Divider, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { TripCreateButton } from "../../Trip/Components/trip.create.button.component";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/project.service";
 import { ProjectCreateButton } from "./project.create.button.component";

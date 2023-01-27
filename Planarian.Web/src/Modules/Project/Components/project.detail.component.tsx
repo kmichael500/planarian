@@ -4,18 +4,20 @@ import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException"
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/project.service";
 import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
-import { TripVm } from "../../Trip/Models/TripVm";
-import { TripCreateButton } from "../../Trip/Components/trip.create.button.component";
 import moment from "moment";
 import {
   MemberGridComponent,
   MemberGridType,
 } from "../../../Shared/Components/MemberGridComponent";
+import { TripObjectiveVm } from "../../Objective/Models/TripObjectiveVm";
+import { TripObjectiveCreateButton } from "../../Objective/Components/objective.create.button.component";
+import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
+import { TripObjectiveTagComponent } from "../../../Shared/Components/TripObjectiveTagComponent";
 const { Title, Text } = Typography;
 
 const ProjectDetailComponent: React.FC = () => {
   let [project, setProject] = useState<ProjectVm>();
-  let [trips, setTrips] = useState<TripVm[]>();
+  let [trips, setTrips] = useState<TripObjectiveVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
   const { projectId } = useParams();
@@ -51,7 +53,7 @@ const ProjectDetailComponent: React.FC = () => {
         </Col>
         <Col>
           {" "}
-          <TripCreateButton projectId={projectId} />
+          <TripObjectiveCreateButton projectId={projectId} />
         </Col>
       </Row>
       <Divider />
@@ -77,24 +79,49 @@ const ProjectDetailComponent: React.FC = () => {
             { xs: 8, sm: 8, md: 24, lg: 32 },
           ]}
         >
-          {trips?.map((trip, index) => (
+          {trips?.map((objective, index) => (
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Card
                 title={
-                  <div>
-                    {`Trip ${trip.tripNumber}`}{" "}
-                    <Text type="secondary">{trip.name}</Text>
-                  </div>
+                  <>
+                    {objective.name}{" "}
+                    <Row>
+                      <UserAvatarGroupComponent
+                        size={"small"}
+                        maxCount={4}
+                        userIds={objective.tripObjectiveMemberIds}
+                      />
+                    </Row>
+                  </>
                 }
                 loading={isTripsLoading}
                 bordered={false}
                 actions={[
-                  <Link to={`trip/${trip.id}`}>
+                  <Link to={`trip/${objective.id}`}>
                     <Button>View</Button>
                   </Link>,
                 ]}
               >
-                {moment(trip.tripDate).format("MMMM Do YYYY")}
+                <>
+                  <Row>
+                    {objective.tripObjectiveTypeIds.map(
+                      (objectiveTypeId, index) => (
+                        <Col>
+                          <TripObjectiveTagComponent
+                            key={index}
+                            tripObjectiveId={objectiveTypeId}
+                          />
+                        </Col>
+                      )
+                    )}
+                  </Row>
+                  <Divider />
+
+                  <Row>
+                    {" "}
+                    <Text>Description: {objective.description}</Text>
+                  </Row>
+                </>
               </Card>
             </Col>
           ))}

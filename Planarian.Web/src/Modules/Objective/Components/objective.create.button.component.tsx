@@ -20,7 +20,6 @@ import { TripObjectiveService } from "../Services/trip.objective.service";
 
 interface IObjectiveCreateButtonPRops {
   projectId: string;
-  tripId: string;
 }
 const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
   props: IObjectiveCreateButtonPRops
@@ -78,16 +77,13 @@ const TripObjectiveCreateButton: React.FC<IObjectiveCreateButtonPRops> = (
     values: CreateOrEditTripObjectiveVm
   ): Promise<void> => {
     values.projectId = props.projectId;
-    values.tripId = props.tripId;
 
     setConfirmLoading(true);
     const objective = await TripObjectiveService.AddTripObjective(values);
 
     setOpen(false);
     setConfirmLoading(false);
-    navigate(
-      `/projects/${props.projectId}/trip/${props.tripId}/objective/${objective.id}`
-    );
+    navigate(`/projects/${props.projectId}/trip/${objective.id}`);
   };
 
   return (

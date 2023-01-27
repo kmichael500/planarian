@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from "uuid";
 import { useEffect, useState } from "react";
 import { TripObjectiveService } from "../../Modules/Objective/Services/trip.objective.service";
 import { ProjectService } from "../../Modules/Project/Services/project.service";
-import { TripSerice } from "../../Modules/Trip/Services/trip.service";
 import { nameof } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
 import { PlusCircleOutlined } from "@ant-design/icons";
@@ -37,9 +36,6 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
           members = await ProjectService.GetProjectMembers(
             props.projectId as string
           );
-          break;
-        case MemberGridType.Trip:
-          members = await TripSerice.GetTripMembers(props.tripId as string);
           break;
         case MemberGridType.TripObjective:
           members = await TripObjectiveService.GetTripObjectiveMembers(
@@ -97,18 +93,16 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
       key: nameof<UserTableColumn>("action"),
       render: (text: string, record: any) => (
         <Space size="middle">
-          {props.type !== MemberGridType.Trip && (
-            <Popconfirm
-              title={`Are you sure to delete this ${props.type.toLowerCase()} member?`}
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button type="primary" danger>
-                Delete
-              </Button>
-            </Popconfirm>
-          )}
+          <Popconfirm
+            title={`Are you sure to delete this ${props.type.toLowerCase()} member?`}
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="primary" danger>
+              Delete
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -146,7 +140,6 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
 
 export enum MemberGridType {
   Project = "Project",
-  Trip = "Trip",
   TripObjective = "Trip Objective",
 }
 

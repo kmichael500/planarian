@@ -105,7 +105,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
     [IgnoreAntiforgeryToken]
     [HttpPost("{tripObjectiveId:length(10)}/photos")]
-    public async Task<ActionResult> UploadPhotos([FromForm] IEnumerable<TripPhotoUpload> formData,
+    public async Task<ActionResult> UploadPhotos([FromForm] IEnumerable<TripUploadPhoto> formData,
         string tripObjectiveId)
     {
         await Service.UploadPhotos(formData, tripObjectiveId);

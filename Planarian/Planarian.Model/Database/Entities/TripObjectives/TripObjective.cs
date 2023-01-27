@@ -17,9 +17,8 @@ public class TripObjective : EntityBase, ITripObjective
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; } = null!;
 
-    [Required]
     [MaxLength(PropertyLength.MediumText)]
-    public string Description { get; set; } = null!;
+    public string? Description { get; set; } = null!;
 
     public string? TripReport { get; set; }
     
