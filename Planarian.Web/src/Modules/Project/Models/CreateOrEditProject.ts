@@ -1,4 +1,4 @@
 export interface CreateOrEditProject {
-    id?: string;
-    name: string;
+  id?: string;
+  name: string;
 }
