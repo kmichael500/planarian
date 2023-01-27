@@ -4,6 +4,7 @@ using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
+using Planarian.Shared.Email.Models;
 using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
 using Southport.Messaging.Email.Core;

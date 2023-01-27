@@ -2,11 +2,11 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
 using Planarian.Modules.Invitations.Models;
-using Planarian.Modules.Project.Repositories;
+using Planarian.Modules.Projects.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Project.Services;
+namespace Planarian.Modules.Projects.Services;
 
 public class ProjectService : ServiceBase<ProjectRepository>
 {

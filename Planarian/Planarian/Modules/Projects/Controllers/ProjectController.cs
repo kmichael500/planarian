@@ -5,11 +5,11 @@ using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Invitations.Models;
-using Planarian.Modules.Project.Services;
+using Planarian.Modules.Projects.Services;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Project.Controllers;
+namespace Planarian.Modules.Projects.Controllers;
 
 [Route("api/projects")]
 [Authorize]

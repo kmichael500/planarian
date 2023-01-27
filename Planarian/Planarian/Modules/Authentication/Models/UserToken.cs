@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Authentication.Services;
+namespace Planarian.Modules.Authentication.Models;
 
 public class UserToken
 {

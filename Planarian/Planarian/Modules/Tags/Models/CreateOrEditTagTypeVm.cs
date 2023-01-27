@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Tag.Models;
+namespace Planarian.Modules.Tags.Models;
 
 public class CreateOrEditTagTypeVm
 {
