@@ -5,6 +5,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Leads.Models;
 using Planarian.Modules.Project.Controllers;
+using Planarian.Modules.TripObjectives.Models;
 using Planarian.Modules.TripObjectives.Services;
 using Planarian.Shared.Base;
 
@@ -105,7 +106,7 @@ public class TripObjectiveController : PlanarianControllerBase<TripObjectiveServ
 
     [IgnoreAntiforgeryToken]
     [HttpPost("{tripObjectiveId:length(10)}/photos")]
-    public async Task<ActionResult> UploadPhotos([FromForm] IEnumerable<TripUploadPhoto> formData,
+    public async Task<ActionResult> UploadPhotos([FromForm] IEnumerable<TripPhotoUpload> formData,
         string tripObjectiveId)
     {
         await Service.UploadPhotos(formData, tripObjectiveId);

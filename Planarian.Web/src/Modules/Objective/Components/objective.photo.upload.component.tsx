@@ -117,8 +117,6 @@ const ObjectivePhotoUploadComponent: React.FC<IObjectiveCreateButtonProps> = (
 
     try {
       setUploading(true);
-      // You can use any AJAX library you like
-      console.log("tripObjectiveId", tripObjectiveId);
       await TripObjectiveService.UploadPhotos(
         fetchBody,
         tripObjectiveId as string

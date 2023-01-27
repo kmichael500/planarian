@@ -31,21 +31,11 @@ public class BlobService
     #region Trip Photos
 
     public async Task<string> AddTripPhoto(string projectId, string tripId,
-        string tripObjectiveId, string photoId, Stream stream, string fileExtension)
+        string photoId, Stream stream, string fileExtension)
     {
-        var blobKey = $"project/{projectId}/trips/{tripId}/objectives/{tripObjectiveId}/photos/{photoId}";
-
-        var options = new BlobUploadOptions
-        {
-            HttpHeaders = new BlobHttpHeaders
-            {
-                ContentType = "image/jpeg",
-                CacheControl = "public, max-age=31536000",
-                ContentEncoding = "gzip",
-                ContentLanguage = "en-US"
-            }
-        };
-        var result = await _containerClient.UploadBlobAsync(blobKey, stream);
+        var blobKey = $"projects/{projectId}/trips/{tripId}/photos/{photoId}";
+        
+        await _containerClient.UploadBlobAsync(blobKey, stream);
 
         return blobKey;
     }

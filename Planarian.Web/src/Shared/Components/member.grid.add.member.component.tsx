@@ -131,24 +131,22 @@ const MemberGridAddMemberComponent: React.FC<
 
   return (
     <>
-      {props.type !== MemberGridType.Trip && (
-        <Row gutter={10}>
-          <Col>
-            <Button icon={<MailOutlined />} onClick={inviteMember}>
-              Invite
-            </Button>
-          </Col>
-          <Col>
-            <Button
-              type="primary"
-              icon={<PlusCircleOutlined />}
-              onClick={addExistingMember}
-            >
-              Add
-            </Button>
-          </Col>
-        </Row>
-      )}
+      <Row gutter={10}>
+        <Col>
+          <Button icon={<MailOutlined />} onClick={inviteMember}>
+            Invite
+          </Button>
+        </Col>
+        <Col>
+          <Button
+            type="primary"
+            icon={<PlusCircleOutlined />}
+            onClick={addExistingMember}
+          >
+            Add
+          </Button>
+        </Col>
+      </Row>
 
       <Modal
         title={

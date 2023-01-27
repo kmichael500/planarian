@@ -19,7 +19,7 @@ public class TripPhotosController : PlanarianControllerBase<TripPhotoService>
     #region Trip Photos
 
     [HttpDelete("{tripPhotoId:length(10)}")]
-    public async Task<ActionResult<TripObjectiveVm?>> GetTripObjective(string tripPhotoId)
+    public async Task<ActionResult> DeleteTripPhoto(string tripPhotoId)
     {
         await Service.DeleteTripPhoto(tripPhotoId);
 

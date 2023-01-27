@@ -1,4 +1,4 @@
-namespace Planarian.Modules.TripObjectives.Controllers;
+namespace Planarian.Modules.TripObjectives.Models;
 
 public class TripPhotoUpload
 {

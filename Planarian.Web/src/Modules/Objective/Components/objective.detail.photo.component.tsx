@@ -34,8 +34,6 @@ const TripObjectiveDetailPhotoComponent: React.FC<
 
   const [previewTitle, setPreviewTitle] = useState("");
 
-  const { tripObjectiveId } = useParams();
-
   useEffect(() => {
     if (photos === undefined) {
       const GetTripObjectivePhotos = async () => {

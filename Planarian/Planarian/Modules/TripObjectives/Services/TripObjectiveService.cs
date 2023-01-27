@@ -5,6 +5,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Leads.Models;
 using Planarian.Modules.Project.Controllers;
 using Planarian.Modules.TripObjectives.Controllers;
+using Planarian.Modules.TripObjectives.Models;
 using Planarian.Modules.TripObjectives.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
@@ -45,7 +46,7 @@ public class TripObjectiveService : ServiceBase<TripObjectiveRepository>
             var entity = new TripPhoto(RequestUser.Id, tripObjectiveId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();
-            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, tripObjectiveId, entity.Id,
+            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,
                 photo.File.OpenReadStream(), fileType);
             entity.BlobKey = blobKey;
             await Repository.SaveChangesAsync();

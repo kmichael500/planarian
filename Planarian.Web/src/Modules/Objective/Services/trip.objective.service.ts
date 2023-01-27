@@ -95,7 +95,7 @@ const TripObjectiveService = {
 
     values.forEach((e, i) => {
       const title = values[i].title;
-      const description = values[i].title;
+      const description = values[i].description;
       formData.append(
         `formData[${i}].title`,
         isNullOrWhiteSpace(title) ? "" : (title as string)
