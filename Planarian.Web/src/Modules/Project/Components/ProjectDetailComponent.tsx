@@ -4,7 +4,6 @@ import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException"
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
 import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
-import moment from "moment";
 import {
   MemberGridComponent,
   MemberGridType,
@@ -13,6 +12,7 @@ import { TripVm } from "../../Trips/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { TripTagComponent } from "../../../Shared/Components/TripTagComponent";
 import { TripCreateButtonComponent } from "../../Trips/Components/TripCreateButtonComponent";
+
 const { Title, Text } = Typography;
 
 const ProjectDetailComponent: React.FC = () => {

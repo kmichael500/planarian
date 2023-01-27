@@ -1,9 +1,8 @@
 import {
   BrowserRouter as Router,
-  Routes,
-  Route,
-  Link,
   Navigate,
+  Route,
+  Routes,
 } from "react-router-dom";
 import { ConfirmEmailComponent } from "./Modules/Authentication/Components/ConfirmEmailComponent";
 import { LoginComponent } from "./Modules/Authentication/Components/LoginComponent";

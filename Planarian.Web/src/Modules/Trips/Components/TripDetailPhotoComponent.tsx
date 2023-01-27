@@ -1,17 +1,16 @@
 import {
-  Row,
-  Col,
   Button,
+  Col,
   Image,
-  Typography,
-  Tooltip,
   Modal,
   Popconfirm,
+  Row,
+  Tooltip,
+  Typography,
 } from "antd";
-import { EyeOutlined, DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { TripService } from "../Services/TripService";
 import { TripPhotoVm } from "../Models/TripPhotoVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
@@ -22,6 +21,7 @@ const { Title, Paragraph } = Typography;
 interface TripDetailPhotoComponentProps {
   tripId: string;
 }
+
 const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
   props
 ) => {

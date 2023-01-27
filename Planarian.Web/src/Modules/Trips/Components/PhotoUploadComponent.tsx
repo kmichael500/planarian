@@ -1,28 +1,21 @@
 import {
   Button,
-  Modal,
+  Card,
+  Col,
+  Divider,
   Form,
-  SelectProps,
+  Image,
+  Input,
+  message,
+  Modal,
+  Row,
+  Spin,
+  Tooltip,
   Upload,
   UploadFile,
   UploadProps,
-  message,
-  Image,
-  Row,
-  Col,
-  Tooltip,
-  Divider,
-  Input,
-  Card,
-  Spin,
-  Popover,
 } from "antd";
-import {
-  PlusOutlined,
-  EyeOutlined,
-  DeleteOutlined,
-  InboxOutlined,
-} from "@ant-design/icons";
+import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
 
 import { RcFile } from "antd/lib/upload";
 import React, { useEffect, useState } from "react";
@@ -32,9 +25,11 @@ import { PhotoMetaData } from "../Models/PhotoMetaData";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "./PhotoUploadComponent.scss";
+
 const { TextArea } = Input;
 
 interface PhotoUploadComponentProps {}
+
 const PhotoUploadComponent: React.FC<PhotoUploadComponentProps> = (
   props: PhotoUploadComponentProps
 ) => {

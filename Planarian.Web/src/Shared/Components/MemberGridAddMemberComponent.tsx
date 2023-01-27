@@ -1,8 +1,8 @@
-import { Button, Modal, Input, Form, Select, message, Row, Col } from "antd";
+import { Button, Col, Form, Input, message, Modal, Row, Select } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
-import { PlusCircleOutlined, MailOutlined } from "@ant-design/icons";
+import { MailOutlined, PlusCircleOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../Models/SelectListItem";
 import { ProjectService } from "../../Modules/Project/Services/ProjectService";
 import { SettingsService } from "../../Modules/Settings/Services/SettingsService";
@@ -17,6 +17,7 @@ interface MemberGridAddMemberComponentProps {
   tripId?: string;
   onAddedSuccess?: () => Promise<void>;
 }
+
 const MemberGridAddMemberComponent: React.FC<
   MemberGridAddMemberComponentProps
 > = (props) => {

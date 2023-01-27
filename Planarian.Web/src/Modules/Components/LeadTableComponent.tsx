@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Table, Spin, Button, Popconfirm, Card, Row, Col } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Card, Col, Popconfirm, Row, Table } from "antd";
 import { LeadVm } from "../Leads/Models/LeadVm";
 import { TripService } from "../Trips/Services/TripService";
 import { nameof } from "../../Shared/Helpers/StringHelpers";
@@ -12,6 +12,7 @@ import { CloudDownloadOutlined, PlusCircleOutlined } from "@ant-design/icons";
 interface LeadTableProps {
   tripId: string;
 }
+
 const LeadTableComponent: React.FC<LeadTableProps> = (
   props: LeadTableProps
 ) => {

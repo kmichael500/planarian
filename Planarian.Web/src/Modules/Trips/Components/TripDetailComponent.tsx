@@ -1,15 +1,15 @@
 import {
-  Row,
-  Col,
   Button,
-  Divider,
-  Spin,
-  Typography,
   Card,
+  Col,
+  Divider,
+  Row,
   Select,
   Space,
+  Spin,
+  Typography,
 } from "antd";
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
 import type { ColumnsType } from "antd/es/table";
@@ -22,7 +22,6 @@ import { TripService } from "../Services/TripService";
 import LeadTableComponent from "../../Components/LeadTableComponent";
 import { TripTagComponent } from "../../TripTags/Components/TripTagComponent";
 import { SettingsService } from "../../Settings/Services/SettingsService";
-import { LeadVm } from "../../Leads/Models/LeadVm";
 import { TripDetailPhotoComponent } from "./TripDetailPhotoComponent";
 
 const { Option } = Select;
@@ -57,6 +56,7 @@ const TripDetailComponent: React.FC = () => {
   interface UserTableColumn {
     name: string;
   }
+
   const teamMemberColumns: ColumnsType<UserTableColumn> = [
     {
       title: "Name",

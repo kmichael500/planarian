@@ -4,6 +4,10 @@ import { Station } from "./Station";
 import { Coordinates } from "./Coordinates";
 
 export class ContinuationPoint {
+  public coordinates: Coordinates;
+  public description?: string;
+  public closestStation?: Station;
+
   constructor(coordinates: Coordinates) {
     this.coordinates = coordinates;
   }
@@ -40,8 +44,4 @@ export class ContinuationPoint {
 
     return LeadClassification.UNKNOWN;
   }
-
-  public coordinates: Coordinates;
-  public description?: string;
-  public closestStation?: Station;
 }

@@ -1,4 +1,4 @@
-import { Row, Col, Card, Spin, Divider, Typography } from "antd";
+import { Card, Col, Divider, Row, Spin, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ProjectVm } from "../Models/ProjectVm";

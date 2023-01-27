@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Form, Input, Col, Row, ColProps, message, Card, Button } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Card, Col, ColProps, Form, Input, message, Row } from "antd";
 import { nameof } from "../../../../Shared/Helpers/StringHelpers";
 import { MaskedInput } from "antd-mask-input";
 import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionConstants";
@@ -33,6 +33,7 @@ const RegisterComponent: React.FC = () => {
       }
       setIsLoading(false);
     }
+
     fetchUser();
   }, []);
 

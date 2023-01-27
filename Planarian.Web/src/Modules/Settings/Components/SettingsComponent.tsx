@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Form, Input, Button, Card, Col, Divider, Row, Typography } from "antd";
+import React, { useEffect, useState } from "react";
+import { Button, Col, Divider, Form, Row, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserVm } from "../../User/Models/UserVm";
 import { UserService } from "../../User/UserService";
@@ -23,6 +23,7 @@ const SettingsComponent: React.FC = () => {
       }
       setIsLoading(false);
     }
+
     fetchUser();
   }, []);
 

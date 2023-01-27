@@ -1,15 +1,14 @@
 import React, { useState } from "react";
 import {
-  Form,
-  Input,
-  Select,
   Button,
   Card,
-  Row,
   Col,
   Divider,
+  Form,
+  Input,
   message,
-  Upload,
+  Row,
+  Select,
 } from "antd";
 
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";

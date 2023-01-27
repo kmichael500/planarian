@@ -1,12 +1,10 @@
 import { Button, Card, Popconfirm, Space, Table } from "antd";
 import { ColumnsType } from "antd/lib/table";
-import { v4 as uuidv4 } from "uuid";
 import { useEffect, useState } from "react";
 import { TripService } from "../../Modules/Trips/Services/TripService";
 import { ProjectService } from "../../Modules/Project/Services/ProjectService";
 import { nameof } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
-import { PlusCircleOutlined } from "@ant-design/icons";
 import { MemberGridAddMemberComponent } from "./MemberGridAddMemberComponent";
 
 export interface MemberGridComponentProps {
@@ -14,6 +12,7 @@ export interface MemberGridComponentProps {
   projectId: string;
   tripId?: string;
 }
+
 const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
   const [teamMemberData, setTeamMemberData] = useState<UserTableColumn[]>();
   const [teamMembersLoading, setTeamMembersLoading] = useState(true);

@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Form,
-  Input,
   Button,
   Card,
   Col,
-  Divider,
+  ColProps,
+  Form,
+  Input,
+  message,
   Row,
   Typography,
-  ColProps,
-  message,
-  InputRef,
 } from "antd";
 import { UserVm } from "../Models/UserVm";
 import {
@@ -19,7 +17,6 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { UserService } from "../UserService";
 import { MaskedInput } from "antd-mask-input";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
 import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
 
@@ -49,6 +46,7 @@ const UserUpdateComponent: React.FC = () => {
       }
       setIsLoading(false);
     }
+
     fetchUser();
   }, []);
 

@@ -1,4 +1,5 @@
 import { HttpClient } from "../../..";
+
 const baseUrl = "api/leads";
 const LeadService = {
   //#region Leads
