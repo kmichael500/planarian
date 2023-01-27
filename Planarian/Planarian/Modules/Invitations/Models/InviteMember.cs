@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Project.Controllers;
+namespace Planarian.Modules.Invitations.Models;
 
 public class InviteMember
 {

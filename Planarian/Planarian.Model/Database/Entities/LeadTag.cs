@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities;
@@ -18,7 +19,7 @@ public class LeadTagConfiguration : IEntityTypeConfiguration<LeadTag>
 {
     public void Configure(EntityTypeBuilder<LeadTag> builder)
     {
-        builder.HasKey(e => new { e.TagId, TripObjectiveId = e.LeadId });
+        builder.HasKey(e => new { e.TagId, TripId = e.LeadId });
         builder
             .HasOne(e => e.Tag)
             .WithMany(e => e.LeadTags)

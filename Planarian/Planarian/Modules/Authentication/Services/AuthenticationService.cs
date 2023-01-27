@@ -4,6 +4,7 @@ using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email;
+using Planarian.Shared.Email.Services;
 using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Authentication.Services;

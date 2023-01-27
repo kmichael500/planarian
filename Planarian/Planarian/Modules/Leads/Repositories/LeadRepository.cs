@@ -1,11 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
-using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared;
-using Planarian.Modules.Leads.Models;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Leads.Controllers;
+namespace Planarian.Modules.Leads.Repositories;
 
 public class LeadRepository : RepositoryBase
 {
@@ -16,7 +15,7 @@ public class LeadRepository : RepositoryBase
     public async Task<LeadVm?> GetLead(string leadId)
     {
         return await DbContext.Lead.Where(e =>
-                e.Id == leadId && e.TripObjective.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
+                e.Id == leadId && e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
             .Select(e => new LeadVm(e))
             .FirstOrDefaultAsync();
     }
@@ -24,7 +23,7 @@ public class LeadRepository : RepositoryBase
     public async Task<Lead?> Get(string leadId)
     {
         return await DbContext.Lead.Where(e =>
-                e.Id == leadId && e.TripObjective.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
+                e.Id == leadId && e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
             .FirstOrDefaultAsync();
     }
 }

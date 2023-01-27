@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Projects;
-using Planarian.Model.Database.Entities.TripObjectives;
+using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities;
@@ -20,8 +20,8 @@ public class Tag : EntityBaseNameId
 
     public string Key { get; set; } = null!;
     public string? ProjectId { get; set; } = null!;
-    public virtual ICollection<TripObjective> TripObjectives { get; set; } = new HashSet<TripObjective>();
-    public virtual ICollection<TripObjectiveTag> TripObjectiveTags { get; set; } = new HashSet<TripObjectiveTag>();
+    public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
+    public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
     public virtual Project? Project { get; set; }
 }

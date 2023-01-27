@@ -1,12 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Planarian.Model.Database.Entities.TripObjectives;
+using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
-using Planarian.Modules.TripObjectives.Controllers;
 
-namespace Planarian.Model.Database.Entities;
+namespace Planarian.Model.Database.Entities.Leads;
 
 public class Lead : EntityBase
 {
@@ -14,17 +13,17 @@ public class Lead : EntityBase
     {
     }
 
-    public Lead(CreateLeadVm lead, string tripObjectiveId, string userId) : this(lead.Description,
-        lead.Classification, lead.ClosestStation, userId, tripObjectiveId)
+    public Lead(CreateLeadVm lead, string tripId, string userId) : this(lead.Description,
+        lead.Classification, lead.ClosestStation, userId, tripId)
     {
     }
 
     public Lead(string description,
         string classification, string closestStation,
-        string userId, string tripObjectiveId)
+        string userId, string tripId)
     {
         UserId = userId;
-        TripObjectiveId = tripObjectiveId;
+        TripId = tripId;
         Description = description.Trim();
         ClosestStation = closestStation.Trim();
         Classification = classification.Trim();
@@ -36,7 +35,7 @@ public class Lead : EntityBase
 
     [Required]
     [MaxLength(PropertyLength.Id)]
-    public string TripObjectiveId { get; set; } = null!;
+    public string TripId { get; set; } = null!;
 
 
     [MaxLength(PropertyLength.MediumText)] public string Description { get; set; } = null!;
@@ -48,7 +47,7 @@ public class Lead : EntityBase
     public string Classification { get; set; }
     public bool IsAlive { get; set; } = true;
 
-    public virtual TripObjective TripObjective { get; set; } = null!;
+    public virtual Trip Trip { get; set; } = null!;
     public virtual User User { get; set; } = null!;
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
 }
@@ -57,9 +56,9 @@ public class LeadConfiguration : IEntityTypeConfiguration<Lead>
 {
     public void Configure(EntityTypeBuilder<Lead> builder)
     {
-        builder.HasOne(e => e.TripObjective)
+        builder.HasOne(e => e.Trip)
             .WithMany(e => e.Leads)
-            .HasForeignKey(e => e.TripObjectiveId);
+            .HasForeignKey(e => e.TripId);
 
         builder.HasOne(e => e.User)
             .WithMany(e => e.Leads)

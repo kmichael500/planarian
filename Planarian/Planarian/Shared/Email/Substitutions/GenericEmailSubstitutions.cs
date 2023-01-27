@@ -1,4 +1,4 @@
-using Planarian.Shared.Services.Substitutions;
+using Planarian.Shared.Email.Models;
 
 namespace Planarian.Shared.Email.Substitutions;
 

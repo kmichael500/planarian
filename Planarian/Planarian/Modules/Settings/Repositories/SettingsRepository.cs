@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
@@ -12,14 +13,14 @@ public class SettingsRepository : RepositoryBase
     {
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetObjectiveTypes()
+    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
     {
         return await DbContext.Tags.Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<string> GetObjectiveTypeName(string objectiveTypeId)
+    public async Task<string> GetTagName(string tagId)
     {
-        return await DbContext.Tags.Where(e => e.Id == objectiveTypeId).Select(e => e.Name).FirstAsync();
+        return await DbContext.Tags.Where(e => e.Id == tagId).Select(e => e.Name).FirstAsync();
     }
 
     public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)

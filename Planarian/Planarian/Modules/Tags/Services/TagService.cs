@@ -1,7 +1,7 @@
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Modules.Tags.Models;
-using Planarian.Modules.TripObjectives.Services;
+using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
 

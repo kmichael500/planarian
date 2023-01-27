@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
@@ -15,22 +16,22 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
     {
     }
 
-    #region Objective Types
+    #region Tags
 
-    [HttpGet("objectiveTypes")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetObjectiveTypes()
+    [HttpGet("tags/trip")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetTripTags()
     {
-        var objectiveTypes = await Service.GetObjectiveTypes();
+        var tripTags = await Service.GetTripTags();
 
-        return new JsonResult(objectiveTypes);
+        return new JsonResult(tripTags);
     }
 
-    [HttpGet("objectiveTypes/{objectiveTypeId:length(10)}")]
-    public async Task<ActionResult<string>> GetObjectiveTypeName(string objectiveTypeId)
+    [HttpGet("tags/{tagId:length(10)}")]
+    public async Task<ActionResult<string>> GetTagName(string tagId)
     {
-        var objectiveType = await Service.GetObjectiveTypeName(objectiveTypeId);
+        var tag = await Service.GetTagName(tagId);
 
-        return new JsonResult(objectiveType);
+        return new JsonResult(tag);
     }
 
     #endregion
@@ -40,9 +41,9 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
     [HttpGet("users/{userId:length(10)}")]
     public async Task<ActionResult<NameProfilePhotoVm>> GetUsersName(string userId)
     {
-        var objectiveType = await Service.GetUsersName(userId);
+        var userNameProfilePhoto = await Service.GetUsersName(userId);
 
-        return new JsonResult(objectiveType);
+        return new JsonResult(userNameProfilePhoto);
     }
 
 

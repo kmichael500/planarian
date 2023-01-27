@@ -1,6 +1,4 @@
-using Planarian.Model.Database.Entities;
-
-namespace Planarian.Modules.Leads.Models;
+namespace Planarian.Model.Database.Entities.Leads;
 
 public class LeadVm
 {

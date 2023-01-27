@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Planarian.Model.Database.Entities.TripObjectives;
+using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -13,10 +13,10 @@ public class TripPhoto : EntityBase
     {
     }
 
-    public TripPhoto(string userId, string tripObjectiveId, string name, string description, string fileType)
+    public TripPhoto(string userId, string tripId, string name, string description, string fileType)
     {
         UserId = userId;
-        TripObjectiveId = tripObjectiveId;
+        TripId = tripId;
         Name = name;
         Description = description;
         FileType = fileType;
@@ -28,7 +28,7 @@ public class TripPhoto : EntityBase
 
     [Required]
     [MaxLength(PropertyLength.Id)]
-    public string TripObjectiveId { get; set; } = null!;
+    public string TripId { get; set; } = null!;
 
     [Required]
     [MaxLength(PropertyLength.Name)]
@@ -42,7 +42,7 @@ public class TripPhoto : EntityBase
 
     [MaxLength(PropertyLength.BlobKey)] public string? BlobKey { get; set; } = null!;
 
-    public virtual TripObjective TripObjective { get; set; } = null!;
+    public virtual Trip Trip { get; set; } = null!;
     public virtual User User { get; set; } = null!;
 }
 
@@ -50,9 +50,9 @@ public class PhotoConfiguration : IEntityTypeConfiguration<TripPhoto>
 {
     public void Configure(EntityTypeBuilder<TripPhoto> builder)
     {
-        builder.HasOne(e => e.TripObjective)
+        builder.HasOne(e => e.Trip)
             .WithMany(e => e.Photos)
-            .HasForeignKey(e => e.TripObjectiveId);
+            .HasForeignKey(e => e.TripId);
 
         builder.HasOne(e => e.User)
             .WithMany(e => e.TripPhotos)

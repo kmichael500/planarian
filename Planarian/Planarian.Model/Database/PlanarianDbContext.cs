@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Projects;
-using Planarian.Model.Database.Entities.TripObjectives;
+using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
 
@@ -23,10 +24,10 @@ public class PlanarianDbContext : DbContext
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     // public DbSet<Trip> Trip { get; set; } = null!;
     public DbSet<Lead> Lead { get; set; } = null!;
-    public DbSet<TripObjective> TripObjectives { get; set; } = null!;
-    public DbSet<TripObjectiveTag> TripObjectiveTag { get; set; } = null!;
+    public DbSet<Trip> Trips { get; set; } = null!;
+    public DbSet<TripTag> TripTags { get; set; } = null!;
     public DbSet<LeadTag> LeadTags { get; set; } = null!;
-    public DbSet<TripObjectiveMember> TripObjectiveMembers { get; set; } = null!;
+    public DbSet<TripMember> TripMembers { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
     public DbSet<MessageType> MessageTypes { get; set; } = null!;
     public DbSet<MessageLog> MessageLogs { get; set; } = null!;

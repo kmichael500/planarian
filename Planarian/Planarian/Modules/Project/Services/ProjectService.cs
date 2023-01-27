@@ -1,6 +1,7 @@
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
+using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Project.Controllers;
 using Planarian.Modules.Project.Repositories;
 using Planarian.Modules.Users.Repositories;

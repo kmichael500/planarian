@@ -25,10 +25,4 @@
         <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Folder Include="Modules\Project\Models" />
-        <Folder Include="Modules\TripObjectives\Models" />
-        <Folder Include="Modules\Trips\Models" />
-    </ItemGroup>
-
 </Project>

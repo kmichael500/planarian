@@ -1,4 +1,5 @@
 using Planarian.Model.Shared;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
@@ -16,14 +17,14 @@ public class SettingsService : ServiceBase<SettingsRepository>
         _blobService = blobService;
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetObjectiveTypes()
+    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
     {
-        return await Repository.GetObjectiveTypes();
+        return await Repository.GetTripTags();
     }
 
-    public async Task<string> GetObjectiveTypeName(string objectiveTypeId)
+    public async Task<string> GetTagName(string tagId)
     {
-        return await Repository.GetObjectiveTypeName(objectiveTypeId);
+        return await Repository.GetTagName(tagId);
     }
 
     public async Task<NameProfilePhotoVm> GetUsersName(string userId)

@@ -1,4 +1,4 @@
-namespace Planarian.Shared.Services.Substitutions;
+namespace Planarian.Shared.Email.Models;
 
 public interface ISubstitution
 {

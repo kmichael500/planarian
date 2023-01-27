@@ -1,6 +1,6 @@
-namespace Planarian.Modules.TripObjectives.Models;
+namespace Planarian.Modules.Trips.Models;
 
-public class TripPhotoUpload
+public class PhotoUpload
 {
     public IFormFile File { get; set; } = null!;
     public string Title { get; set; } = null!;

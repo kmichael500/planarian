@@ -1,8 +1,9 @@
+using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared;
-using Planarian.Modules.Leads.Models;
+using Planarian.Modules.Leads.Repositories;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Leads.Controllers;
+namespace Planarian.Modules.Leads.Services;
 
 public class LeadService : ServiceBase<LeadRepository>
 {

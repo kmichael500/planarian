@@ -1,15 +1,14 @@
 using HandlebarsDotNet;
 using Newtonsoft.Json;
+using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
-using Planarian.Shared.Email.Services;
 using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Exceptions;
-using Planarian.Shared.Options;
 using Southport.Messaging.Email.Core;
 
-namespace Planarian.Shared.Email;
+namespace Planarian.Shared.Email.Services;
 
 public class EmailService : ServiceBase<MessageTypeRepository>
 {

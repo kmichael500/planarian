@@ -4,7 +4,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.TripObjectives.Services;
+namespace Planarian.Modules.Tags.Repositories;
 
 public class TagRepository : RepositoryBase
 {

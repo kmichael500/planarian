@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
+using Planarian.Shared.Email.Models;
 
 namespace Planarian.Shared.Email.Services;
 

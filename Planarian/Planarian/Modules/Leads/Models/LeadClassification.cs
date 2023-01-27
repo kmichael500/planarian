@@ -1,4 +1,4 @@
-namespace Planarian.Modules.TripObjectives.Controllers;
+namespace Planarian.Modules.Leads.Models;
 
 public static class LeadClassification
 {

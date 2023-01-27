@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Users.Models;
+namespace Planarian.Modules.Settings.Models;
 
 public class NameProfilePhotoVm
 {
