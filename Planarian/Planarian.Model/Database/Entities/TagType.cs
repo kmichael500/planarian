@@ -17,10 +17,11 @@ public class TagType : EntityBaseNameId
     public TagType()
     {
     }
+
     public string? ProjectId { get; set; } = null!;
 
     public string Key { get; set; } = null!;
-    
+
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
