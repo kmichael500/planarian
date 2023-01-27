@@ -2,7 +2,6 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
 using Planarian.Modules.Invitations.Models;
-using Planarian.Modules.Project.Controllers;
 using Planarian.Modules.Project.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
@@ -64,9 +63,9 @@ public class ProjectService : ServiceBase<ProjectRepository>
             await Repository.SaveChangesAsync();
             await AddProjectMember(project.Id, RequestUser.Id, false);
         }
-        
+
         await Repository.SaveChangesAsync();
-        
+
         var numberOfTrips = await Repository.GetNumberOfTrips(project.Id);
 
         return new ProjectVm(project, 1, numberOfTrips);

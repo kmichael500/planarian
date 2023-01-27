@@ -25,7 +25,8 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
         GenericEmailSubstitutions substitutions)
     {
-        var messageType = await Repository.GetMessageTypeVm(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
+        var messageType =
+            await Repository.GetMessageTypeVm(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
 
         if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
@@ -40,22 +41,24 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         if (results.Any(e => !e.IsSuccessful)) throw ApiExceptionDictionary.EmailFailedToSend;
 
-        var messageLog = new MessageLog(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, subject, toEmailAddress, toName,
+        var messageLog = new MessageLog(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email, subject,
+            toEmailAddress, toName,
             messageType.FromName, messageType.FromEmail, JsonConvert.SerializeObject(substitutions.Substitutions));
 
         Repository.Add(messageLog);
 
         await Repository.SaveChangesAsync();
     }
-    
-    public async Task SendPasswordResetEmail(string emailAddress, string fullName, string resetCode){
-        const string message = "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
+
+    public async Task SendPasswordResetEmail(string emailAddress, string fullName, string resetCode)
+    {
+        const string message =
+            "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
 
         var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
 
         await SendGenericEmail("Planarian Password Reset", emailAddress, fullName,
             new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
-
     }
 
     public async Task SendEmailConfirmationEmail(string emailAddress, string fullName, string emailConfirmationCode)
@@ -71,7 +74,6 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         await SendGenericEmail("Confirm your email address", emailAddress, fullName,
             new GenericEmailSubstitutions(paragraphs,
                 "Confirm your email address", "Confirm Email", link));
-
     }
 
     public async Task SendPasswordChangedEmail(string emailAddress, string fullName)

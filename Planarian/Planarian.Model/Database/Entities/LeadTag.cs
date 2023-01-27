@@ -9,10 +9,9 @@ public class LeadTag : EntityBase
 {
     public string TagId { get; set; }
     public string LeadId { get; set; }
-    
+
     public Tag Tag { get; set; }
     public Lead Lead { get; set; }
-
 }
 
 public class LeadTagConfiguration : IEntityTypeConfiguration<LeadTag>

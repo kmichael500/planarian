@@ -9,6 +9,7 @@ public class PhotoVm
         Description = description;
         Url = url;
     }
+
     public PhotoVm()
     {
     }

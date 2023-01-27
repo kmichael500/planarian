@@ -50,8 +50,7 @@ public class TripVm : ITrip
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; } = null!;
 
-    [MaxLength(PropertyLength.MediumText)]
-    public string? Description { get; set; } = null!;
+    [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
 
     public string? TripReport { get; set; }
 }

@@ -1,7 +1,6 @@
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
-using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
 
@@ -32,8 +31,8 @@ public class SettingsService : ServiceBase<SettingsRepository>
         var user = await Repository.GetUserNameProfilePhoto(userId);
 
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
-        
-        
+
+
         var url = _blobService.GetSasUrl(user.BlobKey);
         user.ProfilePhotoUrl = url?.AbsoluteUri;
 

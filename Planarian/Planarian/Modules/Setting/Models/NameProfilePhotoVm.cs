@@ -17,7 +17,7 @@ public class NameProfilePhotoVm
     }
 
     public string Name { get; set; } = null!;
-    public string? BlobKey { get; set; } = null!;
+    public string? BlobKey { get; set; }
 
     public string? ProfilePhotoUrl { get; set; }
 }

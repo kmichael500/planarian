@@ -3,8 +3,6 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using Planarian.Library.Options;
-using Planarian.Modules.Authentication.Repositories;
-using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Authentication.Services;
 

@@ -84,6 +84,13 @@ public class TripRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
+    public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string tripId)
+    {
+        return await DbContext.Trips.Where(e => e.ProjectId == tripId)
+            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagId), e.TripMembers.Select(ee => ee.UserId)))
+            .ToListAsync();
+    }
+
     #region Trip
 
     public async Task<TripVm?> GetTripVm(string tripid)
@@ -109,11 +116,4 @@ public class TripRepository : RepositoryBase
     }
 
     #endregion
-
-    public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string tripId)
-    {
-        return await DbContext.Trips.Where(e => e.ProjectId == tripId)
-            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagId), e.TripMembers.Select(ee => ee.UserId)))
-            .ToListAsync();
-    }
 }

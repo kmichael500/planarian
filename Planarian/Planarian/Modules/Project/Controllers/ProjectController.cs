@@ -24,6 +24,18 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         _tripService = tripService;
     }
 
+    #region Invitations
+
+    [HttpPost("{projectId:length(10)}/members/invite")]
+    public async Task<ActionResult> InviteProjectMember(string projectId, [FromBody] InviteMember invitation)
+    {
+        await Service.InviteProjectMember(projectId, invitation);
+
+        return new OkResult();
+    }
+
+    #endregion
+
     #region Trips
 
     [HttpPost("{projectId:length(10)}/trips")]
@@ -33,25 +45,13 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
 
         return new JsonResult(trips);
     }
-    
+
     [HttpGet("{projectId:length(10)}/trips")]
     public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
     {
         var trips = await _tripService.GetTripsByProjectId(projectId);
 
         return new JsonResult(trips);
-    }
-
-    #endregion
-
-    #region Invitations
-
-    [HttpPost("{projectId:length(10)}/members/invite")]
-    public async Task<ActionResult> InviteProjectMember(string projectId, [FromBody] InviteMember invitation)
-    {
-        await Service.InviteProjectMember(projectId, invitation);
-
-        return new OkResult();
     }
 
     #endregion

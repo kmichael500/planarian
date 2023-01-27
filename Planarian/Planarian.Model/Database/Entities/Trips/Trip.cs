@@ -10,19 +10,6 @@ namespace Planarian.Model.Database.Entities.Trips;
 
 public class Trip : EntityBase, ITrip
 {
-    [Required]
-    [MaxLength(PropertyLength.Id)]
-    public string ProjectId { get; set; } = null!;
-
-    [Required]
-    [MaxLength(PropertyLength.Name)]
-    public string Name { get; set; } = null!;
-
-    [MaxLength(PropertyLength.MediumText)]
-    public string? Description { get; set; } = null!;
-
-    public string? TripReport { get; set; }
-    
     public virtual Project Project { get; set; } = null!;
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
 
@@ -31,6 +18,18 @@ public class Trip : EntityBase, ITrip
 
     public virtual ICollection<Photo> Photos { get; set; } = new HashSet<Photo>();
     public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
+
+    [Required]
+    [MaxLength(PropertyLength.Id)]
+    public string ProjectId { get; set; } = null!;
+
+    [Required]
+    [MaxLength(PropertyLength.Name)]
+    public string Name { get; set; } = null!;
+
+    [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; } = null!;
+
+    public string? TripReport { get; set; }
 }
 
 public class TripConfiguration : IEntityTypeConfiguration<Trip>

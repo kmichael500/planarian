@@ -3,7 +3,6 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Services;
-using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Settings.Controllers;

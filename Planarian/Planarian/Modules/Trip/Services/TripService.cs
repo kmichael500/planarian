@@ -29,45 +29,6 @@ public class TripService : ServiceBase<TripRepository>
         _userRepository = userRepository;
     }
 
-    #region Photos
-
-    public async Task<IEnumerable<PhotoVm>> GetTripPhotos(string tripId)
-    {
-        var photos = (await Repository.GetTripPhotos(tripId)).ToList();
-
-        foreach (var photo in photos)
-        {
-            var uri = _blobService.GetSasUrl(photo.Url, 24);
-            if (uri?.AbsolutePath != null) photo.Url = uri.AbsoluteUri;
-        }
-
-        return photos;
-    }
-    public async Task UploadTripPhotos(IEnumerable<PhotoUpload> photos, string tripId)
-    {
-        var ids = await Repository.GetIds(tripId);
-        if (ids == null) throw new ArgumentNullException(nameof(tripId));
-
-        foreach (var photo in photos)
-        {
-            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : photo.File.FileName;
-
-            var fileType = Path.GetExtension(photo.File.FileName);
-
-            if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
-            // TODO: don't throw exception but alert user
-            var entity = new Photo(RequestUser.Id, tripId, title, photo.Description, fileType);
-            Repository.Add(entity);
-            await Repository.SaveChangesAsync();
-            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,
-                photo.File.OpenReadStream(), fileType);
-            entity.BlobKey = blobKey;
-            await Repository.SaveChangesAsync();
-        }
-    }
-
-    #endregion
-
     public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
     {
         var tripMembers = await Repository.GetTripMembers(tripId);
@@ -105,6 +66,46 @@ public class TripService : ServiceBase<TripRepository>
         }
     }
 
+    #region Photos
+
+    public async Task<IEnumerable<PhotoVm>> GetTripPhotos(string tripId)
+    {
+        var photos = (await Repository.GetTripPhotos(tripId)).ToList();
+
+        foreach (var photo in photos)
+        {
+            var uri = _blobService.GetSasUrl(photo.Url, 24);
+            if (uri?.AbsolutePath != null) photo.Url = uri.AbsoluteUri;
+        }
+
+        return photos;
+    }
+
+    public async Task UploadTripPhotos(IEnumerable<PhotoUpload> photos, string tripId)
+    {
+        var ids = await Repository.GetIds(tripId);
+        if (ids == null) throw new ArgumentNullException(nameof(tripId));
+
+        foreach (var photo in photos)
+        {
+            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : photo.File.FileName;
+
+            var fileType = Path.GetExtension(photo.File.FileName);
+
+            if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
+            // TODO: don't throw exception but alert user
+            var entity = new Photo(RequestUser.Id, tripId, title, photo.Description, fileType);
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync();
+            var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,
+                photo.File.OpenReadStream(), fileType);
+            entity.BlobKey = blobKey;
+            await Repository.SaveChangesAsync();
+        }
+    }
+
+    #endregion
+
     #region Trip
 
     public async Task<TripVm> CreateOrUpdateTrip(CreateOrEditTripVm values)
@@ -113,9 +114,9 @@ public class TripService : ServiceBase<TripRepository>
         var trip = values.Id != null
             ? await Repository.GetTrip(values.Id) ?? new Trip()
             : new Trip();
-        
+
         trip.ProjectId = values.ProjectId;
-        
+
         foreach (var tagId in values.TripTagIds)
         {
             var tripTag = Repository.GetTripTag(tagId);
@@ -149,7 +150,7 @@ public class TripService : ServiceBase<TripRepository>
     {
         return await Repository.GetTripVm(projectId);
     }
-    
+
     public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string projectId)
     {
         return await Repository.GetTripsByProjectId(projectId);
@@ -164,7 +165,7 @@ public class TripService : ServiceBase<TripRepository>
             await Repository.SaveChangesAsync();
         }
     }
-    
+
     public async Task UpdateTripName(string tripId, string name)
     {
         var entity = await Repository.GetTrip(tripId);
@@ -284,5 +285,4 @@ public class TripService : ServiceBase<TripRepository>
     }
 
     #endregion
-    
 }

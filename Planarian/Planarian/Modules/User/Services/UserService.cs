@@ -8,10 +8,8 @@ using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Email;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Exceptions;
-using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Users.Services;
 
@@ -106,7 +104,7 @@ public class UserService : ServiceBase<UserRepository>
 
         await Repository.SaveChangesAsync();
 
-        await    _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
+        await _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }
 
     public async Task ResetPassword(string code, string password)
@@ -126,7 +124,7 @@ public class UserService : ServiceBase<UserRepository>
 
         await _emailService.SendPasswordChangedEmail(user.EmailAddress, user.FullName);
     }
-    
+
     public async Task ConfirmEmail(string code)
     {
         var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);

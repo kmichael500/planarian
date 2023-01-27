@@ -17,6 +17,19 @@ public class UserController : PlanarianControllerBase<UserService>
     {
     }
 
+    #region Confirm
+
+    [AllowAnonymous]
+    [HttpPost("confirm-email")]
+    public async Task<ActionResult> ConfirmEmail(string code)
+    {
+        await Service.ConfirmEmail(code);
+
+        return new OkResult();
+    }
+
+    #endregion
+
     #region Users
 
     [HttpGet("current")]
@@ -38,19 +51,6 @@ public class UserController : PlanarianControllerBase<UserService>
     public async Task<ActionResult> UpdateCurrentUserPassword([FromBody] string password)
     {
         await Service.UpdateCurrentUserPassword(password);
-
-        return new OkResult();
-    }
-
-    #endregion
-
-    #region Confirm
-
-    [AllowAnonymous]
-    [HttpPost("confirm-email")]
-    public async Task<ActionResult> ConfirmEmail(string code)
-    {
-        await Service.ConfirmEmail(code);
 
         return new OkResult();
     }

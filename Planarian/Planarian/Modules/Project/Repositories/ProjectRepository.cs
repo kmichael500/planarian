@@ -37,6 +37,15 @@ public class ProjectRepository : RepositoryBase
             .ToListAsync();
     }
 
+    #region Trip
+
+    public async Task<int> GetNumberOfTrips(string projectId)
+    {
+        return await DbContext.Trips.Where(e => e.ProjectId == projectId).CountAsync();
+    }
+
+    #endregion
+
     #region Project
 
     public async Task<ProjectVm?> GetProjectVm(string projectId)
@@ -46,7 +55,6 @@ public class ProjectRepository : RepositoryBase
         return await ToProjectVm(query).FirstOrDefaultAsync();
     }
 
-    
 
     public async Task<Model.Database.Entities.Projects.Project?> GetProject(string ProjectId)
     {
@@ -56,14 +64,6 @@ public class ProjectRepository : RepositoryBase
     private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Model.Database.Entities.Projects.Project> query)
     {
         return query.Select(e => new ProjectVm(e, e.ProjectMembers.Count, e.Trips.Count));
-    }
-    #endregion
-
-    #region Trip
-
-    public async Task<int> GetNumberOfTrips(string projectId)
-    {
-        return await DbContext.Trips.Where(e => e.ProjectId == projectId).CountAsync();
     }
 
     #endregion
