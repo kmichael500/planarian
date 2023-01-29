@@ -15,6 +15,7 @@ public class Member : EntityBase
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string UserId { get; set; } = null!;
+
     public virtual Project? Project { get; set; } = null!;
     public virtual Trip? Trip { get; set; } = null!;
     public virtual User User { get; set; } = null!;
@@ -27,7 +28,7 @@ public class ProjectMemberConfiguration : BaseEntityTypeConfiguration<Member>
         builder.HasOne(e => e.Project)
             .WithMany(e => e.Members)
             .HasForeignKey(e => e.ProjectId);
-        
+
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Members)
             .HasForeignKey(e => e.TripId);

@@ -80,7 +80,7 @@ public class UserService : ServiceBase<UserRepository>
         var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
         {
             HashedPassword = PasswordService.Hash(user.Password),
-            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode),
+            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode)
         };
 
         Repository.Add(entity);

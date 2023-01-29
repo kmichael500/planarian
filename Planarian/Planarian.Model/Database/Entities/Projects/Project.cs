@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;

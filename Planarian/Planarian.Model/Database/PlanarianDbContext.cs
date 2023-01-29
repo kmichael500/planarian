@@ -17,15 +17,6 @@ public class PlanarianDbContext : DbContext
     {
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.AddInterceptors(_changesInterceptor);
-    }
     #region Photo
 
     public DbSet<Photo> Photos { get; set; } = null!;
@@ -45,15 +36,26 @@ public class PlanarianDbContext : DbContext
     #endregion
 
     #region Member
+
     public DbSet<Member> Members { get; set; } = null!;
-    
+
     #endregion
-    
+
     #region Project
 
     public DbSet<Project> Projects { get; set; } = null!;
 
     #endregion
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.AddInterceptors(_changesInterceptor);
+    }
 
     #region Trip
 

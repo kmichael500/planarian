@@ -133,17 +133,22 @@ public class TripService : ServiceBase<TripRepository>
         trip.Description = values.Description;
         trip.TripReport = values.TripReport;
 
+        var numberOfPhotos = 0;
         if (isNew)
         {
             Repository.Add(trip);
             await Repository.SaveChangesAsync();
         }
+        else
+        {
+            numberOfPhotos = await Repository.GetNumberOfTripPhotos(trip.Id);
+        }
 
-        foreach (var tripMemberId in values.TripMemberIds)
-            await AddTripMember(trip.Id, tripMemberId, false);
+        foreach (var tripMemberId in values.TripMemberIds) await AddTripMember(trip.Id, tripMemberId, false);
+
 
         await Repository.SaveChangesAsync();
-        return new TripVm(trip, values.TripTagTypeIds, values.TripMemberIds);
+        return new TripVm(trip, values.TripTagTypeIds, values.TripMemberIds, numberOfPhotos);
     }
 
     public async Task<TripVm?> GetTrip(string projectId)
@@ -203,7 +208,7 @@ public class TripService : ServiceBase<TripRepository>
 
         foreach (var userId in userIds)
         {
-            var tripMember = new Member()
+            var tripMember = new Member
             {
                 Trip = trip,
                 UserId = userId

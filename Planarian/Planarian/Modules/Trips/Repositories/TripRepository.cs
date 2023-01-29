@@ -57,6 +57,11 @@ public class TripRepository : RepositoryBase
         return photos;
     }
 
+    public async Task<int> GetNumberOfTripPhotos(string tripId)
+    {
+        return await DbContext.Photos.CountAsync(e => e.Id == tripId);
+    }
+
     public async Task<IEnumerable<LeadVm>> GetLeads(string tripId)
     {
         return await DbContext.Leads.Where(e =>
@@ -87,7 +92,8 @@ public class TripRepository : RepositoryBase
     public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string tripId)
     {
         return await DbContext.Trips.Where(e => e.ProjectId == tripId)
-            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId), e.Members.Select(ee => ee.UserId)))
+            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId), e.Members.Select(ee => ee.UserId),
+                e.Photos.Count))
             .ToListAsync();
     }
 
@@ -106,7 +112,7 @@ public class TripRepository : RepositoryBase
             query
                 .Select(e =>
                     new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId),
-                        e.Members.Select(ee => ee.UserId))
+                        e.Members.Select(ee => ee.UserId), e.Photos.Count)
                 );
     }
 

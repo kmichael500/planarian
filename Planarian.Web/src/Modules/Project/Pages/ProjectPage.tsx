@@ -4,6 +4,7 @@ import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException"
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
 import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
+import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import {
   MemberGridComponent,
   MemberGridType,
@@ -51,9 +52,6 @@ const ProjectPage: React.FC = () => {
             <Button>Back</Button>
           </Link>
         </Col>
-        <Col>
-          <TripCreateButtonComponent projectId={projectId} />
-        </Col>
       </Row>
       <Divider />
 
@@ -69,6 +67,9 @@ const ProjectPage: React.FC = () => {
         </Col>
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>
+        <Col>
+          <TripCreateButtonComponent projectId={projectId} />
+        </Col>
       </Row>
 
       <Spin spinning={isTripsLoading}>
@@ -80,43 +81,59 @@ const ProjectPage: React.FC = () => {
         >
           {trips?.map((trip, index) => (
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
-              <Card
-                title={
+              <Link to={`trip/${trip.id}`}>
+                <Card
+                  title={
+                    <>
+                      {trip.name}{" "}
+                      <Row>
+                        <UserAvatarGroupComponent
+                          size={"small"}
+                          maxCount={4}
+                          userIds={trip.tripMemberIds}
+                        />
+                      </Row>
+                    </>
+                  }
+                  loading={isTripsLoading}
+                  bordered={false}
+                  hoverable
+                >
                   <>
-                    {trip.name}{" "}
                     <Row>
-                      <UserAvatarGroupComponent
-                        size={"small"}
-                        maxCount={4}
-                        userIds={trip.tripMemberIds}
-                      />
+                      {trip.tripTagTypeIds.map((tagId, index) => (
+                        <Col>
+                          <TagComponent key={index} tagId={tagId} />
+                        </Col>
+                      ))}
+                    </Row>
+                    <Divider />
+
+                    <Row>
+                      <Col>
+                        <Text>Description: {trip.description}</Text>
+                      </Col>
+                    </Row>
+                    <Row>
+                      <Col>
+                        <Text>
+                          Trip Report:{" "}
+                          {trip.isTripReportCompleted ? (
+                            <CheckCircleOutlined />
+                          ) : (
+                            <CloseCircleOutlined />
+                          )}
+                        </Text>
+                      </Col>
+                    </Row>
+                    <Row>
+                      <Col>
+                        <Text>Photos: {trip.numberOfPhotos}</Text>
+                      </Col>
                     </Row>
                   </>
-                }
-                loading={isTripsLoading}
-                bordered={false}
-                actions={[
-                  <Link to={`trip/${trip.id}`}>
-                    <Button>View</Button>
-                  </Link>,
-                ]}
-              >
-                <>
-                  <Row>
-                    {trip.tripTagTypeIds.map((tagId, index) => (
-                      <Col>
-                        <TagComponent key={index} tagId={tagId} />
-                      </Col>
-                    ))}
-                  </Row>
-                  <Divider />
-
-                  <Row>
-                    {" "}
-                    <Text>Description: {trip.description}</Text>
-                  </Row>
-                </>
-              </Card>
+                </Card>
+              </Link>
             </Col>
           ))}
         </Row>

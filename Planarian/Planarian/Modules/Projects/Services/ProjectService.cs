@@ -53,8 +53,8 @@ public class ProjectService : ServiceBase<ProjectRepository>
     {
         var isNew = string.IsNullOrWhiteSpace(values.Id);
         var project = values.Id != null
-            ? await Repository.GetProject(values.Id) ?? new Model.Database.Entities.Projects.Project()
-            : new Model.Database.Entities.Projects.Project();
+            ? await Repository.GetProject(values.Id) ?? new Project()
+            : new Project();
 
         project.Name = values.Name;
         if (isNew)

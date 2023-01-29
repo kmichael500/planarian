@@ -44,9 +44,10 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                         break;
                     case EntityState.Modified:
                         ((EntityBase)entity.Entity).ModifiedOn = DateTime.UtcNow;
-                        ((EntityBase)entity.Entity).ModifiedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id)
-                            ? context.RequestUser.Id
-                            : null;
+                        ((EntityBase)entity.Entity).ModifiedByUserId =
+                            !string.IsNullOrWhiteSpace(context.RequestUser.Id)
+                                ? context.RequestUser.Id
+                                : null;
                         break;
                     case EntityState.Detached:
                         break;

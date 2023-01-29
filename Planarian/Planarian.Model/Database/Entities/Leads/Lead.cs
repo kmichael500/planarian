@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
@@ -27,7 +26,7 @@ public class Lead : EntityBase
         ClosestStation = closestStation.Trim();
         Classification = classification.Trim();
     }
-    
+
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripId { get; set; } = null!;

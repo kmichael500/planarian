@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared.Base;
