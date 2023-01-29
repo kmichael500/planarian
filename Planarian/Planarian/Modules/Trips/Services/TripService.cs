@@ -94,7 +94,7 @@ public class TripService : ServiceBase<TripRepository>
 
             if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
             // TODO: don't throw exception but alert user
-            var entity = new Photo(RequestUser.Id, tripId, title, photo.Description, fileType);
+            var entity = new Photo(tripId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();
             var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,
@@ -203,12 +203,12 @@ public class TripService : ServiceBase<TripRepository>
 
         foreach (var userId in userIds)
         {
-            var tripMember = new TripMember
+            var tripMember = new Member()
             {
                 Trip = trip,
                 UserId = userId
             };
-            trip.TripMembers.Add(tripMember);
+            trip.Members.Add(tripMember);
         }
 
         if (saveChanges) await Repository.SaveChangesAsync();
@@ -216,7 +216,7 @@ public class TripService : ServiceBase<TripRepository>
 
     public async Task DeleteTripMember(string tripId, string userId)
     {
-        var projectMember = await Repository.DeleteTripMember(tripId, userId);
+        var projectMember = await Repository.GetTripMember(tripId, userId);
         if (projectMember != null)
         {
             Repository.Delete(projectMember);

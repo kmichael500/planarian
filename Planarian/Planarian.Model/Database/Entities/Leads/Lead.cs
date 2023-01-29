@@ -14,25 +14,20 @@ public class Lead : EntityBase
     }
 
     public Lead(CreateLeadVm lead, string tripId, string userId) : this(lead.Description,
-        lead.Classification, lead.ClosestStation, userId, tripId)
+        lead.Classification, lead.ClosestStation, tripId)
     {
     }
 
     public Lead(string description,
         string classification, string closestStation,
-        string userId, string tripId)
+        string tripId)
     {
-        UserId = userId;
         TripId = tripId;
         Description = description.Trim();
         ClosestStation = closestStation.Trim();
         Classification = classification.Trim();
     }
-
-    [Required]
-    [MaxLength(PropertyLength.Id)]
-    public string UserId { get; set; } = null!;
-
+    
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripId { get; set; } = null!;
@@ -44,24 +39,20 @@ public class Lead : EntityBase
     [MaxLength(PropertyLength.StationName)]
     public string ClosestStation { get; set; } = null!;
 
-    public string Classification { get; set; }
-    public bool IsAlive { get; set; } = true;
+    [MaxLength(PropertyLength.Key)] public string Classification { get; set; }
+    public DateTime? DateClosed { get; set; }
 
     public virtual Trip Trip { get; set; } = null!;
-    public virtual User User { get; set; } = null!;
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
 }
 
-public class LeadConfiguration : IEntityTypeConfiguration<Lead>
+public class LeadConfiguration : BaseEntityTypeConfiguration<Lead>
 {
-    public void Configure(EntityTypeBuilder<Lead> builder)
+    public override void Configure(EntityTypeBuilder<Lead> builder)
     {
+        base.Configure(builder);
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Leads)
             .HasForeignKey(e => e.TripId);
-
-        builder.HasOne(e => e.User)
-            .WithMany(e => e.Leads)
-            .HasForeignKey(e => e.UserId);
     }
 }

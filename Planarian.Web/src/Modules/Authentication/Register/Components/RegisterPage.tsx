@@ -28,7 +28,7 @@ const RegisterPage: React.FC = () => {
       await RegisterService.RegisterUser(values);
 
       message.success(
-        "Thansk! Please check your email to confirm your account!"
+        "Thanks! Please check your email to confirm your account!"
       );
 
       navigate("../login");

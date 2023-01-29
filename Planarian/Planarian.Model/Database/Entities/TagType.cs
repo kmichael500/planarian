@@ -28,9 +28,9 @@ public class TagType : EntityBaseNameId
     public virtual Project? Project { get; set; }
 }
 
-public class TagTypeConfiguration : IEntityTypeConfiguration<TagType>
+public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
 {
-    public void Configure(EntityTypeBuilder<TagType> builder)
+    public override void Configure(EntityTypeBuilder<TagType> builder)
     {
         builder.HasOne(e => e.Project)
             .WithMany(e => e.CustomTagTypes)

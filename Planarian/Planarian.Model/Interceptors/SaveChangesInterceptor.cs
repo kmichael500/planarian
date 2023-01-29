@@ -40,14 +40,13 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                         ((EntityBase)entity.Entity).CreatedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id)
                             ? context.RequestUser.Id
                             : null;
-                        ((EntityBase)entity.Entity).CreatedByName =
-                            !string.IsNullOrWhiteSpace(context.RequestUser.FullName)
-                                ? context.RequestUser.FullName
-                                : null;
                         ((EntityBase)entity.Entity).Id = IdGenerator.Generate();
                         break;
                     case EntityState.Modified:
                         ((EntityBase)entity.Entity).ModifiedOn = DateTime.UtcNow;
+                        ((EntityBase)entity.Entity).ModifiedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id)
+                            ? context.RequestUser.Id
+                            : null;
                         break;
                     case EntityState.Detached:
                         break;

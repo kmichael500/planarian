@@ -29,7 +29,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         var user = await _userRepository.GetUserByEmail(email);
 
         if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
-        if (user.IsEmailConfirmed == null || (bool)!user.IsEmailConfirmed)
+        if (user.EmailConfirmedOn == null)
         {
             user.EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode);
             await Repository.SaveChangesAsync();

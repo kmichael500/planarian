@@ -18,9 +18,9 @@ public class TripRepository : RepositoryBase
 
     #region Trip Member
 
-    public async Task<TripMember?> DeleteTripMember(string tripId, string userId)
+    public async Task<Member?> GetTripMember(string tripId, string userId)
     {
-        return await DbContext.TripMembers.FirstOrDefaultAsync(e =>
+        return await DbContext.Members.FirstOrDefaultAsync(e =>
             e.UserId == userId && e.TripId == tripId);
     }
 
@@ -40,7 +40,7 @@ public class TripRepository : RepositoryBase
     public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
     {
         var tripMembers = await DbContext.Trips.Where(e => e.Id == tripId)
-            .SelectMany(e => e.TripMembers)
+            .SelectMany(e => e.Members)
             .Select(e => new SelectListItem<string>(e.User.FullName, e.UserId))
             .ToListAsync();
 
@@ -61,7 +61,7 @@ public class TripRepository : RepositoryBase
     {
         return await DbContext.Leads.Where(e =>
                 e.TripId == tripId &&
-                e.Trip.Project.ProjectMembers.Any(e => e.UserId == RequestUser.Id))
+                e.Trip.Project.Members.Any(e => e.UserId == RequestUser.Id))
             .Select(e => new LeadVm(e))
             .ToListAsync();
     }
@@ -69,7 +69,7 @@ public class TripRepository : RepositoryBase
     public async Task<IEnumerable<SelectListItem<string>>> GetTripTags(string tripId)
     {
         return await DbContext.Trips.Where(e =>
-                e.Id == tripId && e.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
+                e.Id == tripId && e.Project.Members.Any(ee => ee.UserId == RequestUser.Id))
             .SelectMany(e => e.TripTags)
             .Select(e => e.TagType)
             .Select(e => new SelectListItem<string>(e.Name, e.Id))
@@ -80,22 +80,22 @@ public class TripRepository : RepositoryBase
     {
         return await DbContext.TripTags.Where(e =>
                 e.TagTypeId == tagTypeId && e.TripId == tripId &&
-                e.Trip.Project.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
+                e.Trip.Project.Members.Any(ee => ee.UserId == RequestUser.Id))
             .FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string tripId)
     {
         return await DbContext.Trips.Where(e => e.ProjectId == tripId)
-            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId), e.TripMembers.Select(ee => ee.UserId)))
+            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId), e.Members.Select(ee => ee.UserId)))
             .ToListAsync();
     }
 
     #region Trip
 
-    public async Task<TripVm?> GetTripVm(string tripid)
+    public async Task<TripVm?> GetTripVm(string tripId)
     {
-        var query = DbContext.Trips.Where(e => e.Id == tripid);
+        var query = DbContext.Trips.Where(e => e.Id == tripId);
 
         return await ToTripVm(query).FirstOrDefaultAsync();
     }
@@ -106,7 +106,7 @@ public class TripRepository : RepositoryBase
             query
                 .Select(e =>
                     new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId),
-                        e.TripMembers.Select(ee => ee.UserId))
+                        e.Members.Select(ee => ee.UserId))
                 );
     }
 

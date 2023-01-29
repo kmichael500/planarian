@@ -81,7 +81,6 @@ public class UserService : ServiceBase<UserRepository>
         {
             HashedPassword = PasswordService.Hash(user.Password),
             EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode),
-            IsEmailConfirmed = false
         };
 
         Repository.Add(entity);
@@ -131,7 +130,7 @@ public class UserService : ServiceBase<UserRepository>
         if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
 
         user.EmailConfirmationCode = null;
-        user.IsEmailConfirmed = true;
+        user.EmailConfirmedOn = DateTime.UtcNow;
 
         await Repository.SaveChangesAsync();
     }

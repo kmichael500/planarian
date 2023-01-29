@@ -99,7 +99,7 @@ public class ProjectService : ServiceBase<ProjectRepository>
     {
         var project = await Repository.GetProject(projectId);
         if (project == null) throw new NullReferenceException("Project not found");
-        var projectMember = new ProjectMember
+        var projectMember = new Member
         {
             UserId = userId,
             ProjectId = projectId

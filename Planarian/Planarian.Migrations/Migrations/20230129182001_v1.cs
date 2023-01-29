@@ -10,6 +10,31 @@ namespace Planarian.Migrations.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    EmailAddress = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    HashedPassword = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PasswordResetCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    EmailConfirmationCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    EmailConfirmedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    PasswordResetCodeExpiration = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ProfilePhotoBlobKey = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "MessageLogs",
                 columns: table => new
                 {
@@ -22,14 +47,24 @@ namespace Planarian.Migrations.Migrations
                     FromName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     FromEmailAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Substitutions = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_MessageLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MessageLogs_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_MessageLogs_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -37,23 +72,33 @@ namespace Planarian.Migrations.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     IsEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    Subject = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FromName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FromEmail = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Subject = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    FromName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    FromEmail = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
                     Mjml = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Html = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_MessageTypes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MessageTypes_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_MessageTypes_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -62,39 +107,24 @@ namespace Planarian.Migrations.Migrations
                 {
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Projects", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Users",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    EmailAddress = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    HashedPassword = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    PasswordResetCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    EmailConfirmationCode = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    IsEmailConfirmed = table.Column<bool>(type: "bit", nullable: true),
-                    PasswordResetCodeExpiration = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ProfilePhotoBlobKey = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Projects_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Projects_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -104,10 +134,10 @@ namespace Planarian.Migrations.Migrations
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     ProjectId = table.Column<string>(type: "nvarchar(10)", nullable: true),
                     Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
@@ -121,35 +151,6 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ProjectMembers",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    ProjectId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProjectMembers", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ProjectMembers_Projects_ProjectId",
-                        column: x => x.ProjectId,
-                        principalTable: "Projects",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ProjectMembers_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Trips",
                 columns: table => new
                 {
@@ -159,10 +160,10 @@ namespace Planarian.Migrations.Migrations
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     TripReport = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -178,6 +179,16 @@ namespace Planarian.Migrations.Migrations
                         column: x => x.TagTypeId,
                         principalTable: "TagTypes",
                         principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Trips_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Trips_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -185,16 +196,15 @@ namespace Planarian.Migrations.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     TripId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     ClosestStation = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Classification = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsAlive = table.Column<bool>(type: "bit", nullable: false),
+                    Classification = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    DateClosed = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -206,7 +216,45 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Leads_Users_UserId",
+                        name: "FK_Leads_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Leads_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Members",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    ProjectId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    TripId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    UserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Members", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Members_Projects_ProjectId",
+                        column: x => x.ProjectId,
+                        principalTable: "Projects",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Members_Trips_TripId",
+                        column: x => x.TripId,
+                        principalTable: "Trips",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Members_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -218,16 +266,15 @@ namespace Planarian.Migrations.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     TripId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     FileType = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     BlobKey = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -236,41 +283,6 @@ namespace Planarian.Migrations.Migrations
                         name: "FK_Photos_Trips_TripId",
                         column: x => x.TripId,
                         principalTable: "Trips",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Photos_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "TripMembers",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    TripId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
-                    CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_TripMembers", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_TripMembers_Trips_TripId",
-                        column: x => x.TripId,
-                        principalTable: "Trips",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_TripMembers_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -282,10 +294,10 @@ namespace Planarian.Migrations.Migrations
                     TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     TripId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -311,10 +323,10 @@ namespace Planarian.Migrations.Migrations
                     TagTypeId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     LeadId = table.Column<string>(type: "nvarchar(10)", nullable: false),
                     Id = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedByName = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ModifiedOn = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -331,7 +343,27 @@ namespace Planarian.Migrations.Migrations
                         principalTable: "TagTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_LeadTags_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_LeadTags_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Leads_CreatedByUserId",
+                table: "Leads",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Leads_ModifiedByUserId",
+                table: "Leads",
+                column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Leads_TripId",
@@ -339,9 +371,9 @@ namespace Planarian.Migrations.Migrations
                 column: "TripId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Leads_UserId",
-                table: "Leads",
-                column: "UserId");
+                name: "IX_LeadTags_CreatedByUserId",
+                table: "LeadTags",
+                column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_LeadTags_LeadId",
@@ -349,24 +381,59 @@ namespace Planarian.Migrations.Migrations
                 column: "LeadId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_LeadTags_ModifiedByUserId",
+                table: "LeadTags",
+                column: "ModifiedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Members_ProjectId",
+                table: "Members",
+                column: "ProjectId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Members_TripId",
+                table: "Members",
+                column: "TripId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Members_UserId",
+                table: "Members",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageLogs_CreatedByUserId",
+                table: "MessageLogs",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageLogs_ModifiedByUserId",
+                table: "MessageLogs",
+                column: "ModifiedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageTypes_CreatedByUserId",
+                table: "MessageTypes",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageTypes_ModifiedByUserId",
+                table: "MessageTypes",
+                column: "ModifiedByUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Photos_TripId",
                 table: "Photos",
                 column: "TripId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Photos_UserId",
-                table: "Photos",
-                column: "UserId");
+                name: "IX_Projects_CreatedByUserId",
+                table: "Projects",
+                column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ProjectMembers_ProjectId",
-                table: "ProjectMembers",
-                column: "ProjectId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ProjectMembers_UserId",
-                table: "ProjectMembers",
-                column: "UserId");
+                name: "IX_Projects_ModifiedByUserId",
+                table: "Projects",
+                column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TagTypes_ProjectId",
@@ -374,14 +441,14 @@ namespace Planarian.Migrations.Migrations
                 column: "ProjectId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TripMembers_TripId",
-                table: "TripMembers",
-                column: "TripId");
+                name: "IX_Trips_CreatedByUserId",
+                table: "Trips",
+                column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TripMembers_UserId",
-                table: "TripMembers",
-                column: "UserId");
+                name: "IX_Trips_ModifiedByUserId",
+                table: "Trips",
+                column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Trips_ProjectId",
@@ -411,6 +478,9 @@ namespace Planarian.Migrations.Migrations
                 name: "LeadTags");
 
             migrationBuilder.DropTable(
+                name: "Members");
+
+            migrationBuilder.DropTable(
                 name: "MessageLogs");
 
             migrationBuilder.DropTable(
@@ -418,12 +488,6 @@ namespace Planarian.Migrations.Migrations
 
             migrationBuilder.DropTable(
                 name: "Photos");
-
-            migrationBuilder.DropTable(
-                name: "ProjectMembers");
-
-            migrationBuilder.DropTable(
-                name: "TripMembers");
 
             migrationBuilder.DropTable(
                 name: "TripTags");
@@ -435,13 +499,13 @@ namespace Planarian.Migrations.Migrations
                 name: "Trips");
 
             migrationBuilder.DropTable(
-                name: "Users");
-
-            migrationBuilder.DropTable(
                 name: "TagTypes");
 
             migrationBuilder.DropTable(
                 name: "Projects");
+
+            migrationBuilder.DropTable(
+                name: "Users");
         }
     }
 }
