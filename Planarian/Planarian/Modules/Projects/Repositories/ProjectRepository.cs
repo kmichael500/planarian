@@ -56,12 +56,12 @@ public class ProjectRepository : RepositoryBase
     }
 
 
-    public async Task<Model.Database.Entities.Projects.Project?> GetProject(string ProjectId)
+    public async Task<Project?> GetProject(string ProjectId)
     {
         return await DbContext.Projects.Where(e => e.Id == ProjectId).FirstOrDefaultAsync();
     }
 
-    private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Model.Database.Entities.Projects.Project> query)
+    private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Project> query)
     {
         return query.Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count));
     }

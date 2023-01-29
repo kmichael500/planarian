@@ -1,9 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
-using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -60,9 +58,9 @@ public class User : EntityBase
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
-    
+
     public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
-    
+
     #region Helper Functions
 
     [NotMapped] public bool IsProjectMember => Members.Any(e => !string.IsNullOrWhiteSpace(e.ProjectId));

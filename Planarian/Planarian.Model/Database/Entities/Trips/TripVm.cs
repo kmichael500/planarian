@@ -34,7 +34,6 @@ public class TripVm : ITrip
     }
 
 
-
     public TripVm()
     {
     }
@@ -42,6 +41,8 @@ public class TripVm : ITrip
     [Required] public IEnumerable<string> TripTagTypeIds { get; set; } = new HashSet<string>();
 
     [Required] public IEnumerable<string> TripMemberIds { get; set; } = new HashSet<string>();
+    public bool IsTripReportCompleted { get; set; }
+    public int NumberOfPhotos { get; set; }
 
     [Required]
     [MaxLength(PropertyLength.Id)]
@@ -58,6 +59,4 @@ public class TripVm : ITrip
     [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
 
     public string? TripReport { get; set; }
-    public bool IsTripReportCompleted { get; set; }
-    public int NumberOfPhotos { get; set; }
 }

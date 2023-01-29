@@ -122,6 +122,4 @@ public class TripRepository : RepositoryBase
     }
 
     #endregion
-
-    
 }

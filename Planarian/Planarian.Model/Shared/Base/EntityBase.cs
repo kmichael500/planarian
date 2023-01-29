@@ -21,13 +21,17 @@ public abstract class EntityBase
         Id = Guid.NewGuid().ToString();
     }
 
-    [Key] [MaxLength(PropertyLength.Id)] [Required] public string Id { get; set; } = null!;
+    [Key]
+    [MaxLength(PropertyLength.Id)]
+    [Required]
+    public string Id { get; set; } = null!;
+
     [MaxLength(PropertyLength.Id)] public string? CreatedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? ModifiedByUserId { get; set; } = null!;
-    
+
     [Required] public DateTime CreatedOn { get; set; }
     public DateTime? ModifiedOn { get; set; } = null!;
-    
+
     [NotMapped] public virtual User? CreatedByUser { get; set; } = null!;
     [NotMapped] public virtual User? ModifiedByUser { get; set; } = null!;
 }
@@ -39,7 +43,7 @@ public abstract class BaseEntityTypeConfiguration<T> : IEntityTypeConfiguration<
         builder.HasOne(e => e.CreatedByUser)
             .WithMany()
             .HasForeignKey(b => b.CreatedByUserId);
-        
+
         builder.HasOne(e => e.ModifiedByUser)
             .WithMany()
             .HasForeignKey(e => e.ModifiedByUserId);

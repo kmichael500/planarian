@@ -144,12 +144,8 @@ public class TripService : ServiceBase<TripRepository>
             numberOfPhotos = await Repository.GetNumberOfTripPhotos(trip.Id);
         }
 
-        foreach (var tripMemberId in values.TripMemberIds)
-        {
-            await AddTripMember(trip.Id, tripMemberId, false);
-        }
-        
-        
+        foreach (var tripMemberId in values.TripMemberIds) await AddTripMember(trip.Id, tripMemberId, false);
+
 
         await Repository.SaveChangesAsync();
         return new TripVm(trip, values.TripTagTypeIds, values.TripMemberIds, numberOfPhotos);
@@ -212,7 +208,7 @@ public class TripService : ServiceBase<TripRepository>
 
         foreach (var userId in userIds)
         {
-            var tripMember = new Member()
+            var tripMember = new Member
             {
                 Trip = trip,
                 UserId = userId

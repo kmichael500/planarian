@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
@@ -20,6 +19,7 @@ public class Photo : EntityBase
         Description = description;
         FileType = fileType;
     }
+
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripId { get; set; } = null!;
