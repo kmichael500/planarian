@@ -13,19 +13,13 @@ public class Photo : EntityBase
     {
     }
 
-    public Photo(string userId, string tripId, string name, string description, string fileType)
+    public Photo(string tripId, string name, string description, string fileType)
     {
-        UserId = userId;
         TripId = tripId;
         Name = name;
         Description = description;
         FileType = fileType;
     }
-
-    [Required]
-    [MaxLength(PropertyLength.Id)]
-    public string UserId { get; set; } = null!;
-
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string TripId { get; set; } = null!;
@@ -43,19 +37,15 @@ public class Photo : EntityBase
     [MaxLength(PropertyLength.BlobKey)] public string? BlobKey { get; set; } = null!;
 
     public virtual Trip Trip { get; set; } = null!;
-    public virtual User User { get; set; } = null!;
 }
 
-public class PhotoConfiguration : IEntityTypeConfiguration<Photo>
+public class PhotoConfiguration : BaseEntityTypeConfiguration<Photo>
 {
-    public void Configure(EntityTypeBuilder<Photo> builder)
+    public override void Configure(EntityTypeBuilder<Photo> builder)
     {
+        var photo = new Photo();
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Photos)
             .HasForeignKey(e => e.TripId);
-
-        builder.HasOne(e => e.User)
-            .WithMany(e => e.Photos)
-            .HasForeignKey(e => e.UserId);
     }
 }

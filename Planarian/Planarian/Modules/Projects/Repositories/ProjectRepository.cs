@@ -15,24 +15,24 @@ public class ProjectRepository : RepositoryBase
 
     #region Project Member
 
-    public async Task<ProjectMember?> GetProjectMember(string projectId, string userId)
+    public async Task<Member?> GetProjectMember(string projectId, string userId)
     {
-        return await DbContext.ProjectMembers.FirstOrDefaultAsync(e => e.UserId == userId && e.ProjectId == projectId);
+        return await DbContext.Members.FirstOrDefaultAsync(e => e.UserId == userId && e.ProjectId == projectId);
     }
 
     #endregion
 
     public async Task<IEnumerable<ProjectVm>> GetProjects()
     {
-        return await DbContext.Projects.Where(e => e.ProjectMembers.Any(ee => ee.UserId == RequestUser.Id))
-            .Select(e => new ProjectVm(e, e.ProjectMembers.Count, e.Trips.Count)).ToListAsync();
+        return await DbContext.Projects.Where(e => e.Members.Any(ee => ee.UserId == RequestUser.Id))
+            .Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count)).ToListAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetProjectMembers(string projectId)
     {
         return await DbContext.Projects
-            .Where(e => e.Id == projectId && e.ProjectMembers.Any(e => e.UserId == RequestUser.Id))
-            .SelectMany(e => e.ProjectMembers)
+            .Where(e => e.Id == projectId && e.Members.Any(e => e.UserId == RequestUser.Id))
+            .SelectMany(e => e.Members)
             .Select(e => new SelectListItem<string>(e.User.FullName, e.UserId))
             .ToListAsync();
     }
@@ -63,7 +63,7 @@ public class ProjectRepository : RepositoryBase
 
     private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Model.Database.Entities.Projects.Project> query)
     {
-        return query.Select(e => new ProjectVm(e, e.ProjectMembers.Count, e.Trips.Count));
+        return query.Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count));
     }
 
     #endregion

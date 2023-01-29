@@ -25,18 +25,19 @@ public class Trip : EntityBase, ITrip
     public virtual Project Project { get; set; } = null!;
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
 
-    public virtual ICollection<TripMember> TripMembers { get; set; } =
-        new HashSet<TripMember>();
+    public virtual ICollection<Member> Members { get; set; } =
+        new HashSet<Member>();
 
     public virtual ICollection<Photo> Photos { get; set; } = new HashSet<Photo>();
     public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
 
 }
 
-public class TripConfiguration : IEntityTypeConfiguration<Trip>
+public class TripConfiguration : BaseEntityTypeConfiguration<Trip>
 {
-    public void Configure(EntityTypeBuilder<Trip> builder)
+    public override void Configure(EntityTypeBuilder<Trip> builder)
     {
+        base.Configure(builder);
         builder.HasOne(e => e.Project)
             .WithMany(e => e.Trips)
             .HasForeignKey(e => e.ProjectId);

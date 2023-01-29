@@ -13,9 +13,9 @@ public class TripTag : EntityBase
     public string TripId { get; set; }
 }
 
-public class TripTagConfiguration : IEntityTypeConfiguration<TripTag>
+public class TripTagConfiguration : BaseEntityTypeConfiguration<TripTag>
 {
-    public void Configure(EntityTypeBuilder<TripTag> builder)
+    public override void Configure(EntityTypeBuilder<TripTag> builder)
     {
         builder.HasKey(e => new { e.TagTypeId, e.TripId });
         builder

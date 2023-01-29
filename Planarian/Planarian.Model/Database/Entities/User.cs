@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
@@ -38,7 +39,7 @@ public class User : EntityBase
     [MaxLength(PropertyLength.Name)]
     public string LastName { get; set; } = null!;
 
-    public string FullName => $"{FirstName} {LastName}";
+    [NotMapped] public string FullName => $"{FirstName} {LastName}";
 
     [MaxLength(PropertyLength.EmailAddress)]
     public string EmailAddress { get; set; } = null!;
@@ -55,23 +56,24 @@ public class User : EntityBase
     [MaxLength(PropertyLength.EmailConfirmationCode)]
     public string? EmailConfirmationCode { get; set; }
 
-    public bool? IsEmailConfirmed { get; set; }
+    public DateTime? EmailConfirmedOn { get; set; }
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
+    
+    public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
+    
+    #region Helper Functions
 
-    public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new HashSet<ProjectMember>();
+    [NotMapped] public bool IsProjectMember => Members.Any(e => !string.IsNullOrWhiteSpace(e.ProjectId));
+    [NotMapped] public bool IsTripMember => Members.Any(e => !string.IsNullOrWhiteSpace(e.TripId));
 
-    public virtual ICollection<TripMember> TripMembers { get; set; } =
-        new HashSet<TripMember>();
-
-    public virtual ICollection<Photo> Photos { get; set; } = new HashSet<Photo>();
-    public virtual ICollection<Lead> Leads { get; set; } = new HashSet<Lead>();
+    #endregion
 }
 
-public class UserConfiguration : IEntityTypeConfiguration<User>
+public class UserConfiguration : BaseEntityTypeConfiguration<User>
 {
-    public void Configure(EntityTypeBuilder<User> builder)
+    public override void Configure(EntityTypeBuilder<User> builder)
     {
         builder.HasIndex(e => e.EmailAddress).IsUnique();
     }

@@ -14,17 +14,18 @@ public class LeadTag : EntityBase
     public Lead Lead { get; set; }
 }
 
-public class LeadTagConfiguration : IEntityTypeConfiguration<LeadTag>
+public class LeadTagConfiguration : BaseEntityTypeConfiguration<LeadTag>
 {
-    public void Configure(EntityTypeBuilder<LeadTag> builder)
+    public override void Configure(EntityTypeBuilder<LeadTag> builder)
     {
+        base.Configure(builder);
+
         builder.HasKey(e => new { e.TagTypeId, TripId = e.LeadId });
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.LeadTags)
             .HasForeignKey(bc => bc.TagTypeId);
-
-
+        
         builder.HasOne(e => e.Lead)
             .WithMany(e => e.LeadTags)
             .HasForeignKey(e => e.LeadId);
