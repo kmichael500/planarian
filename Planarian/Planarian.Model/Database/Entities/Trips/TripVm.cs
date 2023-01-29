@@ -8,17 +8,19 @@ public class TripVm : ITrip
     public TripVm(string id, string projectId, IEnumerable<string> tripTagTypeIds,
         IEnumerable<string> tripMemberIds, string name,
         string? description,
-        string? tripReport)
+        string? tripReport, int numberOfPhotos)
     {
         Id = id;
         ProjectId = projectId;
         TripTagTypeIds = tripTagTypeIds;
         TripMemberIds = tripMemberIds;
         TripReport = tripReport;
+        IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
+        NumberOfPhotos = numberOfPhotos;
     }
 
     public TripVm(Trip trip, IEnumerable<string> tripTagTypeIds,
-        IEnumerable<string> tripMemberIds)
+        IEnumerable<string> tripMemberIds, int numberOfPhotos)
     {
         Id = trip.Id;
         ProjectId = trip.ProjectId;
@@ -27,7 +29,10 @@ public class TripVm : ITrip
         Name = trip.Name;
         Description = trip.Description;
         TripReport = trip.TripReport;
+        IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
+        NumberOfPhotos = numberOfPhotos;
     }
+
 
 
     public TripVm()
@@ -53,4 +58,6 @@ public class TripVm : ITrip
     [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
 
     public string? TripReport { get; set; }
+    public bool IsTripReportCompleted { get; set; }
+    public int NumberOfPhotos { get; set; }
 }
