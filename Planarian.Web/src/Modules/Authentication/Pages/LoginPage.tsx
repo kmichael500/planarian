@@ -30,7 +30,6 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (values: UserLoginVm) => {
-    console.log("click");
     try {
       setIsLoggingIn(true);
       await AuthenticationService.Login(values);

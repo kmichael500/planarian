@@ -7,7 +7,7 @@ interface AppContextProps {
 }
 
 export const AppContext = createContext<AppContextProps>({
-  isAuthenticated: AuthenticationService.IsAuthenticated(),
+  isAuthenticated: AuthenticationService.IsAuthenticated() as boolean,
   setIsAuthenticated: () => {},
 });
 
@@ -15,7 +15,9 @@ interface AppProviderProps {
   children: React.ReactNode;
 }
 export const AppProvider: React.FC<AppProviderProps> = (props) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+    AuthenticationService.IsAuthenticated()
+  );
 
   return (
     <AppContext.Provider

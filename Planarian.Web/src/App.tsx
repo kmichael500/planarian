@@ -21,7 +21,6 @@ const App: React.FC = () => {
             <title>Planarian</title>
             <meta name="description" content="Cave project managment" />
           </Helmet>
-
           <Favicon url={logo} />
           <SideBar />
           <Layout className="site-layout">
