@@ -11,9 +11,8 @@ const AuthenticationService = {
     this.SetToken(response.data);
     return response.data;
   },
-  async Logout(): Promise<string> {
-    const response = await HttpClient.post<string>(`${baseUrl}/logout`, {});
-    return response.data;
+  Logout(): void {
+    this.RemoveToken();
   },
   GetToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);

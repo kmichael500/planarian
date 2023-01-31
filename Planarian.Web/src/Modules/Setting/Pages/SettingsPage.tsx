@@ -41,15 +41,11 @@ const SettingsPage: React.FC = () => {
     <>
       <Row align="middle" gutter={10}>
         <Col>
-          <Title level={2}>Preferences</Title>
+          <Title level={2}>Settings</Title>
         </Col>
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>
-        <Col>
-          <Link to={"./.."}>
-            <Button>Back</Button>
-          </Link>
-        </Col>
+        <Col></Col>
         <Col></Col>
       </Row>
       <Divider />

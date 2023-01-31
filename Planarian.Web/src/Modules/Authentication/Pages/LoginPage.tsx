@@ -1,6 +1,7 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AppContext } from "../../../Configuration/AppContext";
 import {
   isNullOrWhiteSpace,
   nameof,
@@ -12,6 +13,7 @@ import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
+  const { setIsAuthenticated } = useContext(AppContext);
 
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
@@ -32,6 +34,7 @@ const LoginPage: React.FC = () => {
     try {
       setIsLoggingIn(true);
       await AuthenticationService.Login(values);
+      setIsAuthenticated(true);
       navigate(redirectUrl);
     } catch (e: any) {
       const error = e as ApiErrorResponse;
