@@ -6,10 +6,15 @@ import {
   LoginOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import Favicon from "react-favicon";
 import { Helmet } from "react-helmet";
-import { Link, BrowserRouter, useNavigate } from "react-router-dom";
+import {
+  Link,
+  BrowserRouter,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import { AppRouting } from "../App.routing";
 import { AuthenticationService } from "../Modules/Authentication/Services/AuthenticationService";
 import { AppContext, AppProvider } from "./AppContext";
@@ -19,10 +24,28 @@ const { Content, Footer, Sider } = Layout;
 
 const SideBar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true);
+  const [selectedKey, setSelectedKey] = useState<string>("");
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  console.log("isAuthenticated", isAuthenticated);
+  useEffect(() => {
+    if (isAuthenticated) {
+      const selectedItem = authenticatedMenuItems.find(
+        (item) => item.key && location.pathname.startsWith(`/${item.key}`)
+      );
+      if (selectedItem?.key) {
+        setSelectedKey(selectedItem.key as string);
+      }
+    } else {
+      const selectedItem = unauthenticatedMenuItems.find(
+        (item) => item.key && location.pathname.startsWith(`/${item.key}`)
+      );
+      if (selectedItem?.key) {
+        setSelectedKey(selectedItem.key as string);
+      }
+    }
+  }, [location]);
 
   const authenticatedMenuItems = [
     {
@@ -85,7 +108,8 @@ const SideBar: React.FC = () => {
       {isAuthenticated && (
         <Menu
           theme="dark"
-          defaultSelectedKeys={["1"]}
+          selectedKeys={[selectedKey]}
+          onSelect={(value) => setSelectedKey(value.key)}
           mode="inline"
           items={authenticatedMenuItems}
         />
@@ -93,7 +117,8 @@ const SideBar: React.FC = () => {
       {!isAuthenticated && (
         <Menu
           theme="dark"
-          defaultSelectedKeys={["1"]}
+          selectedKeys={[selectedKey]}
+          onSelect={(value) => setSelectedKey(value.key)}
           mode="inline"
           items={unauthenticatedMenuItems}
         />
