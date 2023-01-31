@@ -1,4 +1,4 @@
-import { Layout, Menu, MenuProps } from "antd";
+import { Layout, Menu } from "antd";
 import {
   DatabaseOutlined,
   SettingOutlined,
@@ -7,22 +7,14 @@ import {
   UserAddOutlined,
 } from "@ant-design/icons";
 import React, { useContext, useEffect, useState } from "react";
-import Favicon from "react-favicon";
-import { Helmet } from "react-helmet";
-import {
-  Link,
-  BrowserRouter,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
-import { AppRouting } from "../App.routing";
-import { AuthenticationService } from "../Modules/Authentication/Services/AuthenticationService";
-import { AppContext, AppProvider } from "./AppContext";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { AppContext } from "../Context/AppContext";
 import { MenuItemType } from "antd/lib/menu/hooks/useItems";
 
-const { Content, Footer, Sider } = Layout;
+const { Sider } = Layout;
 
-const SideBar: React.FC = () => {
+const SideBarComponent: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string>("");
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
@@ -68,6 +60,7 @@ const SideBar: React.FC = () => {
     },
     {
       key: "logout",
+
       icon: <LogoutOutlined />,
       onClick: () => {
         AuthenticationService.Logout();
@@ -127,4 +120,4 @@ const SideBar: React.FC = () => {
   );
 };
 
-export { SideBar };
+export { SideBarComponent };

@@ -7,8 +7,8 @@ import Favicon from "react-favicon";
 import logo from "./logo.svg";
 import { Helmet } from "react-helmet";
 import { BrowserRouter } from "react-router-dom";
-import { AppProvider } from "./Configuration/AppContext";
-import { SideBar } from "./Configuration/Sidebar";
+import { AppProvider } from "./Configuration/Context/AppContext";
+import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 
 const { Content, Footer, Sider } = Layout;
 
@@ -22,7 +22,7 @@ const App: React.FC = () => {
             <meta name="description" content="Cave project managment" />
           </Helmet>
           <Favicon url={logo} />
-          <SideBar />
+          <SideBarComponent />
           <Layout className="site-layout">
             <Content style={{ margin: "16px 16px" }}>
               <AppRouting />

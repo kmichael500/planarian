@@ -1,5 +1,5 @@
 import React, { createContext, useState } from "react";
-import { AuthenticationService } from "../Modules/Authentication/Services/AuthenticationService";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 interface AppContextProps {
   isAuthenticated: boolean;

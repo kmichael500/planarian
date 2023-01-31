@@ -1,7 +1,7 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
 import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AppContext } from "../../../Configuration/AppContext";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import {
   isNullOrWhiteSpace,
   nameof,
@@ -68,6 +68,11 @@ const LoginPage: React.FC = () => {
         layout="vertical"
         initialValues={{ remember: true }}
         onFinish={onSubmit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            form.submit();
+          }
+        }}
         autoComplete="off"
       >
         <Form.Item
