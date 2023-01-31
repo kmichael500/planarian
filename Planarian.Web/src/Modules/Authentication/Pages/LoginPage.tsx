@@ -1,6 +1,7 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import {
   isNullOrWhiteSpace,
   nameof,
@@ -12,6 +13,7 @@ import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
+  const { setIsAuthenticated } = useContext(AppContext);
 
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
@@ -28,10 +30,10 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (values: UserLoginVm) => {
-    console.log("click");
     try {
       setIsLoggingIn(true);
       await AuthenticationService.Login(values);
+      setIsAuthenticated(true);
       navigate(redirectUrl);
     } catch (e: any) {
       const error = e as ApiErrorResponse;
@@ -66,6 +68,11 @@ const LoginPage: React.FC = () => {
         layout="vertical"
         initialValues={{ remember: true }}
         onFinish={onSubmit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            form.submit();
+          }
+        }}
         autoComplete="off"
       >
         <Form.Item
