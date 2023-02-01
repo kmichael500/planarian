@@ -38,7 +38,7 @@ const ProjectPage: React.FC = () => {
   }
 
   useEffect(() => {
-    setHeaderTitle(["Project: " + project?.name]);
+    setHeaderTitle([`Project: ${project?.name ?? ""}`]);
   }, [project]);
   useEffect(() => {
     if (project === undefined) {

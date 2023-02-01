@@ -1,8 +1,8 @@
 import { Row, Col, Typography, Spin } from "antd";
 import { Header } from "antd/lib/layout/layout";
-import React from "react";
 import { useContext, useEffect, useState } from "react";
 import { Helmet } from "react-helmet";
+import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 
 const HeaderComponent: React.FC = () => {
@@ -18,46 +18,47 @@ const HeaderComponent: React.FC = () => {
 
   const [navigationTitle, setNavigationTitle] = useState("");
   useEffect(() => {
-    if (typeof headerTitle[0] === "string") {
-      setNavigationTitle(headerTitle[0]);
-    } else if (headerTitle[1]) {
+    if (headerTitle[1]) {
       setNavigationTitle(headerTitle[1]);
+    } else if (typeof headerTitle[0] === "string") {
+      setNavigationTitle(headerTitle[0]);
     } else {
       setNavigationTitle("Planarian");
     }
   }, [headerTitle]);
-
   return (
     <>
       <Helmet>
-        <title>{`${navigationTitle} | Planarian`}</title>
-        <meta name="description" content="Cave project managment" />
+        <title>{navigationTitle}</title>
       </Helmet>
-      <Spin spinning={headerTitle === null}>
-        <Header
-          style={{
-            paddingTop: hasHeaderButons ? "4px" : "16px",
-            paddingBottom: "4px",
-            paddingLeft: "16px",
-            height: "70px",
-            background: "white",
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            width: "100%",
-            border: "1px solid #f0f0f0",
-          }}
+      <Header
+        style={{
+          paddingTop: "4px",
+          paddingBottom: "4px",
+          paddingLeft: "16px",
+          height: "70px",
+          background: "white",
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+          width: "100%",
+          border: "1px solid #f0f0f0",
+        }}
+      >
+        <Spin
+          spinning={
+            headerTitle[0] == null ||
+            (typeof headerTitle[0] === "string" &&
+              isNullOrWhiteSpace(headerTitle[0]))
+          }
         >
           <Row align="middle" gutter={10}>
             <Col>
               <>
-                {typeof headerTitle[0] === "string" &&
-                  headerTitle[1] == undefined && (
-                    <Typography.Title level={4}>
-                      {headerTitle[0]}
-                    </Typography.Title>
-                  )}
-                {typeof headerTitle[0] !== "string" && headerTitle[0]}
+                {typeof headerTitle[0] == "string" && (
+                  <Typography.Title level={4}>{headerTitle}</Typography.Title>
+                )}
+                {typeof headerTitle[0] != "string" && headerTitle[0]}
               </>
             </Col>
 
@@ -67,8 +68,8 @@ const HeaderComponent: React.FC = () => {
               <Col key={index}>{button}</Col>
             ))}
           </Row>
-        </Header>{" "}
-      </Spin>
+        </Spin>
+      </Header>
     </>
   );
 };
