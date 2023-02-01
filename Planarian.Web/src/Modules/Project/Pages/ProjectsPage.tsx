@@ -1,6 +1,7 @@
-import { Card, Col, Divider, Row, Spin, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
+import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ProjectCreateButtonComponent } from "../Components/ProjectCreateButtonComponent";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
@@ -10,7 +11,12 @@ const { Title, Paragraph } = Typography;
 const ProjectsPage: React.FC = () => {
   let [isLoading, setIsLoading] = useState(true);
   let [projects, setProjects] = useState<ProjectVm[]>();
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
+  useEffect(() => {
+    setHeaderButtons([<ProjectCreateButtonComponent />]);
+    setHeaderTitle(["Projects"]);
+  }, []);
   useEffect(() => {
     if (projects === undefined) {
       const GetProjects = async (): Promise<void> => {
@@ -24,19 +30,6 @@ const ProjectsPage: React.FC = () => {
 
   return (
     <div className="site-card-wrapper">
-      <Row align="middle">
-        <Col>
-          <Title level={2}>Projects</Title>
-        </Col>
-        {/* take up rest of space to push others to right and left side */}
-        <Col flex="auto"></Col>
-        <Col>
-          {" "}
-          <ProjectCreateButtonComponent />
-        </Col>
-      </Row>
-      <Divider />
-
       <Spin spinning={isLoading} size="large">
         <Row
           gutter={[

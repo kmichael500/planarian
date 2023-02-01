@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -19,6 +19,9 @@ import { TextFileInputComponent } from "../../../Shared/Components/TextFileInput
 import { TherionService } from "../../Therion/Services/TherionService";
 import { TripService } from "../Services/TripService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import Title from "antd/lib/skeleton/Title";
+import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Option } = Select;
 
@@ -28,6 +31,16 @@ const LeadAddPage: React.FC = () => {
 
   const { tripId } = useParams();
   const navigate = useNavigate();
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderButtons([
+      <Link relative="path" to={"./.."}>
+        <Button>Back</Button>
+      </Link>,
+    ]);
+    setHeaderTitle(["Add Leads"]);
+  }, []);
 
   const addLead = () => {
     setLeads([
@@ -117,18 +130,6 @@ const LeadAddPage: React.FC = () => {
 
   return (
     <>
-      <Row align="middle" gutter={10}>
-        <Col>{/* <Title level={2}>{project?.name}</Title> */}</Col>
-        {/* take up rest of space to push others to right and left side */}
-        <Col flex="auto"></Col>
-        <Col>
-          <Link to={"./../"}>
-            <Button>Back</Button>
-          </Link>
-        </Col>
-        <Col> </Col>
-      </Row>
-      <Divider />
       <Card
         loading={isLoading}
         title="Add Leads"

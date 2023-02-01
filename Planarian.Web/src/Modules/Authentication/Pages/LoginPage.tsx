@@ -1,5 +1,5 @@
 import { Button, Card, Checkbox, Form, Input, message } from "antd";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import {
@@ -13,9 +13,14 @@ import { AuthenticationService } from "../Services/AuthenticationService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
-  const { setIsAuthenticated } = useContext(AppContext);
-
+  const { setIsAuthenticated, setHeaderTitle, setHeaderButtons } =
+    useContext(AppContext);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHeaderTitle(["Login"]);
+    setHeaderButtons([]);
+  }, []);
 
   const location = useLocation();
   const encodedRedirectUrl = new URLSearchParams(location.search).get(

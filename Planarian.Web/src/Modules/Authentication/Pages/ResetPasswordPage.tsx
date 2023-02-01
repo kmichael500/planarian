@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Button, Card, Form, Input, message } from "antd";
 import { UserVm } from "../../User/Models/UserVm";
 import {
@@ -11,6 +11,7 @@ import { ResetPasswordEmailVm } from "../../User/Models/ResetPasswordEmailVm";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { UserService } from "../../User/UserService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const ResetPasswordPage: React.FC = () => {
   const [passwordForm] = Form.useForm();
@@ -18,6 +19,14 @@ const ResetPasswordPage: React.FC = () => {
 
   const [user, setUser] = useState<UserVm | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderTitle(["Forgot Password"]);
+
+    setHeaderButtons([]);
+  }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setIsChangingPassword] = useState(false);
