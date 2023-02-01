@@ -33,7 +33,7 @@ const HeaderComponent: React.FC = () => {
       </Helmet>
       <Header
         style={{
-          paddingTop: "4px",
+          paddingTop: hasHeaderButons ? "4px" : "16px",
           paddingBottom: "4px",
           paddingLeft: "16px",
           height: "70px",
