@@ -1,4 +1,4 @@
-import { Layout, Menu } from "antd";
+import { Col, Divider, Layout, Menu, Row, Space, Typography } from "antd";
 import {
   DatabaseOutlined,
   SettingOutlined,
@@ -11,6 +11,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { AppContext } from "../Context/AppContext";
 import { MenuItemType } from "antd/lib/menu/hooks/useItems";
+import { LogoIcon } from "./AppIcon";
 
 const { Sider } = Layout;
 
@@ -40,6 +41,15 @@ const SideBarComponent: React.FC = () => {
   }, [location]);
 
   const authenticatedMenuItems = [
+    // {
+    //   key: "logo",
+
+    //   icon: (
+    //     <Link to="/">
+    //       <LogoIcon />
+    //     </Link>
+    //   ),
+    // },
     {
       key: "projects",
       icon: (
@@ -95,12 +105,38 @@ const SideBarComponent: React.FC = () => {
   return (
     <Sider
       collapsible
+      theme="light"
       collapsed={collapsed}
       onCollapse={(value) => setCollapsed(value)}
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1,
+        width: "100%",
+        height: "100vh",
+      }}
     >
+      <Space
+        direction="horizontal"
+        style={{ width: "100%", justifyContent: "center" }}
+      >
+        <Link to="/">
+          <LogoIcon style={{ padding: "10px", fontSize: "50px" }} />
+        </Link>
+      </Space>
+      <Space
+        direction="horizontal"
+        style={{
+          width: "100%",
+          fontWeight: "lighter",
+          justifyContent: "center",
+        }}
+      >
+        <Typography.Text>Planarian</Typography.Text>
+      </Space>
       {isAuthenticated && (
         <Menu
-          theme="dark"
+          theme="light"
           selectedKeys={[selectedKey]}
           onSelect={(value) => setSelectedKey(value.key)}
           mode="inline"
@@ -109,7 +145,7 @@ const SideBarComponent: React.FC = () => {
       )}
       {!isAuthenticated && (
         <Menu
-          theme="dark"
+          theme="light"
           selectedKeys={[selectedKey]}
           onSelect={(value) => setSelectedKey(value.key)}
           mode="inline"

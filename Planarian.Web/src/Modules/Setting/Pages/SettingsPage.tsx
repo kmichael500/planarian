@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Button, Col, Divider, Form, Row, Typography } from "antd";
 import { Link } from "react-router-dom";
 import { UserVm } from "../../User/Models/UserVm";
 import { UserService } from "../../User/UserService";
 import UserUpdateComponent from "../../User/Componenets/UserUpdateComponent";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Title } = Typography;
 
@@ -11,6 +12,13 @@ const SettingsPage: React.FC = () => {
   const [form] = Form.useForm();
   const [user, setUser] = useState<UserVm>();
   const [isLoading, setIsLoading] = useState(false);
+
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderButtons([]);
+    setHeaderTitle(["Settings"]);
+  }, []);
 
   useEffect(() => {
     async function fetchUser() {
@@ -39,16 +47,6 @@ const SettingsPage: React.FC = () => {
 
   return (
     <>
-      <Row align="middle" gutter={10}>
-        <Col>
-          <Title level={2}>Settings</Title>
-        </Col>
-        {/* take up rest of space to push others to right and left side */}
-        <Col flex="auto"></Col>
-        <Col></Col>
-        <Col></Col>
-      </Row>
-      <Divider />
       <Row align="middle"></Row>
       <UserUpdateComponent />
     </>

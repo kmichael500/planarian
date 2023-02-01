@@ -18,7 +18,7 @@ import {
 import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
 
 import { RcFile } from "antd/lib/upload";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripService } from "../Services/TripService";
 import { PhotoMetaData } from "../../Photo/Models/PhotoMetaData";
@@ -26,6 +26,7 @@ import { TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "./TripPhotoUploadComponent.scss";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { TextArea } = Input;
 
@@ -34,6 +35,17 @@ interface TripPhotoUploadComponentProps {}
 const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
   props: TripPhotoUploadComponentProps
 ) => {
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderButtons([
+      <Link relative="path" to={"./.."}>
+        <Button>Back</Button>
+      </Link>,
+    ]);
+    setHeaderTitle(["Upload Photos"]);
+  }, []);
+
   //#region Main Modal
 
   const [open, setOpen] = useState(false);
@@ -231,18 +243,6 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
 
   return (
     <>
-      <Row align="middle" gutter={10}>
-        <Col>{/* <Title level={2}>{project?.name}</Title> */}</Col>
-        {/* take up rest of space to push others to right and left side */}
-        <Col flex="auto"></Col>
-        <Col>
-          <Link to={"./../"}>
-            <Button>Back</Button>
-          </Link>
-        </Col>
-        <Col> </Col>
-      </Row>
-      <Divider />
       <Spin spinning={uploading}>
         <Card
           title="Upload"

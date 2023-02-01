@@ -5,15 +5,12 @@ import {
   Divider,
   message,
   Row,
-  Select,
-  Space,
   Spin,
   Typography,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
-import type { ColumnsType } from "antd/es/table";
 import {
   MemberGridComponent,
   MemberGridType,
@@ -26,6 +23,7 @@ import { TripDetailPhotoComponent } from "../Components/TripDetailPhotoComponent
 import { TripTagComponent } from "../Components/TripTagComponent";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Title, Paragraph } = Typography;
 
@@ -36,7 +34,31 @@ const TripPage: React.FC = () => {
 
   const { tripId, projectId } = useParams();
 
-  let [tripReport, setTripReport] = useState<string>("");
+  const [tripReport, setTripReport] = useState<string>("");
+
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderButtons([
+      <Link relative="path" to={"./../.."}>
+        <Button>Back</Button>
+      </Link>,
+    ]);
+    setHeaderTitle([
+      <>
+        <Title
+          editable={{
+            onChange: updateName,
+            maxLength: PropertyLength.NAME,
+          }}
+          level={4}
+        >
+          {trip?.name}
+        </Title>
+      </>,
+      `Trip: ${trip?.name}`,
+    ]);
+  }, [trip]);
 
   const onEditClick = () => {
     setIsEditing(true);
@@ -104,27 +126,15 @@ const TripPage: React.FC = () => {
     <>
       <Row align="middle" gutter={10}>
         <Col>
-          <Spin spinning={isLoading}>
-            <Title
-              editable={{
-                onChange: updateName,
-                maxLength: PropertyLength.NAME,
-              }}
-              level={2}
-            >
-              {trip?.name}
-            </Title>
-            <Paragraph
-              type="secondary"
-              editable={{
-                onChange: updateDescription,
-                maxLength: PropertyLength.MEDIUM_TEXT,
-              }}
-            >
-              {trip?.description}
-            </Paragraph>
-          </Spin>
-
+          <Paragraph
+            type="secondary"
+            editable={{
+              onChange: updateDescription,
+              maxLength: PropertyLength.MEDIUM_TEXT,
+            }}
+          >
+            {trip?.description}
+          </Paragraph>
           <TripTagComponent
             getTags={() => {
               return TripService.GetTags(tripId as string);
@@ -135,12 +145,6 @@ const TripPage: React.FC = () => {
         </Col>
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>
-        <Col>
-          <Link to={"./../.."}>
-            <Button>Back</Button>
-          </Link>
-        </Col>
-        <Col> </Col>
       </Row>
       <Divider />
 

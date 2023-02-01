@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { ProjectVm } from "../Models/ProjectVm";
@@ -13,11 +13,22 @@ import { TripVm } from "../../Trip/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Title, Text } = Typography;
 
 const ProjectPage: React.FC = () => {
   let [project, setProject] = useState<ProjectVm>();
+  const { setHeaderTitle, headerButtons, setHeaderButtons } =
+    useContext(AppContext);
+
+  useEffect(() => {
+    setHeaderButtons([
+      <Link to={"./.."}>
+        <Button>Back</Button>
+      </Link>,
+    ]);
+  }, []);
   let [trips, setTrips] = useState<TripVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
@@ -27,11 +38,15 @@ const ProjectPage: React.FC = () => {
   }
 
   useEffect(() => {
+    setHeaderTitle([`Project: ${project?.name ?? ""}`]);
+  }, [project]);
+  useEffect(() => {
     if (project === undefined) {
       const getProject = async () => {
         const projectResponse = await ProjectService.GetProject(projectId);
         setProject(projectResponse);
         const tripsResponse = await ProjectService.GetTrips(projectId);
+
         setTrips(tripsResponse);
         setIsTripsLoading(false);
       };
@@ -41,20 +56,6 @@ const ProjectPage: React.FC = () => {
 
   return (
     <>
-      <Row align="middle" gutter={10}>
-        <Col>
-          <Title level={2}>{project?.name}</Title>
-        </Col>
-        {/* take up rest of space to push others to right and left side */}
-        <Col flex="auto"></Col>
-        <Col>
-          <Link to={"./.."}>
-            <Button>Back</Button>
-          </Link>
-        </Col>
-      </Row>
-      <Divider />
-
       <MemberGridComponent
         type={MemberGridType.Project}
         projectId={projectId}
