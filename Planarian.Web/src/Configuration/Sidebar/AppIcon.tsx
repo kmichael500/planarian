@@ -1,8 +1,8 @@
-import Icon, { HomeOutlined } from "@ant-design/icons";
+import Icon from "@ant-design/icons";
 import type { CustomIconComponentProps } from "@ant-design/icons/lib/components/Icon";
-import { Space } from "antd";
 
 import { SVGProps } from "react";
+
 const LogoSvg = (props: SVGProps<SVGSVGElement>) => (
   <svg
     className="img-fluid"

@@ -1,8 +1,6 @@
 import {
-  Button,
   Card,
   Col,
-  Divider,
   Form,
   Image,
   Input,
@@ -16,19 +14,18 @@ import {
   UploadProps,
 } from "antd";
 import {
+  CloudUploadOutlined,
   DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
-  CloudUploadOutlined,
 } from "@ant-design/icons";
 
 import { RcFile } from "antd/lib/upload";
 import React, { useContext, useEffect, useState } from "react";
-import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripService } from "../Services/TripService";
 import { PhotoMetaData } from "../../Photo/Models/PhotoMetaData";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "./TripPhotoUploadComponent.scss";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../Configuration/Context/AppContext";

@@ -1,8 +1,8 @@
-import { Button, Col, Form, Input, message, Modal, Row, Select } from "antd";
+import { Col, Form, Input, message, Modal, Row, Select } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
-import { MailOutlined, PlusCircleOutlined } from "@ant-design/icons";
+import { MailOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../../Models/SelectListItem";
 import { ProjectService } from "../../../Modules/Project/Services/ProjectService";
 import { SettingsService } from "../../../Modules/Setting/Services/SettingsService";

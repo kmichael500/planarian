@@ -5,7 +5,6 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { CreateLeadVm } from "../../Lead/Models/CreateLeadVm";
 import { LeadVm } from "../../Lead/Models/LeadVm";
-import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripVm } from "../Models/TripVm";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
 import { PhotoVm } from "../../Photo/Models/PhotoVm";

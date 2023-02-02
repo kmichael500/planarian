@@ -1,24 +1,13 @@
-import {
-  Button,
-  Col,
-  Divider,
-  Grid,
-  Layout,
-  Menu,
-  Row,
-  Space,
-  Typography,
-} from "antd";
+import { Grid, Layout, Space, Typography } from "antd";
 import {
   DatabaseOutlined,
-  SettingOutlined,
-  LogoutOutlined,
   LoginOutlined,
+  LogoutOutlined,
+  SettingOutlined,
   UserAddOutlined,
-  MenuOutlined,
 } from "@ant-design/icons";
 import React, { useContext, useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { AppContext } from "../Context/AppContext";
 import { MenuItemType } from "antd/lib/menu/hooks/useItems";

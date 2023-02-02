@@ -1,7 +1,6 @@
 import { UndoOutlined } from "@ant-design/icons";
 import {
   PlanarianButton,
-  PlanarianButtonType,
   PlanarianButtonTypeWithoutIcon,
 } from "./PlanarianButtton";
 

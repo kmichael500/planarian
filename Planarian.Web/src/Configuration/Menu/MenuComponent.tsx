@@ -1,20 +1,21 @@
 import { Menu } from "antd";
 import { MenuItemType } from "antd/lib/menu/hooks/useItems";
-import { useState, useContext, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { AppContext } from "../Context/AppContext";
 import {
   DatabaseOutlined,
-  SettingOutlined,
-  LogoutOutlined,
   LoginOutlined,
+  LogoutOutlined,
+  SettingOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
 
 interface MenuComponentProps {
   onMenuItemClick?: (key: string) => void;
 }
+
 const MenuComponent: React.FC<MenuComponentProps> = (props) => {
   const [selectedKey, setSelectedKey] = useState<string>("");
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);

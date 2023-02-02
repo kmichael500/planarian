@@ -1,8 +1,6 @@
 import { PlusCircleOutlined } from "@ant-design/icons";
-import { ButtonProps } from "antd";
 import {
   PlanarianButton,
-  PlanarianButtonType,
   PlanarianButtonTypeWithoutIcon,
 } from "./PlanarianButtton";
 

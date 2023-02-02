@@ -1,14 +1,5 @@
-import {
-  Button,
-  Col,
-  Image,
-  Modal,
-  Popconfirm,
-  Row,
-  Tooltip,
-  Typography,
-} from "antd";
-import { DeleteOutlined, EyeOutlined } from "@ant-design/icons";
+import { Col, Image, Modal, Row, Tooltip, Typography } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
 
 import { useEffect, useState } from "react";
 import { TripService } from "../Services/TripService";
