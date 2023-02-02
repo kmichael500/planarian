@@ -41,7 +41,7 @@ const HeaderComponent: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>{navigationTitle}</title>
+        <title>{navigationTitle} | Planarian</title>
       </Helmet>
 
       <Header
