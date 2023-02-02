@@ -1,7 +1,13 @@
-import { Button, Card, Checkbox, Form, Input, message } from "antd";
+import { Card, Checkbox, Form, Input, message } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import {
+  LoginOutlined,
+  QuestionCircleOutlined,
+  UserAddOutlined,
+} from "@ant-design/icons";
 import {
   isNullOrWhiteSpace,
   nameof,
@@ -51,19 +57,25 @@ const LoginPage: React.FC = () => {
     <Card
       title="Login"
       actions={[
-        <Button
+        <PlanarianButton
           loading={isLoggingIn}
           type="primary"
           onClick={(e) => form.submit()}
+          icon={<LoginOutlined />}
+          alwaysShowChildren
         >
           Login
-        </Button>,
+        </PlanarianButton>,
 
         <Link to={"../register"}>
-          <Button>Register</Button>
+          <PlanarianButton alwaysShowChildren icon={<UserAddOutlined />}>
+            Register
+          </PlanarianButton>
         </Link>,
         <Link to={"../reset-password"}>
-          <Button type="dashed">Forgot Password?</Button>
+          <PlanarianButton icon={<QuestionCircleOutlined />}>
+            Forgot Password?
+          </PlanarianButton>
         </Link>,
       ]}
     >

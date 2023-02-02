@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Col, Popconfirm, Row, Table } from "antd";
+import { Card, Col, Row, Table } from "antd";
 
-import { CloudDownloadOutlined, PlusCircleOutlined } from "@ant-design/icons";
+import { CloudDownloadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { downloadCSV } from "../../../Shared/Helpers/FileHelpers";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { LeadVm } from "../../Lead/Models/LeadVm";
 import { LeadService } from "../../Lead/Services/LeadService";
 import { TripService } from "../Services/TripService";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
 
 interface LeadTableProps {
   tripId: string;
@@ -55,16 +58,12 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
       key: "actions",
       render: (text: string, record: LeadVm) => (
         <span>
-          <Popconfirm
+          <DeleteButtonComponent
             title="Are you sure to delete this lead?"
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
-          >
-            <Button type="primary" danger>
-              Delete
-            </Button>
-          </Popconfirm>
+          />
         </span>
       ),
     },
@@ -93,20 +92,18 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
           <Row gutter={10}>
             <Col>
               <Link to={"./addLeads"}>
-                <Button type="primary" icon={<PlusCircleOutlined />}>
-                  Add
-                </Button>
+                <AddButtonComponent />
               </Link>
             </Col>
             <Col>
-              <Button
+              <PlanarianButton
                 icon={<CloudDownloadOutlined />}
                 onClick={() => {
                   downloadCSV(leads, true);
                 }}
               >
                 Download
-              </Button>
+              </PlanarianButton>
             </Col>
           </Row>
         </>,

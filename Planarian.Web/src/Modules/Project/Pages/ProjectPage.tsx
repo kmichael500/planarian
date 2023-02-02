@@ -3,17 +3,18 @@ import { Link, useParams } from "react-router-dom";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
-import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
+import { Card, Col, Divider, Row, Spin, Typography } from "antd";
 import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import {
   MemberGridComponent,
   MemberGridType,
-} from "../../../Shared/Components/MemberGridComponent";
+} from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { TripVm } from "../../Trip/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 
 const { Title, Text } = Typography;
 
@@ -23,11 +24,7 @@ const ProjectPage: React.FC = () => {
     useContext(AppContext);
 
   useEffect(() => {
-    setHeaderButtons([
-      <Link to={"./.."}>
-        <Button>Back</Button>
-      </Link>,
-    ]);
+    setHeaderButtons([<BackButtonComponent to={"./.."} />]);
   }, []);
   let [trips, setTrips] = useState<TripVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
@@ -61,10 +58,9 @@ const ProjectPage: React.FC = () => {
         projectId={projectId}
       ></MemberGridComponent>
       <Divider></Divider>
-
       <Row align="middle">
         <Col>
-          <Title level={3}>Trips</Title>
+          <Typography.Title level={3}>Trips</Typography.Title>
         </Col>
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>
@@ -84,6 +80,7 @@ const ProjectPage: React.FC = () => {
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Link to={`trip/${trip.id}`}>
                 <Card
+                  style={{ height: "100%" }}
                   title={
                     <>
                       {trip.name}{" "}

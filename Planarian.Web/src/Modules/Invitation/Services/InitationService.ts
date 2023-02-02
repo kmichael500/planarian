@@ -1,5 +1,5 @@
 import { HttpClient } from "../../..";
-import { MemberGridType } from "../../../Shared/Components/MemberGridComponent";
+import { MemberGridType } from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { InviteMember as InviteMember } from "../../../Shared/Models/InviteMember";
 
 const baseUrl = "api/invitations";

@@ -1,27 +1,17 @@
 import React, { useContext, useEffect, useState } from "react";
-import {
-  Button,
-  Card,
-  Col,
-  Divider,
-  Form,
-  Input,
-  message,
-  Row,
-  Select,
-} from "antd";
-
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Card, Col, Form, Input, message, Row, Select } from "antd";
 import { LeadClassification } from "../../Lead/Models/LeadClassification";
 import { CreateLeadVm } from "../../Lead/Models/CreateLeadVm";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { TextFileInputComponent } from "../../../Shared/Components/TextFileInputComponent";
+import { useNavigate, useParams } from "react-router-dom";
+import { TextFileInputComponent } from "../../../Shared/Components/TextFileInput/TextFileInputComponent";
 import { TherionService } from "../../Therion/Services/TherionService";
 import { TripService } from "../Services/TripService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import Title from "antd/lib/skeleton/Title";
-import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
+import { SubmitButtonComponent } from "../../../Shared/Components/Buttons/SubmitButtonComponent";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
 const { Option } = Select;
 
@@ -34,11 +24,7 @@ const LeadAddPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
-    setHeaderButtons([
-      <Link relative="path" to={"./.."}>
-        <Button>Back</Button>
-      </Link>,
-    ]);
+    setHeaderButtons([<BackButtonComponent to={"./.."} />]);
     setHeaderTitle(["Add Leads"]);
   }, []);
 
@@ -133,19 +119,17 @@ const LeadAddPage: React.FC = () => {
       <Card
         loading={isLoading}
         title="Add Leads"
-        extra={[
-          <Button onClick={addLead} icon={<PlusOutlined />}>
-            Add
-          </Button>,
-        ]}
+        extra={[<AddButtonComponent onClick={addLead} />]}
         actions={[
           <TextFileInputComponent
             buttonText="Extract from TH2"
             onTextChange={extractFromTh2}
           ></TextFileInputComponent>,
-          <Button onClick={handleSubmit} type="primary" htmlType="submit">
-            Submit
-          </Button>,
+          <SubmitButtonComponent
+            onClick={handleSubmit}
+            type="primary"
+            htmlType="submit"
+          />,
         ]}
       >
         <Form layout="vertical">
@@ -156,10 +140,10 @@ const LeadAddPage: React.FC = () => {
                   title={`Lead ${index + 1}`}
                   style={{ marginBottom: 16 }}
                   extra={[
-                    <Button
-                      onClick={() => deleteLead(index)}
-                      icon={<DeleteOutlined />}
-                    ></Button>,
+                    <DeleteButtonComponent
+                      title={"Delete Lead"}
+                      onConfirm={() => deleteLead(index)}
+                    />,
                   ]}
                   actions={[]}
                 >

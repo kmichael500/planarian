@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Button, Card, Form, Input, message } from "antd";
+import { Card, Form, Input, message } from "antd";
 import { UserVm } from "../../User/Models/UserVm";
 import {
   isNullOrWhiteSpace,
@@ -12,6 +12,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { UserService } from "../../User/UserService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 
 const ResetPasswordPage: React.FC = () => {
   const [passwordForm] = Form.useForm();
@@ -81,16 +83,13 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button
+            <SaveButtonComponent
               loading={isSubmitting}
               type="primary"
               onClick={(e) => passwordForm.submit()}
-            >
-              Reset
-            </Button>,
-
+            />,
             <Link to={"/"}>
-              <Button>Cancel</Button>
+              <CancelButtonComponent />
             </Link>,
           ]}
         >
@@ -157,16 +156,13 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <Button
+            <SaveButtonComponent
               loading={isSubmitting}
               type="primary"
               onClick={(e) => emailForm.submit()}
-            >
-              Reset
-            </Button>,
-
+            />,
             <Link to={"/"}>
-              <Button>Cancel</Button>
+              <CancelButtonComponent />
             </Link>,
           ]}
         >

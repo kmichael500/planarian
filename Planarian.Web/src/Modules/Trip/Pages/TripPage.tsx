@@ -1,20 +1,11 @@
-import {
-  Button,
-  Card,
-  Col,
-  Divider,
-  message,
-  Row,
-  Spin,
-  Typography,
-} from "antd";
+import { Card, Col, Divider, message, Row, Spin, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
 import {
   MemberGridComponent,
   MemberGridType,
-} from "../../../Shared/Components/MemberGridComponent";
+} from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { TripVm } from "../Models/TripVm";
 import { TripService } from "../Services/TripService";
 import { SettingsService } from "../../Setting/Services/SettingsService";
@@ -24,6 +15,11 @@ import { TripTagComponent } from "../Components/TripTagComponent";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
+import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
+import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 
 const { Title, Paragraph } = Typography;
 
@@ -39,11 +35,7 @@ const TripPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
-    setHeaderButtons([
-      <Link relative="path" to={"./../.."}>
-        <Button>Back</Button>
-      </Link>,
-    ]);
+    setHeaderButtons([<BackButtonComponent to={"./../.."} />]);
     setHeaderTitle([
       <>
         <Title
@@ -81,10 +73,6 @@ const TripPage: React.FC = () => {
       message.error(error.message);
     }
   };
-
-  interface UserTableColumn {
-    name: string;
-  }
 
   useEffect(() => {
     if (trip === undefined) {
@@ -162,23 +150,22 @@ const TripPage: React.FC = () => {
             {isEditing && (
               <>
                 <Col>
-                  <Button type="primary" onClick={onSaveClick}>
-                    Save
-                  </Button>
+                  <SaveButtonComponent type="primary" onClick={onSaveClick} />
                 </Col>
                 <Col>
-                  <Button onClick={onCancelClick} type="default">
-                    Cancel
-                  </Button>
+                  <CancelButtonComponent
+                    onClick={onCancelClick}
+                    type="default"
+                  />
                 </Col>
               </>
             )}
 
             {!isEditing && (
               <Col>
-                <Button onClick={onEditClick} type="primary">
+                <EditButtonComponentt onClick={onEditClick} type="primary">
                   Edit
-                </Button>
+                </EditButtonComponentt>
               </Col>
             )}
           </Row>
@@ -208,14 +195,14 @@ const TripPage: React.FC = () => {
 
       <Divider />
 
-      <LeadTableComponent tripId={tripId as string}></LeadTableComponent>
+      <LeadTableComponent tripId={tripId as string} />
 
       <Divider />
       <Card
         title="Photos"
         extra={
           <Link to={"uploadPhotos"}>
-            <Button>+</Button>
+            <AddButtonComponent />
           </Link>
         }
       >

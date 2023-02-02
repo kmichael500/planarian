@@ -1,4 +1,4 @@
-import { Button, Card, Col, Divider, Row, Spin, Typography } from "antd";
+import { Card, Col, Row, Spin, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
@@ -41,6 +41,7 @@ const ProjectsPage: React.FC = () => {
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Link to={project.id}>
                 <Card
+                  style={{ height: "100%" }}
                   loading={isLoading}
                   hoverable
                   title={project.name}

@@ -1,8 +1,6 @@
 import {
-  Button,
   Card,
   Col,
-  Divider,
   Form,
   Image,
   Input,
@@ -15,18 +13,25 @@ import {
   UploadFile,
   UploadProps,
 } from "antd";
-import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  CloudUploadOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
 
 import { RcFile } from "antd/lib/upload";
 import React, { useContext, useEffect, useState } from "react";
-import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { TripService } from "../Services/TripService";
 import { PhotoMetaData } from "../../Photo/Models/PhotoMetaData";
 import { TripPhotoUpload } from "../Models/TripPhotoUpload";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import "./TripPhotoUploadComponent.scss";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
 const { TextArea } = Input;
 
@@ -38,11 +43,7 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
-    setHeaderButtons([
-      <Link relative="path" to={"./.."}>
-        <Button>Back</Button>
-      </Link>,
-    ]);
+    setHeaderButtons([<BackButtonComponent to={"./.."} />]);
     setHeaderTitle(["Upload Photos"]);
   }, []);
 
@@ -247,9 +248,13 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
         <Card
           title="Upload"
           extra={
-            <Button onClick={handleUpload} type="primary">
-              Upload
-            </Button>
+            <PlanarianButton
+              icon={<CloudUploadOutlined />}
+              onClick={handleUpload}
+              type="primary"
+            >
+              Submit
+            </PlanarianButton>
           }
         >
           <Upload
@@ -273,24 +278,26 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
                           <Row gutter={5}>
                             <Col>
                               <Tooltip title="Preview">
-                                <Button
+                                <PlanarianButton
                                   onClick={() => {
                                     handlePreview(file);
                                   }}
                                   ghost
                                   icon={<EyeOutlined />}
-                                ></Button>
+                                ></PlanarianButton>
                               </Tooltip>
                             </Col>
                             <Col>
                               <Tooltip title="Remove">
-                                <Button
-                                  onClick={() => {
+                                <DeleteButtonComponent
+                                  neverShowChildren
+                                  title={"Delete"}
+                                  onConfirm={() => {
                                     onRemoveImageClick(file);
                                   }}
                                   ghost
                                   icon={<DeleteOutlined />}
-                                ></Button>
+                                ></DeleteButtonComponent>
                               </Tooltip>
                             </Col>
                           </Row>

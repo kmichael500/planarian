@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Button, Col, Divider, Form, Row, Typography } from "antd";
-import { Link } from "react-router-dom";
+import { Form, Row, Typography } from "antd";
 import { UserVm } from "../../User/Models/UserVm";
 import { UserService } from "../../User/UserService";
 import UserUpdateComponent from "../../User/Componenets/UserUpdateComponent";

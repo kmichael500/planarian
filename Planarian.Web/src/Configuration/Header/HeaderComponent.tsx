@@ -1,13 +1,23 @@
-import { Row, Col, Typography, Spin } from "antd";
+import { Col, Drawer, Grid, Row, Spin, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
+import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
+import { MenuComponent } from "../Menu/MenuComponent";
+import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
+
+const { useBreakpoint } = Grid;
 
 const HeaderComponent: React.FC = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
   const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
+
+  const screens = useBreakpoint();
+  const isLargeScreenSize = Object.entries(screens).some(
+    ([key, value]) => value && (key === "lg" || key === "xl")
+  );
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);
@@ -26,14 +36,21 @@ const HeaderComponent: React.FC = () => {
       setNavigationTitle("Planarian");
     }
   }, [headerTitle]);
+
+  const [visible, setVisible] = useState(false);
+
   return (
     <>
       <Helmet>
-        <title>{navigationTitle}</title>
+        <title>{navigationTitle} | Planarian</title>
       </Helmet>
+
       <Header
         style={{
-          paddingTop: hasHeaderButons ? "4px" : "16px",
+          paddingTop:
+            hasHeaderButons || (!hasHeaderButons && !isLargeScreenSize)
+              ? "4px"
+              : "16px",
           paddingBottom: "4px",
           paddingLeft: "16px",
           height: "70px",
@@ -53,6 +70,30 @@ const HeaderComponent: React.FC = () => {
           }
         >
           <Row align="middle" gutter={10}>
+            <Col>
+              {!isLargeScreenSize && (
+                <PlanarianButton
+                  className="menu"
+                  type="primary"
+                  icon={<MenuOutlined />}
+                  onClick={() => setVisible(true)}
+                />
+              )}
+
+              <Drawer
+                bodyStyle={{ padding: 0 }}
+                title="Planrian"
+                placement="left"
+                onClose={() => setVisible(false)}
+                open={visible}
+              >
+                <MenuComponent
+                  onMenuItemClick={(key) => {
+                    setVisible(false);
+                  }}
+                />
+              </Drawer>
+            </Col>
             <Col>
               <>
                 {typeof headerTitle[0] == "string" && (

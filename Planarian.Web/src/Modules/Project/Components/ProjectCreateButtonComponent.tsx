@@ -1,6 +1,7 @@
-import { Button, Form, Input, Modal } from "antd";
+import { Form, Input, Modal } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { CreateOrEditProject } from "../Models/CreateOrEditProject";
 import { ProjectService } from "../Services/ProjectService";
@@ -30,9 +31,7 @@ const ProjectCreateButtonComponent: React.FC = () => {
 
   return (
     <>
-      <Button type="primary" onClick={showModal}>
-        New Project
-      </Button>
+      <AddButtonComponent type="primary" onClick={showModal} />
       <Modal
         title="New Project"
         open={open}

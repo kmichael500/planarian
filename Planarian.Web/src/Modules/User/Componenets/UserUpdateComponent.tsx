@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  Button,
-  Card,
-  Col,
-  ColProps,
-  Form,
-  Input,
-  message,
-  Row,
-  Typography,
-} from "antd";
+import { Card, Col, ColProps, Form, Input, message, Row } from "antd";
+import { EditOutlined, KeyOutlined } from "@ant-design/icons";
 import { UserVm } from "../Models/UserVm";
 import {
   formatPhoneNumber,
@@ -20,8 +11,8 @@ import { MaskedInput } from "antd-mask-input";
 import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
 import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-
-const { Title } = Typography;
+import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 
 const UserUpdateComponent: React.FC = () => {
   const [form] = Form.useForm();
@@ -91,31 +82,33 @@ const UserUpdateComponent: React.FC = () => {
         extra={[
           <>
             {!isChangingPassword && (
-              <Button
+              <PlanarianButton
                 onClick={() => {
                   passwordForm.resetFields();
                   setIsChangingPassword(true);
                 }}
+                icon={<KeyOutlined />}
               >
                 Change Password
-              </Button>
+              </PlanarianButton>
             )}
           </>,
           <>
             {isChangingPassword && (
-              <Button
+              <PlanarianButton
                 onClick={() => {
                   setIsChangingPassword(false);
                   passwordForm.resetFields();
                 }}
+                icon={<EditOutlined />}
               >
                 Change Info
-              </Button>
+              </PlanarianButton>
             )}
           </>,
         ]}
         actions={[
-          <Button
+          <SaveButtonComponent
             type="primary"
             loading={isSubmitting}
             onClick={() => {
@@ -125,9 +118,8 @@ const UserUpdateComponent: React.FC = () => {
                 passwordForm.submit();
               }
             }}
-          >
-            Save
-          </Button>,
+            alwaysShowChildren
+          />,
         ]}
       >
         {isChangingPassword && (

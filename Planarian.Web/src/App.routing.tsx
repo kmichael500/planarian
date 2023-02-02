@@ -1,9 +1,4 @@
-import {
-  BrowserRouter as Router,
-  Navigate,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/ProtectedRoutesComponent";
 import { ConfirmEmailPage } from "./Modules/Authentication/Pages/ConfirmEmailPage";
 import { LoginPage } from "./Modules/Authentication/Pages/LoginPage";

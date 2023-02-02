@@ -1,13 +1,15 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Button, Card, Col, ColProps, Form, Input, message, Row } from "antd";
+import { Card, Col, ColProps, Form, Input, message, Row } from "antd";
 import { nameof } from "../../../../Shared/Helpers/StringHelpers";
 import { MaskedInput } from "antd-mask-input";
 import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionConstants";
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../../Configuration/Context/AppContext";
+import { SubmitButtonComponent } from "../../../../Shared/Components/Buttons/SubmitButtonComponent";
+import { LoginButtonComponent } from "../../../../Shared/Components/Buttons/LoginButtonComponent";
 
 const RegisterPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -55,16 +57,12 @@ const RegisterPage: React.FC = () => {
     <Card
       title="Register"
       actions={[
-        <Button
+        <SubmitButtonComponent
           type="primary"
           loading={isSubmitting}
           onClick={() => form.submit()}
-        >
-          Register
-        </Button>,
-        <Link to={"../login"}>
-          <Button>Login</Button>
-        </Link>,
+        />,
+        <LoginButtonComponent />,
       ]}
     >
       <Form

@@ -1,15 +1,18 @@
-import { Button, Col, Form, Input, message, Modal, Row, Select } from "antd";
+import { Col, Form, Input, message, Modal, Row, Select } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
-import { MailOutlined, PlusCircleOutlined } from "@ant-design/icons";
-import { SelectListItem } from "../Models/SelectListItem";
-import { ProjectService } from "../../Modules/Project/Services/ProjectService";
-import { SettingsService } from "../../Modules/Setting/Services/SettingsService";
-import { nameof } from "../Helpers/StringHelpers";
-import { AddMember } from "../Models/AddMember";
-import { InviteMember as InviteMember } from "../Models/InviteMember";
-import { TripService } from "../../Modules/Trip/Services/TripService";
+import { MailOutlined } from "@ant-design/icons";
+import { SelectListItem } from "../../Models/SelectListItem";
+import { ProjectService } from "../../../Modules/Project/Services/ProjectService";
+import { SettingsService } from "../../../Modules/Setting/Services/SettingsService";
+import { nameof } from "../../Helpers/StringHelpers";
+import { AddMember } from "../../Models/AddMember";
+import { InviteMember as InviteMember } from "../../Models/InviteMember";
+import { TripService } from "../../../Modules/Trip/Services/TripService";
+import { PlanarianButton } from "../Buttons/PlanarianButtton";
+import { AddButtonComponent } from "../Buttons/AddButtonComponent";
+import { InviteButtonComponent } from "../Buttons/InviteButtonComponent";
 
 interface MemberGridAddMemberComponentProps {
   type: MemberGridType;
@@ -125,18 +128,14 @@ const MemberGridAddMemberComponent: React.FC<
     <>
       <Row gutter={10}>
         <Col>
-          <Button icon={<MailOutlined />} onClick={inviteMember}>
+          <PlanarianButton icon={<MailOutlined />} onClick={inviteMember}>
             Invite
-          </Button>
+          </PlanarianButton>
         </Col>
         <Col>
-          <Button
-            type="primary"
-            icon={<PlusCircleOutlined />}
-            onClick={addExistingMember}
-          >
+          <AddButtonComponent onClick={addExistingMember}>
             Add
-          </Button>
+          </AddButtonComponent>
         </Col>
       </Row>
 
@@ -178,13 +177,11 @@ const MemberGridAddMemberComponent: React.FC<
                 labelInValue
                 mode="multiple"
                 notFoundContent={
-                  <Button
+                  <InviteButtonComponent
                     onClick={(e) => {
                       inviteMember();
                     }}
-                  >
-                    Invite Member
-                  </Button>
+                  />
                 }
               >
                 {members?.map((member) => {
