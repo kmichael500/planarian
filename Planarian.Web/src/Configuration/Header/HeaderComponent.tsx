@@ -12,6 +12,11 @@ const { useBreakpoint } = Grid;
 const HeaderComponent: React.FC = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
   const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
+
+  const screens = useBreakpoint();
+  const isLargeScreenSize = Object.entries(screens).some(
+    ([key, value]) => value && (key === "lg" || key === "xl")
+  );
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);
@@ -32,11 +37,7 @@ const HeaderComponent: React.FC = () => {
   }, [headerTitle]);
 
   const [visible, setVisible] = useState(false);
-  const screens = useBreakpoint();
 
-  const isLargeScreenSize = Object.entries(screens).some(
-    ([key, value]) => value && (key === "lg" || key === "xl")
-  );
   return (
     <>
       <Helmet>
@@ -45,7 +46,10 @@ const HeaderComponent: React.FC = () => {
 
       <Header
         style={{
-          paddingTop: hasHeaderButons ? "4px" : "16px",
+          paddingTop:
+            hasHeaderButons || (!hasHeaderButons && !isLargeScreenSize)
+              ? "4px"
+              : "16px",
           paddingBottom: "4px",
           paddingLeft: "16px",
           height: "70px",
