@@ -1,21 +1,11 @@
-import {
-  Button,
-  Card,
-  Col,
-  Divider,
-  message,
-  Row,
-  Spin,
-  Typography,
-} from "antd";
-import { EditOutlined, UndoOutlined, SaveOutlined } from "@ant-design/icons";
+import { Card, Col, Divider, message, Row, Spin, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
 import {
   MemberGridComponent,
   MemberGridType,
-} from "../../../Shared/Components/MemberGridComponent";
+} from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { TripVm } from "../Models/TripVm";
 import { TripService } from "../Services/TripService";
 import { SettingsService } from "../../Setting/Services/SettingsService";
@@ -26,7 +16,6 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
@@ -84,10 +73,6 @@ const TripPage: React.FC = () => {
       message.error(error.message);
     }
   };
-
-  interface UserTableColumn {
-    name: string;
-  }
 
   useEffect(() => {
     if (trip === undefined) {

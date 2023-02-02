@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button, message, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { PlanarianButton } from "./Buttons/PlanarianButtton";
+import { PlanarianButton } from "../Buttons/PlanarianButtton";
 
 interface Props {
   onTextChange: (text: string) => void;

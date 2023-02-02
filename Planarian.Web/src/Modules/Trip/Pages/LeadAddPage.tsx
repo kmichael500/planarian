@@ -15,7 +15,7 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { LeadClassification } from "../../Lead/Models/LeadClassification";
 import { CreateLeadVm } from "../../Lead/Models/CreateLeadVm";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { TextFileInputComponent } from "../../../Shared/Components/TextFileInputComponent";
+import { TextFileInputComponent } from "../../../Shared/Components/TextFileInput/TextFileInputComponent";
 import { TherionService } from "../../Therion/Services/TherionService";
 import { TripService } from "../Services/TripService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";

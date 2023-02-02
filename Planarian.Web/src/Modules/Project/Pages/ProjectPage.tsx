@@ -8,7 +8,7 @@ import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import {
   MemberGridComponent,
   MemberGridType,
-} from "../../../Shared/Components/MemberGridComponent";
+} from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { TripVm } from "../../Trip/Models/TripVm";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { TagComponent } from "../../Tag/Components/TagComponent";
@@ -58,10 +58,9 @@ const ProjectPage: React.FC = () => {
         projectId={projectId}
       ></MemberGridComponent>
       <Divider></Divider>
-
       <Row align="middle">
         <Col>
-          <Title level={3}>Trips</Title>
+          <Typography.Title level={3}>Trips</Typography.Title>
         </Col>
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>

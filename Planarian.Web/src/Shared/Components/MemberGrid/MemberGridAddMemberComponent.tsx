@@ -3,16 +3,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
 import { MailOutlined, PlusCircleOutlined } from "@ant-design/icons";
-import { SelectListItem } from "../Models/SelectListItem";
-import { ProjectService } from "../../Modules/Project/Services/ProjectService";
-import { SettingsService } from "../../Modules/Setting/Services/SettingsService";
-import { nameof } from "../Helpers/StringHelpers";
-import { AddMember } from "../Models/AddMember";
-import { InviteMember as InviteMember } from "../Models/InviteMember";
-import { TripService } from "../../Modules/Trip/Services/TripService";
-import { PlanarianButton } from "./Buttons/PlanarianButtton";
-import { AddButtonComponent } from "./Buttons/AddButtonComponent";
-import { InviteButtonComponent } from "./Buttons/InviteButtonComponent";
+import { SelectListItem } from "../../Models/SelectListItem";
+import { ProjectService } from "../../../Modules/Project/Services/ProjectService";
+import { SettingsService } from "../../../Modules/Setting/Services/SettingsService";
+import { nameof } from "../../Helpers/StringHelpers";
+import { AddMember } from "../../Models/AddMember";
+import { InviteMember as InviteMember } from "../../Models/InviteMember";
+import { TripService } from "../../../Modules/Trip/Services/TripService";
+import { PlanarianButton } from "../Buttons/PlanarianButtton";
+import { AddButtonComponent } from "../Buttons/AddButtonComponent";
+import { InviteButtonComponent } from "../Buttons/InviteButtonComponent";
 
 interface MemberGridAddMemberComponentProps {
   type: MemberGridType;
