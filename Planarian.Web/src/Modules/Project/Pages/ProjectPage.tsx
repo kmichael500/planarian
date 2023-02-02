@@ -15,6 +15,7 @@ import { TagComponent } from "../../Tag/Components/TagComponent";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 
 const { Title, Text } = Typography;
 
@@ -70,71 +71,64 @@ const ProjectPage: React.FC = () => {
       </Row>
 
       <Spin spinning={isTripsLoading}>
-        <Row
-          gutter={[
-            { xs: 8, sm: 8, md: 24, lg: 32 },
-            { xs: 8, sm: 8, md: 24, lg: 32 },
-          ]}
-        >
-          {trips?.map((trip, index) => (
-            <Col key={index} xs={24} sm={12} md={8} lg={6}>
-              <Link to={`trip/${trip.id}`}>
-                <Card
-                  style={{ height: "100%" }}
-                  title={
-                    <>
-                      {trip.name}{" "}
-                      <Row>
-                        <UserAvatarGroupComponent
-                          size={"small"}
-                          maxCount={4}
-                          userIds={trip.tripMemberIds}
-                        />
-                      </Row>
-                    </>
-                  }
-                  loading={isTripsLoading}
-                  bordered={false}
-                  hoverable
-                >
+        <CardGridComponent
+          items={trips?.map((trip, index) => (
+            <Link to={`trip/${trip.id}`}>
+              <Card
+                style={{ height: "100%" }}
+                title={
                   <>
+                    {trip.name}{" "}
                     <Row>
-                      {trip.tripTagTypeIds.map((tagId, index) => (
-                        <Col>
-                          <TagComponent key={index} tagId={tagId} />
-                        </Col>
-                      ))}
-                    </Row>
-                    <Divider />
-
-                    <Row>
-                      <Col>
-                        <Text>Description: {trip.description}</Text>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col>
-                        <Text>
-                          Trip Report:{" "}
-                          {trip.isTripReportCompleted ? (
-                            <CheckCircleOutlined />
-                          ) : (
-                            <CloseCircleOutlined />
-                          )}
-                        </Text>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col>
-                        <Text>Photos: {trip.numberOfPhotos}</Text>
-                      </Col>
+                      <UserAvatarGroupComponent
+                        size={"small"}
+                        maxCount={4}
+                        userIds={trip.tripMemberIds}
+                      />
                     </Row>
                   </>
-                </Card>
-              </Link>
-            </Col>
+                }
+                loading={isTripsLoading}
+                bordered={false}
+                hoverable
+              >
+                <>
+                  <Row>
+                    {trip.tripTagTypeIds.map((tagId, index) => (
+                      <Col>
+                        <TagComponent key={index} tagId={tagId} />
+                      </Col>
+                    ))}
+                  </Row>
+                  <Divider />
+
+                  <Row>
+                    <Col>
+                      <Text>Description: {trip.description}</Text>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col>
+                      <Text>
+                        Trip Report:{" "}
+                        {trip.isTripReportCompleted ? (
+                          <CheckCircleOutlined />
+                        ) : (
+                          <CloseCircleOutlined />
+                        )}
+                      </Text>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col>
+                      <Text>Photos: {trip.numberOfPhotos}</Text>
+                    </Col>
+                  </Row>
+                </>
+              </Card>
+            </Link>
           ))}
-        </Row>
+        />
       </Spin>
     </>
   );

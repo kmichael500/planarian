@@ -2,6 +2,7 @@ import { Card, Col, Row, Spin, Typography } from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { ProjectCreateButtonComponent } from "../Components/ProjectCreateButtonComponent";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
@@ -31,31 +32,24 @@ const ProjectsPage: React.FC = () => {
   return (
     <div className="site-card-wrapper">
       <Spin spinning={isLoading} size="large">
-        <Row
-          gutter={[
-            { xs: 8, sm: 8, md: 24, lg: 32 },
-            { xs: 8, sm: 8, md: 24, lg: 32 },
-          ]}
-        >
-          {projects?.map((project, index) => (
-            <Col key={index} xs={24} sm={12} md={8} lg={6}>
-              <Link to={project.id}>
-                <Card
-                  style={{ height: "100%" }}
-                  loading={isLoading}
-                  hoverable
-                  title={project.name}
-                  bordered={false}
-                >
-                  <Paragraph>
-                    Project Members: {project.numberOfProjectMembers}
-                  </Paragraph>
-                  <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
-                </Card>
-              </Link>
-            </Col>
+        <CardGridComponent
+          items={projects?.map((project, index) => (
+            <Link to={project.id}>
+              <Card
+                style={{ height: "100%" }}
+                loading={isLoading}
+                hoverable
+                title={project.name}
+                bordered={false}
+              >
+                <Paragraph>
+                  Project Members: {project.numberOfProjectMembers}
+                </Paragraph>
+                <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
+              </Card>
+            </Link>
           ))}
-        </Row>
+        />
       </Spin>
     </div>
   );
