@@ -52,6 +52,7 @@ const HeaderComponent: React.FC = () => {
               ? "4px"
               : "16px",
           paddingBottom: "4px",
+          paddingRight: "16px",
           paddingLeft: "16px",
           height: "70px",
           background: "white",
