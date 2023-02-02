@@ -6,6 +6,8 @@ import { ProjectService } from "../../Modules/Project/Services/ProjectService";
 import { nameof } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
 import { MemberGridAddMemberComponent } from "./MemberGridAddMemberComponent";
+import { PlanarianButton } from "./Buttons/PlanarianButtton";
+import { DeleteButtonComponent } from "./Buttons/DeleteButtonComponent";
 
 export interface MemberGridComponentProps {
   type: MemberGridType;
@@ -84,16 +86,12 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
       key: nameof<UserTableColumn>("action"),
       render: (text: string, record: any) => (
         <Space size="middle">
-          <Popconfirm
+          <DeleteButtonComponent
             title={`Are you sure to delete this ${props.type.toLowerCase()} member?`}
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
-          >
-            <Button type="primary" danger>
-              Delete
-            </Button>
-          </Popconfirm>
+          />
         </Space>
       ),
     },

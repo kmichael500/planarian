@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button, message, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import { PlanarianButton } from "./Buttons/PlanarianButtton";
 
 interface Props {
   onTextChange: (text: string) => void;
@@ -54,7 +55,7 @@ const TextFileInputComponent: React.FC<Props> = ({
 
   return (
     <Upload {...props}>
-      <Button icon={<UploadOutlined />}>{buttonText}</Button>
+      <PlanarianButton icon={<UploadOutlined />}>{buttonText}</PlanarianButton>
     </Upload>
   );
 };

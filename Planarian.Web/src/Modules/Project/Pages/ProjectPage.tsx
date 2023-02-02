@@ -14,6 +14,7 @@ import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroup
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 
 const { Title, Text } = Typography;
 
@@ -23,11 +24,7 @@ const ProjectPage: React.FC = () => {
     useContext(AppContext);
 
   useEffect(() => {
-    setHeaderButtons([
-      <Link to={"./.."}>
-        <Button>Back</Button>
-      </Link>,
-    ]);
+    setHeaderButtons([<BackButtonComponent to={"./.."} />]);
   }, []);
   let [trips, setTrips] = useState<TripVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
@@ -84,6 +81,7 @@ const ProjectPage: React.FC = () => {
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Link to={`trip/${trip.id}`}>
                 <Card
+                  style={{ height: "100%" }}
                   title={
                     <>
                       {trip.name}{" "}

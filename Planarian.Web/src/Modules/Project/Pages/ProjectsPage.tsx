@@ -41,6 +41,7 @@ const ProjectsPage: React.FC = () => {
             <Col key={index} xs={24} sm={12} md={8} lg={6}>
               <Link to={project.id}>
                 <Card
+                  style={{ height: "100%" }}
                   loading={isLoading}
                   hoverable
                   title={project.name}

@@ -9,6 +9,7 @@ import { ProjectService } from "../../Project/Services/ProjectService";
 import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
 
 interface TripCreateButtonProps {
   projectId: string;
@@ -82,9 +83,7 @@ const TripCreateButtonComponent: React.FC<TripCreateButtonProps> = (
 
   return (
     <>
-      <Button type="primary" onClick={showModal}>
-        New Trip
-      </Button>
+      <AddButtonComponent type="primary" onClick={showModal} />
       <Modal
         title="New Trip"
         open={open}

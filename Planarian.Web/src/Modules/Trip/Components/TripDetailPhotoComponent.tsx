@@ -15,6 +15,8 @@ import { TripService } from "../Services/TripService";
 import { PhotoVm } from "../../Photo/Models/PhotoVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { PhotoService } from "../../Photo/Services/PhotoService";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
 const { Title, Paragraph } = Typography;
 
@@ -84,25 +86,24 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
                     <Row gutter={5}>
                       <Col>
                         <Tooltip title="Preview">
-                          <Button
+                          <PlanarianButton
                             onClick={() => {
                               handlePreview(photo);
                             }}
                             ghost
                             icon={<EyeOutlined />}
-                          ></Button>
+                          />
                         </Tooltip>
                       </Col>
                       <Col>
-                        <Tooltip title="Remove">
-                          <Popconfirm
+                        <Tooltip title="Delete">
+                          <DeleteButtonComponent
                             title="Are you sure to delete this photo?"
                             onConfirm={() => onRemoveImageClick(photo)}
                             okText="Yes"
                             cancelText="No"
-                          >
-                            <Button icon={<DeleteOutlined />}></Button>
-                          </Popconfirm>
+                            neverShowChildren={true}
+                          />
                         </Tooltip>
                       </Col>
                     </Row>

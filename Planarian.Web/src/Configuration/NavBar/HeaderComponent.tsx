@@ -1,9 +1,13 @@
-import { Row, Col, Typography, Spin } from "antd";
+import { Row, Col, Typography, Spin, Grid, Button, Drawer } from "antd";
 import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
+import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
+import { MenuComponent } from "../Menu/MenuComponent";
+import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
+const { useBreakpoint } = Grid;
 
 const HeaderComponent: React.FC = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
@@ -26,11 +30,19 @@ const HeaderComponent: React.FC = () => {
       setNavigationTitle("Planarian");
     }
   }, [headerTitle]);
+
+  const [visible, setVisible] = useState(false);
+  const screens = useBreakpoint();
+
+  const isLargeScreenSize = Object.entries(screens).some(
+    ([key, value]) => value && (key === "lg" || key === "xl")
+  );
   return (
     <>
       <Helmet>
         <title>{navigationTitle}</title>
       </Helmet>
+
       <Header
         style={{
           paddingTop: "4px",
@@ -53,6 +65,30 @@ const HeaderComponent: React.FC = () => {
           }
         >
           <Row align="middle" gutter={10}>
+            <Col>
+              {!isLargeScreenSize && (
+                <PlanarianButton
+                  className="menu"
+                  type="primary"
+                  icon={<MenuOutlined />}
+                  onClick={() => setVisible(true)}
+                />
+              )}
+
+              <Drawer
+                bodyStyle={{ padding: 0 }}
+                title="Planrian"
+                placement="left"
+                onClose={() => setVisible(false)}
+                open={visible}
+              >
+                <MenuComponent
+                  onMenuItemClick={(key) => {
+                    setVisible(false);
+                  }}
+                />
+              </Drawer>
+            </Col>
             <Col>
               <>
                 {typeof headerTitle[0] == "string" && (
