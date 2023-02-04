@@ -41,28 +41,34 @@ public class BlobService
 
     #endregion
 
-    public Uri? GetSasUrl(string blobKey, int expiresInHours = 1)
+    public Uri? GetSasUrl(string blobKey, int expiresInHours = 48)
     {
         var exists = _cache.TryGetValue(blobKey, out Uri uri);
         if (exists) return uri;
-        var expiresOn = DateTimeOffset.UtcNow.AddHours(expiresInHours);
-
+        
         var blobClient = _containerClient.GetBlobClient(blobKey);
-        var maxCacheAgeInDays = 2;
 
-        var blobSasBuilder = new BlobSasBuilder(BlobSasPermissions.Read, expiresOn)
+        var now = DateTimeOffset.UtcNow;
+        
+        var sasExpiresOn = now.AddHours(expiresInHours);
+        var cacheExpiresOn = now.AddHours(expiresInHours).AddMinutes(-10);
+        var maxAge = (cacheExpiresOn - now).TotalSeconds;
+
+        var blobSasBuilder = new BlobSasBuilder(BlobSasPermissions.Read, sasExpiresOn)
         {
             ContentType = "image/jpg",
-            CacheControl = "public, max-age=31536000",
+            CacheControl = $"public, max-age={maxAge}",
             ContentLanguage = "en-US"
         };
+
         var sasUrl = blobClient.GenerateSasUri(blobSasBuilder);
         _cache.Set(blobKey, sasUrl, new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(31536000)
+            AbsoluteExpiration = cacheExpiresOn
         });
         return sasUrl;
     }
+
 
 
     public async Task DeleteBlob(string? blobKey)
