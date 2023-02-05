@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, Col, Row, Table } from "antd";
+import { Card, Col, message, Row, Table } from "antd";
 
 import { CloudDownloadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
@@ -11,6 +11,7 @@ import { TripService } from "../Services/TripService";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 interface LeadTableProps {
   tripId: string;
@@ -27,8 +28,9 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
       try {
         const response = await TripService.GetLeads(props.tripId as string);
         setLeads(response);
-      } catch (error) {
-        console.error(error);
+      } catch (e) {
+        const error = e as ApiErrorResponse;
+        message.error(error.message);
       } finally {
         setLoading(false);
       }
@@ -41,21 +43,17 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
     {
       title: "Description",
       dataIndex: nameof<LeadVm>("description"),
-      key: nameof<LeadVm>("description"),
     },
     {
       title: "Classification",
       dataIndex: nameof<LeadVm>("classification"),
-      key: "classification",
     },
     {
       title: "Closest Station",
       dataIndex: nameof<LeadVm>("closestStation"),
-      key: nameof<LeadVm>("closestStation"),
     },
     {
       title: "Actions",
-      key: "actions",
       render: (text: string, record: LeadVm) => (
         <span>
           <DeleteButtonComponent
@@ -88,32 +86,29 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
       title="Leads"
       loading={loading}
       extra={[
-        <>
-          <Row gutter={10}>
-            <Col>
-              <Link to={"./addLeads"}>
-                <AddButtonComponent />
-              </Link>
-            </Col>
-            <Col>
-              <PlanarianButton
-                icon={<CloudDownloadOutlined />}
-                onClick={() => {
-                  downloadCSV(leads, true);
-                }}
-              >
-                Download
-              </PlanarianButton>
-            </Col>
-          </Row>
-        </>,
+        <Row gutter={10} key={1}>
+          <Col>
+            <Link to={"./addLeads"}>
+              <AddButtonComponent />
+            </Link>
+          </Col>
+          <Col>
+            <PlanarianButton
+              icon={<CloudDownloadOutlined />}
+              onClick={() => {
+                downloadCSV(leads, true);
+              }}
+            >
+              Download
+            </PlanarianButton>
+          </Col>
+        </Row>,
       ]}
     >
-      {" "}
       <Table
         dataSource={leads}
         columns={columns}
-        rowKey={nameof<LeadVm>("id")}
+        rowKey={(record) => record.id}
       />
     </Card>
   );

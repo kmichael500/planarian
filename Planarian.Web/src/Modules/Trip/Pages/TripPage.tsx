@@ -174,8 +174,8 @@ const TripPage: React.FC = () => {
         <Spin spinning={isLoading}>
           {!isEditing && (
             <>
-              {tripReport.split(/\r?\n/).map((paragraph) => {
-                return <Paragraph>{paragraph}</Paragraph>;
+              {tripReport.split(/\r?\n/).map((paragraph, index) => {
+                return <Paragraph key={index}>{paragraph}</Paragraph>;
               })}
             </>
           )}

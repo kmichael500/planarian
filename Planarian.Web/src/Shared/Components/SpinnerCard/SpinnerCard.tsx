@@ -20,16 +20,12 @@ const SpinnerCardComponent: React.FC<SpinnerCardProps> = ({
       {spinning && (
         <CardGridComponent
           items={[...Array(numberOfCards).keys()].map((_, index) => {
-            return (
-              <>
-                <Card
-                  key={index}
-                  loading={spinning}
-                  className={className}
-                  {...props}
-                />
-              </>
-            );
+            return {
+              item: (
+                <Card loading={spinning} className={className} {...props} />
+              ),
+              key: index,
+            };
           })}
         />
       )}
