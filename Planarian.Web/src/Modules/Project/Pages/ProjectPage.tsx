@@ -16,6 +16,7 @@ import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButto
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
+import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 
 const { Title, Text } = Typography;
 
@@ -70,7 +71,7 @@ const ProjectPage: React.FC = () => {
         </Col>
       </Row>
 
-      <Spin spinning={isTripsLoading}>
+      <SpinnerCardComponent spinning={isTripsLoading}>
         <CardGridComponent
           items={trips?.map((trip, index) => (
             <Link to={`trip/${trip.id}`}>
@@ -129,7 +130,7 @@ const ProjectPage: React.FC = () => {
             </Link>
           ))}
         />
-      </Spin>
+      </SpinnerCardComponent>
     </>
   );
 };
