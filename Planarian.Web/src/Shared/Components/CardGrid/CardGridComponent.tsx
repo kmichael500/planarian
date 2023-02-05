@@ -1,9 +1,14 @@
-import { Row, Col, Card } from "antd";
-import Paragraph from "antd/lib/skeleton/Paragraph";
-import { Link } from "react-router-dom";
+import { Row, Col } from "antd";
+import { Key } from "react";
 interface CardGridComponentProps {
-  items: any[] | undefined;
+  items: ReactNodeWithKey[] | undefined;
 }
+
+interface ReactNodeWithKey {
+  item: React.ReactNode;
+  key: Key | null | undefined;
+}
+
 const CardGridComponent: React.FC<CardGridComponentProps> = ({ items }) => {
   return (
     <Row
@@ -12,13 +17,11 @@ const CardGridComponent: React.FC<CardGridComponentProps> = ({ items }) => {
         { xs: 8, sm: 8, md: 24, lg: 32 },
       ]}
     >
-      {items?.map((item) => {
+      {items?.map((node) => {
         return (
-          <>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              {item}
-            </Col>
-          </>
+          <Col key={node.key} xs={24} sm={12} md={8} lg={6}>
+            {node.item}
+          </Col>
         );
       })}
     </Row>

@@ -3,6 +3,7 @@ import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
+import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { ProjectCreateButtonComponent } from "../Components/ProjectCreateButtonComponent";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
@@ -31,26 +32,29 @@ const ProjectsPage: React.FC = () => {
 
   return (
     <div className="site-card-wrapper">
-      <Spin spinning={isLoading} size="large">
+      <SpinnerCardComponent numberOfCards={16} spinning={isLoading}>
         <CardGridComponent
-          items={projects?.map((project, index) => (
-            <Link to={project.id}>
-              <Card
-                style={{ height: "100%" }}
-                loading={isLoading}
-                hoverable
-                title={project.name}
-                bordered={false}
-              >
-                <Paragraph>
-                  Project Members: {project.numberOfProjectMembers}
-                </Paragraph>
-                <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
-              </Card>
-            </Link>
-          ))}
+          items={projects?.map((project) => ({
+            item: (
+              <Link to={project.id}>
+                <Card
+                  style={{ height: "100%" }}
+                  loading={isLoading}
+                  hoverable
+                  title={project.name}
+                  bordered={false}
+                >
+                  <Paragraph>
+                    Project Members: {project.numberOfProjectMembers}
+                  </Paragraph>
+                  <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
+                </Card>
+              </Link>
+            ),
+            key: project.id,
+          }))}
         />
-      </Spin>
+      </SpinnerCardComponent>
     </div>
   );
 };

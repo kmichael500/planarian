@@ -77,12 +77,10 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
     {
       title: "Name",
       dataIndex: nameof<UserTableColumn>("name"),
-      key: nameof<UserTableColumn>("name"),
       render: (text) => <a>{text}</a>,
     },
     {
       title: "Action",
-      key: nameof<UserTableColumn>("action"),
       render: (text: string, record: any) => (
         <Space size="middle">
           <DeleteButtonComponent
