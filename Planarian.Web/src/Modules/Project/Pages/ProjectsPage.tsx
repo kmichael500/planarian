@@ -34,6 +34,8 @@ const ProjectsPage: React.FC = () => {
     <div className="site-card-wrapper">
       <SpinnerCardComponent numberOfCards={16} spinning={isLoading}>
         <CardGridComponent
+          noDataDescription="No projects found"
+          noDataCreateButton={<ProjectCreateButtonComponent />}
           items={projects?.map((project) => ({
             item: (
               <Link to={project.id}>

@@ -73,6 +73,10 @@ const ProjectPage: React.FC = () => {
 
       <SpinnerCardComponent spinning={isTripsLoading}>
         <CardGridComponent
+          noDataDescription={"No trips found"}
+          noDataCreateButton={
+            <TripCreateButtonComponent projectId={projectId} />
+          }
           items={trips?.map((trip) => ({
             item: (
               <Link to={`trip/${trip.id}`}>

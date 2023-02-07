@@ -1,4 +1,13 @@
-import { Card, Col, Divider, message, Row, Spin, Typography } from "antd";
+import {
+  Card,
+  Col,
+  Divider,
+  Empty,
+  message,
+  Row,
+  Spin,
+  Typography,
+} from "antd";
 import { useContext, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TextArea from "antd/lib/input/TextArea";
@@ -20,11 +29,12 @@ import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButton
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const { Title, Paragraph } = Typography;
 
 const TripPage: React.FC = () => {
-  let [isLoading, setIsLoading] = useState(false);
+  let [isLoading, setIsLoading] = useState(true);
   let [isEditing, setIsEditing] = useState(false);
   let [trip, setTrip] = useState<TripVm>();
 
@@ -171,26 +181,29 @@ const TripPage: React.FC = () => {
           </Row>
         }
       >
-        <Spin spinning={isLoading}>
-          {!isEditing && (
-            <>
-              {tripReport.split(/\r?\n/).map((paragraph, index) => {
-                return <Paragraph key={index}>{paragraph}</Paragraph>;
-              })}
-            </>
-          )}
-          {isEditing && (
-            <TextArea
-              onChange={(e) => {
-                setTripReport(e.target.value);
-              }}
-              value={tripReport}
-              defaultValue={tripReport}
-              disabled={!isEditing}
-              rows={20}
-            ></TextArea>
-          )}
-        </Spin>
+        {!isEditing && isNullOrWhiteSpace(tripReport) && (
+          <>
+            <Empty description={<span>No trip report available</span>}></Empty>
+          </>
+        )}
+        {!isEditing && !isNullOrWhiteSpace(tripReport) && (
+          <>
+            {tripReport.split(/\r?\n/).map((paragraph, index) => {
+              return <Paragraph key={index}>{paragraph}</Paragraph>;
+            })}
+          </>
+        )}
+        {isEditing && (
+          <TextArea
+            onChange={(e) => {
+              setTripReport(e.target.value);
+            }}
+            value={tripReport}
+            defaultValue={tripReport}
+            disabled={!isEditing}
+            rows={20}
+          ></TextArea>
+        )}
       </Card>
 
       <Divider />
