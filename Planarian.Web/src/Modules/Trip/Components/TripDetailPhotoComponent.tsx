@@ -1,4 +1,4 @@
-import { Col, Image, Modal, Row, Tooltip, Typography } from "antd";
+import { Card, Col, Empty, Image, Modal, Row, Tooltip, Typography } from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 
 import { useEffect, useState } from "react";
@@ -62,6 +62,14 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
 
   return (
     <>
+      {photos === undefined ||
+        (photos.length === 0 && (
+          <Card>
+            <Empty
+              description={<span>No photos have been added yet</span>}
+            ></Empty>
+          </Card>
+        ))}
       {photos?.map((photo) => {
         return (
           <>
