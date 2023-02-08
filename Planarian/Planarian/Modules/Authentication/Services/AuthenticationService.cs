@@ -31,9 +31,13 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
         if (user.EmailConfirmedOn == null)
         {
-            user.EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode);
             await Repository.SaveChangesAsync();
-            await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
+            if (user.EmailConfirmationCode != null)
+                await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
+            else
+            {
+                throw ApiExceptionDictionary.InternalServerError("Email confirmation code is does not exist.");
+            }
             throw ApiExceptionDictionary.EmailNotConfirmed;
         }
 
