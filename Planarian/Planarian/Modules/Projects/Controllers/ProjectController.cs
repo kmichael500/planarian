@@ -7,6 +7,7 @@ using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Projects.Services;
+using Planarian.Modules.Query.Models;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
 

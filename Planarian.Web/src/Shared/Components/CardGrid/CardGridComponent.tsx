@@ -1,9 +1,11 @@
 import { Row, Col, Button, Empty, Card } from "antd";
+import Pagination, { PaginationConfig } from "antd/lib/pagination";
 import { Key } from "react";
 interface CardGridComponentProps {
   items: ReactNodeWithKey[] | undefined;
   noDataDescription?: string;
   noDataCreateButton?: React.ReactNode;
+  pagination?: PaginationConfig | false;
 }
 
 interface ReactNodeWithKey {
@@ -15,6 +17,7 @@ const CardGridComponent: React.FC<CardGridComponentProps> = ({
   items,
   noDataDescription,
   noDataCreateButton,
+  pagination,
 }) => {
   return (
     <>
@@ -28,8 +31,8 @@ const CardGridComponent: React.FC<CardGridComponentProps> = ({
         ))}
       <Row
         gutter={[
-          { xs: 8, sm: 8, md: 24, lg: 32 },
-          { xs: 8, sm: 8, md: 24, lg: 32 },
+          { xs: 8, sm: 8, md: 12, lg: 12 },
+          { xs: 8, sm: 8, md: 12, lg: 12 },
         ]}
       >
         {items?.map((node) => {
@@ -39,6 +42,13 @@ const CardGridComponent: React.FC<CardGridComponentProps> = ({
             </Col>
           );
         })}
+      </Row>
+      <Row style={{ marginTop: "10px" }}>
+        <Col flex="auto"></Col>
+
+        <Col>
+          <Pagination {...pagination} />
+        </Col>
       </Row>
     </>
   );

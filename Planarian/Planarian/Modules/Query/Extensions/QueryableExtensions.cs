@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Modules.Leads.Controllers;
+using Planarian.Modules.Query.Constants;
 
 namespace Planarian.Modules.Query.Extensions;
 
@@ -84,20 +85,13 @@ public static class QueryableExtensions
     public static async Task<PagedResult<T>> ApplyPagingAsync<T>(this IQueryable<T> query, int pageNumber, int pageSize,
         Expression<Func<T, object?>> orderingExpression)
     {
-        if (query == null)
-        {
-            throw new ArgumentNullException(nameof(query));
-        }
+        if (query == null) throw new ArgumentNullException(nameof(query));
 
-        if (pageNumber < 1)
-        {
-            pageNumber = 1;
-        }
+        if (pageNumber < 1) pageNumber = 1;
 
-        if (pageSize < 1)
-        {
-            pageSize = 10;
-        }
+        if (pageSize < 1) pageSize = QueryConstants.DefaultPageSize;
+
+        if (pageSize > QueryConstants.MaxPageSize) pageSize = QueryConstants.MaxPageSize;
 
 
         query = query.OrderBy(orderingExpression);
@@ -106,15 +100,9 @@ public static class QueryableExtensions
         var totalCount = await query.CountAsync();
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-        if (pageNumber > totalPages)
-        {
-            pageNumber = totalPages;
-        }
-        
-        if (pageNumber < 1)
-        {
-            pageNumber = 1;
-        }
+        if (pageNumber > totalPages) pageNumber = totalPages;
+
+        if (pageNumber < 1) pageNumber = 1;
 
         var results = await query
             .Skip((pageNumber - 1) * pageSize)
@@ -123,22 +111,4 @@ public static class QueryableExtensions
 
         return new PagedResult<T>(pageNumber, pageSize, totalCount, results);
     }
-}
-
-public class PagedResult<T>
-{
-    public PagedResult(int pageNumber, int pageSize, int totalCount, IList<T> results)
-    {
-        PageNumber = pageNumber;
-        PageSize = pageSize;
-        TotalCount = totalCount;
-        TotalPages = (int)Math.Ceiling((double)totalCount / pageSize);
-        Results = results;
-    }
-
-    public int PageNumber { get; set; }
-    public int PageSize { get; set; }
-    public int TotalCount { get; set; }
-    public int TotalPages { get; set; }
-    public IList<T> Results { get; set; }
 }
