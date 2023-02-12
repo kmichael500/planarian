@@ -17,6 +17,10 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
+import {
+  QueryBuilder,
+  QueryOperator,
+} from "../../Search/Services/QueryBuilder2";
 
 const { Title, Text } = Typography;
 
@@ -30,6 +34,13 @@ const ProjectPage: React.FC = () => {
   }, []);
   let [trips, setTrips] = useState<TripVm[]>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
+
+  const query = new QueryBuilder<TripVm>()
+    // .filterBy("tripReport", QueryOperator.Contains, "Christian")
+    .filterBy("name", QueryOperator.FreeText, "riv")
+    .buildAsQueryString();
+
+  console.log(query);
 
   const { projectId } = useParams();
   if (projectId === undefined) {

@@ -51,10 +51,10 @@ const ProjectService = {
   },
 
   async GetTrips(projectId: string): Promise<TripVm[]> {
-    const response = await HttpClient.get<TripVm[]>(
+    const response = (await HttpClient.get<TripVm[]>(
       `${baseUrl}/${projectId}/trips`
-    );
-    return response.data;
+    )) as any;
+    return response.data.data;
   },
 
   //#endregion

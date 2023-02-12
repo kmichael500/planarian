@@ -1,9 +1,12 @@
+using Gridify;
+using Gridify.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
+using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Photos.Models;
 using Planarian.Modules.Trips.Models;
 using Planarian.Shared.Base;
@@ -89,12 +92,25 @@ public class TripRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string tripId)
+    public async Task<IEnumerable<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
+        IEnumerable<QueryCondition> query1)
     {
-        return await DbContext.Trips.Where(e => e.ProjectId == tripId)
-            .Select(e => new TripVm(e, e.TripTags.Select(ee => ee.TagTypeId), e.Members.Select(ee => ee.UserId),
-                e.Photos.Count))
+        var query = await DbContext.Trips.Where(e => e.ProjectId == projectId)
+            .QueryFilter(query1)
+            .Select(e => new 
+            {
+                Id = e.Id,
+                ProjectId = e.ProjectId,
+                TripTagTypeIds = e.TripTags.Select(e => e.TagTypeId),
+                TripMemberIds = e.Members.Select(ee => ee.UserId),
+                Name = e.Name,
+                Description = e.Description,
+                TripReport = e.TripReport,
+                NumberOfPhotos = e.Photos.Count,
+            })
             .ToListAsync();
+        
+        return new List<TripVm>();
     }
 
     #region Trip

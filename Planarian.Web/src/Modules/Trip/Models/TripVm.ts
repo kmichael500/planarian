@@ -7,5 +7,5 @@ export interface TripVm {
   description: string;
   tripReport: string | null;
   isTripReportCompleted: boolean;
-  numberOfPhotos: boolean;
+  numberOfPhotos: number;
 }

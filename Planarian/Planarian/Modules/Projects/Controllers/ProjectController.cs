@@ -1,3 +1,4 @@
+using Gridify;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.Projects;
@@ -5,6 +6,7 @@ using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Invitations.Models;
+using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Projects.Services;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
@@ -39,7 +41,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
     #region Trips
 
     [HttpPost("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<TripVm>> AddTrip(string projectId, [FromBody] CreateOrEditTripVm trip)
+    public async Task<ActionResult<TripVm>> AddTrip([FromBody] CreateOrEditTripVm trip)
     {
         var trips = await _tripService.CreateOrUpdateTrip(trip);
 
@@ -47,9 +49,9 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
     }
 
     [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId)
+    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId, [FromQuery] IEnumerable<QueryCondition> query)
     {
-        var trips = await _tripService.GetTripsByProjectId(projectId);
+        var trips = await _tripService.GetTripsByProjectId(projectId, query);
 
         return new JsonResult(trips);
     }

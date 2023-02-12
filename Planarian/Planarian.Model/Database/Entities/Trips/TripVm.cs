@@ -32,6 +32,8 @@ public class TripVm : ITrip
         IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
         NumberOfPhotos = numberOfPhotos;
     }
+    
+    
 
 
     public TripVm()
