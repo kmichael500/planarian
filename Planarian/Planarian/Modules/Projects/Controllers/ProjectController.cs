@@ -1,4 +1,3 @@
-using Gridify;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.Projects;
@@ -48,8 +47,10 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         return new JsonResult(trips);
     }
 
+    [AllowAnonymous]
     [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId, [FromQuery] IEnumerable<QueryCondition> query)
+    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId,
+        [FromQuery] FilterQuery query)
     {
         var trips = await _tripService.GetTripsByProjectId(projectId, query);
 

@@ -1,5 +1,3 @@
-using Gridify;
-using Gridify.EntityFramework;
 using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
@@ -8,6 +6,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Photos.Models;
+using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Modules.Trips.Models;
 using Planarian.Modules.Trips.Repositories;
@@ -159,7 +158,7 @@ public class TripService : ServiceBase<TripRepository>
         return await Repository.GetTripVm(projectId);
     }
 
-    public async Task<IEnumerable<TripVm>> GetTripsByProjectId(string projectId, IEnumerable<QueryCondition> query)
+    public async Task<PagedResult<TripVm>> GetTripsByProjectId(string projectId, FilterQuery query)
     {
         var trips = await Repository.GetTripsByProjectIdAsQueryable(projectId, query);
         

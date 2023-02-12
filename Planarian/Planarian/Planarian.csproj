@@ -9,7 +9,6 @@
 
     <ItemGroup>
         <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
-        <PackageReference Include="Gridify.EntityFramework" Version="2.8.2" />
         <PackageReference Include="Handlebars.Net" Version="2.1.2" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
         <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="5.2.0" />

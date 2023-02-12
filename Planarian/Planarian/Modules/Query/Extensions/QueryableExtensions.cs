@@ -1,7 +1,8 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Planarian.Modules.Leads.Controllers;
 
-namespace Planarian.Modules.Leads.Controllers;
+namespace Planarian.Modules.Query.Extensions;
 
 public static class QueryableExtensions
 {
@@ -9,7 +10,7 @@ public static class QueryableExtensions
     {
         conditions = conditions.ToList();
         if (!conditions.Any()) return source;
-        
+
         var parameter = Expression.Parameter(typeof(T), "x");
         Expression? expression = null;
 
@@ -18,7 +19,7 @@ public static class QueryableExtensions
             var property = Expression.Property(parameter, condition.Field);
             var constant = Expression.Constant(Convert.ChangeType(condition.Value, property.Type));
 
-            Expression? comparison = null;
+            Expression? comparison;
             switch (condition.Operator)
             {
                 case QueryOperator.Equal:
@@ -55,10 +56,10 @@ public static class QueryableExtensions
                     var method = typeof(SqlServerDbFunctionsExtensions).GetMethod("FreeText",
                         new[] { typeof(DbFunctions), typeof(string), typeof(string) });
                     comparison = Expression.Call(
-                        null, 
-                        method, 
-                        Expression.Constant(EF.Functions), 
-                        property, 
+                        null,
+                        method,
+                        Expression.Constant(EF.Functions),
+                        property,
                         constant
                     );
                     break;
@@ -79,4 +80,65 @@ public static class QueryableExtensions
 
         return source;
     }
+
+    public static async Task<PagedResult<T>> ApplyPagingAsync<T>(this IQueryable<T> query, int pageNumber, int pageSize,
+        Expression<Func<T, object?>> orderingExpression)
+    {
+        if (query == null)
+        {
+            throw new ArgumentNullException(nameof(query));
+        }
+
+        if (pageNumber < 1)
+        {
+            pageNumber = 1;
+        }
+
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+
+
+        query = query.OrderBy(orderingExpression);
+
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+        if (pageNumber > totalPages)
+        {
+            pageNumber = totalPages;
+        }
+        
+        if (pageNumber < 1)
+        {
+            pageNumber = 1;
+        }
+
+        var results = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<T>(pageNumber, pageSize, totalCount, results);
+    }
+}
+
+public class PagedResult<T>
+{
+    public PagedResult(int pageNumber, int pageSize, int totalCount, IList<T> results)
+    {
+        PageNumber = pageNumber;
+        PageSize = pageSize;
+        TotalCount = totalCount;
+        TotalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+        Results = results;
+    }
+
+    public int PageNumber { get; set; }
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; }
+    public IList<T> Results { get; set; }
 }

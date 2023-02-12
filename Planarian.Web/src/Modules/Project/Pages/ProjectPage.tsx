@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
-import { Card, Col, Divider, Row, Spin, Typography } from "antd";
+import { Card, Col, Divider, Input, Row, Spin, Typography } from "antd";
 import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import {
   MemberGridComponent,
@@ -20,7 +20,8 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import {
   QueryBuilder,
   QueryOperator,
-} from "../../Search/Services/QueryBuilder2";
+} from "../../Search/Services/QueryBuilder";
+import { TripSearchComponent } from "../../Trip/Components/TripSearchComponent";
 
 const { Title, Text } = Typography;
 
@@ -40,8 +41,6 @@ const ProjectPage: React.FC = () => {
     .filterBy("name", QueryOperator.FreeText, "riv")
     .buildAsQueryString();
 
-  console.log(query);
-
   const { projectId } = useParams();
   if (projectId === undefined) {
     throw new NotFoundException();
@@ -56,7 +55,6 @@ const ProjectPage: React.FC = () => {
         const projectResponse = await ProjectService.GetProject(projectId);
         setProject(projectResponse);
         const tripsResponse = await ProjectService.GetTrips(projectId);
-
         setTrips(tripsResponse);
         setIsTripsLoading(false);
       };
@@ -71,16 +69,19 @@ const ProjectPage: React.FC = () => {
         projectId={projectId}
       ></MemberGridComponent>
       <Divider></Divider>
-      <Row align="middle">
+      <Row align="middle" gutter={10}>
         <Col>
           <Typography.Title level={3}>Trips</Typography.Title>
         </Col>
+
         {/* take up rest of space to push others to right and left side */}
         <Col flex="auto"></Col>
+
         <Col>
           <TripCreateButtonComponent projectId={projectId} />
         </Col>
       </Row>
+      <TripSearchComponent onSearch={(e) => console.log(e)} />
 
       <SpinnerCardComponent spinning={isTripsLoading}>
         <CardGridComponent

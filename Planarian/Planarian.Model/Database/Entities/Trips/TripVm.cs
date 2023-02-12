@@ -8,7 +8,7 @@ public class TripVm : ITrip
     public TripVm(string id, string projectId, IEnumerable<string> tripTagTypeIds,
         IEnumerable<string> tripMemberIds, string name,
         string? description,
-        string? tripReport, int numberOfPhotos)
+        string? tripReport, int numberOfPhotos, DateTime? modifiedOn)
     {
         Id = id;
         ProjectId = projectId;
@@ -17,6 +17,7 @@ public class TripVm : ITrip
         TripReport = tripReport;
         IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
         NumberOfPhotos = numberOfPhotos;
+        ModifiedOn = modifiedOn;
     }
 
     public TripVm(Trip trip, IEnumerable<string> tripTagTypeIds,
@@ -31,6 +32,7 @@ public class TripVm : ITrip
         TripReport = trip.TripReport;
         IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
         NumberOfPhotos = numberOfPhotos;
+        ModifiedOn = trip.ModifiedOn;
     }
     
     
@@ -61,4 +63,5 @@ public class TripVm : ITrip
     [MaxLength(PropertyLength.MediumText)] public string? Description { get; set; }
 
     public string? TripReport { get; set; }
+    public DateTime? ModifiedOn { get; set; }
 }

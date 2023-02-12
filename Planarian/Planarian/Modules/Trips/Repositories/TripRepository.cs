@@ -1,5 +1,3 @@
-using Gridify;
-using Gridify.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
@@ -8,6 +6,7 @@ using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Photos.Models;
+using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Trips.Models;
 using Planarian.Shared.Base;
 
@@ -92,12 +91,11 @@ public class TripRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
-        IEnumerable<QueryCondition> query1)
+    public async Task<PagedResult<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
+        FilterQuery query)
     {
-        var query = await DbContext.Trips.Where(e => e.ProjectId == projectId)
-            .QueryFilter(query1)
-            .Select(e => new 
+        var result = await DbContext.Trips.Where(e => e.ProjectId == projectId)
+            .Select(e => new TripVm
             {
                 Id = e.Id,
                 ProjectId = e.ProjectId,
@@ -107,10 +105,12 @@ public class TripRepository : RepositoryBase
                 Description = e.Description,
                 TripReport = e.TripReport,
                 NumberOfPhotos = e.Photos.Count,
+                ModifiedOn = e.ModifiedOn
             })
-            .ToListAsync();
+            .QueryFilter(query.Conditions)
+            .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);
         
-        return new List<TripVm>();
+        return result;
     }
 
     #region Trip

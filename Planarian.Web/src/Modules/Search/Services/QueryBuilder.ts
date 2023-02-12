@@ -1,180 +1,99 @@
-// interface IFieldValue<T> {
-//   field: keyof T;
-//   value: T[keyof T];
-// }
+interface IQueryCondition<T> {
+  field: keyof T;
+  value: T[keyof T];
+  operator: QueryOperator;
+}
 
-// class FieldValue<T> implements IFieldValue<T> {
-//   constructor(public field: keyof T, public value: T[keyof T]) {}
-// }
+export enum QueryOperator {
+  Equal = "=",
+  NotEqual = "!=",
+  LessThan = "<",
+  GreaterThan = ">",
+  GreaterThanOrEqual = ">=",
+  LessThanOrEqual = "<=",
+  Contains = "=*",
+  NotContains = "!*",
+  StartsWith = "^",
+  NotStartsWith = "!^",
+  EndsWith = "$",
+  NotEndsWith = "!$",
+  FreeText = "*=",
+}
 
-// interface IQueryOperator<T> {
-//   operator: string;
-//   fieldValue: FieldValue<T>;
-// }
+class QueryCondition<T> implements IQueryCondition<T> {
+  constructor(
+    public field: keyof T,
+    public operator: QueryOperator,
+    public value: T[keyof T]
+  ) {}
+}
 
-// class QueryOperator<T> implements IQueryOperator<T> {
-//   constructor(public operator: string, public fieldValue: FieldValue<T>) {}
-// }
+class QueryBuilder<T> {
+  private conditions: QueryCondition<T>[] = [];
 
-// class QueryBuilder<T> {
-//   private conditions: QueryOperator<T>[] = [];
+  equal(field: keyof T, value: T[keyof T]) {
+    this.push(new QueryCondition(field, QueryOperator.Equal, value));
 
-//   equal(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(QueryOperatorEnum.Equal, new FieldValue(field, value))
-//     );
-//     return this;
-//   }
+    return this;
+  }
 
-//   notEqual(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.NotEqual,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+  filterBy(field: keyof T, operator: QueryOperator, value: T[keyof T]) {
+    this.push(new QueryCondition(field, operator, value));
+    return this;
+  }
 
-//   lessThan(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.LessThan,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+  private push(condition: QueryCondition<T>) {
+    this.conditions = this.conditions.filter(
+      (condition) => condition.field !== condition.field
+    );
 
-//   greaterThan(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.GreaterThan,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+    this.conditions.push(condition);
+    return this;
+  }
 
-//   greaterThanOrEqual(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.GreaterThanOrEqual,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+  public buildAsQueryString() {
+    const conditionsQueryString = this.convertArrayToQueryParams(
+      this.conditions
+    );
+    const filterQueryString = this.convertToQueryParams({
+      pageNumber: 1,
+      pageSize: 10,
+    });
 
-//   lessThanOrEqual(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.LessThanOrEqual,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+    const queryString = `${conditionsQueryString}&${filterQueryString}`;
 
-//   contains(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.Contains,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+    window.history.pushState({}, "", `?${queryString}`);
 
-//   notContains(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.NotStartsWith,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+    return filterQueryString;
+  }
 
-//   startsWith(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.StartsWith,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+  private convertArrayToQueryParams(array: { [key: string]: any }[]) {
+    let queryParams = "";
+    for (let i = 0; i < array.length; i++) {
+      const object = array[i];
+      for (const key in object) {
+        if (object.hasOwnProperty(key)) {
+          const value = object[key];
+          queryParams += `conditions[${i}].${key}=${encodeURIComponent(
+            value
+          )}&`;
+        }
+      }
+    }
+    return queryParams.slice(0, -1);
+  }
 
-//   notStartsWith(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.NotStartsWith,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+  private convertToQueryParams(object: { [key: string]: any }) {
+    let queryParams = "";
 
-//   endsWith(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.EndsWith,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
+    for (const key in object) {
+      if (object.hasOwnProperty(key)) {
+        const value = object[key];
+        queryParams += `${key}=${encodeURIComponent(value)}&`;
+      }
+    }
+    return queryParams.slice(0, -1);
+  }
+}
 
-//   notEndsWith(field: keyof T, value: T[keyof T]) {
-//     this.push(
-//       new QueryOperator(
-//         QueryOperatorEnum.NotEndsWith,
-//         new FieldValue(field, value)
-//       )
-//     );
-//     return this;
-//   }
-
-//   private push(operator: QueryOperator<T>) {
-//     if (
-//       typeof operator.fieldValue.value === "string" ||
-//       operator.fieldValue.value instanceof String
-//     ) {
-//       const escapedValue = operator.fieldValue.value.replace(
-//         /([(),|]|\/i)/g,
-//         "\\$1"
-//       );
-//       operator.fieldValue.value = escapedValue as any;
-//     }
-//     this.conditions.push(operator);
-//     return this;
-//   }
-
-//   build(by: QueryLogicalOperatorEnum = QueryLogicalOperatorEnum.And) {
-//     return this.conditions;
-//   }
-// }
-
-// enum QueryOperatorEnum {
-//   Equal = "=",
-//   NotEqual = "!=",
-//   LessThan = "<",
-//   GreaterThan = ">",
-//   GreaterThanOrEqual = ">=",
-//   LessThanOrEqual = "<=",
-//   Contains = "=*",
-//   NotContains = "!*",
-//   StartsWith = "^",
-//   NotStartsWith = "!^",
-//   EndsWith = "$",
-//   NotEndsWith = "!$",
-// }
-
-// enum QueryLogicalOperatorEnum {
-//   And = ",",
-//   Or = "|",
-// }
-
-// export { QueryBuilder };
-export {};
+export { QueryBuilder };

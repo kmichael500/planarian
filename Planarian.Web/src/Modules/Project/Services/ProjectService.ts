@@ -54,7 +54,7 @@ const ProjectService = {
     const response = (await HttpClient.get<TripVm[]>(
       `${baseUrl}/${projectId}/trips`
     )) as any;
-    return response.data.data;
+    return response.data.results;
   },
 
   //#endregion
