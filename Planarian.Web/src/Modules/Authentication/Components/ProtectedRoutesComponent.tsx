@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { AuthenticationService } from "../Services/AuthenticationService";
@@ -13,7 +13,11 @@ const ProtectedRoutesComponent = () => {
   const url = `login?redirectUrl=${redirectUrl}`;
 
   const isAuthenticated = AuthenticationService.IsAuthenticated();
-  setIsAuthenticated(isAuthenticated);
+
+  useEffect(() => {
+    setIsAuthenticated(isAuthenticated);
+  }, []);
+
   if (isAuthenticated) {
     return <Outlet />;
   } else {

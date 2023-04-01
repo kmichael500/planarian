@@ -15,4 +15,5 @@ public static class QueryOperator
     public const string EndsWith = "$";
     public const string NotEndsWith = "!$";
     public const string FreeText = "*=";
+    public const string In = "=]";
 }

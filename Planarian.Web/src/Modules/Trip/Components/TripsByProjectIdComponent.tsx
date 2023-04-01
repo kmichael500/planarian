@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { SlidersOutlined } from "@ant-design/icons";
 import {
   Button,
-  Card,
   Col,
-  Divider,
   Drawer,
   Form,
   Input,
-  List,
-  Pagination,
+  InputNumber,
   Row,
-  Space,
+  Select,
+  Tooltip,
   Typography,
 } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import { TripVm } from "../../Trip/Models/TripVm";
-import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
-import { TagComponent } from "../../Tag/Components/TagComponent";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -25,17 +21,21 @@ import {
   QueryBuilder,
   QueryOperator,
 } from "../../Search/Services/QueryBuilder";
-import { TripSearchComponent } from "../../Trip/Components/TripSearchComponent";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { PagedResult } from "../../Search/Models/PagedResult";
-import Sider from "antd/lib/layout/Sider";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
-const { Title, Text } = Typography;
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { TripCardComponent } from "./TripCard";
+import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
+import { TagType } from "../../Tag/Models/TagType";
+const { Option } = Select;
 interface TripsByProjectIdComponentProps {
   projectId: string;
 }
 
-const queryBuilder = new QueryBuilder<TripVm>();
+const query = window.location.search.substring(1);
+
+const queryBuilder = new QueryBuilder<TripVm>(query);
 
 const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
   props
@@ -61,12 +61,16 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
   };
 
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
-  const onSearch = async (value?: string) => {
-    if (value !== undefined) {
-      queryBuilder.filterBy("name", QueryOperator.Contains, value);
-    }
+  const onSearch = async () => {
     setIsAdvancedSearchOpen(false);
     await getTrips();
+  };
+  const colSpanProps = {
+    xs: { span: 24 },
+    sm: { span: 24 },
+    md: { span: 12 },
+    lg: { span: 8 },
+    xl: { span: 6 },
   };
 
   return (
@@ -85,12 +89,25 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
       </Row>
       <Row style={{ marginBottom: 10 }} gutter={5}>
         <Col>
-          <Input.Search onSearch={onSearch} />
+          <Input.Search
+            defaultValue={queryBuilder.getFieldValue("name") as string}
+            onChange={(e) => {
+              queryBuilder.filterBy(
+                "name",
+                QueryOperator.Contains,
+                e.target.value
+              );
+            }}
+            onSearch={onSearch}
+          />
         </Col>
         <Col>
-          <Button onClick={(e) => setIsAdvancedSearchOpen(true)}>
-            Advanced Search
-          </Button>
+          <PlanarianButton
+            icon={<SlidersOutlined />}
+            onClick={(e) => setIsAdvancedSearchOpen(true)}
+          >
+            Advanced
+          </PlanarianButton>
           <Drawer
             open={isAdvancedSearchOpen}
             onClose={(e) => setIsAdvancedSearchOpen(false)}
@@ -102,6 +119,16 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                 }
               }}
               layout="vertical"
+              initialValues={
+                {
+                  tripReport: queryBuilder.getFieldValue(
+                    "tripReport"
+                  ) as string,
+                  tripTagTypeIds: queryBuilder.getFieldValue(
+                    "tripTagTypeIds"
+                  ) as string[],
+                } as TripVm
+              }
             >
               <Form.Item
                 name={nameof<TripVm>("tripReport")}
@@ -109,16 +136,106 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
               >
                 <Input
                   onChange={(e) => {
-                    console.log(
-                      queryBuilder.filterBy(
-                        "tripReport",
-                        QueryOperator.Contains,
-                        e.target.value
-                      )
+                    queryBuilder.filterBy(
+                      "tripReport",
+                      QueryOperator.Contains,
+                      e.target.value
                     );
                   }}
                 />
               </Form.Item>
+              <Form.Item name={nameof<TripVm>("tripTagTypeIds")} label="Tags">
+                <TagSelectComponent
+                  projectId={props.projectId}
+                  tagType={TagType.Trip}
+                  defaultValue={
+                    queryBuilder.getFieldValue("tripTagTypeIds") as string[]
+                  }
+                  onChange={(e) => {
+                    queryBuilder.filterBy(
+                      "tripTagTypeIds",
+                      QueryOperator.In,
+                      e
+                    );
+                  }}
+                />
+              </Form.Item>
+              <Form.Item
+                name={nameof<TripVm>("tripMemberIds")}
+                label="Trip Members"
+              >
+                <TagSelectComponent
+                  projectId={props.projectId}
+                  tagType={TagType.ProjectMember}
+                  defaultValue={
+                    queryBuilder.getFieldValue("tripMemberIds") as string[]
+                  }
+                  onChange={(e) => {
+                    queryBuilder.filterBy("tripMemberIds", QueryOperator.In, e);
+                  }}
+                />
+              </Form.Item>
+              {/* <Col>
+                <Row gutter={5}>
+                  <Col span={24}>Number of Photos</Col>
+                  <Col span={7}>
+                    <InputNumber
+                      size="large"
+                      placeholder="0"
+                      style={{ width: "100%" }}
+                      onChange={(e) => {
+                        queryBuilder.filterBy(
+                          "numberOfPhotos",
+                          QueryOperator.GreaterThanOrEqual,
+                          e
+                        );
+                      }}
+                    ></InputNumber>
+                  </Col>
+                  <Col span={10}>
+                    <Select
+                      size="large"
+                      style={{ width: "100%", textAlign: "center" }}
+                      defaultValue={QueryOperator.LessThanOrEqual}
+                      onChange={(e) => {
+                        queryBuilder.reverseOperators("numberOfPhotos", e);
+                      }}
+                    >
+                      <Option
+                        style={{ textAlign: "center" }}
+                        value={QueryOperator.GreaterThanOrEqual}
+                      >
+                        <Tooltip title="Greater than or equal to x and less or equal to y.">
+                          <div>{"x <= L <= y"}</div>
+                        </Tooltip>
+                      </Option>
+                      <Option
+                        style={{ textAlign: "center" }}
+                        value={QueryOperator.GreaterThan}
+                      >
+                        <Tooltip title="Greater than x and less than y.">
+                          <div>{"x < L < y"}</div>
+                        </Tooltip>
+                      </Option>
+                    </Select>
+                  </Col>
+
+                  <Col span={7}>
+                    <InputNumber
+                      size="large"
+                      style={{ width: "100%" }}
+                      placeholder="10"
+                      onChange={(e) => {
+                        queryBuilder.filterBy(
+                          "numberOfPhotos",
+                          QueryOperator.LessThanOrEqual,
+                          e
+                        );
+                      }}
+                    ></InputNumber>
+                  </Col>
+                </Row>
+              </Col> */}
             </Form>
             <Button
               onClick={() => {
@@ -152,58 +269,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
           items={trips?.results.map((trip) => ({
             item: (
               <Link to={`trip/${trip.id}`}>
-                <Card
-                  style={{ height: "100%" }}
-                  title={
-                    <>
-                      {trip.name}{" "}
-                      <Row>
-                        <UserAvatarGroupComponent
-                          size={"small"}
-                          maxCount={4}
-                          userIds={trip.tripMemberIds}
-                        />
-                      </Row>
-                    </>
-                  }
-                  loading={isTripsLoading}
-                  bordered={false}
-                  hoverable
-                >
-                  <>
-                    <Row>
-                      {trip.tripTagTypeIds.map((tagId, index) => (
-                        <Col key={tagId}>
-                          <TagComponent tagId={tagId} />
-                        </Col>
-                      ))}
-                    </Row>
-                    <Divider />
-
-                    <Row>
-                      <Col>
-                        <Text>Description: {trip.description}</Text>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col>
-                        <Text>
-                          Trip Report:{" "}
-                          {trip.isTripReportCompleted ? (
-                            <CheckCircleOutlined />
-                          ) : (
-                            <CloseCircleOutlined />
-                          )}
-                        </Text>
-                      </Col>
-                    </Row>
-                    <Row>
-                      <Col>
-                        <Text>Photos: {trip.numberOfPhotos}</Text>
-                      </Col>
-                    </Row>
-                  </>
-                </Card>
+                <TripCardComponent trip={trip} />
               </Link>
             ),
             key: trip.id,
