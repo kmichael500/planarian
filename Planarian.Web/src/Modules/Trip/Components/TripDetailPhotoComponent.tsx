@@ -97,7 +97,7 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
                       <Col>
                         <Tooltip title="Delete">
                           <DeleteButtonComponent
-                            title="Are you sure to delete this photo?"
+                            title="Are you sure you want to delete this photo?"
                             onConfirm={() => onRemoveImageClick(photo)}
                             okText="Yes"
                             cancelText="No"
