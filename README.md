@@ -33,12 +33,16 @@ npm i ts-node -g
 npm i
 ```
 **Client config**
--Configure appsettings.Template.Development.json in ./Planarian/ with the appropriate connection strings.
--Rename appsettings.Template.Development.json to appsettings.Development.json
+
+Configure appsettings.Template.Development.json in ./Planarian/Planarian/ with the appropriate connection strings.
+
+Rename appsettings.Template.Development.json to appsettings.Development.json
 
 **Starting the client**
--Open ./Planarian/Planarian.sln in Visual Studio
--Run the client
+
+Open ./Planarian/Planarian.sln in Visual Studio
+
+Run the client
 
 **Starting the server**
 ``` bash
@@ -46,4 +50,5 @@ npm i
 # Start running the server
 npm start
 ```
--Your browser should automatically open Planarian to the login screen.
+
+Your browser should automatically open Planarian to the login screen.
