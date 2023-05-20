@@ -14,3 +14,36 @@ Some key features of Planarian include:
     
 
 Overall, Planarian is an intuitive and powerful tool for managing your cave project data. Its features make it easy to stay organized and on top of your work, allowing you to focus on what matters most: your cave exploration and research. Try Planarian today and see how it can streamline your cave project management!
+
+## Technologies Used
+**Server:** Node, Express, Passport, SQL, and Typescript
+
+**Client:** React, Passport, Leaflet, and Typescript
+
+## How to Run
+After installing [NodeJS](https://nodejs.org/en/download/) you will need to setup a few config files.
+
+**Install dependencies**
+```bash
+# Install required global dependencies
+npm i typescript -g
+npm i ts-node -g
+
+# Install required server dependencies
+npm i
+```
+**Client config**
+-Configure appsettings.Template.Development.json in ./Planarian/ with the appropriate connection strings.
+-Rename appsettings.Template.Development.json to appsettings.Development.json
+
+**Starting the client**
+-Open ./Planarian/Planarian.sln in Visual Studio
+-Run the client
+
+**Starting the server**
+``` bash
+# Navigate to ./Planarian.Web
+# Start running the server
+npm start
+```
+-Your browser should automatically open Planarian to the login screen.
