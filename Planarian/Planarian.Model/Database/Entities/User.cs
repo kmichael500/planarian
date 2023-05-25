@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -60,6 +61,8 @@ public class User : EntityBase
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
 
     public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
+    public ICollection<Cave> CavesReported { get; set; } = new HashSet<Cave>();
+    public ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
 
     #region Helper Functions
 

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
@@ -5,8 +6,9 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class Entrance : EntityBase
 {
     public string CaveId { get; set; } = null!;
-    public string LocationQualityTagId { get; set; } = null!;
     public string ReportedByUserId { get; set; } = null!;
+    public string LocationQualityTagId { get; set; } = null!;
+
     
     public string Name { get; set; }
     public string Description { get; set; }
@@ -26,4 +28,23 @@ public class Entrance : EntityBase
     public ICollection<EntranceStatusTag> EntranceStatusTags { get; set; } = new HashSet<EntranceStatusTag>();
     public ICollection<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } = new HashSet<EntranceHydrologyFrequencyTag>();
     public ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
+    public ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; }
+}
+
+public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
+{
+    public override void Configure(EntityTypeBuilder<Entrance> builder)
+    {
+        builder.HasOne(e => e.Cave)
+            .WithMany(e => e.Entrances)
+            .HasForeignKey(e => e.CaveId);
+        
+        builder.HasOne(e => e.ReportedByUser)
+            .WithMany(e => e.EntrancesReported)
+            .HasForeignKey(e => e.ReportedByUserId);
+
+        builder.HasOne(e => e.LocationQualityTag)
+            .WithMany(e => e.EntranceLocationQualitiesTags)
+            .HasForeignKey(e => e.LocationQualityTagId);
+    }
 }
