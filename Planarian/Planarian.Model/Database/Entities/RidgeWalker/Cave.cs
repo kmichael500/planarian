@@ -1,29 +1,32 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class Cave : EntityBase
 {
-    public string CountyId { get; set; }
-    public string ReportedByUserId { get; set; }
-    public string PrimaryEntranceId { get; set; }
-
-    public string Name { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string PrimaryEntranceId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
+    
     public int CaveNumber { get; set; } // max of highest cave number in county + 1
-
+    
+    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    
     public double LengthFeet { get; set; }
     public double DepthFeet { get; set; }
-    public double MaxPitDepthFeet { get; set; }
-    public int NumberOfPits { get; set; }
+    public double? MaxPitDepthFeet { get; set; }
+    public int NumberOfPits { get; set; } = 0;
 
-    public string Narrative { get; set; }
+    public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    public string ReportedByName { get; set; }
-    public bool IsArchived { get; set; }
+    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
+    public bool IsArchived { get; set; } = false;
 
-    public virtual User ReportedByUser { get; set; } = null!;
+    public virtual User? ReportedByUser { get; set; } = null!;
     public virtual County County { get; set; } = null!;
     public virtual Entrance PrimaryEntrance { get; set; } = null!;
 

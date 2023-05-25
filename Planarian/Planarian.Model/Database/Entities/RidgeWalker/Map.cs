@@ -1,12 +1,14 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class Map : EntityBase
 {
-    public string CaveId { get; set; }
-    public string MapStatusTagId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string MapStatusTagId { get; set; } = null!;
     
     public TagType MapStatusTag { get; set; }
     

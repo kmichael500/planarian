@@ -1,12 +1,14 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class FieldIndicationTag : EntityBase
 {
-    public string TagTypeId { get; set; }
-    public string EntranceId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;
 
     public TagType TagType { get; set; }
     public Entrance Entrance { get; set; }

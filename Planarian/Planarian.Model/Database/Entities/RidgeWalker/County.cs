@@ -1,11 +1,13 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class County : EntityBaseNameId
 {
-    public string DispayId { get; set; }
+    [MaxLength(PropertyLength.SmallText)] public string DisplayId { get; set; } = null!;
     
     public ICollection<Cave> Caves { get; set; } = null!;
 }
