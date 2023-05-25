@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Projects;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared.Base;
 
@@ -32,7 +33,9 @@ public class TagType : EntityBaseNameId
     public virtual ICollection<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } =
         new HashSet<EntranceHydrologyFrequencyTag>();
     public virtual ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
-    public ICollection<Entrance> EntranceLocationQualities { get; set; } = new HashSet<Entrance>();
+    public ICollection<Entrance> EntranceLocationQualitiesTags { get; set; } = new HashSet<Entrance>();
+    public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
+    public ICollection<Map> MapStatusTags { get; set; } = new HashSet<Map>();
     public virtual Project? Project { get; set; }
 }
 
