@@ -1,6 +1,6 @@
 import { Button, ButtonProps, Grid } from "antd";
 
-interface PlanrianButtonProps {
+interface PlanarianButtonProps {
   icon: React.ReactNode;
   alwaysShowChildren?: boolean;
   neverShowChildren?: boolean;
@@ -8,7 +8,7 @@ interface PlanrianButtonProps {
 
 const { useBreakpoint } = Grid;
 
-export type PlanarianButtonType = ButtonProps & PlanrianButtonProps;
+export type PlanarianButtonType = ButtonProps & PlanarianButtonProps;
 export type PlanarianButtonTypeWithoutIcon = Omit<PlanarianButtonType, "icon">;
 
 const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {

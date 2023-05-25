@@ -83,7 +83,7 @@ const HeaderComponent: React.FC = () => {
 
               <Drawer
                 bodyStyle={{ padding: 0 }}
-                title="Planrian"
+                title="Planarian"
                 placement="left"
                 onClose={() => setVisible(false)}
                 open={visible}
