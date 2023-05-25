@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Projects;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
@@ -45,6 +46,20 @@ public class PlanarianDbContext : DbContext
 
     public DbSet<Project> Projects { get; set; } = null!;
 
+    #endregion
+
+    #region RidgeWalker
+
+    public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<County> Counties { get; set; } = null!;
+    public DbSet<Entrance> Entrances { get; set; } = null!;
+    public DbSet<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } = null!;
+    public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;
+    public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
+    public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
+    public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
+    public DbSet<Map> Maps { get; set; } = null!;
+    
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
