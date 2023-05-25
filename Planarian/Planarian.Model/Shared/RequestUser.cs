@@ -13,6 +13,7 @@ public class RequestUser
     }
 
     public string Id { get; set; } = null!;
+    public string? AccountId { get; set; }
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string FullName => $"{FirstName} {LastName}";
@@ -20,7 +21,7 @@ public class RequestUser
 
     public async Task Initialize(string userId)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(e => e.Id == userId);
+        var user = await _dbContext.Users.Include(e => e.AccountUsers).FirstOrDefaultAsync(e => e.Id == userId);
         if (user == null)
         {
             IsAuthenticated = false;
@@ -32,5 +33,7 @@ public class RequestUser
         FirstName = user.FirstName;
         LastName = user.LastName;
         IsAuthenticated = true;
+        
+        AccountId = user.AccountUsers.FirstOrDefault()?.AccountId;
     }
 }

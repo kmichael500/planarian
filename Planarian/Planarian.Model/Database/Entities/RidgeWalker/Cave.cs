@@ -7,6 +7,7 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class Cave : EntityBase
 {
+    [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string PrimaryEntranceId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
@@ -26,6 +27,7 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
 
+    public virtual Account Account { get; set; } = null!;
     public virtual User? ReportedByUser { get; set; } = null!;
     public virtual County County { get; set; } = null!;
     public virtual Entrance PrimaryEntrance { get; set; } = null!;
@@ -47,9 +49,17 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
             .WithMany(e => e.CavesReported)
             .HasForeignKey(e => e.ReportedByUserId);
         
-        // TODO: Is this correct way to configure a one to one?
+        builder.HasOne(e => e.ReportedByUser)
+            .WithMany(e => e.CavesReported)
+            .HasForeignKey(e => e.ReportedByUserId);
+
         builder.HasOne(e => e.PrimaryEntrance)
             .WithOne()
             .HasForeignKey<Cave>(e => e.PrimaryEntranceId);
+        
+        builder.HasOne(e => e.Account)
+            .WithMany(e => e.Caves)
+            .HasForeignKey(e => e.AccountId);
+
     }
 }

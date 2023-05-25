@@ -59,10 +59,11 @@ public class User : EntityBase
 
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
-
+    
     public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
     public ICollection<Cave> CavesReported { get; set; } = new HashSet<Cave>();
     public ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
+    public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
 
     #region Helper Functions
 

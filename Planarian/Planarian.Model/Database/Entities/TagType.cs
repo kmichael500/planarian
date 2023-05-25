@@ -19,6 +19,7 @@ public class TagType : EntityBaseNameId
     }
 
     public string? ProjectId { get; set; } = null!;
+    public string? AccountId { get; set; } = null!;
 
     public string Key { get; set; } = null!;
 
