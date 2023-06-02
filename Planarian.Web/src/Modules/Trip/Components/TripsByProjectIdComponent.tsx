@@ -1,37 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Button,
-  Col,
-  Drawer,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Col, Row, Typography } from "antd";
 import { TripVm } from "../../Trip/Models/TripVm";
 import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
-import {
-  QueryBuilder,
-  QueryOperator,
-} from "../../Search/Services/QueryBuilder";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { PagedResult } from "../../Search/Models/PagedResult";
-import { nameof } from "../../../Shared/Helpers/StringHelpers";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { TripCardComponent } from "./TripCard";
-import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
 import { SearchFormComponent as AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
-const { Option } = Select;
 interface TripsByProjectIdComponentProps {
   projectId: string;
 }
@@ -66,13 +48,6 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
   const onSearch = async () => {
     await getTrips();
   };
-  const colSpanProps = {
-    xs: { span: 24 },
-    sm: { span: 24 },
-    md: { span: 12 },
-    lg: { span: 8 },
-    xl: { span: 6 },
-  };
 
   return (
     <>
@@ -90,6 +65,8 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
       </Row>
 
       <AdvancedSearchDrawerComponent
+        mainSearchField={"name"}
+        mainSearchFieldLabel={"Name"}
         onSearch={onSearch}
         queryBuilder={queryBuilder}
       >

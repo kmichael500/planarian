@@ -9,23 +9,29 @@ export interface AdvancedSearchDrawerComponentProps<T>
   extends FilterFormProps<T> {
   onSearch: () => Promise<void>;
   children?: React.ReactNode;
+  mainSearchField: keyof T;
+  mainSearchFieldLabel: string;
 }
 
 const SearchFormComponent = <T,>({
   queryBuilder,
   onSearch,
   children,
+  mainSearchField,
+  mainSearchFieldLabel,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
     setIsAdvancedSearchOpen(false);
     await onSearch();
   };
+
   return (
     <Row style={{ marginBottom: 10 }} gutter={5}>
       <Col>
         <Input.Search
-          defaultValue={queryBuilder.getFieldValue("name") as string}
+          placeholder={mainSearchFieldLabel}
+          defaultValue={queryBuilder.getFieldValue(mainSearchField) as string}
           onChange={(e) => {
             queryBuilder.filterBy(
               "name" as any,
