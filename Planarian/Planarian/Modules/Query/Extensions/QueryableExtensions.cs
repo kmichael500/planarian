@@ -10,22 +10,29 @@ namespace Planarian.Modules.Query.Extensions;
 
 public static class QueryableExtensions
 {
-   
+
     public static IQueryable<T> QueryFilter<T>(this IQueryable<T> source, IEnumerable<QueryCondition> conditions)
     {
         conditions = conditions.ToList();
         if (!conditions.Any()) return source;
 
         var parameter = Expression.Parameter(typeof(T), "x");
-        Expression? expression = null;
+        Expression expression = null;
 
         foreach (var condition in conditions)
         {
-            var property = Expression.Property(parameter, condition.Field);
+            var properties = condition.Field.Split('.');
+            Expression property = parameter;
+
+            foreach (var propName in properties)
+            {
+                property = Expression.Property(property, propName);
+            }
+
             var propertyType = property.Type;
 
-            object? value = null;
-            
+            object value;
+
             if (propertyType == typeof(IEnumerable<string>))
             {
                 var values = condition.Value.Split(',');
@@ -39,69 +46,70 @@ public static class QueryableExtensions
 
             var constant = Expression.Constant(value);
 
-            Expression? comparison;
-                
+            Expression comparison;
+
             switch (condition.Operator)
             {
                 case QueryOperator.In:
                     var ids = condition.Value.Split(',',
                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                    
-                    if (property is not { Member: PropertyInfo })
+
+                    if (property is not MemberExpression { Member: PropertyInfo })
                     {
                         throw new ArgumentException("Selector must be a property selector.");
                     }
-                    var containsMethod = typeof(Enumerable).GetMethods()
-                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2).MakeGenericMethod(typeof(string));
 
-                    foreach (var id in ids)
-                    {
-                        constant = Expression.Constant(id, typeof(string));
-                        var expressionBody = Expression.Call(containsMethod, property, constant);
-                        var expressionLambda = Expression.Lambda<Func<T, bool>>(expressionBody, parameter);
-                        source = source.Where(expressionLambda);
-                    }
-                    continue;
+
+                    var containsMethod = typeof(Enumerable).GetMethods()
+                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
+                        .MakeGenericMethod(typeof(string));
+
+                    comparison = Expression.Call(containsMethod, constant, property);
+                    break;
+
                 case QueryOperator.Equal:
                     comparison = Expression.Equal(property, constant);
                     break;
+
                 case QueryOperator.NotEqual:
                     comparison = Expression.NotEqual(property, constant);
                     break;
+
                 case QueryOperator.GreaterThan:
                     comparison = Expression.GreaterThan(property, constant);
                     break;
+
                 case QueryOperator.GreaterThanOrEqual:
                     comparison = Expression.GreaterThanOrEqual(property, constant);
                     break;
+
                 case QueryOperator.LessThan:
                     comparison = Expression.LessThan(property, constant);
                     break;
+
                 case QueryOperator.LessThanOrEqual:
                     comparison = Expression.LessThanOrEqual(property, constant);
                     break;
+
                 case QueryOperator.Contains:
                     comparison = Expression.Call(property,
                         typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!, constant);
                     break;
+
                 case QueryOperator.StartsWith:
                     comparison = Expression.Call(property,
                         typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!, constant);
                     break;
+
                 case QueryOperator.EndsWith:
                     comparison = Expression.Call(property,
                         typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) })!, constant);
                     break;
+
                 case QueryOperator.FreeText:
                     var method = typeof(SqlServerDbFunctionsExtensions).GetMethod("FreeText",
                         new[] { typeof(DbFunctions), typeof(string), typeof(string) });
-                    comparison = Expression.Call(
-                        null,
-                        method,
-                        Expression.Constant(EF.Functions),
-                        property,
-                        constant
-                    );
+                    comparison = Expression.Call(null, method, Expression.Constant(EF.Functions), property, constant);
                     break;
 
                 default:
@@ -113,9 +121,7 @@ public static class QueryableExtensions
 
         if (expression == null) return source;
 
-        var methodName = expression.ToString();
         var lambda = Expression.Lambda<Func<T, bool>>(expression, parameter);
-
         source = source.Where(lambda);
 
         return source;

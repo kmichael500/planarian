@@ -106,7 +106,9 @@ public class TripRepository : RepositoryBase
                 Description = e.Description,
                 TripReport = e.TripReport,
                 NumberOfPhotos = e.Photos.Count,
-                ModifiedOn = e.ModifiedOn
+                ModifiedOn = e.ModifiedOn,
+                Leads = e.Leads.Select(e => new LeadVm(e)),
+                Project = e.Project
             })
             // .IsInList(e=>e.TripTagTypeIds, new List<string>{"43T0lkwQ30", "Q1wx7qw5aU"})
             .QueryFilter(query.Conditions)

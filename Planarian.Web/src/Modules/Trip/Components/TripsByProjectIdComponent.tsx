@@ -72,6 +72,11 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
       >
         <TextFilterFormItem
           queryBuilder={queryBuilder}
+          field={"project.name" as any}
+          label={"Project Name"}
+        />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
           field={"tripReport"}
           label={"Trip Report"}
         />

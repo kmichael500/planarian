@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Planarian.Model.Database.Entities.Leads;
+using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
 
 namespace Planarian.Model.Database.Entities.Trips;
@@ -64,4 +66,6 @@ public class TripVm : ITrip
 
     public string? TripReport { get; set; }
     public DateTime? ModifiedOn { get; set; }
+    public IEnumerable<LeadVm> Leads { get; set; }
+    public Project Project { get; set; }
 }
