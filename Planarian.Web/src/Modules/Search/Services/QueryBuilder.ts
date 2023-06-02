@@ -3,7 +3,7 @@ import { QueryStringParser } from "./QueryStringParser";
 
 interface IQueryCondition<T> {
   field: keyof T;
-  value: T[keyof T];
+  value: T[keyof T] | null;
   operator: QueryOperator;
 }
 
@@ -29,7 +29,7 @@ class QueryCondition<T> implements IQueryCondition<T> {
     public field: keyof T,
     public key: string | undefined,
     public operator: QueryOperator,
-    public value: T[keyof T]
+    public value: T[keyof T] | null
   ) {
     if (!key) {
       this.key = field.toString();
@@ -57,30 +57,25 @@ class QueryBuilder<T> {
     this.pageSize = filerQuery.pageSize ?? 8;
   }
 
-  public reversedOperator(operator: QueryOperator) {
-    switch (operator) {
-      case QueryOperator.GreaterThan:
-        return QueryOperator.LessThan;
-      case QueryOperator.GreaterThanOrEqual:
-        return QueryOperator.LessThanOrEqual;
-      case QueryOperator.LessThanOrEqual:
-        return QueryOperator.GreaterThanOrEqual;
-      case QueryOperator.LessThan:
-        return QueryOperator.GreaterThan;
-      default:
-        throw new Error("Invalid operator");
-    }
-  }
-
-  changeOperators(key: string, operator: QueryOperator) {
+  changeOperators(field: keyof T, operator: QueryOperator, key?: string) {
     const existingCondition = this.conditions.find((x) => x.key === key);
     if (existingCondition) {
       existingCondition.operator = operator;
+    } else {
+      const condition = new QueryCondition(field, key, operator, null);
+      this.addToDictionary(condition);
     }
   }
 
-  public getFieldValue(key: keyof T): T[keyof T] | undefined {
+  public getFieldValue(key: keyof T | string): T[keyof T] | undefined | null {
     return this.conditions.find((x) => x.key === key)?.value;
+  }
+
+  public getOperatorValue(
+    key: keyof T | string,
+    defaultValue: QueryOperator
+  ): QueryOperator {
+    return this.conditions.find((x) => x.key === key)?.operator ?? defaultValue;
   }
 
   equal(

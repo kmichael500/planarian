@@ -178,67 +178,93 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                   }}
                 />
               </Form.Item>
-              <Col>
-                <Row gutter={5}>
-                  <Col span={24}>Number of Photos</Col>
-                  <Col span={7}>
-                    <InputNumber
-                      size="large"
-                      placeholder="0"
-                      style={{ width: "100%" }}
-                      onChange={(e) => {
-                        queryBuilder.filterBy(
-                          "numberOfPhotos",
-                          QueryOperator.GreaterThanOrEqual,
-                          e
-                        );
-                      }}
-                    ></InputNumber>
-                  </Col>
-                  <Col span={10}>
-                    <Select
-                      size="large"
-                      style={{ width: "100%", textAlign: "center" }}
-                      defaultValue={QueryOperator.LessThanOrEqual}
-                      onChange={(e) => {
-                        queryBuilder.changeOperators("numberOfPhotos", e);
-                      }}
-                    >
-                      <Option
-                        style={{ textAlign: "center" }}
-                        value={QueryOperator.GreaterThanOrEqual}
-                      >
-                        <Tooltip title="Greater than or equal to x and less or equal to y.">
-                          <div>{"x <= L <= y"}</div>
-                        </Tooltip>
-                      </Option>
-                      <Option
-                        style={{ textAlign: "center" }}
-                        value={QueryOperator.GreaterThan}
-                      >
-                        <Tooltip title="Greater than x and less than y.">
-                          <div>{"x < L < y"}</div>
-                        </Tooltip>
-                      </Option>
-                    </Select>
-                  </Col>
-
-                  <Col span={7}>
-                    <InputNumber
-                      size="large"
-                      style={{ width: "100%" }}
-                      placeholder="10"
-                      onChange={(e) => {
-                        queryBuilder.filterBy(
-                          "numberOfPhotos",
-                          QueryOperator.LessThanOrEqual,
-                          e
-                        );
-                      }}
-                    ></InputNumber>
-                  </Col>
-                </Row>
-              </Col>
+              <Form.Item label="Number of Photos">
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <Input
+                    type="number"
+                    defaultValue={
+                      queryBuilder.getFieldValue(
+                        "numberOfPhotosGreaterThan"
+                      ) as number
+                    }
+                    onChange={(e) => {
+                      const currentOperator = queryBuilder.getOperatorValue(
+                        "numberOfPhotosGreaterThan",
+                        QueryOperator.GreaterThanOrEqual
+                      );
+                      queryBuilder.filterBy(
+                        "numberOfPhotos",
+                        currentOperator,
+                        e.target.value,
+                        "numberOfPhotosGreaterThan"
+                      );
+                    }}
+                  />
+                  <Select
+                    defaultValue={queryBuilder.getOperatorValue(
+                      "numberOfPhotosGreaterThan",
+                      QueryOperator.GreaterThanOrEqual
+                    )}
+                    onChange={(e) => {
+                      queryBuilder.changeOperators(
+                        "numberOfPhotos",
+                        e,
+                        "numberOfPhotosGreaterThan"
+                      );
+                    }}
+                  >
+                    {" "}
+                    <Option value={QueryOperator.GreaterThanOrEqual}>
+                      {QueryOperator.GreaterThanOrEqual}
+                    </Option>
+                    <Option value={QueryOperator.GreaterThan}>
+                      {QueryOperator.GreaterThan}
+                    </Option>
+                  </Select>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <Input
+                    type="number"
+                    defaultValue={
+                      queryBuilder.getFieldValue(
+                        "numberOfPhotosLessThan"
+                      ) as number
+                    }
+                    onChange={(e) => {
+                      const currentOperator = queryBuilder.getOperatorValue(
+                        "numberOfPhotosLessThan",
+                        QueryOperator.LessThanOrEqual
+                      );
+                      queryBuilder.filterBy(
+                        "numberOfPhotos",
+                        currentOperator,
+                        e.target.value,
+                        "numberOfPhotosLessThan"
+                      );
+                    }}
+                  />
+                  <Select
+                    defaultValue={queryBuilder.getOperatorValue(
+                      "numberOfPhotosLessThan",
+                      QueryOperator.LessThanOrEqual
+                    )}
+                    onChange={(e) => {
+                      queryBuilder.changeOperators(
+                        "numberOfPhotos",
+                        e,
+                        "numberOfPhotosLessThan"
+                      );
+                    }}
+                  >
+                    <Option value={QueryOperator.LessThanOrEqual}>
+                      {QueryOperator.LessThanOrEqual}
+                    </Option>
+                    <Option value={QueryOperator.LessThan}>
+                      {QueryOperator.LessThan}
+                    </Option>
+                  </Select>
+                </div>
+              </Form.Item>
             </Form>
             <Button
               onClick={() => {
