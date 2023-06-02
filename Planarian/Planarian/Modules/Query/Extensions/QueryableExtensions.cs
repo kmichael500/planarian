@@ -39,6 +39,23 @@ public static class QueryableExtensions
                 var listExpression = typeof(List<string>).GetConstructor(new[] { typeof(IEnumerable<string>) })!;
                 value = Expression.New(listExpression, Expression.Constant(values));
             }
+            else if (propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
+            {
+                var dateTimeValue = DateTime.Parse(condition.Value);
+                var underlyingType = Nullable.GetUnderlyingType(propertyType);
+
+                if (underlyingType != null)
+                {
+                    // Property type is nullable
+                    value = Convert.ChangeType(dateTimeValue, underlyingType);
+                    value = Activator.CreateInstance(propertyType, value) ?? throw new InvalidOperationException();
+                }
+                else
+                {
+                    // Property type is non-nullable
+                    value = Convert.ChangeType(dateTimeValue, propertyType);
+                }
+            }
             else
             {
                 value = Convert.ChangeType(condition.Value, propertyType);
@@ -78,20 +95,69 @@ public static class QueryableExtensions
                     break;
 
                 case QueryOperator.GreaterThan:
-                    comparison = Expression.GreaterThan(property, constant);
-                    break;
+                    if (IsNullableType(property.Type))
+                    {
+                        // Retrieve the underlying non-nullable type
+                        var underlyingType = Nullable.GetUnderlyingType(property.Type);
+
+                        // Create an expression to convert the nullable property to the non-nullable type
+                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        comparison = Expression.GreaterThan(convertedProperty, constant);
+
+                    }
+                    else
+                    {
+                        comparison = Expression.GreaterThan(property, constant);
+                    }                    break;
 
                 case QueryOperator.GreaterThanOrEqual:
-                    comparison = Expression.GreaterThanOrEqual(property, constant);
-                    break;
+                    if (IsNullableType(property.Type))
+                    {
+                        // Retrieve the underlying non-nullable type
+                        var underlyingType = Nullable.GetUnderlyingType(property.Type);
 
-                case QueryOperator.LessThan:
-                    comparison = Expression.LessThan(property, constant);
+                        // Create an expression to convert the nullable property to the non-nullable type
+                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        comparison = Expression.GreaterThanOrEqual(convertedProperty, constant);
+
+                    }
+                    else
+                    {
+                        comparison = Expression.GreaterThanOrEqual(property, constant);
+                    }
+                    
                     break;
+                case QueryOperator.LessThan:
+                    if (IsNullableType(property.Type))
+                    {
+                        // Retrieve the underlying non-nullable type
+                        var underlyingType = Nullable.GetUnderlyingType(property.Type);
+
+                        // Create an expression to convert the nullable property to the non-nullable type
+                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        comparison = Expression.LessThan(convertedProperty, constant);
+
+                    }
+                    else
+                    {
+                        comparison = Expression.LessThan(property, constant);
+                    }                    break;
 
                 case QueryOperator.LessThanOrEqual:
-                    comparison = Expression.LessThanOrEqual(property, constant);
-                    break;
+                    if (IsNullableType(property.Type))
+                    {
+                        // Retrieve the underlying non-nullable type
+                        var underlyingType = Nullable.GetUnderlyingType(property.Type);
+
+                        // Create an expression to convert the nullable property to the non-nullable type
+                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        comparison = Expression.LessThanOrEqual(convertedProperty, constant);
+
+                    }
+                    else
+                    {
+                        comparison = Expression.LessThanOrEqual(property, constant);
+                    }                    break;
 
                 case QueryOperator.Contains:
                     comparison = Expression.Call(property,
@@ -128,7 +194,10 @@ public static class QueryableExtensions
 
         return source;
     }
-
+    private static bool IsNullableType(Type type)
+    {
+        return Nullable.GetUnderlyingType(type) != null;
+    }
     public static IQueryable<T> IsInList<T>(this IQueryable<T> source,
         Expression<Func<T, IEnumerable<string>>> stringListSelector, List<string> ids)
     {

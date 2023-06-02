@@ -1,3 +1,5 @@
+import { LeadVm } from "../../Lead/Models/LeadVm";
+
 export interface TripVm {
   id: string;
   projectId: string;
@@ -8,4 +10,7 @@ export interface TripVm {
   tripReport: string | null;
   isTripReportCompleted: boolean;
   numberOfPhotos: number;
+  modifiedOn: string | null;
+  createdOn: string;
+  leads: LeadVm[];
 }

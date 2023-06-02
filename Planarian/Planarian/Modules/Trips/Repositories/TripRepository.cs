@@ -106,9 +106,9 @@ public class TripRepository : RepositoryBase
                 Description = e.Description,
                 TripReport = e.TripReport,
                 NumberOfPhotos = e.Photos.Count,
-                ModifiedOn = e.ModifiedOn,
                 Leads = e.Leads.Select(e => new LeadVm(e)),
-                Project = e.Project
+                CreatedOn = e.CreatedOn,
+                ModifiedOn = e.ModifiedOn,
             })
             .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);

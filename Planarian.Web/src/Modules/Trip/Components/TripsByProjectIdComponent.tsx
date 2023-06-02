@@ -96,9 +96,22 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
           label={"Trip Members"}
         />
         <NumberComparisonFormItem
+          inputType="number"
           queryBuilder={queryBuilder}
           field={"numberOfPhotos"}
           label={"Number of Photos"}
+        />
+        <NumberComparisonFormItem
+          inputType="date"
+          queryBuilder={queryBuilder}
+          field={"createdOn"}
+          label={"Created On"}
+        />
+        <NumberComparisonFormItem
+          inputType="date"
+          queryBuilder={queryBuilder}
+          field={"modifiedOn"}
+          label={"Modified On"}
         />
       </AdvancedSearchDrawerComponent>
 

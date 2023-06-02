@@ -1,12 +1,41 @@
 import { Form, Input, Select } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { FilterFormItemProps } from "./NumberComparisonFormItemProps";
+import { LiteralUnion } from "antd/lib/_util/type";
 const { Option } = Select;
+
+export interface NumberFilterFormItemProps<T> extends FilterFormItemProps<T> {
+  inputType:
+    | "button"
+    | "checkbox"
+    | "color"
+    | "date"
+    | "datetime-local"
+    | "email"
+    | "file"
+    | "hidden"
+    | "image"
+    | "month"
+    | "number"
+    | "password"
+    | "radio"
+    | "range"
+    | "reset"
+    | "search"
+    | "submit"
+    | "tel"
+    | "text"
+    | "time"
+    | "url"
+    | "week";
+}
+
 const NumberFilterFormItem = <T,>({
   queryBuilder,
   field,
   label,
-}: FilterFormItemProps<T>) => {
+  inputType,
+}: NumberFilterFormItemProps<T>) => {
   const getGreaterThanKey = () => {
     return `${field.toString()}GreaterThan`;
   };
@@ -23,7 +52,7 @@ const NumberFilterFormItem = <T,>({
     <Form.Item label={label}>
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
-          type="number"
+          type={inputType}
           defaultValue={
             queryBuilder.getFieldValue(getGreaterThanKey()) as number
           }
@@ -61,7 +90,7 @@ const NumberFilterFormItem = <T,>({
       <br />
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
-          type="number"
+          type={inputType}
           defaultValue={queryBuilder.getFieldValue(getLessThanKey()) as number}
           onChange={(e) => {
             const currentOperator = queryBuilder.getOperatorValue(

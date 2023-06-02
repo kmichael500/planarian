@@ -55,11 +55,13 @@ const ProjectsPage: React.FC = () => {
         queryBuilder={queryBuilder}
       >
         <NumberComparisonFormItem
+          inputType="number"
           queryBuilder={queryBuilder}
           field={"numberOfTrips"}
           label={"Number of Trips"}
         />
         <NumberComparisonFormItem
+          inputType="number"
           queryBuilder={queryBuilder}
           field={"numberOfProjectMembers"}
           label={"Number of Project Members"}

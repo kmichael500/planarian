@@ -10,7 +10,7 @@ public class TripVm : ITrip
     public TripVm(string id, string projectId, IEnumerable<string> tripTagTypeIds,
         IEnumerable<string> tripMemberIds, string name,
         string? description,
-        string? tripReport, int numberOfPhotos, DateTime? modifiedOn)
+        string? tripReport, int numberOfPhotos, DateTime createdOn, DateTime? modifiedOn)
     {
         Id = id;
         ProjectId = projectId;
@@ -34,6 +34,7 @@ public class TripVm : ITrip
         TripReport = trip.TripReport;
         IsTripReportCompleted = !string.IsNullOrWhiteSpace(TripReport);
         NumberOfPhotos = numberOfPhotos;
+        CreatedOn = trip.CreatedOn;
         ModifiedOn = trip.ModifiedOn;
     }
     
@@ -66,6 +67,6 @@ public class TripVm : ITrip
 
     public string? TripReport { get; set; }
     public DateTime? ModifiedOn { get; set; }
+    public DateTime CreatedOn { get; set; }
     public IEnumerable<LeadVm> Leads { get; set; }
-    public Project Project { get; set; }
 }
