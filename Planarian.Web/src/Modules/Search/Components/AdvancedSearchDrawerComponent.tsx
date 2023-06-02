@@ -50,7 +50,7 @@ const SearchFormComponent = <T,>({
           <Form
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                onSearch();
+                onClickSearch();
               }
             }}
             layout="vertical"
@@ -60,7 +60,7 @@ const SearchFormComponent = <T,>({
           </Form>
           <Button
             onClick={() => {
-              onSearch();
+              onClickSearch();
             }}
           >
             Search
