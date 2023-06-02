@@ -2,6 +2,7 @@ import { Row, Col, Button, Empty, Card } from "antd";
 import Pagination, { PaginationConfig } from "antd/lib/pagination";
 import { Key } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
+import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
 
 interface CardGridComponentProps<T> {
   renderItem: (item: T) => React.ReactNode;
@@ -9,12 +10,8 @@ interface CardGridComponentProps<T> {
   pagedItems?: PagedResult<T> | undefined;
   noDataDescription?: string;
   noDataCreateButton?: React.ReactNode;
-  pagination?: PaginationConfig | false;
-}
-
-interface ReactNodeWithKey {
-  item: React.ReactNode;
-  key: Key | null | undefined;
+  queryBuilder?: QueryBuilder<T>;
+  onSearch?: () => Promise<void>;
 }
 
 const CardGridComponent = <T,>({
@@ -23,7 +20,8 @@ const CardGridComponent = <T,>({
   pagedItems,
   noDataDescription,
   noDataCreateButton,
-  pagination,
+  queryBuilder,
+  onSearch,
 }: CardGridComponentProps<T>) => {
   let data: T[] = [];
 
@@ -59,7 +57,23 @@ const CardGridComponent = <T,>({
       <Row style={{ marginTop: "10px" }}>
         <Col flex="auto"></Col>
         <Col>
-          <Pagination {...pagination} />
+          {pagedItems && (
+            <Pagination
+              onChange={async (pageNumber, pageSize) => {
+                if (queryBuilder) {
+                  queryBuilder.changePage(pageNumber, pageSize);
+                }
+                if (onSearch) {
+                  await onSearch();
+                }
+              }}
+              showSizeChanger={false}
+              responsive={true}
+              current={pagedItems?.pageNumber}
+              pageSize={pagedItems?.pageSize}
+              total={pagedItems?.totalCount}
+            />
+          )}
         </Col>
       </Row>
     </>

@@ -99,18 +99,6 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
 
       <SpinnerCardComponent spinning={isTripsLoading}>
         <CardGridComponent
-          pagination={{
-            onChange: async (pageNumber, pageSize) => {
-              queryBuilder.changePage(pageNumber, pageSize);
-              await getTrips();
-            },
-            showSizeChanger: false,
-            responsive: true,
-            current: trips?.pageNumber,
-            pageSize: trips?.pageSize,
-            position: "bottom",
-            total: trips?.totalCount,
-          }}
           noDataDescription={"No trips found"}
           noDataCreateButton={
             <TripCreateButtonComponent projectId={props.projectId} />
@@ -121,6 +109,8 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
             </Link>
           )}
           pagedItems={trips}
+          queryBuilder={queryBuilder}
+          onSearch={onSearch}
         />
       </SpinnerCardComponent>
     </>
