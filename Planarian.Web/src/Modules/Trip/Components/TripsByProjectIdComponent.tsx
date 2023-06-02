@@ -127,6 +127,9 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                   tripTagTypeIds: queryBuilder.getFieldValue(
                     "tripTagTypeIds"
                   ) as string[],
+                  tripMemberIds: queryBuilder.getFieldValue(
+                    "tripMemberIds"
+                  ) as string[],
                 } as TripVm
               }
             >

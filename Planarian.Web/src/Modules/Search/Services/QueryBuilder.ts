@@ -150,7 +150,8 @@ class QueryBuilder<T> {
     const existingCondition = this.conditions.find(
       (x) =>
         (x.field === condition.field && x.operator === condition.operator) ||
-        x.operator === this.reversedOperator(condition.operator)
+        (x.field === condition.field &&
+          x.operator === this.reversedOperator(condition.operator))
     );
     if (existingCondition && !keepDuplicates) {
       // this is either genius or it will cause a bug that someone will find in a year...
