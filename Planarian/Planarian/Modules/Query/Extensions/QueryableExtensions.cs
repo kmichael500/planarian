@@ -53,20 +53,22 @@ public static class QueryableExtensions
                 case QueryOperator.In:
                     var ids = condition.Value.Split(',',
                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
+                    
                     if (property is not MemberExpression { Member: PropertyInfo })
                     {
                         throw new ArgumentException("Selector must be a property selector.");
                     }
-
-
                     var containsMethod = typeof(Enumerable).GetMethods()
-                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
-                        .MakeGenericMethod(typeof(string));
+                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2).MakeGenericMethod(typeof(string));
 
-                    comparison = Expression.Call(containsMethod, constant, property);
-                    break;
-
+                    foreach (var id in ids)
+                    {
+                        constant = Expression.Constant(id, typeof(string));
+                        var expressionBody = Expression.Call(containsMethod, property, constant);
+                        var expressionLambda = Expression.Lambda<Func<T, bool>>(expressionBody, parameter);
+                        source = source.Where(expressionLambda);
+                    }
+                    continue;
                 case QueryOperator.Equal:
                     comparison = Expression.Equal(property, constant);
                     break;

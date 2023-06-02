@@ -48,7 +48,6 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
         return new JsonResult(trips);
     }
 
-    [AllowAnonymous]
     [HttpGet("{projectId:length(10)}/trips")]
     public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId,
         [FromQuery] FilterQuery query)
