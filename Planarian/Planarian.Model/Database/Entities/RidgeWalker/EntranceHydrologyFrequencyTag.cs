@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -20,15 +21,17 @@ public class LeadTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrolog
     {
         base.Configure(builder);
 
-        builder.HasKey(e => new { e.TagTypeId, TripId = e.EntranceId });
+        builder.HasKey(e => new { e.TagTypeId,  e.EntranceId });
         
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceHydrologyFrequencyTags)
-            .HasForeignKey(bc => bc.TagTypeId);
+            .HasForeignKey(bc => bc.TagTypeId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
 
         builder.HasOne(e => e.Entrance)
             .WithMany(e => e.EntranceHydrologyFrequencyTags)
-            .HasForeignKey(e => e.EntranceId);
+            .HasForeignKey(e => e.EntranceId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
     }
 }

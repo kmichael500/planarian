@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -22,10 +23,12 @@ public class MapConfiguration : BaseEntityTypeConfiguration<Map>
         builder
             .HasOne(e => e.Cave)
             .WithMany(e => e.Maps)
-            .HasForeignKey(bc => bc.CaveId);
+            .HasForeignKey(bc => bc.CaveId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
 
         builder.HasOne(e => e.MapStatusTag)
             .WithMany(e => e.MapStatusTags)
-            .HasForeignKey(e => e.MapStatusTagId);
+            .HasForeignKey(e => e.MapStatusTagId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
     }
 }

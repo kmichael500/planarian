@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -39,14 +40,18 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
     {
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.Entrances)
-            .HasForeignKey(e => e.CaveId);
-        
+            .HasForeignKey(e => e.CaveId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
+
         builder.HasOne(e => e.ReportedByUser)
             .WithMany(e => e.EntrancesReported)
-            .HasForeignKey(e => e.ReportedByUserId);
+            .HasForeignKey(e => e.ReportedByUserId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
+
 
         builder.HasOne(e => e.LocationQualityTag)
             .WithMany(e => e.EntranceLocationQualitiesTags)
-            .HasForeignKey(e => e.LocationQualityTagId);
+            .HasForeignKey(e => e.LocationQualityTagId)
+            .OnDelete(DeleteBehavior.ClientNoAction);
     }
 }
