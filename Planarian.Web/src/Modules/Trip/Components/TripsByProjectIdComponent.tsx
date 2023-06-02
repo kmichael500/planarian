@@ -115,14 +115,12 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
           noDataCreateButton={
             <TripCreateButtonComponent projectId={props.projectId} />
           }
-          items={trips?.results.map((trip) => ({
-            item: (
-              <Link to={`trip/${trip.id}`}>
-                <TripCardComponent trip={trip} />
-              </Link>
-            ),
-            key: trip.id,
-          }))}
+          renderItem={(trip) => (
+            <Link to={`trip/${trip.id}`}>
+              <TripCardComponent trip={trip} />
+            </Link>
+          )}
+          pagedItems={trips}
         />
       </SpinnerCardComponent>
     </>

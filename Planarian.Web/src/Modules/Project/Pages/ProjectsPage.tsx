@@ -7,6 +7,7 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import { ProjectCreateButtonComponent } from "../Components/ProjectCreateButtonComponent";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
+import { PagedResult } from "../../Search/Models/PagedResult";
 
 const { Title, Paragraph } = Typography;
 
@@ -36,25 +37,23 @@ const ProjectsPage: React.FC = () => {
         <CardGridComponent
           noDataDescription="No projects found"
           noDataCreateButton={<ProjectCreateButtonComponent />}
-          items={projects?.map((project) => ({
-            item: (
-              <Link to={project.id}>
-                <Card
-                  style={{ height: "100%" }}
-                  loading={isLoading}
-                  hoverable
-                  title={project.name}
-                  bordered={false}
-                >
-                  <Paragraph>
-                    Project Members: {project.numberOfProjectMembers}
-                  </Paragraph>
-                  <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
-                </Card>
-              </Link>
-            ),
-            key: project.id,
-          }))}
+          renderItem={(project) => (
+            <Link to={project.id}>
+              <Card
+                style={{ height: "100%" }}
+                loading={isLoading}
+                hoverable
+                title={project.name}
+                bordered={false}
+              >
+                <Paragraph>
+                  Project Members: {project.numberOfProjectMembers}
+                </Paragraph>
+                <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
+              </Card>
+            </Link>
+          )}
+          items={projects}
         />
       </SpinnerCardComponent>
     </div>
