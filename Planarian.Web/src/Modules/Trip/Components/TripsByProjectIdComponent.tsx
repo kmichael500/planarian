@@ -30,6 +30,8 @@ import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
+import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
+import { SearchFormComponent } from "../../Search/Components/SearchFormComponent";
 const { Option } = Select;
 interface TripsByProjectIdComponentProps {
   projectId: string;
@@ -114,41 +116,16 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
             open={isAdvancedSearchOpen}
             onClose={(e) => setIsAdvancedSearchOpen(false)}
           >
-            <Form
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onSearch();
-                }
-              }}
-              layout="vertical"
-              initialValues={
-                {
-                  tripReport: queryBuilder.getFieldValue(
-                    "tripReport"
-                  ) as string,
-                  tripTagTypeIds: queryBuilder.getFieldValue(
-                    "tripTagTypeIds"
-                  ) as string[],
-                  tripMemberIds: queryBuilder.getFieldValue(
-                    "tripMemberIds"
-                  ) as string[],
-                } as TripVm
-              }
+            <SearchFormComponent
+              onSearch={onSearch}
+              queryBuilder={queryBuilder}
             >
-              <Form.Item
-                name={nameof<TripVm>("tripReport")}
-                label="Trip Report"
-              >
-                <Input
-                  onChange={(e) => {
-                    queryBuilder.filterBy(
-                      "tripReport",
-                      QueryOperator.Contains,
-                      e.target.value
-                    );
-                  }}
-                />
-              </Form.Item>
+              <TextFilterFormItem
+                queryBuilder={queryBuilder}
+                field={"tripReport"}
+                label={"Trip Report"}
+              />
+
               <TagFilterFormItem
                 projectId={props.projectId}
                 tagType={TagType.Trip}
@@ -168,7 +145,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                 field={"numberOfPhotos"}
                 label={"Number of Photos"}
               />
-            </Form>
+            </SearchFormComponent>
             <Button
               onClick={() => {
                 onSearch();

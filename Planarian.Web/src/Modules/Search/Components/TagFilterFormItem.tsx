@@ -19,20 +19,12 @@ const TagFilterFormItem = <T,>({
 }: TagFilterFormItemProps<T>) => {
   const [form] = Form.useForm(); // Create a form instance
 
-  // Set the initial value using setFieldsValue when the component mounts
-  useEffect(() => {
-    form.setFieldsValue({
-      [field]: queryBuilder.getFieldValue(field),
-    });
-  }, [field, form, queryBuilder]);
-
   return (
     <TagSelectComponent
       projectId={projectId}
       tagType={tagType}
       field={field.toString()}
       label={label}
-      // defaultValue={queryBuilder.getFieldValue(field) as string[]}
       onChange={(e) => {
         queryBuilder.filterBy(field, QueryOperator.In, e as any);
       }}

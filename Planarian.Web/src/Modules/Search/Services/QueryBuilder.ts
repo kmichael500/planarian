@@ -25,14 +25,17 @@ export enum QueryOperator {
 }
 
 class QueryCondition<T> implements IQueryCondition<T> {
+  public key!: string;
   constructor(
     public field: keyof T,
-    public key: string | undefined,
+    key: string | undefined,
     public operator: QueryOperator,
     public value: T[keyof T] | null
   ) {
     if (!key) {
       this.key = field.toString();
+    } else {
+      this.key = key;
     }
   }
 }
@@ -65,6 +68,14 @@ class QueryBuilder<T> {
       const condition = new QueryCondition(field, key, operator, null);
       this.addToDictionary(condition);
     }
+  }
+
+  public getDefaultValues() {
+    const defaultValues = {} as any;
+    this.conditions.forEach((condition) => {
+      defaultValues[condition.key] = condition.value;
+    });
+    return defaultValues;
   }
 
   public getFieldValue(key: keyof T | string): T[keyof T] | undefined | null {

@@ -7,40 +7,46 @@ const NumberFilterFormItem = <T,>({
   field,
   label,
 }: FilterFormItemProps<T>) => {
+  const getGreaterThanKey = () => {
+    return `${field.toString()}GreaterThan`;
+  };
+  const getGreaterThanDefaultOperator = () => {
+    return QueryOperator.GreaterThanOrEqual;
+  };
+  const getLessThanKey = () => {
+    return `${field.toString()}LessThan`;
+  };
+  const getLessThanDefaultOperator = () => {
+    return QueryOperator.LessThanOrEqual;
+  };
   return (
     <Form.Item label={label}>
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
           type="number"
           defaultValue={
-            queryBuilder.getFieldValue(
-              `${field.toString()}GreaterThan`
-            ) as number
+            queryBuilder.getFieldValue(getGreaterThanKey()) as number
           }
           onChange={(e) => {
             const currentOperator = queryBuilder.getOperatorValue(
-              `${field.toString()}GreaterThan`,
-              QueryOperator.GreaterThanOrEqual
+              getGreaterThanKey(),
+              getGreaterThanDefaultOperator()
             );
             queryBuilder.filterBy(
               field,
               currentOperator,
               e.target.value as any,
-              `${field.toString()}GreaterThan`
+              getGreaterThanKey()
             );
           }}
         />
         <Select
           defaultValue={queryBuilder.getOperatorValue(
-            `${field.toString()}GreaterThan`,
-            QueryOperator.GreaterThanOrEqual
+            getGreaterThanKey(),
+            getGreaterThanDefaultOperator()
           )}
           onChange={(e) => {
-            queryBuilder.changeOperators(
-              field,
-              e,
-              `${field.toString()}GreaterThan`
-            );
+            queryBuilder.changeOperators(field, e, getGreaterThanKey());
           }}
         >
           {" "}
@@ -56,33 +62,27 @@ const NumberFilterFormItem = <T,>({
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
           type="number"
-          defaultValue={
-            queryBuilder.getFieldValue(`${field.toString()}LessThan`) as number
-          }
+          defaultValue={queryBuilder.getFieldValue(getLessThanKey()) as number}
           onChange={(e) => {
             const currentOperator = queryBuilder.getOperatorValue(
-              `${field.toString()}LessThan`,
-              QueryOperator.LessThanOrEqual
+              getLessThanKey(),
+              getLessThanDefaultOperator()
             );
             queryBuilder.filterBy(
               field,
               currentOperator,
               e.target.value as any,
-              `${field.toString()}LessThan`
+              getLessThanKey()
             );
           }}
         />
         <Select
           defaultValue={queryBuilder.getOperatorValue(
-            "numberOfPhotosLessThan",
-            QueryOperator.LessThanOrEqual
+            getLessThanKey(),
+            getLessThanDefaultOperator()
           )}
           onChange={(e) => {
-            queryBuilder.changeOperators(
-              field,
-              e,
-              `${field.toString()}LessThan`
-            );
+            queryBuilder.changeOperators(field, e, getLessThanKey());
           }}
         >
           <Option value={QueryOperator.LessThanOrEqual}>
