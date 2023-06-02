@@ -108,6 +108,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
               <TripCardComponent trip={trip} />
             </Link>
           )}
+          itemKey={(trip) => trip.id}
           pagedItems={trips}
           queryBuilder={queryBuilder}
           onSearch={onSearch}

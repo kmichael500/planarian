@@ -6,6 +6,7 @@ import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
 
 interface CardGridComponentProps<T> {
   renderItem: (item: T) => React.ReactNode;
+  itemKey: (item: T) => string;
   items?: T[] | undefined;
   pagedItems?: PagedResult<T> | undefined;
   noDataDescription?: string;
@@ -16,6 +17,7 @@ interface CardGridComponentProps<T> {
 
 const CardGridComponent = <T,>({
   renderItem,
+  itemKey,
   items,
   pagedItems,
   noDataDescription,
@@ -46,10 +48,10 @@ const CardGridComponent = <T,>({
           { xs: 8, sm: 8, md: 12, lg: 12 },
         ]}
       >
-        {data.map((node, i) => {
+        {data.map((item, i) => {
           return (
-            <Col key={i} xs={24} sm={12} md={8} lg={6}>
-              {renderItem(node)}
+            <Col key={itemKey(item)} xs={24} sm={12} md={8} lg={6}>
+              {renderItem(item)}
             </Col>
           );
         })}

@@ -7,7 +7,6 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import { ProjectCreateButtonComponent } from "../Components/ProjectCreateButtonComponent";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
-import { PagedResult } from "../../Search/Models/PagedResult";
 
 const { Title, Paragraph } = Typography;
 
@@ -53,6 +52,7 @@ const ProjectsPage: React.FC = () => {
               </Card>
             </Link>
           )}
+          itemKey={(project) => project.id}
           items={projects}
         />
       </SpinnerCardComponent>
