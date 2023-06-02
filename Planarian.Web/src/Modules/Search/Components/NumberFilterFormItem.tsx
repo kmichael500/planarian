@@ -1,6 +1,6 @@
 import { Form, Input, Select } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
-import { FilterFormItemProps } from "./NumberComparisonFormItemProps";
+import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
 import { LiteralUnion } from "antd/lib/_util/type";
 const { Option } = Select;
 

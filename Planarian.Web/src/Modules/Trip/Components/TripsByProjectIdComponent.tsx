@@ -14,6 +14,7 @@ import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFo
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
 import { AdvancedSearchDrawerComponent as AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
+import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
 interface TripsByProjectIdComponentProps {
   projectId: string;
 }
@@ -70,17 +71,6 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
         onSearch={onSearch}
         queryBuilder={queryBuilder}
       >
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"project.name" as any}
-          label={"Project Name"}
-        />
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"tripReport"}
-          label={"Trip Report"}
-        />
-
         <TagFilterFormItem
           projectId={props.projectId}
           tagType={TagType.Trip}
@@ -95,6 +85,30 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
           field={"tripMemberIds"}
           label={"Trip Members"}
         />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"tripReport"}
+          label={"Trip Report"}
+        />
+        <Row gutter={10}>
+          <Col span={12}>
+            <BooleanFilterFormItem
+              queryBuilder={queryBuilder}
+              field={"isTripReportCompleted"}
+              key={"completedTripReportsOnly"}
+              label={"Completed Trip Reports Only"}
+            />
+          </Col>
+          <Col span={12}>
+            <BooleanFilterFormItem
+              queryBuilder={queryBuilder}
+              opposite
+              field={"isTripReportCompleted"}
+              key={"uncompletedTripReportsOnly"}
+              label={"Uncompleted Trip Reports Only"}
+            />
+          </Col>
+        </Row>
         <NumberComparisonFormItem
           inputType="number"
           queryBuilder={queryBuilder}

@@ -1,5 +1,5 @@
 import { Button, Col, Drawer, Form, Input, Row } from "antd";
-import { FilterFormProps } from "./NumberComparisonFormItemProps";
+import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";

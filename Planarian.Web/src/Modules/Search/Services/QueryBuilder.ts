@@ -104,10 +104,18 @@ class QueryBuilder<T> {
   filterBy(
     field: keyof T,
     operator: QueryOperator,
-    value: T[keyof T],
+    value: T[keyof T] | null,
     key?: string
   ) {
     this.addToDictionary(new QueryCondition(field, key, operator, value));
+    return this;
+  }
+
+  public removeFromDictionary(key: string) {
+    const index = this.conditions.findIndex((x) => x.key === key);
+    if (index > -1) {
+      this.conditions.splice(index, 1);
+    }
     return this;
   }
 
@@ -132,6 +140,7 @@ class QueryBuilder<T> {
 
   public buildAsQueryString() {
     const conditions = [] as QueryCondition<T>[];
+    console.log("Here");
     this.conditions.forEach((condition) => {
       if (condition.value !== null || condition.value !== undefined) {
         if (

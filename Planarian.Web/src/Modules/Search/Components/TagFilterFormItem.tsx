@@ -1,9 +1,8 @@
 import { Form, Select } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
-import { FilterFormItemProps } from "./NumberComparisonFormItemProps";
+import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
-import { useEffect } from "react";
 
 export interface TagFilterFormItemProps<T> extends FilterFormItemProps<T> {
   projectId: string;
