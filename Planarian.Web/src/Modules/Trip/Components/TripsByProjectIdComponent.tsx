@@ -28,7 +28,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { TripCardComponent } from "./TripCard";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
-import { NumberComparisonFormItem } from "../../Search/Components/NumberComparisonFormItem";
+import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 const { Option } = Select;
 interface TripsByProjectIdComponentProps {

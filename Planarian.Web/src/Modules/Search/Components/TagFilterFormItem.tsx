@@ -27,16 +27,16 @@ const TagFilterFormItem = <T,>({
   }, [field, form, queryBuilder]);
 
   return (
-    <Form.Item name={field.toString()} label={label}>
-      <TagSelectComponent
-        projectId={projectId}
-        tagType={tagType}
-        defaultValue={queryBuilder.getFieldValue(field) as string[]}
-        onChange={(e) => {
-          queryBuilder.filterBy(field, QueryOperator.In, e as any);
-        }}
-      />
-    </Form.Item>
+    <TagSelectComponent
+      projectId={projectId}
+      tagType={tagType}
+      field={field.toString()}
+      label={label}
+      // defaultValue={queryBuilder.getFieldValue(field) as string[]}
+      onChange={(e) => {
+        queryBuilder.filterBy(field, QueryOperator.In, e as any);
+      }}
+    />
   );
 };
 

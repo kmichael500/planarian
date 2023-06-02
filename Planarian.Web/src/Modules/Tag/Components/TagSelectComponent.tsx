@@ -1,4 +1,4 @@
-import { Select, Spin } from "antd";
+import { Form, Select, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ProjectService } from "../../Project/Services/ProjectService";
@@ -10,6 +10,8 @@ export interface TagSelectComponentProps {
   defaultValue?: string[];
   tagType: TagType;
   projectId: string;
+  field?: string;
+  label?: string;
 }
 const TagSelectComponent: React.FC<TagSelectComponentProps> = (props) => {
   const [tags, setTags] = useState<SelectListItem<string>[]>();
@@ -42,25 +44,27 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = (props) => {
 
   return (
     <Spin spinning={isLoading}>
-      <Select
-        loading={isLoading}
-        notFoundContent={isLoading ? <Spin size="small" /> : null}
-        mode="multiple"
-        value={defaultValue}
-        allowClear
-        onChange={(e) => {
-          setDefaultValue(e);
-          if (props.onChange) {
-            props?.onChange(e);
-          }
-        }}
-      >
-        {tags?.map((tag) => (
-          <Select.Option key={tag.value} value={tag.value}>
-            {tag.display}
-          </Select.Option>
-        ))}
-      </Select>
+      <Form.Item name={props.field} label={props.label}>
+        <Select
+          loading={isLoading}
+          notFoundContent={isLoading ? <Spin size="small" /> : null}
+          mode="multiple"
+          value={defaultValue}
+          allowClear
+          onChange={(e) => {
+            setDefaultValue(e);
+            if (props.onChange) {
+              props?.onChange(e);
+            }
+          }}
+        >
+          {tags?.map((tag) => (
+            <Select.Option key={tag.value} value={tag.value}>
+              {tag.display}
+            </Select.Option>
+          ))}
+        </Select>
+      </Form.Item>
     </Spin>
   );
 };
