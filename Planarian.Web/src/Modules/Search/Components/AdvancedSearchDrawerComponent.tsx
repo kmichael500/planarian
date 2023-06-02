@@ -1,9 +1,9 @@
-import { Button, Col, Drawer, Form, Input, Row } from "antd";
+import { Button, Col, Drawer, Form, Input, Row, Space } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";
-import { SlidersOutlined } from "@ant-design/icons";
+import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
 
 export interface AdvancedSearchDrawerComponentProps<T>
   extends FilterFormProps<T> {
@@ -26,6 +26,11 @@ const AdvancedSearchDrawerComponent = <T,>({
     await onSearch();
   };
 
+  const onClearSearch = async () => {
+    queryBuilder.clear();
+    await onSearch();
+  };
+
   return (
     <Row style={{ marginBottom: 10 }} gutter={5}>
       <Col>
@@ -43,12 +48,20 @@ const AdvancedSearchDrawerComponent = <T,>({
         />
       </Col>
       <Col>
-        <PlanarianButton
-          icon={<SlidersOutlined />}
-          onClick={(e) => setIsAdvancedSearchOpen(true)}
-        >
-          Advanced
-        </PlanarianButton>
+        <Space>
+          <PlanarianButton
+            icon={<SlidersOutlined />}
+            onClick={(e) => setIsAdvancedSearchOpen(true)}
+          >
+            Advanced
+          </PlanarianButton>
+          <PlanarianButton
+            icon={<ClearOutlined />}
+            onClick={(e) => onClearSearch()}
+          >
+            Clear
+          </PlanarianButton>
+        </Space>
         <Drawer
           open={isAdvancedSearchOpen}
           onClose={(e) => setIsAdvancedSearchOpen(false)}

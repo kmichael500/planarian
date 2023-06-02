@@ -118,6 +118,10 @@ class QueryBuilder<T> {
     }
     return this;
   }
+  public clear() {
+    this.conditions = [];
+    return this;
+  }
 
   private addToDictionary(condition: QueryCondition<T>) {
     const existingCondition = this.conditions.find(
