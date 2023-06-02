@@ -13,7 +13,7 @@ export interface AdvancedSearchDrawerComponentProps<T>
   mainSearchFieldLabel: string;
 }
 
-const SearchFormComponent = <T,>({
+const AdvancedSearchDrawerComponent = <T,>({
   queryBuilder,
   onSearch,
   children,
@@ -77,4 +77,4 @@ const SearchFormComponent = <T,>({
   );
 };
 
-export { SearchFormComponent };
+export { AdvancedSearchDrawerComponent };

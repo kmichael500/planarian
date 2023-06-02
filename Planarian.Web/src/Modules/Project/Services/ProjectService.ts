@@ -25,8 +25,12 @@ const ProjectService = {
    *
    * @returns List of projects that user has access to.
    */
-  async GetProjects(): Promise<ProjectVm[]> {
-    const response = await HttpClient.get<ProjectVm[]>(`${baseUrl}/`);
+  async GetProjects(
+    queryBuilder: QueryBuilder<ProjectVm>
+  ): Promise<PagedResult<ProjectVm>> {
+    const response = await HttpClient.get<PagedResult<ProjectVm>>(
+      `${baseUrl}?${queryBuilder.buildAsQueryString()}`
+    );
     return response.data;
   },
 

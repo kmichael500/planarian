@@ -5,8 +5,8 @@ using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Invitations.Models;
-using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Projects.Services;
+using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Modules.Trips.Services;
 using Planarian.Shared.Base;
@@ -49,7 +49,7 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
     }
 
     [HttpGet("{projectId:length(10)}/trips")]
-    public async Task<ActionResult<IEnumerable<TripVm>>> GetTrips(string projectId,
+    public async Task<ActionResult<PagedResult<TripVm>>> GetTrips(string projectId,
         [FromQuery] FilterQuery query)
     {
         var trips = await _tripService.GetTripsByProjectId(projectId, query);
@@ -70,9 +70,9 @@ public class ProjectController : PlanarianControllerBase<ProjectService>
     }
 
     [HttpGet]
-    public async Task<ActionResult<ProjectVm?>> GetProjects()
+    public async Task<ActionResult<PagedResult<ProjectVm>>> GetProjects([FromQuery] FilterQuery query)
     {
-        var result = await Service.GetProjects();
+        var result = await Service.GetProjects(query);
 
         return new JsonResult(result);
     }

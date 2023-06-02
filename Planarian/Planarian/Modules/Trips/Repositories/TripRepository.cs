@@ -110,7 +110,6 @@ public class TripRepository : RepositoryBase
                 Leads = e.Leads.Select(e => new LeadVm(e)),
                 Project = e.Project
             })
-            // .IsInList(e=>e.TripTagTypeIds, new List<string>{"43T0lkwQ30", "Q1wx7qw5aU"})
             .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);
         

@@ -13,7 +13,7 @@ import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
-import { SearchFormComponent as AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
+import { AdvancedSearchDrawerComponent as AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 interface TripsByProjectIdComponentProps {
   projectId: string;
 }
