@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { SlidersOutlined } from "@ant-design/icons";
 import {
   Button,
   Col,
@@ -31,7 +30,7 @@ import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
-import { SearchFormComponent } from "../../Search/Components/SearchFormComponent";
+import { SearchFormComponent as AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 const { Option } = Select;
 interface TripsByProjectIdComponentProps {
   projectId: string;
@@ -64,9 +63,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
     setIsTripsLoading(false);
   };
 
-  const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onSearch = async () => {
-    setIsAdvancedSearchOpen(false);
     await getTrips();
   };
   const colSpanProps = {
@@ -91,71 +88,37 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
           <TripCreateButtonComponent projectId={props.projectId} />
         </Col>
       </Row>
-      <Row style={{ marginBottom: 10 }} gutter={5}>
-        <Col>
-          <Input.Search
-            defaultValue={queryBuilder.getFieldValue("name") as string}
-            onChange={(e) => {
-              queryBuilder.filterBy(
-                "name",
-                QueryOperator.Contains,
-                e.target.value
-              );
-            }}
-            onSearch={onSearch}
-          />
-        </Col>
-        <Col>
-          <PlanarianButton
-            icon={<SlidersOutlined />}
-            onClick={(e) => setIsAdvancedSearchOpen(true)}
-          >
-            Advanced
-          </PlanarianButton>
-          <Drawer
-            open={isAdvancedSearchOpen}
-            onClose={(e) => setIsAdvancedSearchOpen(false)}
-          >
-            <SearchFormComponent
-              onSearch={onSearch}
-              queryBuilder={queryBuilder}
-            >
-              <TextFilterFormItem
-                queryBuilder={queryBuilder}
-                field={"tripReport"}
-                label={"Trip Report"}
-              />
 
-              <TagFilterFormItem
-                projectId={props.projectId}
-                tagType={TagType.Trip}
-                queryBuilder={queryBuilder}
-                field={"tripTagTypeIds"}
-                label={"Tags"}
-              />
-              <TagFilterFormItem
-                projectId={props.projectId}
-                tagType={TagType.ProjectMember}
-                queryBuilder={queryBuilder}
-                field={"tripMemberIds"}
-                label={"Trip Members"}
-              />
-              <NumberComparisonFormItem
-                queryBuilder={queryBuilder}
-                field={"numberOfPhotos"}
-                label={"Number of Photos"}
-              />
-            </SearchFormComponent>
-            <Button
-              onClick={() => {
-                onSearch();
-              }}
-            >
-              Search
-            </Button>
-          </Drawer>
-        </Col>
-      </Row>
+      <AdvancedSearchDrawerComponent
+        onSearch={onSearch}
+        queryBuilder={queryBuilder}
+      >
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"tripReport"}
+          label={"Trip Report"}
+        />
+
+        <TagFilterFormItem
+          projectId={props.projectId}
+          tagType={TagType.Trip}
+          queryBuilder={queryBuilder}
+          field={"tripTagTypeIds"}
+          label={"Tags"}
+        />
+        <TagFilterFormItem
+          projectId={props.projectId}
+          tagType={TagType.ProjectMember}
+          queryBuilder={queryBuilder}
+          field={"tripMemberIds"}
+          label={"Trip Members"}
+        />
+        <NumberComparisonFormItem
+          queryBuilder={queryBuilder}
+          field={"numberOfPhotos"}
+          label={"Number of Photos"}
+        />
+      </AdvancedSearchDrawerComponent>
 
       <SpinnerCardComponent spinning={isTripsLoading}>
         <CardGridComponent
