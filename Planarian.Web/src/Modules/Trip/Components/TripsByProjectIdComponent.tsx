@@ -28,6 +28,8 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { TripCardComponent } from "./TripCard";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
+import { NumberComparisonFormItem } from "../../Search/Components/NumberComparisonFormItem";
+import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 const { Option } = Select;
 interface TripsByProjectIdComponentProps {
   projectId: string;
@@ -147,124 +149,25 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                   }}
                 />
               </Form.Item>
-              <Form.Item name={nameof<TripVm>("tripTagTypeIds")} label="Tags">
-                <TagSelectComponent
-                  projectId={props.projectId}
-                  tagType={TagType.Trip}
-                  defaultValue={
-                    queryBuilder.getFieldValue("tripTagTypeIds") as string[]
-                  }
-                  onChange={(e) => {
-                    queryBuilder.filterBy(
-                      "tripTagTypeIds",
-                      QueryOperator.In,
-                      e
-                    );
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                name={nameof<TripVm>("tripMemberIds")}
-                label="Trip Members"
-              >
-                <TagSelectComponent
-                  projectId={props.projectId}
-                  tagType={TagType.ProjectMember}
-                  defaultValue={
-                    queryBuilder.getFieldValue("tripMemberIds") as string[]
-                  }
-                  onChange={(e) => {
-                    queryBuilder.filterBy("tripMemberIds", QueryOperator.In, e);
-                  }}
-                />
-              </Form.Item>
-              <Form.Item label="Number of Photos">
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <Input
-                    type="number"
-                    defaultValue={
-                      queryBuilder.getFieldValue(
-                        "numberOfPhotosGreaterThan"
-                      ) as number
-                    }
-                    onChange={(e) => {
-                      const currentOperator = queryBuilder.getOperatorValue(
-                        "numberOfPhotosGreaterThan",
-                        QueryOperator.GreaterThanOrEqual
-                      );
-                      queryBuilder.filterBy(
-                        "numberOfPhotos",
-                        currentOperator,
-                        e.target.value,
-                        "numberOfPhotosGreaterThan"
-                      );
-                    }}
-                  />
-                  <Select
-                    defaultValue={queryBuilder.getOperatorValue(
-                      "numberOfPhotosGreaterThan",
-                      QueryOperator.GreaterThanOrEqual
-                    )}
-                    onChange={(e) => {
-                      queryBuilder.changeOperators(
-                        "numberOfPhotos",
-                        e,
-                        "numberOfPhotosGreaterThan"
-                      );
-                    }}
-                  >
-                    {" "}
-                    <Option value={QueryOperator.GreaterThanOrEqual}>
-                      {QueryOperator.GreaterThanOrEqual}
-                    </Option>
-                    <Option value={QueryOperator.GreaterThan}>
-                      {QueryOperator.GreaterThan}
-                    </Option>
-                  </Select>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <Input
-                    type="number"
-                    defaultValue={
-                      queryBuilder.getFieldValue(
-                        "numberOfPhotosLessThan"
-                      ) as number
-                    }
-                    onChange={(e) => {
-                      const currentOperator = queryBuilder.getOperatorValue(
-                        "numberOfPhotosLessThan",
-                        QueryOperator.LessThanOrEqual
-                      );
-                      queryBuilder.filterBy(
-                        "numberOfPhotos",
-                        currentOperator,
-                        e.target.value,
-                        "numberOfPhotosLessThan"
-                      );
-                    }}
-                  />
-                  <Select
-                    defaultValue={queryBuilder.getOperatorValue(
-                      "numberOfPhotosLessThan",
-                      QueryOperator.LessThanOrEqual
-                    )}
-                    onChange={(e) => {
-                      queryBuilder.changeOperators(
-                        "numberOfPhotos",
-                        e,
-                        "numberOfPhotosLessThan"
-                      );
-                    }}
-                  >
-                    <Option value={QueryOperator.LessThanOrEqual}>
-                      {QueryOperator.LessThanOrEqual}
-                    </Option>
-                    <Option value={QueryOperator.LessThan}>
-                      {QueryOperator.LessThan}
-                    </Option>
-                  </Select>
-                </div>
-              </Form.Item>
+              <TagFilterFormItem
+                projectId={props.projectId}
+                tagType={TagType.Trip}
+                queryBuilder={queryBuilder}
+                field={"tripTagTypeIds"}
+                label={"Tags"}
+              />
+              <TagFilterFormItem
+                projectId={props.projectId}
+                tagType={TagType.ProjectMember}
+                queryBuilder={queryBuilder}
+                field={"tripMemberIds"}
+                label={"Trip Members"}
+              />
+              <NumberComparisonFormItem
+                queryBuilder={queryBuilder}
+                field={"numberOfPhotos"}
+                label={"Number of Photos"}
+              />
             </Form>
             <Button
               onClick={() => {
