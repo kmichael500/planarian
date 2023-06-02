@@ -57,7 +57,7 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
       render: (text: string, record: LeadVm) => (
         <span>
           <DeleteButtonComponent
-            title="Are you sure to delete this lead?"
+            title="Are you sure you want to delete this lead?"
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"

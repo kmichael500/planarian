@@ -84,7 +84,7 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
       render: (text: string, record: any) => (
         <Space size="middle">
           <DeleteButtonComponent
-            title={`Are you sure to delete this ${props.type.toLowerCase()} member?`}
+            title={`Are you sure you want to delete this ${props.type.toLowerCase()} member?`}
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
