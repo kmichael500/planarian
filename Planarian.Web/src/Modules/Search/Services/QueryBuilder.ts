@@ -27,9 +27,14 @@ export enum QueryOperator {
 class QueryCondition<T> implements IQueryCondition<T> {
   constructor(
     public field: keyof T,
+    public key: string | undefined,
     public operator: QueryOperator,
     public value: T[keyof T]
-  ) {}
+  ) {
+    if (!key) {
+      this.key = field.toString();
+    }
+  }
 }
 
 class QueryBuilder<T> {
@@ -67,65 +72,25 @@ class QueryBuilder<T> {
     }
   }
 
-  reverseOperators(field: keyof T, operator: QueryOperator) {
-    this.conditions.forEach((element) => {
-      if (element.field === field) {
-        const reversedOperator = this.reversedOperator(operator);
-        if (this.isSameOperatorType(element.operator, operator)) {
-          element.operator = operator;
-        } else if (
-          this.isSameOperatorType(element.operator, reversedOperator)
-        ) {
-          console.log("HERER");
-          element.operator = reversedOperator;
-        }
-
-        // else if (
-        //   this.isSameOperatorType(
-        //     element.operator,
-        //     this.reversedOperator(operator)
-        //   )
-        // ) {
-        //   element.operator = this.reversedOperator(operator);
-        // }
-      }
-    });
+  changeOperators(key: string, operator: QueryOperator) {
+    const existingCondition = this.conditions.find((x) => x.key === key);
+    if (existingCondition) {
+      existingCondition.operator = operator;
+    }
   }
 
-  private isSameOperatorType(
-    operator: QueryOperator,
-    operator2: QueryOperator
+  public getFieldValue(key: keyof T): T[keyof T] | undefined {
+    return this.conditions.find((x) => x.key === key)?.value;
+  }
+
+  equal(
+    field: keyof T,
+    value: T[keyof T],
+    keepDuplicates = false,
+    key?: string
   ) {
-    console.log("here");
-    if (
-      (operator === QueryOperator.GreaterThan ||
-        operator === QueryOperator.GreaterThanOrEqual) &&
-      (operator2 === QueryOperator.GreaterThan ||
-        operator2 === QueryOperator.GreaterThanOrEqual)
-    ) {
-      return true;
-    }
-
-    if (
-      (operator === QueryOperator.LessThan ||
-        operator === QueryOperator.LessThanOrEqual) &&
-      (operator2 === QueryOperator.LessThan ||
-        operator2 === QueryOperator.LessThanOrEqual)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  public getFieldValue(field: keyof T): T[keyof T] | undefined {
-    return this.conditions.find((x) => x.field === field)?.value;
-  }
-
-  equal(field: keyof T, value: T[keyof T], keepDuplicates = false) {
     this.addToDictionary(
-      new QueryCondition(field, QueryOperator.Equal, value),
-      keepDuplicates
+      new QueryCondition(field, key, QueryOperator.Equal, value)
     );
     return this;
   }
@@ -134,35 +99,18 @@ class QueryBuilder<T> {
     field: keyof T,
     operator: QueryOperator,
     value: T[keyof T],
-    keepDuplicates = false
+    key?: string
   ) {
-    this.addToDictionary(
-      new QueryCondition(field, operator, value),
-      keepDuplicates
-    );
+    this.addToDictionary(new QueryCondition(field, key, operator, value));
     return this;
   }
 
-  private addToDictionary(
-    condition: QueryCondition<T>,
-    keepDuplicates = false
-  ) {
+  private addToDictionary(condition: QueryCondition<T>) {
     const existingCondition = this.conditions.find(
-      (x) =>
-        (x.field === condition.field && x.operator === condition.operator) ||
-        (x.field === condition.field &&
-          x.operator === this.reversedOperator(condition.operator))
+      (x) => x.key === condition.key
     );
-    if (existingCondition && !keepDuplicates) {
-      // this is either genius or it will cause a bug that someone will find in a year...
-      if (
-        existingCondition.operator !== QueryOperator.GreaterThan &&
-        existingCondition.operator !== QueryOperator.GreaterThanOrEqual &&
-        existingCondition.operator !== QueryOperator.LessThan &&
-        existingCondition.operator !== QueryOperator.LessThanOrEqual
-      ) {
-        existingCondition.operator = condition.operator;
-      }
+    if (existingCondition) {
+      existingCondition.operator = condition.operator;
       existingCondition.value = condition.value;
     } else {
       this.conditions.push(condition);

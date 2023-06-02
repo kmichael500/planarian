@@ -178,7 +178,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                   }}
                 />
               </Form.Item>
-              {/* <Col>
+              <Col>
                 <Row gutter={5}>
                   <Col span={24}>Number of Photos</Col>
                   <Col span={7}>
@@ -201,7 +201,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                       style={{ width: "100%", textAlign: "center" }}
                       defaultValue={QueryOperator.LessThanOrEqual}
                       onChange={(e) => {
-                        queryBuilder.reverseOperators("numberOfPhotos", e);
+                        queryBuilder.changeOperators("numberOfPhotos", e);
                       }}
                     >
                       <Option
@@ -238,7 +238,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
                     ></InputNumber>
                   </Col>
                 </Row>
-              </Col> */}
+              </Col>
             </Form>
             <Button
               onClick={() => {
