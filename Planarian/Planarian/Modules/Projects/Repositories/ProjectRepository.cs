@@ -3,6 +3,8 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
+using Planarian.Modules.Query.Extensions;
+using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Projects.Repositories;
@@ -22,10 +24,22 @@ public class ProjectRepository : RepositoryBase
 
     #endregion
 
-    public async Task<IEnumerable<ProjectVm>> GetProjects()
+    public async Task<PagedResult<ProjectVm>> GetProjects(FilterQuery query)
     {
         return await DbContext.Projects.Where(e => e.Members.Any(ee => ee.UserId == RequestUser.Id))
-            .Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count)).ToListAsync();
+            .Select(e => 
+                new ProjectVm
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    NumberOfProjectMembers = e.Members.Count,
+                    NumberOfTrips = e.Trips.Count,
+                    CreatedOn = e.CreatedOn,
+                    ModifiedOn = e.ModifiedOn
+                }
+            )
+            .QueryFilter(query.Conditions)
+            .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetProjectMembers(string projectId)
@@ -63,7 +77,7 @@ public class ProjectRepository : RepositoryBase
 
     private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Project> query)
     {
-        return query.Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count));
+        return query.Select(e => new ProjectVm(e, e.Members.Count, e.Trips.Count, e.CreatedOn, e.ModifiedOn));
     }
 
     #endregion

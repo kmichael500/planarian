@@ -5,20 +5,20 @@ namespace Planarian.Model.Database.Entities.Projects;
 
 public class ProjectVm : IProject
 {
-    public ProjectVm(string id, string name, int numberOfProjectMembers, int numberOfTrips)
+    public ProjectVm(string id, string name, int numberOfProjectMembers, int numberOfTrips, DateTime createdOn,
+        DateTime? modifiedOn)
     {
         Id = id;
         Name = name;
         NumberOfProjectMembers = numberOfProjectMembers;
         NumberOfTrips = numberOfTrips;
+        CreatedOn = createdOn;
+        ModifiedOn = modifiedOn;
     }
 
-    public ProjectVm(Project project, int numberOfProjectMembers, int numberOfTrips)
+    public ProjectVm(Project project, int numberOfProjectMembers, int numberOfTrips, DateTime createdOn,
+        DateTime? modifiedOn) : this(project.Id, project.Name, numberOfProjectMembers, numberOfTrips, createdOn, modifiedOn)
     {
-        Id = project.Id;
-        Name = project.Name;
-        NumberOfProjectMembers = numberOfProjectMembers;
-        NumberOfTrips = numberOfTrips;
     }
 
     public ProjectVm()
@@ -32,4 +32,7 @@ public class ProjectVm : IProject
     public int NumberOfProjectMembers { get; set; }
     public int NumberOfTrips { get; set; }
     [Required] public string Name { get; set; } = null!;
+    public DateTime CreatedOn { get; set; }
+    public DateTime? ModifiedOn { get; set; } = null!;
+    
 }

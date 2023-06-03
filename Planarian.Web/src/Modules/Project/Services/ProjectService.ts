@@ -5,6 +5,8 @@ import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { InviteMember } from "../../../Shared/Models/InviteMember";
 import { TripVm } from "../../Trip/Models/TripVm";
 import { CreateOrEditTripVm } from "../../Trip/Models/CreateOrEditTripVm";
+import { PagedResult } from "../../Search/Models/PagedResult";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 
 const baseUrl = "api/projects";
 const ProjectService = {
@@ -23,8 +25,12 @@ const ProjectService = {
    *
    * @returns List of projects that user has access to.
    */
-  async GetProjects(): Promise<ProjectVm[]> {
-    const response = await HttpClient.get<ProjectVm[]>(`${baseUrl}/`);
+  async GetProjects(
+    queryBuilder: QueryBuilder<ProjectVm>
+  ): Promise<PagedResult<ProjectVm>> {
+    const response = await HttpClient.get<PagedResult<ProjectVm>>(
+      `${baseUrl}?${queryBuilder.buildAsQueryString()}`
+    );
     return response.data;
   },
 
@@ -50,9 +56,12 @@ const ProjectService = {
     return response.data;
   },
 
-  async GetTrips(projectId: string): Promise<TripVm[]> {
-    const response = await HttpClient.get<TripVm[]>(
-      `${baseUrl}/${projectId}/trips`
+  async GetTrips(
+    projectId: string,
+    queryBuilder: QueryBuilder<TripVm>
+  ): Promise<PagedResult<TripVm>> {
+    const response = await HttpClient.get<PagedResult<TripVm>>(
+      `${baseUrl}/${projectId}/trips?${queryBuilder.buildAsQueryString()}`
     );
     return response.data;
   },

@@ -3,6 +3,8 @@ using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
 using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Projects.Repositories;
+using Planarian.Modules.Query.Extensions;
+using Planarian.Modules.Query.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 
@@ -18,9 +20,9 @@ public class ProjectService : ServiceBase<ProjectRepository>
         _userRepository = userRepository;
     }
 
-    public async Task<IEnumerable<ProjectVm>> GetProjects()
+    public async Task<PagedResult<ProjectVm>> GetProjects(FilterQuery query)
     {
-        return await Repository.GetProjects();
+        return await Repository.GetProjects(query);
     }
 
     #region Invitations
@@ -68,7 +70,7 @@ public class ProjectService : ServiceBase<ProjectRepository>
 
         var numberOfTrips = await Repository.GetNumberOfTrips(project.Id);
 
-        return new ProjectVm(project, 1, numberOfTrips);
+        return new ProjectVm(project, 1, numberOfTrips, isNew ? DateTime.UtcNow : project.CreatedOn, DateTime.UtcNow);
     }
 
     public async Task<ProjectVm?> GetProject(string projectId)
