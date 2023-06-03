@@ -95,7 +95,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
             <BooleanFilterFormItem
               queryBuilder={queryBuilder}
               field={"isTripReportCompleted"}
-              key={"completedTripReportsOnly"}
+              keyValue={"completedTripReportsOnly"}
               label={"Completed Trip Reports Only"}
             />
           </Col>
@@ -104,7 +104,7 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
               queryBuilder={queryBuilder}
               opposite
               field={"isTripReportCompleted"}
-              key={"uncompletedTripReportsOnly"}
+              keyValue={"uncompletedTripReportsOnly"}
               label={"Uncompleted Trip Reports Only"}
             />
           </Col>
