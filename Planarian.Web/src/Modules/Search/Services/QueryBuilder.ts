@@ -144,7 +144,6 @@ class QueryBuilder<T> {
 
   public buildAsQueryString() {
     const conditions = [] as QueryCondition<T>[];
-    console.log("Here");
     this.conditions.forEach((condition) => {
       if (condition.value !== null || condition.value !== undefined) {
         if (

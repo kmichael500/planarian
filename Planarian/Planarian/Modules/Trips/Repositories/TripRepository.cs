@@ -109,7 +109,7 @@ public class TripRepository : RepositoryBase
                 Leads = e.Leads.Select(e => new LeadVm(e)),
                 CreatedOn = e.CreatedOn,
                 ModifiedOn = e.ModifiedOn,
-                IsTripReportCompleted = string.IsNullOrWhiteSpace(e.TripReport)
+                IsTripReportCompleted = !string.IsNullOrWhiteSpace(e.TripReport)
             })
             .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);

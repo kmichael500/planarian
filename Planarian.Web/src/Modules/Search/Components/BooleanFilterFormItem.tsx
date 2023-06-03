@@ -21,8 +21,6 @@ const BooleanFilterFormItem = <T,>({
           queryBuilder.getFieldValue(keyValue.toString()) as boolean
         }
         onChange={(e) => {
-          console.log("Here");
-
           if (e.target.checked == false) {
             queryBuilder.removeFromDictionary(keyValue);
           } else {
