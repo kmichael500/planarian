@@ -1,28 +1,32 @@
 import { Checkbox, Form, Input, Select } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
+import { useState } from "react";
 
 export interface BooleanFilterFormItemProps<T> extends FilterFormItemProps<T> {
   opposite?: boolean;
-  key?: string;
+  keyValue?: string;
 }
 const BooleanFilterFormItem = <T,>({
   queryBuilder,
   field,
   label,
   opposite,
-  key,
+  keyValue,
 }: BooleanFilterFormItemProps<T>) => {
-  let keyValue = key ?? field.toString();
+  let keyVal = keyValue ?? field.toString();
+
+  let [isChecked, setIsChecked] = useState<boolean>(
+    queryBuilder.getFieldValue(keyVal.toString()) as boolean
+  );
   return (
     <Form.Item name={field.toString()} label={label}>
       <Checkbox
-        defaultChecked={
-          queryBuilder.getFieldValue(keyValue.toString()) as boolean
-        }
+        checked={isChecked}
         onChange={(e) => {
           if (e.target.checked == false) {
-            queryBuilder.removeFromDictionary(keyValue);
+            queryBuilder.removeFromDictionary(keyVal);
+            setIsChecked(false);
           } else {
             queryBuilder.filterBy(
               field,
@@ -32,6 +36,7 @@ const BooleanFilterFormItem = <T,>({
                 : (e.target.checked as T[keyof T]),
               keyValue
             );
+            setIsChecked(true);
           }
         }}
       />
