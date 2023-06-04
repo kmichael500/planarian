@@ -1,6 +1,6 @@
 import { Button, ButtonProps, Grid } from "antd";
 
-interface PlanrianButtonProps {
+interface PlanarianButtonProps {
   icon: React.ReactNode;
   alwaysShowChildren?: boolean;
   neverShowChildren?: boolean;
@@ -8,16 +8,20 @@ interface PlanrianButtonProps {
 
 const { useBreakpoint } = Grid;
 
-export type PlanarianButtonType = ButtonProps & PlanrianButtonProps;
+export type PlanarianButtonType = ButtonProps & PlanarianButtonProps;
 export type PlanarianButtonTypeWithoutIcon = Omit<PlanarianButtonType, "icon">;
 
 const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
+  const { cancelText, okText, onConfirm, ...newProps } = props as any;
+  props = newProps as any;
+
   const screens = useBreakpoint();
   const { alwaysShowChildren = false, neverShowChildren = false } = props;
 
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
+
   return (
     <Button {...props} icon={props.icon}>
       {!neverShowChildren &&

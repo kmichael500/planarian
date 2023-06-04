@@ -9,7 +9,7 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Leads.Controllers;
 
 [Route("api/leads")]
-[Authorize]
+[AllowAnonymous]
 public class LeadController : PlanarianControllerBase<LeadService>
 {
     public LeadController(RequestUser requestUser, TokenService tokenService, LeadService service) : base(requestUser,
@@ -23,6 +23,17 @@ public class LeadController : PlanarianControllerBase<LeadService>
         var leads = await Service.GetLeads(leadId);
         return new JsonResult(leads);
     }
+
+    [HttpGet("")]
+    public async Task<ActionResult<IEnumerable<LeadVm>>> GetLeads(
+        [FromQuery] IEnumerable<QueryCondition> queryCondition)
+    {
+        // var leads = await Service.GetLeads(queryCondition);
+
+
+        return new JsonResult(queryCondition);
+    }
+
 
     [HttpDelete("{leadId:length(10)}")]
     public async Task<ActionResult> DeleteLead(string leadId)
