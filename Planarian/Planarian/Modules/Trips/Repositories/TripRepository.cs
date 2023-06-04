@@ -95,6 +95,7 @@ public class TripRepository : RepositoryBase
     public async Task<PagedResult<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
         FilterQuery query)
     {
+        
         var result = await DbContext.Trips.Where(e => e.ProjectId == projectId)
             .Select(e => new TripVm
             {
