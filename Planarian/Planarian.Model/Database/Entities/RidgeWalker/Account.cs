@@ -1,25 +1,33 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class Account : EntityBase
 {
-    public string Name { get; set; }
+    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
 
     public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
     public ICollection<Cave> Caves { get; set; } = new HashSet<Cave>();
+    public ICollection<AccountState> AccountStates { get; set; } = new HashSet<AccountState>();
+    public ICollection<County> Counties { get; set; } = new HashSet<County>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>
 {
     public void Configure(EntityTypeBuilder<Account> builder)
     {
-        builder
-            .HasMany(a => a.AccountUsers)
+        builder.HasMany(e => e.AccountUsers)
             .WithOne(au => au.Account)
             .HasForeignKey(au => au.AccountId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasMany(e => e.AccountStates)
+            .WithOne(e => e.Account)
+            .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.NoAction);
     }
 }
