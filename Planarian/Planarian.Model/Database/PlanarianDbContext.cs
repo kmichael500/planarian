@@ -50,6 +50,9 @@ public class PlanarianDbContext : DbContext
 
     #region RidgeWalker
 
+    public DbSet<Account> Accounts { get; set; } = null!;
+    public DbSet<AccountState> AccountStates { get; set; } = null!;
+    public DbSet<AccountUser> AccountUsers { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
@@ -59,6 +62,7 @@ public class PlanarianDbContext : DbContext
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<Map> Maps { get; set; } = null!;
+    public DbSet<State> States { get; set; } = null!;
     
     #endregion
 
