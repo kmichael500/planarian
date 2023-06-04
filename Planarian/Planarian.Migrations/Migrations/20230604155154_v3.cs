@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Planarian.Migrations.Migrations
 {
-    public partial class v2 : Migration
+    public partial class v3 : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
