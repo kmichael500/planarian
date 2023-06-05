@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
@@ -14,6 +15,9 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     
     public int CaveNumber { get; set; } // max of highest cave number in county + 1
+    
+    [NotMapped]
+    public string DisplayId => $"{County.DisplayId}{CaveNumber}";
     
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     

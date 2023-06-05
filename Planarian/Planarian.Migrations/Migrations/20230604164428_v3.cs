@@ -593,7 +593,7 @@ namespace Planarian.Migrations.Migrations
                 principalTable: "Entrances",
                 principalColumn: "Id");
 
-            var states = StateGenerator.GenerateStates();
+            var states = Generator.GenerateStates();
 
             foreach (var state in states)
             {

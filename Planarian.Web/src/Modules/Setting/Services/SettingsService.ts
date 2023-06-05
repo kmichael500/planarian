@@ -10,6 +10,18 @@ const SettingsService = {
     );
     return response.data;
   },
+  async GetStates(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/states`
+    );
+    return response.data;
+  },
+  async GetCounties(stateId: string): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/states/${stateId}/counties/`
+    );
+    return response.data;
+  },
   async GetTagName(tagId: string): Promise<string> {
     const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
     return response.data;

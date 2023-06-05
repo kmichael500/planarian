@@ -24,6 +24,22 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(tripTags);
     }
+    
+    [HttpGet("tags/states/{stateId:length(10)}/counties")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateCounties(string stateId)
+    {
+        var tripTags = await Service.GetStateCounties(stateId);
+
+        return new JsonResult(tripTags);
+    }
+    
+    [HttpGet("tags/states/")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStates()
+    {
+        var tripTags = await Service.GetStates();
+
+        return new JsonResult(tripTags);
+    }
 
     [HttpGet("tags/{tagTypeId:length(10)}")]
     public async Task<ActionResult<string>> GetTagTypeName(string tagTypeId)

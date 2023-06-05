@@ -5,11 +5,10 @@ namespace Planarian.Modules.Caves.Models;
 
 public class AddCaveVm
 {
-    public AddCaveVm(string id, string countyId, string name,
+    public AddCaveVm(string countyId, string name,
         double lengthFeet,
         double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds)
     {
-        Id = id;
         CountyId = countyId;
         Name = name;
         LengthFeet = lengthFeet;
@@ -18,10 +17,11 @@ public class AddCaveVm
         GeologyTagIds = geologyTagIds;
     }
 
-    public AddCaveVm(string id, double maxPitDepthFeet, string narrative, DateTime? reportedOn,
+
+    public AddCaveVm(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
         string reportedByName, string countyId, string name,
         double lengthFeet,
-        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(id, countyId, name, lengthFeet, depthFeet, numberOfPits, geologyTagIds)
+        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(countyId, name, lengthFeet, depthFeet, numberOfPits, geologyTagIds)
     {
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
@@ -32,9 +32,8 @@ public class AddCaveVm
     public AddCaveVm(){}
     
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
-    
+    [MaxLength(PropertyLength.Id)] public string CountyId { get; set; }
+
     
     public double LengthFeet { get; set; }
     public double DepthFeet { get; set; }

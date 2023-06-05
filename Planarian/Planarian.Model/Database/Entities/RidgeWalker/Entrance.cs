@@ -9,11 +9,11 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class Entrance : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string ReportedByUserId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;
 
     
-    [MaxLength(PropertyLength.Name)] public string Name { get; set; } // TODO should this be required?
+    [MaxLength(PropertyLength.Name)] public string? Name { get; set; }
     public string? Description { get; set; }
 
     public double Latitude { get; set; }

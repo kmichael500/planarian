@@ -42,6 +42,15 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
 
   const authenticatedMenuItems = [
     {
+      key: "caves",
+      icon: (
+        <Link to="/caves">
+          <DatabaseOutlined />
+        </Link>
+      ),
+      label: "Caves",
+    },
+    {
       key: "projects",
       icon: (
         <Link to="/projects">

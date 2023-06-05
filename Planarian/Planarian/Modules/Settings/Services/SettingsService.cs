@@ -43,4 +43,14 @@ public class SettingsService : ServiceBase<SettingsRepository>
     {
         return await Repository.GetUsers();
     }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    {
+        return await Repository.GetStates();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    {
+        return await Repository.GetStateCounties(stateId);
+    }
 }

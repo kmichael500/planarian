@@ -32,4 +32,18 @@ public class SettingsRepository : RepositoryBase
     {
         return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
     }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    {
+        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
+            .Select(e => e.State)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    {
+        return await DbContext.Counties.Where(e => e.StateId == stateId && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
 }

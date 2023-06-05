@@ -3,9 +3,9 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Models;
 
-public class CreateEntranceVm
+public class AddEntranceVm
 {
-    public CreateEntranceVm(double latitude, double longitude, double elevationFeet,
+    public AddEntranceVm(double latitude, double longitude, double elevationFeet,
         IEnumerable<string> entranceStatusTagIds,
         IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds)
@@ -21,7 +21,7 @@ public class CreateEntranceVm
     }
 
 
-    public CreateEntranceVm(string name, string description, double latitude, double longitude,
+    public AddEntranceVm(string name, string description, double latitude, double longitude,
         double elevationFeet,
         double pitFeet, string locationQualityTagId, string reportedByName,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds,
@@ -37,9 +37,10 @@ public class CreateEntranceVm
         ReportedOn = reportedOn;
     }
 
-    public CreateEntranceVm()
+    public AddEntranceVm()
     {
     }
+    public bool IsPrimary { get; set; }
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;
     
     [MaxLength(PropertyLength.Name)] public string? Name { get; set; }

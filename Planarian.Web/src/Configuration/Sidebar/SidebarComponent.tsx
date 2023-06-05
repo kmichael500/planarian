@@ -1,16 +1,6 @@
 import { Grid, Layout, Space, Typography } from "antd";
-import {
-  DatabaseOutlined,
-  LoginOutlined,
-  LogoutOutlined,
-  SettingOutlined,
-  UserAddOutlined,
-} from "@ant-design/icons";
-import React, { useContext, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
-import { AppContext } from "../Context/AppContext";
-import { MenuItemType } from "antd/lib/menu/hooks/useItems";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { LogoIcon } from "./AppIcon";
 import "./SidebarComponent.scss";
 import { MenuComponent } from "../Menu/MenuComponent";

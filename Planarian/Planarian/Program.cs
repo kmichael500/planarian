@@ -10,6 +10,8 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Caves.Controllers;
+using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
 using Planarian.Modules.Photos.Repositories;
@@ -110,6 +112,7 @@ builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<CaveService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
@@ -128,6 +131,7 @@ builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
+builder.Services.AddScoped<CaveRepository>();
 
 #endregion
 

@@ -1,10 +1,25 @@
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 
 namespace Planarian.Migrations.Generators;
 
-public static class StateGenerator
+public static class Generator
 {
+
+    public static List<TagType> GenerateLocationQualityTags()
+    {
+        var locationQualityTags = new List<TagType>
+        {
+            new() { Name = "Confirmed", Key = TagTypeKeyConstant.LocationQuality, CreatedOn = DateTime.UtcNow },
+            new() { Name = "Estimated", Key = TagTypeKeyConstant.LocationQuality, CreatedOn = DateTime.UtcNow },
+            new() { Name = "Unconfirmed", Key = TagTypeKeyConstant.LocationQuality, CreatedOn = DateTime.UtcNow },
+        };
+
+
+        return locationQualityTags;
+    }
     public static List<State> GenerateStates()
     {
         var states = new List<State>

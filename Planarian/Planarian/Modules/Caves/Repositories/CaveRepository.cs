@@ -5,7 +5,7 @@ using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Caves.Controllers;
+namespace Planarian.Modules.Caves.Repositories;
 
 public class CaveRepository : RepositoryBase
 {
@@ -15,9 +15,10 @@ public class CaveRepository : RepositoryBase
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
     {
-        var caves = await DbContext.Caves.Where(e=>e.AccountId == RequestUser.AccountId)
+        var caves = await DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(e => new CaveVm
             {
+                Id = e.Id,
                 PrimaryEntranceId = e.PrimaryEntranceId,
                 CountyId = e.CountyId,
                 DisplayId = e.DisplayId,
@@ -28,11 +29,13 @@ public class CaveRepository : RepositoryBase
                 IsArchived = e.IsArchived,
                 PrimaryEntrance = new EntranceVm
                 {
+                    Id = e.Id,
                     Latitude = e.PrimaryEntrance.Latitude,
                     Longitude = e.PrimaryEntrance.Longitude,
-                    ElevationFeet = e.PrimaryEntrance.ElevationFeet, 
-                    EntranceStatusTagIds = e.PrimaryEntrance.EntranceStatusTags.Select(y => y.TagTypeId).ToList(), 
-                    EntranceHydrologyFrequencyTagIds = e.PrimaryEntrance.EntranceHydrologyFrequencyTags.Select(y => y.TagTypeId).ToList(),
+                    ElevationFeet = e.PrimaryEntrance.ElevationFeet,
+                    EntranceStatusTagIds = e.PrimaryEntrance.EntranceStatusTags.Select(y => y.TagTypeId).ToList(),
+                    EntranceHydrologyFrequencyTagIds = e.PrimaryEntrance.EntranceHydrologyFrequencyTags
+                        .Select(y => y.TagTypeId).ToList(),
                     FieldIndicationTagIds = e.PrimaryEntrance.FieldIndicationTags.Select(y => y.TagTypeId).ToList(),
                     EntranceHydrologyTagIds = e.PrimaryEntrance.EntranceHydrologyTags.Select(y => y.TagTypeId).ToList(),
                 },
@@ -41,7 +44,7 @@ public class CaveRepository : RepositoryBase
                 GeologyTagIds = e.GeologyTags.Select(gt => gt.Id)
             })
             .QueryFilter(query.Conditions)
-            .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);
+            .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
 
         return caves;
     }

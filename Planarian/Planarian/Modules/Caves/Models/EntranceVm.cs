@@ -5,10 +5,12 @@ namespace Planarian.Modules.Caves.Models;
 
 public class EntranceVm
 {
-    public EntranceVm(double latitude, double longitude, double elevationFeet, IEnumerable<string> entranceStatusTagIds,
+    public EntranceVm(string id, double latitude, double longitude, double elevationFeet,
+        IEnumerable<string> entranceStatusTagIds,
         IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds)
     {
+        Id = id;
         Latitude = latitude;
         Longitude = longitude;
         ElevationFeet = elevationFeet;
@@ -19,11 +21,13 @@ public class EntranceVm
         EntranceHydrologyTagIds = entranceHydrologyTagIds;
     }
 
-    public EntranceVm(string name, string description, double latitude, double longitude, double elevationFeet,
+
+    public EntranceVm(string id, string name, string description, double latitude, double longitude,
+        double elevationFeet,
         double pitFeet, string locationQualityTagId, string reportedByUserId, string reportedByName,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds,
         IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds,
+        IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet, entranceStatusTagIds,
         entranceHydrologyFrequencyTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
@@ -38,6 +42,9 @@ public class EntranceVm
     public EntranceVm()
     {
     }
+    
+    [MaxLength(PropertyLength.Id)] public string Id { get; set; }
+
 
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Col, Row, Typography } from "antd";
-import { TripVm } from "../../Trip/Models/TripVm";
-import { TripCreateButtonComponent } from "../../Trip/Components/TripCreateButtonComponent";
+import { TripVm } from "../Models/TripVm";
+import { TripCreateButtonComponent } from "./TripCreateButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
@@ -23,9 +23,7 @@ const query = window.location.search.substring(1);
 
 const queryBuilder = new QueryBuilder<TripVm>(query);
 
-const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
-  props
-) => {
+const TripsComponent: React.FC<TripsByProjectIdComponentProps> = (props) => {
   let [trips, setTrips] = useState<PagedResult<TripVm>>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
@@ -150,4 +148,4 @@ const TripsByProjectIdComponent: React.FC<TripsByProjectIdComponentProps> = (
   );
 };
 
-export { TripsByProjectIdComponent };
+export { TripsComponent };
