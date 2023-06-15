@@ -3,11 +3,12 @@ import { QueryOperator } from "../Services/QueryBuilder";
 import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
 import { useState } from "react";
 
-export interface BooleanFilterFormItemProps<T> extends FilterFormItemProps<T> {
+export interface BooleanFilterFormItemProps<T extends object>
+  extends FilterFormItemProps<T> {
   opposite?: boolean;
   keyValue?: string;
 }
-const BooleanFilterFormItem = <T,>({
+const BooleanFilterFormItem = <T extends object>({
   queryBuilder,
   field,
   label,
@@ -22,6 +23,7 @@ const BooleanFilterFormItem = <T,>({
   return (
     <Form.Item name={field.toString()} label={label}>
       <Checkbox
+        id={field.toString()}
         checked={isChecked}
         onChange={(e) => {
           if (e.target.checked == false) {

@@ -1,3 +1,6 @@
+import moment from "moment";
+import { CaveVm } from "../../Modules/Caves/Models/CaveVm";
+
 export const StringHelpers = {
   NameToInitials(name: string | undefined): string {
     if (name == undefined) return "";
@@ -12,17 +15,65 @@ export const StringHelpers = {
   },
 };
 
+export function convertDistance(
+  distanceInFeet: number | undefined | null
+): string {
+  if (distanceInFeet === undefined || distanceInFeet === null) return "0 ft";
+  const milesThreshold = 2640; // Half a mile in feet (1 mile = 5280 feet)
+
+  const formatOptions = {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  } as Intl.NumberFormatOptions;
+
+  if (distanceInFeet >= milesThreshold) {
+    const miles = distanceInFeet / 5280;
+    const formattedMiles = miles.toLocaleString(undefined, formatOptions);
+    return `${formattedMiles} mi`; // Display miles with 2 decimal places and commas for thousands
+  }
+
+  formatOptions.minimumFractionDigits = 0;
+
+  return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`; // Add commas for thousands in feet
+}
+
 export function isNullOrWhiteSpace(input: string | null | undefined): boolean {
   if (input == null || input == undefined) return true;
   return input.replace(/\s/g, "").length < 1;
 }
 
-export const nameof = <T>(name: Extract<keyof T, string>): string => name;
+export function getDirectionsUrl(
+  latitude: string | number,
+  longitude: string | number
+): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=car`;
+}
 
+//#region nameof
+
+export const nameof = <T extends object>(name: NestedKeyOf<T>): string => name;
+
+// https://dev.to/pffigueiredo/typescript-utility-keyof-nested-object-2pa3
+export type NestedKeyOf<ObjectType extends object> = {
+  [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
+    ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`
+    : `${Key}`;
+}[keyof ObjectType & (string | number)];
+
+//#endregion
 export function formatPhoneNumber(phoneNumber?: string): string {
   const formattedPhoneNumber = phoneNumber?.replace(
     /^(\+1)(\d{3})(\d{3})(\d{4})$/,
     "$1 ($2) $3-$4"
   );
   return formattedPhoneNumber ?? "";
+}
+
+export function formatDateTime(
+  date: Date | string | null | undefined,
+  formatString: string = "YYYY MMM-DD"
+): string | null {
+  if (typeof date === "string" && isNullOrWhiteSpace(date)) return null;
+  if (date === null || date === undefined) return null;
+  return moment(date).format(formatString);
 }

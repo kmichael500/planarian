@@ -3,6 +3,14 @@ import { TOKEN_KEY } from "../../../Shared/Constants/TokenKeyConstant";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+const NAME_CLAIM_KEY =
+  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+
+interface JwtPayload {
+  [key: string]: any;
+  name: string;
+  userId: string;
+}
 
 const baseUrl = "api/authentication";
 const AuthenticationService = {
@@ -44,6 +52,22 @@ const AuthenticationService = {
     } catch (err) {
       return true;
     }
+  },
+  GetName(): string | null {
+    const token = this.GetToken();
+    if (token) {
+      const payload = jwt_decode(token) as JwtPayload;
+      return payload ? payload[NAME_CLAIM_KEY] : null;
+    }
+    return null;
+  },
+  GetUserId(): string | null {
+    const token = this.GetToken();
+    if (token) {
+      const payload = jwt_decode(token) as JwtPayload;
+      return payload ? payload.userId : null;
+    }
+    return null;
   },
 };
 

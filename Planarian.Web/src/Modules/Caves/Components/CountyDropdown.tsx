@@ -3,17 +3,17 @@ import { useState, useEffect } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 const { Option } = Select;
-interface CountyDropdownProps extends SelectProps<string> {
+export interface CountyDropdownProps extends SelectProps<string> {
   selectedState: string;
 }
 // Generic County Dropdown Component
 const CountyDropdown = ({
   selectedState: selectedStateId,
+  defaultValue,
   onSelect,
   ...rest
 }: CountyDropdownProps) => {
   const [counties, setCounties] = useState<SelectListItem<string>[]>([]);
-  const [selectedCounty, setSelectedCounty] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
@@ -30,9 +30,9 @@ const CountyDropdown = ({
       <Spin spinning={isLoading}>
         {!isLoading && (
           <Select
+            id="countyDropdown"
             loading={isLoading}
             placeholder="Select county"
-            value={selectedCounty}
             {...rest}
           >
             {counties.map((county) => (

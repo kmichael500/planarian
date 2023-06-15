@@ -1,18 +1,30 @@
 import { Form, Input, Select } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
-import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
-const TextFilterFormItem = <T,>({
+import {
+  FilterFormItemProps,
+  FilterFormProps,
+} from "../Models/NumberComparisonFormItemProps";
+
+export interface TextFilterFormItemProps<T extends object>
+  extends FilterFormItemProps<T> {
+  queryOperator?: QueryOperator;
+}
+
+const TextFilterFormItem = <T extends object>({
   queryBuilder,
   field,
   label,
-}: FilterFormItemProps<T>) => {
+  queryOperator,
+}: TextFilterFormItemProps<T>) => {
+  queryOperator = queryOperator ?? QueryOperator.Contains;
   return (
     <Form.Item name={field.toString()} label={label}>
       <Input
+        id={field.toString()}
         onChange={(e) => {
           queryBuilder.filterBy(
             field,
-            QueryOperator.Contains,
+            queryOperator as QueryOperator,
             e.target.value as T[keyof T]
           );
         }}

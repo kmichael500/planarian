@@ -16,9 +16,58 @@ const SettingsService = {
     );
     return response.data;
   },
+  async GetStateName(stateId?: string): Promise<string> {
+    const response = await HttpClient.get<string>(
+      `${baseUrl}/tags/states/${stateId}`
+    );
+    return response.data;
+  },
   async GetCounties(stateId: string): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
       `${baseUrl}/tags/states/${stateId}/counties/`
+    );
+    return response.data;
+  },
+  async GetCountyName(countyId?: string): Promise<string> {
+    const response = await HttpClient.get<string>(
+      `${baseUrl}/tags/counties/${countyId}`
+    );
+    return response.data;
+  },
+
+  async GetGeology(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/geology`
+    );
+    return response.data;
+  },
+  async GetLocationQualityTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/location-quality`
+    );
+    return response.data;
+  },
+  async GetEntranceStatusTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/entrance-status`
+    );
+    return response.data;
+  },
+  async GetFieldIndicationTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/field-indication`
+    );
+    return response.data;
+  },
+  async GetEntranceHydrology(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/entrance-hydrology`
+    );
+    return response.data;
+  },
+  async GetEntranceHydrologyFrequencyTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/entrance-hydrology-frequency`
     );
     return response.data;
   },

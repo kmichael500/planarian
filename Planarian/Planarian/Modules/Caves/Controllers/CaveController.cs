@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
@@ -19,12 +20,57 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetTrips([FromQuery] FilterQuery query)
+    public async Task<ActionResult<PagedResult<CaveVm>>> GetCaves([FromQuery] FilterQuery query)
     {
-        var trips = await Service.GetCaves(query);
+        var caves = await Service.GetCaves(query);
 
-        return new JsonResult(trips);
+        return new JsonResult(caves);
     }
 
-  
+    [HttpGet("{caveId:length(10)}")]
+    public async Task<ActionResult<CaveVm>> GetCave(string caveId)
+    {
+        var cave = await Service.GetCave(caveId);
+
+        return new JsonResult(cave);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave)
+    {
+        var result = await Service.AddCave(cave);
+
+        return new JsonResult(result);
+    }
+
+    [HttpPut]
+    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave)
+    {
+        var result = await Service.AddCave(cave);
+
+        return new JsonResult(result);
+    }
+
+    [HttpDelete("{caveId:length(10)}")]
+    public async Task<ActionResult> DeleteCave(string caveId)
+    {
+        await Service.DeleteCave(caveId);
+
+        return new OkResult();
+    }
+    
+    [HttpPost("{caveId:length(10)}/archive")]
+    public async Task<ActionResult> ArchiveCave(string caveId)
+    {
+        await Service.ArchiveCave(caveId);
+
+        return new OkResult();
+    }
+    [HttpPost("{caveId:length(10)}/unarchive")]
+    public async Task<ActionResult> UnarchiveCave(string caveId)
+    {
+        await Service.UnarchiveCave(caveId);
+
+        return new OkResult();
+    }
 }

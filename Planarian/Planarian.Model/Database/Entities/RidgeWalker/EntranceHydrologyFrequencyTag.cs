@@ -27,11 +27,11 @@ public class LeadTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrolog
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceHydrologyFrequencyTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(e => e.Entrance)
             .WithMany(e => e.EntranceHydrologyFrequencyTags)
             .HasForeignKey(e => e.EntranceId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

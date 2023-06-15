@@ -17,13 +17,18 @@ public static class PropertyLength
     public const int EmailConfirmationCode = 20;
 }
 
+
 public static class TagTypeKeyConstant
 {
     public const string Default = "Default";
     public const string Trip = "Trip";
     public const string Photo = "Photo";
     public const string LocationQuality = "LocationQuality";
-
+    public const string Geology = "Geology";
+    public const string EntranceStatus = "EntranceStatus";
+    public const string FieldIndication = "FieldIndication";
+    public const string EntranceHydrology = "EntranceHydrology";
+    public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
     private static readonly List<string> All = new() { Default, Trip, Photo, LocationQuality };
 
     public static bool IsValidTagKey(string tagKey)

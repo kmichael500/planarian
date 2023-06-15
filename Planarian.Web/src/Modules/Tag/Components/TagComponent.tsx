@@ -1,4 +1,4 @@
-import { Spin, Tag } from "antd";
+import { Col, Spin, Tag } from "antd";
 import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
@@ -14,15 +14,17 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
   let [isTagNameLoading, setIsTagNameLoading] = useState(true);
 
   useEffect(() => {
-    if (tagName === undefined) {
-      const getTagName = async () => {
+    const getTagName = async () => {
+      try {
         const tripNameResponse = await SettingsService.GetTagName(props.tagId);
         setTagName(tripNameResponse);
-        setIsTagNameLoading(false);
-      };
-      getTagName();
-    }
-  });
+      } catch (error) {
+        setTagName("Error");
+      }
+      setIsTagNameLoading(false);
+    };
+    getTagName();
+  }, [props.tagId]);
 
   return (
     <Spin spinning={isTagNameLoading}>

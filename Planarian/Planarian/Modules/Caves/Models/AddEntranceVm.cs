@@ -40,6 +40,7 @@ public class AddEntranceVm
     public AddEntranceVm()
     {
     }
+    [MaxLength(PropertyLength.Id)] public string? Id { get; set; }
     public bool IsPrimary { get; set; }
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;
     
@@ -59,4 +60,9 @@ public class AddEntranceVm
     public IEnumerable<string> EntranceHydrologyFrequencyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
+}
+
+public class EditEntranceVm : AddEntranceVm
+{
+    public string Id { get; set; } = null!;
 }

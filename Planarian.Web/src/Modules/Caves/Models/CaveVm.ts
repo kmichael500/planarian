@@ -2,13 +2,14 @@ import { EntranceVm } from "./EntranceVm";
 
 export interface CaveVm {
   id: string;
+  displayId: string;
   reportedByUserId: string | null;
-  primaryEntranceId: string;
   countyId: string;
+  stateId: string;
   name: string;
   lengthFeet: number;
   depthFeet: number;
-  maxPitDepthFeet: number | null;
+  maxPitDepthFeet: number;
   numberOfPits: number;
   narrative: string | null;
   reportedOn: string | null;
@@ -16,6 +17,9 @@ export interface CaveVm {
   isArchived: boolean;
   primaryEntrance: EntranceVm;
   mapIds: string[];
-  entranceIds: string[];
+  entrances: EntranceVm[];
   geologyTagIds: string[];
+
+  MaxEntranceElevationFeet?: number;
+  MinEntranceElevationFeet?: number;
 }

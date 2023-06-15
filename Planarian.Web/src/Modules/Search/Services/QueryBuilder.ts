@@ -1,11 +1,8 @@
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import {
+  NestedKeyOf,
+  isNullOrWhiteSpace,
+} from "../../../Shared/Helpers/StringHelpers";
 import { QueryStringParser } from "./QueryStringParser";
-
-interface IQueryCondition<T> {
-  field: keyof T;
-  value: T[keyof T] | null;
-  operator: QueryOperator;
-}
 
 export enum QueryOperator {
   Equal = "=",
@@ -24,10 +21,10 @@ export enum QueryOperator {
   In = "=]",
 }
 
-class QueryCondition<T> implements IQueryCondition<T> {
+class QueryCondition<T extends object> {
   public key!: string;
   constructor(
-    public field: keyof T,
+    public field: NestedKeyOf<T>,
     key: string | undefined,
     public operator: QueryOperator,
     public value: T[keyof T] | null
@@ -40,7 +37,7 @@ class QueryCondition<T> implements IQueryCondition<T> {
   }
 }
 
-class QueryBuilder<T> {
+class QueryBuilder<T extends object> {
   private conditions: QueryCondition<T>[];
   private currentPage: number;
   private pageSize: number;
@@ -60,7 +57,11 @@ class QueryBuilder<T> {
     this.pageSize = filerQuery.pageSize ?? 8;
   }
 
-  changeOperators(field: keyof T, operator: QueryOperator, key?: string) {
+  changeOperators(
+    field: NestedKeyOf<T>,
+    operator: QueryOperator,
+    key?: string
+  ) {
     const existingCondition = this.conditions.find((x) => x.key === key);
     if (existingCondition) {
       existingCondition.operator = operator;
@@ -90,7 +91,7 @@ class QueryBuilder<T> {
   }
 
   equal(
-    field: keyof T,
+    field: NestedKeyOf<T>,
     value: T[keyof T],
     keepDuplicates = false,
     key?: string
@@ -102,7 +103,7 @@ class QueryBuilder<T> {
   }
 
   filterBy(
-    field: keyof T,
+    field: NestedKeyOf<T>,
     operator: QueryOperator,
     value: T[keyof T] | null,
     key?: string

@@ -12,6 +12,7 @@ using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Controllers;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
 using Planarian.Modules.Photos.Repositories;

@@ -12,6 +12,8 @@ import { TripPage } from "./Modules/Trip/Pages/TripPage";
 import { TripPhotoUploadPage } from "./Modules/Trip/Pages/TripPhotoUploadPage";
 import { CavesPage } from "./Modules/Caves/Pages/CavesPage";
 import { AddCavesPage } from "./Modules/Caves/Pages/AddCavePage";
+import { CavePage } from "./Modules/Caves/Pages/CavePage";
+import { EditCavePage } from "./Modules/Caves/Pages/EditCavePage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -22,7 +24,10 @@ export const AppRouting: React.FC = () => {
       <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
       <Route element={<ProtectedRoutesComponent />}>
         <Route path="/caves" element={<CavesPage />} />
+        <Route path="/caves/:caveId" element={<CavePage />} />
+        <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
         <Route path="/caves/add" element={<AddCavesPage />} />
+        {/* <Route path="/account/settings" element={<AccountSettings />} /> */}
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
         <Route

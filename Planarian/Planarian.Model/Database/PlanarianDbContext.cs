@@ -73,6 +73,7 @@ public class PlanarianDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
+        optionsBuilder.EnableSensitiveDataLogging();
         optionsBuilder.AddInterceptors(_changesInterceptor);
     }
 

@@ -22,17 +22,17 @@ public class FieldIndicationTagConfiguration : BaseEntityTypeConfiguration<Field
         base.Configure(builder);
 
         builder.HasKey(e => new { e.TagTypeId, e.EntranceId });
-        
+
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.FieldIndicationTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(e => e.Entrance)
             .WithMany(e => e.FieldIndicationTags)
             .HasForeignKey(e => e.EntranceId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
 
     }
 }

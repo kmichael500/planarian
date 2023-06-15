@@ -1,24 +1,36 @@
-import { Button, Col, Drawer, Form, Input, Row, Space } from "antd";
+import {
+  Button,
+  Col,
+  Drawer,
+  Form,
+  FormInstance,
+  Input,
+  Row,
+  Space,
+} from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";
 import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
+import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 
-export interface AdvancedSearchDrawerComponentProps<T>
+export interface AdvancedSearchDrawerComponentProps<T extends object>
   extends FilterFormProps<T> {
   onSearch: () => Promise<void>;
   children?: React.ReactNode;
-  mainSearchField: keyof T;
+  mainSearchField: NestedKeyOf<T>;
   mainSearchFieldLabel: string;
+  form?: FormInstance<T>;
 }
 
-const AdvancedSearchDrawerComponent = <T,>({
+const AdvancedSearchDrawerComponent = <T extends object>({
   queryBuilder,
   onSearch,
   children,
   mainSearchField,
   mainSearchFieldLabel,
+  form,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
@@ -28,6 +40,7 @@ const AdvancedSearchDrawerComponent = <T,>({
 
   const onClearSearch = async () => {
     queryBuilder.clear();
+    form?.resetFields();
     await onSearch();
   };
 
@@ -39,7 +52,7 @@ const AdvancedSearchDrawerComponent = <T,>({
           defaultValue={queryBuilder.getFieldValue(mainSearchField) as string}
           onChange={(e) => {
             queryBuilder.filterBy(
-              "name" as any,
+              mainSearchField,
               QueryOperator.Contains,
               e.target.value as any
             );
@@ -63,6 +76,7 @@ const AdvancedSearchDrawerComponent = <T,>({
           </PlanarianButton>
         </Space>
         <Drawer
+          title="Advanced Search"
           open={isAdvancedSearchOpen}
           onClose={(e) => setIsAdvancedSearchOpen(false)}
         >
@@ -74,6 +88,7 @@ const AdvancedSearchDrawerComponent = <T,>({
             }}
             layout="vertical"
             initialValues={queryBuilder.getDefaultValues()}
+            form={form}
           >
             {children}
           </Form>

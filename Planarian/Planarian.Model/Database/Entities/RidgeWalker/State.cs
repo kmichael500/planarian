@@ -8,6 +8,7 @@ public class State : EntityBaseNameId
     public string Abbreviation { get; set; } = null!;
     public ICollection<AccountState> AccountStates { get; set; } = new HashSet<AccountState>();
     public ICollection<County> Counties { get; set; } = new HashSet<County>();
+    public ICollection<Cave> Caves { get; set; } = new HashSet<Cave>();
 }
 
 public class StateConfiguration : BaseEntityTypeConfiguration<State>

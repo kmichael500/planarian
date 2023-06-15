@@ -5,7 +5,10 @@ import { TripVm } from "../Models/TripVm";
 import { TripCreateButtonComponent } from "./TripCreateButtonComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
-import { QueryBuilder } from "../../Search/Services/QueryBuilder";
+import {
+  QueryBuilder,
+  QueryOperator,
+} from "../../Search/Services/QueryBuilder";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import { TripCardComponent } from "./TripCard";
@@ -87,6 +90,7 @@ const TripsComponent: React.FC<TripsByProjectIdComponentProps> = (props) => {
           queryBuilder={queryBuilder}
           field={"tripReport"}
           label={"Trip Report"}
+          queryOperator={QueryOperator.FreeText}
         />
         <Row gutter={10}>
           <Col span={12}>

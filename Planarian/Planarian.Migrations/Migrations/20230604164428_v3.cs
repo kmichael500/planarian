@@ -593,7 +593,7 @@ namespace Planarian.Migrations.Migrations
                 principalTable: "Entrances",
                 principalColumn: "Id");
 
-            var states = Generator.GenerateStates();
+            var states = DataGenerator.GenerateStates();
 
             foreach (var state in states)
             {
@@ -602,7 +602,7 @@ namespace Planarian.Migrations.Migrations
                     columns: new[] { "Id", "Name", "Abbreviation", "CreatedOn" },
                     values: new object[] { state.Id, state.Name, state.Abbreviation, state.CreatedOn });
             }
-
+            
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

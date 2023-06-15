@@ -7,7 +7,8 @@ import { useRef, useState } from "react";
 
 const { Option } = Select;
 
-export interface NumberFilterFormItemProps<T> extends FilterFormItemProps<T> {
+export interface NumberFilterFormItemProps<T extends object>
+  extends FilterFormItemProps<T> {
   inputType:
     | "button"
     | "checkbox"
@@ -33,7 +34,7 @@ export interface NumberFilterFormItemProps<T> extends FilterFormItemProps<T> {
     | "week";
 }
 
-const NumberFilterFormItem = <T,>({
+const NumberFilterFormItem = <T extends object>({
   queryBuilder,
   field,
   label,
@@ -80,6 +81,9 @@ const NumberFilterFormItem = <T,>({
     <Form.Item label={label}>
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
+          id={field.toString() + " field 1"}
+          min={0}
+          allowClear
           type={inputType}
           value={inputValue1}
           onChange={(e) => {
@@ -115,6 +119,9 @@ const NumberFilterFormItem = <T,>({
       <br />
       <div style={{ display: "flex", gap: "8px" }}>
         <Input
+          min={0}
+          id={field.toString() + " field 2"}
+          allowClear
           type={inputType}
           value={inputValue2}
           onChange={(e) => {
@@ -146,10 +153,6 @@ const NumberFilterFormItem = <T,>({
           </Option>
         </Select>
       </div>
-      <br />
-      <PlanarianButton onClick={onClear} icon={<ClearOutlined />}>
-        Clear
-      </PlanarianButton>
     </Form.Item>
   );
 };

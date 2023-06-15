@@ -1,4 +1,6 @@
 export interface EntranceVm {
+  id: string;
+  isPrimary: boolean;
   reportedByUserId: string | null;
   locationQualityTagId: string;
   name: string | null;
@@ -9,8 +11,9 @@ export interface EntranceVm {
   reportedOn: string | null;
   reportedByName: string | null;
   pitFeet: number | null;
+
   entranceStatusTagIds: string[];
-  entranceHydrologyFrequencyTagIds: string[];
   fieldIndicationTagIds: string[];
   entranceHydrologyTagIds: string[];
+  entranceHydrologyFrequencyTagIds: string[];
 }

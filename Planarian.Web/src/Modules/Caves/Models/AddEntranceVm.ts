@@ -1,4 +1,5 @@
 export interface AddEntranceVm {
+  id?: string;
   isPrimary: boolean;
   locationQualityTagId: string;
   name: string | null;
