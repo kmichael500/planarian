@@ -4,7 +4,7 @@ import { Key } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
 import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
 
-interface CardGridComponentProps<T> {
+interface CardGridComponentProps<T extends object> {
   renderItem: (item: T) => React.ReactNode;
   itemKey: (item: T) => string;
   items?: T[] | undefined;
@@ -15,7 +15,7 @@ interface CardGridComponentProps<T> {
   onSearch?: () => Promise<void>;
 }
 
-const CardGridComponent = <T,>({
+const CardGridComponent = <T extends object>({
   renderItem,
   itemKey,
   items,

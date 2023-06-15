@@ -3,4 +3,10 @@ export enum TagType {
   Trip = "Trip",
   Photo = "Photo",
   ProjectMember = "User",
+  Geology = "Geology",
+  LocationQuality = "LocationQuality",
+  EntranceStatus = "EntranceStatus",
+  FieldIndication = "FieldIndication",
+  EntranceHydrology = "EntranceHydrology",
+  EntranceHydrologyFrequency = "EntranceHydrologyFrequency",
 }

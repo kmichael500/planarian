@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -19,6 +21,11 @@ public abstract class RepositoryBase
     public async Task SaveChangesAsync()
     {
         await DbContext.SaveChangesAsync();
+    }
+    
+    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    {
+        return await DbContext.Database.BeginTransactionAsync();
     }
 
     public void Add(EntityBase entity)

@@ -94,30 +94,6 @@ const ProjectsPage: React.FC = () => {
           pagedItems={trips}
         />
       </SpinnerCardComponent>
-      {/* <SpinnerCardComponent spinning={isTripsLoading}>
-        <CardGridComponent
-          noDataDescription="No projects found"
-          noDataCreateButton={<ProjectCreateButtonComponent />}
-          renderItem={(project) => (
-            <Link to={project.id}>
-              <Card
-                style={{ height: "100%" }}
-                loading={isTripsLoading}
-                hoverable
-                title={project.name}
-                bordered={false}
-              >
-                <Paragraph>
-                  Project Members: {project.numberOfProjectMembers}
-                </Paragraph>
-                <Paragraph>Trips: {project.numberOfTrips}</Paragraph>
-              </Card>
-            </Link>
-          )}
-          itemKey={(project) => project.id}
-          pagedItems={trips}
-        />
-      </SpinnerCardComponent> */}
     </div>
   );
 };

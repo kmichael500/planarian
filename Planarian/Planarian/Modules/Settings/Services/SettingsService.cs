@@ -16,11 +16,6 @@ public class SettingsService : ServiceBase<SettingsRepository>
         _blobService = blobService;
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
-    {
-        return await Repository.GetTripTags();
-    }
-
     public async Task<string> GetTagTypeName(string tagTypeId)
     {
         return await Repository.GetTagTypeName(tagTypeId);
@@ -42,5 +37,60 @@ public class SettingsService : ServiceBase<SettingsRepository>
     public async Task<IEnumerable<SelectListItem<string>>> GetUsers()
     {
         return await Repository.GetUsers();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    {
+        return await Repository.GetStates();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    {
+        return await Repository.GetStateCounties(stateId);
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
+    {
+        return await Repository.GetTripTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetGeologyTags()
+    {
+        return await Repository.GetGeologyTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetLocationQualityTags()
+    {
+        return await Repository.GetLocationQualityTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>?> GetEntranceStatusTags()
+    {
+        return await Repository.GetEntranceStatusTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetFieldIndicationTags()
+    {
+        return await Repository.GetFieldIndicationTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyTags()
+    {
+        return await Repository.GetEntranceHydrologyTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyFrequencyTags()
+    {
+        return await Repository.GetEntranceHydrologyFrequencyTags();
+    }
+
+    public async Task<string?> GetCountyName(string countyId)
+    {
+        return await Repository.GetCountyName(countyId);
+    }
+
+    public async Task<string?> GetStateName(string stateId)
+    {
+        return await Repository.GetStateName(stateId);
     }
 }

@@ -19,7 +19,9 @@ const SpinnerCardComponent: React.FC<SpinnerCardProps> = ({
     <>
       {spinning && (
         <CardGridComponent
-          items={[...Array(numberOfCards).keys()]}
+          items={[...Array(numberOfCards).keys()].map((index) => ({
+            id: index,
+          }))}
           itemKey={(index) => index.toString()}
           renderItem={(index) => (
             <Card loading={spinning} className={className} {...props} />

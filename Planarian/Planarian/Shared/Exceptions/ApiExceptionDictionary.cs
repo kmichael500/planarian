@@ -1,3 +1,5 @@
+using Planarian.Model.Database.Entities.RidgeWalker;
+
 namespace Planarian.Shared.Exceptions;
 
 public static class ApiExceptionDictionary
@@ -79,4 +81,10 @@ public static class ApiExceptionDictionary
         new(StatusCodes.Status500InternalServerError, 301, "The email failed to send");
 
     #endregion
+
+    public static ApiException NoAccount =>
+        new(StatusCodes.Status500InternalServerError, 302, "No account was found");
+
+    public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
+        new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
 }

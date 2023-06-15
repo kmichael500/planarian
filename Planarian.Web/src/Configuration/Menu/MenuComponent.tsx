@@ -1,4 +1,4 @@
-import { Menu } from "antd";
+import { Divider, Menu } from "antd";
 import { MenuItemType } from "antd/lib/menu/hooks/useItems";
 import { useContext, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -41,6 +41,18 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
   }, [location]);
 
   const authenticatedMenuItems = [
+    {
+      key: "caves",
+      icon: (
+        <Link to="/caves">
+          <DatabaseOutlined />
+        </Link>
+      ),
+      label: "Caves",
+    },
+    {
+      icon: <Divider />,
+    },
     {
       key: "projects",
       icon: (

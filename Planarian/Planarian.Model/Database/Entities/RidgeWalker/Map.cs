@@ -24,11 +24,11 @@ public class MapConfiguration : BaseEntityTypeConfiguration<Map>
             .HasOne(e => e.Cave)
             .WithMany(e => e.Maps)
             .HasForeignKey(bc => bc.CaveId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(e => e.MapStatusTag)
             .WithMany(e => e.MapStatusTags)
             .HasForeignKey(e => e.MapStatusTagId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

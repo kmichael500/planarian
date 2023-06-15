@@ -101,13 +101,13 @@ public class TripRepository : RepositoryBase
             {
                 Id = e.Id,
                 ProjectId = e.ProjectId,
-                TripTagTypeIds = e.TripTags.Select(e => e.TagTypeId),
+                TripTagTypeIds = e.TripTags.Select(ee => ee.TagTypeId),
                 TripMemberIds = e.Members.Select(ee => ee.UserId),
                 Name = e.Name,
                 Description = e.Description,
                 TripReport = e.TripReport,
                 NumberOfPhotos = e.Photos.Count,
-                Leads = e.Leads.Select(e => new LeadVm(e)),
+                Leads = e.Leads.Select(ee => new LeadVm(ee)),
                 CreatedOn = e.CreatedOn,
                 ModifiedOn = e.ModifiedOn,
                 IsTripReportCompleted = !string.IsNullOrWhiteSpace(e.TripReport)

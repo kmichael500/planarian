@@ -46,7 +46,7 @@ const LoginPage: React.FC = () => {
       await AuthenticationService.Login(values);
       setIsAuthenticated(true);
       navigate(redirectUrl);
-    } catch (e: any) {
+    } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
       setIsLoggingIn(false);

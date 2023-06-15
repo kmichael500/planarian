@@ -8,7 +8,6 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 const { Title } = Typography;
 
 const SettingsPage: React.FC = () => {
-  const [form] = Form.useForm();
   const [user, setUser] = useState<UserVm>();
   const [isLoading, setIsLoading] = useState(false);
 

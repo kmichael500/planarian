@@ -10,7 +10,7 @@ import {
 } from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
-import { TripsByProjectIdComponent } from "../../Trip/Components/TripsByProjectIdComponent";
+import { TripsComponent } from "../../Trip/Components/TripsComponent";
 
 const ProjectPage: React.FC = () => {
   let [project, setProject] = useState<ProjectVm>();
@@ -45,7 +45,7 @@ const ProjectPage: React.FC = () => {
         projectId={projectId}
       ></MemberGridComponent>
       <Divider></Divider>
-      <TripsByProjectIdComponent projectId={projectId} />
+      <TripsComponent projectId={projectId} />
     </>
   );
 };

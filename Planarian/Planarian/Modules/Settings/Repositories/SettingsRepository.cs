@@ -32,4 +32,76 @@ public class SettingsRepository : RepositoryBase
     {
         return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
     }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    {
+        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
+            .Select(e => e.State)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    {
+        return await DbContext.Counties.Where(e => e.StateId == stateId && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetGeologyTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetLocationQualityTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.LocationQuality &&
+                        (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceStatusTags()
+    {
+        return await DbContext.TagTypes.Where(e =>
+                e.Key == TagTypeKeyConstant.EntranceStatus &&
+                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetFieldIndicationTags()
+    {
+        return await DbContext.TagTypes.Where(e =>
+                e.Key == TagTypeKeyConstant.FieldIndication &&
+                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyTags()
+    {
+        return await DbContext.TagTypes.Where(e =>
+                e.Key == TagTypeKeyConstant.EntranceHydrology &&
+                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyFrequencyTags()
+    {
+        return await DbContext.TagTypes.Where(e =>
+                e.Key == TagTypeKeyConstant.EntranceHydrologyFrequency &&
+                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<string?> GetCountyName(string countyId)
+    {
+        return await DbContext.Counties.Where(e => e.Id == countyId && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Name).FirstOrDefaultAsync();
+    }
+
+    public async Task<string?> GetStateName(string stateId)
+    {
+        return await DbContext.States.Where(e => e.Id == stateId).Select(e => e.Name).FirstOrDefaultAsync();
+    }
 }
