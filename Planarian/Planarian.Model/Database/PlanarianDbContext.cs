@@ -6,6 +6,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
+using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Database;
 
@@ -61,7 +62,7 @@ public class PlanarianDbContext : DbContext
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
-    public DbSet<Map> Maps { get; set; } = null!;
+    public DbSet<File> Files { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
     
     #endregion

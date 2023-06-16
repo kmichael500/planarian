@@ -3,6 +3,7 @@ using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared.Base;
+using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Database.Entities;
 
@@ -36,7 +37,7 @@ public class TagType : EntityBaseNameId
     public virtual ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
     public ICollection<Entrance> EntranceLocationQualitiesTags { get; set; } = new HashSet<Entrance>();
     public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
-    public ICollection<Map> MapStatusTags { get; set; } = new HashSet<Map>();
+    public ICollection<File> FileTypeTags { get; set; } = new HashSet<File>();
     public virtual Project? Project { get; set; }
 }
 
