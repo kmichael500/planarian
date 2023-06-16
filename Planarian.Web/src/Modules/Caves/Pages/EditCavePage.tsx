@@ -78,7 +78,7 @@ const EditCavePage: React.FC = () => {
           onFinish={handleFormSubmit}
           form={form}
         >
-          <AddCaveComponent form={form} />
+          <AddCaveComponent isEditing={true} form={form} />
         </Form>
       </Card>
     </>

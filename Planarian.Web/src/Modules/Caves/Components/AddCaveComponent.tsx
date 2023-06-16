@@ -16,29 +16,41 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { AddEntranceVm } from "../Models/AddEntranceVm";
 import { FormInstance, RuleObject } from "antd/lib/form";
 import { StateDropdown } from "./StateDropdown";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CountyDropdown } from "./CountyDropdown";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
-import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import {
+  isNullOrWhiteSpace,
+  nameof,
+} from "../../../Shared/Helpers/StringHelpers";
 import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputDistance";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
+  isEditing?: boolean;
 }
-const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
+const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
   const [selectedStateId, setSelectedStateId] = useState<string>();
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
       entrances: form
-        .getFieldValue("entrances")
+        .getFieldValue(nameof<AddCaveVm>("entrances"))
         .map((entrance: AddEntranceVm, i: number) => ({
           ...entrance,
           isPrimary: i === index,
         })),
     });
   };
+
+  useEffect(() => {
+    // if stateId has a value in the form, set the selectedStateId to that value
+    const initialStateValue = form.getFieldValue(nameof<AddCaveVm>("stateId"));
+    if (!isNullOrWhiteSpace(initialStateValue)) {
+      setSelectedStateId(initialStateValue);
+    }
+  }, [form]);
 
   const validateEntrances = async (
     rule: RuleObject,
@@ -105,7 +117,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
           rules={[{ required: true, message: "Please select a state" }]}
         >
           <StateDropdown
-            autoSelectFirst={true}
+            autoSelectFirst={!isEditing}
             onChange={(e) => {
               setSelectedStateId(e.toString());
               if (isInitialLoad) return setIsInitialLoad(false);
@@ -121,7 +133,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
           rules={[{ required: true, message: "Please select a county" }]}
         >
           {selectedStateId && (
-            <CountyDropdown selectedState={selectedStateId}></CountyDropdown>
+            <CountyDropdown selectedStateId={selectedStateId}></CountyDropdown>
           )}
         </Form.Item>
       </Col>

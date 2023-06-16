@@ -4,11 +4,11 @@ import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 const { Option } = Select;
 export interface CountyDropdownProps extends SelectProps<string> {
-  selectedState: string;
+  selectedStateId: string;
 }
 // Generic County Dropdown Component
 const CountyDropdown = ({
-  selectedState: selectedStateId,
+  selectedStateId,
   defaultValue,
   onSelect,
   ...rest
@@ -17,18 +17,16 @@ const CountyDropdown = ({
 
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
-    if (selectedStateId) {
-      SettingsService.GetCounties(selectedStateId).then((data) => {
-        setCounties(data);
-        setIsLoading(false);
-      });
-    }
+    SettingsService.GetCounties(selectedStateId).then((data) => {
+      setCounties(data);
+      setIsLoading(false);
+    });
   }, [selectedStateId]);
 
   return (
     <>
       <Spin spinning={isLoading}>
-        {!isLoading && (
+        {!isLoading && counties.length > 0 && (
           <Select
             id="countyDropdown"
             loading={isLoading}

@@ -69,13 +69,13 @@ const StateCountyFilterFormItem = <T extends object>({
 
   return (
     <>
-      <Form.Item label={stateLabel}>
+      <Form.Item label={stateLabel} fieldId={stateField}>
         <StateDropdown {...stateDropDownProps} />
       </Form.Item>
       <Form.Item label={countyLabel} name={countyField}>
         {selectedState && (
           <CountyDropdown
-            selectedState={selectedState}
+            selectedStateId={selectedState}
             allowClear={true}
             onClear={() => {
               queryBuilder.removeFromDictionary(countyField);
