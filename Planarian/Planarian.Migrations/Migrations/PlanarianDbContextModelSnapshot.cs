@@ -847,6 +847,16 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<string>("BlobContainer")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("BlobKey")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("CaveId")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");

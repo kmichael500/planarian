@@ -12,7 +12,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20230616170042_v12")]
+    [Migration("20230616170818_v12")]
     partial class v12
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -846,6 +846,16 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("AccountId")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("BlobContainer")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("BlobKey")
+                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 

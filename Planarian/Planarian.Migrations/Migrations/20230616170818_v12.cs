@@ -20,6 +20,8 @@ namespace Planarian.Migrations.Migrations
                     FileTypeTagId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     CaveId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     AccountId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    BlobKey = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    BlobContainer = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     CreatedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     ModifiedByUserId = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "datetime2", nullable: false),
