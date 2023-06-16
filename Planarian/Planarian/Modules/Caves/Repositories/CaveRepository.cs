@@ -45,7 +45,7 @@ public class CaveRepository : RepositoryBase
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList(),
                     }).FirstOrDefault(),
-                MapIds = e.Maps.Select(ee => ee.Id),
+                MapIds = e.Files.Select(ee => ee.Id),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
                 {
                     Id = ee.Id,
@@ -121,7 +121,7 @@ public class CaveRepository : RepositoryBase
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList(),
                     }).FirstOrDefault(),
-                MapIds = e.Maps.Select(e => e.Id),
+                MapIds = e.Files.Select(e => e.Id),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
                 {
                     Id = ee.Id,
@@ -162,7 +162,7 @@ public class CaveRepository : RepositoryBase
     public async Task<Cave?> GetAsync(string? id)
     {
         return await DbContext.Caves.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
-            .Include(e=>e.Maps)
+            .Include(e=>e.Files)
             .Include(e=>e.GeologyTags)
             .Include(e=>e.Entrances)
             .FirstOrDefaultAsync();

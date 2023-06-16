@@ -6,29 +6,31 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
-public class Map : EntityBase
+public class File : EntityBase
 {
-    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string MapStatusTagId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; } = null!;
     
-    public TagType MapStatusTag { get; set; }
-    
-    public virtual Cave Cave { get; set; } = null!;
+    public TagType FileTypeTag { get; set; } = null!;
+
+    public virtual Cave? Cave { get; set; } = null!;
+    public virtual Account? Account { get; set; } = null!;
 }
 
-public class MapConfiguration : BaseEntityTypeConfiguration<Map>
+public class FileConfiguration : BaseEntityTypeConfiguration<File>
 {
-    public override void Configure(EntityTypeBuilder<Map> builder)
+    public override void Configure(EntityTypeBuilder<File> builder)
     {
         builder
             .HasOne(e => e.Cave)
-            .WithMany(e => e.Maps)
+            .WithMany(e => e.Files)
             .HasForeignKey(bc => bc.CaveId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(e => e.MapStatusTag)
-            .WithMany(e => e.MapStatusTags)
-            .HasForeignKey(e => e.MapStatusTagId)
+        builder.HasOne(e => e.FileTypeTag)
+            .WithMany(e => e.FileTypeTags)
+            .HasForeignKey(e => e.FileTypeTagId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

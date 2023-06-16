@@ -837,6 +837,50 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("FieldIndicationTags");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.File", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FileTypeTagId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("FileTypeTagId");
+
+                    b.ToTable("Files");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologyTag", b =>
                 {
                     b.Property<string>("TagTypeId")
@@ -874,45 +918,6 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ModifiedByUserId");
 
                     b.ToTable("GeologyTags");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Map", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("CaveId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("MapStatusTagId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CaveId");
-
-                    b.HasIndex("MapStatusTagId");
-
-                    b.ToTable("Maps");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
@@ -1524,6 +1529,30 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("TagType");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.File", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("Files")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "FileTypeTag")
+                        .WithMany("FileTypeTags")
+                        .HasForeignKey("FileTypeTagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("FileTypeTag");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologyTag", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
@@ -1553,25 +1582,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("ModifiedByUser");
 
                     b.Navigation("TagType");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Map", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
-                        .WithMany("Maps")
-                        .HasForeignKey("CaveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.TagType", "MapStatusTag")
-                        .WithMany("MapStatusTags")
-                        .HasForeignKey("MapStatusTagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Cave");
-
-                    b.Navigation("MapStatusTag");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
@@ -1673,9 +1683,9 @@ namespace Planarian.Migrations.Migrations
                 {
                     b.Navigation("Entrances");
 
-                    b.Navigation("GeologyTags");
+                    b.Navigation("Files");
 
-                    b.Navigation("Maps");
+                    b.Navigation("GeologyTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -1715,11 +1725,11 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("FieldIndicationTags");
 
+                    b.Navigation("FileTypeTags");
+
                     b.Navigation("GeologyTags");
 
                     b.Navigation("LeadTags");
-
-                    b.Navigation("MapStatusTags");
 
                     b.Navigation("TripTags");
 
