@@ -88,7 +88,8 @@ public static class DataGenerator
         {
             Name = e.Name,
             Abbreviation = e.Abbreviation,
-            CreatedOn = now
+            CreatedOn = now,
+            Id = e.Id
         }).ToList();
     }
 }

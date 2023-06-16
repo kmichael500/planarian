@@ -41,9 +41,9 @@ const EditCavePage: React.FC = () => {
 
       setHeaderButtons([
         <DeleteButtonComponent
-          title={`Are you sure you want to delete '${cave?.name}? This action is not reversable!'`}
+          title={`Are you sure you want to delete '${caveResponse?.name}'? This action is not reversable!'`}
           onConfirm={async () => {
-            await CaveService.DeleteCave(cave?.id as string);
+            await CaveService.DeleteCave(caveResponse?.id as string);
           }}
         />,
         <BackButtonComponent to={"./.."} />,

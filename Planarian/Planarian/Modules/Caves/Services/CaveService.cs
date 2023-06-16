@@ -30,11 +30,67 @@ public class CaveService : ServiceBase<CaveRepository>
                 throw ApiExceptionDictionary.NoAccount;
             }
 
+            #region Data Validation
+
             // must be at least one entrance
             if (values.Entrances == null || !values.Entrances.Any())
             {
                 throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
             }
+
+            if (values.NumberOfPits < 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
+            }
+            
+            if(values.LengthFeet < 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
+            }
+            if(values.DepthFeet < 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
+            }
+
+            if (values.MaxPitDepthFeet < 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
+            }
+            
+            if(values.Entrances.Any(e=>e.Latitude > 90 || e.Latitude < -90))
+            {
+                throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
+            }
+            
+            if(values.Entrances.Any(e=>e.Longitude > 180 || e.Longitude < -180))
+            {
+                throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
+            }
+            
+            if(values.Entrances.Any(e=>e.ElevationFeet < 0))
+            {
+                throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
+            }
+            
+            if(values.Entrances.Any(e=>e.PitFeet < 0))
+            {
+                throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
+            }
+            
+            var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
+
+            if (numberOfPrimaryEntrances == 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
+            }
+
+            if (numberOfPrimaryEntrances != 1)
+            {
+                throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
+            }
+
+            #endregion
+
 
             var isNew = string.IsNullOrWhiteSpace(values.Id);
 
@@ -88,12 +144,6 @@ public class CaveService : ServiceBase<CaveRepository>
                     entity.Entrances.Remove(entrance);
                     Repository.Delete(entrance);
                 }
-            }
-
-            var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
-            if (numberOfPrimaryEntrances != 1)
-            {
-                throw ApiExceptionDictionary.BadRequest("Only one entrance can be primary!");
             }
 
             foreach (var entranceValue in values.Entrances)

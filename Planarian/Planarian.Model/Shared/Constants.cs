@@ -23,6 +23,7 @@ public static class TagTypeKeyConstant
     public const string Default = "Default";
     public const string Trip = "Trip";
     public const string Photo = "Photo";
+    
     public const string LocationQuality = "LocationQuality";
     public const string Geology = "Geology";
     public const string EntranceStatus = "EntranceStatus";

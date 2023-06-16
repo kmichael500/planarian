@@ -16,11 +16,39 @@ public class TagService : ServiceBase<TagRepository>
     public async Task CreateTag(CreateOrEditTagTypeVm tagType)
     {
         var key = tagType.Key;
-
-        if (!TagTypeKeyConstant.IsValidTagKey(key)) throw ApiExceptionDictionary.BadRequest("Invalid tag key");
-
         var entity = new TagType(tagType.Name, key);
 
+        switch (key)
+        {
+            case TagTypeKeyConstant.Default:
+                break;
+
+            # region Planarian
+
+            case TagTypeKeyConstant.Trip:
+                break;
+            case TagTypeKeyConstant.Photo:
+                break;
+
+            #endregion
+
+            #region Ridgewalker
+
+            case TagTypeKeyConstant.LocationQuality:
+            case TagTypeKeyConstant.Geology:
+            case TagTypeKeyConstant.EntranceStatus:
+            case TagTypeKeyConstant.FieldIndication:
+            case TagTypeKeyConstant.EntranceHydrology:
+            case TagTypeKeyConstant.EntranceHydrologyFrequency:
+                entity.AccountId = RequestUser.AccountId;
+                break;
+
+            #endregion
+
+            default:
+                throw ApiExceptionDictionary.BadRequest("Invalid tag key");
+        }
+        
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();

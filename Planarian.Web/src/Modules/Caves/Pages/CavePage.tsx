@@ -8,6 +8,7 @@ import { CaveService } from "../Service/CaveService";
 import { CaveComponent } from "../Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { EditOutlined } from "@ant-design/icons";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const CavePage = () => {
   const [cave, setCave] = useState<CaveVm>();
@@ -24,14 +25,16 @@ const CavePage = () => {
       </Link>,
       <BackButtonComponent to={"./.."} />,
     ]);
-  }, []);
+  }, [cave]);
 
   if (caveId === undefined) {
     throw new NotFoundException();
   }
 
   useEffect(() => {
-    setHeaderTitle([`${cave?.displayId} ${cave?.name ?? ""}`]);
+    if (!isNullOrWhiteSpace(cave?.name)) {
+      setHeaderTitle([`${cave?.displayId} ${cave?.name ?? ""}`]);
+    }
   }, [cave]);
   useEffect(() => {
     const getCave = async () => {

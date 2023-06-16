@@ -21,6 +21,7 @@ import { CountyDropdown } from "./CountyDropdown";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputDistance";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -136,7 +137,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
       </Col>
       <Col {...fourColProps}>
         <Form.Item
-          label="Length (Feet)"
+          label="Length"
           name={nameof<AddCaveVm>("lengthFeet")}
           rules={[
             {
@@ -145,23 +146,23 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
             },
           ]}
         >
-          <InputNumber min={0} style={{ width: "100%" }} />
+          <InputDistanceComponent />
         </Form.Item>
       </Col>
       <Col {...fourColProps}>
         <Form.Item
-          label="Depth (Feet)"
+          label="Depth"
           name={nameof<AddCaveVm>("depthFeet")}
           rules={[
             { required: true, message: "Please enter the depth in feet" },
           ]}
         >
-          <InputNumber min={0} style={{ width: "100%" }} />
+          <InputDistanceComponent />
         </Form.Item>
       </Col>
       <Col {...fourColProps}>
         <Form.Item
-          label="Max Pit Depth (Feet)"
+          label="Max Pit Depth"
           name={nameof<AddCaveVm>("maxPitDepthFeet")}
           rules={[
             {
@@ -170,7 +171,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
             },
           ]}
         >
-          <InputNumber min={0} style={{ width: "100%" }} />
+          <InputDistanceComponent />
         </Form.Item>
       </Col>
       <Col {...fourColProps}>
@@ -189,7 +190,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
       </Col>
       <Col span={24}>
         <Form.Item label="Narrative" name={nameof<AddCaveVm>("narrative")}>
-          <Input.TextArea rows={10} />
+          <Input.TextArea rows={15} />
         </Form.Item>
       </Col>
       <Col {...twoColProps}>
@@ -327,6 +328,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
                           <Form.Item
                             {...field}
                             label="Latitude"
+                            help="WGS 84"
                             name={[
                               field.name,
                               nameof<AddEntranceVm>("latitude"),
@@ -373,7 +375,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
                         <Col {...fourColProps}>
                           <Form.Item
                             {...field}
-                            label="Elevation (Feet)"
+                            label="Elevation"
                             name={[
                               field.name,
                               nameof<AddEntranceVm>("elevationFeet"),
@@ -385,7 +387,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
                               },
                             ]}
                           >
-                            <InputNumber style={{ width: "100%" }} min={0} />
+                            <InputDistanceComponent />
                           </Form.Item>
                         </Col>
                         <Col {...fourColProps}>
@@ -421,13 +423,13 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
                         <Col span={24}>
                           <Form.Item
                             {...field}
-                            label="Pit (Feet)"
+                            label="Pit Depth"
                             name={[
                               field.name,
                               nameof<AddEntranceVm>("pitFeet"),
                             ]}
                           >
-                            <InputNumber style={{ width: "100%" }} min={0} />
+                            <InputDistanceComponent />
                           </Form.Item>
                         </Col>
                         <Col span={24}>
@@ -439,7 +441,7 @@ const AddCaveComponent = ({ form }: AddCaveComponentProps) => {
                               nameof<AddEntranceVm>("description"),
                             ]}
                           >
-                            <Input.TextArea rows={4} />
+                            <Input.TextArea rows={6} />
                           </Form.Item>
                         </Col>
 
