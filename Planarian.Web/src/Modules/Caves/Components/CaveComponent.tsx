@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CarOutlined, EditOutlined } from "@ant-design/icons";
 import {
@@ -26,6 +26,10 @@ import { StateTagComponent } from "../../../Shared/Components/Display/StateTagCo
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UploadComponent } from "../../Files/Components/FIleUploadComponent";
+import { CloudDownloadOutlined } from "@ant-design/icons";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
+import { FileCardComponent } from "../../Files/Components/FileCardComponent";
+
 const { Panel } = Collapse;
 const { Paragraph } = Typography;
 
@@ -187,10 +191,22 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
         <br />
         <Divider orientation="left">Narrative</Divider>
         <ParagraphDisplayComponent text={cave?.narrative} />
-      </Card>
-      <Card title="Files">
+        <Divider orientation="left">Files</Divider>
+        <CardGridComponent
+          renderItem={(file) => {
+            return <FileCardComponent file={file} />;
+          }}
+          itemKey={(item) => {
+            return item.id;
+          }}
+          items={cave?.files}
+        ></CardGridComponent>
+
         <UploadComponent caveId={cave?.id} />
       </Card>
+      {/* <Card title="Files">
+        <UploadComponent caveId={cave?.id} />
+      </Card> */}
     </>
   );
 };

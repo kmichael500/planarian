@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { HttpClient } from "../../../..";
+import { HttpClient } from "../../..";
 
 const baseUrl = "api/files";
 const FileService = {};
