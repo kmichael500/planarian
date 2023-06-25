@@ -1,8 +1,12 @@
+import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
+import { UploadedFileResponse } from "../../Files/Components/Services/FileService";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
+import { FileVm } from "../../Files/Models/FileVm";
+import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -35,6 +39,28 @@ const CaveService = {
   },
   async DeleteCave(id: string): Promise<void> {
     const response = await HttpClient.delete<void>(`${baseUrl}/${id}`);
+    return response.data;
+  },
+  async AddCaveFile(
+    file: string | Blob | RcFile,
+    caveId: string,
+    onProgress: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<FileVm> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress: onProgress, // Set the onUploadProgress callback
+    };
+
+    const response = await HttpClient.post<FileVm>(
+      `${baseUrl}/${caveId}/files`,
+      formData,
+      config
+    );
     return response.data;
   },
 };

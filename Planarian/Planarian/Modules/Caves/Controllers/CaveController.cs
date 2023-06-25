@@ -4,6 +4,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
@@ -14,9 +15,13 @@ namespace Planarian.Modules.Caves.Controllers;
 [Authorize]
 public class CaveController : PlanarianControllerBase<CaveService>
 {
-    public CaveController(RequestUser requestUser, TokenService tokenService, CaveService service) : base(requestUser,
+    private readonly FileService _fileService;
+
+    public CaveController(RequestUser requestUser, TokenService tokenService, CaveService service,
+        FileService fileService) : base(requestUser,
         tokenService, service)
     {
+        _fileService = fileService;
     }
 
     [HttpGet]
@@ -48,6 +53,16 @@ public class CaveController : PlanarianControllerBase<CaveService>
     {
         var result = await Service.AddCave(cave);
 
+        return new JsonResult(result);
+    }
+    
+    [DisableRequestSizeLimit] //TODO
+    [HttpPost("{caveId:length(10)}/files")]
+    public async Task<IActionResult> UploadCaveFile(string caveId, [FromForm] IFormFile file)
+    {
+        var result = await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName);
+
+        // return Ok();
         return new JsonResult(result);
     }
 

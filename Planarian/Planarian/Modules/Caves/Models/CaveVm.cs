@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Files.Services;
 
 namespace Planarian.Modules.Caves.Models;
 
@@ -11,7 +12,7 @@ public class CaveVm
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
-        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds)
+        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files)
     {
         Id = id;
         StateId = stateId;
@@ -26,6 +27,7 @@ public class CaveVm
         MapIds = mapIds;
         Entrances = entrances;
         GeologyTagIds = geologyTagIds;
+        Files = files;
     }
 
 
@@ -35,9 +37,9 @@ public class CaveVm
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
-        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds) : this(id, stateId,
+        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files) : this(id, stateId,
         countyId, displayId, name, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived, primaryEntrance,
-        mapIds, entrances, geologyTagIds)
+        mapIds, entrances, geologyTagIds, files)
     {
         ReportedByUserId = reportedByUserId;
         MaxPitDepthFeet = maxPitDepthFeet;
@@ -67,6 +69,7 @@ public class CaveVm
     public DateTime? ReportedOn { get; set; }
     [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
+    public IEnumerable<FileVm> Files { get; set; } = new HashSet<FileVm>();
 
     public EntranceVm PrimaryEntrance { get; set; } = null!;
 

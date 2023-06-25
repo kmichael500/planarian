@@ -36,4 +36,6 @@ public class RequestUser
         
         AccountId = user.AccountUsers.FirstOrDefault()?.AccountId;
     }
+
+    public string AccountContainerName => $"account-{AccountId?.ToLower() ?? throw new NullReferenceException(  $" {nameof(AccountId)} is null")}";
 }

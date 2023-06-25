@@ -3,6 +3,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
@@ -30,7 +31,7 @@ public class CaveRepository : RepositoryBase
                 DepthFeet = e.DepthFeet,
                 NumberOfPits = e.NumberOfPits,
                 IsArchived = e.IsArchived,
-                PrimaryEntrance = e.Entrances.Where(ee=>ee.IsPrimary).Select(ee=>
+                PrimaryEntrance = e.Entrances.Where(ee => ee.IsPrimary).Select(ee =>
                     new EntranceVm
                     {
                         Id = ee.Id,
@@ -47,28 +48,36 @@ public class CaveRepository : RepositoryBase
                     }).FirstOrDefault(),
                 MapIds = e.Files.Select(ee => ee.Id),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
-                {
-                    Id = ee.Id,
-                    IsPrimary = ee.IsPrimary,
-                    ReportedByUserId = ee.ReportedByUserId,
-                    LocationQualityTagId = ee.LocationQualityTagId,
-                    Name = ee.Name,
-                    Description = ee.Description,
-                    Latitude = ee.Latitude,
-                    Longitude = ee.Longitude,
-                    ElevationFeet = ee.ElevationFeet,
-                    ReportedOn = ee.ReportedOn,
-                    ReportedByName = ee.ReportedByName,
-                    PitFeet = ee.PitFeet,
-                    EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId),
-                    EntranceHydrologyFrequencyTagIds =
-                        ee.EntranceHydrologyFrequencyTags.Select(e => e.TagTypeId),
-                    FieldIndicationTagIds = ee.FieldIndicationTags.Select(e => e.TagTypeId),
-                    EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(e => e.TagTypeId)
-                })
-                    .OrderByDescending(ee=>ee.IsPrimary)
-                    .ThenBy(ee=>ee.ReportedOn).ToList(),
+                    {
+                        Id = ee.Id,
+                        IsPrimary = ee.IsPrimary,
+                        ReportedByUserId = ee.ReportedByUserId,
+                        LocationQualityTagId = ee.LocationQualityTagId,
+                        Name = ee.Name,
+                        Description = ee.Description,
+                        Latitude = ee.Latitude,
+                        Longitude = ee.Longitude,
+                        ElevationFeet = ee.ElevationFeet,
+                        ReportedOn = ee.ReportedOn,
+                        ReportedByName = ee.ReportedByName,
+                        PitFeet = ee.PitFeet,
+                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId),
+                        EntranceHydrologyFrequencyTagIds =
+                            ee.EntranceHydrologyFrequencyTags.Select(e => e.TagTypeId),
+                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(e => e.TagTypeId),
+                        EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(e => e.TagTypeId)
+                    })
+                    .OrderByDescending(ee => ee.IsPrimary)
+                    .ThenBy(ee => ee.ReportedOn).ToList(),
                 GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
+                Files = e.Files.Select(ee => new FileVm
+                {
+                    Id = e.Id,
+                    DisplayName = ee.DisplayName,
+                    FileName = ee.FileName,
+                    FileTypeKey = ee.FileTypeTag.Key,
+                    FileTypeTagId = ee.FileTypeTagId,
+                })
             })
             .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
@@ -144,7 +153,15 @@ public class CaveRepository : RepositoryBase
                 })
                     .OrderByDescending(ee=>ee.IsPrimary)
                     .ThenBy(ee=>ee.ReportedOn).ToList(),
-                GeologyTagIds = e.GeologyTags.Select(e => e.TagTypeId)
+                GeologyTagIds = e.GeologyTags.Select(e => e.TagTypeId),
+                Files = e.Files.Select(ee=>new FileVm
+                {
+                    Id = e.Id,
+                    DisplayName = ee.DisplayName,
+                    FileName = ee.FileName,
+                    FileTypeKey = ee.FileTypeTag.Key,
+                    FileTypeTagId = ee.FileTypeTagId,
+                })
             })
             .FirstOrDefaultAsync();
     }
