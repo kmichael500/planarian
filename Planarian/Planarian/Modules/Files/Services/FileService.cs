@@ -25,14 +25,15 @@ public class FileService : ServiceBase<FileRepository>
         _fileOptions = fileOptions;
     }
 
-    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName)
+    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName, string? uuid = null)
     {
+        await using var transaction = await Repository.BeginTransactionAsync();
         if (RequestUser.AccountId == null)
         {
             throw new BadRequestException("Account Id is null");
         }
 
-        var other = await _tagRepository.GetFileTypeTagByName(TagTypeKeyConstant.File, FileTypeTagName.Other, RequestUser.AccountId);
+        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
 
         //fileName without extension
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
@@ -57,13 +58,15 @@ public class FileService : ServiceBase<FileRepository>
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
         await Repository.SaveChangesAsync();
-        
+        await transaction.CommitAsync();
+
         var fileInformation = new FileVm
         {
             Id = entity.Id,
             FileName = entity.FileName,
             DisplayName = entity.DisplayName,
-            FileTypeTagId = entity.FileTypeTagId
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid,
         };
         return fileInformation;
     }
@@ -111,4 +114,5 @@ public class FileVm
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
+    public string? Uuid { get; set; }
 }

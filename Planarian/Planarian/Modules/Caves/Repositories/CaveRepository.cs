@@ -79,6 +79,7 @@ public class CaveRepository : RepositoryBase
                     FileTypeTagId = ee.FileTypeTagId,
                 })
             })
+            .AsSplitQuery()
             .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
 
@@ -163,6 +164,7 @@ public class CaveRepository : RepositoryBase
                     FileTypeTagId = ee.FileTypeTagId,
                 })
             })
+            .AsSplitQuery()
             .FirstOrDefaultAsync();
     }
 

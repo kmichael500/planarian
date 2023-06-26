@@ -44,6 +44,7 @@ const CaveService = {
   async AddCaveFile(
     file: string | Blob | RcFile,
     caveId: string,
+    uuid: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileVm> {
     const formData = new FormData();
@@ -57,7 +58,7 @@ const CaveService = {
     };
 
     const response = await HttpClient.post<FileVm>(
-      `${baseUrl}/${caveId}/files`,
+      `${baseUrl}/${caveId}/files?uuid=${uuid}`,
       formData,
       config
     );

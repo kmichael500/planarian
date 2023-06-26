@@ -9,4 +9,5 @@ export enum TagType {
   FieldIndication = "FieldIndication",
   EntranceHydrology = "EntranceHydrology",
   EntranceHydrologyFrequency = "EntranceHydrologyFrequency",
+  File = "File",
 }

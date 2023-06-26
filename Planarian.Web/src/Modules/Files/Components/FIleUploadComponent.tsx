@@ -1,20 +1,35 @@
 import Dragger from "antd/lib/upload/Dragger";
 import { InboxOutlined } from "@ant-design/icons";
-import { UploadProps, message } from "antd";
+import { Form, UploadProps, message, Input, Card, Row, Col } from "antd";
 import { CaveService } from "../../Caves/Service/CaveService";
 import { AxiosProgressEvent } from "axios";
 import { RcFile } from "antd/lib/upload/interface";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UploadRequestError } from "rc-upload/lib/interface";
 import { FileVm } from "../Models/FileVm";
-import { useState } from "react";
+import { AddCaveVm } from "../../Caves/Models/AddCaveVm";
+import { useEffect } from "react";
+import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
+import { TagType } from "../../Tag/Models/TagType";
+
+export interface AddCaveFilesForm {
+  files: FileVm[];
+}
 
 const UploadComponent = ({ caveId }: UploadComponentProps) => {
-  const [uploadresult, setUploadresult] = useState<FileVm[]>([]);
+  const [form] = Form.useForm<AddCaveFilesForm>();
 
+  useEffect(() => {
+    form.setFieldsValue({ files: [] });
+  }, []);
   const props: UploadProps = {
     name: "file",
     multiple: true,
+
+    itemRender: (originNode, file, currFileList) => {
+      return file.status !== "done" ? originNode : null;
+    },
     async customRequest(options) {
       const { onSuccess, onError, file, onProgress } = options;
       if (!caveId) throw new Error("CaveId is undefined");
@@ -22,19 +37,22 @@ const UploadComponent = ({ caveId }: UploadComponentProps) => {
         const result = await CaveService.AddCaveFile(
           file,
           caveId,
+          (file as RcFile).uid,
           (event: AxiosProgressEvent) => {
             const percent = Math.round(
               (100 * event.loaded) / (event.total ?? 0)
             );
-
-            console.log((file as RcFile).name, percent);
 
             if (onProgress) {
               onProgress({ percent });
             }
           }
         );
-        setUploadresult([...uploadresult, result]);
+        const test = form.getFieldValue("files");
+        form.setFieldsValue({
+          files: [...form.getFieldValue("files"), result],
+        });
+
         if (onSuccess) {
           onSuccess({});
         }
@@ -49,14 +67,49 @@ const UploadComponent = ({ caveId }: UploadComponentProps) => {
   };
 
   return (
-    <Dragger {...props}>
-      <p className="ant-upload-drag-icon">
-        <InboxOutlined />
-      </p>
-      <p className="ant-upload-text">
-        Drag and drop files or click to select files
-      </p>
-    </Dragger>
+    <>
+      <Dragger {...props}>
+        <p className="ant-upload-drag-icon">
+          <InboxOutlined />
+        </p>
+        <p className="ant-upload-text">
+          Drag and drop files or click to select files
+        </p>
+      </Dragger>
+      <br />
+      <Form form={form} layout="vertical">
+        <Form.List name="files">
+          {(fields, { add, remove }, { errors }) => (
+            <>
+              <Row gutter={16}>
+                {fields.map((field, index) => (
+                  <Col>
+                    <Card bordered style={{ height: "100%" }}>
+                      <Form.Item
+                        name={[field.name, nameof<FileVm>("displayName")]}
+                        key={field.key}
+                        label={`Name`}
+                        required
+                      >
+                        <Input />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, nameof<FileVm>("fileTypeTagId")]}
+                        key={field.key}
+                        label={`File Type`}
+                        required
+                      >
+                        <TagSelectComponent tagType={TagType.File} />
+                      </Form.Item>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </>
+          )}
+        </Form.List>
+      </Form>
+    </>
   );
 };
 

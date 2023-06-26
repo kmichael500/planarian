@@ -104,6 +104,14 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(entranceHydrologyFrequencyTags);
     }
+    
+    [HttpGet("tags/file/")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetFileTags()
+    {
+        var fileTags = await Service.GetFileTags();
+
+        return new JsonResult(fileTags);
+    }
 
     [HttpGet("tags/{tagTypeId:length(10)}")]
     public async Task<ActionResult<string>> GetTagTypeName(string tagTypeId)

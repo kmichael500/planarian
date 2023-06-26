@@ -93,6 +93,14 @@ public class SettingsRepository : RepositoryBase
                 (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
+    
+    public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
+    {
+        return await DbContext.TagTypes.Where(e =>
+                e.Key == TagTypeKeyConstant.File &&
+                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
 
     public async Task<string?> GetCountyName(string countyId)
     {
@@ -104,4 +112,5 @@ public class SettingsRepository : RepositoryBase
     {
         return await DbContext.States.Where(e => e.Id == stateId).Select(e => e.Name).FirstOrDefaultAsync();
     }
+    
 }

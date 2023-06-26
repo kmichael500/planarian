@@ -18,11 +18,11 @@ public class TagRepository : RepositoryBase
         return await DbContext.TagTypes.FirstOrDefaultAsync(e => e.Id == tagTypeId);
     }
 
-    public async Task<TagType?> GetFileTypeTagByName(string key, string fileTagTypeName, string? accountId = null)
+    public async Task<TagType?> GetFileTypeTagByName(string fileTagTypeName, string? accountId = null)
     {
-        
+
         var result = await DbContext.TagTypes
-            .Where(e => e.Key == key && e.Name == fileTagTypeName && !(!string.IsNullOrWhiteSpace(accountId) && accountId == RequestUser.AccountId))
+            .Where(e => e.Key == TagTypeKeyConstant.File && e.Name == fileTagTypeName && e.AccountId == accountId)
             .FirstOrDefaultAsync();
         
         if(result == null && fileTagTypeName == FileTypeTagName.Other)

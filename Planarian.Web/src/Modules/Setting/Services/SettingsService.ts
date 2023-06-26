@@ -71,6 +71,12 @@ const SettingsService = {
     );
     return response.data;
   },
+  async GetFileTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/file`
+    );
+    return response.data;
+  },
   async GetTagName(tagId: string): Promise<string> {
     const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
     return response.data;

@@ -191,7 +191,13 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
         <br />
         <Divider orientation="left">Narrative</Divider>
         <ParagraphDisplayComponent text={cave?.narrative} />
-        <Divider orientation="left">Files</Divider>
+        <Divider orientation="left">
+          <>
+            Files
+            <PlanarianButton icon={undefined}>Hi</PlanarianButton>
+          </>{" "}
+        </Divider>
+
         <CardGridComponent
           renderItem={(file) => {
             return <FileCardComponent file={file} />;
@@ -204,9 +210,6 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
 
         <UploadComponent caveId={cave?.id} />
       </Card>
-      {/* <Card title="Files">
-        <UploadComponent caveId={cave?.id} />
-      </Card> */}
     </>
   );
 };
