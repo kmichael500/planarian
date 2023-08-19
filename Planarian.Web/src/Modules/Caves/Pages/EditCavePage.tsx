@@ -57,7 +57,6 @@ const EditCavePage: React.FC = () => {
 
   const handleFormSubmit = async (values: AddCaveVm) => {
     try {
-      console.log(values);
       await CaveService.UpdateCave(values);
       message.success(`'${values?.name}' has been updated successfully`);
       navigate(`/caves/${cave?.id}`);

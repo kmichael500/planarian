@@ -1,6 +1,11 @@
 import { ReactNode, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import { CarOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  CarOutlined,
+  EditOutlined,
+  CloudUploadOutlined,
+} from "@ant-design/icons";
+
 import {
   Card,
   Col,
@@ -29,6 +34,9 @@ import { UploadComponent } from "../../Files/Components/FIleUploadComponent";
 import { CloudDownloadOutlined } from "@ant-design/icons";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileCardComponent } from "../../Files/Components/FileCardComponent";
+import { FileVm } from "../../Files/Models/FileVm";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 
 const { Panel } = Collapse;
 const { Paragraph } = Typography;
@@ -39,11 +47,11 @@ export interface CaveComponentProps {
 }
 
 const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
+  const [isUploading, setIsUploading] = useState(false);
   return (
     <>
       <Card loading={isLoading}>
         <Divider orientation="left">Information</Divider>
-
         <Descriptions bordered>
           <Descriptions.Item label="ID">{cave?.displayId}</Descriptions.Item>
           <Descriptions.Item label="State">
@@ -191,24 +199,43 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
         <br />
         <Divider orientation="left">Narrative</Divider>
         <ParagraphDisplayComponent text={cave?.narrative} />
-        <Divider orientation="left">
-          <>
-            Files
-            <PlanarianButton icon={undefined}>Hi</PlanarianButton>
-          </>{" "}
-        </Divider>
+        <Divider orientation="left">Files </Divider>
+        <Row>
+          <Col flex="auto"></Col>
 
-        <CardGridComponent
-          renderItem={(file) => {
-            return <FileCardComponent file={file} />;
-          }}
-          itemKey={(item) => {
-            return item.id;
-          }}
-          items={cave?.files}
-        ></CardGridComponent>
-
-        <UploadComponent caveId={cave?.id} />
+          <Col>
+            {!isUploading && (
+              <PlanarianButton
+                icon={<CloudUploadOutlined />}
+                onClick={() => {
+                  setIsUploading(true);
+                }}
+              >
+                Upload
+              </PlanarianButton>
+            )}
+            {isUploading && (
+              <CancelButtonComponent
+                onClick={() => {
+                  setIsUploading(false);
+                }}
+              />
+            )}
+          </Col>
+        </Row>
+        <br />
+        {!isUploading && (
+          <CardGridComponent
+            renderItem={(file) => {
+              return <FileCardComponent file={file} />;
+            }}
+            itemKey={(item) => {
+              return item.id;
+            }}
+            items={cave?.files}
+          ></CardGridComponent>
+        )}
+        {isUploading && <UploadComponent caveId={cave?.id} />}
       </Card>
     </>
   );
