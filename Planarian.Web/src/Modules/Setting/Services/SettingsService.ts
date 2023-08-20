@@ -1,5 +1,6 @@
 import { HttpClient } from "../../..";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { CacheService } from "../../../Shared/Services/CacheService";
 import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
 
 const baseUrl = "api/settings";
@@ -17,9 +18,16 @@ const SettingsService = {
     return response.data;
   },
   async GetStateName(stateId?: string): Promise<string> {
+    const cacheKey = `state-name-${stateId}`;
+    const cachedDisplayValue = CacheService.get<string>(cacheKey);
+    if (cachedDisplayValue) {
+      return cachedDisplayValue;
+    }
+
     const response = await HttpClient.get<string>(
       `${baseUrl}/tags/states/${stateId}`
     );
+    CacheService.set(cacheKey, response.data);
     return response.data;
   },
   async GetCounties(stateId: string): Promise<SelectListItem<string>[]> {
@@ -29,9 +37,15 @@ const SettingsService = {
     return response.data;
   },
   async GetCountyName(countyId?: string): Promise<string> {
+    const cacheKey = `county-name-${countyId}`;
+    const cachedDisplayValue = CacheService.get<string>(cacheKey);
+    if (cachedDisplayValue) {
+      return cachedDisplayValue;
+    }
     const response = await HttpClient.get<string>(
       `${baseUrl}/tags/counties/${countyId}`
     );
+    CacheService.set(cacheKey, response.data);
     return response.data;
   },
 
@@ -78,7 +92,13 @@ const SettingsService = {
     return response.data;
   },
   async GetTagName(tagId: string): Promise<string> {
+    const cacheKey = `tag-name-${tagId}`;
+    const cachedDisplayValue = CacheService.get<string>(cacheKey);
+    if (cachedDisplayValue) {
+      return cachedDisplayValue;
+    }
     const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
+    CacheService.set(cacheKey, response.data);
     return response.data;
   },
   async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {
