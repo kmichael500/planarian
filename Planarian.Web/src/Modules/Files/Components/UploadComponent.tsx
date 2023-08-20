@@ -32,9 +32,21 @@ interface AddCaveFilesForm {
 
 const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
   const [form] = Form.useForm<AddCaveFilesForm>();
+  const [formChanged, setFormChanged] = useState(false); // Track form changes
 
   const [numberOfFilesToUpload, setNumberOfFilesToUpload] = useState(0);
   const [completedNumberOfUploads, setCompletedNumberOfUploads] = useState(0);
+
+  useEffect(() => {
+    // Check if all uploads are completed
+    if (
+      completedNumberOfUploads === numberOfFilesToUpload &&
+      completedNumberOfUploads !== 0
+    ) {
+      // Display a success message
+      message.success("All files have been uploaded successfully!");
+    }
+  }, [completedNumberOfUploads, numberOfFilesToUpload]);
 
   const uploadsInProgress = () => {
     return (
@@ -86,7 +98,6 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
             }
           }
         );
-        const test = form.getFieldValue("files");
         form.setFieldsValue({
           files: [...form.getFieldValue("files"), result],
         });
@@ -122,7 +133,14 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
       )}
       {!uploadsInProgress() && (
         <>
-          <Form form={form} layout="vertical" onFinish={onSubmit}>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onSubmit}
+            onChange={() => {
+              setFormChanged(true);
+            }}
+          >
             <Form.List name="files">
               {(fields, { add, remove }, { errors }) => (
                 <>
@@ -144,7 +162,12 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
                             label={`File Type`}
                             required
                           >
-                            <TagSelectComponent tagType={TagType.File} />
+                            <TagSelectComponent
+                              onChange={() => {
+                                setFormChanged(true);
+                              }}
+                              tagType={TagType.File}
+                            />
                           </Form.Item>
                         </Card>
                       </Col>
@@ -153,29 +176,43 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
                 </>
               )}
             </Form.List>
-          </Form>{" "}
+          </Form>
         </>
       )}
 
       <br />
       <Space direction="horizontal">
-        <CancelButtonComponent
-          onClick={() => {
-            if (onClose) {
-              onClose();
-            }
-          }}
-        />
-        {!uploadsInProgress() && (
-          <PlanarianButton
-            icon={undefined}
+        {uploadsInProgress() && (
+          <CancelButtonComponent
             onClick={() => {
-              form.submit();
+              if (onClose) {
+                onClose();
+              }
             }}
-            disabled={uploadsInProgress()}
-          >
-            Save Changes
-          </PlanarianButton>
+          />
+        )}
+        {!uploadsInProgress() && (
+          <>
+            <PlanarianButton
+              icon={undefined}
+              onClick={() => {
+                if (onClose) {
+                  onClose();
+                }
+              }}
+            >
+              Back
+            </PlanarianButton>
+            <PlanarianButton
+              icon={undefined}
+              onClick={() => {
+                form.submit();
+              }}
+              disabled={uploadsInProgress() || !formChanged}
+            >
+              Save Changes
+            </PlanarianButton>
+          </>
         )}
       </Space>
     </>

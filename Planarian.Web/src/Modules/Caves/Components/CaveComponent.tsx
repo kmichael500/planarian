@@ -24,15 +24,15 @@ import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTag
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { UploadComponent } from "../../Files/Components/FIleUploadComponent";
+import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileListItemComponent } from "../../Files/Components/FileListItemComponent";
 import { FileVm } from "../../Files/Models/FileVm";
 import { customSort } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
+import { FileListComponent } from "../../Files/Components/FileListComponent";
 
 const { Panel } = Collapse;
-const { Paragraph } = Typography;
 
 export interface CaveComponentProps {
   cave?: CaveVm;
@@ -236,33 +236,11 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
 
         {!isUploading && (
           <>
-            <Collapse bordered>
-              {sortedFileTypes.map((fileType) => (
-                <Panel header={fileType} key={fileType}>
-                  <CardGridComponent
-                    useList
-                    noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
-                    noDataCreateButton={
-                      <PlanarianButton
-                        icon={<CloudUploadOutlined />}
-                        onClick={() => {
-                          setIsUploading(true);
-                        }}
-                      >
-                        Upload
-                      </PlanarianButton>
-                    }
-                    renderItem={(file) => {
-                      return <FileListItemComponent file={file} />;
-                    }}
-                    itemKey={(item) => {
-                      return item.id;
-                    }}
-                    items={filesByType[fileType]}
-                  ></CardGridComponent>
-                </Panel>
-              ))}
-            </Collapse>
+            <FileListComponent
+              files={cave?.files}
+              isUploading={isUploading}
+              setIsUploading={(value) => setIsUploading(value)}
+            />
           </>
         )}
         {isUploading && (

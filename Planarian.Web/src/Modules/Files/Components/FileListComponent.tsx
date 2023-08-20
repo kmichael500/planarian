@@ -1,7 +1,72 @@
+import { Collapse } from "antd";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileVm } from "../Models/FileVm";
+import { FileListItemComponent } from "./FileListItemComponent";
+import { customSort } from "../../../Shared/Helpers/ArrayHelpers";
+import { CloudUploadOutlined } from "@ant-design/icons";
+const { Panel } = Collapse;
 
 export interface FileListComponentProps {
-  files: FileVm[];
-  isLoading: boolean;
-  updateFiles?: () => void;
+  files?: FileVm[];
+  customOrder?: string[];
+  isUploading: boolean;
+  setIsUploading?: (value: boolean) => void;
 }
+
+export const FileListComponent = ({
+  files,
+  isUploading,
+  setIsUploading,
+}: FileListComponentProps) => {
+  if (!files) {
+    files = [];
+  }
+  const filesByType = {} as { [key: string]: FileVm[] };
+
+  files.forEach((file) => {
+    if (!filesByType[file.fileTypeKey]) {
+      filesByType[file.fileTypeKey] = [];
+    }
+    filesByType[file.fileTypeKey].push(file);
+  });
+
+  const customOrder = ["Map"];
+
+  // Order file types by custom order if provided
+  let sortedFileTypes = customOrder
+    ? customSort(customOrder, Object.keys(filesByType))
+    : Object.keys(filesByType);
+
+  return (
+    <Collapse bordered>
+      {sortedFileTypes.map((fileType) => (
+        <Panel header={fileType} key={fileType}>
+          <CardGridComponent
+            useList
+            noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
+            noDataCreateButton={
+              <PlanarianButton
+                icon={<CloudUploadOutlined />}
+                onClick={() => {
+                  if (setIsUploading) {
+                    setIsUploading(true);
+                  }
+                }}
+              >
+                Upload
+              </PlanarianButton>
+            }
+            renderItem={(file) => {
+              return <FileListItemComponent file={file} />;
+            }}
+            itemKey={(item) => {
+              return item.id;
+            }}
+            items={filesByType[fileType]}
+          ></CardGridComponent>
+        </Panel>
+      ))}
+    </Collapse>
+  );
+};
