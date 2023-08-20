@@ -8,6 +8,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
+using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
@@ -21,11 +22,14 @@ public class FileService : ServiceBase<FileRepository>
 {
     private readonly TagRepository _tagRepository;
     private readonly FileOptions _fileOptions;
+    private readonly SettingsRepository _settingsRepository;
 
-    public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository, FileOptions fileOptions) : base(repository, requestUser)
+    public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
+        FileOptions fileOptions, SettingsRepository settingsRepository) : base(repository, requestUser)
     {
         _tagRepository = tagRepository;
         _fileOptions = fileOptions;
+        _settingsRepository = settingsRepository;
     }
 
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName, string? uuid = null)
@@ -36,7 +40,19 @@ public class FileService : ServiceBase<FileRepository>
             throw new BadRequestException("Account Id is null");
         }
 
+        var allFileTypes = await _settingsRepository.GetFileTags();
+        
+        // check if tag type name exists in the file name
+        var autoTagType =
+            allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
+        
         var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
+        
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ?  autoTagType.Value : other?.Id;
+
+        if (tagTypeId == null)
+            throw ApiExceptionDictionary.NotFound("File type");
+                
 
         //fileName without extension
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
@@ -46,7 +62,7 @@ public class FileService : ServiceBase<FileRepository>
             FileName = fileName,
             DisplayName = fileNameWithoutExtension,
             AccountId = RequestUser.AccountId,
-            FileTypeTag = other ?? throw new InvalidOperationException()
+            FileTypeTagId = tagTypeId
         };
 
         Repository.Add(entity);

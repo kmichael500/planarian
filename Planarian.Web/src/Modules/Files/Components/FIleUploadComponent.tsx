@@ -26,11 +26,11 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { FileService } from "../Services/FileService";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 
-export interface AddCaveFilesForm {
+interface AddCaveFilesForm {
   files: FileVm[];
 }
 
-const UploadComponent = ({ caveId }: UploadComponentProps) => {
+const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
   const [form] = Form.useForm<AddCaveFilesForm>();
 
   const [numberOfFilesToUpload, setNumberOfFilesToUpload] = useState(0);
@@ -47,6 +47,9 @@ const UploadComponent = ({ caveId }: UploadComponentProps) => {
     try {
       await FileService.UpdateFilesMetadata(values.files);
       message.success("Files successfully updated!");
+      if (onClose) {
+        onClose();
+      }
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
@@ -156,15 +159,24 @@ const UploadComponent = ({ caveId }: UploadComponentProps) => {
 
       <br />
       <Space direction="horizontal">
-        <CancelButtonComponent />
-        <PlanarianButton
-          icon={undefined}
+        <CancelButtonComponent
           onClick={() => {
-            form.submit();
+            if (onClose) {
+              onClose();
+            }
           }}
-        >
-          Save Changes
-        </PlanarianButton>
+        />
+        {!uploadsInProgress() && (
+          <PlanarianButton
+            icon={undefined}
+            onClick={() => {
+              form.submit();
+            }}
+            disabled={uploadsInProgress()}
+          >
+            Save Changes
+          </PlanarianButton>
+        )}
       </Space>
     </>
   );
@@ -172,6 +184,7 @@ const UploadComponent = ({ caveId }: UploadComponentProps) => {
 
 interface UploadComponentProps {
   caveId?: string | undefined;
+  onClose?: () => void;
 }
 
 export { UploadComponent };

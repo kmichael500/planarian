@@ -1,17 +1,12 @@
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import {
-  CarOutlined,
-  EditOutlined,
-  CloudUploadOutlined,
-} from "@ant-design/icons";
+import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
 
 import {
   Card,
   Col,
   Collapse,
   Descriptions,
-  Divider,
   Row,
   Space,
   Tag,
@@ -25,19 +20,16 @@ import {
   getDirectionsUrl,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
-import MapPointComponent from "./MapPointComponent";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UploadComponent } from "../../Files/Components/FIleUploadComponent";
-import { CloudDownloadOutlined } from "@ant-design/icons";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
-import { FileListComponent } from "../../Files/Components/FileCardComponent";
+import { FileListItemComponent } from "../../Files/Components/FileListItemComponent";
 import { FileVm } from "../../Files/Models/FileVm";
-import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-import { customSort, distinct } from "../../../Shared/Helpers/ArrayHelpers";
+import { customSort } from "../../../Shared/Helpers/ArrayHelpers";
+import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 
 const { Panel } = Collapse;
 const { Paragraph } = Typography;
@@ -45,9 +37,10 @@ const { Paragraph } = Typography;
 export interface CaveComponentProps {
   cave?: CaveVm;
   isLoading: boolean;
+  updateCave?: () => void;
 }
 
-const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
+const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const filesByType = {} as { [key: string]: FileVm[] };
 
@@ -60,12 +53,20 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
 
   const customOrder = ["Map"];
 
+  // func that acccepts a react/jsk element
+  const element = (element: React.ReactElement) => {
+    return <>{element}</>;
+  };
+
   // Assuming you have already populated the filesByType object
   let sortedFileTypes = customSort(customOrder, Object.keys(filesByType));
   return (
     <>
-      <Card loading={isLoading}>
-        <Divider orientation="left">Information</Divider>
+      <Card
+        bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
+        loading={isLoading}
+      >
+        <PlanarianDividerComponent title="Information" />
         <Descriptions bordered>
           <Descriptions.Item label="ID">{cave?.displayId}</Descriptions.Item>
           <Descriptions.Item label="State">
@@ -102,7 +103,8 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
             </Row>
           </Descriptions.Item>
         </Descriptions>
-        <Divider orientation="left">Entrances</Divider>
+        <PlanarianDividerComponent title="Entrances" />
+
         <Collapse bordered defaultActiveKey={["0"]}>
           {cave?.entrances.map((entrance, index) => (
             <Panel
@@ -210,34 +212,28 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
             </Panel>
           ))}
         </Collapse>
-        <br />
-        <Divider orientation="left">Narrative</Divider>
-        <ParagraphDisplayComponent text={cave?.narrative} />
-        <Divider orientation="left">Files </Divider>
-        <Row>
-          <Col flex="auto"></Col>
 
-          <Col>
-            {!isUploading && (
-              <PlanarianButton
-                icon={<CloudUploadOutlined />}
-                onClick={() => {
-                  setIsUploading(true);
-                }}
-              >
-                Upload
-              </PlanarianButton>
-            )}
-            {isUploading && (
-              <CancelButtonComponent
-                onClick={() => {
-                  setIsUploading(false);
-                }}
-              />
-            )}
-          </Col>
-        </Row>
-        <br />
+        <PlanarianDividerComponent title="Narrative" />
+
+        <ParagraphDisplayComponent text={cave?.narrative} />
+        <PlanarianDividerComponent
+          title="Files"
+          element={
+            <>
+              {!isUploading && (
+                <PlanarianButton
+                  icon={<CloudUploadOutlined />}
+                  onClick={() => {
+                    setIsUploading(true);
+                  }}
+                >
+                  Upload
+                </PlanarianButton>
+              )}
+            </>
+          }
+        />
+
         {!isUploading && (
           <>
             <Collapse bordered>
@@ -257,7 +253,7 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
                       </PlanarianButton>
                     }
                     renderItem={(file) => {
-                      return <FileListComponent file={file} />;
+                      return <FileListItemComponent file={file} />;
                     }}
                     itemKey={(item) => {
                       return item.id;
@@ -269,7 +265,17 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
             </Collapse>
           </>
         )}
-        {isUploading && <UploadComponent caveId={cave?.id} />}
+        {isUploading && (
+          <UploadComponent
+            caveId={cave?.id}
+            onClose={() => {
+              if (updateCave) {
+                updateCave();
+              }
+              setIsUploading(false);
+            }}
+          />
+        )}
       </Card>
     </>
   );

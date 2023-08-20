@@ -47,7 +47,16 @@ const CavePage = () => {
 
   return (
     <>
-      <CaveComponent cave={cave} isLoading={isLoading} />
+      <CaveComponent
+        cave={cave}
+        isLoading={isLoading}
+        updateCave={async () => {
+          setIsLoading(true);
+          const updatedCave = await CaveService.GetCave(caveId);
+          setCave(updatedCave);
+          setIsLoading(false);
+        }}
+      />
     </>
   );
 };
