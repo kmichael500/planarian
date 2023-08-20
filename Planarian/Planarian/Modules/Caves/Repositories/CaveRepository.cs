@@ -157,7 +157,7 @@ public class CaveRepository : RepositoryBase
                 GeologyTagIds = e.GeologyTags.Select(e => e.TagTypeId),
                 Files = e.Files.Select(ee=>new FileVm
                 {
-                    Id = e.Id,
+                    Id = ee.Id,
                     DisplayName = ee.DisplayName,
                     FileName = ee.FileName,
                     FileTypeKey = ee.FileTypeTag.Key,

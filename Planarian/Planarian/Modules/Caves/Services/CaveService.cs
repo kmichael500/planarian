@@ -2,6 +2,8 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Files.Repositories;
+using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
@@ -11,8 +13,13 @@ namespace Planarian.Modules.Caves.Services;
 
 public class CaveService : ServiceBase<CaveRepository>
 {
-    public CaveService(CaveRepository repository, RequestUser requestUser) : base(repository, requestUser)
+    private readonly FileService _fileService;
+    private readonly FileRepository _fileRepository;
+
+    public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService, FileRepository fileRepository) : base(repository, requestUser)
     {
+        _fileService = fileService;
+        _fileRepository = fileRepository;
     }
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
@@ -238,6 +245,21 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<CaveVm?> GetCave(string caveId)
     {
         var cave = await Repository.GetCave(caveId);
+
+        if (cave == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Cave");
+        }
+
+        foreach (var file in cave.Files)
+        {
+            var fileProperties = await _fileRepository.GetFileBlobProperties(file.Id);
+            if (fileProperties == null || string.IsNullOrWhiteSpace((fileProperties.BlobKey)) ||
+                string.IsNullOrWhiteSpace(fileProperties.ContainerName)) continue;
+
+            file.Url = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
+        }
+
         return cave;
     }
 

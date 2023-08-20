@@ -226,6 +226,17 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
         <br />
         {!isUploading && (
           <CardGridComponent
+            noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
+            noDataCreateButton={
+              <PlanarianButton
+                icon={<CloudUploadOutlined />}
+                onClick={() => {
+                  setIsUploading(true);
+                }}
+              >
+                Upload
+              </PlanarianButton>
+            }
             renderItem={(file) => {
               return <FileCardComponent file={file} />;
             }}

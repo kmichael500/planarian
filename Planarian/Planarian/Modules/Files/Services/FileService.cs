@@ -1,9 +1,12 @@
 
 using System.ComponentModel.DataAnnotations;
+using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
@@ -82,7 +85,7 @@ public class FileService : ServiceBase<FileRepository>
 
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(key);
-
+        
         await blobClient.UploadAsync(stream, overwrite: true);
     }
 
@@ -100,6 +103,78 @@ public class FileService : ServiceBase<FileRepository>
     }
     #endregion
 
+    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync();
+        foreach (var value in values)
+        {
+            var file = await Repository.GetFileById(value.Id);
+            if (file == null)
+            {
+                throw ApiExceptionDictionary.NotFound("File not found");
+            }
+
+            if (!string.IsNullOrWhiteSpace(value.DisplayName))
+            {
+                file.DisplayName = value.DisplayName;
+                file.FileName = $"{value.DisplayName}{Path.GetExtension(file.FileName)}";
+            }
+            
+            file.FileTypeTagId = value.FileTypeTagId;
+            
+            await Repository.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+    }
+
+    public async Task<FileVm> GetFile(string id)
+    {
+        var file = await Repository.GetFileVm(id);
+        var blobProperties = await Repository.GetFileBlobProperties(id);
+        if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
+            string.IsNullOrWhiteSpace(blobProperties.BlobKey))
+        {
+            throw ApiExceptionDictionary.NotFound("File not found");
+        }
+
+        var client = await GetBlobContainerClient(blobProperties.ContainerName);
+        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+
+        var sasLink = await GetSasLink(blobClient, file.FileName);
+        file.Url = sasLink;
+
+        return file;
+    }
+
+    private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
+    {
+        // Generate a SAS token for the blob with read permissions that expires in 1 hour
+        BlobSasBuilder sasBuilder = new BlobSasBuilder()
+        {
+            BlobContainerName = blobClient.BlobContainerName,
+            BlobName = blobClient.Name,
+            Resource = "b", // "b" for blob
+            StartsOn = DateTimeOffset.UtcNow,
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ContentDisposition = "attachment; filename=\"" + $"{fileName}" + "\"; filename*=UTF-8''" + Uri.EscapeDataString($"{fileName}")
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+
+        var sasUrl = $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
+
+        return sasUrl;
+    }
+
+    public async Task<string> GetLink(string blobKey, string containerName, string fileName)
+    {
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
+        
+        var sasLink = await GetSasLink(blobClient, fileName);
+        return sasLink;
+    }
 }
 
 public class FileTypeTagName
@@ -115,4 +190,5 @@ public class FileVm
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
     public string? Uuid { get; set; }
+    public string? Url { get; set; }
 }
