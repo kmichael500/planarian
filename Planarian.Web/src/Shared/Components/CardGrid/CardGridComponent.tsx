@@ -1,4 +1,4 @@
-import { Row, Col, Button, Empty, Card } from "antd";
+import { Row, Col, Button, Empty, Card, List } from "antd";
 import Pagination, { PaginationConfig } from "antd/lib/pagination";
 import { Key } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
@@ -13,6 +13,7 @@ interface CardGridComponentProps<T extends object> {
   noDataCreateButton?: React.ReactNode;
   queryBuilder?: QueryBuilder<T>;
   onSearch?: () => Promise<void>;
+  useList?: boolean;
 }
 
 const CardGridComponent = <T extends object>({
@@ -24,6 +25,7 @@ const CardGridComponent = <T extends object>({
   noDataCreateButton,
   queryBuilder,
   onSearch,
+  useList,
 }: CardGridComponentProps<T>) => {
   let data: T[] = [];
 
@@ -42,20 +44,27 @@ const CardGridComponent = <T extends object>({
           </Empty>
         </Card>
       )}
-      <Row
-        gutter={[
-          { xs: 8, sm: 8, md: 12, lg: 12 },
-          { xs: 8, sm: 8, md: 12, lg: 12 },
-        ]}
-      >
-        {data.map((item, i) => {
-          return (
-            <Col key={itemKey(item)} xs={24} sm={12} md={8} lg={6}>
-              {renderItem(item)}
-            </Col>
-          );
-        })}
-      </Row>
+      {!useList && (
+        <Row
+          gutter={[
+            { xs: 8, sm: 8, md: 12, lg: 12 },
+            { xs: 8, sm: 8, md: 12, lg: 12 },
+          ]}
+        >
+          {data.map((item, i) => {
+            return (
+              <Col key={itemKey(item)} xs={24} sm={12} md={8} lg={6}>
+                {renderItem(item)}
+              </Col>
+            );
+          })}
+        </Row>
+      )}
+      {useList && (
+        <>
+          <List dataSource={data} renderItem={(item) => renderItem(item)} />
+        </>
+      )}
       <Row style={{ marginTop: "10px" }}>
         <Col flex="auto"></Col>
         <Col>

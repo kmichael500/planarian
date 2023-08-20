@@ -33,10 +33,11 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { UploadComponent } from "../../Files/Components/FIleUploadComponent";
 import { CloudDownloadOutlined } from "@ant-design/icons";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
-import { FileCardComponent } from "../../Files/Components/FileCardComponent";
+import { FileListComponent } from "../../Files/Components/FileCardComponent";
 import { FileVm } from "../../Files/Models/FileVm";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { customSort, distinct } from "../../../Shared/Helpers/ArrayHelpers";
 
 const { Panel } = Collapse;
 const { Paragraph } = Typography;
@@ -48,6 +49,19 @@ export interface CaveComponentProps {
 
 const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
+  const filesByType = {} as { [key: string]: FileVm[] };
+
+  cave?.files.forEach((file) => {
+    if (!filesByType[file.fileTypeKey]) {
+      filesByType[file.fileTypeKey] = [];
+    }
+    filesByType[file.fileTypeKey].push(file);
+  });
+
+  const customOrder = ["Map"];
+
+  // Assuming you have already populated the filesByType object
+  let sortedFileTypes = customSort(customOrder, Object.keys(filesByType));
   return (
     <>
       <Card loading={isLoading}>
@@ -225,26 +239,35 @@ const CaveComponent = ({ cave, isLoading }: CaveComponentProps) => {
         </Row>
         <br />
         {!isUploading && (
-          <CardGridComponent
-            noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
-            noDataCreateButton={
-              <PlanarianButton
-                icon={<CloudUploadOutlined />}
-                onClick={() => {
-                  setIsUploading(true);
-                }}
-              >
-                Upload
-              </PlanarianButton>
-            }
-            renderItem={(file) => {
-              return <FileCardComponent file={file} />;
-            }}
-            itemKey={(item) => {
-              return item.id;
-            }}
-            items={cave?.files}
-          ></CardGridComponent>
+          <>
+            <Collapse bordered>
+              {sortedFileTypes.map((fileType) => (
+                <Panel header={fileType} key={fileType}>
+                  <CardGridComponent
+                    useList
+                    noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
+                    noDataCreateButton={
+                      <PlanarianButton
+                        icon={<CloudUploadOutlined />}
+                        onClick={() => {
+                          setIsUploading(true);
+                        }}
+                      >
+                        Upload
+                      </PlanarianButton>
+                    }
+                    renderItem={(file) => {
+                      return <FileListComponent file={file} />;
+                    }}
+                    itemKey={(item) => {
+                      return item.id;
+                    }}
+                    items={filesByType[fileType]}
+                  ></CardGridComponent>
+                </Panel>
+              ))}
+            </Collapse>
+          </>
         )}
         {isUploading && <UploadComponent caveId={cave?.id} />}
       </Card>

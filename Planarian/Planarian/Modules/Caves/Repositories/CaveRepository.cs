@@ -160,7 +160,7 @@ public class CaveRepository : RepositoryBase
                     Id = ee.Id,
                     DisplayName = ee.DisplayName,
                     FileName = ee.FileName,
-                    FileTypeKey = ee.FileTypeTag.Key,
+                    FileTypeKey = ee.FileTypeTag.Name,
                     FileTypeTagId = ee.FileTypeTagId,
                 })
             })

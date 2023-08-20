@@ -1,43 +1,24 @@
-import { Card } from "antd";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { TagComponent } from "../../Tag/Components/TagComponent";
+import { List, Typography } from "antd";
 import { FileVm } from "../Models/FileVm";
-import { CloudDownloadOutlined } from "@ant-design/icons";
+import "./FileListComponent.scss";
 
-const FileCardComponent = ({ file }: { file: FileVm }) => {
-  const handleDownload = (file: FileVm): void => {
-    var fileUrl = file.url;
-
-    var a = document.createElement("a");
-
-    // Set the download attribute to specify the file name
-    a.download = file.fileName;
-
-    // Set the URL of the file
-    a.href = fileUrl;
-
-    // click link to trigger the download
-    a.click();
+const FileListComponent = ({ file }: { file: FileVm }) => {
+  const listItemStyle = {
+    transition: "background-color 0.3s",
+    "&:hover": {
+      backgroundColor: "#f0f0f0", // Change the background color when hovered
+      cursor: "pointer", // Change the cursor to a pointer on hover
+    },
   };
 
   return (
-    <Card
-      style={{ height: "100%" }}
-      title={file.displayName}
-      actions={[
-        <PlanarianButton
-          type="primary"
-          onClick={() => handleDownload(file)}
-          icon={<CloudDownloadOutlined />}
-        >
-          Download
-        </PlanarianButton>,
-      ]}
+    <List.Item
+      style={listItemStyle}
+      actions={[<Typography.Link href={file.url}>Download</Typography.Link>]}
     >
-      <p>Name: {file.fileName}</p>
-      <TagComponent tagId={file.fileTypeTagId} />
-    </Card>
+      <Typography.Text>{file.displayName}</Typography.Text>
+    </List.Item>
   );
 };
 
-export { FileCardComponent };
+export { FileListComponent };
