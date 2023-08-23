@@ -29,6 +29,7 @@ const EditCavePage: React.FC = () => {
     const getCave = async () => {
       const caveResponse = await CaveService.GetCave(caveId);
 
+      // const caveResponse = {} as CaveVm;
       // antd input requires date to be in format yyyy-MM-DD otherwise it will not be displayed
       caveResponse.reportedOn = formatDateTime(
         caveResponse.reportedOn,
@@ -53,17 +54,19 @@ const EditCavePage: React.FC = () => {
       setIsLoading(false);
     };
     getCave();
-  }, [cave]);
+  }, []);
 
   const handleFormSubmit = async (values: AddCaveVm) => {
     try {
-      console.log(values);
+      setIsLoading(true);
       await CaveService.UpdateCave(values);
       message.success(`'${values?.name}' has been updated successfully`);
       navigate(`/caves/${cave?.id}`);
     } catch (e: any) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -78,7 +81,7 @@ const EditCavePage: React.FC = () => {
           onFinish={handleFormSubmit}
           form={form}
         >
-          <AddCaveComponent isEditing={true} form={form} />
+          <AddCaveComponent isEditing={true} form={form} cave={cave} />
         </Form>
       </Card>
     </>

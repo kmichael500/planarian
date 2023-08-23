@@ -14,6 +14,9 @@ import { CavesPage } from "./Modules/Caves/Pages/CavesPage";
 import { AddCavesPage } from "./Modules/Caves/Pages/AddCavePage";
 import { CavePage } from "./Modules/Caves/Pages/CavePage";
 import { EditCavePage } from "./Modules/Caves/Pages/EditCavePage";
+import { ImportPage } from "./Modules/Import/Pages/ImportPage";
+import { NotFoundPage } from "./Shared/Pages/NotFoundPage";
+import { UnauthorizedPage } from "./Shared/Pages/Unauthorized";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -22,11 +25,15 @@ export const AppRouting: React.FC = () => {
       <Route path="/register" element={<RegisterPage />}></Route>
       <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
       <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
+      <Route path="/not-found" element={<NotFoundPage />}></Route>
+      <Route path="/unauthorized" element={<UnauthorizedPage />}></Route>
+
       <Route element={<ProtectedRoutesComponent />}>
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
         <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
         <Route path="/caves/add" element={<AddCavesPage />} />
+        <Route path="/caves/import" element={<ImportPage />} />
         {/* <Route path="/account/settings" element={<AccountSettings />} /> */}
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
@@ -43,8 +50,9 @@ export const AppRouting: React.FC = () => {
           element={<LeadAddPage />}
         ></Route>
         <Route path="/settings" element={<SettingsPage />}></Route>
-        <Route path="*" element={<Navigate to="/projects" replace />} />
+        <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Route>
+      <Route path="*" element={<Navigate to="/not-found" replace />} />
     </Routes>
   );
 };

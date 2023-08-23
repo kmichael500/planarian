@@ -10,9 +10,10 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
-using Planarian.Modules.Caves.Controllers;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Files.Repositories;
+using Planarian.Modules.Files.Services;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
 using Planarian.Modules.Photos.Repositories;
@@ -33,6 +34,7 @@ using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.SendGrid.Interfaces;
 using Southport.Messaging.Email.SendGrid.Message;
+using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +97,10 @@ builder.Services.AddSingleton(blobOptions);
 var emailOptions = builder.Configuration.GetSection(EmailOptions.Key).Get<EmailOptions>();
 if (emailOptions == null) throw new Exception("Email options not found");
 
+var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOptions>();
+if (fileOptions == null) throw new Exception("Email options not found");
+builder.Services.AddSingleton(fileOptions);
+
 builder.Services.AddSingleton(Options.Create<SendGridOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
@@ -114,6 +120,8 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
+builder.Services.AddScoped<CaveService>();
+builder.Services.AddScoped<FileService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
@@ -133,6 +141,7 @@ builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<CaveRepository>();
+builder.Services.AddScoped<FileRepository>();
 
 #endregion
 

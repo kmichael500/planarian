@@ -67,6 +67,11 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
           setTags(entranceStatusTags);
           break;
 
+        case TagType.File:
+          const fileTags = await SettingsService.GetFileTags();
+          setTags(fileTags);
+          break;
+
         default:
           throw new Error("Invalid tag type");
       }

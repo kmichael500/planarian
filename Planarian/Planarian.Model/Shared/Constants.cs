@@ -15,6 +15,7 @@ public static class PropertyLength
     public const int PasswordHash = 100;
     public const int PasswordResetCode = 20;
     public const int EmailConfirmationCode = 20;
+    public const int FileName = 1000;
 }
 
 
@@ -30,6 +31,7 @@ public static class TagTypeKeyConstant
     public const string FieldIndication = "FieldIndication";
     public const string EntranceHydrology = "EntranceHydrology";
     public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
+    public const string File = "File";
     private static readonly List<string> All = new() { Default, Trip, Photo, LocationQuality };
 
     public static bool IsValidTagKey(string tagKey)

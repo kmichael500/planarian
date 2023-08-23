@@ -1,3 +1,4 @@
+import { FileVm } from "../../Files/Models/FileVm";
 import { EntranceVm } from "./EntranceVm";
 
 export interface CaveVm {
@@ -19,7 +20,5 @@ export interface CaveVm {
   mapIds: string[];
   entrances: EntranceVm[];
   geologyTagIds: string[];
-
-  MaxEntranceElevationFeet?: number;
-  MinEntranceElevationFeet?: number;
+  files: FileVm[];
 }

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Files.Controllers;
 
 namespace Planarian.Modules.Caves.Models;
 
@@ -48,6 +49,7 @@ public class AddCaveVm
     public DateTime? ReportedOn { get; set; }
     [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
-    public virtual IEnumerable<AddEntranceVm> Entrances { get; set; } = new HashSet<AddEntranceVm>();
+    public IEnumerable<AddEntranceVm> Entrances { get; set; } = new HashSet<AddEntranceVm>();
+    public IEnumerable<EditFileMetadataVm>? Files { get; set; } = new HashSet<EditFileMetadataVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
 }
