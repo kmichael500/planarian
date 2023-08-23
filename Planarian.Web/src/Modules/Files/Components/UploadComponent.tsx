@@ -84,13 +84,25 @@ const UploadComponent = ({
     }
   };
 
+  const beforeUpload = (file: File) => {
+    const fileSizeInMB = file.size / 1024 / 1024;
+    const maxSizeInMB = 50;
+
+    if (fileSizeInMB > maxSizeInMB) {
+      message.error(`File size should not exceed ${maxSizeInMB} MB.`);
+      return false; // Prevent file from being uploaded
+    }
+
+    return true; // Allow file upload
+  };
+
   useEffect(() => {
     form.setFieldsValue({ files: [] });
   }, []);
   const props: UploadProps = {
     name: "file",
     multiple: true,
-
+    beforeUpload,
     itemRender: (originNode, file, currFileList) => {
       return file.status !== "done" ? originNode : null;
     },
