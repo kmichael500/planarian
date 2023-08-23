@@ -11,13 +11,11 @@ import {
   Button,
   Space,
 } from "antd";
-import { CaveService } from "../../Caves/Service/CaveService";
 import { AxiosProgressEvent } from "axios";
 import { RcFile } from "antd/lib/upload/interface";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UploadRequestError } from "rc-upload/lib/interface";
 import { FileVm } from "../Models/FileVm";
-import { AddCaveVm } from "../../Caves/Models/AddCaveVm";
 import { useEffect, useState } from "react";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
@@ -25,12 +23,30 @@ import { TagType } from "../../Tag/Models/TagType";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { FileService } from "../Services/FileService";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 
 interface AddCaveFilesForm {
   files: FileVm[];
 }
 
-const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
+interface UploadComponentProps {
+  onClose?: () => void;
+  uploadFunction: (params: UploadParams) => Promise<FileVm>;
+  updateFunction: (files: FileVm[]) => Promise<void>;
+}
+
+interface UploadParams {
+  file: any;
+  uid: string;
+  onProgress: (event: AxiosProgressEvent) => void;
+  [key: string]: any; // This allows you to pass in any other parameters your upload function might need
+}
+
+const UploadComponent = ({
+  onClose,
+  uploadFunction,
+  updateFunction,
+}: UploadComponentProps) => {
   const [form] = Form.useForm<AddCaveFilesForm>();
   const [formChanged, setFormChanged] = useState(false); // Track form changes
 
@@ -57,7 +73,7 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
 
   const onSubmit = async (values: AddCaveFilesForm) => {
     try {
-      await FileService.UpdateFilesMetadata(values.files);
+      await updateFunction(values.files);
       message.success("Files successfully updated!");
       if (onClose) {
         onClose();
@@ -80,15 +96,13 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
     },
     async customRequest(options) {
       const { onSuccess, onError, file, onProgress } = options;
-      if (!caveId) throw new Error("CaveId is undefined");
       setNumberOfFilesToUpload((prevCount) => prevCount + 1);
 
       try {
-        const result = await CaveService.AddCaveFile(
+        const result = await uploadFunction({
           file,
-          caveId,
-          (file as RcFile).uid,
-          (event: AxiosProgressEvent) => {
+          uid: (file as RcFile).uid,
+          onProgress: (event: AxiosProgressEvent) => {
             const percent = Math.round(
               (100 * event.loaded) / (event.total ?? 0)
             );
@@ -96,8 +110,8 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
             if (onProgress) {
               onProgress({ percent });
             }
-          }
-        );
+          },
+        });
         form.setFieldsValue({
           files: [...form.getFieldValue("files"), result],
         });
@@ -149,7 +163,10 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
                       <Col>
                         <Card bordered style={{ height: "100%" }}>
                           <Form.Item
-                            name={[field.name, nameof<FileVm>("displayName")]}
+                            name={[
+                              field.name,
+                              nameof<EditFileMetadataVm>("displayName"),
+                            ]}
                             key={field.key}
                             label={`Name`}
                             required
@@ -157,7 +174,10 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
                             <Input />
                           </Form.Item>
                           <Form.Item
-                            name={[field.name, nameof<FileVm>("fileTypeTagId")]}
+                            name={[
+                              field.name,
+                              nameof<EditFileMetadataVm>("fileTypeTagId"),
+                            ]}
                             key={field.key}
                             label={`File Type`}
                             required
@@ -218,10 +238,5 @@ const UploadComponent = ({ caveId, onClose }: UploadComponentProps) => {
     </>
   );
 };
-
-interface UploadComponentProps {
-  caveId?: string | undefined;
-  onClose?: () => void;
-}
 
 export { UploadComponent };

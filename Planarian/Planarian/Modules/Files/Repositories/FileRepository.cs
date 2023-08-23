@@ -48,4 +48,10 @@ public class FileRepository : RepositoryBase
             FileTypeTagId = e.FileTypeTagId,
         });
     }
+
+    public async Task<IEnumerable<string>> GetAllExistingFileIdsByCaveId(string entityId)
+    {
+        return await DbContext.Files.Where(e => e.CaveId == entityId && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id).ToListAsync();
+    }
 }

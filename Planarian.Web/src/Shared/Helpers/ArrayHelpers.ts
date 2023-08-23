@@ -24,3 +24,20 @@ export function customSort(inputArray: string[], stringArray: string[]) {
     return a.localeCompare(b);
   });
 }
+
+export function groupBy<T, K extends string>(
+  items: T[],
+  keyExtractor: (item: T) => K
+): { [key: string]: T[] } {
+  const result: { [key: string]: T[] } = {};
+
+  items.forEach((item) => {
+    const key = keyExtractor(item);
+    if (!result[key]) {
+      result[key] = [];
+    }
+    result[key].push(item);
+  });
+
+  return result;
+}

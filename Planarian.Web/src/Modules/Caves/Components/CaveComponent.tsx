@@ -11,7 +11,6 @@ import {
   Space,
   Tag,
   Tooltip,
-  Typography,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import {
@@ -25,12 +24,10 @@ import { StateTagComponent } from "../../../Shared/Components/Display/StateTagCo
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UploadComponent } from "../../Files/Components/UploadComponent";
-import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
-import { FileListItemComponent } from "../../Files/Components/FileListItemComponent";
-import { FileVm } from "../../Files/Models/FileVm";
-import { customSort } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
+import { FileService } from "../../Files/Services/FileService";
+import { CaveService } from "../Service/CaveService";
 
 const { Panel } = Collapse;
 
@@ -42,24 +39,7 @@ export interface CaveComponentProps {
 
 const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
-  const filesByType = {} as { [key: string]: FileVm[] };
 
-  cave?.files.forEach((file) => {
-    if (!filesByType[file.fileTypeKey]) {
-      filesByType[file.fileTypeKey] = [];
-    }
-    filesByType[file.fileTypeKey].push(file);
-  });
-
-  const customOrder = ["Map"];
-
-  // func that acccepts a react/jsk element
-  const element = (element: React.ReactElement) => {
-    return <>{element}</>;
-  };
-
-  // Assuming you have already populated the filesByType object
-  let sortedFileTypes = customSort(customOrder, Object.keys(filesByType));
   return (
     <>
       <Card
@@ -240,18 +220,27 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
               files={cave?.files}
               isUploading={isUploading}
               setIsUploading={(value) => setIsUploading(value)}
+              customOrder={["Map"]}
             />
           </>
         )}
         {isUploading && (
           <UploadComponent
-            caveId={cave?.id}
             onClose={() => {
               if (updateCave) {
                 updateCave();
               }
               setIsUploading(false);
             }}
+            uploadFunction={(params) =>
+              CaveService.AddCaveFile(
+                params.file,
+                cave?.id as string,
+                params.uid,
+                params.onProgress
+              )
+            }
+            updateFunction={FileService.UpdateFilesMetadata}
           />
         )}
       </Card>

@@ -6,8 +6,10 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
+using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
+using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Caves.Services;
 
@@ -15,11 +17,14 @@ public class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
+    private readonly TagRepository _tagRepository;
 
-    public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService, FileRepository fileRepository) : base(repository, requestUser)
+    public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
+        FileRepository fileRepository, TagRepository tagRepository) : base(repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
+        _tagRepository = tagRepository;
     }
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
@@ -224,6 +229,50 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
             }
 
+            var blobsToDelete = new List<File>();
+            if (values.Files != null)
+            {
+                foreach (var file in values.Files)
+                {
+                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
+                 
+                    if (fileEntity == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound("File");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
+                        !string.Equals(file.DisplayName, fileEntity.DisplayName))
+                    {
+                        fileEntity.DisplayName = file.DisplayName;
+                        fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
+                    }
+                    if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
+                        !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
+                    {
+                        var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
+                        if (tagType == null)
+                        {
+                            throw ApiExceptionDictionary.NotFound("Tag");
+                        }
+                        fileEntity.FileTypeTagId = tagType.Id;
+                    }
+                    
+                }
+                
+                // check if any ids are missing from the request compared to the db and delete the ones that are missing
+                var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
+                foreach (var missingId in missingIds)
+                {
+                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
+                    if (fileEntity != null)
+                    {
+                        blobsToDelete.Add(fileEntity);
+                    }
+                    Repository.Delete(fileEntity);
+                }
+            }
+
             if (isNew)
             {
                 Repository.Add(entity);
@@ -232,6 +281,11 @@ public class CaveService : ServiceBase<CaveRepository>
             await Repository.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            foreach (var blobProperties in blobsToDelete)
+            {
+                await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
+            }
 
             return entity.Id;
         }
@@ -257,7 +311,8 @@ public class CaveService : ServiceBase<CaveRepository>
             if (fileProperties == null || string.IsNullOrWhiteSpace((fileProperties.BlobKey)) ||
                 string.IsNullOrWhiteSpace(fileProperties.ContainerName)) continue;
 
-            file.Url = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
+            file.EmbedUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
+            file.DownloadUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName, true);
         }
 
         return cave;
@@ -272,8 +327,15 @@ public class CaveService : ServiceBase<CaveRepository>
             throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
         }
 
+        var files = entity.Files.ToList();
+
         Repository.Delete(entity);
         await Repository.SaveChangesAsync();
+        
+        foreach (var file in files)
+        {
+            await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+        }
     }
 
     public async Task ArchiveCave(string caveId)

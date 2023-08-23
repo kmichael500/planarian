@@ -10,6 +10,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   UserAddOutlined,
+  ImportOutlined,
 } from "@ant-design/icons";
 
 interface MenuComponentProps {
@@ -49,6 +50,15 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
         </Link>
       ),
       label: "Caves",
+    },
+    {
+      key: "import",
+      icon: (
+        <Link to="/caves/import">
+          <ImportOutlined />
+        </Link>
+      ),
+      label: "Import",
     },
     {
       icon: <Divider />,

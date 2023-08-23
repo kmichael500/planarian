@@ -139,8 +139,8 @@ public class FileService : ServiceBase<FileRepository>
             file.FileTypeTagId = value.FileTypeTagId;
             
             await Repository.SaveChangesAsync();
-            await transaction.CommitAsync();
         }
+        await transaction.CommitAsync();
     }
 
     public async Task<FileVm> GetFile(string id)
@@ -156,23 +156,54 @@ public class FileService : ServiceBase<FileRepository>
         var client = await GetBlobContainerClient(blobProperties.ContainerName);
         var blobClient = client.GetBlobClient(blobProperties.BlobKey);
 
-        var sasLink = await GetSasLink(blobClient, file.FileName);
-        file.Url = sasLink;
+        var sasLinkDownload = GetSasLink(blobClient, file.FileName, true);
+        var sasLinkEmbed = GetSasLink(blobClient, file.FileName, true);
+        file.EmbedUrl = sasLinkEmbed;
+        file.DownloadUrl = sasLinkDownload;
 
         return file;
     }
 
-    private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
+    // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
+    // {
+    //     // Generate a SAS token for the blob with read permissions that expires in 1 hour
+    //     BlobSasBuilder sasBuilder = new BlobSasBuilder()
+    //     {
+    //         BlobContainerName = blobClient.BlobContainerName,
+    //         BlobName = blobClient.Name,
+    //         Resource = "b", // "b" for blob
+    //         StartsOn = DateTimeOffset.UtcNow,
+    //         ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+    //         ContentDisposition = "attachment; filename=\"" + $"{fileName}" + "\"; filename*=UTF-8''" + Uri.EscapeDataString($"{fileName}")
+    //     };
+    //     sasBuilder.SetPermissions(BlobSasPermissions.Read);
+    //
+    //     var sasUri = blobClient.GenerateSasUri(sasBuilder);
+    //
+    //     var sasUrl = $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
+    //
+    //     return sasUrl;
+    // }
+    private string GetSasLink(BlobClient blobClient, string fileName, bool download = false)
     {
+        // Get the file extension
+        var fileExtension = Path.GetExtension(fileName);
+
+        // Get the MIME type of the file
+        var mimeType = MimeTypes.GetMimeType(fileExtension);
+
         // Generate a SAS token for the blob with read permissions that expires in 1 hour
-        BlobSasBuilder sasBuilder = new BlobSasBuilder()
+        var sasBuilder = new BlobSasBuilder()
         {
             BlobContainerName = blobClient.BlobContainerName,
             BlobName = blobClient.Name,
             Resource = "b", // "b" for blob
             StartsOn = DateTimeOffset.UtcNow,
             ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-            ContentDisposition = "attachment; filename=\"" + $"{fileName}" + "\"; filename*=UTF-8''" + Uri.EscapeDataString($"{fileName}")
+            ContentDisposition = download
+                ? $"attachment; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}"
+                : $"inline; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}",
+            ContentType = mimeType
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read);
 
@@ -183,13 +214,25 @@ public class FileService : ServiceBase<FileRepository>
         return sasUrl;
     }
 
-    public async Task<string> GetLink(string blobKey, string containerName, string fileName)
+    public async Task<string> GetLink(string blobKey, string containerName, string fileName, bool isDownload = false)
     {
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(blobKey);
         
-        var sasLink = await GetSasLink(blobClient, fileName);
+        var sasLink = GetSasLink(blobClient, fileName, isDownload);
         return sasLink;
+    }
+
+    public async Task DeleteFile(string? blobKey, string? blobContainer)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(blobContainer))
+        {
+            throw ApiExceptionDictionary.NotFound("File not found");
+        }
+
+        var client = await GetBlobContainerClient(blobContainer);
+        var blobClient = client.GetBlobClient(blobKey);
+        await blobClient.DeleteIfExistsAsync();
     }
 }
 
@@ -206,5 +249,6 @@ public class FileVm
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
     public string? Uuid { get; set; }
-    public string? Url { get; set; }
+    public string? EmbedUrl { get; set; }
+    public string? DownloadUrl { get; set; }
 }

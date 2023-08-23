@@ -1,3 +1,4 @@
+import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { AddEntranceVm } from "./AddEntranceVm";
 
 export interface AddCaveVm {
@@ -14,4 +15,5 @@ export interface AddCaveVm {
   reportedByName: string | null;
   entrances: AddEntranceVm[];
   geologyTagIds: string[];
+  files?: EditFileMetadataVm[];
 }

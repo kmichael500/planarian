@@ -3,8 +3,9 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileVm } from "../Models/FileVm";
 import { FileListItemComponent } from "./FileListItemComponent";
-import { customSort } from "../../../Shared/Helpers/ArrayHelpers";
+import { customSort, groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { CloudUploadOutlined } from "@ant-design/icons";
+import { ReactNode } from "react";
 const { Panel } = Collapse;
 
 export interface FileListComponentProps {
@@ -18,55 +19,72 @@ export const FileListComponent = ({
   files,
   isUploading,
   setIsUploading,
+  customOrder,
 }: FileListComponentProps) => {
   if (!files) {
     files = [];
   }
-  const filesByType = {} as { [key: string]: FileVm[] };
+  const filesByType = groupBy(files, (file) => file.fileTypeKey);
 
-  files.forEach((file) => {
-    if (!filesByType[file.fileTypeKey]) {
-      filesByType[file.fileTypeKey] = [];
-    }
-    filesByType[file.fileTypeKey].push(file);
-  });
-
-  const customOrder = ["Map"];
-
-  // Order file types by custom order if provided
   let sortedFileTypes = customOrder
     ? customSort(customOrder, Object.keys(filesByType))
     : Object.keys(filesByType);
 
   return (
-    <Collapse bordered>
-      {sortedFileTypes.map((fileType) => (
-        <Panel header={fileType} key={fileType}>
-          <CardGridComponent
-            useList
-            noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
-            noDataCreateButton={
-              <PlanarianButton
-                icon={<CloudUploadOutlined />}
-                onClick={() => {
-                  if (setIsUploading) {
-                    setIsUploading(true);
-                  }
+    <>
+      {sortedFileTypes.length > 0 ? (
+        <Collapse bordered defaultActiveKey={sortedFileTypes}>
+          {sortedFileTypes.map((fileType) => (
+            <Panel header={fileType} key={fileType}>
+              <CardGridComponent
+                useList
+                noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
+                noDataCreateButton={
+                  <PlanarianButton
+                    icon={<CloudUploadOutlined />}
+                    onClick={() => {
+                      if (setIsUploading) {
+                        setIsUploading(true);
+                      }
+                    }}
+                  >
+                    Upload
+                  </PlanarianButton>
+                }
+                renderItem={(file) => {
+                  return <FileListItemComponent file={file} />;
                 }}
-              >
-                Upload
-              </PlanarianButton>
-            }
-            renderItem={(file) => {
-              return <FileListItemComponent file={file} />;
-            }}
-            itemKey={(item) => {
-              return item.id;
-            }}
-            items={filesByType[fileType]}
-          ></CardGridComponent>
-        </Panel>
-      ))}
-    </Collapse>
+                itemKey={(item) => {
+                  return item.id;
+                }}
+                items={filesByType[fileType]}
+              ></CardGridComponent>
+            </Panel>
+          ))}
+        </Collapse>
+      ) : (
+        <CardGridComponent
+          noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
+          noDataCreateButton={
+            <PlanarianButton
+              icon={<CloudUploadOutlined />}
+              onClick={() => {
+                if (setIsUploading) {
+                  setIsUploading(true);
+                }
+              }}
+            >
+              Upload
+            </PlanarianButton>
+          }
+          renderItem={function (item: object): ReactNode {
+            return null;
+          }}
+          itemKey={function (item: object): string {
+            return "";
+          }}
+        ></CardGridComponent>
+      )}
+    </>
   );
 };

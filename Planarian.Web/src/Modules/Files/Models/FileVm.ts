@@ -7,5 +7,6 @@ export interface FileVm {
   uuid?: string;
   fileTypeTagId: string;
   fileTypeKey: FileTypeKey;
-  url: string;
+  embedUrl: string;
+  downloadUrl: string;
 }

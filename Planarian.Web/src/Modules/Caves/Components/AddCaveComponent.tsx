@@ -8,6 +8,8 @@ import {
   Col,
   Radio,
   ColProps,
+  Collapse,
+  Space,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
@@ -25,14 +27,23 @@ import {
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
 import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputDistance";
+import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
+import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
+import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
   isEditing?: boolean;
+  cave?: AddCaveVm;
 }
-const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
+const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   const [selectedStateId, setSelectedStateId] = useState<string>();
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+
+  const [caveState, setCaveState] = useState<AddCaveVm>(
+    cave ?? ({} as AddCaveVm)
+  );
+
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
       entrances: form
@@ -67,6 +78,22 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
     }
   };
 
+  // let groupedByFileTypes: {
+  //   [key: string]: EditFileMetadataVm[];
+  // } = {};
+  const [groupedByFileTypes, setGroupedByFiles] = useState<{
+    [key: string]: EditFileMetadataVm[];
+  }>({});
+
+  useEffect(() => {
+    console.log("hi");
+
+    if (caveState?.files) {
+      const temp = groupBy(caveState.files, (file) => file.fileTypeKey);
+      setGroupedByFiles(temp);
+    }
+  }, [caveState]);
+
   //#region  Column Props
   const fourColProps = {
     xxl: 6,
@@ -100,6 +127,7 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
       <Form.Item name="id" noStyle>
         <Input type="hidden" />
       </Form.Item>
+
       <Col span={24}>
         <Form.Item
           label="Name"
@@ -109,7 +137,6 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
           <Input />
         </Form.Item>
       </Col>
-
       <Col {...threeColProps}>
         <Form.Item
           label="State"
@@ -137,7 +164,6 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
           )}
         </Form.Item>
       </Col>
-
       <Col {...threeColProps}>
         <Form.Item label="Geology" name={nameof<AddCaveVm>("geologyTagIds")}>
           <TagSelectComponent
@@ -218,7 +244,9 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
           <Input />
         </Form.Item>
       </Col>
-
+      <Col span={24}>
+        <PlanarianDividerComponent title={"Entrances"} />
+      </Col>
       <Col span={24}>
         <Form.List
           name={nameof<AddCaveVm>("entrances")}
@@ -249,7 +277,9 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
                             title={`Are you sure you want to delete entrance ${(
                               field.name + 1
                             ).toString()}?`}
-                            onConfirm={() => remove(field.name)}
+                            onConfirm={() => {
+                              remove(field.name);
+                            }}
                             okText="Yes"
                             cancelText="No"
                           ></DeleteButtonComponent>
@@ -274,7 +304,7 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
                             </Radio.Group>
                           </Form.Item>
                         </Col>
-                        <Col {...fourColProps}>
+                        <Col {...twoColProps}>
                           <Form.Item
                             {...field}
                             label="Status"
@@ -289,7 +319,7 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        <Col {...fourColProps}>
+                        <Col {...twoColProps}>
                           <Form.Item
                             {...field}
                             label="Field Indication"
@@ -304,7 +334,7 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        <Col {...fourColProps}>
+                        <Col {...twoColProps}>
                           <Form.Item
                             {...field}
                             label="Hydrology"
@@ -319,7 +349,7 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        <Col {...fourColProps}>
+                        <Col {...twoColProps}>
                           <Form.Item
                             {...field}
                             label="Hydrology Frequency"
@@ -508,11 +538,110 @@ const AddCaveComponent = ({ form, isEditing }: AddCaveComponentProps) => {
           )}
         </Form.List>
       </Col>
-      <Form.Item>
-        <Button type="primary" htmlType="submit">
-          Submit
-        </Button>
-      </Form.Item>
+      {Object.entries(groupedByFileTypes).length > 0 && (
+        <Col span={24}>
+          <PlanarianDividerComponent title={"Files"} />
+        </Col>
+      )}
+      {Object.entries(groupedByFileTypes).length > 0 && (
+        <Col span={24}>
+          <Form.List name={nameof<AddCaveVm>("files")}>
+            {(fields, { add, remove }, { errors }) => (
+              <Collapse accordion>
+                {Object.entries(groupedByFileTypes).map(([fileType, files]) => (
+                  <Collapse.Panel header={`${fileType}`} key={fileType}>
+                    <Row gutter={16}>
+                      {fields.map((field) => {
+                        // Get the file at the index
+                        const f = caveState?.files?.[field.key];
+
+                        if (f?.fileTypeKey === fileType) {
+                          return (
+                            <Col key={field.key} span={12}>
+                              <Card
+                                bordered
+                                style={{ height: "100%" }}
+                                actions={[
+                                  <DeleteButtonComponent
+                                    title={
+                                      "Are you sure? This cannot be undone!"
+                                    }
+                                    onConfirm={() => {
+                                      if (caveState?.files) {
+                                        remove(field.name);
+
+                                        const filteredFiles =
+                                          caveState.files.filter(
+                                            (file, index) =>
+                                              index !== field.key &&
+                                              fields.some(
+                                                (formField) =>
+                                                  formField.key === index
+                                              )
+                                          );
+
+                                        const temp = groupBy(
+                                          filteredFiles,
+                                          (file) => file.fileTypeKey
+                                        );
+                                        setGroupedByFiles(temp);
+                                      }
+                                    }}
+                                  />,
+                                ]}
+                              >
+                                <Form.Item
+                                  {...field}
+                                  label="Name"
+                                  name={[
+                                    field.name,
+                                    nameof<EditFileMetadataVm>("displayName"),
+                                  ]}
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Please enter a name",
+                                    },
+                                  ]}
+                                >
+                                  <Input />
+                                </Form.Item>
+                                <Form.Item
+                                  {...field}
+                                  label="File Type"
+                                  name={[
+                                    field.name,
+                                    nameof<EditFileMetadataVm>("fileTypeTagId"),
+                                  ]}
+                                >
+                                  <TagSelectComponent tagType={TagType.File} />
+                                </Form.Item>
+                              </Card>
+                            </Col>
+                          );
+                        }
+
+                        return null;
+                      })}
+                    </Row>
+                  </Collapse.Panel>
+                ))}
+              </Collapse>
+            )}
+          </Form.List>
+        </Col>
+      )}
+      <Col>
+        <Form.Item>
+          <Button
+            style={{ marginTop: "16px" }}
+            type="primary"
+            htmlType="submit"
+          >
+            Submit
+          </Button>
+        </Form.Item>
+      </Col>
     </Row>
   );
 };
