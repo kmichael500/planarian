@@ -1,3 +1,4 @@
+using NetTopologySuite.Geometries;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
@@ -172,11 +173,10 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
-                entrance.Latitude = entranceValue.Latitude;
-                entrance.Longitude = entranceValue.Longitude;
-                entrance.ElevationFeet = entranceValue.ElevationFeet;
                 entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
                 entrance.PitFeet = entranceValue.PitFeet;
+                
+                entrance.Location = new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet) { SRID = 4326 };
 
                 if (string.IsNullOrWhiteSpace(entrance.ReportedByName)) entrance.ReportedByName = RequestUser.FullName;
 

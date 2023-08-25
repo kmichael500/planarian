@@ -22,6 +22,7 @@
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.2-mauipre.1.22102.1&gt;5" />
         <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.2-mauipre.1.22102.15" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.2-mauipre.1.22102.15" />
+
     </ItemGroup>
 
     <ItemGroup>
