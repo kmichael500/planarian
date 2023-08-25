@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NetTopologySuite.Geometries;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -18,10 +19,11 @@ public class Entrance : EntityBase
     public bool IsPrimary { get; set; } = false;
     public string? Description { get; set; }
 
-    public double Latitude { get; set; }
-    public double Longitude { get; set; }
-    public double ElevationFeet { get; set; }
-    
+    // public double Latitude { get; set; }
+    // public double Longitude { get; set; }
+    // public double ElevationFeet { get; set; }
+    public Point Location { get; set; } = null!;
+
     public DateTime? ReportedOn { get; set; }
     [MaxLength(PropertyLength.Name)]public string? ReportedByName { get; set; }
 
@@ -40,7 +42,6 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
 {
     public override void Configure(EntityTypeBuilder<Entrance> builder)
     {
-
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.Entrances)
             .HasForeignKey(e => e.CaveId)
@@ -56,10 +57,6 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
             .WithMany(e => e.EntranceLocationQualitiesTags)
             .HasForeignKey(e => e.LocationQualityTagId)
             .OnDelete(DeleteBehavior.NoAction);
-        //
-        // builder.HasIndex(e => new { e.CaveId, e.IsPrimary })
-        //     .HasFilter("[IsPrimary] = 1")
-        //     .IsUnique();
-        
+
     }
 }

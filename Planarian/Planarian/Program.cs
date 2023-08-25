@@ -34,6 +34,8 @@ using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.SendGrid.Interfaces;
 using Southport.Messaging.Email.SendGrid.Message;
+using Microsoft.EntityFrameworkCore.SqlServer;
+
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -153,7 +155,8 @@ builder.Services.AddScoped<RequestUser>();
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
 {
-    options.UseSqlServer(serverOptions.SqlConnectionString);
+    options.UseSqlServer(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+
 });
 
 #endregion
