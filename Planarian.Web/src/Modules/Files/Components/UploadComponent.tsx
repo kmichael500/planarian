@@ -35,7 +35,7 @@ interface UploadComponentProps {
   updateFunction: (files: FileVm[]) => Promise<void>;
 }
 
-interface UploadParams {
+export interface UploadParams {
   file: any;
   uid: string;
   onProgress: (event: AxiosProgressEvent) => void;

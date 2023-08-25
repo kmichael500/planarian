@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Shared.Base;
@@ -112,5 +113,20 @@ public class SettingsRepository : RepositoryBase
     {
         return await DbContext.States.Where(e => e.Id == stateId).Select(e => e.Name).FirstOrDefaultAsync();
     }
-    
+
+    public async Task<State?> GetStateByNameOrAbbreviation(string caveRecordState)
+    {
+        var state = await DbContext.States.Where(e => e.Name == caveRecordState || e.Abbreviation == caveRecordState)
+            .FirstOrDefaultAsync();
+
+        return state;
+    }
+
+    public async Task<County?> GetCountyByDisplayId(string displayId, string stateId)
+    {
+        var county = await DbContext.Counties
+            .Where(e => e.DisplayId == displayId && e.StateId == stateId).FirstOrDefaultAsync();
+
+        return county;
+    }
 }

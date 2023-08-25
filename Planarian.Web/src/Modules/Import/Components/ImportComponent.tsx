@@ -5,6 +5,12 @@ import {
   createCsvWithHeaders,
   downloadFile,
 } from "../../../Shared/Helpers/FileHelpers";
+import {
+  UploadComponent,
+  UploadParams,
+} from "../../Files/Components/UploadComponent";
+import { FileVm } from "../../Files/Models/FileVm";
+import { CaveService } from "../../Caves/Service/CaveService";
 
 const caveImportHeaders = [
   "CaveName",
@@ -73,6 +79,18 @@ const ImportComponent = () => {
           Sample Entrance Import Template
         </PlanarianButton>
       </Space>
+      <UploadComponent
+        uploadFunction={async (params): Promise<FileVm> => {
+          return await CaveService.ImportCaveCsv(
+            params.file,
+            params.uid,
+            params.onProgress
+          );
+        }}
+        updateFunction={(files: FileVm[]): Promise<void> => {
+          throw new Error("Function not implemented.");
+        }}
+      />
     </Card>
   );
 };

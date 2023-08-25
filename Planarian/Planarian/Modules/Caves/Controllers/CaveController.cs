@@ -88,4 +88,17 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new OkResult();
     }
+
+    #region Import
+
+    [DisableRequestSizeLimit] //TODO
+    [HttpPost("import-caves")]
+    public async Task<IActionResult> ImportCaves(string? uuid, [FromForm] IFormFile file)
+    {
+        FileVm result = await Service.ImportCaves(file.OpenReadStream(), file.FileName, uuid);
+
+        return new JsonResult(result);
+    }
+
+    #endregion
 }

@@ -87,4 +87,6 @@ public static class ApiExceptionDictionary
 
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
         new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
+
+ 
 }

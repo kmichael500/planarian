@@ -39,4 +39,13 @@ public class TagRepository : RepositoryBase
         }
         return result;
     }
+
+    public async Task<TagType?> GetGeologyTagByName(string geologyType)
+    {
+        var result = await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.Name == geologyType && e.AccountId == RequestUser.AccountId)
+            .FirstOrDefaultAsync();
+        
+        return result;
+    }
 }

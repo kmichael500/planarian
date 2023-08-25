@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
+        <PackageReference Include="CsvHelper" Version="30.0.1" />
         <PackageReference Include="Handlebars.Net" Version="2.1.2" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
         <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="5.2.0" />
@@ -27,6 +28,10 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Modules\Import\Models" />
     </ItemGroup>
     
     <Target Name="PublishAndRunWebPack" AfterTargets="ComputeFilesToPublish">

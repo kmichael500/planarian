@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Import.Controllers;
+namespace Planarian.Modules.Import.Services;
 
 public class ImportService
 {
