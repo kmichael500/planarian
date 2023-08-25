@@ -18,10 +18,6 @@ public class Entrance : EntityBase
 
     public bool IsPrimary { get; set; } = false;
     public string? Description { get; set; }
-
-    // public double Latitude { get; set; }
-    // public double Longitude { get; set; }
-    // public double ElevationFeet { get; set; }
     public Point Location { get; set; } = null!;
 
     public DateTime? ReportedOn { get; set; }

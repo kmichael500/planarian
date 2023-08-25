@@ -1,3 +1,5 @@
+import { getFileType } from "../../Modules/Files/Services/FileHelpers";
+
 export const downloadCSV = (data: any[], ignoreId: boolean = false): void => {
   let csvContent = "data:text/csv;charset=utf-8,";
   let keys = Object.keys(data[0]);
@@ -34,4 +36,33 @@ export const downloadCSV = (data: any[], ignoreId: boolean = false): void => {
   link.setAttribute("download", "data.csv");
   document.body.appendChild(link);
   link.click();
+};
+
+export const createCsvWithHeaders = (headers: string[]) => {
+  // Create CSV content from headers
+  const csvContent = headers.join(",") + "\n";
+
+  return csvContent;
+};
+
+export const downloadFile = (filename: string, content: string) => {
+  // Create a downloadable link and trigger download
+  const link = document.createElement("a");
+  var blob: Blob;
+  switch (getFileType(filename)) {
+    case "csv":
+      blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+      break;
+    default:
+      throw new Error("File type not supported");
+      break;
+  }
+
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };

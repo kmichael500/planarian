@@ -1,5 +1,6 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { ImportComponent } from "../Components/ImportComponent";
 
 const ImportPage = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -9,8 +10,9 @@ const ImportPage = () => {
     setHeaderTitle(["Import"]);
   }, []);
   return (
-    <div>
-    </div>
+    <>
+      <ImportComponent />
+    </>
   );
 };
 
