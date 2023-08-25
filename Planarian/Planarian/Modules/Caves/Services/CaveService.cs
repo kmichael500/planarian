@@ -173,9 +173,6 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
-                // entrance.Latitude = entranceValue.Latitude;
-                // entrance.Longitude = entranceValue.Longitude;
-                // entrance.ElevationFeet = entranceValue.ElevationFeet;
                 entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
                 entrance.PitFeet = entranceValue.PitFeet;
                 
