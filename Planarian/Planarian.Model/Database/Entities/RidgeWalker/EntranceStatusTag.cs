@@ -6,7 +6,7 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
-public class EntranceStatusTag : EntityBase
+public class EntranceStatusTag : EntityBase, IEntranceTag
 {
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;

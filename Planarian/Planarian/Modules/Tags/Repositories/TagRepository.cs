@@ -25,8 +25,8 @@ public class TagRepository : RepositoryBase
         var result = await DbContext.TagTypes
             .Where(e => e.Key == TagTypeKeyConstant.File && e.Name == fileTagTypeName && e.AccountId == accountId)
             .FirstOrDefaultAsync();
-        
-        if(result == null && fileTagTypeName == FileTypeTagName.Other)
+
+        if (result == null && fileTagTypeName == FileTypeTagName.Other)
         {
             var tagType = new TagType
             {
@@ -38,21 +38,24 @@ public class TagRepository : RepositoryBase
             await DbContext.SaveChangesAsync();
             return tagType;
         }
+
         return result;
     }
 
     public async Task<TagType?> GetGeologyTagByName(string geologyName)
     {
         var result = await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.Name == geologyName && e.AccountId == RequestUser.AccountId)
+            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.Name == geologyName &&
+                        e.AccountId == RequestUser.AccountId)
             .FirstOrDefaultAsync();
-        
+
         return result;
     }
 
     public async Task<IEnumerable<TagType>> GetGeologyTags()
     {
-        return await DbContext.TagTypes.Where(e=>e.Key == TagTypeKeyConstant.Geology && e.AccountId == RequestUser.AccountId).ToListAsync();
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.AccountId == RequestUser.AccountId).ToListAsync();
     }
 
     public async Task<IEnumerable<County>> GetCounties()
@@ -66,4 +69,33 @@ public class TagRepository : RepositoryBase
             .Where(e => e.Key == TagTypeKeyConstant.LocationQuality && e.AccountId == RequestUser.AccountId)
             .ToListAsync();
     }
+
+    public async Task<IEnumerable<TagType>> GetEntranceHydrologyTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.EntranceHydrology && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<TagType>> GetEntranceStatusTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.EntranceStatus && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<TagType>> GetEntranceHydrologyFrequencyTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.EntranceHydrologyFrequency && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<TagType>> GetFieldIndicationTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.FieldIndication && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
+    }
+    
 }

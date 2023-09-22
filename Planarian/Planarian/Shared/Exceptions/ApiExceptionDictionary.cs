@@ -91,6 +91,7 @@ public static class ApiExceptionDictionary
 
     public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCsvRecord<T>> failedCaveRecords) =>
         new ApiException(StatusCodes.Status400BadRequest, 304, "Invalid cave import") { Data = failedCaveRecords };
-
+    public static ApiException NullValue(string name) =>
+        new ApiException(StatusCodes.Status400BadRequest, 304, $"Value is missing from '{name}'");
 
 }

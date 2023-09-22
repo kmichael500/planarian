@@ -81,11 +81,8 @@ public class CaveRepository : RepositoryBase
                     FileTypeKey = ee.FileTypeTag.Key,
                     FileTypeTagId = ee.FileTypeTagId,
                 })
-            })
-            .QueryFilter(query.Conditions);
-        // .AsSplitQuery()
+            }).AsSplitQuery();
 
-        // var test = await queryable.CountAsync();
         var caves = await queryable.ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
 
 

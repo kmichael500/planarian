@@ -605,24 +605,24 @@ public class CaveService : ServiceBase<CaveRepository>
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
             var entranceRecords = csv.GetRecords<EntranceCsvModel>().ToList();
             var entrances = new List<TemporaryEntrance>();
+
+            #region Tags
+
+            var allLocationQualityTags = await ProcessTags(entranceRecords, 
+                _tagRepository.LocationQualityTags, 
+                TagTypeKeyConstant.LocationQuality, 
+                e => new List<string?> { e.LocationQuality }, 
+                cancellationToken);
             
-            #region Location Quality Tags
+            var allEntranceStatusTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceStatusTags, TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatus?.Split(','), cancellationToken);
+            var allEntranceHydrologyTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyTags, TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), cancellationToken);
+            var allEntranceHydrologyFrequencyTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyFrequencyTags, TagTypeKeyConstant.EntranceHydrologyFrequency, e => e.EntranceHydrologyFrequency?.Split(','), cancellationToken);
+            var allFieldIndicationTags = await ProcessTags(entranceRecords, _tagRepository.GetFieldIndicationTags, TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.Split(','), cancellationToken);
 
-            var allLocationQualityTags = (await _tagRepository.LocationQualityTags()).ToList();
-            var locationQualityTags = entranceRecords.Select(e => e.LocationQuality?.Trim()).Distinct()
-                .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => new TagType
-                {
-                    AccountId = RequestUser.AccountId, CreatedByUserId = RequestUser.Id, CreatedOn = DateTime.UtcNow,
-                    Key = TagTypeKeyConstant.LocationQuality, Id = IdGenerator.Generate(),
-                    Name = e ?? throw ApiExceptionDictionary.NotFound(nameof(EntranceCsvModel.LocationQuality))
-                }).ToList();
-
-            var newLocationQualityTags = locationQualityTags.Where(gt => allLocationQualityTags.All(ag => ag.Name != gt.Name)).ToList();
-
-            await _tagRepository.BulkInsertAsync(newLocationQualityTags, cancellationToken: cancellationToken);
-
-            allLocationQualityTags.AddRange(newLocationQualityTags);
-
+            var entranceStatusTags = new List<EntranceStatusTag>();
+            var entranceHydrologyTags = new List<EntranceHydrologyTag>();
+            var entranceHydrologyFrequencyTags = new List<EntranceHydrologyFrequencyTag>();
+            var entranceFieldIndicationTags = new List<FieldIndicationTag>();
             #endregion
             
 
@@ -636,6 +636,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
+                    #region Validation
+                    
                     var isValidReportedOn = DateTime.TryParse(entranceRecord.ReportedOnDate, out var reportedOnDate);
 
                     if (entranceRecord.DecimalLatitude == null)
@@ -675,31 +677,64 @@ public class CaveService : ServiceBase<CaveRepository>
                     {
                         throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.LocationQuality));
                     }
+                    
+                    #endregion
+                    
+                    
 
                     var entrance = new TemporaryEntrance()
                     {
-                        // Map properties from entranceCsv to entrance
-                        Name = entranceRecord.EntranceName,
                         Id = IdGenerator.Generate(),
-                        // intentionally null
-                        CaveId = null,
+                        Name = entranceRecord.EntranceName,
                         Description = entranceRecord.EntranceDescription,
+                        IsPrimary = entranceRecord.IsPrimaryEntrance ?? false,
+                        PitFeet = entranceRecord.EntrancePitDepth,
                         CountyCaveNumber = hasCountyCaveNumber
                             ? countyCaveNumber
                             : throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCaveNumber)),
-                        CountyDisplayId = entranceRecord.CountyCode ??
-                                          throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCode)),
-                        IsPrimary = entranceRecord.IsPrimaryEntrance ?? false,
-                        PitFeet = entranceRecord.EntrancePitDepth,
+                        CountyDisplayId = string.IsNullOrWhiteSpace(entranceRecord.CountyCode) ?
+                                          throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCode)) : entranceRecord.CountyCode,
                         Latitude = (double)entranceRecord.DecimalLatitude,
                         Longitude = (double)entranceRecord.DecimalLongitude,
                         Elevation = (double)entranceRecord.EntranceElevationFt,
                         LocationQualityTagId = locationQualityTag.Id,
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
                         ReportedByName = entranceRecord.ReportedByName,
+                        CaveId = null, // intentionally null
                     };
+                    entranceRecord.CaveId = entrance.Id; // used to associate with erroneous records after inserting into the db
 
-                    entranceRecord.CaveId = entrance.Id;
+                    #region Tags
+
+                    ProcessEntranceTags(
+                        entranceRecord, entrance.Id,
+                        nameof(entranceRecord.EntranceStatus), 
+                        entranceStatusTags, 
+                        e => e.EntranceStatus, 
+                        allEntranceStatusTags);
+
+                    ProcessEntranceTags(
+                        entranceRecord, entrance.Id,
+                        nameof(entranceRecord.EntranceHydrology), 
+                        entranceHydrologyTags, 
+                        e => e.EntranceHydrology, 
+                        allEntranceHydrologyTags);
+
+                    ProcessEntranceTags(
+                        entranceRecord, entrance.Id,
+                        nameof(entranceRecord.EntranceHydrologyFrequency),
+                        entranceHydrologyFrequencyTags,
+                        e => e.EntranceHydrologyFrequency,
+                        allEntranceHydrologyFrequencyTags);
+                    
+                    ProcessEntranceTags(
+                        entranceRecord, entrance.Id,
+                        nameof(entranceRecord.FieldIndication), 
+                        entranceFieldIndicationTags, 
+                        e => e.FieldIndication, 
+                        allFieldIndicationTags);
+                    
+                    #endregion
                     
                     // await IsValidCave(cave, usedCountyNumbers);
                     entrances.Add(entrance);
@@ -727,7 +762,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
                 var calculatedRowNumber = entranceRecords.IndexOf(unassociatedRecord) + 2;
                 failedRecords.Add(new FailedCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
-                    "Cave not found"));
+                    $"Entrance could not be associated with the cave {unassociatedRecord.CountyCode}-{unassociatedRecord.CountyCaveNumber}"));
             }
 
             if (failedRecords.Any())
@@ -736,6 +771,44 @@ public class CaveService : ServiceBase<CaveRepository>
             }
             
             await _temporaryEntranceRepository.MigrateTemporaryEntrancesAsync();
+
+            #region Tag Insert
+            
+            const int batchSize = 500;
+            
+            var proccessedEntranceStatusTags = 0;
+            foreach (var batch in entranceStatusTags.Chunk(batchSize).ToList())
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessedEntranceStatusTags += batch.Count;
+            }
+            
+            var proccessedEntranceHydrologyTags = 0;
+            foreach (var batch in entranceHydrologyTags.Chunk(batchSize).ToList())
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessedEntranceHydrologyTags += batch.Count;
+            }
+            
+            var proccessedEntranceHydrologyFrequencyTags = 0;
+            foreach (var batch in entranceHydrologyFrequencyTags.Chunk(batchSize).ToList())
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessedEntranceHydrologyFrequencyTags += batch.Count;
+            }
+            
+            var proccessedFieldIndicationTags = 0;
+            foreach (var batch in entranceFieldIndicationTags.Chunk(batchSize).ToList())
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessedFieldIndicationTags += batch.Count;
+            }
+            
+            
+
+            #endregion
+            
+            
             await transaction.CommitAsync(cancellationToken);
             
         }
@@ -748,8 +821,67 @@ public class CaveService : ServiceBase<CaveRepository>
         return new FileVm();
     }
 
-    
-    
+    private async Task<List<TagType>> ProcessTags(IEnumerable<EntranceCsvModel> entranceRecords,
+        Func<Task<IEnumerable<TagType>>> getTags, string key, Func<EntranceCsvModel, IEnumerable<string?>?> selector,
+        CancellationToken cancellationToken)
+    {
+        var allTags = (await getTags()).ToList();
+        var tags = entranceRecords.SelectMany(e => selector(e)?.Select(s => s?.Trim()) ?? Array.Empty<string>())
+            .Distinct()
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => new TagType
+            {
+                AccountId = RequestUser.AccountId,
+                CreatedByUserId = RequestUser.Id,
+                CreatedOn = DateTime.UtcNow,
+                Key = key,
+                Id = IdGenerator.Generate(),
+                Name = e ?? throw ApiExceptionDictionary.NullValue(nameof(TagType.Name))
+            }).ToList();
+
+        var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
+
+        await _tagRepository.BulkInsertAsync(newTags, cancellationToken: cancellationToken);
+
+        allTags.AddRange(newTags);
+
+        return allTags;
+    }
+
+    private void ProcessEntranceTags<TTag>(EntranceCsvModel entranceRecord,
+        string entranceId,
+        string entranceTagField,
+        List<TTag> tagList,
+        Func<EntranceCsvModel, string?> entranceTagSelector,
+        List<TagType> allTags) where TTag : EntityBase, IEntranceTag, new()
+    {
+        var entranceTagNames = entranceTagSelector(entranceRecord)?.Split(',').Select(g => g.Trim())
+            .Where(e => !string.IsNullOrWhiteSpace(e)).ToList() ?? new List<string>();
+
+        foreach (var tagName in entranceTagNames)
+        {
+            var tag = allTags.FirstOrDefault(e =>
+                e.Name.Equals(tagName, StringComparison.InvariantCultureIgnoreCase));
+            if (tag == null)
+            {
+                throw ApiExceptionDictionary.NotFound(entranceTagField);
+            }
+
+            var entranceTag = new TTag()
+            {
+                Id = IdGenerator.Generate(),
+                EntranceId = entranceId,
+                TagTypeId = tag.Id,
+                CreatedOn = DateTime.UtcNow,
+                CreatedByUserId = RequestUser.Id,
+            };
+            tagList.Add(entranceTag);
+        }
+    }
+
+
+
+
     #endregion
 
     #region Helper
