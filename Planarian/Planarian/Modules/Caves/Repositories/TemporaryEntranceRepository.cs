@@ -12,40 +12,45 @@ namespace Planarian.Modules.Caves.Repositories;
 
 public class TemporaryEntranceRepository : RepositoryBase
 {
+    private readonly string _temporaryEntranceTableName;
+
     public TemporaryEntranceRepository(PlanarianDbContext dbContext, RequestUser requestUser)
         : base(dbContext, requestUser)
     {
+        _temporaryEntranceTableName = "TemporaryEntrance" + Guid.NewGuid().ToString().Replace("-", "");
     }
+
 
     public async Task<ITable<TemporaryEntrance>> CreateTable()
     {
-        var uniqueTableName = "TemporaryEntrance" + Guid.NewGuid().ToString().Replace("-", "");
-
         await using var db = DbContext.CreateLinqToDBConnection();
-        
-        // db.TraceSwitch.Level = TraceLevel.Info;
-        // db.OnTraceConnection = (info) => 
-        // {
-        //     Console.WriteLine($"{info.TraceInfoStep}: {info.}");
-        // };
 
-        
         var result = await db
-            .CreateTableAsync<TemporaryEntrance>("TemporaryEntrance");
+            .CreateTableAsync<TemporaryEntrance>(_temporaryEntranceTableName);
         return result;
     }
 
     public async Task<BulkCopyRowsCopied> TaskInsert(IEnumerable<TemporaryEntrance> entrances)
     {
         await using var db = DbContext.CreateLinqToDBConnection();
-        return await db.BulkCopyAsync(entrances);
+
+        var options = new BulkCopyOptions
+        {
+            TableName = _temporaryEntranceTableName
+        };
+
+        return await db.BulkCopyAsync(options, entrances);
     }
 
     public async Task<IEnumerable<string>> UpdateTemporaryEntranceWithCaveId()
     {
+        if (string.IsNullOrEmpty(_temporaryEntranceTableName))
+            throw new InvalidOperationException("The temporary table has not been created.");
+
         await using var db = DbContext.CreateLinqToDBConnection();
 
         var result = await db.GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName)
             .Set(te => te.CaveId, te => db.GetTable<Cave>()
                 .Join(db.GetTable<County>(),
                     cave => cave.CountyId,
@@ -58,14 +63,17 @@ public class TemporaryEntranceRepository : RepositoryBase
             .UpdateAsync();
 
         var unassociatedEntrances = await db.GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName) // Use dynamic table name
             .Where(e => e.CaveId == null)
             .Select(e => e.Id).ToListAsyncLinqToDB();
 
         var deleteResult = await db.GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName) // Use dynamic table name
             .Where(e => e.CaveId == null).DeleteAsync();
-        
+
         return unassociatedEntrances;
     }
+
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
@@ -109,20 +117,22 @@ public class TemporaryEntranceRepository : RepositoryBase
             {nameof(TemporaryEntrance.ModifiedByUserId)},
             {nameof(TemporaryEntrance.CreatedOn)},
             {nameof(TemporaryEntrance.ModifiedOn)}
-        FROM {nameof(TemporaryEntrance)}";
+        FROM {_temporaryEntranceTableName}";
 
-        
+
         // execute raw sql
         await DbContext.Database.ExecuteSqlRawAsync(command);
     }
 
     public List<TemporaryEntrance> GetEntrancesById(string id)
     {
-        return DbContext.CreateLinqToDBConnection().GetTable<TemporaryEntrance>().Where(e => e.Id == id).ToList();
+        return DbContext.CreateLinqToDBConnection().GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName)
+            .Where(e => e.Id == id).ToList();
     }
 
     public async Task DropTable()
     {
-        await DbContext.CreateLinqToDBConnection().DropTableAsync<TemporaryEntrance>(tableName: "TemporaryEntrance");
+        await DbContext.CreateLinqToDBConnection()
+            .DropTableAsync<TemporaryEntrance>(tableName: _temporaryEntranceTableName);
     }
-} 
+}

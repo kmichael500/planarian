@@ -774,7 +774,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             #region Tag Insert
             
-            const int batchSize = 500;
+            const int batchSize = 5000;
             
             var proccessedEntranceStatusTags = 0;
             foreach (var batch in entranceStatusTags.Chunk(batchSize).ToList())
@@ -807,7 +807,8 @@ public class CaveService : ServiceBase<CaveRepository>
             
 
             #endregion
-            
+
+            await _temporaryEntranceRepository.DropTable();
             
             await transaction.CommitAsync(cancellationToken);
             
