@@ -10,7 +10,7 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class Entrance : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public virtual string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;
 
     

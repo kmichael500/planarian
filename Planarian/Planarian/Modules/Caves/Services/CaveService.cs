@@ -1,10 +1,19 @@
+using System.ComponentModel.DataAnnotations;
+using System.Data.SqlTypes;
 using System.Globalization;
 using CsvHelper;
-using Microsoft.AspNetCore.Mvc;
+using CsvHelper.Configuration.Attributes;
+using EFCore.BulkExtensions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.SqlServer.Types;
 using NetTopologySuite.Geometries;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
@@ -15,6 +24,7 @@ using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
+using Planarian.Shared.Extensions.Type;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Caves.Services;
@@ -25,14 +35,18 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
     private readonly SettingsRepository _settingsRepository;
+    private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository, SettingsRepository settingsRepository) : base(repository, requestUser)
+        FileRepository fileRepository, TagRepository tagRepository, SettingsRepository settingsRepository,
+        TemporaryEntranceRepository temporaryEntranceRepository) : base(
+        repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
+        _temporaryEntranceRepository = temporaryEntranceRepository;
     }
 
     #region Caves
@@ -127,16 +141,16 @@ public class CaveService : ServiceBase<CaveRepository>
 
             var isNewCounty = entity.CountyId != values.CountyId;
 
-            entity.Name = values.Name;
-            entity.CountyId = values.CountyId;
-            entity.StateId = values.StateId;
+            entity.Name = values.Name.Trim();
+            entity.CountyId = values.CountyId.Trim();
+            entity.StateId = values.StateId.Trim();
             entity.LengthFeet = values.LengthFeet;
             entity.DepthFeet = values.DepthFeet;
             entity.MaxPitDepthFeet = values.MaxPitDepthFeet;
             entity.NumberOfPits = values.NumberOfPits;
-            entity.Narrative = values.Narrative;
+            entity.Narrative = values.Narrative?.Trim();
             entity.ReportedOn = values.ReportedOn;
-            entity.ReportedByName = values.ReportedByName;
+            entity.ReportedByName = values.ReportedByName?.Trim();
             entity.AccountId = RequestUser.AccountId;
 
             if (string.IsNullOrWhiteSpace(entity.ReportedByName)) entity.ReportedByName = RequestUser.FullName;
@@ -355,6 +369,18 @@ public class CaveService : ServiceBase<CaveRepository>
         }
     }
 
+    public async Task DeleteAllCaves()
+    {
+        var blobProperties = await _fileRepository.GetAllCavesBlobProperties();
+        await Repository.DeleteAlLCaves();
+        foreach (var blobProperty in blobProperties)
+        {
+            await _fileService.DeleteFile(blobProperty.BlobKey, blobProperty.ContainerName);
+        }
+
+
+    }
+
     public async Task ArchiveCave(string caveId)
     {
         var entity = await Repository.GetAsync(caveId);
@@ -385,116 +411,431 @@ public class CaveService : ServiceBase<CaveRepository>
 
     #region Import
 
-    public async Task<FileVm> ImportCaves(Stream stream, string fileName, string? uuid)
+    public async Task<FileVm> ImportCaves(Stream stream, string fileName, string? uuid,
+        CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null)
         {
             throw ApiExceptionDictionary.NoAccount;
         }
-        
-        using var reader = new StreamReader(stream);
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-        var caveRecords = csv.GetRecords<CaveCsvModel>().ToList();
 
-        foreach (var caveRecord in caveRecords)
+        await using var transaction = await Repository.BeginTransactionAsync();
+        try
         {
-            await using var transaction = await Repository.BeginTransactionAsync();
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+            var caveRecords = csv.GetRecords<CaveCsvModel>().ToList();
+            var caves = new List<Cave>();
 
-            try
+            var states = caveRecords.Select(e => e.State.Trim()).Distinct().ToList();
+
+            var stateEntities = new List<State>();
+
+            foreach (var state in states)
             {
-                var state = await _settingsRepository.GetStateByNameOrAbbreviation(caveRecord.State);
-                if (state == null)
-                {
-                    throw ApiExceptionDictionary.NotFound("State");
-                }
+                var stateEntity = await _settingsRepository.GetStateByNameOrAbbreviation(state) ??
+                                  throw ApiExceptionDictionary.NotFound("State");
+                stateEntities.Add(stateEntity);
+            }
 
-                var county = await _settingsRepository.GetCountyByDisplayId(caveRecord.CountyCode, state.Id);
-                if (county == null)
+            #region Geology
+
+            var allGeologyTags = (await _tagRepository.GetGeologyTags()).ToList();
+            var geologyTags = caveRecords.SelectMany(e => e.Geology.Split(',').Select(g => g.Trim())).Distinct()
+                .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => new TagType
                 {
-                    county = new County
+                    AccountId = RequestUser.AccountId, CreatedByUserId = RequestUser.Id, CreatedOn = DateTime.UtcNow,
+                    Key = TagTypeKeyConstant.Geology, Id = IdGenerator.Generate(), Name = e
+                }).ToList();
+
+            var newGeologyTags = geologyTags.Where(gt => allGeologyTags.All(ag => ag.Name != gt.Name)).ToList();
+
+            await _tagRepository.BulkInsertAsync(newGeologyTags, cancellationToken: cancellationToken);
+
+            allGeologyTags.AddRange(newGeologyTags);
+
+            #endregion
+
+            #region Counties
+
+            var allCounties = (await _tagRepository.GetCounties()).ToList();
+            var counties = caveRecords.Select(e =>
+                    new County
                     {
-                        DisplayId = caveRecord.CountyCode,
-                        Name = caveRecord.CountyName,
+                        Id = IdGenerator.Generate(),
+                        Name = e.CountyName.Trim(),
+                        DisplayId = e.CountyCode.Trim(),
+                        AccountId = RequestUser.AccountId,
+                        CreatedByUserId = RequestUser.Id,
+                        CreatedOn = DateTime.UtcNow,
+                        StateId = stateEntities
+                            .Where(ee => ee.Name.Contains(e.State) || ee.Abbreviation.Contains(e.State))
+                            .Select(ee => ee.Id).First()
+                    })
+                .GroupBy(e => new { e.DisplayId, e.AccountId })
+                .Select(e => e.First())
+                .ToList();
+
+            var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
+            await _tagRepository.BulkInsertAsync(newCounties, cancellationToken: cancellationToken);
+
+            allCounties.AddRange(newCounties);
+
+            #endregion
+
+
+            var usedCountyNumbers = await Repository.GetUsedCountyNumbers();
+            var failedRecords = new List<FailedCsvRecord<CaveCsvModel>>();
+
+            var rowNumber = 0;
+            foreach (var caveRecord in caveRecords)
+            {
+                rowNumber++;
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var state = stateEntities.FirstOrDefault(e =>
+                        e.Name.Contains(caveRecord.State) || e.Abbreviation.Contains(caveRecord.State));
+                    if (state == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound("State");
+                    }
+
+                    var county = allCounties.FirstOrDefault(c =>
+                        c.DisplayId.Equals(caveRecord.CountyCode, StringComparison.InvariantCultureIgnoreCase) &&
+                        c.StateId == state.Id);
+                    if (county == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound("County");
+                    }
+
+                    var isValidReportedOn = DateTime.TryParse(caveRecord.ReportedOnDate, out var reportedOnDate);
+                    var cave = new Cave
+                    {
+                        Id = IdGenerator.Generate(),
+                        Name = caveRecord.CaveName.Trim(),
+                        AccountId = RequestUser.AccountId,
+                        LengthFeet = caveRecord.CaveLengthFt,
+                        DepthFeet = caveRecord.CaveDepthFt,
+                        MaxPitDepthFeet = caveRecord.MaxPitDepthFt,
+                        NumberOfPits = caveRecord.NumberOfPits,
+                        Narrative = caveRecord.Narrative.Trim(),
+                        CountyId = county.Id,
+                        CountyNumber = caveRecord.CountyCaveNumber,
                         StateId = state.Id,
-                        AccountId = RequestUser.AccountId
+                        ReportedOn = isValidReportedOn ? reportedOnDate : null,
+                        ReportedByName = caveRecord.ReportedByName.Trim(),
+                        IsArchived = caveRecord.IsArchived,
                     };
-                    Repository.Add(county);
-                }
-
-                await Repository.SaveChangesAsync();
-
-                var geologyTypes = caveRecord.Geology.Split(',').Select(g => g.Trim()).ToList();
-                var geologyTags = new List<TagType>();
-                foreach (var geologyType in geologyTypes)
-                {
-                    if (geologyTags.Select(e => e.Name)
-                        .Contains(geologyType, StringComparer.InvariantCultureIgnoreCase))
+                    var geologyNames = caveRecord.Geology.Split(',').Select(g => g.Trim())
+                        .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
+                    foreach (var geologyName in geologyNames)
                     {
-                        continue;
-                    }
-
-                    var tagType = await _tagRepository.GetGeologyTagByName(geologyType);
-                    if (tagType == null)
-                    {
-                        tagType = new TagType
+                        var tag = allGeologyTags.FirstOrDefault(e =>
+                            e.Name.Equals(geologyName, StringComparison.InvariantCultureIgnoreCase));
+                        if (tag == null)
                         {
-                            Key = TagTypeKeyConstant.Geology,
-                            Name = geologyType,
-                            AccountId = RequestUser.AccountId
+                            throw ApiExceptionDictionary.NotFound(nameof(caveRecord.Geology));
+                        }
+
+                        var geologyTag = new GeologyTag
+                        {
+                            Id = IdGenerator.Generate(),
+                            CaveId = cave.Id,
+                            TagTypeId = tag.Id,
+                            CreatedOn = DateTime.UtcNow,
+                            CreatedByUserId = RequestUser.Id,
                         };
-                        _tagRepository.Add(tagType);
+                        cave.GeologyTags.Add(geologyTag);
                     }
 
-                    geologyTags.Add(tagType);
+                    await IsValidCave(cave, usedCountyNumbers);
+                    caves.Add(cave);
                 }
-
-                await Repository.SaveChangesAsync();
-
-                var cave = new Cave
+                catch (Exception e)
                 {
-                    Name = caveRecord.CaveName,
-                    AccountId = RequestUser.AccountId,
-                    LengthFeet = caveRecord.CaveLengthFt,
-                    DepthFeet = caveRecord.CaveDepthFt,
-                    MaxPitDepthFeet = caveRecord.MaxPitDepthFt,
-                    NumberOfPits = caveRecord.NumberOfPits,
-                    Narrative = caveRecord.Narrative,
-                    CountyId = county.Id,
-                    CountyNumber = caveRecord.CountyCaveNumber,
-                    StateId = state.Id,
-                    ReportedOn = DateTime.Parse(caveRecord.ReportedOnDate),
-                    ReportedByName = caveRecord.ReportedByName,
-                    IsArchived = caveRecord.IsArchived
-                };
-
-                foreach (var tagType in geologyTags)
-                {
-                    var geologyTag = new GeologyTag
-                    {
-                        TagTypeId = tagType.Id,
-                    };
-                    cave.GeologyTags.Add(geologyTag);
+                    failedRecords.Add(new FailedCsvRecord<CaveCsvModel>(caveRecord, rowNumber, e.Message));
                 }
-
-                Repository.Add(cave);
-
-                await Repository.SaveChangesAsync();
-
-                await transaction.CommitAsync();
             }
-            catch (Exception e)
+            
+            if (failedRecords.Any())
             {
-                await transaction.RollbackAsync();
+                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
             }
+
+            var batchSize = 500;
+            var proccessed = 0;
+            foreach (var batch in caves.Chunk(batchSize))
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessed += batch.Count;
+            }
+            
+            var geologyTagsForInsert = caves.SelectMany(e => e.GeologyTags).ToList();
+            var proccessedGeologyTags = 0;
+            foreach (var batch in geologyTagsForInsert.Chunk(batchSize).ToList())
+            {
+                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
+                proccessedGeologyTags += batch.Count;
+            }
+            
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        return new FileVm();
+    }
+    
+    public async Task<FileVm> ImportCaveEntrances(Stream stream, string fileName, string? uuid,
+        CancellationToken cancellationToken)
+    {
+        if (RequestUser.AccountId == null)
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        await using var transaction = await Repository.BeginTransactionAsync();
+        try
+        {
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+            var entranceRecords = csv.GetRecords<EntranceCsvModel>().ToList();
+            var entrances = new List<TemporaryEntrance>();
+            
+            #region Location Quality Tags
+
+            var allLocationQualityTags = (await _tagRepository.LocationQualityTags()).ToList();
+            var locationQualityTags = entranceRecords.Select(e => e.LocationQuality?.Trim()).Distinct()
+                .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => new TagType
+                {
+                    AccountId = RequestUser.AccountId, CreatedByUserId = RequestUser.Id, CreatedOn = DateTime.UtcNow,
+                    Key = TagTypeKeyConstant.LocationQuality, Id = IdGenerator.Generate(),
+                    Name = e ?? throw ApiExceptionDictionary.NotFound(nameof(EntranceCsvModel.LocationQuality))
+                }).ToList();
+
+            var newLocationQualityTags = locationQualityTags.Where(gt => allLocationQualityTags.All(ag => ag.Name != gt.Name)).ToList();
+
+            await _tagRepository.BulkInsertAsync(newLocationQualityTags, cancellationToken: cancellationToken);
+
+            allLocationQualityTags.AddRange(newLocationQualityTags);
+
+            #endregion
+            
+
+            var failedRecords = new List<FailedCsvRecord<EntranceCsvModel>>();
+
+            var rowNumber = 0;
+            foreach (var entranceRecord in entranceRecords)
+            {
+                rowNumber++;
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var isValidReportedOn = DateTime.TryParse(entranceRecord.ReportedOnDate, out var reportedOnDate);
+
+                    if (entranceRecord.DecimalLatitude == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                    }
+
+                    if (entranceRecord.DecimalLongitude == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLongitude));
+                    }
+
+                    if (entranceRecord.EntranceElevationFt == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.EntranceElevationFt));
+                    }
+
+                    var hasCountyCaveNumber = int.TryParse(entranceRecord.CountyCaveNumber, out var countyCaveNumber);
+
+                    if (entranceRecord.DecimalLongitude == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLongitude));
+                    }
+                    if(entranceRecord.DecimalLatitude == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                    }
+                    if(entranceRecord.EntranceElevationFt == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                    }
+
+                    var locationQualityTag = allLocationQualityTags.FirstOrDefault(e =>
+                        e.Name.Equals(entranceRecord.LocationQuality, StringComparison.InvariantCultureIgnoreCase));
+
+                    if(locationQualityTag == null)
+                    {
+                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.LocationQuality));
+                    }
+
+                    var entrance = new TemporaryEntrance()
+                    {
+                        // Map properties from entranceCsv to entrance
+                        Name = entranceRecord.EntranceName,
+                        Id = IdGenerator.Generate(),
+                        // intentionally null
+                        CaveId = null,
+                        Description = entranceRecord.EntranceDescription,
+                        CountyCaveNumber = hasCountyCaveNumber
+                            ? countyCaveNumber
+                            : throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCaveNumber)),
+                        CountyDisplayId = entranceRecord.CountyCode ??
+                                          throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCode)),
+                        IsPrimary = entranceRecord.IsPrimaryEntrance ?? false,
+                        PitFeet = entranceRecord.EntrancePitDepth,
+                        Latitude = (double)entranceRecord.DecimalLatitude,
+                        Longitude = (double)entranceRecord.DecimalLongitude,
+                        Elevation = (double)entranceRecord.EntranceElevationFt,
+                        LocationQualityTagId = locationQualityTag.Id,
+                        ReportedOn = isValidReportedOn ? reportedOnDate : null,
+                        ReportedByName = entranceRecord.ReportedByName,
+                    };
+
+                    entranceRecord.CaveId = entrance.Id;
+                    
+                    // await IsValidCave(cave, usedCountyNumbers);
+                    entrances.Add(entrance);
+                }
+                catch (Exception e)
+                {
+                    failedRecords.Add(new FailedCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber, e.Message));
+                }
+            }
+
+            if (failedRecords.Any())
+            {
+                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+            }
+            
+            var result = await _temporaryEntranceRepository.CreateTable();
+            var result1 = await _temporaryEntranceRepository.TaskInsert(entrances);
+            var unassociatedEntranceIds = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
+
+            foreach (var unassociatedEntranceId in unassociatedEntranceIds)
+            {
+                var unassociatedRecord = entranceRecords.FirstOrDefault(e => e.CaveId == unassociatedEntranceId);
+                if (unassociatedRecord == null) continue;
+
+                // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
+                var calculatedRowNumber = entranceRecords.IndexOf(unassociatedRecord) + 2;
+                failedRecords.Add(new FailedCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
+                    "Cave not found"));
+            }
+
+            if (failedRecords.Any())
+            {
+                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+            }
+            
+            await _temporaryEntranceRepository.MigrateTemporaryEntrancesAsync();
+            await transaction.CommitAsync(cancellationToken);
+            
+        }
+        catch (Exception e)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
 
         return new FileVm();
     }
 
+    
+    
+    #endregion
+
+    #region Helper
+
+  
+    private async Task IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers)
+    {
+        if (cave == null)
+        {
+            throw ApiExceptionDictionary.BadRequest("Cave is null");
+        }
+        
+        // check max length for properties
+        foreach (var prop in typeof(Cave).GetProperties())
+        {
+            if (prop.Name != nameof(cave.Id))
+            {
+                var maxLengthAttribute = prop.GetCustomAttributes(typeof(MaxLengthAttribute), false).FirstOrDefault() as MaxLengthAttribute;
+                if (maxLengthAttribute != null)
+                {
+                    var stringValue = prop.GetValue(cave) as string;
+                    if (stringValue != null && stringValue.Length > maxLengthAttribute.Length)
+                    {
+                        throw ApiExceptionDictionary.BadRequest($"{prop.Name} exceeds the maximum allowed length of {maxLengthAttribute.Length}");
+                    }
+                }
+            }
+        }
+        
+        if(usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
+        {
+            throw ApiExceptionDictionary.BadRequest("County number is already used");
+        }
+        usedCountyNumbers.Add(new CaveRepository.UsedCountyNumber(cave.CountyId, cave.CountyNumber));
+        
+        if (cave.CountyId == null)
+        {
+            throw ApiExceptionDictionary.BadRequest("County is null");
+        }
+
+        if (cave.NumberOfPits < 0)
+        {
+            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
+        }
+
+        if (cave.LengthFeet < 0)
+        {
+            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
+        }
+
+        if (cave.DepthFeet < 0)
+        {
+            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
+        }
+
+        if (cave.MaxPitDepthFeet < 0)
+        {
+            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
+        }
+
+        if (cave.Entrances.Any(e => e.PitFeet < 0))
+        {
+            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
+        }
+    }
+
     #endregion
 }
 
-public class CaveCsvModel
+public class FailedCsvRecord<T>
+{
+    public FailedCsvRecord(T rowData, int rowNumber, string reason)
+    {
+        CaveCsvModel = rowData;
+        RowNumber = rowNumber;
+        Reason = reason;
+    }
+
+    public T CaveCsvModel { get; set; }
+    public int RowNumber { get; set; }
+    public string Reason { get; set; }
+}
+
+
+
+public class CaveCsvModel   
 {
     public string CaveName { get; set; }
     public double CaveLengthFt { get; set; }
@@ -510,4 +851,27 @@ public class CaveCsvModel
     public string ReportedOnDate { get; set; }
     public string ReportedByName { get; set; }
     public bool IsArchived { get; set; }
+}
+
+public class EntranceCsvModel
+{
+    public string CountyCaveNumber { get; set; }
+    public string? EntranceName { get; set; }
+    public string? EntranceDescription { get; set; }
+    public bool? IsPrimaryEntrance { get; set; }
+    public double? EntrancePitDepth { get; set; }
+    public string? EntranceStatus { get; set; }
+    public string? EntranceHydrology { get; set; }
+    public string? EntranceHydrologyFrequency { get; set; }
+    public string? FieldIndication { get; set; }
+    public string? CountyCode { get; set; }
+    public double? DecimalLatitude { get; set; }
+    public double? DecimalLongitude { get; set; }
+    public double? EntranceElevationFt { get; set; }
+    public string? GeologyFormation { get; set; }
+    public string? ReportedOnDate { get; set; }
+    public string? ReportedByName { get; set; }
+    public string? LocationQuality { get; set; }
+    [Ignore]
+    public string? CaveId { get; set; }
 }

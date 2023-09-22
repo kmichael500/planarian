@@ -239,7 +239,7 @@ public static class QueryableExtensions
         if (pageSize > QueryConstants.MaxPageSize) pageSize = QueryConstants.MaxPageSize;
 
 
-        query = query.OrderBy(orderingExpression);
+        query = query.OrderByDescending(orderingExpression);
 
 
         var totalCount = await query.CountAsync();

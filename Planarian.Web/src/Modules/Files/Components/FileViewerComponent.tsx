@@ -11,6 +11,7 @@ import {
   isTextFileType,
   isCsvFileType,
 } from "../Services/FileHelpers";
+import { CSVDisplay } from "./CsvDisplayComponent";
 
 interface FileViewerProps {
   embedUrl: string | null | undefined;
@@ -101,19 +102,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 height="100%"
               />
             )}
-            {isCsvFileType(fileType) && (
-              <Table
-                dataSource={tableData}
-                columns={
-                  tableData.length > 0
-                    ? Object.keys(tableData[0]).map((key) => ({
-                        title: key,
-                        dataIndex: key,
-                      }))
-                    : []
-                }
-              />
-            )}
+            {isCsvFileType(fileType) && <CSVDisplay data={fileContent || ""} />}
             {isTextFileType(fileType) && (
               <pre
                 style={{

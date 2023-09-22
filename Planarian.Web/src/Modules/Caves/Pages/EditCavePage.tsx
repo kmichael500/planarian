@@ -44,7 +44,16 @@ const EditCavePage: React.FC = () => {
         <DeleteButtonComponent
           title={`Are you sure you want to delete '${caveResponse?.name}'? This action is not reversable!'`}
           onConfirm={async () => {
-            await CaveService.DeleteCave(caveResponse?.id as string);
+            try {
+              await CaveService.DeleteCave(caveResponse?.id as string);
+              message.success(
+                `'${caveResponse?.name}' has been deleted successfully`
+              );
+              navigate(`/caves`);
+            } catch (e: any) {
+              const error = e as ApiErrorResponse;
+              message.error(error.message);
+            }
           }}
         />,
         <BackButtonComponent to={"./.."} />,

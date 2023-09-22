@@ -1,4 +1,5 @@
 using System.Text;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -34,8 +35,6 @@ using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.SendGrid.Interfaces;
 using Southport.Messaging.Email.SendGrid.Message;
-using Microsoft.EntityFrameworkCore.SqlServer;
-
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -144,6 +143,7 @@ builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
+builder.Services.AddScoped<TemporaryEntranceRepository>();
 
 #endregion
 
@@ -158,6 +158,18 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
     options.UseSqlServer(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 
 });
+
+LinqToDBForEFTools.Initialize();
+//
+// // Convert NetTopologySuite Point to SqlGeometry
+// MappingSchema.Default.SetConverter<Point, SqlGeometry>(p =>
+// {
+//     var sqlGeometry = SqlGeometry.Point(p.X, p.Y, 4326); // Example SRID
+//     return sqlGeometry;
+// });
+//
+// // Convert SqlGeometry to NetTopologySuite Point
+// MappingSchema.Default.SetConverter<SqlGeometry, Point>(sqlGeometry => new Point(sqlGeometry.STX.Value, sqlGeometry.STY.Value));
 
 #endregion
 
@@ -220,3 +232,4 @@ app.UseMiddleware<HttpResponseExceptionMiddleware>();
 app.MapControllers();
 
 app.Run();
+

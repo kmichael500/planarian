@@ -9,7 +9,7 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class County : EntityBaseNameId
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? StateId { get; set; } = null!;
     [MaxLength(PropertyLength.SmallText)] public string DisplayId { get; set; } = null!;
     
     public virtual Account Account { get; set; } = null!;
@@ -31,5 +31,6 @@ public class CountyConfiguration : BaseEntityTypeConfiguration<County>
             .HasForeignKey(e=>e.StateId)
             .OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(e => new { e.AccountId, e.DisplayId }).IsUnique();
+        builder.HasIndex(e => e.DisplayId);
     }
-}
+} 

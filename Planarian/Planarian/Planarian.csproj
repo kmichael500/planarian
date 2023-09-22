@@ -10,7 +10,9 @@
     <ItemGroup>
         <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
         <PackageReference Include="CsvHelper" Version="30.0.1" />
+        <PackageReference Include="EFCore.BulkExtensions.SqlServer" Version="6.7.15" />
         <PackageReference Include="Handlebars.Net" Version="2.1.2" />
+        <PackageReference Include="linq2db.EntityFrameworkCore" Version="6.15.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10" />
         <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="5.2.0" />
         <PackageReference Include="MimeTypes" Version="2.4.1">

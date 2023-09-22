@@ -31,6 +31,13 @@ public class FileRepository : RepositoryBase
         return await DbContext.Files.Where(e=>e.Id == id && e.AccountId == RequestUser.AccountId).Select(e=>new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).FirstOrDefaultAsync();
     }
 
+    public async Task<IEnumerable<GetFileBlobPropertiesResult>> GetAllCavesBlobProperties()
+    {
+        return await DbContext.Files
+            .Where(e => e.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(e.CaveId))
+            .Select(e => new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).ToListAsync();
+    }
+
     public async Task<FileVm?> GetFileVm(string id)
     {
         return await ToFileVm(DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId))

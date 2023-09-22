@@ -103,7 +103,7 @@ public class SettingsRepository : RepositoryBase
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<string?> GetCountyName(string countyId)
+    public async Task<string?> GetCountyId(string countyId)
     {
         return await DbContext.Counties.Where(e => e.Id == countyId && e.AccountId == RequestUser.AccountId)
             .Select(e => e.Name).FirstOrDefaultAsync();

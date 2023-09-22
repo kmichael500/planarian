@@ -93,11 +93,28 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import-caves")]
-    public async Task<IActionResult> ImportCaves(string? uuid, [FromForm] IFormFile file)
+    public async Task<IActionResult> ImportCaves(string? uuid, [FromForm] IFormFile file, CancellationToken cancellationToken)
     {
-        FileVm result = await Service.ImportCaves(file.OpenReadStream(), file.FileName, uuid);
+        FileVm result = await Service.ImportCaves(file.OpenReadStream(), file.FileName, uuid, cancellationToken);
 
         return new JsonResult(result);
+    }
+    
+    [DisableRequestSizeLimit] //TODO
+    [HttpPost("import-entrances")]
+    public async Task<IActionResult> ImportCaveEntrances(string? uuid, [FromForm] IFormFile file, CancellationToken cancellationToken)
+    {
+        FileVm result = await Service.ImportCaveEntrances(file.OpenReadStream(), file.FileName, uuid, cancellationToken);
+
+        return new JsonResult(result);
+    }
+    
+    [HttpDelete("import")]
+    public async Task<ActionResult> DeleteAllCaves()
+    {
+        await Service.DeleteAllCaves();
+
+        return new OkResult();
     }
 
     #endregion

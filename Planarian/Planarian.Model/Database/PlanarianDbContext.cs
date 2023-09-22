@@ -4,6 +4,7 @@ using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.Trips;
+using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -69,6 +70,7 @@ public class PlanarianDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
     }
 

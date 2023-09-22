@@ -41,6 +41,10 @@ const CaveService = {
     const response = await HttpClient.delete<void>(`${baseUrl}/${id}`);
     return response.data;
   },
+  async DeleteAllCaves(): Promise<void> {
+    const response = await HttpClient.delete<void>(`${baseUrl}/import`);
+    return response.data;
+  },
   async AddCaveFile(
     file: string | Blob | RcFile,
     caveId: string,
@@ -81,6 +85,28 @@ const CaveService = {
 
     const response = await HttpClient.post<FileVm>(
       `${baseUrl}/import-caves?uuid=${uuid}`,
+      formData,
+      config
+    );
+    return response.data;
+  },
+  async ImportEntranceCsv(
+    file: string | Blob | RcFile,
+    uuid: string,
+    onProgress: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<FileVm> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress: onProgress, // Set the onUploadProgress callback
+    };
+
+    const response = await HttpClient.post<FileVm>(
+      `${baseUrl}/import-entrances?uuid=${uuid}`,
       formData,
       config
     );

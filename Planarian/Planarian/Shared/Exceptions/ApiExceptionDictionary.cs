@@ -1,4 +1,5 @@
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Modules.Caves.Services;
 
 namespace Planarian.Shared.Exceptions;
 
@@ -88,5 +89,8 @@ public static class ApiExceptionDictionary
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
         new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
 
- 
+    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCsvRecord<T>> failedCaveRecords) =>
+        new ApiException(StatusCodes.Status400BadRequest, 304, "Invalid cave import") { Data = failedCaveRecords };
+
+
 }

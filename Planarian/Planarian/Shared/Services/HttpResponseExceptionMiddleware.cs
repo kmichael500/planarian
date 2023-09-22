@@ -24,7 +24,10 @@ public class HttpResponseExceptionMiddleware
         }
         catch (ApiException e)
         {
-            var error = new ApiErrorResponse(e.Message, e.ErrorCode);
+            var error = new ApiErrorResponse(e.Message, e.ErrorCode)
+            {
+                Data = e.Data
+            };
 
             context.Response.StatusCode = e.StatusCode;
             context.Response.ContentType = "application/json";
@@ -54,4 +57,5 @@ public class ApiErrorResponse
 
     public string Message { get; }
     public int ErrorCode { get; }
+    public object? Data { get; set; }
 }

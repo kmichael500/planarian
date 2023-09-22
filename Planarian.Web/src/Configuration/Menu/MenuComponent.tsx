@@ -24,10 +24,19 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
   const location = useLocation();
 
   useEffect(() => {
+    console.log("Hi");
     if (isAuthenticated) {
-      const selectedItem = authenticatedMenuItems.find(
-        (item) => item.key && location.pathname.startsWith(`/${item.key}`)
+      // First, search for an exact match
+      let selectedItem = authenticatedMenuItems.find(
+        (item) => item.key && location.pathname === item.key
       );
+
+      // If no exact match is found, search for a starting match
+      if (!selectedItem) {
+        selectedItem = authenticatedMenuItems.find(
+          (item) => item.key && location.pathname.startsWith(`/${item.key}`)
+        );
+      }
       if (selectedItem?.key) {
         setSelectedKey(selectedItem.key as string);
       }
@@ -52,7 +61,7 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
       label: "Caves",
     },
     {
-      key: "import",
+      key: "/caves/import",
       icon: (
         <Link to="/caves/import">
           <ImportOutlined />

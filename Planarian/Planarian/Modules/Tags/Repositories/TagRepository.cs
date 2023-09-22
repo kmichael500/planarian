@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 using Planarian.Shared.Base;
@@ -40,12 +41,29 @@ public class TagRepository : RepositoryBase
         return result;
     }
 
-    public async Task<TagType?> GetGeologyTagByName(string geologyType)
+    public async Task<TagType?> GetGeologyTagByName(string geologyName)
     {
         var result = await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.Name == geologyType && e.AccountId == RequestUser.AccountId)
+            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.Name == geologyName && e.AccountId == RequestUser.AccountId)
             .FirstOrDefaultAsync();
         
         return result;
+    }
+
+    public async Task<IEnumerable<TagType>> GetGeologyTags()
+    {
+        return await DbContext.TagTypes.Where(e=>e.Key == TagTypeKeyConstant.Geology && e.AccountId == RequestUser.AccountId).ToListAsync();
+    }
+
+    public async Task<IEnumerable<County>> GetCounties()
+    {
+        return await DbContext.Counties.Where(e => e.AccountId == RequestUser.AccountId).ToListAsync();
+    }
+
+    public async Task<IEnumerable<TagType>> LocationQualityTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.LocationQuality && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
     }
 }

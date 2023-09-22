@@ -91,7 +91,7 @@ public class SettingsService : ServiceBase<SettingsRepository>
 
     public async Task<string?> GetCountyName(string countyId)
     {
-        return await Repository.GetCountyName(countyId);
+        return await Repository.GetCountyId(countyId);
     }
 
     public async Task<string?> GetStateName(string stateId)

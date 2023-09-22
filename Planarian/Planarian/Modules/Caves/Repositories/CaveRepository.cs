@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
@@ -18,7 +21,7 @@ public class CaveRepository : RepositoryBase
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
     {
-        var caves = await DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId)
+        var queryable = DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(e => new CaveVm
             {
                 Id = e.Id,
@@ -79,9 +82,12 @@ public class CaveRepository : RepositoryBase
                     FileTypeTagId = ee.FileTypeTagId,
                 })
             })
-            .AsSplitQuery()
-            .QueryFilter(query.Conditions)
-            .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
+            .QueryFilter(query.Conditions);
+        // .AsSplitQuery()
+
+        // var test = await queryable.CountAsync();
+        var caves = await queryable.ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
+
 
         return caves;
     }
@@ -186,4 +192,31 @@ public class CaveRepository : RepositoryBase
             .Include(e=>e.Entrances)
             .FirstOrDefaultAsync();
     }
+
+    public async Task DeleteAlLCaves()
+    {
+        var sql =
+            $"DELETE FROM {nameof(PlanarianDbContext.Caves)} WHERE {nameof(Cave.AccountId)} = '{RequestUser.AccountId}'";
+        await DbContext.Database.ExecuteSqlRawAsync(sql);
+
+        sql =
+            $"DELETE FROM {nameof(PlanarianDbContext.TagTypes)} WHERE {nameof(TagType.AccountId)} = '{RequestUser.AccountId}' AND [{nameof(TagType.Key)}] = '{TagTypeKeyConstant.Geology}'";
+        await DbContext.Database.ExecuteSqlRawAsync(sql);
+
+        await DbContext.Database.ExecuteSqlRawAsync(sql);
+
+    }
+
+    public record UsedCountyNumber(string CountyId, int CountyNumber);
+    public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
+    {
+        var usedCountyNumbers = await DbContext.Caves
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Select(e => new UsedCountyNumber(e.CountyId, e.CountyNumber))
+            .ToListAsync();
+
+        return usedCountyNumbers.ToHashSet();
+    }
+
+   
 }
