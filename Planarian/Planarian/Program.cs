@@ -9,6 +9,8 @@ using Microsoft.OpenApi.Models;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.App.Repositories;
+using Planarian.Modules.App.Services;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
@@ -17,6 +19,8 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Notifications.Hubs;
+using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
 using Planarian.Modules.Photos.Services;
 using Planarian.Modules.Projects.Repositories;
@@ -123,6 +127,8 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
+builder.Services.AddScoped<AppService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
@@ -133,6 +139,7 @@ builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
 #region Repositories
 
 builder.Services.AddScoped<ProjectRepository>();
+builder.Services.AddScoped<AppRepository>();
 builder.Services.AddScoped<TripRepository>();
 builder.Services.AddScoped<AuthenticationRepository>();
 builder.Services.AddScoped<SettingsRepository>();
@@ -148,6 +155,7 @@ builder.Services.AddScoped<TemporaryEntranceRepository>();
 #endregion
 
 builder.Services.AddScoped<RequestUser>();
+builder.Services.AddSignalR();
 
 #endregion
 
@@ -225,6 +233,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHub<NotificationHub>("/api/notificationHub"); 
 app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(o => true));
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();

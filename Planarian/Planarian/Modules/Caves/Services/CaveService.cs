@@ -22,6 +22,7 @@ using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Services;
+using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Modules.Settings.Repositories;
@@ -41,10 +42,12 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly TagRepository _tagRepository;
     private readonly SettingsRepository _settingsRepository;
     private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
+    private readonly NotificationService _notificationService;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         FileRepository fileRepository, TagRepository tagRepository, SettingsRepository settingsRepository,
-        TemporaryEntranceRepository temporaryEntranceRepository) : base(
+        TemporaryEntranceRepository temporaryEntranceRepository,
+        NotificationService notificationService) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -52,6 +55,7 @@ public class CaveService : ServiceBase<CaveRepository>
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
         _temporaryEntranceRepository = temporaryEntranceRepository;
+        _notificationService = notificationService;
     }
 
     #region Caves
@@ -431,6 +435,9 @@ public class CaveService : ServiceBase<CaveRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
+        var signalRGroup = temporaryFileId;
+            
+
         if (string.IsNullOrWhiteSpace(temporaryFileId))
         {
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
@@ -442,8 +449,9 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
             
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
             var caveRecords = await ParseCaveCsv(stream, failedRecords);
-
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
 
             #region States
             

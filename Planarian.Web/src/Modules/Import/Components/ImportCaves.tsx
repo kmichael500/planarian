@@ -22,6 +22,7 @@ import { FileVm } from "../../Files/Models/FileVm";
 // Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import NotificationComponent from "./NotificationComponent";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -154,6 +155,9 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
                 <Button onClick={tryAgain} icon={<RedoOutlined />}>
                   Try Again
                 </Button>,
+                <NotificationComponent
+                  groupName={uploadResult?.id as string}
+                />,
               ]}
             />
           </Spin>
