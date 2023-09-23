@@ -55,12 +55,14 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new JsonResult(result);
     }
-    
+
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]
-    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, [FromForm] IFormFile file)
+    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
     {
-        var result = await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName, uuid);
+        var result =
+            await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName, cancellationToken, uuid);
 
         // return Ok();
         return new JsonResult(result);
@@ -96,25 +98,36 @@ public class CaveController : PlanarianControllerBase<CaveService>
     public async Task<IActionResult> ImportCavesFile(string? uuid, [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
-        var result = await Service.UploadImportCaveFile(file.OpenReadStream(), file.FileName, uuid);
+        var result = await Service.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid, cancellationToken);
 
         return new JsonResult(result);
     }
-    [DisableRequestSizeLimit] //TODO
+    
     [HttpPost("import-caves/process/{fileId:length(10)}")]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
         CancellationToken cancellationToken)
     {
-        var result = await Service.ProcessImportCave(fileId, cancellationToken);
+        var result = await Service.ImportCavesFileProcess(fileId, cancellationToken);
 
         return new JsonResult(result);
     }
 
     [DisableRequestSizeLimit] //TODO
-    [HttpPost("import-entrances")]
-    public async Task<IActionResult> ImportCaveEntrances(string? uuid, [FromForm] IFormFile file, CancellationToken cancellationToken)
+    [HttpPost("import-entrances/file")]
+    public async Task<IActionResult> ImportEntrancesFile(string? uuid, [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
     {
-        var result = await Service.ImportCaveEntrances(file.OpenReadStream(), file.FileName, uuid, cancellationToken);
+        var result =
+            await Service.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid, cancellationToken);
+
+        return new JsonResult(result);
+    }
+
+    [HttpPost("import-entrances/process/{fileId:length(10)}")]
+    public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.ImportEntrancesFileProcess(fileId, cancellationToken);
 
         return new JsonResult(result);
     }

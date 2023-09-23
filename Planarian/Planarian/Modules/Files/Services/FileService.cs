@@ -32,7 +32,8 @@ public class FileService : ServiceBase<FileRepository>
         _settingsRepository = settingsRepository;
     }
 
-    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName, string? uuid = null)
+    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync();
         if (RequestUser.AccountId == null)
@@ -72,7 +73,7 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
-        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName);
+        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
@@ -91,6 +92,7 @@ public class FileService : ServiceBase<FileRepository>
     }
 
     public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
+        CancellationToken cancellationToken,
         string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync();
@@ -122,7 +124,7 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
 
-        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName);
+        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
@@ -130,7 +132,7 @@ public class FileService : ServiceBase<FileRepository>
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(cancellationToken);
         
         var fileInformation = new FileVm
         {
@@ -157,7 +159,8 @@ public class FileService : ServiceBase<FileRepository>
 
     #region Blob Storage
 
-    private async Task AddToBlobStorage(Stream stream, string key, string containerName)
+    private async Task AddToBlobStorage(Stream stream, string key, string containerName,
+        CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null)
         {
@@ -167,7 +170,7 @@ public class FileService : ServiceBase<FileRepository>
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(key);
         
-        await blobClient.UploadAsync(stream, overwrite: true);
+        await blobClient.UploadAsync(stream, overwrite: true, cancellationToken: cancellationToken);
     }
 
     private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
@@ -323,7 +326,6 @@ public class FileService : ServiceBase<FileRepository>
     public class FileTypeTagName
     {
         public const string Other = "Other";
-        public const string TemporaryCaveImport = "TemporaryCaveImport";
     }
 
     public class FileVm

@@ -96,7 +96,7 @@ const CaveService = {
     );
     return response.data;
   },
-  async ImportEntranceCsv(
+  async ImportEntrancesFile(
     file: string | Blob | RcFile,
     uuid: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
@@ -112,9 +112,15 @@ const CaveService = {
     };
 
     const response = await HttpClient.post<FileVm>(
-      `${baseUrl}/import-entrances?uuid=${uuid}`,
+      `${baseUrl}/import-entrances/file?uuid=${uuid}`,
       formData,
       config
+    );
+    return response.data;
+  },
+  async ImportEntrancesProcess(fileId: string): Promise<void> {
+    const response = await HttpClient.post<void>(
+      `${baseUrl}/import-entrances/process/${fileId}`
     );
     return response.data;
   },

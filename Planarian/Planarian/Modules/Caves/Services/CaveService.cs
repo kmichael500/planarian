@@ -1,3 +1,4 @@
+using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using System.Data.SqlTypes;
 using System.Globalization;
@@ -419,17 +420,17 @@ public class CaveService : ServiceBase<CaveRepository>
     #endregion
 
     #region Import
-
-    #region Import Caves
-    public async Task<FileVm> UploadImportCaveFile(Stream stream, string fileName, string? uuid)
+    public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
+        CancellationToken cancellationToken)
     {
         var result = await _fileService.AddTemporaryAccountFile(stream, fileName,
-            FileTypeTagName.TemporaryCaveImport, uuid);
+            FileTypeTagName.Other, cancellationToken, uuid);
         
         return result;
     }
+    #region Import Caves
 
-    public async Task<FileVm> ProcessImportCave(string temporaryFileId, CancellationToken cancellationToken)
+    public async Task<FileVm> ImportCavesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null)
         {
@@ -437,8 +438,7 @@ public class CaveService : ServiceBase<CaveRepository>
         }
 
         var signalRGroup = temporaryFileId;
-
-
+        
         if (string.IsNullOrWhiteSpace(temporaryFileId))
         {
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
@@ -553,17 +553,36 @@ public class CaveService : ServiceBase<CaveRepository>
             var usedCountyNumbers = await Repository.GetUsedCountyNumbers();
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing caves");
             var rowNumber = 1; // start at 1 to account for header row
+
+            #region notifications
+            int totalRecords = caveRecords.Count();
+            int notifyInterval = (int)(totalRecords * 0.1); // every 10%
+            int processedRecords = 0;
+            int successfulRecords = 0;
+            #endregion
+            
             foreach (var caveRecord in caveRecords)
             {
+                processedRecords++;
                 rowNumber++;
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (processedRecords % notifyInterval == 0 || processedRecords == 1 || processedRecords == totalRecords)
+                {
+                    var message =
+                        $"Processed {processedRecords} out of {totalRecords} records.";
+                    await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+                }
+
                 try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     var state = stateEntities.FirstOrDefault(e =>
                         e.Name.Contains(caveRecord.State) || e.Abbreviation.Contains(caveRecord.State));
                     if (state == null)
                     {
-                        throw ApiExceptionDictionary.NotFound("State");
+                        failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                            $"State not found: '{caveRecord.State}'"));
+                        continue;
                     }
 
                     var county = allCounties.FirstOrDefault(c =>
@@ -575,9 +594,16 @@ public class CaveService : ServiceBase<CaveRepository>
                         var existingCountyRecord =
                             allCounties.FirstOrDefault(e => e.DisplayId == caveRecord.CountyCode.Trim());
 
-                        if (existingCountyRecord == null) throw ApiExceptionDictionary.NotFound("County");
+                        if (existingCountyRecord == null)
+                        {
+                            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                                $"{nameof(caveRecord.CountyCode)} not found: '{caveRecord.CountyCode}'"));
+                            continue;
+                        }
 
-                        throw ApiExceptionDictionary.ImportCaveDuplicateCountyCode(caveRecord, existingCountyRecord);
+                        failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                            $"{nameof(caveRecord.CountyCode)} value '{caveRecord.CountyCode}' is already being used for county '{existingCountyRecord.Name}'."));
+                        continue;
                     }
 
                     var isValidReportedOn = DateTime.TryParse(caveRecord.ReportedOnDate, out var reportedOnDate);
@@ -607,7 +633,9 @@ public class CaveService : ServiceBase<CaveRepository>
                             e.Name.Equals(geologyName, StringComparison.InvariantCultureIgnoreCase));
                         if (tag == null)
                         {
-                            throw ApiExceptionDictionary.NotFound(nameof(caveRecord.Geology));
+                            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                                $"{nameof(caveRecord.Geology)} not found: '{geologyName}'"));
+                            continue;
                         }
 
                         var geologyTag = new GeologyTag
@@ -621,16 +649,12 @@ public class CaveService : ServiceBase<CaveRepository>
                         cave.GeologyTags.Add(geologyTag);
                     }
 
-                    await IsValidCave(cave, usedCountyNumbers);
-                    caves.Add(cave);
+                    var isValidCave = await IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords);
+                    if (!isValidCave) continue;
 
-                    // send notification everytime 10% is completed, as well as the initial and final notifications
-                    if (rowNumber % (caveRecords.Count / 10) == 0 || rowNumber == caveRecords.Count)
-                    {
-                        var message = $"Processed {rowNumber} out of {caveRecords.Count} records.";
-                        await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
-                    }
+                    caves.Add(cave);
                 }
+
                 catch (Exception e)
                 {
                     failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber, e.Message));
@@ -880,13 +904,20 @@ public class CaveService : ServiceBase<CaveRepository>
         return caveRecords;
     }
 
-    public async Task<FileVm> ImportCaveEntrances(Stream stream, string fileName, string? uuid,
-        CancellationToken cancellationToken)
+    public async Task<FileVm> ImportEntrancesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null)
         {
             throw ApiExceptionDictionary.NoAccount;
         }
+        
+        if (string.IsNullOrWhiteSpace(temporaryFileId))
+        {
+            throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
+        }
+
+        await using var stream = await _fileService.GetFileStream(temporaryFileId);
+
 
         await using var transaction = await Repository.BeginTransactionAsync();
         try
@@ -1181,8 +1212,12 @@ public class CaveService : ServiceBase<CaveRepository>
     #region Helper
 
   
-    private async Task IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers)
+    private async Task<bool> IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
+        CaveCsvModel currentRecord,
+        int currentRowNumber,
+        List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
     {
+        var isValid = true;
         if (cave == null)
         {
             throw ApiExceptionDictionary.BadRequest("Cave is null");
@@ -1199,7 +1234,9 @@ public class CaveService : ServiceBase<CaveRepository>
                     var stringValue = prop.GetValue(cave) as string;
                     if (stringValue != null && stringValue.Length > maxLengthAttribute.Length)
                     {
-                        throw ApiExceptionDictionary.BadRequest($"{prop.Name} exceeds the maximum allowed length of {maxLengthAttribute.Length}");
+                        failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                            $"{prop.Name} exceeds the maximum allowed length of {maxLengthAttribute.Length}"));
+                        isValid = false;
                     }
                 }
             }
@@ -1207,44 +1244,54 @@ public class CaveService : ServiceBase<CaveRepository>
         
         if(usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
         {
-            throw ApiExceptionDictionary.BadRequest("County number is already used");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"County number is already used"));
+            isValid = false;
         }
-        usedCountyNumbers.Add(new CaveRepository.UsedCountyNumber(cave.CountyId, cave.CountyNumber));
-        
+        else
+        {
+            usedCountyNumbers.Add(new CaveRepository.UsedCountyNumber(cave.CountyId, cave.CountyNumber));
+        }
+
         if (cave.CountyId == null)
         {
-            throw ApiExceptionDictionary.BadRequest("County is null");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"County is required"));
+            isValid = false;
         }
 
         if (cave.NumberOfPits < 0)
         {
-            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"Number of pits must be greater than or equal to 1!"));
+            isValid = false;
         }
 
         if (cave.LengthFeet < 0)
         {
-            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"Length must be greater than or equal to 0!"));
+            isValid = false;
         }
 
         if (cave.DepthFeet < 0)
         {
-            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"Depth must be greater than or equal to 0!"));
+            isValid = false;
         }
 
         if (cave.MaxPitDepthFeet < 0)
         {
-            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
+            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                $"Pit depth must be greater than or equal to 0!"));
+            isValid = false;
         }
 
-        if (cave.Entrances.Any(e => e.PitFeet < 0))
-        {
-            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
-        }
+        return isValid;
     }
 
     #endregion
-
-  
 }
 
 public class FailedCaveCsvRecord<T>

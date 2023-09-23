@@ -14,7 +14,8 @@ import { CaveService } from "../../Caves/Service/CaveService";
 
 // Importing models
 import {
-  FailedCaveRecord,
+  CaveCsvModel,
+  FailedCsvRecord,
   ImportApiErrorResponse,
 } from "../../../Shared/Models/ApiErrorResponse";
 import { FileVm } from "../../Files/Models/FileVm";
@@ -37,7 +38,9 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const [processError, setProcessError] = useState<string | null>(null);
   const [isProcessed, setIsProcessed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorList, setErrorList] = useState<FailedCaveRecord[]>([]);
+  const [errorList, setErrorList] = useState<FailedCsvRecord<CaveCsvModel>[]>(
+    []
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +49,9 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const showCSVModal = () => setIsModalOpen(true);
   const handleOk = () => setIsModalOpen(false);
   const tryAgain = () => resetStates();
-  const convertErrorListToCsv = (errorList: FailedCaveRecord[]): string =>
+  const convertErrorListToCsv = (
+    errorList: FailedCsvRecord<CaveCsvModel>[]
+  ): string =>
     Papa.unparse(
       errorList.map((error) => ({
         rowNumber: error.rowNumber,
@@ -63,7 +68,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       await CaveService.ImportCavesFileProcess(uploadResult.id);
       setIsProcessed(true);
     } catch (e) {
-      const error = e as ImportApiErrorResponse;
+      const error = e as ImportApiErrorResponse<CaveCsvModel>;
       setErrorList(error.data);
       setProcessError(error.message);
     } finally {
@@ -102,7 +107,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
               setUploadResult(result);
               setIsUploaded(true);
             } catch (e) {
-              const error = e as ImportApiErrorResponse;
+              const error = e as ImportApiErrorResponse<CaveCsvModel>;
 
               if (error.data) {
                 setErrorList(error.data);
@@ -145,7 +150,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Successfully Uploaded!"
-            subTitle="Click the process button below to start the processing. If not, no caves will be imported."
+            subTitle="Click the process button below to start processing. If not, no caves will be imported."
             extra={[
               <PlanarianButton
                 onClick={handleProcessClick}
