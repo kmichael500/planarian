@@ -1,3 +1,4 @@
+using System.Collections;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
@@ -60,5 +61,11 @@ public class FileRepository : RepositoryBase
     {
         return await DbContext.Files.Where(e => e.CaveId == entityId && e.AccountId == RequestUser.AccountId)
             .Select(e => e.Id).ToListAsync();
+    }
+
+    public async Task<IEnumerable<File>> GetExpiredFiles()
+    {
+        return await DbContext.Files.Where(e => e.ExpiresOn < DateTime.UtcNow && e.AccountId == RequestUser.AccountId)
+            .ToListAsync();
     }
 }

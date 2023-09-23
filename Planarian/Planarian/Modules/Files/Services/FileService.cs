@@ -90,6 +90,70 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
+    public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string? uuid = null)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync();
+        if (RequestUser.AccountId == null)
+        {
+            throw new BadRequestException("Account Id is null");
+        }
+
+        await RemoveExpiredFiles();
+
+        var tempCaveImportTagType =
+            await _tagRepository.GetFileTypeTagByName(FileTypeTagName.TemporaryCaveImport, RequestUser.AccountId);
+
+        var tagTypeId = tempCaveImportTagType?.Id;
+
+        if (tagTypeId == null)
+            throw ApiExceptionDictionary.NotFound("File type");
+
+
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+        var entity = new File()
+        {
+            FileName = fileName,
+            DisplayName = fileNameWithoutExtension,
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId,
+            ExpiresOn = DateTime.UtcNow.AddDays(10)
+        };
+        var fileExtension = Path.GetExtension(fileName);
+        var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
+
+        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName);
+
+        entity.BlobKey = blobKey;
+        entity.BlobContainer = RequestUser.AccountContainerName;
+
+
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync();
+        await transaction.CommitAsync();
+        
+        var fileInformation = new FileVm
+        {
+            Id = entity.Id,
+            FileName = entity.FileName,
+            DisplayName = entity.DisplayName,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid,
+        };
+        return fileInformation;
+    }
+
+    private async Task RemoveExpiredFiles()
+    {
+        var expiredFiles = await Repository.GetExpiredFiles();
+        foreach (var expiredFile in expiredFiles)
+        {
+            await DeleteFile(expiredFile.BlobKey, expiredFile.BlobContainer);
+            Repository.Delete(expiredFile);
+        }
+
+        await Repository.SaveChangesAsync();
+    }
+
     #region Blob Storage
 
     private async Task AddToBlobStorage(Stream stream, string key, string containerName)
@@ -236,12 +300,13 @@ public class FileService : ServiceBase<FileRepository>
     }
 }
 
-public class FileTypeTagName
-{
-    public const string Other = "Other";
-}
+    public class FileTypeTagName
+    {
+        public const string Other = "Other";
+        public const string TemporaryCaveImport = "TemporaryCaveImport";
+    }
 
-public class FileVm
+    public class FileVm
 {
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }

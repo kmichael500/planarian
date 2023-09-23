@@ -38,6 +38,20 @@ public class TagRepository : RepositoryBase
             await DbContext.SaveChangesAsync();
             return tagType;
         }
+        
+        if (result == null && fileTagTypeName == FileTypeTagName.TemporaryCaveImport)
+        {
+            var tagType = new TagType
+            {
+                Key = TagTypeKeyConstant.File,
+                Name = FileTypeTagName.TemporaryCaveImport,
+                AccountId = RequestUser.AccountId
+            };
+            DbContext.TagTypes.Add(tagType);
+            await DbContext.SaveChangesAsync();
+            return tagType;
+        }
+        
 
         return result;
     }
