@@ -30,14 +30,19 @@ public abstract class RepositoryBase
     }
 
     public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null,
+        Action<int, int>? onBatchProcessed = null,
         CancellationToken cancellationToken = default)
     {
-        var batchSize = 1000;
-        var proccessed = 0;
+        entities = entities.ToList();
+        const int batchSize = 1000;
+        var totalEntities = entities.Count();
+        
+        var processed = 0;
         foreach (var batch in entities.Chunk(batchSize))
         {
             await DbContext.BulkInsertAsync(batch, bulkConfig, cancellationToken: cancellationToken);
-            proccessed += batch.Length;
+            processed += batch.Length;
+            onBatchProcessed?.Invoke(processed, totalEntities);
         }
     }
 

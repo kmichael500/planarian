@@ -428,35 +428,38 @@ public class CaveService : ServiceBase<CaveRepository>
         
         return result;
     }
+
     public async Task<FileVm> ProcessImportCave(string temporaryFileId, CancellationToken cancellationToken)
-    { 
+    {
         if (RequestUser.AccountId == null)
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
         var signalRGroup = temporaryFileId;
-            
+
 
         if (string.IsNullOrWhiteSpace(temporaryFileId))
         {
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
         }
+
         await using var stream = await _fileService.GetFileStream(temporaryFileId);
-        
+
         await using var transaction = await Repository.BeginTransactionAsync();
         try
         {
             var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
-            
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
             var caveRecords = await ParseCaveCsv(stream, failedRecords);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
 
             #region States
-            
+
             var caves = new List<Cave>();
 
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing states");
             var states = caveRecords.Select(e => e.State.Trim()).Distinct().ToList();
 
             var stateEntities = new List<State>();
@@ -467,11 +470,14 @@ public class CaveService : ServiceBase<CaveRepository>
                                   throw ApiExceptionDictionary.NotFound("State");
                 stateEntities.Add(stateEntity);
             }
-            
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing states");
+
             #endregion
 
             #region Geology
 
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing geology");
             var allGeologyTags = (await _tagRepository.GetGeologyTags()).ToList();
             var geologyTags = caveRecords.SelectMany(e => e.Geology.Split(',').Select(g => g.Trim())).Distinct()
                 .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => new TagType
@@ -482,14 +488,23 @@ public class CaveService : ServiceBase<CaveRepository>
 
             var newGeologyTags = geologyTags.Where(gt => allGeologyTags.All(ag => ag.Name != gt.Name)).ToList();
 
-            await _tagRepository.BulkInsertAsync(newGeologyTags, cancellationToken: cancellationToken);
+            async void OnBatchProcessed(int processed, int total)
+            {
+                var message = $"Inserted {processed} out of {total} records.";
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+            }
+
+            await _tagRepository.BulkInsertAsync(newGeologyTags, onBatchProcessed: OnBatchProcessed,
+                cancellationToken: cancellationToken);
 
             allGeologyTags.AddRange(newGeologyTags);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing states");
 
             #endregion
 
             #region Counties
 
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing counties");
             var allCounties = (await _tagRepository.GetCounties()).ToList();
             var caveRecordsToRemove = new List<CaveCsvModel>();
             var counties = caveRecords.Select(csvRecord =>
@@ -508,10 +523,11 @@ public class CaveService : ServiceBase<CaveRepository>
                 .Where(e =>
                 {
                     if (!string.IsNullOrWhiteSpace(e.Item1.StateId)) return true;
-                    
+
                     var index = caveRecords.IndexOf(e.csvRecord) + 2;
                     failedRecords.Add(
-                        new FailedCaveCsvRecord<CaveCsvModel>(e.csvRecord, index, $"State not found: '{e.csvRecord.State}'"));
+                        new FailedCaveCsvRecord<CaveCsvModel>(e.csvRecord, index,
+                            $"State not found: '{e.csvRecord.State}'"));
                     caveRecordsToRemove.Add(e.csvRecord);
                     return false;
                 })
@@ -524,17 +540,18 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 caveRecords.Remove(record);
             }
-            
+
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
             await _tagRepository.BulkInsertAsync(newCounties, cancellationToken: cancellationToken);
 
             allCounties.AddRange(newCounties);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing counties");
 
             #endregion
 
 
             var usedCountyNumbers = await Repository.GetUsedCountyNumbers();
-
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing caves");
             var rowNumber = 1; // start at 1 to account for header row
             foreach (var caveRecord in caveRecords)
             {
@@ -555,9 +572,10 @@ public class CaveService : ServiceBase<CaveRepository>
 
                     if (county == null)
                     {
-                        var existingCountyRecord = allCounties.FirstOrDefault(e => e.DisplayId == caveRecord.CountyCode.Trim());
+                        var existingCountyRecord =
+                            allCounties.FirstOrDefault(e => e.DisplayId == caveRecord.CountyCode.Trim());
 
-                        if(existingCountyRecord == null) throw ApiExceptionDictionary.NotFound("County");
+                        if (existingCountyRecord == null) throw ApiExceptionDictionary.NotFound("County");
 
                         throw ApiExceptionDictionary.ImportCaveDuplicateCountyCode(caveRecord, existingCountyRecord);
                     }
@@ -605,13 +623,22 @@ public class CaveService : ServiceBase<CaveRepository>
 
                     await IsValidCave(cave, usedCountyNumbers);
                     caves.Add(cave);
+
+                    // send notification everytime 10% is completed, as well as the initial and final notifications
+                    if (rowNumber % (caveRecords.Count / 10) == 0 || rowNumber == caveRecords.Count)
+                    {
+                        var message = $"Processed {rowNumber} out of {caveRecords.Count} records.";
+                        await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+                    }
                 }
                 catch (Exception e)
                 {
                     failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber, e.Message));
                 }
             }
-            
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing caves");
+
             if (failedRecords.Any())
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -619,11 +646,18 @@ public class CaveService : ServiceBase<CaveRepository>
                 throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
             }
 
-            await Repository.BulkInsertAsync(caves, cancellationToken: cancellationToken);
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Inserting caves. This may take a while...");
+            await Repository.BulkInsertAsync(caves, onBatchProcessed: OnBatchProcessed,
+                cancellationToken: cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geology tags.");
             var geologyTagsForInsert = caves.SelectMany(e => e.GeologyTags).ToList();
-            await Repository.BulkInsertAsync(geologyTagsForInsert, cancellationToken: cancellationToken);
-            
+            await Repository.BulkInsertAsync(geologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
+                cancellationToken: cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting geology tags.");
+
             await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
@@ -632,6 +666,7 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
+
             throw;
         }
 

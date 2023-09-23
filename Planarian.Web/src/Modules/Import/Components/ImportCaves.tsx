@@ -22,7 +22,7 @@ import { FileVm } from "../../Files/Models/FileVm";
 // Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import NotificationComponent from "./NotificationComponent";
+import { NotificationComponent } from "./NotificationComponent";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -36,6 +36,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const [uploadFailed, setUploadFailed] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
   const [isProcessed, setIsProcessed] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [errorList, setErrorList] = useState<FailedCaveRecord[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
@@ -53,9 +54,11 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
         ...error.caveCsvModel,
       }))
     );
+
   const handleProcessClick = async () => {
     if (!uploadResult?.id) return message.error("File id not found");
     setIsLoading(true);
+    setIsProcessing(true); // Set processing state to true when starting to process
     try {
       await CaveService.ImportCavesFileProcess(uploadResult.id);
       setIsProcessed(true);
@@ -65,6 +68,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       setProcessError(error.message);
     } finally {
       setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -136,34 +140,44 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {isUploaded && !isProcessed && processError === null && (
+      {isUploaded && !isProcessed && !isProcessing && processError === null && (
         <Card style={{ width: "100%" }}>
-          <Spin spinning={isLoading}>
-            <Result
-              icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-              title="Successfully Uploaded!"
-              subTitle="Click the process button below to start the processing. If not, no caves will be imported."
-              extra={[
-                <PlanarianButton
-                  onClick={handleProcessClick}
-                  icon={<DeliveredProcedureOutlined />}
-                  loading={isLoading}
-                  type="primary"
-                >
-                  Process
-                </PlanarianButton>,
-                <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                  Try Again
-                </Button>,
-                <NotificationComponent
-                  groupName={uploadResult?.id as string}
-                />,
-              ]}
-            />
-          </Spin>
+          <Result
+            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+            title="Successfully Uploaded!"
+            subTitle="Click the process button below to start the processing. If not, no caves will be imported."
+            extra={[
+              <PlanarianButton
+                onClick={handleProcessClick}
+                icon={<DeliveredProcedureOutlined />}
+                loading={isLoading}
+                type="primary"
+              >
+                Process
+              </PlanarianButton>,
+              <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                Reset
+              </Button>,
+            ]}
+          />
         </Card>
       )}
 
+      {isProcessing && (
+        <Card style={{ width: "100%" }}>
+          <Result
+            icon={<DeliveredProcedureOutlined style={{ color: "#1890ff" }} />}
+            title="Processing..."
+            subTitle="Please wait while your data is being processed."
+            extra={[
+              <NotificationComponent
+                groupName={uploadResult?.id as string}
+                isLoading={isProcessing}
+              />,
+            ]}
+          />
+        </Card>
+      )}
       {isProcessed && (
         <Card style={{ width: "100%" }}>
           <Result
