@@ -29,11 +29,18 @@ public abstract class RepositoryBase
         return await DbContext.Database.BeginTransactionAsync();
     }
 
-    public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null, CancellationToken cancellationToken = default)
+    public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null,
+        CancellationToken cancellationToken = default)
     {
-        await DbContext.BulkInsertAsync(entities, bulkConfig, cancellationToken: cancellationToken);
+        var batchSize = 1000;
+        var proccessed = 0;
+        foreach (var batch in entities.Chunk(batchSize))
+        {
+            await DbContext.BulkInsertAsync(batch, bulkConfig, cancellationToken: cancellationToken);
+            proccessed += batch.Length;
+        }
     }
-    
+
     public async Task<int> ExecuteRawSql(string sql, CancellationToken cancellationToken = default)
     {
         return await DbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken:cancellationToken);

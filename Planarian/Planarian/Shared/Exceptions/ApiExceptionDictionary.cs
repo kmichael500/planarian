@@ -89,9 +89,25 @@ public static class ApiExceptionDictionary
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
         new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
 
-    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCsvRecord<T>> failedCaveRecords) =>
-        new ApiException(StatusCodes.Status400BadRequest, 304, "Invalid cave import") { Data = failedCaveRecords };
-    public static ApiException NullValue(string name) =>
-        new ApiException(StatusCodes.Status400BadRequest, 304, $"Value is missing from '{name}'");
+    #region Import 400-499
 
+    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCsvRecord<T>> failedCaveRecords) =>
+        new ApiException(StatusCodes.Status400BadRequest, 400, "Invalid cave import") { Data = failedCaveRecords };
+
+    public static ApiException NullValue(string name) =>
+        new ApiException(StatusCodes.Status400BadRequest, 401, $"Value is missing from '{name}'");
+
+    public static ApiException ImportCaveMultipleCountyCodes(IEnumerable<string> codes) =>
+        new ApiException(StatusCodes.Status400BadRequest, 402,
+            $"Multiple county codes found: {string.Join(',', codes.Select(e => $"'{e}'"))}");
+
+    #endregion
+
+    public static ApiException ImportCaveDuplicateCountyCode(CaveCsvModel caveRecord, County existingCountyRecord) =>
+        new ApiException(StatusCodes.Status400BadRequest, 403,
+            $"{nameof(caveRecord.CountyCode)} value '{caveRecord.CountyCode}' is already being used for county '{existingCountyRecord.Name}'.");
+
+    public static Exception ImportMissingValue(string columnName) => new ApiException(StatusCodes.Status400BadRequest,
+        404,
+        $"Missing value for column '{columnName}'");
 }

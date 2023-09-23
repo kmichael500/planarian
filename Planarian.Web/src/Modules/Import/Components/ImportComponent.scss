@@ -4,3 +4,18 @@
   overflow: scroll;
   //   text-overflow: ellipsis;
 }
+
+.ant-upload.ant-upload-drag {
+  height: 100%;
+}
+
+#step-wrapper-container > span {
+  width: 100%;
+}
+
+.clickable-step {
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+  }
+}

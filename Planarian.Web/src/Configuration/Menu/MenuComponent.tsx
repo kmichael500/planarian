@@ -24,7 +24,6 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
   const location = useLocation();
 
   useEffect(() => {
-    console.log("Hi");
     if (isAuthenticated) {
       // First, search for an exact match
       let selectedItem = authenticatedMenuItems.find(
