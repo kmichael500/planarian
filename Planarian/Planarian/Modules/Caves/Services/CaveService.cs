@@ -440,7 +440,7 @@ public class CaveService : ServiceBase<CaveRepository>
         await using var transaction = await Repository.BeginTransactionAsync();
         try
         {
-            var failedRecords = new List<FailedCsvRecord<CaveCsvModel>>();
+            var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
             
             var caveRecords = await ParseCaveCsv(stream, failedRecords);
 
@@ -503,7 +503,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     
                     var index = caveRecords.IndexOf(e.csvRecord) + 2;
                     failedRecords.Add(
-                        new FailedCsvRecord<CaveCsvModel>(e.csvRecord, index, $"State not found: '{e.csvRecord.State}'"));
+                        new FailedCaveCsvRecord<CaveCsvModel>(e.csvRecord, index, $"State not found: '{e.csvRecord.State}'"));
                     caveRecordsToRemove.Add(e.csvRecord);
                     return false;
                 })
@@ -600,7 +600,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
                 catch (Exception e)
                 {
-                    failedRecords.Add(new FailedCsvRecord<CaveCsvModel>(caveRecord, rowNumber, e.Message));
+                    failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber, e.Message));
                 }
             }
             
@@ -630,7 +630,7 @@ public class CaveService : ServiceBase<CaveRepository>
         return new FileVm();
     }
 
-    private async Task<List<CaveCsvModel>> ParseCaveCsv(Stream stream, List<FailedCsvRecord<CaveCsvModel>> failedRecords)
+    private async Task<List<CaveCsvModel>> ParseCaveCsv(Stream stream, List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
     {
         var caveRecords = new List<CaveCsvModel>();
         using var reader = new StreamReader(stream);
@@ -820,7 +820,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     }
 
                     failedRecords.Add(
-                        new FailedCsvRecord<CaveCsvModel>(record, index, errorMessage));
+                        new FailedCaveCsvRecord<CaveCsvModel>(record, index, errorMessage));
                     hasExceptions = true;
                 }
                 exceptions.Clear();
@@ -873,7 +873,7 @@ public class CaveService : ServiceBase<CaveRepository>
             #endregion
             
 
-            var failedRecords = new List<FailedCsvRecord<EntranceCsvModel>>();
+            var failedRecords = new List<FailedCaveCsvRecord<EntranceCsvModel>>();
 
             var rowNumber = 0;
             foreach (var entranceRecord in entranceRecords)
@@ -988,7 +988,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
                 catch (Exception e)
                 {
-                    failedRecords.Add(new FailedCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber, e.Message));
+                    failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber, e.Message));
                 }
             }
 
@@ -1008,7 +1008,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
                 // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
                 var calculatedRowNumber = entranceRecords.IndexOf(unassociatedRecord) + 2;
-                failedRecords.Add(new FailedCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
+                failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
                     $"Entrance could not be associated with the cave {unassociatedRecord.CountyCode}-{unassociatedRecord.CountyCaveNumber}"));
             }
 
@@ -1204,9 +1204,9 @@ public class CaveService : ServiceBase<CaveRepository>
   
 }
 
-public class FailedCsvRecord<T>
+public class FailedCaveCsvRecord<T>
 {
-    public FailedCsvRecord(T rowData, int rowNumber, string reason)
+    public FailedCaveCsvRecord(T rowData, int rowNumber, string reason)
     {
         CaveCsvModel = rowData;
         RowNumber = rowNumber;

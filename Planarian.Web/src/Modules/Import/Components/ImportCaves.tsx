@@ -1,65 +1,61 @@
+import React, { useState } from "react";
 import { Card, Result, Button, Modal, message, Spin } from "antd";
-import React from "react";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
+  RedoOutlined,
 } from "@ant-design/icons";
+import Papa from "papaparse";
+
+// Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
-import { CaveService } from "../../Caves/Service/CaveService";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
+import { CaveService } from "../../Caves/Service/CaveService";
+
+// Importing models
 import {
   FailedCaveRecord,
   ImportApiErrorResponse,
 } from "../../../Shared/Models/ApiErrorResponse";
 import { FileVm } from "../../Files/Models/FileVm";
-import Papa from "papaparse";
-import "./ImportComponent.scss";
 
-export interface ImportCaveComponentProps {
+// Importing styles
+import "./ImportComponent.scss";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+
+interface ImportCaveComponentProps {
   onUploaded: () => void;
 }
 
-const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
-  const [isUploaded, setIsUploaded] = React.useState(false);
-  const [isProcessed, setIsProcessed] = React.useState(false);
-  const [errorList, setErrorList] = React.useState<FailedCaveRecord[]>([]);
-  const [isModalVisible, setIsModalVisible] = React.useState(false);
-  const [uploadResult, setUploadResult] = React.useState<FileVm>();
-  const [processError, setProcessError] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
+const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
+  onUploaded,
+}) => {
+  // Initializing states
+  const [isUploaded, setIsUploaded] = useState(false);
+  const [uploadFailed, setUploadFailed] = useState(false);
+  const [processError, setProcessError] = useState<string | null>(null);
+  const [isProcessed, setIsProcessed] = useState(false);
+  const [errorList, setErrorList] = useState<FailedCaveRecord[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const showCSVModal = () => {
-    setIsModalVisible(true);
-  };
-
-  const handleOk = () => {
-    setIsModalVisible(false);
-  };
-
-  const tryAgain = () => {
-    setIsUploaded(false);
-    setIsProcessed(false);
-    setProcessError(null);
-    setErrorList([]);
-    setUploadResult(undefined);
-  };
-
-  const convertErrorListToCsv = (errorList: FailedCaveRecord[]): string => {
-    const csv = Papa.unparse(
+  // Handlers and functions
+  const showCSVModal = () => setIsModalOpen(true);
+  const handleOk = () => setIsModalOpen(false);
+  const tryAgain = () => resetStates();
+  const convertErrorListToCsv = (errorList: FailedCaveRecord[]): string =>
+    Papa.unparse(
       errorList.map((error) => ({
         rowNumber: error.rowNumber,
         reason: error.reason,
         ...error.caveCsvModel,
       }))
     );
-    return csv;
-  };
-
   const handleProcessClick = async () => {
-    if (!uploadResult?.id) throw new Error("File id not found");
+    if (!uploadResult?.id) return message.error("File id not found");
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       await CaveService.ImportCavesFileProcess(uploadResult.id);
       setIsProcessed(true);
     } catch (e) {
@@ -71,9 +67,19 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
     }
   };
 
+  // Helper function to reset states
+  const resetStates = () => {
+    setIsUploaded(false);
+    setIsProcessed(false);
+    setUploadFailed(false);
+    setProcessError(null);
+    setErrorList([]);
+    setUploadResult(undefined);
+  };
+
   return (
     <>
-      {!isUploaded && errorList.length <= 0 && (
+      {!isUploaded && !uploadFailed && errorList.length === 0 && (
         <UploadComponent
           draggerMessage="Click or drag your caves CSV file to this area to upload."
           draggerTitle="Import Cave File"
@@ -92,7 +98,13 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
               setIsUploaded(true);
             } catch (e) {
               const error = e as ImportApiErrorResponse;
-              setErrorList(error.data);
+
+              if (error.data) {
+                setErrorList(error.data);
+              } else {
+                setUploadFailed(true);
+              }
+
               message.error(error.message);
             }
             return {} as FileVm;
@@ -102,6 +114,27 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
           }}
         />
       )}
+
+      {uploadFailed && (
+        <Card style={{ width: "100%" }}>
+          <Result
+            status="error"
+            title="Upload Failed"
+            subTitle="Please try uploading the file again."
+            extra={[
+              <PlanarianButton
+                type="primary"
+                danger
+                onClick={tryAgain}
+                icon={<RedoOutlined />}
+              >
+                Try Again
+              </PlanarianButton>,
+            ]}
+          />
+        </Card>
+      )}
+
       {isUploaded && !isProcessed && processError === null && (
         <Card style={{ width: "100%" }}>
           <Spin spinning={isLoading}>
@@ -114,14 +147,19 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
                   onClick={handleProcessClick}
                   icon={<DeliveredProcedureOutlined />}
                   loading={isLoading}
+                  type="primary"
                 >
                   Process
                 </PlanarianButton>,
+                <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                  Try Again
+                </Button>,
               ]}
             />
           </Spin>
         </Card>
       )}
+
       {isProcessed && (
         <Card style={{ width: "100%" }}>
           <Result
@@ -132,13 +170,14 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
               <Button type="primary" key="console" onClick={onUploaded}>
                 Import Entrances
               </Button>,
-              <Button key="buy" onClick={tryAgain}>
-                Import Another File
+              <Button key="buy" onClick={tryAgain} icon={<RedoOutlined />}>
+                Import Another Cave File
               </Button>,
             ]}
           />
         </Card>
       )}
+
       {(errorList.length > 0 || processError !== null) && (
         <>
           <Card style={{ width: "100%" }}>
@@ -152,7 +191,7 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
               extra={[
                 errorList.length > 0 && (
                   <Button type="primary" onClick={showCSVModal}>
-                    View Error CSV
+                    View Errors
                   </Button>
                 ),
                 <Button type="primary" danger onClick={tryAgain}>
@@ -162,8 +201,8 @@ const ImportCaveComponent = ({ onUploaded }: ImportCaveComponentProps) => {
             />
           </Card>
           <Modal
-            title="Error CSV"
-            visible={isModalVisible}
+            title="Import Cave Errors"
+            open={isModalOpen}
             onOk={handleOk}
             onCancel={handleOk}
             footer={null}

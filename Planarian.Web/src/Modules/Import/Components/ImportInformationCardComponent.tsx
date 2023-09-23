@@ -338,7 +338,7 @@ const ImportInformationCardComponent = () => {
           </Paragraph>
           <Row gutter={10}>
             <Col>
-              <Title level={4}>Cave Data File</Title>
+              <Title level={4}>Cave Data Template</Title>
             </Col>
             <Col>
               <PlanarianButton
@@ -405,7 +405,7 @@ const ImportInformationCardComponent = () => {
 
           <Row gutter={10}>
             <Col>
-              <Title level={4}>Cave Entrance File</Title>
+              <Title level={4}>Cave Entrance Template</Title>
             </Col>
             <Col>
               <PlanarianButton

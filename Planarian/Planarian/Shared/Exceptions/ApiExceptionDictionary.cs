@@ -91,7 +91,7 @@ public static class ApiExceptionDictionary
 
     #region Import 400-499
 
-    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCsvRecord<T>> failedCaveRecords) =>
+    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords) =>
         new ApiException(StatusCodes.Status400BadRequest, 400, "Invalid cave import") { Data = failedCaveRecords };
 
     public static ApiException NullValue(string name) =>
