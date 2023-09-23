@@ -416,14 +416,27 @@ public class CaveService : ServiceBase<CaveRepository>
 
     #region Import
 
-    public async Task<FileVm> ImportCaves(Stream stream, string fileName, string? uuid,
-        CancellationToken cancellationToken)
+    #region Import Caves
+    public async Task<FileVm> UploadImportCaveFile(Stream stream, string fileName, string? uuid)
     {
+        var result = await _fileService.AddTemporaryAccountFile(stream, fileName,
+            FileTypeTagName.TemporaryCaveImport, uuid);
+        
+        return result;
+    }
+    public async Task<FileVm> ProcessImportCave(string temporaryFileId, CancellationToken cancellationToken)
+    { 
         if (RequestUser.AccountId == null)
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
+        if (string.IsNullOrWhiteSpace(temporaryFileId))
+        {
+            throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
+        }
+        await using var stream = await _fileService.GetFileStream(temporaryFileId);
+        
         await using var transaction = await Repository.BeginTransactionAsync();
         try
         {
@@ -1055,6 +1068,9 @@ public class CaveService : ServiceBase<CaveRepository>
 
         return new FileVm();
     }
+    
+    #endregion
+
 
     private async Task<List<TagType>> ProcessTags(IEnumerable<EntranceCsvModel> entranceRecords,
         Func<Task<IEnumerable<TagType>>> getTags, string key, Func<EntranceCsvModel, IEnumerable<string?>?> selector,
@@ -1184,6 +1200,8 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     #endregion
+
+  
 }
 
 public class FailedCsvRecord<T>

@@ -90,7 +90,8 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
-    public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string? uuid = null)
+    public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
+        string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync();
         if (RequestUser.AccountId == null)
@@ -101,7 +102,7 @@ public class FileService : ServiceBase<FileRepository>
         await RemoveExpiredFiles();
 
         var tempCaveImportTagType =
-            await _tagRepository.GetFileTypeTagByName(FileTypeTagName.TemporaryCaveImport, RequestUser.AccountId);
+            await _tagRepository.GetFileTypeTagByName(fileTypeTagName, RequestUser.AccountId);
 
         var tagTypeId = tempCaveImportTagType?.Id;
 
@@ -191,7 +192,7 @@ public class FileService : ServiceBase<FileRepository>
             var file = await Repository.GetFileById(value.Id);
             if (file == null)
             {
-                throw ApiExceptionDictionary.NotFound("File not found");
+                throw ApiExceptionDictionary.NotFound("File");
             }
 
             if (!string.IsNullOrWhiteSpace(value.DisplayName))
@@ -214,7 +215,7 @@ public class FileService : ServiceBase<FileRepository>
         if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
         {
-            throw ApiExceptionDictionary.NotFound("File not found");
+            throw ApiExceptionDictionary.NotFound("File");
         }
 
         var client = await GetBlobContainerClient(blobProperties.ContainerName);
@@ -291,12 +292,31 @@ public class FileService : ServiceBase<FileRepository>
     {
         if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(blobContainer))
         {
-            throw ApiExceptionDictionary.NotFound("File not found");
+            throw ApiExceptionDictionary.NotFound("File");
         }
 
         var client = await GetBlobContainerClient(blobContainer);
         var blobClient = client.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
+    }
+
+    public async Task<Stream> GetFileStream(string fileId)
+    {
+        var file = await Repository.GetFileVm(fileId);
+        var blobProperties = await Repository.GetFileBlobProperties(fileId);
+        if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
+            string.IsNullOrWhiteSpace(blobProperties.BlobKey))
+        {
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+
+        var client = await GetBlobContainerClient(blobProperties.ContainerName);
+        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        
+        var stream = new MemoryStream();
+        await blobClient.DownloadToAsync(stream);
+        stream.Position = 0;
+        return stream;
     }
 }
 
