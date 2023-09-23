@@ -230,12 +230,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
+app.UseRouting();
+app.UseCors(x =>
+    x.WithOrigins(serverOptions.ClientBaseUrl)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+);
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHub<NotificationHub>("/api/notificationHub"); 
-app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(o => true));
+
+app.MapHub<NotificationHub>("/api/notificationHub", options =>
+{
+});
+
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();
 

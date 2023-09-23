@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Planarian.Modules.Notifications.Hubs;
 
+[Authorize]
 public class NotificationHub : Hub
 {
     public async Task JoinGroup(string groupName)

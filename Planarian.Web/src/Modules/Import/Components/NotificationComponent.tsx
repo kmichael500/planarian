@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { HubConnectionBuilder } from "@microsoft/signalr";
 import { AppOptions } from "../../../Shared/Services/AppService";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 function NotificationComponent({ groupName }: { groupName: string }) {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(
@@ -11,7 +12,18 @@ function NotificationComponent({ groupName }: { groupName: string }) {
   useEffect(() => {
     // Build the connection
     const newConnection = new HubConnectionBuilder()
-      .withUrl(AppOptions.signalrBaseUrl)
+      .withUrl(AppOptions.signalrBaseUrl, {
+        accessTokenFactory: () => {
+          console.log("Getting token");
+          if (AuthenticationService.IsAuthenticated()) {
+            var token = AuthenticationService.GetToken();
+            if (token) {
+              return token;
+            }
+          }
+          throw new Error("No access token found");
+        },
+      })
       .withAutomaticReconnect()
       .build();
 
