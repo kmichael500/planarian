@@ -12,11 +12,8 @@ import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
 
 // Importing models
-import {
-  CaveCsvModel,
-  FailedCsvRecord,
-  ImportApiErrorResponse,
-} from "../../../Shared/Models/ApiErrorResponse";
+import { ImportApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { CaveCsvModel } from "../Models/CaveCsvModel";
 import { FileVm } from "../../Files/Models/FileVm";
 
 // Importing styles
@@ -25,6 +22,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { NotificationComponent } from "./NotificationComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
+import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
