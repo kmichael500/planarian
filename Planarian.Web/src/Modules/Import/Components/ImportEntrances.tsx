@@ -12,11 +12,7 @@ import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
 
 // Importing models
-import {
-  EntranceCsvModel,
-  FailedCsvRecord,
-  ImportApiErrorResponse,
-} from "../../../Shared/Models/ApiErrorResponse";
+import { ImportApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { FileVm } from "../../Files/Models/FileVm";
 
 // Importing styles
@@ -26,6 +22,8 @@ import { NotificationComponent } from "./NotificationComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { Link } from "react-router-dom";
 import { AccountService } from "../../Account/Services/AccountService";
+import { EntranceCsvModel } from "../Models/EntranceCsvModel";
+import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 
 interface ImportEntrancesComponentProps {
   onUploaded: () => void;
