@@ -8,8 +8,8 @@ import {
   Card,
   Row,
   Col,
-  Button,
   Space,
+  Progress,
 } from "antd";
 import { AxiosProgressEvent } from "axios";
 import { RcFile } from "antd/lib/upload/interface";
@@ -21,9 +21,9 @@ import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { FileService } from "../Services/FileService";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
+import { getFileType } from "../Services/FileHelpers";
 
 interface AddCaveFilesForm {
   files: FileVm[];
@@ -33,9 +33,15 @@ interface UploadComponentProps {
   onClose?: () => void;
   uploadFunction: (params: UploadParams) => Promise<FileVm>;
   updateFunction: (files: FileVm[]) => Promise<void>;
+  allowedFileTypes?: string[];
+  hideCancelButton?: boolean;
+  style?: React.CSSProperties;
+  draggerMessage?: string;
+  draggerTitle?: string;
+  singleFile?: boolean;
 }
 
-interface UploadParams {
+export interface UploadParams {
   file: any;
   uid: string;
   onProgress: (event: AxiosProgressEvent) => void;
@@ -46,9 +52,22 @@ const UploadComponent = ({
   onClose,
   uploadFunction,
   updateFunction,
+  hideCancelButton,
+  style,
+  draggerMessage,
+  draggerTitle,
+  singleFile,
+  allowedFileTypes,
 }: UploadComponentProps) => {
   const [form] = Form.useForm<AddCaveFilesForm>();
   const [formChanged, setFormChanged] = useState(false); // Track form changes
+
+  const [singleFileUploadPercent, setSingleFileUploadPercent] =
+    useState<number>(0);
+
+  if (!draggerMessage) {
+    draggerMessage = "Drag and drop files or click to select files";
+  }
 
   const [numberOfFilesToUpload, setNumberOfFilesToUpload] = useState(0);
   const [completedNumberOfUploads, setCompletedNumberOfUploads] = useState(0);
@@ -85,6 +104,24 @@ const UploadComponent = ({
   };
 
   const beforeUpload = (file: File) => {
+    var fileType = getFileType(file.name);
+    const processedAllowedFileTypes = allowedFileTypes?.map((type) =>
+      type.startsWith(".") ? type.substr(1).toLowerCase() : type.toLowerCase()
+    );
+
+    if (
+      fileType &&
+      processedAllowedFileTypes &&
+      !processedAllowedFileTypes.includes(fileType.toLowerCase())
+    ) {
+      message.error(
+        `File type ${fileType} is not allowed. Allowed file types are ${processedAllowedFileTypes.join(
+          ", "
+        )}.`
+      );
+      console.error(file);
+      return false; // Prevent file from being uploaded
+    }
     const fileSizeInMB = file.size / 1024 / 1024;
     const maxSizeInMB = 50;
 
@@ -101,8 +138,11 @@ const UploadComponent = ({
   }, []);
   const props: UploadProps = {
     name: "file",
-    multiple: true,
+    multiple: !singleFile,
+    style: style,
+    accept: allowedFileTypes?.join(","),
     beforeUpload,
+    showUploadList: singleFile ? false : true,
     itemRender: (originNode, file, currFileList) => {
       return file.status !== "done" ? originNode : null;
     },
@@ -118,6 +158,8 @@ const UploadComponent = ({
             const percent = Math.round(
               (100 * event.loaded) / (event.total ?? 0)
             );
+
+            setSingleFileUploadPercent(percent);
 
             if (onProgress) {
               onProgress({ percent });
@@ -150,9 +192,20 @@ const UploadComponent = ({
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <p className="ant-upload-text">
-              Drag and drop files or click to select files
+            <p
+              className="ant-upload-title"
+              style={{
+                fontSize: "24px",
+                fontWeight: "bold",
+                marginBottom: "8px",
+              }}
+            >
+              {draggerTitle}
             </p>
+            <p className="ant-upload-text">{draggerMessage}</p>
+            {singleFile && singleFileUploadPercent > 0 && (
+              <Progress percent={singleFileUploadPercent} />
+            )}
           </Dragger>
           <br />
         </>
@@ -214,7 +267,7 @@ const UploadComponent = ({
 
       <br />
       <Space direction="horizontal">
-        {uploadsInProgress() && (
+        {uploadsInProgress() && !hideCancelButton && (
           <CancelButtonComponent
             onClick={() => {
               if (onClose) {

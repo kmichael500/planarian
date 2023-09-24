@@ -548,6 +548,12 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("CountyId");
 
+                    b.HasIndex("CountyNumber");
+
+                    b.HasIndex("DepthFeet");
+
+                    b.HasIndex("LengthFeet");
+
                     b.HasIndex("ReportedByUserId");
 
                     b.HasIndex("StateId");
@@ -599,6 +605,8 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DisplayId");
 
                     b.HasIndex("StateId");
 
@@ -865,6 +873,9 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("DisplayName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ExpiresOn")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("FileName")
                         .IsRequired()

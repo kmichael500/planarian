@@ -24,12 +24,19 @@ public class HttpResponseExceptionMiddleware
         }
         catch (ApiException e)
         {
-            var error = new ApiErrorResponse(e.Message, e.ErrorCode);
+            var error = new ApiErrorResponse(e.Message, e.ErrorCode)
+            {
+                Data = e.Data
+            };
+
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault
+            };
 
             context.Response.StatusCode = e.StatusCode;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(error,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(error, options));
         }
         catch (Exception e)
         {
@@ -54,4 +61,5 @@ public class ApiErrorResponse
 
     public string Message { get; }
     public int ErrorCode { get; }
+    public object? Data { get; set; }
 }

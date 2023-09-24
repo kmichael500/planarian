@@ -1,4 +1,3 @@
-
 export function isImageFileType(fileType: string | null | undefined): boolean {
   if (!fileType) {
     return false;
@@ -14,18 +13,30 @@ export function isPdfFileType(fileType: string | null | undefined): boolean {
 }
 
 export const isTextFileType = (fileType: string | null | undefined) => {
-  const textFileTypes = ['th','txt', 'csv', 'json', 'xml', 'html', 'js', 'ts', 'css']; // Add more file types as needed
+  const textFileTypes = ["th", "txt", "json", "xml", "html", "js", "ts", "css"]; // Add more file types as needed
   return fileType ? textFileTypes.includes(fileType.toLowerCase()) : false;
 };
+export const isCsvFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "csv" : false;
+};
 
-export function isSupportedFileType(fileType: string | null | undefined): boolean {
+export function isSupportedFileType(
+  fileType: string | null | undefined
+): boolean {
   if (!fileType) {
     return false;
   }
-  return isPdfFileType(fileType) || isImageFileType(fileType) || isTextFileType(fileType);
+  return (
+    isPdfFileType(fileType) ||
+    isImageFileType(fileType) ||
+    isTextFileType(fileType) ||
+    isCsvFileType(fileType)
+  );
 }
 
-export function getFileType(fileName: string | undefined | null): string | null {
+export function getFileType(
+  fileName: string | undefined | null
+): string | null {
   if (!fileName) {
     return null;
   }
@@ -33,4 +44,3 @@ export function getFileType(fileName: string | undefined | null): string | null 
   const fileType = fileName.split(".").pop() || null;
   return fileType;
 }
-

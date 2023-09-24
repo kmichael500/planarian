@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Modules.Authentication.Models;
 
@@ -19,11 +20,16 @@ public class TokenService
 
     public string BuildToken(UserToken user)
     {
-        var claims = new[]
+        var claims = new List<Claim>()
         {
-            new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(nameof(user.Id), user.Id)
+            new(ClaimTypes.Name, user.FullName),
+            new(nameof(user.Id).ToCamelCase(), user.Id),
         };
+
+        if (!string.IsNullOrWhiteSpace(user.AccountId))
+        {
+            claims.Add(new Claim(nameof(user.AccountId).ToCamelCase(), user.AccountId));
+        }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
@@ -66,6 +72,6 @@ public class TokenService
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var jwtToken = tokenHandler.ReadJwtToken(token);
-        return jwtToken.Claims.First(claim => claim.Type == nameof(UserToken.Id)).Value;
+        return jwtToken.Claims.First(claim => claim.Type == nameof(UserToken.Id).ToCamelCase()).Value;
     }
 }

@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Leads.Controllers;
+namespace Planarian.Modules.Query.Models;
 
 public class QueryCondition
 {

@@ -11,4 +11,5 @@ public class ApiException : Exception
 
     public int StatusCode { get; }
     public int ErrorCode { get; }
+    public object? Data { get; set; }
 }

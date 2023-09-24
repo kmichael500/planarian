@@ -4,6 +4,7 @@ using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Leads.Controllers;

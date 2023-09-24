@@ -1,4 +1,5 @@
 using System.Text;
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -8,14 +9,21 @@ using Microsoft.OpenApi.Models;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
+using Planarian.Modules.Account.Services;
+using Planarian.Modules.App.Repositories;
+using Planarian.Modules.App.Services;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Notifications.Hubs;
+using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
 using Planarian.Modules.Photos.Services;
 using Planarian.Modules.Projects.Repositories;
@@ -34,8 +42,6 @@ using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.SendGrid.Interfaces;
 using Southport.Messaging.Email.SendGrid.Message;
-using Microsoft.EntityFrameworkCore.SqlServer;
-
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -119,11 +125,15 @@ builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
+builder.Services.AddScoped<AppService>();
+builder.Services.AddScoped<ImportService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
@@ -134,6 +144,7 @@ builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
 #region Repositories
 
 builder.Services.AddScoped<ProjectRepository>();
+builder.Services.AddScoped<AppRepository>();
 builder.Services.AddScoped<TripRepository>();
 builder.Services.AddScoped<AuthenticationRepository>();
 builder.Services.AddScoped<SettingsRepository>();
@@ -142,12 +153,15 @@ builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
+builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
+builder.Services.AddScoped<TemporaryEntranceRepository>();
 
 #endregion
 
 builder.Services.AddScoped<RequestUser>();
+builder.Services.AddSignalR();
 
 #endregion
 
@@ -158,6 +172,18 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
     options.UseSqlServer(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 
 });
+
+LinqToDBForEFTools.Initialize();
+//
+// // Convert NetTopologySuite Point to SqlGeometry
+// MappingSchema.Default.SetConverter<Point, SqlGeometry>(p =>
+// {
+//     var sqlGeometry = SqlGeometry.Point(p.X, p.Y, 4326); // Example SRID
+//     return sqlGeometry;
+// });
+//
+// // Convert SqlGeometry to NetTopologySuite Point
+// MappingSchema.Default.SetConverter<SqlGeometry, Point>(sqlGeometry => new Point(sqlGeometry.STX.Value, sqlGeometry.STY.Value));
 
 #endregion
 
@@ -191,6 +217,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     // options.SecurityTokenValidators.Clear();
     //
     // options.SecurityTokenValidators.Add(new CustomJwtSecurityTokenHandler());
+    
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+
+            // If the request is for our hub...
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                // Read the token out of the query string
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddMvc().AddSessionStateTempDataProvider();
@@ -210,13 +253,27 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+// correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
+app.UseRouting();
+app.UseCors(x =>
+    x.WithOrigins(serverOptions.ClientBaseUrl)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+);
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(o => true));
+
+
+app.MapHub<NotificationHub>("/api/notificationHub", options =>
+{
+});
+
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();
 
 app.MapControllers();
 
 app.Run();
+

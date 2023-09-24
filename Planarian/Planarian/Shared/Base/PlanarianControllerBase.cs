@@ -19,7 +19,7 @@ public abstract class PlanarianControllerBase : ControllerBase, IAsyncActionFilt
     [NonAction]
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var token = context.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        var token = context.HttpContext.Request.Headers["Authorization"].ToString()?.Replace("Bearer ", "");
 
         if (!string.IsNullOrWhiteSpace(token))
         {

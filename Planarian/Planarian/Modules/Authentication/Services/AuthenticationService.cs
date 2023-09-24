@@ -1,5 +1,4 @@
 using Planarian.Model.Shared;
-using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
@@ -45,8 +44,11 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
         if (!isValid) throw ApiExceptionDictionary.InvalidPassword;
+        
+        var accountIds = await Repository.GetAccountIdsByUserId(user.Id);
+        var accountId = accountIds.FirstOrDefault();
 
-        var userForToken = new UserToken(user.FullName, user.Id);
+        var userForToken = new UserToken(user.FullName, user.Id, accountId);
 
         var token = _tokenService.BuildToken(userForToken);
 

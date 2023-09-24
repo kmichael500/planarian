@@ -5,8 +5,11 @@ using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Import.Repositories;
+using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
+using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
@@ -19,23 +22,34 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
+    private readonly SettingsRepository _settingsRepository;
+    private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
+    private readonly NotificationService _notificationService;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository) : base(repository, requestUser)
+        FileRepository fileRepository, TagRepository tagRepository, SettingsRepository settingsRepository,
+        TemporaryEntranceRepository temporaryEntranceRepository,
+        NotificationService notificationService) : base(
+        repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _tagRepository = tagRepository;
+        _settingsRepository = settingsRepository;
+        _temporaryEntranceRepository = temporaryEntranceRepository;
+        _notificationService = notificationService;
     }
+
+    #region Caves
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
     {
         return await Repository.GetCaves(query);
     }
 
-    public async Task<string> AddCave(AddCaveVm values)
+    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
@@ -55,12 +69,13 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
             }
-            
-            if(values.LengthFeet < 0)
+
+            if (values.LengthFeet < 0)
             {
                 throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
             }
-            if(values.DepthFeet < 0)
+
+            if (values.DepthFeet < 0)
             {
                 throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
             }
@@ -69,27 +84,27 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
             }
-            
-            if(values.Entrances.Any(e=>e.Latitude > 90 || e.Latitude < -90))
+
+            if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
             {
                 throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
             }
-            
-            if(values.Entrances.Any(e=>e.Longitude > 180 || e.Longitude < -180))
+
+            if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
             {
                 throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
             }
-            
-            if(values.Entrances.Any(e=>e.ElevationFeet < 0))
+
+            if (values.Entrances.Any(e => e.ElevationFeet < 0))
             {
                 throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
             }
-            
-            if(values.Entrances.Any(e=>e.PitFeet < 0))
+
+            if (values.Entrances.Any(e => e.PitFeet < 0))
             {
                 throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
             }
-            
+
             var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
 
             if (numberOfPrimaryEntrances == 0)
@@ -117,16 +132,16 @@ public class CaveService : ServiceBase<CaveRepository>
 
             var isNewCounty = entity.CountyId != values.CountyId;
 
-            entity.Name = values.Name;
-            entity.CountyId = values.CountyId;
-            entity.StateId = values.StateId;
+            entity.Name = values.Name.Trim();
+            entity.CountyId = values.CountyId.Trim();
+            entity.StateId = values.StateId.Trim();
             entity.LengthFeet = values.LengthFeet;
             entity.DepthFeet = values.DepthFeet;
             entity.MaxPitDepthFeet = values.MaxPitDepthFeet;
             entity.NumberOfPits = values.NumberOfPits;
-            entity.Narrative = values.Narrative;
+            entity.Narrative = values.Narrative?.Trim();
             entity.ReportedOn = values.ReportedOn;
-            entity.ReportedByName = values.ReportedByName;
+            entity.ReportedByName = values.ReportedByName?.Trim();
             entity.AccountId = RequestUser.AccountId;
 
             if (string.IsNullOrWhiteSpace(entity.ReportedByName)) entity.ReportedByName = RequestUser.FullName;
@@ -175,8 +190,10 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Description = entranceValue.Description;
                 entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
                 entrance.PitFeet = entranceValue.PitFeet;
-                
-                entrance.Location = new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet) { SRID = 4326 };
+
+                entrance.Location =
+                    new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)
+                        { SRID = 4326 };
 
                 if (string.IsNullOrWhiteSpace(entrance.ReportedByName)) entrance.ReportedByName = RequestUser.FullName;
 
@@ -235,7 +252,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 foreach (var file in values.Files)
                 {
                     var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
-                 
+
                     if (fileEntity == null)
                     {
                         throw ApiExceptionDictionary.NotFound("File");
@@ -247,6 +264,7 @@ public class CaveService : ServiceBase<CaveRepository>
                         fileEntity.DisplayName = file.DisplayName;
                         fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
                     }
+
                     if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
                         !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
                     {
@@ -255,11 +273,11 @@ public class CaveService : ServiceBase<CaveRepository>
                         {
                             throw ApiExceptionDictionary.NotFound("Tag");
                         }
+
                         fileEntity.FileTypeTagId = tagType.Id;
                     }
-                    
                 }
-                
+
                 // check if any ids are missing from the request compared to the db and delete the ones that are missing
                 var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
                 foreach (var missingId in missingIds)
@@ -269,6 +287,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     {
                         blobsToDelete.Add(fileEntity);
                     }
+
                     Repository.Delete(fileEntity);
                 }
             }
@@ -280,7 +299,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync();
 
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(cancellationToken);
 
             foreach (var blobProperties in blobsToDelete)
             {
@@ -291,7 +310,7 @@ public class CaveService : ServiceBase<CaveRepository>
         }
         catch (Exception e)
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }
@@ -311,8 +330,10 @@ public class CaveService : ServiceBase<CaveRepository>
             if (fileProperties == null || string.IsNullOrWhiteSpace((fileProperties.BlobKey)) ||
                 string.IsNullOrWhiteSpace(fileProperties.ContainerName)) continue;
 
-            file.EmbedUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
-            file.DownloadUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName, true);
+            file.EmbedUrl =
+                await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
+            file.DownloadUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName,
+                file.FileName, true);
         }
 
         return cave;
@@ -331,7 +352,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
         Repository.Delete(entity);
         await Repository.SaveChangesAsync();
-        
+
         foreach (var file in files)
         {
             await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
@@ -341,11 +362,12 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task ArchiveCave(string caveId)
     {
         var entity = await Repository.GetAsync(caveId);
-        
+
         if (entity == null)
         {
             throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
         }
+
         entity.IsArchived = true;
         await Repository.SaveChangesAsync();
     }
@@ -353,12 +375,15 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task UnarchiveCave(string caveId)
     {
         var entity = await Repository.GetAsync(caveId);
-        
+
         if (entity == null)
         {
             throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
         }
+
         entity.IsArchived = false;
         await Repository.SaveChangesAsync();
     }
+
+    #endregion
 }

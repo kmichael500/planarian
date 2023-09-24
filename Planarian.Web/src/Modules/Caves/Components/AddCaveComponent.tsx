@@ -86,8 +86,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   }>({});
 
   useEffect(() => {
-    console.log("hi");
-
     if (caveState?.files) {
       const temp = groupBy(caveState.files, (file) => file.fileTypeKey);
       setGroupedByFiles(temp);

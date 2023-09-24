@@ -18,7 +18,7 @@ public class CaveRepository : RepositoryBase
 
     public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
     {
-        var caves = await DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId)
+        var queryable = DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(e => new CaveVm
             {
                 Id = e.Id,
@@ -78,10 +78,10 @@ public class CaveRepository : RepositoryBase
                     FileTypeKey = ee.FileTypeTag.Key,
                     FileTypeTagId = ee.FileTypeTagId,
                 })
-            })
-            .AsSplitQuery()
-            .QueryFilter(query.Conditions)
-            .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
+            }).AsSplitQuery();
+
+        var caves = await queryable.ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.LengthFeet);
+
 
         return caves;
     }
@@ -186,4 +186,19 @@ public class CaveRepository : RepositoryBase
             .Include(e=>e.Entrances)
             .FirstOrDefaultAsync();
     }
+
+    
+
+    public record UsedCountyNumber(string CountyId, int CountyNumber);
+    public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
+    {
+        var usedCountyNumbers = await DbContext.Caves
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Select(e => new UsedCountyNumber(e.CountyId, e.CountyNumber))
+            .ToListAsync();
+
+        return usedCountyNumbers.ToHashSet();
+    }
+
+   
 }

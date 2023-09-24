@@ -85,7 +85,6 @@ const CavesComponent: React.FC = () => {
           field={"depthFeet"}
           label={"Depth (Feet)"}
         />
-
         <TagFilterFormItem
           tagType={TagType.EntranceStatus}
           queryBuilder={queryBuilder}
@@ -132,17 +131,23 @@ const CavesComponent: React.FC = () => {
                     More Info
                   </PlanarianButton>
                 </Link>,
-                <a
-                  href={getDirectionsUrl(
-                    cave.primaryEntrance.latitude,
-                    cave.primaryEntrance.longitude
+                <>
+                  {cave.primaryEntrance && (
+                    <>
+                      <a
+                        href={getDirectionsUrl(
+                          cave.primaryEntrance.latitude,
+                          cave.primaryEntrance.longitude
+                        )}
+                        target="_blank"
+                      >
+                        <PlanarianButton icon={<CarOutlined />}>
+                          Directions
+                        </PlanarianButton>
+                      </a>
+                    </>
                   )}
-                  target="_blank"
-                >
-                  <PlanarianButton icon={<CarOutlined />}>
-                    Directions
-                  </PlanarianButton>
-                </a>,
+                </>,
               ]}
             >
               <Typography.Paragraph>
@@ -151,9 +156,12 @@ const CavesComponent: React.FC = () => {
               <Typography.Paragraph>
                 Depth: {convertDistance(cave.depthFeet)}
               </Typography.Paragraph>
-              <Typography.Paragraph>
-                Elevation: {convertDistance(cave.primaryEntrance.elevationFeet)}
-              </Typography.Paragraph>
+              {cave.primaryEntrance && (
+                <Typography.Paragraph>
+                  Elevation:{" "}
+                  {convertDistance(cave.primaryEntrance.elevationFeet)}
+                </Typography.Paragraph>
+              )}
               <Typography.Paragraph>
                 Max Pit Depth: {convertDistance(cave.maxPitDepthFeet)}
               </Typography.Paragraph>

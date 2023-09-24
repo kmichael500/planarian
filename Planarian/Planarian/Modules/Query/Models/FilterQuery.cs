@@ -1,4 +1,3 @@
-using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Query.Constants;
 
 namespace Planarian.Modules.Query.Models;

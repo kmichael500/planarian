@@ -9,13 +9,14 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class File : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; }
     
-    [MaxLength(PropertyLength.Key)] public string? BlobKey { get; set; } = null!;
-    [MaxLength(PropertyLength.Key)] public string? BlobContainer { get; set; } = null!;
+    [MaxLength(PropertyLength.Key)] public string? BlobKey { get; set; }
+    [MaxLength(PropertyLength.Key)] public string? BlobContainer { get; set; }
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; } = null!;
+    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
+    public DateTime? ExpiresOn { get; set; } = null!;
     public TagType FileTypeTag { get; set; } = null!;
 
     public virtual Cave? Cave { get; set; } = null!;

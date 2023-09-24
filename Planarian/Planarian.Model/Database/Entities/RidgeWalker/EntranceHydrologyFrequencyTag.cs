@@ -6,7 +6,7 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
-public class EntranceHydrologyFrequencyTag : EntityBase
+public class EntranceHydrologyFrequencyTag : EntityBase, IEntranceTag
 {
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;

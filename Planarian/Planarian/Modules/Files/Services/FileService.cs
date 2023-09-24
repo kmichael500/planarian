@@ -1,10 +1,7 @@
 
 using System.ComponentModel.DataAnnotations;
-using Azure.Storage;
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
-using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
@@ -32,9 +29,10 @@ public class FileService : ServiceBase<FileRepository>
         _settingsRepository = settingsRepository;
     }
 
-    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName, string? uuid = null)
+    public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null)
         {
             throw new BadRequestException("Account Id is null");
@@ -72,7 +70,7 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
-        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName);
+        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
@@ -90,9 +88,76 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
+    public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
+        CancellationToken cancellationToken,
+        string? uuid = null)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        if (RequestUser.AccountId == null)
+        {
+            throw new BadRequestException("Account Id is null");
+        }
+
+        await RemoveExpiredFiles();
+
+        var tempCaveImportTagType =
+            await _tagRepository.GetFileTypeTagByName(fileTypeTagName, RequestUser.AccountId);
+
+        var tagTypeId = tempCaveImportTagType?.Id;
+
+        if (tagTypeId == null)
+            throw ApiExceptionDictionary.NotFound("File type");
+
+
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+        var entity = new File()
+        {
+            FileName = fileName,
+            DisplayName = fileNameWithoutExtension,
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId,
+            ExpiresOn = DateTime.UtcNow.AddDays(10)
+        };
+        var fileExtension = Path.GetExtension(fileName);
+        var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
+
+        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
+
+        entity.BlobKey = blobKey;
+        entity.BlobContainer = RequestUser.AccountContainerName;
+
+
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync();
+        await transaction.CommitAsync(cancellationToken);
+        
+        var fileInformation = new FileVm
+        {
+            Id = entity.Id,
+            FileName = entity.FileName,
+            DisplayName = entity.DisplayName,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid,
+        };
+        return fileInformation;
+    }
+
+    private async Task RemoveExpiredFiles()
+    {
+        var expiredFiles = await Repository.GetExpiredFiles();
+        foreach (var expiredFile in expiredFiles)
+        {
+            await DeleteFile(expiredFile.BlobKey, expiredFile.BlobContainer);
+            Repository.Delete(expiredFile);
+        }
+
+        await Repository.SaveChangesAsync();
+    }
+
     #region Blob Storage
 
-    private async Task AddToBlobStorage(Stream stream, string key, string containerName)
+    private async Task AddToBlobStorage(Stream stream, string key, string containerName,
+        CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null)
         {
@@ -102,7 +167,7 @@ public class FileService : ServiceBase<FileRepository>
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(key);
         
-        await blobClient.UploadAsync(stream, overwrite: true);
+        await blobClient.UploadAsync(stream, overwrite: true, cancellationToken: cancellationToken);
     }
 
     private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
@@ -119,15 +184,15 @@ public class FileService : ServiceBase<FileRepository>
     }
     #endregion
 
-    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values)
+    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values, CancellationToken cancellationToken)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
         {
             var file = await Repository.GetFileById(value.Id);
             if (file == null)
             {
-                throw ApiExceptionDictionary.NotFound("File not found");
+                throw ApiExceptionDictionary.NotFound("File");
             }
 
             if (!string.IsNullOrWhiteSpace(value.DisplayName))
@@ -150,7 +215,7 @@ public class FileService : ServiceBase<FileRepository>
         if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
         {
-            throw ApiExceptionDictionary.NotFound("File not found");
+            throw ApiExceptionDictionary.NotFound("File");
         }
 
         var client = await GetBlobContainerClient(blobProperties.ContainerName);
@@ -227,21 +292,40 @@ public class FileService : ServiceBase<FileRepository>
     {
         if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(blobContainer))
         {
-            throw ApiExceptionDictionary.NotFound("File not found");
+            throw ApiExceptionDictionary.NotFound("File");
         }
 
         var client = await GetBlobContainerClient(blobContainer);
         var blobClient = client.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
     }
+
+    public async Task<Stream> GetFileStream(string fileId)
+    {
+        var file = await Repository.GetFileVm(fileId);
+        var blobProperties = await Repository.GetFileBlobProperties(fileId);
+        if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
+            string.IsNullOrWhiteSpace(blobProperties.BlobKey))
+        {
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+
+        var client = await GetBlobContainerClient(blobProperties.ContainerName);
+        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        
+        var stream = new MemoryStream();
+        await blobClient.DownloadToAsync(stream);
+        stream.Position = 0;
+        return stream;
+    }
 }
 
-public class FileTypeTagName
-{
-    public const string Other = "Other";
-}
+    public class FileTypeTagName
+    {
+        public const string Other = "Other";
+    }
 
-public class FileVm
+    public class FileVm
 {
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }

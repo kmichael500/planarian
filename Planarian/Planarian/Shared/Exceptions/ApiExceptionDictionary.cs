@@ -1,4 +1,5 @@
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Modules.Import.Models;
 
 namespace Planarian.Shared.Exceptions;
 
@@ -86,5 +87,33 @@ public static class ApiExceptionDictionary
         new(StatusCodes.Status500InternalServerError, 302, "No account was found");
 
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
-        new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
+        new(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
+
+    #region Import 400-499
+
+    public static ApiException InvalidImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords,
+        ImportType importType) =>
+        new(StatusCodes.Status400BadRequest, 400, $"Failed {importType.ToString().ToLower()} import")
+            { Data = failedCaveRecords };
+    public enum ImportType { Cave, Entrance, File }
+    public static ApiException NullValue(string name) =>
+        new(StatusCodes.Status400BadRequest, 401, $"Value is missing from '{name}'");
+
+    public static ApiException ImportCaveMultipleCountyCodes(IEnumerable<string> codes) =>
+        new(StatusCodes.Status400BadRequest, 402,
+            $"Multiple county codes found: {string.Join(',', codes.Select(e => $"'{e}'"))}");
+
+    #endregion
+
+    public static ApiException ImportCaveDuplicateCountyCode(CaveCsvModel caveRecord, County existingCountyRecord) =>
+        new(StatusCodes.Status400BadRequest, 403,
+            $"{nameof(caveRecord.CountyCode)} value '{caveRecord.CountyCode}' is already being used for county '{existingCountyRecord.Name}'.");
+
+    public static Exception ImportMissingValue(string columnName) => new ApiException(StatusCodes.Status400BadRequest,
+        404,
+        $"Missing value for column '{columnName}'");
+
+    public static Exception ParsingError => new ApiException(StatusCodes.Status400BadRequest,
+        405,
+        $"There were errors during import.'");
 }

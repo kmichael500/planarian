@@ -83,115 +83,123 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
             </Row>
           </Descriptions.Item>
         </Descriptions>
-        <PlanarianDividerComponent title="Entrances" />
+        {cave?.entrances && cave?.entrances.length > 0 && (
+          <>
+            <PlanarianDividerComponent title="Entrances" />
 
-        <Collapse bordered defaultActiveKey={["0"]}>
-          {cave?.entrances.map((entrance, index) => (
-            <Panel
-              header={
-                <>
-                  <Row>
-                    Entrance {index + 1}
-                    {!isNullOrWhiteSpace(entrance.name)
-                      ? " - " + entrance.name
-                      : ""}
-                    {entrance.isPrimary && (
-                      <>
-                        <Col flex="auto"></Col>
-                        <Tag>Primary</Tag>
-                      </>
-                    )}
-                  </Row>
-                </>
-              }
-              key={index}
-            >
-              <Descriptions bordered>
-                <Descriptions.Item
-                  label={
-                    <Space>
-                      Coordinates
-                      <a
-                        href={getDirectionsUrl(
-                          entrance.latitude,
-                          entrance.longitude
+            <Collapse bordered defaultActiveKey={["0"]}>
+              {cave?.entrances.map((entrance, index) => (
+                <Panel
+                  header={
+                    <>
+                      <Row>
+                        Entrance {index + 1}
+                        {!isNullOrWhiteSpace(entrance.name)
+                          ? " - " + entrance.name
+                          : ""}
+                        {entrance.isPrimary && (
+                          <>
+                            <Col flex="auto"></Col>
+                            <Tag>Primary</Tag>
+                          </>
                         )}
-                        target="_blank"
-                      >
-                        <Tooltip title="Directions">
-                          <CarOutlined />
-                        </Tooltip>
-                      </a>
-                    </Space>
+                      </Row>
+                    </>
                   }
+                  key={index}
                 >
-                  {entrance.latitude}, {entrance.longitude}
-                </Descriptions.Item>
-                <Descriptions.Item label="Elevation">
-                  {convertDistance(entrance.elevationFeet)}
-                </Descriptions.Item>
-                <Descriptions.Item label="Location Quality">
-                  <TagComponent tagId={entrance.locationQualityTagId} />
-                </Descriptions.Item>
-                <Descriptions.Item label="Name">
-                  {entrance.name}
-                </Descriptions.Item>
+                  <Descriptions bordered>
+                    <Descriptions.Item
+                      label={
+                        <Space>
+                          Coordinates
+                          <a
+                            href={getDirectionsUrl(
+                              entrance.latitude,
+                              entrance.longitude
+                            )}
+                            target="_blank"
+                          >
+                            <Tooltip title="Directions">
+                              <CarOutlined />
+                            </Tooltip>
+                          </a>
+                        </Space>
+                      }
+                    >
+                      {entrance.latitude}, {entrance.longitude}
+                    </Descriptions.Item>
+                    {cave.primaryEntrance && (
+                      <Descriptions.Item label="Elevation">
+                        {convertDistance(entrance.elevationFeet)}
+                      </Descriptions.Item>
+                    )}
+                    <Descriptions.Item label="Location Quality">
+                      <TagComponent tagId={entrance.locationQualityTagId} />
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Name">
+                      {entrance.name}
+                    </Descriptions.Item>
 
-                <Descriptions.Item label="Reported On">
-                  {formatDateTime(entrance.reportedOn)}
-                </Descriptions.Item>
-                <Descriptions.Item label="Reported By">
-                  {entrance.reportedByName}
-                </Descriptions.Item>
-                <Descriptions.Item label="Pit Depth">
-                  {convertDistance(entrance.pitFeet)}
-                </Descriptions.Item>
-                <Descriptions.Item label="Status">
-                  <Row>
-                    {entrance.entranceStatusTagIds.map((tagId) => (
-                      <Col key={tagId}>
-                        <TagComponent tagId={tagId} key={tagId} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Descriptions.Item>
-                <Descriptions.Item label="Field Indication">
-                  <Row>
-                    {entrance.fieldIndicationTagIds.map((tagId) => (
-                      <Col key={tagId}>
-                        <TagComponent tagId={tagId} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Descriptions.Item>
-                <Descriptions.Item label="Hydrology">
-                  <Row>
-                    {entrance.entranceHydrologyTagIds.map((tagId) => (
-                      <Col key={tagId}>
-                        <TagComponent tagId={tagId} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Descriptions.Item>
-                <Descriptions.Item label="Hydrology Frequency">
-                  <Row>
-                    {entrance.entranceHydrologyFrequencyTagIds.map((tagId) => (
-                      <Col key={tagId}>
-                        <TagComponent tagId={tagId} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Descriptions.Item>
-              </Descriptions>
-              {!isNullOrWhiteSpace(entrance.description) && (
-                <>
-                  <br />
-                  {entrance.description}
-                </>
-              )}
-            </Panel>
-          ))}
-        </Collapse>
+                    <Descriptions.Item label="Reported On">
+                      {formatDateTime(entrance.reportedOn)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Reported By">
+                      {entrance.reportedByName}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Pit Depth">
+                      {convertDistance(entrance.pitFeet)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Status">
+                      <Row>
+                        {entrance.entranceStatusTagIds.map((tagId) => (
+                          <Col key={tagId}>
+                            <TagComponent tagId={tagId} key={tagId} />
+                          </Col>
+                        ))}
+                      </Row>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Field Indication">
+                      <Row>
+                        {entrance.fieldIndicationTagIds.map((tagId) => (
+                          <Col key={tagId}>
+                            <TagComponent tagId={tagId} />
+                          </Col>
+                        ))}
+                      </Row>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Hydrology">
+                      <Row>
+                        {entrance.entranceHydrologyTagIds.map((tagId) => (
+                          <Col key={tagId}>
+                            <TagComponent tagId={tagId} />
+                          </Col>
+                        ))}
+                      </Row>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Hydrology Frequency">
+                      <Row>
+                        {entrance.entranceHydrologyFrequencyTagIds.map(
+                          (tagId) => (
+                            <Col key={tagId}>
+                              <TagComponent tagId={tagId} />
+                            </Col>
+                          )
+                        )}
+                      </Row>
+                    </Descriptions.Item>
+                  </Descriptions>
+                  {!isNullOrWhiteSpace(entrance.description) && (
+                    <>
+                      <br />
+                      {entrance.description}
+                    </>
+                  )}
+                </Panel>
+              ))}
+            </Collapse>
+          </>
+        )}
 
         <PlanarianDividerComponent title="Narrative" />
 

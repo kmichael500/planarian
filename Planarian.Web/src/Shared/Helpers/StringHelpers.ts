@@ -75,5 +75,21 @@ export function formatDateTime(
 ): string | null {
   if (typeof date === "string" && isNullOrWhiteSpace(date)) return null;
   if (date === null || date === undefined) return null;
+
+  // Check if the date follows the pattern "YYYY-01-01 00:00:00+00:00"
+  const yearPattern = /(\d{4})-01-01 00:00:00\+00:00/;
+
+  const match = yearPattern.exec(date.toString());
+  if (match) {
+    // Format only the year part if the pattern matches
+    return moment(match[1], "YYYY").format(formatString);
+  }
+
   return moment(date).format(formatString);
 }
+
+const splitCamelCase = (str: string): string => {
+  return str
+    .replace(/([A-Z])/g, " $1") // add a space before each uppercase letter
+    .replace(/^./, (char) => char.toUpperCase()); // capitalize the first character
+};

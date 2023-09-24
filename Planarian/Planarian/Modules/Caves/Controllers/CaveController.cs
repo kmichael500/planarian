@@ -41,26 +41,28 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost]
-    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave)
+    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave);
+        var result = await Service.AddCave(cave, cancellationToken);
 
         return new JsonResult(result);
     }
 
     [HttpPut]
-    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave)
+    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave);
+        var result = await Service.AddCave(cave, cancellationToken);
 
         return new JsonResult(result);
     }
-    
+
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]
-    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, [FromForm] IFormFile file)
+    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
     {
-        var result = await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName, uuid);
+        var result =
+            await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName, cancellationToken, uuid);
 
         // return Ok();
         return new JsonResult(result);

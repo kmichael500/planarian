@@ -9,7 +9,8 @@ const NAME_CLAIM_KEY =
 interface JwtPayload {
   [key: string]: any;
   name: string;
-  userId: string;
+  id: string;
+  accountId: string;
 }
 
 const baseUrl = "api/authentication";
@@ -65,9 +66,22 @@ const AuthenticationService = {
     const token = this.GetToken();
     if (token) {
       const payload = jwt_decode(token) as JwtPayload;
-      return payload ? payload.userId : null;
+      return payload ? payload.id : null;
     }
     return null;
+  },
+  GetAccountId(): string | null {
+    const token = this.GetToken();
+    if (token) {
+      const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
+      return payload ? payload.accountId : null;
+    }
+    return null;
+  },
+  GetUserGroupPrefix(): string {
+    var accountId = this.GetAccountId();
+    var userId = this.GetUserId();
+    return `${userId}-${accountId}`;
   },
 };
 
