@@ -31,10 +31,10 @@ public abstract class RepositoryBase
 
     public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null,
         Action<int, int>? onBatchProcessed = null,
+        int batchSize = 1000,
         CancellationToken cancellationToken = default)
     {
         entities = entities.ToList();
-        const int batchSize = 1000;
         var totalEntities = entities.Count();
         
         var processed = 0;

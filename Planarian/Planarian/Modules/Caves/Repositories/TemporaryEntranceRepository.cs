@@ -30,13 +30,17 @@ public class TemporaryEntranceRepository : RepositoryBase
         return result;
     }
 
-    public async Task<BulkCopyRowsCopied> TaskInsert(IEnumerable<TemporaryEntrance> entrances)
+    public async Task<BulkCopyRowsCopied> InsertEntrances(IEnumerable<TemporaryEntrance> entrances,
+        Action<int, int> onBatchProcessed)
     {
         await using var db = DbContext.CreateLinqToDBConnection();
 
+        
         var options = new BulkCopyOptions
         {
-            TableName = _temporaryEntranceTableName
+            TableName = _temporaryEntranceTableName,
+            NotifyAfter = 1000,
+            RowsCopiedCallback = copied => onBatchProcessed((int)copied.RowsCopied, entrances.Count())
         };
 
         return await db.BulkCopyAsync(options, entrances);

@@ -11,14 +11,13 @@ const AccountSettingsComponent = () => {
   var userGroupPrefix = AuthenticationService.GetUserGroupPrefix();
 
   return (
-    <Card title="Account Settings">
-      <Typography.Title level={3}>Reset Account</Typography.Title>
+    <Card title="Reset Account">
       <Typography.Paragraph>
         This action will permanently delete all your caves and related account
         data. This action is irreversible.
       </Typography.Paragraph>
       <ConfirmationModalComponent
-        title={`Delete All Caves`}
+        title={`Reset Account`}
         modalMessage={
           <>
             Are you positive you want to delete <b>ALL</b> cave data?! This is

@@ -91,9 +91,10 @@ public static class ApiExceptionDictionary
 
     #region Import 400-499
 
-    public static ApiException InvalidCaveImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords) =>
-        new ApiException(StatusCodes.Status400BadRequest, 400, "Invalid cave import") { Data = failedCaveRecords };
-
+    public static ApiException InvalidImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords,
+        ImportType importType) =>
+        new ApiException(StatusCodes.Status400BadRequest, 400, $"Failed {importType} import") { Data = failedCaveRecords };
+    public enum ImportType { Cave, Entrance, File }
     public static ApiException NullValue(string name) =>
         new ApiException(StatusCodes.Status400BadRequest, 401, $"Value is missing from '{name}'");
 

@@ -119,6 +119,7 @@ const ConfirmationModalComponent = ({
         {(!isLoading || (isLoading && !onOkClickRender)) && (
           <>
             <Paragraph>{modalMessage}</Paragraph>
+            <Paragraph>Please type the word below to confirm:</Paragraph>
             <div style={{ textAlign: "center" }}>
               <Paragraph
                 strong

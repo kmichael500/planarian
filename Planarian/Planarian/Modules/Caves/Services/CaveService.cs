@@ -1,17 +1,11 @@
-using System.Collections;
 using System.ComponentModel.DataAnnotations;
-using System.Data.SqlTypes;
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
-using CsvHelper.TypeConversion;
-using EFCore.BulkExtensions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.SqlServer.Types;
 using NetTopologySuite.Geometries;
+using Newtonsoft.Json;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
@@ -22,7 +16,6 @@ using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
-using Planarian.Modules.Import.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
@@ -30,9 +23,7 @@ using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
-using Planarian.Shared.Extensions.Type;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
-using ValidationException = CsvHelper.ValidationException;
 
 namespace Planarian.Modules.Caves.Services;
 
@@ -295,7 +286,6 @@ public class CaveService : ServiceBase<CaveRepository>
 
                         fileEntity.FileTypeTagId = tagType.Id;
                     }
-
                 }
 
                 // check if any ids are missing from the request compared to the db and delete the ones that are missing
@@ -443,7 +433,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
             var caveRecords = await ParseCaveCsv(stream, failedRecords, cancellationToken);
-            
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
 
             #region States
@@ -533,7 +523,7 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
-            await _tagRepository.BulkInsertAsync(newCounties, cancellationToken: cancellationToken);
+            await _tagRepository.BulkInsertAsync(newCounties, onBatchProcessed: OnBatchProcessed, cancellationToken: cancellationToken);
 
             allCounties.AddRange(newCounties);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing counties");
@@ -548,7 +538,8 @@ public class CaveService : ServiceBase<CaveRepository>
             #region notifications
 
             int totalRecords = caveRecords.Count();
-            int notifyInterval = (totalRecords > 0) ? (int)(totalRecords * 0.1) : 0; // every 10% if totalRecords is greater than 0
+            int notifyInterval =
+                (totalRecords > 0) ? (int)(totalRecords * 0.1) : 0; // every 10% if totalRecords is greater than 0
             notifyInterval = Math.Max(notifyInterval, 1);
             int processedRecords = 0;
             int successfulRecords = 0;
@@ -643,7 +634,7 @@ public class CaveService : ServiceBase<CaveRepository>
                         cave.GeologyTags.Add(geologyTag);
                     }
 
-                    var isValidCave = await IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords);
+                    var isValidCave = IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords);
                     if (!isValidCave) continue;
 
                     caves.Add(cave);
@@ -661,7 +652,7 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.RollbackAsync(cancellationToken);
                 failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Cave);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -684,6 +675,7 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
+
             throw;
         }
 
@@ -717,11 +709,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     record.CaveName = caveName;
                 }
-                else
-                {
-                    var stop = "";
-                }
-                
+
                 TryGetFieldValue(csv, nameof(record.CaveLengthFt), true, errors, out double caveLengthFt);
                 record.CaveLengthFt = caveLengthFt;
 
@@ -757,7 +745,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     record.State = state;
                 }
-                
+
                 TryGetFieldValue(csv, nameof(record.Geology), false, errors, out string? geology);
                 record.Geology = geology;
 
@@ -785,13 +773,12 @@ public class CaveService : ServiceBase<CaveRepository>
         }
 
         if (!failedRecords.Any()) return caveRecords;
-        
-        failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-        throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
 
+        failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
+        throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Cave);
     }
 
-    private bool TryGetFieldValue<T>(CsvReader csv, string fieldName, bool isRequired, List<string> errors,
+    private bool TryGetFieldValue<T>(IReaderRow csv, string fieldName, bool isRequired, List<string> errors,
         out T? fieldValue)
     {
         var hasValue = csv.TryGetField(fieldName, out fieldValue);
@@ -809,7 +796,7 @@ public class CaveService : ServiceBase<CaveRepository>
         // trim value of string
         if (typeof(T) == typeof(string) && fieldValue != null)
         {
-            fieldValue = (T)(object)fieldValue?.ToString()?.Trim()!;
+            fieldValue = (T)(object)fieldValue.ToString()?.Trim()!;
         }
 
         return true;
@@ -822,7 +809,7 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             throw ApiExceptionDictionary.NoAccount;
         }
-        
+
         if (string.IsNullOrWhiteSpace(temporaryFileId))
         {
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
@@ -832,36 +819,43 @@ public class CaveService : ServiceBase<CaveRepository>
 
 
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        var signalRGroup = temporaryFileId;
         try
         {
-            using var reader = new StreamReader(stream);
-            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-            var entranceRecords = csv.GetRecords<EntranceCsvModel>().ToList();
+            var failedRecords = new List<FailedCaveCsvRecord<EntranceCsvModel>>();
+            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
+            var entranceRecords = await ParseEntranceCsv(stream, failedRecords, cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
+
             var entrances = new List<TemporaryEntrance>();
 
             #region Tags
-
-            var allLocationQualityTags = await ProcessTags(entranceRecords, 
-                _tagRepository.LocationQualityTags, 
-                TagTypeKeyConstant.LocationQuality, 
-                e => new List<string?> { e.LocationQuality }, 
+            var allLocationQualityTags = await ProcessTags(entranceRecords,
+                _tagRepository.LocationQualityTags,
+                TagTypeKeyConstant.LocationQuality,
+                e => new List<string?> { e.LocationQuality }, signalRGroup,
                 cancellationToken);
-            
-            var allEntranceStatusTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceStatusTags, TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatus?.Split(','), cancellationToken);
-            var allEntranceHydrologyTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyTags, TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), cancellationToken);
-            var allEntranceHydrologyFrequencyTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyFrequencyTags, TagTypeKeyConstant.EntranceHydrologyFrequency, e => e.EntranceHydrologyFrequency?.Split(','), cancellationToken);
-            var allFieldIndicationTags = await ProcessTags(entranceRecords, _tagRepository.GetFieldIndicationTags, TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.Split(','), cancellationToken);
+
+            var allEntranceStatusTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceStatusTags,
+                TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatus?.Split(','), signalRGroup, cancellationToken);
+            var allEntranceHydrologyTags = await ProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyTags,
+                TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), signalRGroup, cancellationToken);
+            var allEntranceHydrologyFrequencyTags = await ProcessTags(entranceRecords,
+                _tagRepository.GetEntranceHydrologyFrequencyTags, TagTypeKeyConstant.EntranceHydrologyFrequency,
+                e => e.EntranceHydrologyFrequency?.Split(','), signalRGroup, cancellationToken);
+            var allFieldIndicationTags = await ProcessTags(entranceRecords, _tagRepository.GetFieldIndicationTags,
+                TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.Split(','), signalRGroup, cancellationToken);
 
             var entranceStatusTags = new List<EntranceStatusTag>();
             var entranceHydrologyTags = new List<EntranceHydrologyTag>();
             var entranceHydrologyFrequencyTags = new List<EntranceHydrologyFrequencyTag>();
             var entranceFieldIndicationTags = new List<FieldIndicationTag>();
+
             #endregion
             
-
-            var failedRecords = new List<FailedCaveCsvRecord<EntranceCsvModel>>();
-
             var rowNumber = 0;
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing entrances");
             foreach (var entranceRecord in entranceRecords)
             {
                 rowNumber++;
@@ -870,50 +864,78 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken.ThrowIfCancellationRequested();
 
                     #region Validation
-                    
+
                     var isValidReportedOn = DateTime.TryParse(entranceRecord.ReportedOnDate, out var reportedOnDate);
 
                     if (entranceRecord.DecimalLatitude == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.DecimalLatitude)}"));
+                        continue;
                     }
 
                     if (entranceRecord.DecimalLongitude == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLongitude));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.DecimalLongitude)}"));
+                        continue;
                     }
 
                     if (entranceRecord.EntranceElevationFt == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.EntranceElevationFt));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.EntranceElevationFt)}"));
+                        continue;
                     }
 
                     var hasCountyCaveNumber = int.TryParse(entranceRecord.CountyCaveNumber, out var countyCaveNumber);
+                    if (!hasCountyCaveNumber)
+                    {
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.CountyCaveNumber)}"));
+                        continue;
+                    }
 
                     if (entranceRecord.DecimalLongitude == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLongitude));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.DecimalLongitude)}"));
+                        continue;
                     }
-                    if(entranceRecord.DecimalLatitude == null)
+
+                    if (entranceRecord.DecimalLatitude == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.DecimalLatitude)}"));
+                        continue;
                     }
-                    if(entranceRecord.EntranceElevationFt == null)
+
+                    if (entranceRecord.EntranceElevationFt == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.DecimalLatitude));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.EntranceElevationFt)}"));
+                        continue;
                     }
 
                     var locationQualityTag = allLocationQualityTags.FirstOrDefault(e =>
                         e.Name.Equals(entranceRecord.LocationQuality, StringComparison.InvariantCultureIgnoreCase));
 
-                    if(locationQualityTag == null)
+                    if (locationQualityTag == null)
                     {
-                        throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.LocationQuality));
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.LocationQuality)}"));
+                        continue;
                     }
-                    
+
+                    if (string.IsNullOrWhiteSpace(entranceRecord.CountyCode))
+                    {
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber,
+                            $"Missing value for {nameof(entranceRecord.CountyCode)}"));
+                        continue;
+                    }
+
                     #endregion
-                    
-                    
+
 
                     var entrance = new TemporaryEntrance()
                     {
@@ -922,11 +944,8 @@ public class CaveService : ServiceBase<CaveRepository>
                         Description = entranceRecord.EntranceDescription,
                         IsPrimary = entranceRecord.IsPrimaryEntrance ?? false,
                         PitFeet = entranceRecord.EntrancePitDepth,
-                        CountyCaveNumber = hasCountyCaveNumber
-                            ? countyCaveNumber
-                            : throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCaveNumber)),
-                        CountyDisplayId = string.IsNullOrWhiteSpace(entranceRecord.CountyCode) ?
-                                          throw ApiExceptionDictionary.NotFound(nameof(entranceRecord.CountyCode)) : entranceRecord.CountyCode,
+                        CountyCaveNumber = countyCaveNumber,
+                        CountyDisplayId = entranceRecord.CountyCode,
                         Latitude = (double)entranceRecord.DecimalLatitude,
                         Longitude = (double)entranceRecord.DecimalLongitude,
                         Elevation = (double)entranceRecord.EntranceElevationFt,
@@ -935,22 +954,23 @@ public class CaveService : ServiceBase<CaveRepository>
                         ReportedByName = entranceRecord.ReportedByName,
                         CaveId = null, // intentionally null
                     };
-                    entranceRecord.CaveId = entrance.Id; // used to associate with erroneous records after inserting into the db
+                    entranceRecord.CaveId =
+                        entrance.Id; // used to associate with erroneous records after inserting into the db
 
                     #region Tags
 
                     ProcessEntranceTags(
                         entranceRecord, entrance.Id,
-                        nameof(entranceRecord.EntranceStatus), 
-                        entranceStatusTags, 
-                        e => e.EntranceStatus, 
+                        nameof(entranceRecord.EntranceStatus),
+                        entranceStatusTags,
+                        e => e.EntranceStatus,
                         allEntranceStatusTags);
 
                     ProcessEntranceTags(
                         entranceRecord, entrance.Id,
-                        nameof(entranceRecord.EntranceHydrology), 
-                        entranceHydrologyTags, 
-                        e => e.EntranceHydrology, 
+                        nameof(entranceRecord.EntranceHydrology),
+                        entranceHydrologyTags,
+                        e => e.EntranceHydrology,
                         allEntranceHydrologyTags);
 
                     ProcessEntranceTags(
@@ -959,34 +979,50 @@ public class CaveService : ServiceBase<CaveRepository>
                         entranceHydrologyFrequencyTags,
                         e => e.EntranceHydrologyFrequency,
                         allEntranceHydrologyFrequencyTags);
-                    
+
                     ProcessEntranceTags(
                         entranceRecord, entrance.Id,
-                        nameof(entranceRecord.FieldIndication), 
-                        entranceFieldIndicationTags, 
-                        e => e.FieldIndication, 
+                        nameof(entranceRecord.FieldIndication),
+                        entranceFieldIndicationTags,
+                        e => e.FieldIndication,
                         allFieldIndicationTags);
-                    
+
                     #endregion
-                    
-                    // await IsValidCave(cave, usedCountyNumbers);
-                    entrances.Add(entrance);
+
+                    var isValid = IsValidEntrance(entrance, entranceRecord, rowNumber, failedRecords);
+
+                    if (isValid)
+                    {
+                        entrances.Add(entrance);
+                    }
                 }
                 catch (Exception e)
                 {
                     failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(entranceRecord, rowNumber, e.Message));
                 }
             }
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing entrances");
 
             if (failedRecords.Any())
             {
-                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
             }
-            
-            var result = await _temporaryEntranceRepository.CreateTable();
-            var result1 = await _temporaryEntranceRepository.TaskInsert(entrances);
-            var unassociatedEntranceIds = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
 
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrances. This may take a while...");
+            await _temporaryEntranceRepository.CreateTable();
+
+            async void OnBatchProcessed(int currentProcessedCount, int total)
+            {
+                var message = $"Inserted {currentProcessedCount} out of {total}.";
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+            }
+
+            await _temporaryEntranceRepository.InsertEntrances(entrances, OnBatchProcessed);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting entrances!");
+            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Associating entrances with caves");
+            var unassociatedEntranceIds = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished associating entrances with caves");
             foreach (var unassociatedEntranceId in unassociatedEntranceIds)
             {
                 var unassociatedRecord = entranceRecords.FirstOrDefault(e => e.CaveId == unassociatedEntranceId);
@@ -1000,51 +1036,35 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (failedRecords.Any())
             {
-                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
             }
-            
+        
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Moving entrances to main table");
             await _temporaryEntranceRepository.MigrateTemporaryEntrancesAsync();
 
             #region Tag Insert
-            
+
             const int batchSize = 5000;
-            
-            var proccessedEntranceStatusTags = 0;
-            foreach (var batch in entranceStatusTags.Chunk(batchSize).ToList())
-            {
-                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
-                proccessedEntranceStatusTags += batch.Count;
-            }
-            
-            var proccessedEntranceHydrologyTags = 0;
-            foreach (var batch in entranceHydrologyTags.Chunk(batchSize).ToList())
-            {
-                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
-                proccessedEntranceHydrologyTags += batch.Count;
-            }
-            
-            var proccessedEntranceHydrologyFrequencyTags = 0;
-            foreach (var batch in entranceHydrologyFrequencyTags.Chunk(batchSize).ToList())
-            {
-                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
-                proccessedEntranceHydrologyFrequencyTags += batch.Count;
-            }
-            
-            var proccessedFieldIndicationTags = 0;
-            foreach (var batch in entranceFieldIndicationTags.Chunk(batchSize).ToList())
-            {
-                await Repository.BulkInsertAsync(batch, cancellationToken: cancellationToken);
-                proccessedFieldIndicationTags += batch.Count;
-            }
-            
-            
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrance status tags");
+            await Repository.BulkInsertAsync(entranceStatusTags, onBatchProcessed: OnBatchProcessed, batchSize: batchSize,
+                cancellationToken: cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrance hydrology tags");
+            await Repository.BulkInsertAsync(entranceHydrologyTags, onBatchProcessed: OnBatchProcessed, batchSize: batchSize,
+                cancellationToken: cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrance hydrology frequency tags");
+            await Repository.BulkInsertAsync(entranceHydrologyFrequencyTags, onBatchProcessed: OnBatchProcessed, batchSize: batchSize,
+                cancellationToken: cancellationToken);
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting field indication tags");
+            await Repository.BulkInsertAsync(entranceFieldIndicationTags, onBatchProcessed: OnBatchProcessed, batchSize: batchSize,
+                cancellationToken: cancellationToken);
 
             #endregion
 
             await _temporaryEntranceRepository.DropTable();
-            
+
             await transaction.CommitAsync(cancellationToken);
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished importing entrances!");
         }
         catch (Exception e)
         {
@@ -1054,14 +1074,113 @@ public class CaveService : ServiceBase<CaveRepository>
 
         return new FileVm();
     }
-    
+
+    private async Task<List<EntranceCsvModel>> ParseEntranceCsv(Stream stream,
+        List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords, CancellationToken cancellationToken)
+    {
+        var entranceRecords = new List<EntranceCsvModel>();
+        using var reader = new StreamReader(stream);
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null, };
+        using var csv = new CsvReader(reader, config);
+        csv.Context.RegisterClassMap<EntranceCsvModelMap>();
+
+        if (await csv.ReadAsync())
+        {
+            csv.ReadHeader();
+            var index = 1;
+
+            while (await csv.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                index++;
+
+                var record = new EntranceCsvModel();
+                var errors = new List<string>();
+
+                TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out string? countyCaveNumber);
+                if (!string.IsNullOrWhiteSpace(countyCaveNumber))
+                    record.CountyCaveNumber = countyCaveNumber;
+
+                TryGetFieldValue(csv, nameof(record.EntranceName), false, errors, out string? entranceName);
+                record.EntranceName = entranceName;
+
+                TryGetFieldValue(csv, nameof(record.EntranceDescription), false, errors,
+                    out string? entranceDescription);
+                record.EntranceDescription = entranceDescription;
+
+                TryGetFieldValue(csv, nameof(record.IsPrimaryEntrance), false, errors, out bool isPrimaryEntrance);
+                record.IsPrimaryEntrance = isPrimaryEntrance;
+
+                TryGetFieldValue(csv, nameof(record.EntrancePitDepth), false, errors, out double entrancePitDepth);
+                record.EntrancePitDepth = entrancePitDepth;
+
+                TryGetFieldValue(csv, nameof(record.EntranceStatus), false, errors, out string? entranceStatus);
+                record.EntranceStatus = entranceStatus;
+
+                TryGetFieldValue(csv, nameof(record.EntranceHydrology), false, errors, out string? entranceHydrology);
+                record.EntranceHydrology = entranceHydrology;
+
+                TryGetFieldValue(csv, nameof(record.EntranceHydrologyFrequency), false, errors,
+                    out string? entranceHydrologyFrequency);
+                record.EntranceHydrologyFrequency = entranceHydrologyFrequency;
+
+                TryGetFieldValue(csv, nameof(record.FieldIndication), false, errors, out string? fieldIndication);
+                record.FieldIndication = fieldIndication;
+
+                TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
+                record.CountyCode = countyCode;
+
+                TryGetFieldValue(csv, nameof(record.DecimalLatitude), true, errors, out double decimalLatitude);
+                record.DecimalLatitude = decimalLatitude;
+
+                TryGetFieldValue(csv, nameof(record.DecimalLongitude), true, errors, out double decimalLongitude);
+                record.DecimalLongitude = decimalLongitude;
+
+                TryGetFieldValue(csv, nameof(record.EntranceElevationFt), true, errors,
+                    out double entranceElevationFt);
+                record.EntranceElevationFt = entranceElevationFt;
+
+                TryGetFieldValue(csv, nameof(record.GeologyFormation), false, errors, out string? geologyFormation);
+                record.GeologyFormation = geologyFormation;
+
+                TryGetFieldValue(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOnDate);
+                record.ReportedOnDate = reportedOnDate;
+
+                TryGetFieldValue(csv, nameof(record.ReportedByName), false, errors, out string? reportedByName);
+                record.ReportedByName = reportedByName;
+
+                TryGetFieldValue(csv, nameof(record.LocationQuality), true, errors, out string? locationQuality);
+                record.LocationQuality = locationQuality;
+                
+
+                // Add record to the list if there are no errors, else add errors to the failedRecords list
+                if (errors.Any())
+                {
+                    foreach (var error in errors)
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, index, error));
+                }
+                else
+                {
+                    entranceRecords.Add(record);
+                }
+            }
+        }
+
+        if (!failedRecords.Any()) return entranceRecords;
+
+        failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
+        throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+    }
+
     #endregion
 
 
     private async Task<List<TagType>> ProcessTags(IEnumerable<EntranceCsvModel> entranceRecords,
         Func<Task<IEnumerable<TagType>>> getTags, string key, Func<EntranceCsvModel, IEnumerable<string?>?> selector,
+        string signalRGroup,
         CancellationToken cancellationToken)
     {
+        await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Started processing {key} tags");
         var allTags = (await getTags()).ToList();
         var tags = entranceRecords.SelectMany(e => selector(e)?.Select(s => s?.Trim()) ?? Array.Empty<string>())
             .Distinct()
@@ -1078,11 +1197,18 @@ public class CaveService : ServiceBase<CaveRepository>
 
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
 
-        await _tagRepository.BulkInsertAsync(newTags, cancellationToken: cancellationToken);
+        await _tagRepository.BulkInsertAsync(newTags,onBatchProcessed: (OnBatchProcessed ), cancellationToken: cancellationToken);
 
         allTags.AddRange(newTags);
+        await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Finished processing {key} tags");
 
         return allTags;
+
+        async void OnBatchProcessed(int currentProcessedCount, int total)
+        {
+            var message = $"Inserted {currentProcessedCount} out of {total} {key} tags.";
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+        }
     }
 
     private void ProcessEntranceTags<TTag>(EntranceCsvModel entranceRecord,
@@ -1116,15 +1242,72 @@ public class CaveService : ServiceBase<CaveRepository>
         }
     }
 
-
-
-
     #endregion
 
     #region Helper
 
-  
-    private async Task<bool> IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
+    private bool IsValidEntrance(TemporaryEntrance entrance,
+        EntranceCsvModel currentRecord,
+        int currentRowNumber,
+        List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords)
+    {
+        var isValid = true;
+        if (entrance == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Entrance");
+        }
+
+        // check max length for properties
+        foreach (var prop in typeof(TemporaryEntrance).GetProperties())
+        {
+            if (prop.Name != nameof(entrance.Id))
+            {
+                if (prop.GetCustomAttributes(typeof(MaxLengthAttribute), false).FirstOrDefault() is MaxLengthAttribute
+                    maxLengthAttribute)
+                {
+                    if (prop.GetValue(entrance) is string stringValue && stringValue.Length > maxLengthAttribute.Length)
+                    {
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
+                            $"{prop.Name} exceeds the maximum allowed length of {maxLengthAttribute.Length}"));
+                        isValid = false;
+                    }
+                }
+            }
+        }
+        
+        if (entrance.Latitude is > 90 or < -90)
+        {
+            failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
+                $"Latitude must be between -90 and 90!"));
+            isValid = false;
+        }
+
+        if (entrance.Longitude is > 180 or < -180)
+        {
+            failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
+                $"Longitude must be between -180 and 180!"));
+            isValid = false;
+        }
+
+        if (entrance.Elevation < 0)
+        {
+            failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
+                $"Elevation must be greater than or equal to 0!"));
+            isValid = false;
+        }
+
+        if (entrance.PitFeet < 0)
+        {
+            failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
+                $"Pit depth must be greater than or equal to 0!"));
+            isValid = false;
+        }
+        
+        
+        return isValid;
+    }
+
+    private bool IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord,
         int currentRowNumber,
         List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
@@ -1134,13 +1317,14 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             throw ApiExceptionDictionary.BadRequest("Cave is null");
         }
-        
+
         // check max length for properties
         foreach (var prop in typeof(Cave).GetProperties())
         {
             if (prop.Name != nameof(cave.Id))
             {
-                var maxLengthAttribute = prop.GetCustomAttributes(typeof(MaxLengthAttribute), false).FirstOrDefault() as MaxLengthAttribute;
+                var maxLengthAttribute =
+                    prop.GetCustomAttributes(typeof(MaxLengthAttribute), false).FirstOrDefault() as MaxLengthAttribute;
                 if (maxLengthAttribute != null)
                 {
                     var stringValue = prop.GetValue(cave) as string;
@@ -1153,8 +1337,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
             }
         }
-        
-        if(usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
+
+        if (usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
         {
             failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
                 $"County number is already used"));
@@ -1241,7 +1425,6 @@ public sealed class CaveCsvModelMap : ClassMap<CaveCsvModel>
     }
 }
 
-
 public class EntranceCsvModel
 {
     public string CountyCaveNumber { get; set; }
@@ -1261,6 +1444,30 @@ public class EntranceCsvModel
     public string? ReportedOnDate { get; set; }
     public string? ReportedByName { get; set; }
     public string? LocationQuality { get; set; }
-    [Ignore]
-    public string? CaveId { get; set; }
+    [Ignore] [JsonIgnore] public string? CaveId { get; set; }
+
+}
+
+public sealed class EntranceCsvModelMap : ClassMap<EntranceCsvModel>
+{
+    public EntranceCsvModelMap()
+    {
+        Map(m => m.CountyCaveNumber);
+        Map(m => m.EntranceName);
+        Map(m => m.EntranceDescription);
+        Map(m => m.IsPrimaryEntrance).Default(false);
+        Map(m => m.EntrancePitDepth).Default(0.0);
+        Map(m => m.EntranceStatus);
+        Map(m => m.EntranceHydrology);
+        Map(m => m.EntranceHydrologyFrequency);
+        Map(m => m.FieldIndication);
+        Map(m => m.CountyCode);
+        Map(m => m.DecimalLatitude);
+        Map(m => m.DecimalLongitude);
+        Map(m => m.EntranceElevationFt).Default(0.0);
+        Map(m => m.GeologyFormation);
+        Map(m => m.ReportedOnDate);
+        Map(m => m.ReportedByName);
+        Map(m => m.LocationQuality);
+    }
 }

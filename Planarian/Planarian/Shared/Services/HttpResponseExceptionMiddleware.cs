@@ -29,10 +29,14 @@ public class HttpResponseExceptionMiddleware
                 Data = e.Data
             };
 
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault
+            };
+
             context.Response.StatusCode = e.StatusCode;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(error,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(error, options));
         }
         catch (Exception e)
         {

@@ -24,6 +24,8 @@ import { FileVm } from "../../Files/Models/FileVm";
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NotificationComponent } from "./NotificationComponent";
+import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
+import { Link } from "react-router-dom";
 
 interface ImportEntrancesComponentProps {
   onUploaded: () => void;
@@ -69,7 +71,10 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<EntranceCsvModel>;
-      setErrorList(error.data);
+
+      if (error.data) {
+        setErrorList(error.data);
+      }
       setProcessError(error.message);
     } finally {
       setIsLoading(false);
@@ -190,9 +195,11 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             title="Successfully Processed!"
             subTitle="Your entrance CSV file has been successfully processed."
             extra={[
-              <Button type="primary" key="console" onClick={onUploaded}>
-                Import Entrances
-              </Button>,
+              <Link to="/caves">
+                <Button type="primary" key="console" onClick={onUploaded}>
+                  View Caves
+                </Button>
+              </Link>,
               <Button key="buy" onClick={tryAgain} icon={<RedoOutlined />}>
                 Import Another Entrance File
               </Button>,
@@ -223,15 +230,17 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
               ]}
             />
           </Card>
-          <Modal
-            title="Import Entrance Errors"
-            open={isModalOpen}
-            onOk={handleOk}
-            onCancel={handleOk}
-            footer={null}
-          >
-            <CSVDisplay data={convertErrorListToCsv(errorList)} />
-          </Modal>
+          <FullScreenModal>
+            <Modal
+              title="Import Entrance Errors"
+              open={isModalOpen}
+              onOk={handleOk}
+              onCancel={handleOk}
+              footer={null}
+            >
+              <CSVDisplay data={convertErrorListToCsv(errorList)} />
+            </Modal>
+          </FullScreenModal>
         </>
       )}
     </>
