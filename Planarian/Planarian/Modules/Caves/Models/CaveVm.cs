@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 

@@ -8,7 +8,7 @@ using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.Caves.Repositories;
+namespace Planarian.Modules.Import.Repositories;
 
 public class TemporaryEntranceRepository : RepositoryBase
 {

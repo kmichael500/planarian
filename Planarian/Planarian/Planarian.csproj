@@ -33,7 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Modules\Import\Models" />
+      <Folder Include="Modules\Import\Controllers\" />
     </ItemGroup>
     
     <Target Name="PublishAndRunWebPack" AfterTargets="ComputeFilesToPublish">

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;

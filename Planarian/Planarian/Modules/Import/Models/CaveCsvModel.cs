@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Caves.Services;
+namespace Planarian.Modules.Import.Models;
 
 public class CaveCsvModel   
 {

@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Caves.Services;
+namespace Planarian.Shared.Extensions;
 
 public static class ListExtensions{
     public static IEnumerable<List<T>> Chunk<T>(this IEnumerable<T> source, int chunkSize)

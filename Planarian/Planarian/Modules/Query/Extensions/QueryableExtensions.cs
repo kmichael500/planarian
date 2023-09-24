@@ -1,10 +1,8 @@
-using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
-using Planarian.Model.Database.Entities.Trips;
-using Planarian.Modules.Leads.Controllers;
 using Planarian.Modules.Query.Constants;
+using Planarian.Modules.Query.Models;
 
 namespace Planarian.Modules.Query.Extensions;
 

@@ -1,5 +1,5 @@
 using Planarian.Model.Database.Entities.RidgeWalker;
-using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Import.Models;
 
 namespace Planarian.Shared.Exceptions;
 
