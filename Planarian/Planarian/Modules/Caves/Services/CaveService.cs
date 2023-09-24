@@ -954,7 +954,7 @@ public class CaveService : ServiceBase<CaveRepository>
                         ReportedByName = entranceRecord.ReportedByName,
                         CaveId = null, // intentionally null
                     };
-                    entranceRecord.CaveId =
+                    entranceRecord.EntranceId =
                         entrance.Id; // used to associate with erroneous records after inserting into the db
 
                     #region Tags
@@ -1025,7 +1025,7 @@ public class CaveService : ServiceBase<CaveRepository>
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished associating entrances with caves");
             foreach (var unassociatedEntranceId in unassociatedEntranceIds)
             {
-                var unassociatedRecord = entranceRecords.FirstOrDefault(e => e.CaveId == unassociatedEntranceId);
+                var unassociatedRecord = entranceRecords.FirstOrDefault(e => e.EntranceId == unassociatedEntranceId);
                 if (unassociatedRecord == null) continue;
 
                 // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
@@ -1033,9 +1033,41 @@ public class CaveService : ServiceBase<CaveRepository>
                 failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
                     $"Entrance could not be associated with the cave {unassociatedRecord.CountyCode}-{unassociatedRecord.CountyCaveNumber}"));
             }
+            
+            if (failedRecords.Any())
+            {
+                failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+            }
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Validating there is only one primary entrance per cave");
+            var invalidPrimaryEntrance = await _temporaryEntranceRepository.GetInvalidIsPrimaryRecords();
+            if (invalidPrimaryEntrance.Any())
+            {
+                foreach (var tempEntranceId in invalidPrimaryEntrance)
+                {
+                    var tempEntrance = entrances.FirstOrDefault(e => e.Id == tempEntranceId);
+                    if (tempEntrance == null)
+                    {
+                        throw ApiExceptionDictionary.InternalServerError("There was an issue validating primary entrances.");
+                    }
+
+                    var record = entranceRecords.FirstOrDefault(e => e.EntranceId == tempEntranceId);
+                    if (record == null)
+                    {
+                        throw ApiExceptionDictionary.InternalServerError("There was an issue validating primary entrances.");
+                    }
+                    
+                    // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
+                    var calculatedRowNumber = entranceRecords.IndexOf(record) + 2;
+                    failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, calculatedRowNumber,
+                        $"Entrance is marked as primary but there is already a primary entrance for the cave {record.CountyCode}-{record.CountyCaveNumber}"));
+                }
+            }
 
             if (failedRecords.Any())
             {
+                failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
                 throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
             }
         
@@ -1444,7 +1476,7 @@ public class EntranceCsvModel
     public string? ReportedOnDate { get; set; }
     public string? ReportedByName { get; set; }
     public string? LocationQuality { get; set; }
-    [Ignore] [JsonIgnore] public string? CaveId { get; set; }
+    [Ignore] [JsonIgnore] public string? EntranceId { get; set; }
 
 }
 

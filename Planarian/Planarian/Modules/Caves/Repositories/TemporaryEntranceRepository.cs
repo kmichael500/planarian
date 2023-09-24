@@ -78,6 +78,27 @@ public class TemporaryEntranceRepository : RepositoryBase
         return unassociatedEntrances;
     }
 
+    public async Task<List<string>> GetInvalidIsPrimaryRecords()
+    {
+        await using var db = DbContext.CreateLinqToDBConnection();
+        
+        var tempEntranceTable = db.GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName);
+        var entranceTable = db.GetTable<Entrance>();
+
+        // Selecting TemporaryEntrance records that are marked as IsPrimary
+        var invalidTempEntrances = await (from temp in tempEntranceTable.Where(e => e.IsPrimary)
+
+            // Check if there is another TemporaryEntrance record marked as IsPrimary with the same CaveId
+            where tempEntranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary && e.Id != temp.Id)
+
+                  // Union with TemporaryEntrance records that have a corresponding Entrance record marked as IsPrimary with the same CaveId
+                  || entranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary)
+
+            select temp.Id).ToListAsyncLinqToDB();
+        return invalidTempEntrances;
+    }
+
+
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
