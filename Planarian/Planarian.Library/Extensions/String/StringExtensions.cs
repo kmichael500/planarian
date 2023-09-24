@@ -78,4 +78,12 @@ public static class StringExtensions
     {
         return Regex.IsMatch(password, RegularExpressions.PasswordValidation);
     }
+    
+    public static string ToCamelCase(this string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+        
+        return char.ToLowerInvariant(input[0]) + input.Substring(1);
+    }
 }

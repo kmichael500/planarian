@@ -4,11 +4,14 @@ import {
   PlanarianButtonTypeWithoutIcon,
 } from "./PlanarianButtton";
 import { Popconfirm, PopconfirmProps } from "antd";
+import { ReactNode } from "react";
 
-type DeleteButtonomponentType = PopconfirmProps &
-  PlanarianButtonTypeWithoutIcon;
+type DeleteButtonComponentType = PopconfirmProps &
+  PlanarianButtonTypeWithoutIcon & {
+    children?: ReactNode;
+  };
 
-const DeleteButtonComponent: React.FC<DeleteButtonomponentType> = (props) => {
+const DeleteButtonComponent: React.FC<DeleteButtonComponentType> = (props) => {
   return (
     <Popconfirm {...props}>
       <PlanarianButton
@@ -17,7 +20,7 @@ const DeleteButtonComponent: React.FC<DeleteButtonomponentType> = (props) => {
         type="primary"
         icon={<DeleteOutlined />}
       >
-        Delete
+        {props.children || "Delete"}
       </PlanarianButton>
     </Popconfirm>
   );

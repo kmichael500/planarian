@@ -9,6 +9,8 @@ using Microsoft.OpenApi.Models;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
+using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
 using Planarian.Modules.App.Services;
 using Planarian.Modules.Authentication.Repositories;
@@ -122,6 +124,7 @@ builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
@@ -148,6 +151,7 @@ builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
+builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
@@ -211,6 +215,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     // options.SecurityTokenValidators.Clear();
     //
     // options.SecurityTokenValidators.Add(new CustomJwtSecurityTokenHandler());
+    
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+
+            // If the request is for our hub...
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                // Read the token out of the query string
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddMvc().AddSessionStateTempDataProvider();

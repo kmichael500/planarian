@@ -66,9 +66,9 @@ public class CaveService : ServiceBase<CaveRepository>
         return await Repository.GetCaves(query);
     }
 
-    public async Task<string> AddCave(AddCaveVm values)
+    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
@@ -319,7 +319,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync();
 
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(cancellationToken);
 
             foreach (var blobProperties in blobsToDelete)
             {
@@ -330,7 +330,7 @@ public class CaveService : ServiceBase<CaveRepository>
         }
         catch (Exception e)
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }
@@ -377,18 +377,6 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
         }
-    }
-
-    public async Task DeleteAllCaves()
-    {
-        var blobProperties = await _fileRepository.GetAllCavesBlobProperties();
-        await Repository.DeleteAlLCaves();
-        foreach (var blobProperty in blobProperties)
-        {
-            await _fileService.DeleteFile(blobProperty.BlobKey, blobProperty.ContainerName);
-        }
-
-
     }
 
     public async Task ArchiveCave(string caveId)
@@ -448,7 +436,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
         await using var stream = await _fileService.GetFileStream(temporaryFileId);
 
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
@@ -560,7 +548,8 @@ public class CaveService : ServiceBase<CaveRepository>
             #region notifications
 
             int totalRecords = caveRecords.Count();
-            int notifyInterval = (int)(totalRecords * 0.1); // every 10%
+            int notifyInterval = (totalRecords > 0) ? (int)(totalRecords * 0.1) : 0; // every 10% if totalRecords is greater than 0
+            notifyInterval = Math.Max(notifyInterval, 1);
             int processedRecords = 0;
             int successfulRecords = 0;
 
@@ -689,7 +678,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await transaction.CommitAsync(cancellationToken);
         }
-        catch (Exception)
+        catch (Exception e)
         {
             if (transaction.GetDbTransaction().Connection != null)
             {
@@ -728,17 +717,21 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     record.CaveName = caveName;
                 }
+                else
+                {
+                    var stop = "";
+                }
                 
-                TryGetFieldValue(csv, nameof(record.CaveLengthFt), false, errors, out double caveLengthFt);
+                TryGetFieldValue(csv, nameof(record.CaveLengthFt), true, errors, out double caveLengthFt);
                 record.CaveLengthFt = caveLengthFt;
 
-                TryGetFieldValue(csv, nameof(record.CaveDepthFt), false, errors, out double caveDepthFt);
+                TryGetFieldValue(csv, nameof(record.CaveDepthFt), true, errors, out double caveDepthFt);
                 record.CaveDepthFt = caveDepthFt;
 
-                TryGetFieldValue(csv, nameof(record.MaxPitDepthFt), false, errors, out double maxPitDepthFt);
+                TryGetFieldValue(csv, nameof(record.MaxPitDepthFt), true, errors, out double maxPitDepthFt);
                 record.MaxPitDepthFt = maxPitDepthFt;
 
-                TryGetFieldValue(csv, nameof(record.NumberOfPits), false, errors, out int numberOfPits);
+                TryGetFieldValue(csv, nameof(record.NumberOfPits), true, errors, out int numberOfPits);
                 record.NumberOfPits = numberOfPits;
 
                 TryGetFieldValue(csv, nameof(record.Narrative), false, errors, out string? narrative);
@@ -756,7 +749,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     record.CountyName = countyName;
                 }
 
-                TryGetFieldValue(csv, nameof(record.CountyCaveNumber), false, errors, out int countyCaveNumber);
+                TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out int countyCaveNumber);
                 record.CountyCaveNumber = countyCaveNumber;
 
                 TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
@@ -838,7 +831,7 @@ public class CaveService : ServiceBase<CaveRepository>
         await using var stream = await _fileService.GetFileStream(temporaryFileId);
 
 
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             using var reader = new StreamReader(stream);

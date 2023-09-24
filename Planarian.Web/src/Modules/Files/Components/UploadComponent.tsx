@@ -160,7 +160,6 @@ const UploadComponent = ({
             );
 
             setSingleFileUploadPercent(percent);
-            console.log(percent);
 
             if (onProgress) {
               onProgress({ percent });

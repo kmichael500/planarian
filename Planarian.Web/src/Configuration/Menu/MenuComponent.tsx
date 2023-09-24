@@ -69,6 +69,15 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
       label: "Import",
     },
     {
+      key: "/account/settings",
+      icon: (
+        <Link to="/account/settings">
+          <SettingOutlined />
+        </Link>
+      ),
+      label: "Settings",
+    },
+    {
       icon: <Divider />,
     },
     {

@@ -16,9 +16,10 @@ public class FileController : PlanarianControllerBase<FileService>
     }
 
     [HttpPut("multiple")]
-    public async Task<IActionResult> UpdateFilesMetadata([FromBody] IEnumerable<EditFileMetadataVm> values)
+    public async Task<IActionResult> UpdateFilesMetadata([FromBody] IEnumerable<EditFileMetadataVm> values,
+        CancellationToken cancellationToken)
     {
-        await Service.UpdateFilesMetadata(values);
+        await Service.UpdateFilesMetadata(values, cancellationToken);
         return Ok();
     }
     

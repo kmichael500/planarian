@@ -3,6 +3,7 @@ import { HubConnectionBuilder } from "@microsoft/signalr";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { Alert, List, Space, Spin, Typography } from "antd";
+import { group } from "console";
 
 function NotificationComponent({
   groupName,
@@ -21,7 +22,6 @@ function NotificationComponent({
     const newConnection = new HubConnectionBuilder()
       .withUrl(AppOptions.signalrBaseUrl, {
         accessTokenFactory: () => {
-          console.log("Getting token");
           if (AuthenticationService.IsAuthenticated()) {
             var token = AuthenticationService.GetToken();
             if (token) {
@@ -59,7 +59,7 @@ function NotificationComponent({
             });
           });
         })
-        .catch((e) => console.log("Connection failed: ", e));
+        .catch((e) => console.error("Connection failed: ", e));
     }
 
     // Clean up the connection on component unmount
@@ -68,7 +68,7 @@ function NotificationComponent({
         connection
           .stop()
           .then(() => console.log("Connection stopped!"))
-          .catch((e) => console.log("Error stopping the connection: ", e));
+          .catch((e) => console.error("Error stopping the connection: ", e));
       }
     };
   }, [connection, groupName]);

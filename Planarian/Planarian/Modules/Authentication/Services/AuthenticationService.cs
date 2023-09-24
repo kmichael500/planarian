@@ -45,8 +45,11 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
         if (!isValid) throw ApiExceptionDictionary.InvalidPassword;
+        
+        var accountIds = await Repository.GetAccountIdsByUserId(user.Id);
+        var accountId = accountIds.FirstOrDefault();
 
-        var userForToken = new UserToken(user.FullName, user.Id);
+        var userForToken = new UserToken(user.FullName, user.Id, accountId);
 
         var token = _tokenService.BuildToken(userForToken);
 

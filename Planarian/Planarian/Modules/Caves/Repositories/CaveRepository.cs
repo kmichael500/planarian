@@ -1,11 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
-using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
-using Planarian.Modules.Caves.Services;
-using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
@@ -190,19 +187,7 @@ public class CaveRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task DeleteAlLCaves()
-    {
-        var sql =
-            $"DELETE FROM {nameof(PlanarianDbContext.Caves)} WHERE {nameof(Cave.AccountId)} = '{RequestUser.AccountId}'";
-        await DbContext.Database.ExecuteSqlRawAsync(sql);
-
-        sql =
-            $"DELETE FROM {nameof(PlanarianDbContext.TagTypes)} WHERE {nameof(TagType.AccountId)} = '{RequestUser.AccountId}' AND [{nameof(TagType.Key)}] = '{TagTypeKeyConstant.Geology}'";
-        await DbContext.Database.ExecuteSqlRawAsync(sql);
-
-        await DbContext.Database.ExecuteSqlRawAsync(sql);
-
-    }
+    
 
     public record UsedCountyNumber(string CountyId, int CountyNumber);
     public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()

@@ -35,7 +35,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
         CancellationToken cancellationToken, string? uuid = null)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null)
         {
             throw new BadRequestException("Account Id is null");
@@ -95,7 +95,7 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken,
         string? uuid = null)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null)
         {
             throw new BadRequestException("Account Id is null");
@@ -187,9 +187,9 @@ public class FileService : ServiceBase<FileRepository>
     }
     #endregion
 
-    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values)
+    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values, CancellationToken cancellationToken)
     {
-        await using var transaction = await Repository.BeginTransactionAsync();
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
         {
             var file = await Repository.GetFileById(value.Id);

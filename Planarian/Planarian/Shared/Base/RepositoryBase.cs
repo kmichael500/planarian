@@ -24,9 +24,9 @@ public abstract class RepositoryBase
         var result = await DbContext.SaveChangesAsync();
     }
     
-    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
     {
-        return await DbContext.Database.BeginTransactionAsync();
+        return await DbContext.Database.BeginTransactionAsync(cancellationToken);
     }
 
     public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null,

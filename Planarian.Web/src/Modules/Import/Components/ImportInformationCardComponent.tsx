@@ -357,7 +357,7 @@ const ImportInformationCardComponent = () => {
           </Row>
 
           <Paragraph>
-            <b>Required Columns:</b>{" "}
+            Required Columns{" "}
             <Space wrap>
               {caveImportHeadersData
                 .filter((item) => item.data.isRequired)
@@ -380,7 +380,7 @@ const ImportInformationCardComponent = () => {
             </Space>
           </Paragraph>
           <Paragraph>
-            <b>Optional Columns:</b>{" "}
+            Optional Columns:{" "}
             <Space wrap>
               {caveImportHeadersData
                 .filter((item) => !item.data.isRequired)
@@ -423,7 +423,7 @@ const ImportInformationCardComponent = () => {
             </Col>
           </Row>
           <Paragraph>
-            <b>Required Columns:</b>{" "}
+            Required Columns:{" "}
             <Space wrap>
               {entranceImportHeadersData
                 .filter((item) => item.data.isRequired)
@@ -446,7 +446,7 @@ const ImportInformationCardComponent = () => {
             </Space>
           </Paragraph>
           <Paragraph>
-            <b>Optional Columns:</b>{" "}
+            Optional Columns:{" "}
             <Space wrap>
               {entranceImportHeadersData
                 .filter((item) => !item.data.isRequired)

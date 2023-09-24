@@ -24,6 +24,7 @@ import { FileVm } from "../../Files/Models/FileVm";
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NotificationComponent } from "./NotificationComponent";
+import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -69,7 +70,11 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<CaveCsvModel>;
-      setErrorList(error.data);
+
+      if (error.data) {
+        setErrorList(error.data);
+        setErrorList(error.data);
+      }
       setProcessError(error.message);
     } finally {
       setIsLoading(false);
@@ -223,15 +228,18 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
               ]}
             />
           </Card>
-          <Modal
-            title="Import Cave Errors"
-            open={isModalOpen}
-            onOk={handleOk}
-            onCancel={handleOk}
-            footer={null}
-          >
-            <CSVDisplay data={convertErrorListToCsv(errorList)} />
-          </Modal>
+          <FullScreenModal>
+            <div>test</div>
+            <Modal
+              title="Import Cave Errors"
+              open={isModalOpen}
+              onOk={handleOk}
+              onCancel={handleOk}
+              footer={null}
+            >
+              <CSVDisplay data={convertErrorListToCsv(errorList)} />
+            </Modal>
+          </FullScreenModal>
         </>
       )}
     </>

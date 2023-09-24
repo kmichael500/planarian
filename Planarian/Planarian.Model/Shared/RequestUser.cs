@@ -14,6 +14,7 @@ public class RequestUser
 
     public string Id { get; set; } = null!;
     public string? AccountId { get; set; }
+    public string? UserGroupPrefix { get; set; }
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string FullName => $"{FirstName} {LastName}";
@@ -33,8 +34,9 @@ public class RequestUser
         FirstName = user.FirstName;
         LastName = user.LastName;
         IsAuthenticated = true;
-        
+
         AccountId = user.AccountUsers.FirstOrDefault()?.AccountId;
+        UserGroupPrefix = $"{userId}-{AccountId}";
     }
 
     public string AccountContainerName => $"account-{AccountId?.ToLower() ?? throw new NullReferenceException(  $" {nameof(AccountId)} is null")}";

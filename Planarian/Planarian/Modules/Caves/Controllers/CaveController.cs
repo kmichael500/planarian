@@ -41,17 +41,17 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost]
-    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave)
+    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave);
+        var result = await Service.AddCave(cave, cancellationToken);
 
         return new JsonResult(result);
     }
 
     [HttpPut]
-    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave)
+    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave);
+        var result = await Service.AddCave(cave, cancellationToken);
 
         return new JsonResult(result);
     }
@@ -132,13 +132,5 @@ public class CaveController : PlanarianControllerBase<CaveService>
         return new JsonResult(result);
     }
     
-    [HttpDelete("import")]
-    public async Task<ActionResult> DeleteAllCaves()
-    {
-        await Service.DeleteAllCaves();
-
-        return new OkResult();
-    }
-
     #endregion
 }

@@ -17,6 +17,7 @@ import { EditCavePage } from "./Modules/Caves/Pages/EditCavePage";
 import { ImportPage } from "./Modules/Import/Pages/ImportPage";
 import { NotFoundPage } from "./Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "./Shared/Pages/Unauthorized";
+import { AccountSettingsPage } from "./Modules/Account/Pages/AccountSettingsPage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -34,7 +35,7 @@ export const AppRouting: React.FC = () => {
         <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
         <Route path="/caves/add" element={<AddCavesPage />} />
         <Route path="/caves/import" element={<ImportPage />} />
-        {/* <Route path="/account/settings" element={<AccountSettings />} /> */}
+        <Route path="/account/settings" element={<AccountSettingsPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
         <Route
