@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Modal, message, Spin } from "antd";
+import { Card, Result, Button, Modal, message } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -10,7 +10,6 @@ import Papa from "papaparse";
 // Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
-import { CaveService } from "../../Caves/Service/CaveService";
 
 // Importing models
 import {
@@ -25,6 +24,7 @@ import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NotificationComponent } from "./NotificationComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
+import { AccountService } from "../../Account/Services/AccountService";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -66,7 +66,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setIsLoading(true);
     setIsProcessing(true); // Set processing state to true when starting to process
     try {
-      await CaveService.ImportCavesFileProcess(uploadResult.id);
+      await AccountService.ImportCavesFileProcess(uploadResult.id);
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<CaveCsvModel>;
@@ -104,7 +104,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
           style={{ display: "flex" }}
           uploadFunction={async (params): Promise<FileVm> => {
             try {
-              const result = await CaveService.ImportCavesFile(
+              const result = await AccountService.ImportCavesFile(
                 params.file,
                 params.uid,
                 params.onProgress

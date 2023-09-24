@@ -34,7 +34,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     #region Import
 
     [DisableRequestSizeLimit] //TODO
-    [HttpPost("import-caves/file")]
+    [HttpPost("import/caves/file")]
     public async Task<IActionResult> ImportCavesFile(string? uuid, [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -45,7 +45,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return new JsonResult(result);
     }
 
-    [HttpPost("import-caves/process/{fileId:length(10)}")]
+    [HttpPost("import/caves/process/{fileId:length(10)}")]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
         CancellationToken cancellationToken)
     {
@@ -55,7 +55,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [DisableRequestSizeLimit] //TODO
-    [HttpPost("import-entrances/file")]
+    [HttpPost("import/entrances/file")]
     public async Task<IActionResult> ImportEntrancesFile(string? uuid, [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -66,7 +66,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return new JsonResult(result);
     }
 
-    [HttpPost("import-entrances/process/{fileId:length(10)}")]
+    [HttpPost("import/entrances/process/{fileId:length(10)}")]
     public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
         CancellationToken cancellationToken)
     {
