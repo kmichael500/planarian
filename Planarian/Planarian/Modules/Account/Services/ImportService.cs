@@ -9,6 +9,7 @@ using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
@@ -30,11 +31,13 @@ public class ImportService : ServiceBase
     private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
     private readonly NotificationService _notificationService;
     private readonly CaveRepository _repository;
+    private readonly AccountRepository _accountRepository;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository tagRepository, SettingsRepository settingsRepository,
         TemporaryEntranceRepository temporaryEntranceRepository,
-        NotificationService notificationService, CaveRepository repository) : base(requestUser)
+        NotificationService notificationService, CaveRepository repository,
+        AccountRepository accountRepository) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -42,6 +45,7 @@ public class ImportService : ServiceBase
         _temporaryEntranceRepository = temporaryEntranceRepository;
         _notificationService = notificationService;
         _repository = repository;
+        _accountRepository = accountRepository;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -113,13 +117,30 @@ public class ImportService : ServiceBase
             var states = caveRecords.Select(e => e.State.Trim()).Distinct().ToList();
 
             var stateEntities = new List<State>();
-
+            var allAccountStates = (await _accountRepository.GetAllAccountStates()).ToList();
+            var newAccountStates = new List<AccountState>();
             foreach (var state in states)
             {
                 var stateEntity = await _settingsRepository.GetStateByNameOrAbbreviation(state) ??
                                   throw ApiExceptionDictionary.NotFound("State");
                 stateEntities.Add(stateEntity);
+                
+                var existingAccountState = allAccountStates.Any(e=>e.StateId == stateEntity.Id);
+                if (!existingAccountState)
+                {
+                    var accountState = new AccountState
+                    {
+                        Id = IdGenerator.Generate(),
+                        AccountId = RequestUser.AccountId,
+                        StateId = stateEntity.Id,
+                        CreatedByUserId = RequestUser.Id,
+                        CreatedOn = DateTime.UtcNow,
+                    };
+                    newAccountStates.Add(accountState);
+                }
             }
+
+            await _accountRepository.BulkInsertAsync(newAccountStates, cancellationToken: cancellationToken);
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing states");
 
@@ -260,6 +281,13 @@ public class ImportService : ServiceBase
                         continue;
                     }
 
+                    if (caveRecord.IsArchived == null)
+                    {
+                        failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                            $"{nameof(caveRecord.IsArchived)} is missing."));
+                        continue;
+                    }
+
                     var isValidReportedOn = DateTime.TryParse(caveRecord.ReportedOnDate, out var reportedOnDate);
                     var cave = new Cave
                     {
@@ -276,31 +304,35 @@ public class ImportService : ServiceBase
                         StateId = state.Id,
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
                         ReportedByName = caveRecord.ReportedByName?.Trim(),
-                        IsArchived = caveRecord.IsArchived ??
-                                     throw ApiExceptionDictionary.ImportMissingValue(nameof(caveRecord.IsArchived)),
+                        IsArchived = (bool)caveRecord.IsArchived,
+                        CreatedOn = DateTime.UtcNow,
+                        CreatedByUserId = RequestUser.Id,
                     };
-                    var geologyNames = caveRecord.Geology.Split(',').Select(g => g.Trim())
-                        .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
-                    foreach (var geologyName in geologyNames)
+                    if (caveRecord.Geology != null)
                     {
-                        var tag = allGeologyTags.FirstOrDefault(e =>
-                            e.Name.Equals(geologyName, StringComparison.InvariantCultureIgnoreCase));
-                        if (tag == null)
+                        var geologyNames = caveRecord.Geology.Split(',').Select(g => g.Trim())
+                            .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
+                        foreach (var geologyName in geologyNames)
                         {
-                            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
-                                $"{nameof(caveRecord.Geology)} not found: '{geologyName}'"));
-                            continue;
-                        }
+                            var tag = allGeologyTags.FirstOrDefault(e =>
+                                e.Name.Equals(geologyName, StringComparison.InvariantCultureIgnoreCase));
+                            if (tag == null)
+                            {
+                                failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                                    $"{nameof(caveRecord.Geology)} not found: '{geologyName}'"));
+                                continue;
+                            }
 
-                        var geologyTag = new GeologyTag
-                        {
-                            Id = IdGenerator.Generate(),
-                            CaveId = cave.Id,
-                            TagTypeId = tag.Id,
-                            CreatedOn = DateTime.UtcNow,
-                            CreatedByUserId = RequestUser.Id,
-                        };
-                        cave.GeologyTags.Add(geologyTag);
+                            var geologyTag = new GeologyTag
+                            {
+                                Id = IdGenerator.Generate(),
+                                CaveId = cave.Id,
+                                TagTypeId = tag.Id,
+                                CreatedOn = DateTime.UtcNow,
+                                CreatedByUserId = RequestUser.Id,
+                            };
+                            cave.GeologyTags.Add(geologyTag);
+                        }
                     }
 
                     var isValidCave = IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords);
@@ -683,34 +715,36 @@ public class ImportService : ServiceBase
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
                         ReportedByName = entranceRecord.ReportedByName,
                         CaveId = null, // intentionally null
+                        CreatedOn = DateTime.UtcNow,
+                        CreatedByUserId = RequestUser.Id,
                     };
                     entranceRecord.EntranceId =
                         entrance.Id; // used to associate with erroneous records after inserting into the db
 
                     #region Tags
 
-                    InsertEntranceTags(
+                    CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.EntranceStatus),
                         entranceStatusTags,
                         e => e.EntranceStatus,
                         allEntranceStatusTags);
 
-                    InsertEntranceTags(
+                    CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.EntranceHydrology),
                         entranceHydrologyTags,
                         e => e.EntranceHydrology,
                         allEntranceHydrologyTags);
 
-                    InsertEntranceTags(
+                    CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.EntranceHydrologyFrequency),
                         entranceHydrologyFrequencyTags,
                         e => e.EntranceHydrologyFrequency,
                         allEntranceHydrologyFrequencyTags);
 
-                    InsertEntranceTags(
+                    CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.FieldIndication),
                         entranceFieldIndicationTags,
@@ -981,7 +1015,7 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
         }
     }
-    private void InsertEntranceTags<TTag>(EntranceCsvModel entranceRecord,
+    private void CreateEntranceTags<TTag>(EntranceCsvModel entranceRecord,
         string entranceId,
         string entranceTagField,
         List<TTag> tagList,

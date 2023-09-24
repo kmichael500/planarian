@@ -132,6 +132,7 @@ builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
+builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();

@@ -1,5 +1,6 @@
 using LinqToDB;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
@@ -13,8 +14,8 @@ public class AccountRepository : RepositoryBase
 
     public async Task DeleteAlLCaves(IProgress<string> progress, CancellationToken cancellationToken)
     {
-        const int batchSize = 1000; // Adjust based on your needs
-        var cavesCount = await DbContext.Caves.CountAsync(e=>e.AccountId == RequestUser.AccountId, cancellationToken);
+        const int batchSize = 500; // Adjust based on your needs
+        var cavesCount = await DbContext.Caves.CountAsync(e => e.AccountId == RequestUser.AccountId, cancellationToken);
         // Batch delete for Caves
         int deletedCount;
         var totalDeleted = 0;
@@ -44,7 +45,7 @@ public class AccountRepository : RepositoryBase
                 .DeleteAsync(token: cancellationToken);
 
             totalDeleted += deletedCount;
-            progress.Report($"Deleted {totalDeleted} of {tagTypesCount} caves.");
+            progress.Report($"Deleted {totalDeleted} of {tagTypesCount} tags.");
 
         } while (deletedCount == batchSize); // Continue until fewer than batchSize rows are deleted
     }
@@ -58,5 +59,9 @@ public class AccountRepository : RepositoryBase
     {
         await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
     }
-    
+
+    public async Task<IEnumerable<AccountState>> GetAllAccountStates()
+    {
+        return await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).ToListAsync();
+    }
 }
