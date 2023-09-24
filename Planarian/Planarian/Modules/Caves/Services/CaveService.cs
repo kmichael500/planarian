@@ -420,14 +420,16 @@ public class CaveService : ServiceBase<CaveRepository>
     #endregion
 
     #region Import
+
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
         CancellationToken cancellationToken)
     {
         var result = await _fileService.AddTemporaryAccountFile(stream, fileName,
             FileTypeTagName.Other, cancellationToken, uuid);
-        
+
         return result;
     }
+
     #region Import Caves
 
     public async Task<FileVm> ImportCavesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
@@ -438,7 +440,7 @@ public class CaveService : ServiceBase<CaveRepository>
         }
 
         var signalRGroup = temporaryFileId;
-        
+
         if (string.IsNullOrWhiteSpace(temporaryFileId))
         {
             throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
@@ -452,7 +454,8 @@ public class CaveService : ServiceBase<CaveRepository>
             var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
-            var caveRecords = await ParseCaveCsv(stream, failedRecords);
+            var caveRecords = await ParseCaveCsv(stream, failedRecords, cancellationToken);
+            
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
 
             #region States
@@ -555,12 +558,14 @@ public class CaveService : ServiceBase<CaveRepository>
             var rowNumber = 1; // start at 1 to account for header row
 
             #region notifications
+
             int totalRecords = caveRecords.Count();
             int notifyInterval = (int)(totalRecords * 0.1); // every 10%
             int processedRecords = 0;
             int successfulRecords = 0;
+
             #endregion
-            
+
             foreach (var caveRecord in caveRecords)
             {
                 processedRecords++;
@@ -690,219 +695,133 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
-
             throw;
         }
 
         return new FileVm();
     }
 
-    private async Task<List<CaveCsvModel>> ParseCaveCsv(Stream stream, List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
+    private async Task<List<CaveCsvModel>> ParseCaveCsv(Stream stream,
+        List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords, CancellationToken cancellationToken)
     {
         var caveRecords = new List<CaveCsvModel>();
         using var reader = new StreamReader(stream);
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-        {
-            MissingFieldFound = null,
-        };
-
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null, };
         using var csv = new CsvReader(reader, config);
         csv.Context.RegisterClassMap<CaveCsvModelMap>();
-        
+
         if (await csv.ReadAsync())
         {
-            csv.ReadHeader(); // Reads the header.
-            var exceptions = new List<(Exception exception, string fieldName)>();
-            var hasExceptions = false;
+            csv.ReadHeader();
+            var index = 1;
 
-            var index = 1; // start at 1 to account for header row
-            while (await csv.ReadAsync()) // Now, start reading the records.
-            {           
+            while (await csv.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 index++;
-                // var type = typeof(CaveCsvModel);
-                // var properties = type.GetProperties();
-                //
-                // bool isEmptyRow = properties.All(property =>
-                // {
-                //     var fieldName = property.Name;
-                //     var fieldValue = csv.GetField(fieldName);
-                //     return string.IsNullOrWhiteSpace(fieldValue);
-                // });
-                //
-                // if (isEmptyRow)
-                //     continue; // Skip to the next iteration if the row is empty.
-
 
                 var record = new CaveCsvModel();
-                try
+                var errors = new List<string>();
+
+                TryGetFieldValue(csv, nameof(record.CaveName), true, errors, out string? caveName);
+                if (!string.IsNullOrWhiteSpace(caveName))
                 {
-                    var caveName = csv.GetField(nameof(CaveCsvModel.CaveName));
-                    record.CaveName = caveName?.Trim() ??
-                                      throw ApiExceptionDictionary.ImportMissingValue(nameof(record.CaveName));
+                    record.CaveName = caveName;
                 }
-                catch (Exception e)
+                
+                TryGetFieldValue(csv, nameof(record.CaveLengthFt), false, errors, out double caveLengthFt);
+                record.CaveLengthFt = caveLengthFt;
+
+                TryGetFieldValue(csv, nameof(record.CaveDepthFt), false, errors, out double caveDepthFt);
+                record.CaveDepthFt = caveDepthFt;
+
+                TryGetFieldValue(csv, nameof(record.MaxPitDepthFt), false, errors, out double maxPitDepthFt);
+                record.MaxPitDepthFt = maxPitDepthFt;
+
+                TryGetFieldValue(csv, nameof(record.NumberOfPits), false, errors, out int numberOfPits);
+                record.NumberOfPits = numberOfPits;
+
+                TryGetFieldValue(csv, nameof(record.Narrative), false, errors, out string? narrative);
+                record.Narrative = narrative;
+
+                TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
+                if (!string.IsNullOrWhiteSpace(countyCode))
                 {
-                    exceptions.Add((e, nameof(record.CaveName)));
+                    record.CountyCode = countyCode;
                 }
 
-                try
+                TryGetFieldValue(csv, nameof(record.CountyName), true, errors, out string? countyName);
+                if (!string.IsNullOrWhiteSpace(countyName))
                 {
-                    var caveLengthFt = csv.GetField<double>(nameof(CaveCsvModel.CaveLengthFt));
-                    record.CaveLengthFt = caveLengthFt;
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.CaveLengthFt)));
+                    record.CountyName = countyName;
                 }
 
-                try
-                {
-                    var caveDepthFt = csv.GetField<double>(nameof(CaveCsvModel.CaveDepthFt));
-                    record.CaveDepthFt = caveDepthFt;
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.CaveDepthFt)));
-                }
+                TryGetFieldValue(csv, nameof(record.CountyCaveNumber), false, errors, out int countyCaveNumber);
+                record.CountyCaveNumber = countyCaveNumber;
 
-                try
+                TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
+                if (!string.IsNullOrWhiteSpace(state))
                 {
-                    var maxPitDepthFt = csv.GetField<double>(nameof(CaveCsvModel.MaxPitDepthFt));
-                    record.MaxPitDepthFt = maxPitDepthFt;
+                    record.State = state;
                 }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.MaxPitDepthFt)));
-                }
+                
+                TryGetFieldValue(csv, nameof(record.Geology), false, errors, out string? geology);
+                record.Geology = geology;
 
-                try
-                {
-                    var numberOfPits = csv.GetField<int>(nameof(CaveCsvModel.NumberOfPits));
-                    record.NumberOfPits = numberOfPits;
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.NumberOfPits)));
-                }
+                TryGetFieldValue(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOnDate);
+                record.ReportedOnDate = reportedOnDate;
 
-                try
-                {
-                    var narrative = csv.GetField(nameof(CaveCsvModel.Narrative));
-                    record.Narrative = narrative?.Trim();
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.Narrative)));  
-                }
+                TryGetFieldValue(csv, nameof(record.ReportedByName), false, errors, out string? reportedByName);
+                record.ReportedByName = reportedByName;
 
-                try
-                {
-                    var countyCode = csv.GetField(nameof(CaveCsvModel.CountyCode));
-                    record.CountyCode = countyCode?.Trim() ??
-                                        throw ApiExceptionDictionary.ImportMissingValue(nameof(record.CountyCode));
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.CountyCode)));
-                }
+                TryGetFieldValue(csv, nameof(record.IsArchived), false, errors, out bool isArchived);
+                record.IsArchived = isArchived;
 
-                try
+                if (errors.Any())
                 {
-                    var countyName = csv.GetField(nameof(CaveCsvModel.CountyName));
-                    record.CountyName = countyName?.Trim() ??
-                                        throw ApiExceptionDictionary.ImportMissingValue(nameof(record.CountyName));
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.CountyName)));
-                }
-
-                try
-                {
-                    var countyCaveNumber = csv.GetField<int>(nameof(CaveCsvModel.CountyCaveNumber));
-                    record.CountyCaveNumber = countyCaveNumber;
-                }
-                catch (TypeConverterException e)
-                {
-                    exceptions.Add((e, nameof(record.CountyCaveNumber)));
-                }
-
-                try
-                {
-                    var state = csv.GetField(nameof(CaveCsvModel.State));
-                    record.State = state?.Trim() ??
-                                   throw ApiExceptionDictionary.ImportMissingValue(nameof(record.State));
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.State)));
-                }
-
-                try
-                {
-                    var geology = csv.GetField(nameof(CaveCsvModel.Geology));
-                    record.Geology = geology?.Trim();
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.Geology)));
-                }
-
-                try
-                {
-                    var reportedOnDate = csv.GetField(nameof(CaveCsvModel.ReportedOnDate));
-                    record.ReportedOnDate = reportedOnDate?.Trim();
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.ReportedOnDate)));
-                }
-
-                try
-                {
-                    var reportedByName = csv.GetField(nameof(CaveCsvModel.ReportedByName));
-                    record.ReportedByName = reportedByName?.Trim();
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.ReportedByName)));
-                }
-
-                try
-                {
-                    var isArchived = csv.GetField<bool>(nameof(CaveCsvModel.IsArchived));
-                    record.IsArchived = isArchived;
-                }
-                catch (Exception e)
-                {
-                    exceptions.Add((e, nameof(record.IsArchived)));
-                }
-                foreach (var e in exceptions)
-                {
-                    var errorMessage = e.exception.Message;
-                    if (e.exception is TypeConverterException castException)
+                    foreach (var error in errors)
                     {
-                        errorMessage =
-                            $"Invalid type for '{e.fieldName}'\nOriginal Value: '{castException.Text}'";
+                        failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(record, index, error));
                     }
-
-                    failedRecords.Add(
-                        new FailedCaveCsvRecord<CaveCsvModel>(record, index, errorMessage));
-                    hasExceptions = true;
                 }
-                exceptions.Clear();
-
-                caveRecords.Add(record);
-            }
-            if (hasExceptions)
-            {
-                failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-                throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+                else
+                {
+                    caveRecords.Add(record);
+                }
             }
         }
+
+        if (!failedRecords.Any()) return caveRecords;
         
-        return caveRecords;
+        failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
+        throw ApiExceptionDictionary.InvalidCaveImport(failedRecords);
+
     }
+
+    private bool TryGetFieldValue<T>(CsvReader csv, string fieldName, bool isRequired, List<string> errors,
+        out T? fieldValue)
+    {
+        var hasValue = csv.TryGetField(fieldName, out fieldValue);
+
+        if (!hasValue || typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(fieldValue?.ToString()))
+        {
+            if (isRequired)
+            {
+                errors.Add($"{fieldName} is required.");
+            }
+
+            return false;
+        }
+
+        // trim value of string
+        if (typeof(T) == typeof(string) && fieldValue != null)
+        {
+            fieldValue = (T)(object)fieldValue?.ToString()?.Trim()!;
+        }
+
+        return true;
+    }
+
 
     public async Task<FileVm> ImportEntrancesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
     {

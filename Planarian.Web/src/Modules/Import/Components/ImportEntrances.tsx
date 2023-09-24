@@ -224,7 +224,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             />
           </Card>
           <Modal
-            title="Import Cave Errors"
+            title="Import Entrance Errors"
             open={isModalOpen}
             onOk={handleOk}
             onCancel={handleOk}

@@ -110,4 +110,8 @@ public static class ApiExceptionDictionary
     public static Exception ImportMissingValue(string columnName) => new ApiException(StatusCodes.Status400BadRequest,
         404,
         $"Missing value for column '{columnName}'");
+
+    public static Exception ParsingError => new ApiException(StatusCodes.Status400BadRequest,
+        405,
+        $"There were errors during import.'");
 }
