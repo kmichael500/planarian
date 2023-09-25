@@ -31,7 +31,10 @@ public class CaveRepository : RepositoryBase
                     case "Name":
                         query = queryCondition.Operator switch
                         {
-                            QueryOperator.Contains => query.Where(e => e.Name.Contains(queryCondition.Value)),
+                            QueryOperator.Contains => query.Where(e =>
+                                e.Name.Contains(queryCondition.Value) ||
+                                (queryCondition.Value.Contains(e.County.DisplayId) &&
+                                 queryCondition.Value.Contains(e.CountyNumber.ToString()))),
                             _ => query
                         };
                         break;
