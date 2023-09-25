@@ -5,11 +5,8 @@ using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
-using Planarian.Modules.Import.Repositories;
-using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
-using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Exceptions;
@@ -22,22 +19,14 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
-    private readonly SettingsRepository _settingsRepository;
-    private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
-    private readonly NotificationService _notificationService;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository, SettingsRepository settingsRepository,
-        TemporaryEntranceRepository temporaryEntranceRepository,
-        NotificationService notificationService) : base(
+        FileRepository fileRepository, TagRepository tagRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _tagRepository = tagRepository;
-        _settingsRepository = settingsRepository;
-        _temporaryEntranceRepository = temporaryEntranceRepository;
-        _notificationService = notificationService;
     }
 
     #region Caves
