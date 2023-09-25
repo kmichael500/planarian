@@ -116,4 +116,12 @@ public static class ApiExceptionDictionary
     public static Exception ParsingError => new ApiException(StatusCodes.Status400BadRequest,
         405,
         $"There were errors during import.'");
+
+    #region Query 500-599
+
+    public static Exception QueryInvalidValue(string field, string value) =>
+        new ApiException(StatusCodes.Status400BadRequest, 500,
+            $"Invalid value '{value}' for field '{field}'");
+
+    #endregion
 }

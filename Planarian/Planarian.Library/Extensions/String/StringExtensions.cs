@@ -6,6 +6,20 @@ namespace Planarian.Library.Extensions.String;
 
 public static class StringExtensions
 {
+    public static string[] SplitAndTrim(this string? input, char delimiter = ',')
+    {
+        return input == null ? Array.Empty<string>() : input.Split(delimiter).Select(s => s.Trim()).ToArray();
+    }
+    public static string FirstCharToUpper(this string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return input;
+
+        var result = char.ToUpper(input[0]) + input[1..];
+        
+        return result;
+    }
+
     public static bool IsValidEmail(this string email)
     {
         if (string.IsNullOrEmpty(email)) return false;
