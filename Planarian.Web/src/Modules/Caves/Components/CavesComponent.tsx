@@ -54,7 +54,7 @@ const CavesComponent: React.FC = () => {
     <>
       <AdvancedSearchDrawerComponent
         mainSearchField={"name"}
-        mainSearchFieldLabel={"Name"}
+        mainSearchFieldLabel={"Name or ID"}
         onSearch={onSearch}
         queryBuilder={queryBuilder}
         form={form}
