@@ -1,23 +1,23 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import { ProtectedRoutesComponent } from "./Modules/Authentication/Components/ProtectedRoutesComponent";
-import { ConfirmEmailPage } from "./Modules/Authentication/Pages/ConfirmEmailPage";
-import { LoginPage } from "./Modules/Authentication/Pages/LoginPage";
-import { ResetPasswordPage } from "./Modules/Authentication/Pages/ResetPasswordPage";
-import { RegisterPage } from "./Modules/Authentication/Register/Components/RegisterPage";
-import { ProjectPage } from "./Modules/Project/Pages/ProjectPage";
-import { ProjectsPage } from "./Modules/Project/Pages/ProjectsPage";
-import { SettingsPage } from "./Modules/Setting/Pages/SettingsPage";
-import { LeadAddPage } from "./Modules/Trip/Pages/LeadAddPage";
-import { TripPage } from "./Modules/Trip/Pages/TripPage";
-import { TripPhotoUploadPage } from "./Modules/Trip/Pages/TripPhotoUploadPage";
-import { CavesPage } from "./Modules/Caves/Pages/CavesPage";
-import { AddCavesPage } from "./Modules/Caves/Pages/AddCavePage";
-import { CavePage } from "./Modules/Caves/Pages/CavePage";
-import { EditCavePage } from "./Modules/Caves/Pages/EditCavePage";
-import { ImportPage } from "./Modules/Import/Pages/ImportPage";
-import { NotFoundPage } from "./Shared/Pages/NotFoundPage";
-import { UnauthorizedPage } from "./Shared/Pages/Unauthorized";
-import { AccountSettingsPage } from "./Modules/Account/Pages/AccountSettingsPage";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AccountSettingsPage } from "../../Modules/Account/Pages/AccountSettingsPage";
+import { ProtectedRoutesComponent } from "../../Modules/Authentication/Components/ProtectedRoutesComponent";
+import { ConfirmEmailPage } from "../../Modules/Authentication/Pages/ConfirmEmailPage";
+import { LoginPage } from "../../Modules/Authentication/Pages/LoginPage";
+import { ResetPasswordPage } from "../../Modules/Authentication/Pages/ResetPasswordPage";
+import { RegisterPage } from "../../Modules/Authentication/Register/Components/RegisterPage";
+import { AddCavesPage } from "../../Modules/Caves/Pages/AddCavePage";
+import { CavePage } from "../../Modules/Caves/Pages/CavePage";
+import { CavesPage } from "../../Modules/Caves/Pages/CavesPage";
+import { EditCavePage } from "../../Modules/Caves/Pages/EditCavePage";
+import { ImportPage } from "../../Modules/Import/Pages/ImportPage";
+import { ProjectPage } from "../../Modules/Project/Pages/ProjectPage";
+import { ProjectsPage } from "../../Modules/Project/Pages/ProjectsPage";
+import { SettingsPage } from "../../Modules/Setting/Pages/SettingsPage";
+import { LeadAddPage } from "../../Modules/Trip/Pages/LeadAddPage";
+import { TripPage } from "../../Modules/Trip/Pages/TripPage";
+import { TripPhotoUploadPage } from "../../Modules/Trip/Pages/TripPhotoUploadPage";
+import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
+import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -30,12 +30,13 @@ export const AppRouting: React.FC = () => {
       <Route path="/unauthorized" element={<UnauthorizedPage />}></Route>
 
       <Route element={<ProtectedRoutesComponent />}>
+        <Route path="/" element={<Navigate to="/caves" replace />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
         <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
         <Route path="/caves/add" element={<AddCavesPage />} />
-        <Route path="/caves/import" element={<ImportPage />} />
         <Route path="/account/settings" element={<AccountSettingsPage />} />
+        <Route path="/account/import" element={<ImportPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
         <Route
