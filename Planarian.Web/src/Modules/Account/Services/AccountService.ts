@@ -9,6 +9,7 @@ const AccountService = {
     await HttpClient.delete(`${baseUrl}/reset`);
   },
 
+  //#region Import
   async ImportCavesFile(
     file: string | Blob | RcFile,
     uuid: string,
@@ -65,5 +66,6 @@ const AccountService = {
     );
     return response.data;
   },
+  //#endregion
 };
 export { AccountService };

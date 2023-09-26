@@ -1,55 +1,50 @@
-import React from "react";
-import { Card, Button, message, Typography } from "antd";
-import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { AccountService } from "../Services/AccountService";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
-import { NotificationComponent } from "../../Import/Components/NotificationComponent";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { Card, TagType } from "antd";
+import { ResetAccountComponent } from "./ResetAccountComponent";
+import { useEffect, useState } from "react";
+import { SettingsService } from "../../Setting/Services/SettingsService";
+import TagTypeEditComponent, { TagTypeEditVm } from "./TagTypeEditComponent";
 
 const AccountSettingsComponent = () => {
-  var userGroupPrefix = AuthenticationService.GetUserGroupPrefix();
-
+  const [geologyTags, setGeologyTags] = useState<TagTypeEditVm[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => {
+    const getTags = async () => {
+      var tags = await SettingsService.GetGeology();
+      var tagVms = tags.map((tag) => {
+        return {
+          tagTypeId: tag.value,
+          name: tag.display,
+          isDeletable: true,
+        } as TagTypeEditVm;
+      });
+      setGeologyTags(tagVms);
+      setIsLoading(false);
+    };
+    getTags();
+  }, []);
   return (
-    <Card title="Reset Account">
-      <Typography.Paragraph>
-        This action will permanently delete all your caves and related account
-        data. This action is irreversible.
-      </Typography.Paragraph>
-      <ConfirmationModalComponent
-        title={`Reset Account`}
-        modalMessage={
-          <>
-            Are you positive you want to delete <b>ALL</b> cave data?! This is
-            an irreversible action!
-          </>
-        }
-        onConfirm={async () => {
-          try {
-            await AccountService.ResetAccount();
-            message.success("everything is gone (:");
-          } catch (e) {
-            const error = e as ApiErrorResponse;
-            message.error(error.message);
-          }
-        }}
-        okText="Yes"
-        cancelText="No"
-        confirmationWord={"DELETE EVERYTHING"}
-        onOkClickRender={
-          <>
-            <Card>
-              <NotificationComponent
-                groupName={`${userGroupPrefix}-DeleteAllCaves`}
-                isLoading={true}
-              ></NotificationComponent>
-            </Card>
-          </>
-        }
-      >
-        Delete
-      </ConfirmationModalComponent>
-    </Card>
+    <>
+      <ResetAccountComponent />
+      <Card title="Geology Tags">
+        <TagTypeEditComponent
+          tagTypes={geologyTags}
+          handleSave={async (tagType: TagTypeEditVm) => {
+            console.log(tagType);
+          }}
+          handleDelete={async (tagTypeId: string) => {
+            console.log(tagTypeId);
+          }}
+          handleAdd={async (name: string) => {
+            console.log(name);
+            return {
+              tagTypeId: "1",
+              name: name,
+              isDeletable: true,
+            } as TagTypeEditVm;
+          }}
+        />
+      </Card>
+    </>
   );
 };
 
