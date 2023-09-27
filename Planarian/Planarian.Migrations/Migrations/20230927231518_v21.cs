@@ -12,6 +12,7 @@ namespace Planarian.Migrations.Migrations
                 name: "Key",
                 table: "TagTypes",
                 type: "nvarchar(450)",
+                maxLength: 450,
                 nullable: false,
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)");
@@ -33,8 +34,7 @@ namespace Planarian.Migrations.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_TagTypes_Key",
                 table: "TagTypes",
-                column: "Key",
-                unique: true);
+                column: "Key");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_TagTypes_Accounts_AccountId",
@@ -64,7 +64,8 @@ namespace Planarian.Migrations.Migrations
                 type: "nvarchar(max)",
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "nvarchar(450)");
+                oldType: "nvarchar(450)",
+                oldMaxLength: 450);
 
             migrationBuilder.AlterColumn<string>(
                 name: "AccountId",

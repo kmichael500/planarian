@@ -55,6 +55,6 @@ public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
             .WithMany(e => e.Tags)
             .HasForeignKey(e => e.AccountId);
 
-        builder.HasIndex(e => new { e.Key }).IsUnique();
+        builder.HasIndex(e => new { e.Key });
     }
 }

@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20230927033710_v21")]
+    [Migration("20230927231518_v21")]
     partial class v21
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1005,6 +1005,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<string>("Key")
                         .IsRequired()
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ModifiedByUserId")
@@ -1026,8 +1027,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.HasIndex("Key")
-                        .IsUnique();
+                    b.HasIndex("Key");
 
                     b.HasIndex("ProjectId");
 
