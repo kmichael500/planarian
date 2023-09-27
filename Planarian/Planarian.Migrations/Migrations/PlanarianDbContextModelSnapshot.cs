@@ -1003,6 +1003,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<string>("Key")
                         .IsRequired()
+                        .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ModifiedByUserId")
@@ -1024,8 +1025,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.HasIndex("Key")
-                        .IsUnique();
+                    b.HasIndex("Key");
 
                     b.HasIndex("ProjectId");
 
