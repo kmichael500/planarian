@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Services;
@@ -30,7 +32,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         await Service.ResetAccount(cancellationToken);
         return Ok();
     }
-    
+
     #region Import
 
     [DisableRequestSizeLimit] //TODO
@@ -77,4 +79,48 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     #endregion
 
+    #region Tags
+
+    [HttpGet("tags-table/{key}")]
+    public async Task<ActionResult<IEnumerable<TagTypeTableVm>>> GetTags(string key,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.GetTagsForTable(key, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPut("tags/{tagTypeId:length(10)}")]
+    public async Task<ActionResult<TagTypeTableVm>> UpdateTagTypeName(string tagTypeId,
+        [FromBody] CreateEditTagTypeVm tag)
+    {
+        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId);
+
+        return new JsonResult(result);
+    }
+
+    [HttpPost("tags")]
+    public async Task<ActionResult<TagTypeTableVm>> CreateTagType(string tagTypeId, [FromBody] CreateEditTagTypeVm tag)
+    {
+        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId);
+
+        return new JsonResult(result);
+    }
+    
+    [HttpDelete("tags")]
+    public async Task<ActionResult> DeleteTagType([FromQuery] string tagTypeIds)
+    {
+        var ids = tagTypeIds.SplitAndTrim();
+        var result = await Service.DeleteTagTypes(ids);
+        return Ok(result);
+    }
+    [HttpPost("tags/merge/{destinationTagTypeId:length(10)}")]
+    public async Task<ActionResult> MergeTagTypes([FromQuery] string sourceTagTypeIds, string destinationTagTypeId)
+    {
+        var ids = sourceTagTypeIds.SplitAndTrim();
+        await Service.MergeTagTypes(ids, destinationTagTypeId);
+        return Ok();
+    }
+
+
+    #endregion
 }

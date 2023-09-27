@@ -1,4 +1,4 @@
-import { Row, Col, Typography, Card, Form } from "antd";
+import { Row, Col, Typography, Card, Form, Collapse } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -24,6 +24,7 @@ import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
+import CollapsePanel from "antd/lib/collapse/CollapsePanel";
 
 const query = window.location.search.substring(1);
 
@@ -85,23 +86,11 @@ const CavesComponent: React.FC = () => {
           field={"depthFeet"}
           label={"Depth (Feet)"}
         />
-        <TagFilterFormItem
-          tagType={TagType.EntranceStatus}
+        <NumberComparisonFormItem
+          inputType={"number"}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceStatusTagIds"}
-          label={"Primary Entrance Status"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.EntranceHydrology}
-          queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyTagIds"}
-          label={"Primary Entrance Hydrology"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.EntranceHydrologyFrequency}
-          queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyFrequencyTagIds"}
-          label={"Primary Entrance Hydroloy Frequency"}
+          field={"primaryEntrance.elevationFeet"}
+          label={"Elevation (Feet)"}
         />
         <NumberComparisonFormItem
           inputType={"number"}
@@ -109,11 +98,83 @@ const CavesComponent: React.FC = () => {
           field={"numberOfPits"}
           label={"Numberof Pits"}
         />
+        <NumberComparisonFormItem
+          inputType={"number"}
+          queryBuilder={queryBuilder}
+          field={"maxPitDepthFeet"}
+          label={"Max Pit Depth (Feet)"}
+        />
+        <NumberComparisonFormItem
+          inputType={"number"}
+          queryBuilder={queryBuilder}
+          field={"entrancePitDepth" as any}
+          label={"Entrance Pit Depth (Feet)"}
+        />
+        <NumberComparisonFormItem
+          inputType={"number"}
+          queryBuilder={queryBuilder}
+          field={"numberOfPits"}
+          label={"Number of Pits (Feet)"}
+        />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"reportedByName"}
+          label={"Repored By Name"}
+          queryOperator={QueryOperator.Contains}
+        />
         <TagFilterFormItem
           tagType={TagType.Geology}
           queryBuilder={queryBuilder}
           field={"geologyTagIds"}
           label={"Geology"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.EntranceStatus}
+          queryBuilder={queryBuilder}
+          field={"primaryEntrance.entranceStatusTagIds"}
+          label={"Entrance Status"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.FieldIndication}
+          queryBuilder={queryBuilder}
+          field={"entranceFieldIndication" as any}
+          label={"Entrance Field Indication"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.LocationQuality}
+          queryBuilder={queryBuilder}
+          field={"locationQualityTagIds" as any}
+          label={"Entrance Location Quality"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.EntranceHydrology}
+          queryBuilder={queryBuilder}
+          field={"primaryEntrance.entranceHydrologyTagIds"}
+          label={"Entrance Hydrology"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.EntranceHydrologyFrequency}
+          queryBuilder={queryBuilder}
+          field={"primaryEntrance.entranceHydrologyFrequencyTagIds"}
+          label={"Entrance Hydroloy Frequency"}
+        />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"entranceReportedOnBy" as any}
+          label={"Entrnace Repored By Name"}
+          queryOperator={QueryOperator.Contains}
+        />
+        <TagFilterFormItem
+          tagType={TagType.File}
+          queryBuilder={queryBuilder}
+          field={"fileTypeTagIds" as any}
+          label={"File Types"}
+        />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"fileDisplayName" as any}
+          label={"File Name"}
+          queryOperator={QueryOperator.Contains}
         />
       </AdvancedSearchDrawerComponent>
 

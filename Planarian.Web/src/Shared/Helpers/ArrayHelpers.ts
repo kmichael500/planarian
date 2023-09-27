@@ -1,6 +1,23 @@
+import { SelectListItem } from "../Models/SelectListItem";
+
 export function distinct(array: string[]): string[] {
   return [...new Set(array)];
 }
+
+export const sortSelectListItems = <T>(
+  SelectListItems: SelectListItem<T>[]
+) => {
+  return (
+    SelectListItems?.sort((a, b) => a.display.localeCompare(b.display)) || []
+  );
+};
+
+export const searchFilterSelectListItems = (
+  input: string,
+  option: any // OptionType but can't find it
+) => {
+  return option?.props.children.toLowerCase().includes(input.toLowerCase());
+};
 
 export function customSort(inputArray: string[], stringArray: string[]) {
   return stringArray.sort((a, b) => {

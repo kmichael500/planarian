@@ -3,6 +3,7 @@ import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
+import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
 export interface TripTagComponentProps {
   tagId: string;

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
@@ -35,22 +36,20 @@ public class CaveRepository : RepositoryBase
                                 e.Name.Contains(queryCondition.Value) ||
                                 (queryCondition.Value.Contains(e.County.DisplayId) &&
                                  queryCondition.Value.Contains(e.CountyNumber.ToString()))),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
+
                     case nameof(CaveQuery.StateId):
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.Contains => query.Where(e => e.StateId == queryCondition.Value),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
                     case nameof(CaveQuery.CountyId):
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.Contains => query.Where(e => e.CountyId == queryCondition.Value),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
                     case nameof(CaveQuery.LengthFeet):
                         var lengthHasNumber = double.TryParse(queryCondition.Value, out var lengthFeet);
@@ -63,8 +62,7 @@ public class CaveRepository : RepositoryBase
                             QueryOperator.Equal => query.Where(e => e.LengthFeet == lengthFeet),
                             QueryOperator.GreaterThanOrEqual => query.Where(e => e.LengthFeet >= lengthFeet),
                             QueryOperator.GreaterThan => query.Where(e => e.LengthFeet > lengthFeet),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
 
                         break;
                     case nameof(CaveQuery.DepthFeet):
@@ -78,8 +76,7 @@ public class CaveRepository : RepositoryBase
                             QueryOperator.Equal => query.Where(e => e.DepthFeet == depthFeet),
                             QueryOperator.GreaterThanOrEqual => query.Where(e => e.DepthFeet >= depthFeet),
                             QueryOperator.GreaterThan => query.Where(e => e.DepthFeet > depthFeet),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
                     case nameof(CaveQuery.NumberOfPits):
                         var numberOfPitsHasNumber = int.TryParse(queryCondition.Value, out var numberOfPits);
@@ -92,14 +89,36 @@ public class CaveRepository : RepositoryBase
                             QueryOperator.Equal => query.Where(e => e.NumberOfPits == numberOfPits),
                             QueryOperator.GreaterThanOrEqual => query.Where(e => e.NumberOfPits >= numberOfPits),
                             QueryOperator.GreaterThan => query.Where(e => e.NumberOfPits > numberOfPits),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "MaxPitDepthFeet":
+                        var maxPitDepthFeetHasNumber = double.TryParse(queryCondition.Value, out var maxPitDepthFeet);
+                        if (!maxPitDepthFeetHasNumber)
+                            throw ApiExceptionDictionary.QueryInvalidValue(queryCondition.Field, queryCondition.Value);
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.LessThan => query.Where(e => e.MaxPitDepthFeet < maxPitDepthFeet),
+                            QueryOperator.LessThanOrEqual => query.Where(e => e.MaxPitDepthFeet <= maxPitDepthFeet),
+                            QueryOperator.Equal => query.Where(e => e.MaxPitDepthFeet == maxPitDepthFeet),
+                            QueryOperator.GreaterThanOrEqual => query.Where(e => e.MaxPitDepthFeet >= maxPitDepthFeet),
+                            QueryOperator.GreaterThan => query.Where(e => e.MaxPitDepthFeet > maxPitDepthFeet),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
                     case nameof(CaveQuery.Narrative):
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.FreeText => query.Where(e =>
                                 e.Narrative != null && EF.Functions.FreeText(e.Narrative, queryCondition.Value)),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+
+                        };
+                        break;
+                    case "ReportedByName":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.Contains => query.Where(e =>
+                                e.ReportedByName != null && e.ReportedByName.Contains(queryCondition.Value)),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;
                     case "PrimaryEntrance.entranceStatusTagIds":
@@ -109,10 +128,30 @@ public class CaveRepository : RepositoryBase
                             QueryOperator.In => query = query.Where(e =>
                                 e.Entrances.SelectMany(e => e.EntranceStatusTags)
                                     .Any(e => entranceStatusTagIds.Contains(e.TagTypeId))),
-                            _ => query
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;
-
+                    case "PrimaryEntrance.elevationFeet":
+                        var entranceElevationValues = queryCondition.Value.SplitAndTrim().Select(double.Parse);
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.LessThan => query.Where(e =>
+                                e.Entrances.Select(ee => ee.Location.Z)
+                                    .Any(ee => entranceElevationValues.Contains(ee))),
+                            QueryOperator.LessThanOrEqual => query.Where(e =>
+                                e.Entrances.Select(ee => ee.Location.Z)
+                                    .Any(ee => entranceElevationValues.Contains(ee))),
+                            QueryOperator.Equal => query.Where(e =>
+                                e.Entrances.Select(ee => ee.Location.Z)
+                                    .Any(ee => entranceElevationValues.Contains(ee))),
+                            QueryOperator.GreaterThanOrEqual => query.Where(e =>
+                                e.Entrances.Select(ee => ee.Location.Z)
+                                    .Any(ee => entranceElevationValues.Contains(ee))),
+                            QueryOperator.GreaterThan => query.Where(e =>
+                                e.Entrances.Select(ee => ee.Location.Z)
+                                    .Any(ee => entranceElevationValues.Contains(ee))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
                     case "PrimaryEntrance.entranceHydrologyTagIds":
                         var entranceHydrologyTagIds = queryCondition.Value.SplitAndTrim();
                         query = queryCondition.Operator switch
@@ -120,8 +159,7 @@ public class CaveRepository : RepositoryBase
                             QueryOperator.In => query = query.Where(e =>
                                 e.Entrances.SelectMany(e => e.EntranceHydrologyTags)
                                     .Any(e => entranceHydrologyTagIds.Contains(e.TagTypeId))),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
                         break;
                     case nameof(CaveQuery.GeologyTagIds):
                         var geologyTagIds = queryCondition.Value.SplitAndTrim();
@@ -129,8 +167,7 @@ public class CaveRepository : RepositoryBase
                         {
                             QueryOperator.In => query = query.Where(e =>
                                 e.GeologyTags.Any(e => geologyTagIds.Contains(e.TagTypeId))),
-                            _ => query
-                        };
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
 
                         break;
                     case "PrimaryEntrance.entranceHydrologyFrequencyTagIds":
@@ -138,11 +175,68 @@ public class CaveRepository : RepositoryBase
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.In => query = query.Where(e =>
-                                e.Entrances.SelectMany(e => e.EntranceHydrologyFrequencyTags)
-                                    .Any(e => entranceHydrologyFrequencyTagIds.Contains(e.TagTypeId))),
-                            _ => query
+                                e.Entrances.SelectMany(ee => ee.EntranceHydrologyFrequencyTags)
+                                    .Any(ee => entranceHydrologyFrequencyTagIds.Contains(ee.TagTypeId))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "LocationQualityTagIds":
+                        var entranceLocationQualityTagIds = queryCondition.Value.SplitAndTrim();
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.In => query = query.Where(e =>
+                                e.Entrances.Any(ee => entranceLocationQualityTagIds.Contains(ee.LocationQualityTagId))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "EntranceReportedOnBy":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.Contains => query.Where(e =>
+                                e.Entrances.Any(ee => ee.ReportedByName != null &&
+                                                      ee.ReportedByName.Contains(queryCondition.Value))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "EntrancePitDepth":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.LessThan => query.Where(e =>
+                                e.Entrances.Any(ee => ee.PitFeet < double.Parse(queryCondition.Value))),
+                            QueryOperator.LessThanOrEqual => query.Where(e =>
+                                e.Entrances.Any(ee => ee.PitFeet <= double.Parse(queryCondition.Value))),
+                            QueryOperator.Equal => query.Where(e =>
+                                e.Entrances.Any(ee => ee.PitFeet == double.Parse(queryCondition.Value))),
+                            QueryOperator.GreaterThanOrEqual => query.Where(e =>
+                                e.Entrances.Any(ee => ee.PitFeet >= double.Parse(queryCondition.Value))),
+                            QueryOperator.GreaterThan => query.Where(e =>
+                                e.Entrances.Any(ee => ee.PitFeet > double.Parse(queryCondition.Value))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                            
                         };
                         break;
+                    case "EntranceFieldIndication":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.In => query.Where(e =>
+                                e.Entrances.Any(ee => ee.FieldIndicationTags.Any(eee =>
+                                    eee.TagTypeId.Contains(queryCondition.Value)))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "FileTypeTagIds":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.In => query.Where(e =>
+                                e.Files.Any(ee => ee.FileTypeTagId.Contains(queryCondition.Value))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))                        };
+                        break;
+                    case "FileDisplayName":
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.Contains => query.Where(e =>
+                                e.Files.Any(ee =>
+                                    ee.DisplayName != null && ee.DisplayName.Contains(queryCondition.Value))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                        };
+                        break;
+
                     default:
                         throw new ArgumentOutOfRangeException(nameof(queryCondition.Field));
                 }
@@ -157,9 +251,11 @@ public class CaveRepository : RepositoryBase
             Name = e.Name,
             LengthFeet = e.LengthFeet,
             DepthFeet = e.DepthFeet,
+            MaxPitDepthFeet = e.MaxPitDepthFeet,
             PrimaryEntrance = new EntranceVm
             {
-                ElevationFeet = e.Entrances.Where(e => e.IsPrimary == true).Select(e => e.Location.Z).FirstOrDefault(),
+                ElevationFeet = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
+                    .FirstOrDefault(),
             },
             GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
         }).AsSplitQuery().ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet);

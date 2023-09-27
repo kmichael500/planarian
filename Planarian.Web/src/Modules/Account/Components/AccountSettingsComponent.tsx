@@ -1,49 +1,36 @@
-import { Card, TagType } from "antd";
+import { Card, Space, Tabs } from "antd";
 import { ResetAccountComponent } from "./ResetAccountComponent";
 import { useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import TagTypeEditComponent, { TagTypeEditVm } from "./TagTypeEditComponent";
+import TagTypeEditComponent, { TagTypeTableVm } from "./TagTypeEditComponent";
+import { TagType } from "../../Tag/Models/TagType";
+import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
 const AccountSettingsComponent = () => {
-  const [geologyTags, setGeologyTags] = useState<TagTypeEditVm[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const getTags = async () => {
-      var tags = await SettingsService.GetGeology();
-      var tagVms = tags.map((tag) => {
-        return {
-          tagTypeId: tag.value,
-          name: tag.display,
-          isDeletable: true,
-        } as TagTypeEditVm;
-      });
-      setGeologyTags(tagVms);
-      setIsLoading(false);
-    };
-    getTags();
-  }, []);
+  const includedTagTypes = [
+    TagType.EntranceHydrology,
+    TagType.EntranceHydrologyFrequency,
+    TagType.EntranceStatus,
+    TagType.LocationQuality,
+    TagType.FieldIndication,
+    TagType.File,
+    TagType.Geology,
+  ];
   return (
     <>
-      <ResetAccountComponent />
-      <Card title="Geology Tags">
-        <TagTypeEditComponent
-          tagTypes={geologyTags}
-          handleSave={async (tagType: TagTypeEditVm) => {
-            console.log(tagType);
-          }}
-          handleDelete={async (tagTypeId: string) => {
-            console.log(tagTypeId);
-          }}
-          handleAdd={async (name: string) => {
-            console.log(name);
-            return {
-              tagTypeId: "1",
-              name: name,
-              isDeletable: true,
-            } as TagTypeEditVm;
-          }}
-        />
-      </Card>
+      <Space direction="vertical">
+        <Card title="Manage Tags">
+          <Tabs type="card">
+            {includedTagTypes.map((tagType) => (
+              <Tabs.TabPane tab={splitCamelCase(tagType)} key={tagType}>
+                <TagTypeEditComponent tagType={tagType} />
+              </Tabs.TabPane>
+            ))}
+          </Tabs>
+        </Card>
+
+        <ResetAccountComponent />
+      </Space>
     </>
   );
 };

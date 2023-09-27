@@ -88,8 +88,7 @@ export function formatDateTime(
   return moment(date).format(formatString);
 }
 
-const splitCamelCase = (str: string): string => {
-  return str
-    .replace(/([A-Z])/g, " $1") // add a space before each uppercase letter
-    .replace(/^./, (char) => char.toUpperCase()); // capitalize the first character
-};
+export function splitCamelCase(input: string): string {
+  const result = input.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return result;
+}

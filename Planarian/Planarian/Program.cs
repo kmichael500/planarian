@@ -255,8 +255,10 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
+
+var corsOrigins = serverOptions.AllowedCorsOrigins.Append(serverOptions.ClientBaseUrl).ToArray();
 app.UseCors(x =>
-    x.WithOrigins(serverOptions.ClientBaseUrl)
+    x.WithOrigins(corsOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()

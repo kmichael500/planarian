@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -21,8 +22,9 @@ public class TagType : EntityBaseNameId
 
     public string? ProjectId { get; set; } = null!;
     public string? AccountId { get; set; } = null!;
-
-    public string Key { get; set; } = null!;
+    
+    [MaxLength(450)] public string Key { get; set; } = null!;
+    public bool IsDefault { get; set; } = false;
 
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
@@ -39,6 +41,7 @@ public class TagType : EntityBaseNameId
     public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
     public ICollection<File> FileTypeTags { get; set; } = new HashSet<File>();
     public virtual Project? Project { get; set; }
+    public virtual Account? Account { get; set; }
 }
 
 public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
@@ -48,5 +51,10 @@ public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
         builder.HasOne(e => e.Project)
             .WithMany(e => e.CustomTagTypes)
             .HasForeignKey(e => e.ProjectId);
+        builder.HasOne<Account>(e => e.Account)
+            .WithMany(e => e.Tags)
+            .HasForeignKey(e => e.AccountId);
+
+        builder.HasIndex(e => new { e.Key }).IsUnique();
     }
 }

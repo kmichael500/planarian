@@ -24,7 +24,7 @@ public static class TagTypeKeyConstant
     public const string Default = "Default";
     public const string Trip = "Trip";
     public const string Photo = "Photo";
-    
+
     public const string LocationQuality = "LocationQuality";
     public const string Geology = "Geology";
     public const string EntranceStatus = "EntranceStatus";
@@ -32,10 +32,24 @@ public static class TagTypeKeyConstant
     public const string EntranceHydrology = "EntranceHydrology";
     public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
     public const string File = "File";
-    private static readonly List<string> All = new() { Default, Trip, Photo, LocationQuality };
+    private static readonly List<string> AllProjectTags = new() { Default, Trip, Photo };
+
+    private static readonly List<string> AllAccountTags = new()
+        { Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency, File };
+
+    private static readonly List<string> All = new()
+    {
+        Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency,
+        File
+    };
 
     public static bool IsValidTagKey(string tagKey)
     {
         return All.Any(e => e == tagKey);
+    }
+
+    public static bool IsValidAccountTagKey(string tagKey)
+    {
+        return AllAccountTags.Any(e => e == tagKey);
     }
 }
