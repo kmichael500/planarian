@@ -4,6 +4,8 @@ import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { TagType } from "../Models/TagType";
+import { sortSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
+import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
 export interface TagSelectComponentProps extends SelectProps<string> {
   tagType: TagType;
@@ -17,6 +19,7 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
 }) => {
   const [tags, setTags] = useState<SelectListItem<string>[]>();
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   useEffect(() => {
     const getTags = async () => {
@@ -80,22 +83,32 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
     getTags();
   }, []);
 
+  const filteredTags = sortSelectListItems<string>(tags ?? []);
+
+  var test = true;
+
   return (
     <Spin spinning={isLoading}>
       {!isLoading && (
         <Select
+          showSearch
           loading={isLoading}
           notFoundContent={isLoading ? <Spin size="small" /> : null}
-          placeholder={`Select ${tagType ?? "tag"}`}
+          placeholder={`Select ${splitCamelCase(tagType) ?? "tag"}`}
           allowClear
           onChange={(value, option) => {
             if (onChange) {
               onChange(value, option);
             }
           }}
+          filterOption={(input, option) => {
+            return option?.props.children
+              .toLowerCase()
+              .includes(input.toLowerCase());
+          }}
           {...rest}
         >
-          {tags?.map((tag) => (
+          {filteredTags.map((tag) => (
             <Select.Option key={tag.value} value={tag.value}>
               {tag.display}
             </Select.Option>

@@ -1,55 +1,37 @@
-import React from "react";
-import { Card, Button, message, Typography } from "antd";
-import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { AccountService } from "../Services/AccountService";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
-import { NotificationComponent } from "../../Import/Components/NotificationComponent";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { Card, Space, Tabs } from "antd";
+import { ResetAccountComponent } from "./ResetAccountComponent";
+import { useEffect, useState } from "react";
+import { SettingsService } from "../../Setting/Services/SettingsService";
+import TagTypeEditComponent, { TagTypeTableVm } from "./TagTypeEditComponent";
+import { TagType } from "../../Tag/Models/TagType";
+import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
 const AccountSettingsComponent = () => {
-  var userGroupPrefix = AuthenticationService.GetUserGroupPrefix();
-
+  const includedTagTypes = [
+    TagType.EntranceHydrology,
+    TagType.EntranceHydrologyFrequency,
+    TagType.EntranceStatus,
+    TagType.LocationQuality,
+    TagType.FieldIndication,
+    TagType.File,
+    TagType.Geology,
+  ];
   return (
-    <Card title="Reset Account">
-      <Typography.Paragraph>
-        This action will permanently delete all your caves and related account
-        data. This action is irreversible.
-      </Typography.Paragraph>
-      <ConfirmationModalComponent
-        title={`Reset Account`}
-        modalMessage={
-          <>
-            Are you positive you want to delete <b>ALL</b> cave data?! This is
-            an irreversible action!
-          </>
-        }
-        onConfirm={async () => {
-          try {
-            await AccountService.ResetAccount();
-            message.success("everything is gone (:");
-          } catch (e) {
-            const error = e as ApiErrorResponse;
-            message.error(error.message);
-          }
-        }}
-        okText="Yes"
-        cancelText="No"
-        confirmationWord={"DELETE EVERYTHING"}
-        onOkClickRender={
-          <>
-            <Card>
-              <NotificationComponent
-                groupName={`${userGroupPrefix}-DeleteAllCaves`}
-                isLoading={true}
-              ></NotificationComponent>
-            </Card>
-          </>
-        }
-      >
-        Delete
-      </ConfirmationModalComponent>
-    </Card>
+    <>
+      <Space direction="vertical">
+        <Card title="Manage Tags">
+          <Tabs type="card">
+            {includedTagTypes.map((tagType) => (
+              <Tabs.TabPane tab={splitCamelCase(tagType)} key={tagType}>
+                <TagTypeEditComponent tagType={tagType} />
+              </Tabs.TabPane>
+            ))}
+          </Tabs>
+        </Card>
+
+        <ResetAccountComponent />
+      </Space>
+    </>
   );
 };
 

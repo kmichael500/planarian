@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Planarian.Model.Database;
@@ -12,9 +13,10 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20230927002908_v20")]
+    partial class v20
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -989,7 +991,7 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<string>("AccountId")
-                        .HasColumnType("nvarchar(10)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("CreatedByUserId")
                         .HasMaxLength(10)
@@ -1003,7 +1005,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<string>("Key")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ModifiedByUserId")
                         .HasMaxLength(10)
@@ -1021,11 +1023,6 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("Key")
-                        .IsUnique();
 
                     b.HasIndex("ProjectId");
 
@@ -1633,15 +1630,9 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
-                        .WithMany("Tags")
-                        .HasForeignKey("AccountId");
-
                     b.HasOne("Planarian.Model.Database.Entities.Projects.Project", "Project")
                         .WithMany("CustomTagTypes")
                         .HasForeignKey("ProjectId");
-
-                    b.Navigation("Account");
 
                     b.Navigation("Project");
                 });
@@ -1715,8 +1706,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("Caves");
 
                     b.Navigation("Counties");
-
-                    b.Navigation("Tags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>

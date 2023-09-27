@@ -59,7 +59,7 @@ public class SettingsRepository : RepositoryBase
     {
         return await DbContext.TagTypes
             .Where(e => e.Key == TagTypeKeyConstant.LocationQuality &&
-                        (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
+                        e.AccountId == RequestUser.AccountId)
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 

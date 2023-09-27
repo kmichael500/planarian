@@ -34,6 +34,7 @@
 
     <ItemGroup>
       <Folder Include="Modules\Import\Controllers\" />
+      <Folder Include="Shared\Extensions\Queryable\" />
     </ItemGroup>
     
     <Target Name="PublishAndRunWebPack" AfterTargets="ComputeFilesToPublish">
