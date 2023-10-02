@@ -16,6 +16,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
+import { AppService } from "../../../Shared/Services/AppService";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
@@ -45,6 +46,8 @@ const LoginPage: React.FC = () => {
       setIsLoggingIn(true);
       await AuthenticationService.Login(values);
       setIsAuthenticated(true);
+      await AppService.InitializeApp();
+
       navigate(redirectUrl);
     } catch (e) {
       const error = e as ApiErrorResponse;

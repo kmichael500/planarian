@@ -7,6 +7,8 @@ import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { MenuComponent } from "../Menu/MenuComponent";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
+import SwitchAccountComponent from "../../Modules/Authentication/Components/SwitchAccountComponent";
+import ProfileMenu from "../Menu/ProfileMenuComponent";
 
 const { useBreakpoint } = Grid;
 
@@ -103,12 +105,18 @@ const HeaderComponent: React.FC = () => {
                 {typeof headerTitle[0] != "string" && headerTitle[0]}
               </>
             </Col>
-
             {/* take up rest of space to push others to right and left side */}
             <Col flex="auto"></Col>
             {headerButtons.map((button, index) => (
               <Col key={index}>{button}</Col>
             ))}
+            <Col />
+            <ProfileMenu
+              user={{
+                firstName: "Michael",
+                lastName: "Ketzner",
+              }}
+            />
           </Row>
         </Spin>
       </Header>

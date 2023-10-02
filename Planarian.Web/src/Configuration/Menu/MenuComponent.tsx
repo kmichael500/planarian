@@ -13,6 +13,7 @@ import {
   ImportOutlined,
 } from "@ant-design/icons";
 import SubMenu from "antd/lib/menu/SubMenu";
+import SwitchAccountComponent from "../../Modules/Authentication/Components/SwitchAccountComponent";
 
 interface PlanarianMenuItem extends MenuItemType {
   children?: PlanarianMenuItem[];
@@ -56,7 +57,6 @@ const MenuComponent: React.FC<MenuComponentProps> = (props) => {
       ),
       label: "Caves",
     },
-
     {
       key: "/account",
       icon: <SettingOutlined />,

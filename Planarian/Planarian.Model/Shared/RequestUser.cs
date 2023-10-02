@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
+using Planarian.Shared.Exceptions;
 
 namespace Planarian.Model.Shared;
 
@@ -20,7 +21,7 @@ public class RequestUser
     public string FullName => $"{FirstName} {LastName}";
     public bool IsAuthenticated { get; private set; }
 
-    public async Task Initialize(string userId)
+    public async Task Initialize(string? accountId, string? userId)
     {
         var user = await _dbContext.Users.Include(e => e.AccountUsers).FirstOrDefaultAsync(e => e.Id == userId);
         if (user == null)
@@ -28,16 +29,26 @@ public class RequestUser
             IsAuthenticated = false;
             return;
         }
+        var isValidAccountId = user.AccountUsers.Select(e => e.AccountId).Contains(accountId);
 
-        ;
+        if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
+        {
+            throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
+        }
+
         Id = user.Id;
         FirstName = user.FirstName;
         LastName = user.LastName;
         IsAuthenticated = true;
 
-        AccountId = user.AccountUsers.FirstOrDefault()?.AccountId;
-        UserGroupPrefix = $"{userId}-{AccountId}";
+        
+        if (isValidAccountId)
+        {
+            AccountId = accountId;
+            UserGroupPrefix = $"{userId}-{AccountId}";
+        }
     }
 
-    public string AccountContainerName => $"account-{AccountId?.ToLower() ?? throw new NullReferenceException(  $" {nameof(AccountId)} is null")}";
+    public string AccountContainerName =>
+        $"account-{AccountId?.ToLower() ?? throw new NullReferenceException($" {nameof(AccountId)} is null")}";
 }

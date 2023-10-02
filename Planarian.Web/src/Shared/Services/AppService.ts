@@ -1,9 +1,17 @@
 import { HttpClient } from "../..";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
+import { SelectListItem } from "../Models/SelectListItem";
 
 const baseUrl = "api/app";
 let AppOptions: AppInitializeVm;
 const AppService = {
   async InitializeApp(): Promise<void> {
+    const accountId = AuthenticationService.GetAccountId();
+    if (!isNullOrWhiteSpace(accountId)) {
+      console.log(accountId);
+      AuthenticationService.SwitchAccount(accountId);
+    }
     const response = await HttpClient.get<AppInitializeVm>(
       `${baseUrl}/initialize`
     );
@@ -15,4 +23,5 @@ export { AppService, AppOptions };
 export interface AppInitializeVm {
   serverBaseUrl: string;
   signalrBaseUrl: string;
+  accountIds: SelectListItem<string>[];
 }

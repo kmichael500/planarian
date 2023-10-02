@@ -1,15 +1,17 @@
+using Planarian.Model.Shared;
+
 namespace Planarian.Modules.Authentication.Models;
 
 public class UserToken
 {
-    public UserToken(string fullName, string id, string? accountId)
+    public UserToken(string fullName, string id, string? currentAccountId)
     {
         FullName = fullName;
         Id = id;
-        AccountId = accountId;
+        CurrentAccountId = currentAccountId;
     }
 
     public string FullName { get; init; }
     public string Id { get; init; }
-    public string? AccountId { get; set; }
+    public string? CurrentAccountId { get; set; }
 }

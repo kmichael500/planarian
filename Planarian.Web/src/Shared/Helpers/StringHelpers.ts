@@ -37,7 +37,9 @@ export function convertDistance(
   return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`; // Add commas for thousands in feet
 }
 
-export function isNullOrWhiteSpace(input: string | null | undefined): boolean {
+export function isNullOrWhiteSpace(
+  input: string | null | undefined
+): input is null | undefined {
   if (input == null || input == undefined) return true;
   return input.replace(/\s/g, "").length < 1;
 }

@@ -1,4 +1,4 @@
-using Planarian.Model.Database.Entities.RidgeWalker;
+using Microsoft.AspNetCore.Http;
 using Planarian.Modules.Import.Models;
 
 namespace Planarian.Shared.Exceptions;
@@ -105,9 +105,10 @@ public static class ApiExceptionDictionary
 
     #endregion
 
-    public static ApiException ImportCaveDuplicateCountyCode(CaveCsvModel caveRecord, County existingCountyRecord) =>
+    public static ApiException ImportCaveDuplicateCountyCode(string propertyName, string countyCodeValue,
+        string countyName) =>
         new(StatusCodes.Status400BadRequest, 403,
-            $"{nameof(caveRecord.CountyCode)} value '{caveRecord.CountyCode}' is already being used for county '{existingCountyRecord.Name}'.");
+            $"{propertyName} value '{countyCodeValue}' is already being used for county '{countyName}'.");
 
     public static Exception ImportMissingValue(string columnName) => new ApiException(StatusCodes.Status400BadRequest,
         404,

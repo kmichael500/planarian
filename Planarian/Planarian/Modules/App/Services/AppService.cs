@@ -25,6 +25,11 @@ public class AppService : ServiceBase<AppRepository>
         {
             SignalrBaseUrl = $"{_serverOptions.ServerBaseUrl}/api/notificationHub"
         };
+
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) return result; // if not authenticated
+
+        var accountIds = await Repository.GetAccountIds();
+        result.AccountIds = accountIds;
         return result;
     }
 }

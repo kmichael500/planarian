@@ -3,6 +3,9 @@ import { TOKEN_KEY } from "../../../Shared/Constants/TokenKeyConstant";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { AppOptions } from "../../../Shared/Services/AppService";
+import { message } from "antd";
+import App from "../../../App";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
@@ -10,7 +13,7 @@ interface JwtPayload {
   [key: string]: any;
   name: string;
   id: string;
-  accountId: string;
+  currentAccountId: string;
 }
 
 const baseUrl = "api/authentication";
@@ -71,10 +74,14 @@ const AuthenticationService = {
     return null;
   },
   GetAccountId(): string | null {
+    const currentAccountId = localStorage.getItem("currentAccountId");
+    if (currentAccountId) {
+      return currentAccountId;
+    }
     const token = this.GetToken();
     if (token) {
       const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
-      return payload ? payload.accountId : null;
+      return payload ? payload.currentAccountId : null;
     }
     return null;
   },
@@ -82,6 +89,10 @@ const AuthenticationService = {
     var accountId = this.GetAccountId();
     var userId = this.GetUserId();
     return `${userId}-${accountId}`;
+  },
+  SwitchAccount(accountId: string): void {
+    localStorage.setItem("currentAccountId", accountId);
+    HttpClient.defaults.headers.common["x-account"] = accountId;
   },
 };
 

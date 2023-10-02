@@ -37,6 +37,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             {
                 throw ApiExceptionDictionary.InternalServerError("Email confirmation code is does not exist.");
             }
+
             throw ApiExceptionDictionary.EmailNotConfirmed;
         }
 
@@ -44,9 +45,9 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
         if (!isValid) throw ApiExceptionDictionary.InvalidPassword;
-        
-        var accountIds = await Repository.GetAccountIdsByUserId(user.Id);
-        var accountId = accountIds.FirstOrDefault();
+
+        var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();
+        var accountId = accounts.FirstOrDefault();
 
         var userForToken = new UserToken(user.FullName, user.Id, accountId);
 
