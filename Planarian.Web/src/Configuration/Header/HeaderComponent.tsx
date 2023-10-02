@@ -5,10 +5,10 @@ import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
-import { MenuComponent } from "../Menu/MenuComponent";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
-import SwitchAccountComponent from "../../Modules/Authentication/Components/SwitchAccountComponent";
 import ProfileMenu from "../Menu/ProfileMenuComponent";
+import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
+import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
 
 const { useBreakpoint } = Grid;
 
@@ -90,10 +90,11 @@ const HeaderComponent: React.FC = () => {
                 onClose={() => setVisible(false)}
                 open={visible}
               >
-                <MenuComponent
+                <PlanarianMenuComponent
                   onMenuItemClick={(key) => {
                     setVisible(false);
                   }}
+                  menuItems={[...SideBarMenuItems()]}
                 />
               </Drawer>
             </Col>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import {
   Menu,
   Dropdown,
@@ -15,14 +15,11 @@ import { AppOptions } from "../../Shared/Services/AppService";
 import styled from "styled-components";
 import { useNavigate, useLocation } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
-const StyledListItem = styled(List.Item)`
-  cursor: pointer;
-  transition: background-color 0.3s;
-
-  &:hover {
-    background-color: #f0f0f0; /* Adjust color to your preference */
-  }
-`;
+import {
+  PlanarianMenuComponent,
+  PlanarianMenuItem,
+} from "./PlanarianMenuComponent";
+import { AppContext } from "../Context/AppContext";
 type ProfileMenuProps = {
   user: {
     firstName: string;
@@ -31,16 +28,14 @@ type ProfileMenuProps = {
 };
 
 function ProfileMenu({ user }: ProfileMenuProps) {
-  const [selectedKey, setSelectedKey] = useState<string>("");
-
   const getUserInitials = () => {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
   const [isVisible, setIsVisible] = useState(false);
+
   const navigate = useNavigate();
-  const location = useLocation();
-  const [uniqueKey, setUniqueKey] = useState(0);
+  const { setIsAuthenticated } = useContext(AppContext);
 
   const accountList = AppOptions.accountIds;
   const showModal = () => {
@@ -64,45 +59,30 @@ function ProfileMenu({ user }: ProfileMenuProps) {
 
   const menuItems = [
     {
-      key: "profile",
+      key: "/settings",
       icon: <UserOutlined />,
       label: "Profile",
+      requiresAuthentication: true,
     },
     {
       key: "switch-account",
       icon: <SwapOutlined />,
       label: "Switch Account",
+      requiresAuthentication: true,
+      action: showModal,
     },
     {
       key: "logout",
+
       icon: <LogoutOutlined />,
+      onClick: () => {
+        AuthenticationService.Logout();
+        setIsAuthenticated(false);
+        navigate("/login");
+      },
       label: "Logout",
     },
-  ];
-
-  const renderMenuItem = (item: any) => (
-    <Menu.Item
-      key={item.key}
-      icon={item.icon}
-      onClick={() => {
-        setSelectedKey(item.key);
-        if (item.key === "switch-account") {
-          showModal();
-        }
-      }}
-    >
-      {item.label}
-    </Menu.Item>
-  );
-
-  const menu = (
-    <Menu
-      selectedKeys={[selectedKey]}
-      onClick={(value) => setSelectedKey(value.key)}
-    >
-      {menuItems.map(renderMenuItem)}
-    </Menu>
-  );
+  ] as PlanarianMenuItem[];
 
   return (
     <>
@@ -142,7 +122,12 @@ function ProfileMenu({ user }: ProfileMenuProps) {
           </Form.Item>
         </Form>
       </Modal>
-      <Dropdown overlay={menu} trigger={["click"]}>
+      <Dropdown
+        overlay={
+          <PlanarianMenuComponent mode="vertical" menuItems={menuItems} />
+        }
+        trigger={["click"]}
+      >
         <Avatar
           size={35}
           style={{ backgroundColor: "#87d068", cursor: "pointer" }}

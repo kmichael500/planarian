@@ -51,7 +51,7 @@ export const AppRouting: React.FC = () => {
           path="/projects/:projectId/trip/:tripId/addLeads"
           element={<LeadAddPage />}
         ></Route>
-        <Route path="/settings" element={<SettingsPage />}></Route>
+        <Route path="/profile" element={<SettingsPage />}></Route>
         <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/not-found" replace />} />
