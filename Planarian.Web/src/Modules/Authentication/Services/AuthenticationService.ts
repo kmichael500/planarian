@@ -74,6 +74,10 @@ const AuthenticationService = {
     return null;
   },
   GetAccountId(): string | null {
+    const sessionAccountId = sessionStorage.getItem("currentAccountId");
+    if (sessionAccountId) {
+      return sessionAccountId;
+    }
     const currentAccountId = localStorage.getItem("currentAccountId");
     if (currentAccountId) {
       return currentAccountId;
@@ -91,6 +95,7 @@ const AuthenticationService = {
     return `${userId}-${accountId}`;
   },
   SwitchAccount(accountId: string): void {
+    sessionStorage.setItem("currentAccountId", accountId);
     localStorage.setItem("currentAccountId", accountId);
     HttpClient.defaults.headers.common["x-account"] = accountId;
   },
