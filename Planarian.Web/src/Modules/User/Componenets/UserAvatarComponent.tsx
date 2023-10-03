@@ -35,7 +35,7 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
       {usersName !== undefined && (
         <Tooltip title={usersName.name} placement="top">
           <Avatar src={usersName.profilePhotoUrl} size={props.size}>
-            {StringHelpers.NameToInitials(usersName.name)}
+            {StringHelpers.GenerateAbbreviation(usersName.name)}
           </Avatar>
         </Tooltip>
       )}

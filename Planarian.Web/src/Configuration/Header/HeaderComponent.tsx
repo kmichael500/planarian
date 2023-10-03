@@ -3,12 +3,16 @@ import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
-import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
+import {
+  StringHelpers,
+  isNullOrWhiteSpace,
+} from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
 import ProfileMenu from "../Menu/ProfileMenuComponent";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
 import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 const { useBreakpoint } = Grid;
 
@@ -20,6 +24,7 @@ const HeaderComponent: React.FC = () => {
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
+
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);

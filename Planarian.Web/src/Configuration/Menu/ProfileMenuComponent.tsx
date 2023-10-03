@@ -20,6 +20,7 @@ import {
   PlanarianMenuItem,
 } from "./PlanarianMenuComponent";
 import { AppContext } from "../Context/AppContext";
+import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
 type ProfileMenuProps = {
   user: {
     firstName: string;
@@ -32,30 +33,10 @@ function ProfileMenu({ user }: ProfileMenuProps) {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  const [isVisible, setIsVisible] = useState(false);
-
   const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
 
-  const accountList = AppOptions.accountIds;
-  const showModal = () => {
-    console.log("show modal");
-    setIsVisible(true);
-  };
-
-  const handleCancel = () => {
-    setIsVisible(false);
-  };
-
-  const handleSwitch = async (accountId: string) => {
-    try {
-      AuthenticationService.SwitchAccount(accountId);
-      message.success("Account switched successfully");
-      window.location.reload();
-    } catch (error) {
-      message.error("Failed to switch account");
-    }
-  };
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const menuItems = [
     {
@@ -69,7 +50,9 @@ function ProfileMenu({ user }: ProfileMenuProps) {
       icon: <SwapOutlined />,
       label: "Switch Account",
       requiresAuthentication: true,
-      action: showModal,
+      action: () => {
+        setIsModalOpen(true);
+      },
     },
     {
       key: "logout",
@@ -87,42 +70,10 @@ function ProfileMenu({ user }: ProfileMenuProps) {
 
   return (
     <>
-      <Modal
-        title="Select an Account"
-        visible={isVisible}
-        onCancel={handleCancel}
-        footer={[
-          <Button key="cancel" onClick={handleCancel}>
-            Cancel
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            form="switchAccountForm"
-            htmlType="submit"
-          >
-            Switch
-          </Button>,
-        ]}
-      >
-        <Form
-          id="switchAccountForm"
-          onFinish={(values) => handleSwitch(values.account)}
-        >
-          <Form.Item
-            name="account"
-            rules={[{ required: true, message: "Please select an account!" }]}
-          >
-            <Select placeholder="Select an account" style={{ width: "100%" }}>
-              {accountList.map((item) => (
-                <Select.Option key={item.value} value={item.value}>
-                  {item.display}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <SwitchAccountComponent
+        isVisible={isModalOpen}
+        handleCancel={() => setIsModalOpen(false)}
+      />
       {isAuthenticated && (
         <Dropdown
           overlay={
@@ -131,9 +82,8 @@ function ProfileMenu({ user }: ProfileMenuProps) {
           trigger={["click"]}
         >
           <Avatar
-            size={35}
+            size={40}
             style={{ backgroundColor: "#87d068", cursor: "pointer" }}
-            icon={<UserOutlined />}
           >
             {getUserInitials()}
           </Avatar>

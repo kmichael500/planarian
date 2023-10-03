@@ -7,11 +7,6 @@ const baseUrl = "api/app";
 let AppOptions: AppInitializeVm;
 const AppService = {
   async InitializeApp(): Promise<void> {
-    const accountId = AuthenticationService.GetAccountId();
-    if (!isNullOrWhiteSpace(accountId)) {
-      console.log(accountId);
-      AuthenticationService.SwitchAccount(accountId);
-    }
     const response = await HttpClient.get<AppInitializeVm>(
       `${baseUrl}/initialize`
     );

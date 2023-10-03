@@ -1,71 +1,72 @@
-import React, { useEffect, useState } from "react";
-import { Button, Modal, List, message } from "antd";
+import { Modal, Button, Form, Select, message } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
-import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import styled from "styled-components";
-import { HttpClient } from "../../..";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { SwapOutlined } from "@ant-design/icons";
-import { useLocation, useNavigate } from "react-router-dom";
-import { AccountService } from "../../Account/Services/AccountService";
 import { AuthenticationService } from "../Services/AuthenticationService";
-const StyledListItem = styled(List.Item)`
-  cursor: pointer;
-  transition: background-color 0.3s;
 
-  &:hover {
-    background-color: #f0f0f0; /* Adjust color to your preference */
-  }
-`;
+type SwitchAccountComponentProps = {
+  isVisible: boolean;
+  handleCancel: () => void;
+};
 
-const SwitchAccountComponent: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [accountList, setAccountList] = useState<SelectListItem<string>[]>([]);
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    setAccountList(AppOptions.accountIds);
-  }, []);
-
-  const showModal = () => {
-    setIsVisible(true);
-  };
-
-  const handleCancel = () => {
-    setIsVisible(false);
-  };
+const SwitchAccountComponent = ({
+  isVisible: isOpen,
+  handleCancel: onCancel,
+}: SwitchAccountComponentProps) => {
+  const currentAccountId = AuthenticationService.GetAccountId();
+  const accountList = AppOptions.accountIds.filter(
+    (item) => item.value !== currentAccountId
+  );
 
   const handleSwitch = async (accountId: string) => {
     try {
       AuthenticationService.SwitchAccount(accountId);
+      const accountName = accountList.find(
+        (item) => item.value === accountId
+      )?.display;
+      message.success(`Switched to account ${accountName}`);
+      window.location.reload();
     } catch (error) {
       message.error("Failed to switch account");
     }
   };
 
   return (
-    <div>
-      <PlanarianButton type="link" onClick={showModal} icon={<SwapOutlined />}>
-        Switch Account
-      </PlanarianButton>
-      <Modal
-        title="Select an Account"
-        visible={isVisible}
-        onCancel={handleCancel}
-        footer={null}
+    <Modal
+      title="Select an Account"
+      open={isOpen}
+      onCancel={onCancel}
+      footer={[
+        <Button key="cancel" onClick={onCancel}>
+          Cancel
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          form="switchAccountForm"
+          htmlType="submit"
+        >
+          Switch
+        </Button>,
+      ]}
+    >
+      <Form
+        id="switchAccountForm"
+        onFinish={(values) => handleSwitch(values.account)}
       >
-        <List
-          dataSource={accountList}
-          renderItem={(item) => (
-            <StyledListItem onClick={() => handleSwitch(item.value)}>
-              {item.display}
-            </StyledListItem>
-          )}
-        />
-      </Modal>
-    </div>
+        <Form.Item
+          name="account"
+          rules={[{ required: true, message: "Please select an account!" }]}
+        >
+          <Select placeholder="Select an account" style={{ width: "100%" }}>
+            {accountList.map((item) => (
+              <Select.Option key={item.value} value={item.value}>
+                {item.display}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 };
 
-export default SwitchAccountComponent;
+export { SwitchAccountComponent };

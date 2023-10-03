@@ -2,7 +2,7 @@ import moment from "moment";
 import { CaveVm } from "../../Modules/Caves/Models/CaveVm";
 
 export const StringHelpers = {
-  NameToInitials(name: string | undefined): string {
+  GenerateAbbreviation(name: string | undefined): string {
     if (name == undefined) return "";
     return name
       .split(" ")
@@ -94,3 +94,8 @@ export function splitCamelCase(input: string): string {
   const result = input.replace(/([a-z])([A-Z])/g, "$1 $2");
   return result;
 }
+
+type AbbreviationOptions = {
+  delimiter?: string;
+  maxLength?: number;
+};

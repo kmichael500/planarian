@@ -11,6 +11,7 @@ export interface PlanarianMenuItem extends MenuItemType {
   children?: PlanarianMenuItem[];
   requiresAuthentication: boolean;
   action?: () => void; // Action to be executed when item is clicked
+  isVisible?: boolean;
 }
 
 interface MenuComponentProps {
@@ -31,6 +32,7 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
   const location = useLocation();
 
   const renderMenuItem = (item: PlanarianMenuItem) => {
+    if (item.isVisible === false) return null;
     if (item.children && item.children.length > 0) {
       return (
         <SubMenu key={item.key} title={item.label} icon={item.icon}>

@@ -1,6 +1,5 @@
 import { Divider } from "antd";
-import { Link, useNavigate } from "react-router-dom";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { Link } from "react-router-dom";
 import { PlanarianMenuItem } from "./PlanarianMenuComponent";
 import {
   LoginOutlined,
@@ -8,15 +7,13 @@ import {
   DatabaseOutlined,
   SettingOutlined,
   ImportOutlined,
-  LogoutOutlined,
 } from "@ant-design/icons";
-import { AppContext } from "../Context/AppContext";
-import { useContext } from "react";
+import { AccountService } from "../../Modules/Account/Services/AccountService";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 
 const SideBarMenuItems = () => {
-  const { setIsAuthenticated } = useContext(AppContext);
-  const navigate = useNavigate();
-
+  var hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
   const authenticatedMenuItems = [
     {
       key: "/caves",
@@ -26,11 +23,13 @@ const SideBarMenuItems = () => {
         </Link>
       ),
       label: "Caves",
+      isVisible: hasAccount,
     },
     {
       key: "/account",
       icon: <SettingOutlined />,
       label: "Account",
+      isVisible: hasAccount,
       children: [
         {
           key: "/account/import",

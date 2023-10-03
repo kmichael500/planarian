@@ -6,6 +6,7 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { message } from "antd";
 import App from "../../../App";
+import { NotFouneError } from "../../../Shared/Exceptions/PlanarianErrors";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
@@ -65,6 +66,14 @@ const AuthenticationService = {
     }
     return null;
   },
+  GetAccountName(): string {
+    const name = AppOptions.accountIds.find(
+      (x) => x.value === this.GetAccountId()
+    )?.display;
+    if (!name) throw new NotFouneError("account name");
+
+    return name;
+  },
   GetUserId(): string | null {
     const token = this.GetToken();
     if (token) {
@@ -74,14 +83,24 @@ const AuthenticationService = {
     return null;
   },
   GetAccountId(): string | null {
-    const sessionAccountId = sessionStorage.getItem("currentAccountId");
+    const userId = this.GetUserId();
+    if (userId == null) return null;
+
+    // allows user to switch tabs for different accounts
+    const sessionAccountId = sessionStorage.getItem(
+      currentIdStorageKey(userId)
+    );
     if (sessionAccountId) {
       return sessionAccountId;
     }
-    const currentAccountId = localStorage.getItem("currentAccountId");
+
+    // allows user to login with last account as default
+    const currentAccountId = localStorage.getItem(currentIdStorageKey(userId));
     if (currentAccountId) {
       return currentAccountId;
     }
+
+    // if no account is found, use the account from the token
     const token = this.GetToken();
     if (token) {
       const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
@@ -95,10 +114,14 @@ const AuthenticationService = {
     return `${userId}-${accountId}`;
   },
   SwitchAccount(accountId: string): void {
-    sessionStorage.setItem("currentAccountId", accountId);
-    localStorage.setItem("currentAccountId", accountId);
+    const userId = this.GetUserId();
+    if (userId == null) throw new NotFouneError("user");
+    sessionStorage.setItem(currentIdStorageKey(userId), accountId);
+    localStorage.setItem(currentIdStorageKey(userId), accountId);
     HttpClient.defaults.headers.common["x-account"] = accountId;
   },
 };
+
+const currentIdStorageKey = (userId: string) => `currentAccountId-${userId}`;
 
 export { AuthenticationService };

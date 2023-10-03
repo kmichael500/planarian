@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
+import { NotFoundException } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
 import { Divider } from "antd";
