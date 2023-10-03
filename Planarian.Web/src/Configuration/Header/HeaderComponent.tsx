@@ -116,12 +116,7 @@ const HeaderComponent: React.FC = () => {
               <Col key={index}>{button}</Col>
             ))}
             <Col />
-            <ProfileMenu
-              user={{
-                firstName: "Michael",
-                lastName: "Ketzner",
-              }}
-            />
+            <ProfileMenu />
           </Row>
         </Spin>
       </Header>

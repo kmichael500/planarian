@@ -10,16 +10,12 @@ import {
 import { AppContext } from "../Context/AppContext";
 import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
 import { AppOptions } from "../../Shared/Services/AppService";
-type ProfileMenuProps = {
-  user: {
-    firstName: string;
-    lastName: string;
-  };
-};
+import { StringHelpers } from "../../Shared/Helpers/StringHelpers";
 
-function ProfileMenu({ user }: ProfileMenuProps) {
+function ProfileMenu() {
   const getUserInitials = () => {
-    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
+    const name = AuthenticationService.GetName();
+    return `${StringHelpers.GenerateAbbreviation(name ?? "")}`;
   };
 
   const navigate = useNavigate();
