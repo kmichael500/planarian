@@ -63,6 +63,7 @@ const SideBarMenuItems = () => {
     },
     {
       icon: <Divider />,
+      isVisible: hasAccount,
     },
     {
       key: "/projects",

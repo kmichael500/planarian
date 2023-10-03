@@ -53,6 +53,7 @@ const AuthenticationService = {
   },
   RemoveToken(): void {
     delete HttpClient.defaults.headers.common["Authorization"];
+    delete HttpClient.defaults.headers.common["x-account"];
     localStorage.removeItem(TOKEN_KEY);
     this.notifyAuthChange();
   },
