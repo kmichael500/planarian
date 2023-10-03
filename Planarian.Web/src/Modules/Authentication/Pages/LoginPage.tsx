@@ -18,6 +18,7 @@ import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
 import { AppService } from "../../../Shared/Services/AppService";
 import React from "react";
+import { HttpClient } from "../../..";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
