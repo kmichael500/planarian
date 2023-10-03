@@ -9,10 +9,9 @@ import {
 } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
-import ProfileMenu from "../Menu/ProfileMenuComponent";
+import { ProfileMenu } from "../Menu/ProfileMenuComponent";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
 import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 const { useBreakpoint } = Grid;
 

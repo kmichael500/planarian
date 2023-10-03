@@ -1,6 +1,10 @@
 import { Modal, Button, Form, Select, message } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
+import React from "react";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { SwapOutlined } from "@ant-design/icons";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -35,17 +39,17 @@ const SwitchAccountComponent = ({
       open={isOpen}
       onCancel={onCancel}
       footer={[
-        <Button key="cancel" onClick={onCancel}>
-          Cancel
-        </Button>,
-        <Button
+        <CancelButtonComponent key="cancel" onClick={onCancel} />,
+
+        <PlanarianButton
           key="submit"
           type="primary"
           form="switchAccountForm"
           htmlType="submit"
+          icon={<SwapOutlined />}
         >
           Switch
-        </Button>,
+        </PlanarianButton>,
       ]}
     >
       <Form
