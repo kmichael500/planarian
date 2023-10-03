@@ -1,19 +1,7 @@
 import { useContext, useState } from "react";
-import {
-  Menu,
-  Dropdown,
-  Avatar,
-  message,
-  Modal,
-  List,
-  Button,
-  Form,
-  Select,
-} from "antd";
+import { Dropdown, Avatar } from "antd";
 import { UserOutlined, SwapOutlined, LogoutOutlined } from "@ant-design/icons";
-import { AppOptions } from "../../Shared/Services/AppService";
-import styled from "styled-components";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import {
   PlanarianMenuComponent,
@@ -21,6 +9,7 @@ import {
 } from "./PlanarianMenuComponent";
 import { AppContext } from "../Context/AppContext";
 import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
+import { AppOptions } from "../../Shared/Services/AppService";
 type ProfileMenuProps = {
   user: {
     firstName: string;
@@ -50,6 +39,7 @@ function ProfileMenu({ user }: ProfileMenuProps) {
       icon: <SwapOutlined />,
       label: "Switch Account",
       requiresAuthentication: true,
+      isVisible: AppOptions.accountIds.length > 1,
       action: () => {
         setIsModalOpen(true);
       },
@@ -93,4 +83,4 @@ function ProfileMenu({ user }: ProfileMenuProps) {
   );
 }
 
-export default ProfileMenu;
+export { ProfileMenu };

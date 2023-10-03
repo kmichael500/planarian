@@ -17,6 +17,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
 import { AppService } from "../../../Shared/Services/AppService";
+import React from "react";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
@@ -34,7 +35,7 @@ const LoginPage: React.FC = () => {
     "redirectUrl"
   );
 
-  let redirectUrl = "/projects";
+  let redirectUrl = "/";
   if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
     redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
   }
@@ -47,7 +48,10 @@ const LoginPage: React.FC = () => {
       await AuthenticationService.Login(values);
       setIsAuthenticated(true);
       await AppService.InitializeApp();
-
+      const accountId = AuthenticationService.GetAccountId();
+      if (accountId) {
+        AuthenticationService.SwitchAccount(accountId);
+      }
       navigate(redirectUrl);
     } catch (e) {
       const error = e as ApiErrorResponse;

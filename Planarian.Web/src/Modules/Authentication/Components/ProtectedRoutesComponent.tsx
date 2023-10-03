@@ -2,6 +2,8 @@ import { useContext, useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { AuthenticationService } from "../Services/AuthenticationService";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { AppOptions } from "../../../Shared/Services/AppService";
 
 const ProtectedRoutesComponent = () => {
   const location = useLocation();
@@ -10,7 +12,7 @@ const ProtectedRoutesComponent = () => {
 
   const redirectUrl = encodeURIComponent(location.pathname);
 
-  const url = `login?redirectUrl=${redirectUrl}`;
+  let url = `login?redirectUrl=${redirectUrl}`;
 
   const isAuthenticated = AuthenticationService.IsAuthenticated();
 

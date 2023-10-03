@@ -19,13 +19,27 @@ interface JwtPayload {
 
 const baseUrl = "api/authentication";
 const AuthenticationService = {
+  subscribers: [] as Array<() => void>,
+
+  onAuthChange(callback: () => void) {
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter((sub) => sub !== callback);
+    };
+  },
+
+  notifyAuthChange() {
+    this.subscribers.forEach((callback) => callback());
+  },
   async Login(values: UserLoginVm): Promise<string> {
     const response = await HttpClient.post<string>(`${baseUrl}/login`, values);
     this.SetToken(response.data);
+    this.notifyAuthChange();
     return response.data;
   },
   Logout(): void {
     this.RemoveToken();
+    this.notifyAuthChange();
   },
   GetToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
@@ -34,10 +48,13 @@ const AuthenticationService = {
     HttpClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
     localStorage.setItem(TOKEN_KEY, token);
+
+    this.notifyAuthChange();
   },
   RemoveToken(): void {
     delete HttpClient.defaults.headers.common["Authorization"];
     localStorage.removeItem(TOKEN_KEY);
+    this.notifyAuthChange();
   },
   IsAuthenticated(): boolean {
     // check if token is valid
@@ -119,6 +136,7 @@ const AuthenticationService = {
     sessionStorage.setItem(currentIdStorageKey(userId), accountId);
     localStorage.setItem(currentIdStorageKey(userId), accountId);
     HttpClient.defaults.headers.common["x-account"] = accountId;
+    this.notifyAuthChange();
   },
 };
 

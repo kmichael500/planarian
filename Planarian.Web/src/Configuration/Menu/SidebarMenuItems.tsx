@@ -8,12 +8,26 @@ import {
   SettingOutlined,
   ImportOutlined,
 } from "@ant-design/icons";
-import { AccountService } from "../../Modules/Account/Services/AccountService";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
+import { useState, useEffect } from "react";
 
 const SideBarMenuItems = () => {
-  var hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
+  const [hasAccount, setHasAccount] = useState(
+    !isNullOrWhiteSpace(AuthenticationService.GetAccountId())
+  );
+
+  useEffect(() => {
+    // subscribe to authentication changes
+    const unsubscribe = AuthenticationService.onAuthChange(() => {
+      setHasAccount(!isNullOrWhiteSpace(AuthenticationService.GetAccountId()));
+    });
+
+    // clean up the subscription on component unmount
+    return () => {
+      unsubscribe();
+    };
+  }, []); // empty dependency array ensures this runs once on mount and once on unmount
   const authenticatedMenuItems = [
     {
       key: "/caves",

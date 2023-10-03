@@ -6,6 +6,7 @@ import reportWebVitals from "./reportWebVitals";
 import axios from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
+import { AppService } from "./Shared/Services/AppService";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -46,9 +47,10 @@ const HttpClient = axios.create({
 
 const accountId = AuthenticationService.GetAccountId();
 if (!isNullOrWhiteSpace(accountId)) {
-  AuthenticationService.SwitchAccount(accountId);
+  AppService.InitializeApp().then(() => {
+    AuthenticationService.SwitchAccount(accountId);
+  });
 }
-
 // Override default axios error handler to throw custom error data
 HttpClient.interceptors.response.use(
   function (response) {
