@@ -12,7 +12,7 @@ import { EditCavePage } from "../../Modules/Caves/Pages/EditCavePage";
 import { ImportPage } from "../../Modules/Import/Pages/ImportPage";
 import { ProjectPage } from "../../Modules/Project/Pages/ProjectPage";
 import { ProjectsPage } from "../../Modules/Project/Pages/ProjectsPage";
-import { SettingsPage } from "../../Modules/Setting/Pages/SettingsPage";
+import { ProfilePage } from "../../Modules/Setting/Pages/SettingsPage";
 import { LeadAddPage } from "../../Modules/Trip/Pages/LeadAddPage";
 import { TripPage } from "../../Modules/Trip/Pages/TripPage";
 import { TripPhotoUploadPage } from "../../Modules/Trip/Pages/TripPhotoUploadPage";
@@ -51,7 +51,7 @@ export const AppRouting: React.FC = () => {
           path="/projects/:projectId/trip/:tripId/addLeads"
           element={<LeadAddPage />}
         ></Route>
-        <Route path="/settings" element={<SettingsPage />}></Route>
+        <Route path="/profile" element={<ProfilePage />}></Route>
         <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/not-found" replace />} />

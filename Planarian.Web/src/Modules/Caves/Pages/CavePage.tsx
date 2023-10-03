@@ -3,7 +3,7 @@ import { CaveVm } from "../Models/CaveVm";
 import { Link, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
-import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
+import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { CaveService } from "../Service/CaveService";
 import { CaveComponent } from "../Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -28,7 +28,7 @@ const CavePage = () => {
   }, [cave]);
 
   if (caveId === undefined) {
-    throw new NotFoundException();
+    throw new NotFoundError("caveid");
   }
 
   useEffect(() => {

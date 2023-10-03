@@ -3,6 +3,10 @@ import { TOKEN_KEY } from "../../../Shared/Constants/TokenKeyConstant";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { AppOptions } from "../../../Shared/Services/AppService";
+import { message } from "antd";
+import App from "../../../App";
+import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
@@ -10,7 +14,7 @@ interface JwtPayload {
   [key: string]: any;
   name: string;
   id: string;
-  accountId: string;
+  currentAccountId: string;
 }
 
 const baseUrl = "api/authentication";
@@ -62,6 +66,14 @@ const AuthenticationService = {
     }
     return null;
   },
+  GetAccountName(): string {
+    const name = AppOptions.accountIds.find(
+      (x) => x.value === this.GetAccountId()
+    )?.display;
+    if (!name) throw new NotFoundError("account name");
+
+    return name;
+  },
   GetUserId(): string | null {
     const token = this.GetToken();
     if (token) {
@@ -71,10 +83,28 @@ const AuthenticationService = {
     return null;
   },
   GetAccountId(): string | null {
+    const userId = this.GetUserId();
+    if (userId == null) return null;
+
+    // allows user to switch tabs for different accounts
+    const sessionAccountId = sessionStorage.getItem(
+      currentIdStorageKey(userId)
+    );
+    if (sessionAccountId) {
+      return sessionAccountId;
+    }
+
+    // allows user to login with last account as default
+    const currentAccountId = localStorage.getItem(currentIdStorageKey(userId));
+    if (currentAccountId) {
+      return currentAccountId;
+    }
+
+    // if no account is found, use the account from the token
     const token = this.GetToken();
     if (token) {
       const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
-      return payload ? payload.accountId : null;
+      return payload ? payload.currentAccountId : null;
     }
     return null;
   },
@@ -83,6 +113,15 @@ const AuthenticationService = {
     var userId = this.GetUserId();
     return `${userId}-${accountId}`;
   },
+  SwitchAccount(accountId: string): void {
+    const userId = this.GetUserId();
+    if (userId == null) throw new NotFoundError("user");
+    sessionStorage.setItem(currentIdStorageKey(userId), accountId);
+    localStorage.setItem(currentIdStorageKey(userId), accountId);
+    HttpClient.defaults.headers.common["x-account"] = accountId;
+  },
 };
+
+const currentIdStorageKey = (userId: string) => `currentAccountId-${userId}`;
 
 export { AuthenticationService };

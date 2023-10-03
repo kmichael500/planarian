@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { NotFoundException } from "../../../Shared/Exceptions/NotFoundException";
 import { ProjectVm } from "../Models/ProjectVm";
 import { ProjectService } from "../Services/ProjectService";
 import { Divider } from "antd";
@@ -11,6 +10,7 @@ import {
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { TripsComponent } from "../../Trip/Components/TripsComponent";
+import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 
 const ProjectPage: React.FC = () => {
   let [project, setProject] = useState<ProjectVm>();
@@ -22,7 +22,7 @@ const ProjectPage: React.FC = () => {
 
   const { projectId } = useParams();
   if (projectId === undefined) {
-    throw new NotFoundException();
+    throw new NotFoundError("project");
   }
 
   useEffect(() => {

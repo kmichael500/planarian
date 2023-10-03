@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { LogoIcon } from "./AppIcon";
 import "./SidebarComponent.scss";
-import { MenuComponent } from "../Menu/MenuComponent";
+import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
+import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
 
 const { Sider } = Layout;
 const { useBreakpoint } = Grid;
@@ -51,7 +52,7 @@ const SideBarComponent: React.FC = () => {
       >
         <Typography.Text>Planarian</Typography.Text>
       </Space>
-      <MenuComponent />
+      <PlanarianMenuComponent menuItems={[...SideBarMenuItems()]} />
     </Sider>
   );
 };

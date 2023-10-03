@@ -44,6 +44,11 @@ const HttpClient = axios.create({
   headers: headers,
 });
 
+const accountId = AuthenticationService.GetAccountId();
+if (!isNullOrWhiteSpace(accountId)) {
+  AuthenticationService.SwitchAccount(accountId);
+}
+
 // Override default axios error handler to throw custom error data
 HttpClient.interceptors.response.use(
   function (response) {

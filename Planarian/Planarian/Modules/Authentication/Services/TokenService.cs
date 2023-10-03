@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Modules.Authentication.Models;
@@ -26,9 +27,9 @@ public class TokenService
             new(nameof(user.Id).ToCamelCase(), user.Id),
         };
 
-        if (!string.IsNullOrWhiteSpace(user.AccountId))
+        if (!string.IsNullOrWhiteSpace(user.CurrentAccountId))
         {
-            claims.Add(new Claim(nameof(user.AccountId).ToCamelCase(), user.AccountId));
+            claims.Add(new Claim(nameof(user.CurrentAccountId).ToCamelCase(), user.CurrentAccountId));
         }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));

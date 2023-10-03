@@ -23,8 +23,9 @@ public abstract class PlanarianControllerBase : ControllerBase, IAsyncActionFilt
 
         if (!string.IsNullOrWhiteSpace(token))
         {
+            var accountId = context.HttpContext.Request.Headers["x-account"].ToString();
             var userId = TokenService.GetUserIdFromToken(token);
-            await RequestUser.Initialize(userId);
+            await RequestUser.Initialize(accountId, userId);
         }
 
         await next();

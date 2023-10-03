@@ -3,10 +3,16 @@ import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
-import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
+import {
+  StringHelpers,
+  isNullOrWhiteSpace,
+} from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
-import { MenuComponent } from "../Menu/MenuComponent";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
+import ProfileMenu from "../Menu/ProfileMenuComponent";
+import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
+import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 const { useBreakpoint } = Grid;
 
@@ -18,6 +24,7 @@ const HeaderComponent: React.FC = () => {
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
+
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);
@@ -88,10 +95,11 @@ const HeaderComponent: React.FC = () => {
                 onClose={() => setVisible(false)}
                 open={visible}
               >
-                <MenuComponent
+                <PlanarianMenuComponent
                   onMenuItemClick={(key) => {
                     setVisible(false);
                   }}
+                  menuItems={[...SideBarMenuItems()]}
                 />
               </Drawer>
             </Col>
@@ -103,12 +111,18 @@ const HeaderComponent: React.FC = () => {
                 {typeof headerTitle[0] != "string" && headerTitle[0]}
               </>
             </Col>
-
             {/* take up rest of space to push others to right and left side */}
             <Col flex="auto"></Col>
             {headerButtons.map((button, index) => (
               <Col key={index}>{button}</Col>
             ))}
+            <Col />
+            <ProfileMenu
+              user={{
+                firstName: "Michael",
+                lastName: "Ketzner",
+              }}
+            />
           </Row>
         </Spin>
       </Header>
