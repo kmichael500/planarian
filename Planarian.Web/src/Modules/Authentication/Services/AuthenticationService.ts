@@ -6,7 +6,7 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { message } from "antd";
 import App from "../../../App";
-import { NotFouneError } from "../../../Shared/Exceptions/PlanarianErrors";
+import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
@@ -70,7 +70,7 @@ const AuthenticationService = {
     const name = AppOptions.accountIds.find(
       (x) => x.value === this.GetAccountId()
     )?.display;
-    if (!name) throw new NotFouneError("account name");
+    if (!name) throw new NotFoundError("account name");
 
     return name;
   },
@@ -115,7 +115,7 @@ const AuthenticationService = {
   },
   SwitchAccount(accountId: string): void {
     const userId = this.GetUserId();
-    if (userId == null) throw new NotFouneError("user");
+    if (userId == null) throw new NotFoundError("user");
     sessionStorage.setItem(currentIdStorageKey(userId), accountId);
     localStorage.setItem(currentIdStorageKey(userId), accountId);
     HttpClient.defaults.headers.common["x-account"] = accountId;

@@ -1,7 +1,3 @@
-class NotFoundException extends Error {}
-
-export { NotFoundException };
-
 export class PlanarianError extends Error {
   constructor(message: string) {
     super(message);
@@ -9,7 +5,7 @@ export class PlanarianError extends Error {
   }
 }
 
-export class NotFouneError extends PlanarianError {
+export class NotFoundError extends PlanarianError {
   constructor(parameter: string) {
     super(`Not found ${parameter}`);
     this.name = "NotFoundError";
