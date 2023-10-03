@@ -21,7 +21,7 @@ public class GeologyTagConfiguration : BaseEntityTypeConfiguration<GeologyTag>
     {
         base.Configure(builder);
         builder.HasKey(e => new { e.TagTypeId, e.CaveId });
-        
+
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.GeologyTags)

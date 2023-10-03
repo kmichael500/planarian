@@ -23,5 +23,4 @@ public class EntranceCsvModel
     public string? ReportedByName { get; set; }
     public string? LocationQuality { get; set; }
     [Ignore] [JsonIgnore] public string? EntranceId { get; set; }
-
 }

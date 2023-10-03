@@ -25,6 +25,4 @@ public class AppController : PlanarianControllerBase<AppService>
         var result = await Service.Initialize(serverBaseUrl);
         return new JsonResult(result);
     }
-
-
 }

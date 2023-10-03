@@ -24,13 +24,11 @@ public class TokenService
         var claims = new List<Claim>()
         {
             new(ClaimTypes.Name, user.FullName),
-            new(nameof(user.Id).ToCamelCase(), user.Id),
+            new(nameof(user.Id).ToCamelCase(), user.Id)
         };
 
         if (!string.IsNullOrWhiteSpace(user.CurrentAccountId))
-        {
             claims.Add(new Claim(nameof(user.CurrentAccountId).ToCamelCase(), user.CurrentAccountId));
-        }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);

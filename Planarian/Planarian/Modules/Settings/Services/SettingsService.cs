@@ -83,7 +83,7 @@ public class SettingsService : ServiceBase<SettingsRepository>
     {
         return await Repository.GetEntranceHydrologyFrequencyTags();
     }
-    
+
     public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
     {
         return await Repository.GetFileTags();
@@ -98,6 +98,4 @@ public class SettingsService : ServiceBase<SettingsRepository>
     {
         return await Repository.GetStateName(stateId);
     }
-
-  
 }

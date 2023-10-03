@@ -1,5 +1,3 @@
-
-
 using LinqToDB;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -27,11 +25,10 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.Caves
                 .Where(c => c.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
-                .DeleteAsync(token: cancellationToken);
+                .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} of {cavesCount} caves.");
-
         } while (deletedCount == batchSize); // Continue until fewer than batchSize rows are deleted
 
         // Reset counter for TagTypes
@@ -45,11 +42,10 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.TagTypes
                 .Where(tt => tt.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
-                .DeleteAsync(token: cancellationToken);
+                .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} of {tagTypesCount} tags.");
-
         } while (deletedCount == batchSize); // Continue until fewer than batchSize rows are deleted
     }
 
@@ -88,16 +84,12 @@ public class AccountRepository : RepositoryBase
                               e.GeologyTags.Count +
                               e.FileTypeTags.Count
             })
-            .OrderBy(e=>e.Name)
+            .OrderBy(e => e.Name)
             .ToListAsync(cancellationToken);
 
         if (key.Equals(TagTypeKeyConstant.File))
-        {
             foreach (var tag in result)
-            {
                 tag.IsUserModifiable = tag is { IsUserModifiable: true, Occurrences: 0 };
-            }
-        }
         return result;
     }
 
@@ -121,21 +113,18 @@ public class AccountRepository : RepositoryBase
     public async Task<int> DeleteTagsAsync(IEnumerable<string> tagTypeIds, CancellationToken cancellationToken)
     {
         var deletedRecords = 0;
-        
+
         await using var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken);
         try
         {
             foreach (var batch in tagTypeIds.Chunk(100))
-            {
                 deletedRecords += await DbContext.TagTypes
                     .Where(e => e.AccountId == RequestUser.AccountId)
                     .Where(e => batch.Contains(e.Id))
-                    .DeleteAsync(token: cancellationToken);
-            }
+                    .DeleteAsync(cancellationToken);
 
             // commit transaction
             await transaction.CommitAsync(cancellationToken);
-
         }
         catch (Exception)
         {
@@ -203,9 +192,6 @@ public class AccountRepository : RepositoryBase
         var propertyInfo = typeof(T).GetProperty("TagTypeId");
         if (propertyInfo == null) return;
 
-        foreach (var tag in tags)
-        {
-            propertyInfo.SetValue(tag, destinationTagTypeId);
-        }
+        foreach (var tag in tags) propertyInfo.SetValue(tag, destinationTagTypeId);
     }
 }

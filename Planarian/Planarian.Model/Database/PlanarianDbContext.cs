@@ -65,7 +65,7 @@ public class PlanarianDbContext : DbContext
     public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
-    
+
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

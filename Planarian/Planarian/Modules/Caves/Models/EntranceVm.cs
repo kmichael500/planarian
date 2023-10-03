@@ -27,7 +27,8 @@ public class EntranceVm
         double pitFeet, string locationQualityTagId, string reportedByUserId, string reportedByName,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds,
         IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet, entranceStatusTagIds,
+        IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet,
+        entranceStatusTagIds,
         entranceHydrologyFrequencyTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
@@ -42,7 +43,7 @@ public class EntranceVm
     public EntranceVm()
     {
     }
-    
+
     [MaxLength(PropertyLength.Id)] public string Id { get; set; }
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;

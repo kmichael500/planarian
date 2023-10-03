@@ -1,4 +1,4 @@
-namespace Planarian.Shared.Exceptions;
+namespace Planarian.Library.Exceptions;
 
 public class ApiException : Exception
 {

@@ -36,7 +36,8 @@ public class CaveVm
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
-        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files) : this(id, stateId,
+        IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files) : this(id,
+        stateId,
         countyId, displayId, name, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived, primaryEntrance,
         mapIds, entrances, geologyTagIds, files)
     {
@@ -47,17 +48,19 @@ public class CaveVm
         ReportedByName = reportedByName;
     }
 
-    public CaveVm(){}
+    public CaveVm()
+    {
+    }
 
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
-    
+
     public string DisplayId { get; set; } = null!;
-    
+
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    
+
     public double LengthFeet { get; set; }
     public double DepthFeet { get; set; }
     public double MaxPitDepthFeet { get; set; }

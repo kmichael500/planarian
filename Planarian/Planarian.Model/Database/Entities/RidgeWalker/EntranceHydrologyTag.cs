@@ -15,7 +15,6 @@ public class EntranceHydrologyTag : EntityBase, IEntranceTag
     public Entrance Entrance { get; set; }
 }
 
-
 public class EntranceHydrologyTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrologyTag>
 {
     public override void Configure(EntityTypeBuilder<EntranceHydrologyTag> builder)
@@ -23,7 +22,7 @@ public class EntranceHydrologyTagConfiguration : BaseEntityTypeConfiguration<Ent
         base.Configure(builder);
 
         builder.HasKey(e => new { e.TagTypeId, e.EntranceId });
-        
+
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceHydrologyTags)

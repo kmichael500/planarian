@@ -161,7 +161,7 @@ public class TripService : ServiceBase<TripRepository>
     public async Task<PagedResult<TripVm>> GetTripsByProjectId(string projectId, FilterQuery query)
     {
         var trips = await Repository.GetTripsByProjectIdAsQueryable(projectId, query);
-        
+
         return trips;
     }
 

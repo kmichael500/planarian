@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Import.Models;
+namespace Planarian.Library.Exceptions;
 
 public class FailedCaveCsvRecord<T>
 {

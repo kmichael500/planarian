@@ -17,7 +17,8 @@ public class ProjectVm : IProject
     }
 
     public ProjectVm(Project project, int numberOfProjectMembers, int numberOfTrips, DateTime createdOn,
-        DateTime? modifiedOn) : this(project.Id, project.Name, numberOfProjectMembers, numberOfTrips, createdOn, modifiedOn)
+        DateTime? modifiedOn) : this(project.Id, project.Name, numberOfProjectMembers, numberOfTrips, createdOn,
+        modifiedOn)
     {
     }
 
@@ -34,5 +35,4 @@ public class ProjectVm : IProject
     [Required] public string Name { get; set; } = null!;
     public DateTime CreatedOn { get; set; }
     public DateTime? ModifiedOn { get; set; } = null!;
-    
 }

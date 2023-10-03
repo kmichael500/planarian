@@ -24,7 +24,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(tripTags);
     }
-    
+
     [HttpGet("tags/states/{stateId:length(10)}/counties")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateCounties(string stateId)
     {
@@ -48,6 +48,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(states);
     }
+
     [HttpGet("tags/states/{stateId:length(10)}")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateName(string stateId)
     {
@@ -63,7 +64,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(geologyTags);
     }
-    
+
     [HttpGet("tags/location-quality/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetLocationQualityTags()
     {
@@ -71,7 +72,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(locationQualityTags);
     }
-    
+
     [HttpGet("tags/entrance-status/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceStatusTags()
     {
@@ -79,7 +80,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(entranceStatusTags);
     }
-    
+
     [HttpGet("tags/field-indication/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetFieldIndicationTags()
     {
@@ -87,7 +88,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(fieldIndicationTags);
     }
-    
+
     [HttpGet("tags/entrance-hydrology/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceHydrologyTags()
     {
@@ -95,8 +96,8 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(entranceHydrologyTags);
     }
-    
-        
+
+
     [HttpGet("tags/entrance-hydrology-frequency/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceHydrologyFrequencyTags()
     {
@@ -104,7 +105,7 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
         return new JsonResult(entranceHydrologyFrequencyTags);
     }
-    
+
     [HttpGet("tags/file/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetFileTags()
     {

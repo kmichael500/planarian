@@ -13,7 +13,6 @@ public class AccountState : EntityBase
 
     public virtual State State { get; set; } = null!;
     public virtual Account Account { get; set; } = null!;
-
 }
 
 public class AccountStateConfiguration : IEntityTypeConfiguration<AccountState>

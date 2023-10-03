@@ -4,6 +4,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
@@ -19,13 +20,11 @@ using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Account.Services;
 
 public class ImportService : ServiceBase
 {
-
     private readonly FileService _fileService;
     private readonly TagRepository _tagRepository;
     private readonly SettingsRepository _settingsRepository;
@@ -57,46 +56,34 @@ public class ImportService : ServiceBase
 
         return result;
     }
-    
+
     private bool TryGetFieldValue<T>(IReaderRow csv, string fieldName, bool isRequired, List<string> errors,
         out T? fieldValue)
     {
         var hasValue = csv.TryGetField(fieldName, out fieldValue);
 
-        if (!hasValue || typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(fieldValue?.ToString()))
+        if (!hasValue || (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(fieldValue?.ToString())))
         {
-            if (isRequired)
-            {
-                errors.Add($"{fieldName} is required.");
-            }
+            if (isRequired) errors.Add($"{fieldName} is required.");
 
             return false;
         }
 
         // trim value of string
-        if (typeof(T) == typeof(string) && fieldValue != null)
-        {
-            fieldValue = (T)(object)fieldValue.ToString()?.Trim()!;
-        }
+        if (typeof(T) == typeof(string) && fieldValue != null) fieldValue = (T)(object)fieldValue.ToString()?.Trim()!;
 
         return true;
     }
 
     #region Cave Import
-    
+
     public async Task<FileVm> ImportCavesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
     {
-        if (RequestUser.AccountId == null)
-        {
-            throw ApiExceptionDictionary.NoAccount;
-        }
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
 
         var signalRGroup = temporaryFileId;
 
-        if (string.IsNullOrWhiteSpace(temporaryFileId))
-        {
-            throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
-        }
+        if (string.IsNullOrWhiteSpace(temporaryFileId)) throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
 
         await using var stream = await _fileService.GetFileStream(temporaryFileId);
 
@@ -125,8 +112,8 @@ public class ImportService : ServiceBase
                 var stateEntity = await _settingsRepository.GetStateByNameOrAbbreviation(state) ??
                                   throw ApiExceptionDictionary.NotFound("State");
                 stateEntities.Add(stateEntity);
-                
-                var existingAccountState = allAccountStates.Any(e=>e.StateId == stateEntity.Id);
+
+                var existingAccountState = allAccountStates.Any(e => e.StateId == stateEntity.Id);
                 if (!existingAccountState)
                 {
                     var accountState = new AccountState
@@ -135,7 +122,7 @@ public class ImportService : ServiceBase
                         AccountId = RequestUser.AccountId,
                         StateId = stateEntity.Id,
                         CreatedByUserId = RequestUser.Id,
-                        CreatedOn = DateTime.UtcNow,
+                        CreatedOn = DateTime.UtcNow
                     };
                     newAccountStates.Add(accountState);
                 }
@@ -208,10 +195,7 @@ public class ImportService : ServiceBase
                 .Select(e => e.First())
                 .ToList();
 
-            foreach (var record in caveRecordsToRemove)
-            {
-                caveRecords.Remove(record);
-            }
+            foreach (var record in caveRecordsToRemove) caveRecords.Remove(record);
 
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
             await _tagRepository.BulkInsertAsync(newCounties, onBatchProcessed: OnBatchProcessed,
@@ -229,11 +213,11 @@ public class ImportService : ServiceBase
 
             #region notifications
 
-            int totalRecords = caveRecords.Count();
-            int notifyInterval =
-                (totalRecords > 0) ? (int)(totalRecords * 0.1) : 0; // every 10% if totalRecords is greater than 0
+            var totalRecords = caveRecords.Count();
+            var notifyInterval =
+                totalRecords > 0 ? (int)(totalRecords * 0.1) : 0; // every 10% if totalRecords is greater than 0
             notifyInterval = Math.Max(notifyInterval, 1);
-            int processedRecords = 0;
+            var processedRecords = 0;
 
             #endregion
 
@@ -307,7 +291,7 @@ public class ImportService : ServiceBase
                         ReportedByName = caveRecord.ReportedByName?.Trim(),
                         IsArchived = (bool)caveRecord.IsArchived,
                         CreatedOn = DateTime.UtcNow,
-                        CreatedByUserId = RequestUser.Id,
+                        CreatedByUserId = RequestUser.Id
                     };
                     if (caveRecord.Geology != null)
                     {
@@ -330,7 +314,7 @@ public class ImportService : ServiceBase
                                 CaveId = cave.Id,
                                 TagTypeId = tag.Id,
                                 CreatedOn = DateTime.UtcNow,
-                                CreatedByUserId = RequestUser.Id,
+                                CreatedByUserId = RequestUser.Id
                             };
                             cave.GeologyTags.Add(geologyTag);
                         }
@@ -373,10 +357,7 @@ public class ImportService : ServiceBase
         }
         catch (Exception e)
         {
-            if (transaction.GetDbTransaction().Connection != null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
+            if (transaction.GetDbTransaction().Connection != null) await transaction.RollbackAsync(cancellationToken);
 
             throw;
         }
@@ -389,7 +370,7 @@ public class ImportService : ServiceBase
     {
         var caveRecords = new List<CaveCsvModel>();
         using var reader = new StreamReader(stream);
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null, };
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
         using var csv = new CsvReader(reader, config);
         csv.Context.RegisterClassMap<CaveCsvModelMap>();
 
@@ -407,10 +388,7 @@ public class ImportService : ServiceBase
                 var errors = new List<string>();
 
                 TryGetFieldValue(csv, nameof(record.CaveName), true, errors, out string? caveName);
-                if (!string.IsNullOrWhiteSpace(caveName))
-                {
-                    record.CaveName = caveName;
-                }
+                if (!string.IsNullOrWhiteSpace(caveName)) record.CaveName = caveName;
 
                 TryGetFieldValue(csv, nameof(record.CaveLengthFt), true, errors, out double caveLengthFt);
                 record.CaveLengthFt = caveLengthFt;
@@ -428,25 +406,16 @@ public class ImportService : ServiceBase
                 record.Narrative = narrative;
 
                 TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
-                if (!string.IsNullOrWhiteSpace(countyCode))
-                {
-                    record.CountyCode = countyCode;
-                }
+                if (!string.IsNullOrWhiteSpace(countyCode)) record.CountyCode = countyCode;
 
                 TryGetFieldValue(csv, nameof(record.CountyName), true, errors, out string? countyName);
-                if (!string.IsNullOrWhiteSpace(countyName))
-                {
-                    record.CountyName = countyName;
-                }
+                if (!string.IsNullOrWhiteSpace(countyName)) record.CountyName = countyName;
 
                 TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out int countyCaveNumber);
                 record.CountyCaveNumber = countyCaveNumber;
 
                 TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
-                if (!string.IsNullOrWhiteSpace(state))
-                {
-                    record.State = state;
-                }
+                if (!string.IsNullOrWhiteSpace(state)) record.State = state;
 
                 TryGetFieldValue(csv, nameof(record.Geology), false, errors, out string? geology);
                 record.Geology = geology;
@@ -461,16 +430,10 @@ public class ImportService : ServiceBase
                 record.IsArchived = isArchived;
 
                 if (errors.Any())
-                {
                     foreach (var error in errors)
-                    {
                         failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(record, index, error));
-                    }
-                }
                 else
-                {
                     caveRecords.Add(record);
-                }
             }
         }
 
@@ -480,20 +443,16 @@ public class ImportService : ServiceBase
         throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Cave);
     }
 
-        private bool IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
+    private bool IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord,
         int currentRowNumber,
         List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
     {
         var isValid = true;
-        if (cave == null)
-        {
-            throw ApiExceptionDictionary.BadRequest("Cave is null");
-        }
+        if (cave == null) throw ApiExceptionDictionary.BadRequest("Cave is null");
 
         // check max length for properties
         foreach (var prop in typeof(Cave).GetProperties())
-        {
             if (prop.Name != nameof(cave.Id))
             {
                 var maxLengthAttribute =
@@ -509,7 +468,6 @@ public class ImportService : ServiceBase
                     }
                 }
             }
-        }
 
         if (usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
         {
@@ -559,21 +517,17 @@ public class ImportService : ServiceBase
 
         return isValid;
     }
+
     #endregion
 
 
     #region Entrance Import
+
     public async Task<FileVm> ImportEntrancesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
     {
-        if (RequestUser.AccountId == null)
-        {
-            throw ApiExceptionDictionary.NoAccount;
-        }
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
 
-        if (string.IsNullOrWhiteSpace(temporaryFileId))
-        {
-            throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
-        }
+        if (string.IsNullOrWhiteSpace(temporaryFileId)) throw ApiExceptionDictionary.NullValue(nameof(temporaryFileId));
 
         await using var stream = await _fileService.GetFileStream(temporaryFileId);
 
@@ -598,15 +552,18 @@ public class ImportService : ServiceBase
                 e => new List<string?> { e.LocationQuality }, signalRGroup,
                 cancellationToken);
 
-            var allEntranceStatusTags = await CreateAndProcessTags(entranceRecords, _tagRepository.GetEntranceStatusTags,
+            var allEntranceStatusTags = await CreateAndProcessTags(entranceRecords,
+                _tagRepository.GetEntranceStatusTags,
                 TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatus?.Split(','), signalRGroup, cancellationToken);
-            var allEntranceHydrologyTags = await CreateAndProcessTags(entranceRecords, _tagRepository.GetEntranceHydrologyTags,
+            var allEntranceHydrologyTags = await CreateAndProcessTags(entranceRecords,
+                _tagRepository.GetEntranceHydrologyTags,
                 TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), signalRGroup,
                 cancellationToken);
             var allEntranceHydrologyFrequencyTags = await CreateAndProcessTags(entranceRecords,
                 _tagRepository.GetEntranceHydrologyFrequencyTags, TagTypeKeyConstant.EntranceHydrologyFrequency,
                 e => e.EntranceHydrologyFrequency?.Split(','), signalRGroup, cancellationToken);
-            var allFieldIndicationTags = await CreateAndProcessTags(entranceRecords, _tagRepository.GetFieldIndicationTags,
+            var allFieldIndicationTags = await CreateAndProcessTags(entranceRecords,
+                _tagRepository.GetFieldIndicationTags,
                 TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.Split(','), signalRGroup,
                 cancellationToken);
 
@@ -717,7 +674,7 @@ public class ImportService : ServiceBase
                         ReportedByName = entranceRecord.ReportedByName,
                         CaveId = null, // intentionally null
                         CreatedOn = DateTime.UtcNow,
-                        CreatedByUserId = RequestUser.Id,
+                        CreatedByUserId = RequestUser.Id
                     };
                     entranceRecord.EntranceId =
                         entrance.Id; // used to associate with erroneous records after inserting into the db
@@ -756,10 +713,7 @@ public class ImportService : ServiceBase
 
                     var isValid = IsValidEntrance(entrance, entranceRecord, rowNumber, failedRecords);
 
-                    if (isValid)
-                    {
-                        entrances.Add(entrance);
-                    }
+                    if (isValid) entrances.Add(entrance);
                 }
                 catch (Exception e)
                 {
@@ -770,9 +724,7 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing entrances");
 
             if (failedRecords.Any())
-            {
                 throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
-            }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrances. This may take a while...");
@@ -812,29 +764,23 @@ public class ImportService : ServiceBase
                 "Validating there is only one primary entrance per cave");
             var invalidPrimaryEntrance = await _temporaryEntranceRepository.GetInvalidIsPrimaryRecords();
             if (invalidPrimaryEntrance.Any())
-            {
                 foreach (var tempEntranceId in invalidPrimaryEntrance)
                 {
                     var tempEntrance = entrances.FirstOrDefault(e => e.Id == tempEntranceId);
                     if (tempEntrance == null)
-                    {
                         throw ApiExceptionDictionary.InternalServerError(
                             "There was an issue validating primary entrances.");
-                    }
 
                     var record = entranceRecords.FirstOrDefault(e => e.EntranceId == tempEntranceId);
                     if (record == null)
-                    {
                         throw ApiExceptionDictionary.InternalServerError(
                             "There was an issue validating primary entrances.");
-                    }
 
                     // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
                     var calculatedRowNumber = entranceRecords.IndexOf(record) + 2;
                     failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, calculatedRowNumber,
                         $"Entrance is marked as primary but there is already a primary entrance for the cave {record.CountyCode}-{record.CountyCaveNumber}"));
                 }
-            }
 
             if (failedRecords.Any())
             {
@@ -888,7 +834,7 @@ public class ImportService : ServiceBase
     {
         var entranceRecords = new List<EntranceCsvModel>();
         using var reader = new StreamReader(stream);
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null, };
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
         using var csv = new CsvReader(reader, config);
         csv.Context.RegisterClassMap<EntranceCsvModelMap>();
 
@@ -963,14 +909,10 @@ public class ImportService : ServiceBase
 
                 // Add record to the list if there are no errors, else add errors to the failedRecords list
                 if (errors.Any())
-                {
                     foreach (var error in errors)
                         failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, index, error));
-                }
                 else
-                {
                     entranceRecords.Add(record);
-                }
             }
         }
 
@@ -979,7 +921,7 @@ public class ImportService : ServiceBase
         failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
         throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
     }
-    
+
     private async Task<List<TagType>> CreateAndProcessTags(IEnumerable<EntranceCsvModel> entranceRecords,
         Func<Task<IEnumerable<TagType>>> getTags, string key, Func<EntranceCsvModel, IEnumerable<string?>?> selector,
         string signalRGroup,
@@ -1002,7 +944,7 @@ public class ImportService : ServiceBase
 
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
 
-        await _tagRepository.BulkInsertAsync(newTags, onBatchProcessed: (OnBatchProcessed),
+        await _tagRepository.BulkInsertAsync(newTags, onBatchProcessed: OnBatchProcessed,
             cancellationToken: cancellationToken);
 
         allTags.AddRange(newTags);
@@ -1016,6 +958,7 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
         }
     }
+
     private void CreateEntranceTags<TTag>(EntranceCsvModel entranceRecord,
         string entranceId,
         string entranceTagField,
@@ -1030,10 +973,7 @@ public class ImportService : ServiceBase
         {
             var tag = allTags.FirstOrDefault(e =>
                 e.Name.Equals(tagName, StringComparison.InvariantCultureIgnoreCase));
-            if (tag == null)
-            {
-                throw ApiExceptionDictionary.NotFound(entranceTagField);
-            }
+            if (tag == null) throw ApiExceptionDictionary.NotFound(entranceTagField);
 
             var entranceTag = new TTag()
             {
@@ -1041,41 +981,32 @@ public class ImportService : ServiceBase
                 EntranceId = entranceId,
                 TagTypeId = tag.Id,
                 CreatedOn = DateTime.UtcNow,
-                CreatedByUserId = RequestUser.Id,
+                CreatedByUserId = RequestUser.Id
             };
             tagList.Add(entranceTag);
         }
     }
-    
-        private bool IsValidEntrance(TemporaryEntrance entrance,
+
+    private bool IsValidEntrance(TemporaryEntrance entrance,
         EntranceCsvModel currentRecord,
         int currentRowNumber,
         List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords)
     {
         var isValid = true;
-        if (entrance == null)
-        {
-            throw ApiExceptionDictionary.NotFound("Entrance");
-        }
+        if (entrance == null) throw ApiExceptionDictionary.NotFound("Entrance");
 
         // check max length for properties
         foreach (var prop in typeof(TemporaryEntrance).GetProperties())
-        {
             if (prop.Name != nameof(entrance.Id))
-            {
                 if (prop.GetCustomAttributes(typeof(MaxLengthAttribute), false).FirstOrDefault() is MaxLengthAttribute
                     maxLengthAttribute)
-                {
                     if (prop.GetValue(entrance) is string stringValue && stringValue.Length > maxLengthAttribute.Length)
                     {
                         failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
                             $"{prop.Name} exceeds the maximum allowed length of {maxLengthAttribute.Length}"));
                         isValid = false;
                     }
-                }
-            }
-        }
-        
+
         if (entrance.Latitude is > 90 or < -90)
         {
             failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(currentRecord, currentRowNumber,
@@ -1103,11 +1034,10 @@ public class ImportService : ServiceBase
                 $"Pit depth must be greater than or equal to 0!"));
             isValid = false;
         }
-        
-        
+
+
         return isValid;
     }
-    
-    #endregion
 
+    #endregion
 }

@@ -10,6 +10,7 @@ public class NotificationHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
     }
+
     public async Task LeaveGroup(string groupName)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);

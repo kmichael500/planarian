@@ -33,6 +33,5 @@ public class FieldIndicationTagConfiguration : BaseEntityTypeConfiguration<Field
             .WithMany(e => e.FieldIndicationTags)
             .HasForeignKey(e => e.EntranceId)
             .OnDelete(DeleteBehavior.Cascade);
-
     }
 }

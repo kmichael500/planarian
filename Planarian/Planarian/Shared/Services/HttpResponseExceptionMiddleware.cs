@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Planarian.Shared.Exceptions;
+using Planarian.Library.Exceptions;
 
 namespace Planarian.Shared.Services;
 

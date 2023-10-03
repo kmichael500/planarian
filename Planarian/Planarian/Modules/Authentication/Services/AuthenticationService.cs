@@ -1,11 +1,11 @@
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Authentication.Services;
 
@@ -35,9 +35,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             if (user.EmailConfirmationCode != null)
                 await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
             else
-            {
                 throw ApiExceptionDictionary.InternalServerError("Email confirmation code is does not exist.");
-            }
 
             throw ApiExceptionDictionary.EmailNotConfirmed;
         }

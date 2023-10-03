@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Newtonsoft.Json;
 using Planarian.Library.Constants;
-using Planarian.Shared.Exceptions;
+using Planarian.Library.Exceptions;
 using Planarian.Shared.Options;
 
 namespace Planarian.Shared.Email.Services;

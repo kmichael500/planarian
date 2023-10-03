@@ -1,4 +1,5 @@
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
@@ -10,7 +11,6 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Users.Services;
 

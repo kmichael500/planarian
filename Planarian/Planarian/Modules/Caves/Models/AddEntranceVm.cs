@@ -40,10 +40,11 @@ public class AddEntranceVm
     public AddEntranceVm()
     {
     }
+
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; }
     public bool IsPrimary { get; set; }
     [MaxLength(PropertyLength.Id)] public string LocationQualityTagId { get; set; } = null!;
-    
+
     [MaxLength(PropertyLength.Name)] public string? Name { get; set; }
     public string? Description { get; set; }
 

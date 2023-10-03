@@ -37,8 +37,6 @@ public class TripVm : ITrip
         CreatedOn = trip.CreatedOn;
         ModifiedOn = trip.ModifiedOn;
     }
-    
-    
 
 
     public TripVm()

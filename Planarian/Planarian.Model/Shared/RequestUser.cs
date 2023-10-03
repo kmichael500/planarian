@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Model.Shared;
 
@@ -30,19 +30,18 @@ public class RequestUser
             IsAuthenticated = false;
             return;
         }
+
         var isValidAccountId = user.AccountUsers.Select(e => e.AccountId).Contains(accountId);
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
-        {
             throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
-        }
 
         Id = user.Id;
         FirstName = user.FirstName;
         LastName = user.LastName;
         IsAuthenticated = true;
 
-        
+
         if (isValidAccountId)
         {
             AccountId = accountId;

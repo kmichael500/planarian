@@ -105,7 +105,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
         return new JsonResult(result);
     }
-    
+
     [HttpDelete("tags")]
     public async Task<ActionResult> DeleteTagType([FromQuery] string tagTypeIds)
     {
@@ -113,6 +113,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.DeleteTagTypes(ids);
         return Ok(result);
     }
+
     [HttpPost("tags/merge/{destinationTagTypeId:length(10)}")]
     public async Task<ActionResult> MergeTagTypes([FromQuery] string sourceTagTypeIds, string destinationTagTypeId)
     {
@@ -120,7 +121,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
         await Service.MergeTagTypes(ids, destinationTagTypeId);
         return Ok();
     }
-
 
     #endregion
 }

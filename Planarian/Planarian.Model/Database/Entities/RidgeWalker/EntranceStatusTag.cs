@@ -22,7 +22,7 @@ public class EntranceStatusTagConfiguration : BaseEntityTypeConfiguration<Entran
         base.Configure(builder);
 
         builder.HasKey(e => new { e.TagTypeId, e.EntranceId });
-        
+
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceStatusTags)
@@ -33,6 +33,5 @@ public class EntranceStatusTagConfiguration : BaseEntityTypeConfiguration<Entran
             .WithMany(e => e.EntranceStatusTags)
             .HasForeignKey(e => e.EntranceId)
             .OnDelete(DeleteBehavior.Cascade);
-
     }
 }

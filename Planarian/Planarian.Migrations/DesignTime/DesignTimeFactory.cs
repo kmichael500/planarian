@@ -27,7 +27,6 @@ public class DbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlanarianD
         });
 
 
-
         var options = optionsBuilder.Options;
 
         return new PlanarianDbContext(options);
