@@ -35,7 +35,7 @@ const LoginPage: React.FC = () => {
     "redirectUrl"
   );
 
-  let redirectUrl = "/projects";
+  let redirectUrl = "/";
   if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
     redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
   }

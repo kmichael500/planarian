@@ -18,6 +18,7 @@ import { TripPage } from "../../Modules/Trip/Pages/TripPage";
 import { TripPhotoUploadPage } from "../../Modules/Trip/Pages/TripPhotoUploadPage";
 import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
+import { AppRederect } from "./App.routing.redirect";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -30,7 +31,7 @@ export const AppRouting: React.FC = () => {
       <Route path="/unauthorized" element={<UnauthorizedPage />}></Route>
 
       <Route element={<ProtectedRoutesComponent />}>
-        <Route path="/" element={<Navigate to="/caves" replace />} />
+        <Route path="/" element={<AppRederect />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
         <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
