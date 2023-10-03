@@ -7,7 +7,7 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Title } = Typography;
 
-const SettingsPage: React.FC = () => {
+const ProfilePage: React.FC = () => {
   const [user, setUser] = useState<UserVm>();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,16 +33,6 @@ const SettingsPage: React.FC = () => {
     fetchUser();
   }, []);
 
-  const onFinish = async (values: any) => {
-    setIsLoading(true);
-    try {
-      await UserService.UpdateCurrentUser(values);
-    } catch (error) {
-      console.error(error);
-    }
-    setIsLoading(false);
-  };
-
   return (
     <>
       <Row align="middle"></Row>
@@ -51,4 +41,4 @@ const SettingsPage: React.FC = () => {
   );
 };
 
-export { SettingsPage };
+export { ProfilePage };

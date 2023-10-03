@@ -35,7 +35,7 @@ function ProfileMenu({ user }: ProfileMenuProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   const navigate = useNavigate();
-  const { setIsAuthenticated } = useContext(AppContext);
+  const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
 
   const accountList = AppOptions.accountIds;
   const showModal = () => {
@@ -59,7 +59,7 @@ function ProfileMenu({ user }: ProfileMenuProps) {
 
   const menuItems = [
     {
-      key: "/settings",
+      key: "/profile",
       icon: <UserOutlined />,
       label: "Profile",
       requiresAuthentication: true,
@@ -75,12 +75,13 @@ function ProfileMenu({ user }: ProfileMenuProps) {
       key: "logout",
 
       icon: <LogoutOutlined />,
-      onClick: () => {
+      action: () => {
         AuthenticationService.Logout();
         setIsAuthenticated(false);
         navigate("/login");
       },
       label: "Logout",
+      requiresAuthentication: true,
     },
   ] as PlanarianMenuItem[];
 
@@ -122,20 +123,22 @@ function ProfileMenu({ user }: ProfileMenuProps) {
           </Form.Item>
         </Form>
       </Modal>
-      <Dropdown
-        overlay={
-          <PlanarianMenuComponent mode="vertical" menuItems={menuItems} />
-        }
-        trigger={["click"]}
-      >
-        <Avatar
-          size={35}
-          style={{ backgroundColor: "#87d068", cursor: "pointer" }}
-          icon={<UserOutlined />}
+      {isAuthenticated && (
+        <Dropdown
+          overlay={
+            <PlanarianMenuComponent mode="vertical" menuItems={menuItems} />
+          }
+          trigger={["click"]}
         >
-          {getUserInitials()}
-        </Avatar>
-      </Dropdown>
+          <Avatar
+            size={35}
+            style={{ backgroundColor: "#87d068", cursor: "pointer" }}
+            icon={<UserOutlined />}
+          >
+            {getUserInitials()}
+          </Avatar>
+        </Dropdown>
+      )}
     </>
   );
 }
