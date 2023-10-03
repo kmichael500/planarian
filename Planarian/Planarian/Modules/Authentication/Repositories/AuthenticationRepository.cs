@@ -12,7 +12,7 @@ public class AuthenticationRepository : RepositoryBase
         requestUser)
     {
     }
-    
+
     public async Task<IEnumerable<string>> GetAccountIdsByUserId(string userId)
     {
         return await DbContext.AccountUsers

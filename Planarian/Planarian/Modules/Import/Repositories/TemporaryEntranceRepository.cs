@@ -35,7 +35,7 @@ public class TemporaryEntranceRepository : RepositoryBase
     {
         await using var db = DbContext.CreateLinqToDBConnection();
 
-        
+
         var options = new BulkCopyOptions
         {
             TableName = _temporaryEntranceTableName,
@@ -81,7 +81,7 @@ public class TemporaryEntranceRepository : RepositoryBase
     public async Task<List<string>> GetInvalidIsPrimaryRecords()
     {
         await using var db = DbContext.CreateLinqToDBConnection();
-        
+
         var tempEntranceTable = db.GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName);
         var entranceTable = db.GetTable<Entrance>();
 
@@ -93,11 +93,9 @@ public class TemporaryEntranceRepository : RepositoryBase
 
                   // Union with TemporaryEntrance records that have a corresponding Entrance record marked as IsPrimary with the same CaveId
                   || entranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary)
-
             select temp.Id).ToListAsyncLinqToDB();
         return invalidTempEntrances;
     }
-
 
 
     public async Task MigrateTemporaryEntrancesAsync()
@@ -158,6 +156,6 @@ public class TemporaryEntranceRepository : RepositoryBase
     public async Task DropTable()
     {
         await DbContext.CreateLinqToDBConnection()
-            .DropTableAsync<TemporaryEntrance>(tableName: _temporaryEntranceTableName);
+            .DropTableAsync<TemporaryEntrance>(_temporaryEntranceTableName);
     }
 }

@@ -27,7 +27,7 @@ public class ProjectRepository : RepositoryBase
     public async Task<PagedResult<ProjectVm>> GetProjects(FilterQuery query)
     {
         return await DbContext.Projects.Where(e => e.Members.Any(ee => ee.UserId == RequestUser.Id))
-            .Select(e => 
+            .Select(e =>
                 new ProjectVm
                 {
                     Id = e.Id,

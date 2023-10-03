@@ -1,15 +1,14 @@
-
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Exceptions;
 using SendGrid.Helpers.Errors.Model;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 using FileOptions = Planarian.Shared.Options.FileOptions;
@@ -34,24 +33,21 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken, string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        if (RequestUser.AccountId == null)
-        {
-            throw new BadRequestException("Account Id is null");
-        }
+        if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
 
         var allFileTypes = await _settingsRepository.GetFileTags();
-        
+
         // check if tag type name exists in the file name
         var autoTagType =
             allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
-        
+
         var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
-        
-        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ?  autoTagType.Value : other?.Id;
+
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
 
         if (tagTypeId == null)
             throw ApiExceptionDictionary.NotFound("File type");
-                
+
 
         //fileName without extension
         var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
@@ -84,7 +80,7 @@ public class FileService : ServiceBase<FileRepository>
             FileName = entity.FileName,
             DisplayName = entity.DisplayName,
             FileTypeTagId = entity.FileTypeTagId,
-            Uuid = uuid,
+            Uuid = uuid
         };
         return fileInformation;
     }
@@ -94,10 +90,7 @@ public class FileService : ServiceBase<FileRepository>
         string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        if (RequestUser.AccountId == null)
-        {
-            throw new BadRequestException("Account Id is null");
-        }
+        if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
 
         await RemoveExpiredFiles();
 
@@ -131,14 +124,14 @@ public class FileService : ServiceBase<FileRepository>
         Repository.Add(entity);
         await Repository.SaveChangesAsync();
         await transaction.CommitAsync(cancellationToken);
-        
+
         var fileInformation = new FileVm
         {
             Id = entity.Id,
             FileName = entity.FileName,
             DisplayName = entity.DisplayName,
             FileTypeTagId = entity.FileTypeTagId,
-            Uuid = uuid,
+            Uuid = uuid
         };
         return fileInformation;
     }
@@ -160,29 +153,24 @@ public class FileService : ServiceBase<FileRepository>
     private async Task AddToBlobStorage(Stream stream, string key, string containerName,
         CancellationToken cancellationToken)
     {
-        if (RequestUser.AccountId == null)
-        {
-            throw ApiExceptionDictionary.BadRequest("Account Id is null");
-        }
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(key);
-        
-        await blobClient.UploadAsync(stream, overwrite: true, cancellationToken: cancellationToken);
+
+        await blobClient.UploadAsync(stream, true, cancellationToken);
     }
 
     private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
     {
-        if (RequestUser.AccountId == null)
-        {
-            throw ApiExceptionDictionary.BadRequest("Account Id is null");
-        }
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
         await containerClient.CreateIfNotExistsAsync();
-        
+
         return containerClient;
     }
+
     #endregion
 
     public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values, CancellationToken cancellationToken)
@@ -191,21 +179,19 @@ public class FileService : ServiceBase<FileRepository>
         foreach (var value in values)
         {
             var file = await Repository.GetFileById(value.Id);
-            if (file == null)
-            {
-                throw ApiExceptionDictionary.NotFound("File");
-            }
+            if (file == null) throw ApiExceptionDictionary.NotFound("File");
 
             if (!string.IsNullOrWhiteSpace(value.DisplayName))
             {
                 file.DisplayName = value.DisplayName;
                 file.FileName = $"{value.DisplayName}{Path.GetExtension(file.FileName)}";
             }
-            
+
             file.FileTypeTagId = value.FileTypeTagId;
-            
+
             await Repository.SaveChangesAsync();
         }
+
         await transaction.CommitAsync();
     }
 
@@ -215,9 +201,7 @@ public class FileService : ServiceBase<FileRepository>
         var blobProperties = await Repository.GetFileBlobProperties(id);
         if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
-        {
             throw ApiExceptionDictionary.NotFound("File");
-        }
 
         var client = await GetBlobContainerClient(blobProperties.ContainerName);
         var blobClient = client.GetBlobClient(blobProperties.BlobKey);
@@ -284,7 +268,7 @@ public class FileService : ServiceBase<FileRepository>
     {
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(blobKey);
-        
+
         var sasLink = GetSasLink(blobClient, fileName, isDownload);
         return sasLink;
     }
@@ -292,9 +276,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task DeleteFile(string? blobKey, string? blobContainer)
     {
         if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(blobContainer))
-        {
             throw ApiExceptionDictionary.NotFound("File");
-        }
 
         var client = await GetBlobContainerClient(blobContainer);
         var blobClient = client.GetBlobClient(blobKey);
@@ -307,13 +289,11 @@ public class FileService : ServiceBase<FileRepository>
         var blobProperties = await Repository.GetFileBlobProperties(fileId);
         if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
-        {
             throw ApiExceptionDictionary.NotFound("File");
-        }
 
         var client = await GetBlobContainerClient(blobProperties.ContainerName);
         var blobClient = client.GetBlobClient(blobProperties.BlobKey);
-        
+
         var stream = new MemoryStream();
         await blobClient.DownloadToAsync(stream);
         stream.Position = 0;
@@ -321,12 +301,12 @@ public class FileService : ServiceBase<FileRepository>
     }
 }
 
-    public class FileTypeTagName
-    {
-        public const string Other = "Other";
-    }
+public class FileTypeTagName
+{
+    public const string Other = "Other";
+}
 
-    public class FileVm
+public class FileVm
 {
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }

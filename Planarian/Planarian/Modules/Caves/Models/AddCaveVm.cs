@@ -23,7 +23,8 @@ public class AddCaveVm
     public AddCaveVm(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
         string reportedByName, string stateId, string countyId, string name,
         double lengthFeet,
-        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(stateId, countyId, name, lengthFeet, depthFeet, numberOfPits, geologyTagIds)
+        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(stateId, countyId, name,
+        lengthFeet, depthFeet, numberOfPits, geologyTagIds)
     {
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
@@ -31,13 +32,16 @@ public class AddCaveVm
         ReportedByName = reportedByName;
     }
 
-    public AddCaveVm(){}
+    public AddCaveVm()
+    {
+    }
+
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; }
 
-    
+
     public double LengthFeet { get; set; }
     public double DepthFeet { get; set; }
     public double MaxPitDepthFeet { get; set; }

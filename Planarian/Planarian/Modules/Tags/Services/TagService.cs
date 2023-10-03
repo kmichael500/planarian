@@ -1,10 +1,10 @@
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Planarian.Modules.Tags.Models;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Tags.Services;
 
@@ -44,12 +44,13 @@ public class TagService : ServiceBase<TagRepository>
             case TagTypeKeyConstant.File:
                 entity.AccountId = RequestUser.AccountId;
                 break;
+
             #endregion
 
             default:
                 throw ApiExceptionDictionary.BadRequest("Invalid tag key");
         }
-        
+
         Repository.Add(entity);
 
         await Repository.SaveChangesAsync();

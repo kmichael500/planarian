@@ -7,18 +7,17 @@ namespace Planarian.Migrations.Generators;
 
 public static class DataGenerator
 {
-
     public static IEnumerable<TagType> GenerateLocationQualityTags()
     {
         var locationQualityTags = new List<TagType>
         {
-            new() { Name = "Field Confirmed", Key = TagTypeKeyConstant.LocationQuality},
-            new() { Name = "Estimated", Key = TagTypeKeyConstant.LocationQuality},
-            new() { Name = "Unconfirmed", Key = TagTypeKeyConstant.LocationQuality},
+            new() { Name = "Field Confirmed", Key = TagTypeKeyConstant.LocationQuality },
+            new() { Name = "Estimated", Key = TagTypeKeyConstant.LocationQuality },
+            new() { Name = "Unconfirmed", Key = TagTypeKeyConstant.LocationQuality }
         };
 
 
-        return locationQualityTags.Select(e=> new TagType
+        return locationQualityTags.Select(e => new TagType
         {
             Name = e.Name,
             Key = e.Key,
@@ -26,6 +25,7 @@ public static class DataGenerator
             Id = IdGenerator.Generate()
         });
     }
+
     public static IEnumerable<State> GenerateStates()
     {
         var states = new List<State>
@@ -84,7 +84,7 @@ public static class DataGenerator
 
         var now = DateTime.UtcNow;
 
-        return states.Select(e=> new State
+        return states.Select(e => new State
         {
             Name = e.Name,
             Abbreviation = e.Abbreviation,

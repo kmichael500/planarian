@@ -1,6 +1,6 @@
 namespace Planarian.Modules.Import.Models;
 
-public class CaveCsvModel   
+public class CaveCsvModel
 {
     public string CaveName { get; set; }
     public double CaveLengthFt { get; set; }

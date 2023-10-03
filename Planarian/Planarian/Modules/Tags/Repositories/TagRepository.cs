@@ -21,7 +21,6 @@ public class TagRepository : RepositoryBase
 
     public async Task<TagType?> GetFileTypeTagByName(string fileTagTypeName, string? accountId = null)
     {
-
         var result = await DbContext.TagTypes
             .Where(e => e.Key == TagTypeKeyConstant.File && e.Name == fileTagTypeName && e.AccountId == accountId)
             .FirstOrDefaultAsync();
@@ -38,6 +37,7 @@ public class TagRepository : RepositoryBase
             await DbContext.SaveChangesAsync();
             return tagType;
         }
+
         return result;
     }
 
@@ -96,5 +96,4 @@ public class TagRepository : RepositoryBase
             .Where(e => e.Key == TagTypeKeyConstant.FieldIndication && e.AccountId == RequestUser.AccountId)
             .ToListAsync();
     }
-    
 }

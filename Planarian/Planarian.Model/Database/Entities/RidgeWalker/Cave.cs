@@ -15,7 +15,7 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     public int CountyNumber { get; set; } // max of highest cave number in county + 1
-     public double LengthFeet { get; set; }
+    public double LengthFeet { get; set; }
     public double DepthFeet { get; set; }
     public double MaxPitDepthFeet { get; set; } = 0;
     public int NumberOfPits { get; set; } = 0;
@@ -53,13 +53,13 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.Cascade);
-        
+
         builder.HasOne(e => e.State)
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.StateId)
             .OnDelete(DeleteBehavior.ClientNoAction);
 
-        builder.HasIndex(e => new {  e.CountyNumber, e.CountyId }).IsUnique();
+        builder.HasIndex(e => new { e.CountyNumber, e.CountyId }).IsUnique();
         builder.HasIndex(e => e.LengthFeet);
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);

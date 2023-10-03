@@ -1,6 +1,7 @@
 namespace Planarian.Shared.Extensions;
 
-public static class ListExtensions{
+public static class ListExtensions
+{
     public static IEnumerable<List<T>> Chunk<T>(this IEnumerable<T> source, int chunkSize)
     {
         var list = new List<T>(chunkSize);
@@ -14,9 +15,6 @@ public static class ListExtensions{
             }
         }
 
-        if (list.Count > 0)
-        {
-            yield return list;
-        }
+        if (list.Count > 0) yield return list;
     }
 }

@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Http;
-using Planarian.Modules.Import.Models;
-using Planarian.Shared.Exceptions;
 
-namespace Planarian.Library.Constants;
+namespace Planarian.Library.Exceptions;
 
 public static class ApiExceptionDictionary
 {
@@ -87,26 +85,42 @@ public static class ApiExceptionDictionary
     public static ApiException NoAccount =>
         new(StatusCodes.Status500InternalServerError, 302, "No account was found");
 
-    public static ApiException EntranceRequired(string atLeastEntranceIsRequired) =>
-        new(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
+    public static ApiException EntranceRequired(string atLeastEntranceIsRequired)
+    {
+        return new ApiException(StatusCodes.Status400BadRequest, 303, atLeastEntranceIsRequired);
+    }
 
     #region Import 400-499
 
     public static ApiException InvalidImport<T>(IEnumerable<FailedCaveCsvRecord<T>> failedCaveRecords,
-        ImportType importType) =>
-        new(StatusCodes.Status400BadRequest, 400, $"Failed {importType.ToString().ToLower()} import")
+        ImportType importType)
+    {
+        return new ApiException(StatusCodes.Status400BadRequest, 400,
+                $"Failed {importType.ToString().ToLower()} import")
             { Data = failedCaveRecords };
-    public enum ImportType { Cave, Entrance, File }
-    public static ApiException NullValue(string name) =>
-        new(StatusCodes.Status400BadRequest, 401, $"Value is missing from '{name}'");
+    }
+
+    public enum ImportType
+    {
+        Cave,
+        Entrance,
+        File
+    }
+
+    public static ApiException NullValue(string name)
+    {
+        return new ApiException(StatusCodes.Status400BadRequest, 401, $"Value is missing from '{name}'");
+    }
 
     #endregion
 
     #region Query 500-599
 
-    public static Exception QueryInvalidValue(string field, string value) =>
-        new ApiException(StatusCodes.Status400BadRequest, 500,
+    public static Exception QueryInvalidValue(string field, string value)
+    {
+        return new ApiException(StatusCodes.Status400BadRequest, 500,
             $"Invalid value '{value}' for field '{field}'");
+    }
 
     #endregion
 }

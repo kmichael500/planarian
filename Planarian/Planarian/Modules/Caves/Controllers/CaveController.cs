@@ -75,7 +75,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new OkResult();
     }
-    
+
     [HttpPost("{caveId:length(10)}/archive")]
     public async Task<ActionResult> ArchiveCave(string caveId)
     {
@@ -83,6 +83,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new OkResult();
     }
+
     [HttpPost("{caveId:length(10)}/unarchive")]
     public async Task<ActionResult> UnarchiveCave(string caveId)
     {

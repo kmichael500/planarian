@@ -11,7 +11,7 @@ public class File : EntityBase
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; }
-    
+
     [MaxLength(PropertyLength.Key)] public string? BlobKey { get; set; }
     [MaxLength(PropertyLength.Key)] public string? BlobContainer { get; set; }
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;

@@ -8,7 +8,6 @@ namespace Planarian.Modules.Query.Extensions;
 
 public static class QueryableExtensions
 {
-
     public static IQueryable<T> QueryFilter<T>(this IQueryable<T> source, IEnumerable<QueryCondition> conditions)
     {
         conditions = conditions.ToList();
@@ -22,10 +21,7 @@ public static class QueryableExtensions
             var properties = condition.Field.Split('.');
             Expression property = parameter;
 
-            foreach (var propName in properties)
-            {
-                property = Expression.Property(property, propName);
-            }
+            foreach (var propName in properties) property = Expression.Property(property, propName);
 
             var propertyType = property.Type;
 
@@ -68,13 +64,12 @@ public static class QueryableExtensions
                 case QueryOperator.In:
                     var ids = condition.Value.Split(',',
                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                    
+
                     if (property is not MemberExpression { Member: PropertyInfo })
-                    {
                         throw new ArgumentException("Selector must be a property selector.");
-                    }
                     var containsMethod = typeof(Enumerable).GetMethods()
-                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2).MakeGenericMethod(typeof(string));
+                        .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2)
+                        .MakeGenericMethod(typeof(string));
 
                     foreach (var id in ids)
                     {
@@ -83,6 +78,7 @@ public static class QueryableExtensions
                         var expressionLambda = Expression.Lambda<Func<T, bool>>(expressionBody, parameter);
                         source = source.Where(expressionLambda);
                     }
+
                     continue;
                 case QueryOperator.Equal:
                     comparison = Expression.Equal(property, constant);
@@ -99,14 +95,16 @@ public static class QueryableExtensions
                         var underlyingType = Nullable.GetUnderlyingType(property.Type);
 
                         // Create an expression to convert the nullable property to the non-nullable type
-                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        var convertedProperty = Expression.Convert(property,
+                            underlyingType ?? throw new InvalidOperationException());
                         comparison = Expression.GreaterThan(convertedProperty, constant);
-
                     }
                     else
                     {
                         comparison = Expression.GreaterThan(property, constant);
-                    }                    break;
+                    }
+
+                    break;
 
                 case QueryOperator.GreaterThanOrEqual:
                     if (IsNullableType(property.Type))
@@ -115,15 +113,15 @@ public static class QueryableExtensions
                         var underlyingType = Nullable.GetUnderlyingType(property.Type);
 
                         // Create an expression to convert the nullable property to the non-nullable type
-                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        var convertedProperty = Expression.Convert(property,
+                            underlyingType ?? throw new InvalidOperationException());
                         comparison = Expression.GreaterThanOrEqual(convertedProperty, constant);
-
                     }
                     else
                     {
                         comparison = Expression.GreaterThanOrEqual(property, constant);
                     }
-                    
+
                     break;
                 case QueryOperator.LessThan:
                     if (IsNullableType(property.Type))
@@ -132,14 +130,16 @@ public static class QueryableExtensions
                         var underlyingType = Nullable.GetUnderlyingType(property.Type);
 
                         // Create an expression to convert the nullable property to the non-nullable type
-                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        var convertedProperty = Expression.Convert(property,
+                            underlyingType ?? throw new InvalidOperationException());
                         comparison = Expression.LessThan(convertedProperty, constant);
-
                     }
                     else
                     {
                         comparison = Expression.LessThan(property, constant);
-                    }                    break;
+                    }
+
+                    break;
 
                 case QueryOperator.LessThanOrEqual:
                     if (IsNullableType(property.Type))
@@ -148,14 +148,16 @@ public static class QueryableExtensions
                         var underlyingType = Nullable.GetUnderlyingType(property.Type);
 
                         // Create an expression to convert the nullable property to the non-nullable type
-                        var convertedProperty = Expression.Convert(property, underlyingType ?? throw new InvalidOperationException());
+                        var convertedProperty = Expression.Convert(property,
+                            underlyingType ?? throw new InvalidOperationException());
                         comparison = Expression.LessThanOrEqual(convertedProperty, constant);
-
                     }
                     else
                     {
                         comparison = Expression.LessThanOrEqual(property, constant);
-                    }                    break;
+                    }
+
+                    break;
 
                 case QueryOperator.Contains:
                     comparison = Expression.Call(property,
@@ -192,19 +194,19 @@ public static class QueryableExtensions
 
         return source;
     }
+
     private static bool IsNullableType(Type type)
     {
         return Nullable.GetUnderlyingType(type) != null;
     }
+
     public static IQueryable<T> IsInList<T>(this IQueryable<T> source,
         Expression<Func<T, IEnumerable<string>>> stringListSelector, List<string> ids)
     {
         var parameter = stringListSelector.Parameters.Single();
         var memberExpression = stringListSelector.Body as MemberExpression;
         if (memberExpression == null || !(memberExpression.Member is PropertyInfo))
-        {
             throw new ArgumentException("Selector must be a property selector.");
-        }
         var containsMethod = typeof(Enumerable).GetMethods()
             .Single(m => m.Name == "Contains" && m.GetParameters().Length == 2).MakeGenericMethod(typeof(string));
 

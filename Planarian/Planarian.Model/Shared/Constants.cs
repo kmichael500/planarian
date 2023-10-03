@@ -18,7 +18,6 @@ public static class PropertyLength
     public const int FileName = 1000;
 }
 
-
 public static class TagTypeKeyConstant
 {
     public const string Default = "Default";

@@ -94,7 +94,6 @@ public class TripRepository : RepositoryBase
     public async Task<PagedResult<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
         FilterQuery query)
     {
-        
         var result = await DbContext.Trips.Where(e => e.ProjectId == projectId)
             .Select(e => new TripVm
             {
@@ -112,8 +111,8 @@ public class TripRepository : RepositoryBase
                 IsTripReportCompleted = !string.IsNullOrWhiteSpace(e.TripReport)
             })
             .QueryFilter(query.Conditions)
-            .ApplyPagingAsync(query.PageNumber, query.PageSize, e=>e.ModifiedOn);
-        
+            .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
+
         return result;
     }
 

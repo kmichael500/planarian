@@ -1,4 +1,5 @@
 using Planarian.Library.Constants;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
@@ -9,7 +10,6 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Exceptions;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -57,8 +57,8 @@ public class AccountService : ServiceBase<AccountRepository>
                 "Deleting associated files.");
             var totalDeleted = 0;
             var totalFiles = blobProperties.Count();
-            int notifyInterval =
-                (blobProperties.Count > 0) ? (int)(totalFiles * 0.1) : 0; // every 10% if totalRecords is greater than 0
+            var notifyInterval =
+                blobProperties.Count > 0 ? (int)(totalFiles * 0.1) : 0; // every 10% if totalRecords is greater than 0
             notifyInterval = Math.Max(notifyInterval, 1);
             foreach (var blobProperty in blobProperties)
             {
@@ -77,7 +77,6 @@ public class AccountService : ServiceBase<AccountRepository>
 
             await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
                 "Done deleting associated files.");
-
 
 
             await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
@@ -109,33 +108,22 @@ public class AccountService : ServiceBase<AccountRepository>
 
     public async Task<TagTypeTableVm> CreateOrUpdateTagType(CreateEditTagTypeVm tag, string tagTypeId)
     {
-        if (string.IsNullOrWhiteSpace(tag.Name))
-        {
-            throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
-        }
-        
+        if (string.IsNullOrWhiteSpace(tag.Name)) throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
+
         var isNewTagType = string.IsNullOrWhiteSpace(tagTypeId);
         var entity = !isNewTagType ? await _tagRepository.GetTag(tagTypeId) : new TagType();
 
-        if (entity == null)
-        {
-            throw ApiExceptionDictionary.NotFound("Tag Type Id");
-        }
+        if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
 
-        if (entity.IsDefault)
-        {
-            throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
-        }
-        
+        if (entity.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
+
 
         entity.Name = tag.Name;
 
         if (isNewTagType)
         {
             if (!TagTypeKeyConstant.IsValidAccountTagKey(tag.Key))
-            {
                 throw ApiExceptionDictionary.BadRequest("Invalid tag key.");
-            }
 
             entity.Key = tag.Key;
             entity.AccountId = RequestUser.AccountId;
@@ -151,7 +139,7 @@ public class AccountService : ServiceBase<AccountRepository>
             IsUserModifiable = !string.IsNullOrWhiteSpace(entity.AccountId),
             Occurrences = await Repository.GetNumberOfOccurrences(entity.Id)
         };
-        
+
         return result;
     }
 
@@ -168,7 +156,6 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             var tagType = await _tagRepository.GetTag(id);
             await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId);
-            
         }
     }
 }

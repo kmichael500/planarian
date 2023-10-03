@@ -19,7 +19,6 @@ public class AccountUserConfiguration : IEntityTypeConfiguration<AccountUser>
 {
     public void Configure(EntityTypeBuilder<AccountUser> builder)
     {
-
         builder.HasKey(u => new { u.AccountId, u.UserId });
 
         builder
@@ -33,7 +32,5 @@ public class AccountUserConfiguration : IEntityTypeConfiguration<AccountUser>
             .WithMany(u => u.AccountUsers)
             .HasForeignKey(au => au.UserId)
             .OnDelete(DeleteBehavior.NoAction);
-        
     }
 }
-

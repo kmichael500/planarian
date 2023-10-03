@@ -15,19 +15,23 @@ public class FileRepository : RepositoryBase
 
     public async Task<File?> GetCaveFileByBlobKey(string blobKey)
     {
-        return await DbContext.Files.Where(e=>e.BlobKey == blobKey && e.Cave.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
+        return await DbContext.Files.Where(e => e.BlobKey == blobKey && e.Cave.AccountId == RequestUser.AccountId)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<File?> GetFileById(string id)
     {
-        return await DbContext.Files.Where(e=>e.Id == id && e.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
+        return await DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
+            .FirstOrDefaultAsync();
     }
 
-    
+
     public sealed record GetFileBlobPropertiesResult(string? BlobKey, string? ContainerName);
+
     public async Task<GetFileBlobPropertiesResult?> GetFileBlobProperties(string id)
     {
-        return await DbContext.Files.Where(e=>e.Id == id && e.AccountId == RequestUser.AccountId).Select(e=>new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).FirstOrDefaultAsync();
+        return await DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
+            .Select(e => new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<GetFileBlobPropertiesResult>> GetAllCavesBlobProperties()
@@ -51,7 +55,7 @@ public class FileRepository : RepositoryBase
             DisplayName = e.DisplayName,
             FileName = e.FileName,
             FileTypeKey = e.FileTypeTag.Key,
-            FileTypeTagId = e.FileTypeTagId,
+            FileTypeTagId = e.FileTypeTagId
         });
     }
 

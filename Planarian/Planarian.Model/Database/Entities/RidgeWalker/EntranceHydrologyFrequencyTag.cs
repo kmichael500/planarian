@@ -21,8 +21,8 @@ public class LeadTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrolog
     {
         base.Configure(builder);
 
-        builder.HasKey(e => new { e.TagTypeId,  e.EntranceId });
-        
+        builder.HasKey(e => new { e.TagTypeId, e.EntranceId });
+
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceHydrologyFrequencyTags)

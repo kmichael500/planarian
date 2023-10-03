@@ -45,11 +45,11 @@ public class BlobService
     {
         var exists = _cache.TryGetValue(blobKey, out Uri uri);
         if (exists) return uri;
-        
+
         var blobClient = _containerClient.GetBlobClient(blobKey);
 
         var now = DateTimeOffset.UtcNow;
-        
+
         var sasExpiresOn = now.AddHours(expiresInHours);
         var cacheExpiresOn = now.AddHours(expiresInHours).AddMinutes(-10);
         var maxAge = (cacheExpiresOn - now).TotalSeconds;
@@ -68,7 +68,6 @@ public class BlobService
         });
         return sasUrl;
     }
-
 
 
     public async Task DeleteBlob(string? blobKey)

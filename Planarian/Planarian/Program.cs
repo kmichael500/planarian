@@ -170,7 +170,6 @@ builder.Services.AddSignalR();
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
 {
     options.UseSqlServer(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
-
 });
 
 LinqToDBForEFTools.Initialize();
@@ -217,7 +216,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     // options.SecurityTokenValidators.Clear();
     //
     // options.SecurityTokenValidators.Add(new CustomJwtSecurityTokenHandler());
-    
+
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -227,10 +226,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             // If the request is for our hub...
             var path = context.HttpContext.Request.Path;
             if (!string.IsNullOrEmpty(accessToken))
-            {
                 // Read the token out of the query string
                 context.Token = accessToken;
-            }
             return Task.CompletedTask;
         }
     };
@@ -268,9 +265,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 
-app.MapHub<NotificationHub>("/api/notificationHub", options =>
-{
-});
+app.MapHub<NotificationHub>("/api/notificationHub", options => { });
 
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();
@@ -278,4 +273,3 @@ app.UseMiddleware<HttpResponseExceptionMiddleware>();
 app.MapControllers();
 
 app.Run();
-

@@ -22,7 +22,7 @@ public class TagType : EntityBaseNameId
 
     public string? ProjectId { get; set; } = null!;
     public string? AccountId { get; set; } = null!;
-    
+
     [MaxLength(450)] public string Key { get; set; } = null!;
     public bool IsDefault { get; set; } = false;
 
@@ -33,10 +33,13 @@ public class TagType : EntityBaseNameId
 
     public virtual ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } =
         new HashSet<EntranceHydrologyTag>();
-    
+
     public virtual ICollection<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } =
         new HashSet<EntranceHydrologyFrequencyTag>();
-    public virtual ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
+
+    public virtual ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } =
+        new HashSet<FieldIndicationTag>();
+
     public ICollection<Entrance> EntranceLocationQualitiesTags { get; set; } = new HashSet<Entrance>();
     public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
     public ICollection<File> FileTypeTags { get; set; } = new HashSet<File>();

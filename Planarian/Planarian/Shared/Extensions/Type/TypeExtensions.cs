@@ -8,10 +8,7 @@ public static class TypeExtensions
 {
     public static string GenerateSqlTableScript(this System.Type entityType, string tableName, bool isTemporary = false)
     {
-        if (isTemporary)
-        {
-            tableName = $"#{tableName}";
-        }
+        if (isTemporary) tableName = $"#{tableName}";
 
         var createTableScript = new StringBuilder($"CREATE TABLE {tableName} (");
         var primaryKeyColumns = new List<string>();
@@ -19,46 +16,35 @@ public static class TypeExtensions
         var properties = entityType.GetProperties().ToList();
         foreach (var property in properties)
         {
-            bool isNullable = Nullable.GetUnderlyingType(property.PropertyType) != null ||
-                              (property.PropertyType == typeof(string)); // Strings are inherently nullable
+            var isNullable = Nullable.GetUnderlyingType(property.PropertyType) != null ||
+                             property.PropertyType == typeof(string); // Strings are inherently nullable
 
-            string? sqlType = property.PropertyType.ToSqlServerType();
+            var sqlType = property.PropertyType.ToSqlServerType();
 
             if (string.IsNullOrWhiteSpace(sqlType)) continue;
 
             // Check for MaxLength attribute
             var maxLengthAttr = property.GetCustomAttribute<MaxLengthAttribute>();
             if (maxLengthAttr != null && property.PropertyType == typeof(string))
-            {
                 sqlType = $"NVARCHAR({maxLengthAttr.Length})";
-            }
 
             // Add NOT NULL constraint only if the property is not nullable and it doesn't have a [Required] attribute
-            if (!isNullable && property.GetCustomAttribute<RequiredAttribute>() == null)
-            {
-                sqlType += " NOT NULL";
-            }
+            if (!isNullable && property.GetCustomAttribute<RequiredAttribute>() == null) sqlType += " NOT NULL";
 
             // Check for Key attribute (indicating a primary key)
-            if (property.GetCustomAttribute<KeyAttribute>() != null)
-            {
-                primaryKeyColumns.Add(property.Name);
-            }
+            if (property.GetCustomAttribute<KeyAttribute>() != null) primaryKeyColumns.Add(property.Name);
 
             createTableScript.Append($"{property.Name} {sqlType}, ");
         }
 
         if (primaryKeyColumns.Count > 0)
-        {
             createTableScript.Append($"PRIMARY KEY ({string.Join(", ", primaryKeyColumns)}), ");
-        }
 
         // Remove trailing comma and close parenthesis
         createTableScript.Length -= 2;
         createTableScript.Append(")");
 
         return createTableScript.ToString();
-
     }
 
     private static string? ToSqlServerType(this System.Type clrType)

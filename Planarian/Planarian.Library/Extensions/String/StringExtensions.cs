@@ -10,13 +10,14 @@ public static class StringExtensions
     {
         return input == null ? Array.Empty<string>() : input.Split(delimiter).Select(s => s.Trim()).ToArray();
     }
+
     public static string FirstCharToUpper(this string input)
     {
         if (string.IsNullOrWhiteSpace(input))
             return input;
 
         var result = char.ToUpper(input[0]) + input[1..];
-        
+
         return result;
     }
 
@@ -92,12 +93,12 @@ public static class StringExtensions
     {
         return Regex.IsMatch(password, RegularExpressions.PasswordValidation);
     }
-    
+
     public static string ToCamelCase(this string input)
     {
         if (string.IsNullOrEmpty(input))
             return input;
-        
+
         return char.ToLowerInvariant(input[0]) + input.Substring(1);
     }
 }

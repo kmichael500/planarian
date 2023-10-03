@@ -39,7 +39,6 @@ public class SettingsRepository : RepositoryBase
         return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(e => e.State)
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
@@ -94,7 +93,7 @@ public class SettingsRepository : RepositoryBase
                 (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
-    
+
     public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
     {
         return await DbContext.TagTypes.Where(e =>

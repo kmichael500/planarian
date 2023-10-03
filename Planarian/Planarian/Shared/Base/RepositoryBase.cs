@@ -23,7 +23,7 @@ public abstract class RepositoryBase
     {
         var result = await DbContext.SaveChangesAsync();
     }
-    
+
     public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
     {
         return await DbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -36,7 +36,7 @@ public abstract class RepositoryBase
     {
         entities = entities.ToList();
         var totalEntities = entities.Count();
-        
+
         var processed = 0;
         foreach (var batch in entities.Chunk(batchSize))
         {
@@ -48,7 +48,7 @@ public abstract class RepositoryBase
 
     public async Task<int> ExecuteRawSql(string sql, CancellationToken cancellationToken = default)
     {
-        return await DbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken:cancellationToken);
+        return await DbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
     public async Task BulkSaveChangesAsync()
