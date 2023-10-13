@@ -13,7 +13,7 @@ public class AccountRepository : RepositoryBase
     {
     }
 
-    public async Task DeleteAlLCaves(IProgress<string> progress, CancellationToken cancellationToken)
+    public async Task DeleteAllCaves(IProgress<string> progress, CancellationToken cancellationToken)
     {
         const int batchSize = 500; // Adjust based on your needs
         var cavesCount = await DbContext.Caves.CountAsync(e => e.AccountId == RequestUser.AccountId, cancellationToken);
@@ -23,8 +23,10 @@ public class AccountRepository : RepositoryBase
         do
         {
             deletedCount = await DbContext.Caves
-                .Where(c => c.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
+                .Where(c => DbContext.Caves
+                    .Take(batchSize)
+                    .Select(w => w.Id)
+                    .Contains(c.Id) && c.AccountId == RequestUser.AccountId)
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -40,8 +42,10 @@ public class AccountRepository : RepositoryBase
         do
         {
             deletedCount = await DbContext.TagTypes
-                .Where(tt => tt.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
+                .Where(tt => DbContext.TagTypes
+                    .Take(batchSize)
+                    .Select(w => w.Id)
+                    .Contains(tt.Id) && tt.AccountId == RequestUser.AccountId)
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -146,6 +150,11 @@ public class AccountRepository : RepositoryBase
             await DbContext.TripTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+
+            await DbContext.Entrances
+                .Where(e => e.LocationQualityTagId == tagTypeId)
+                .Set(e => e.LocationQualityTagId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.LeadTags

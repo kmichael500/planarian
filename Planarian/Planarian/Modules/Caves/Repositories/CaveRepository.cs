@@ -111,12 +111,12 @@ public class CaveRepository : RepositoryBase
                         };
                         break;
                     case nameof(CaveQuery.Narrative):
-                        query = queryCondition.Operator switch
-                        {
-                            QueryOperator.FreeText => query.Where(e =>
-                                e.Narrative != null && EF.Functions.FreeText(e.Narrative, queryCondition.Value)),
-                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
-                        };
+                        // query = queryCondition.Operator switch
+                        // {
+                        //     QueryOperator.FreeText => query.Where(e =>
+                        //         e.Narrative != null && EF.Functions.FreeText(e.Narrative, queryCondition.Value)),
+                        //     _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                        // };
                         break;
                     case "ReportedByName":
                         query = queryCondition.Operator switch
@@ -303,22 +303,22 @@ public class CaveRepository : RepositoryBase
                 ReportedOn = e.ReportedOn,
                 ReportedByName = e.ReportedByName,
                 IsArchived = e.IsArchived,
-                PrimaryEntrance = e.Entrances.Where(ee => ee.IsPrimary).Select(ee =>
-                    new EntranceVm
-                    {
-                        Id = ee.Id,
-                        IsPrimary = true,
-                        Latitude = ee.Location.Y,
-                        Longitude = ee.Location.X,
-                        ElevationFeet = ee.Location.Z,
-                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId).ToList(),
-                        EntranceHydrologyFrequencyTagIds = ee.EntranceHydrologyFrequencyTags
-                            .Select(y => y.TagTypeId).ToList(),
-                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
-                        EntranceHydrologyTagIds =
-                            ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
-                    }).FirstOrDefault(),
-                MapIds = e.Files.Select(e => e.Id),
+                // PrimaryEntrance = e.Entrances.Where(ee => ee.IsPrimary).Select(ee =>
+                //     new EntranceVm
+                //     {
+                //         Id = ee.Id,
+                //         IsPrimary = true,
+                //         Latitude = ee.Location.Y,
+                //         Longitude = ee.Location.X,
+                //         ElevationFeet = ee.Location.Z,
+                //         EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId).ToList(),
+                //         EntranceHydrologyFrequencyTagIds = ee.EntranceHydrologyFrequencyTags
+                //             .Select(y => y.TagTypeId).ToList(),
+                //         FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
+                //         EntranceHydrologyTagIds =
+                //             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
+                //     }).FirstOrDefault(),
+                MapIds = e.Files.Select(ee => ee.Id),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
                     {
                         Id = ee.Id,

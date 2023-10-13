@@ -169,7 +169,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
 {
-    options.UseSqlServer(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 });
 
 LinqToDBForEFTools.Initialize();

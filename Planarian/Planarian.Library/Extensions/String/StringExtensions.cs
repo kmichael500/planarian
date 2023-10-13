@@ -11,6 +11,11 @@ public static class StringExtensions
         return input == null ? Array.Empty<string>() : input.Split(delimiter).Select(s => s.Trim()).ToArray();
     }
 
+    public static string Quote(this string input)
+    {
+        return $"\"{input}\"";
+    }
+
     public static string FirstCharToUpper(this string input)
     {
         if (string.IsNullOrWhiteSpace(input))

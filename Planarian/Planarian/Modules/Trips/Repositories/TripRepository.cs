@@ -110,7 +110,7 @@ public class TripRepository : RepositoryBase
                 ModifiedOn = e.ModifiedOn,
                 IsTripReportCompleted = !string.IsNullOrWhiteSpace(e.TripReport)
             })
-            .QueryFilter(query.Conditions)
+            // .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
 
         return result;

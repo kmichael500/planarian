@@ -51,7 +51,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
             }
 
-            await Repository.DeleteAlLCaves(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
+            await Repository.DeleteAllCaves(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
 
             await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
                 "Deleting associated files.");
