@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
 
@@ -28,6 +28,7 @@ import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianD
 import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { FileService } from "../../Files/Services/FileService";
 import { CaveService } from "../Service/CaveService";
+import { MapComponent } from "../../Map/Components/MapComponent";
 
 const { Panel } = Collapse;
 
@@ -39,6 +40,11 @@ export interface CaveComponentProps {
 
 const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (cave?.primaryEntrance) {
+    }
+  }, [cave, isLoading]);
 
   return (
     <>
@@ -202,8 +208,8 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
         )}
 
         <PlanarianDividerComponent title="Narrative" />
-
         <ParagraphDisplayComponent text={cave?.narrative} />
+
         <PlanarianDividerComponent
           title="Files"
           element={
@@ -251,6 +257,16 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
             updateFunction={FileService.UpdateFilesMetadata}
           />
         )}
+        <PlanarianDividerComponent title="Map" />
+        <div style={{ height: "400px" }}>
+          <MapComponent
+            initialCenter={[
+              cave?.primaryEntrance.latitude as number,
+              cave?.primaryEntrance.longitude as number,
+            ]}
+            initialZoom={15}
+          />
+        </div>
       </Card>
     </>
   );

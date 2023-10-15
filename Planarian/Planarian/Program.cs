@@ -22,6 +22,7 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Map.Controllers;
 using Planarian.Modules.Notifications.Hubs;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
@@ -156,6 +157,8 @@ builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
+builder.Services.AddScoped<MapService>();
+builder.Services.AddScoped<MapRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
 
 #endregion

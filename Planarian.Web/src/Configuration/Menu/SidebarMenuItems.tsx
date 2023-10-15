@@ -7,6 +7,7 @@ import {
   DatabaseOutlined,
   SettingOutlined,
   ImportOutlined,
+  CompassOutlined,
 } from "@ant-design/icons";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
@@ -37,6 +38,16 @@ const SideBarMenuItems = () => {
         </Link>
       ),
       label: "Caves",
+      isVisible: hasAccount,
+    },
+    {
+      key: "/map",
+      icon: (
+        <Link to="/map">
+          <CompassOutlined />
+        </Link>
+      ),
+      label: "Map",
       isVisible: hasAccount,
     },
     {
