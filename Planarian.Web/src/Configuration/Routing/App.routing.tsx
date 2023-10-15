@@ -19,6 +19,7 @@ import { TripPhotoUploadPage } from "../../Modules/Trip/Pages/TripPhotoUploadPag
 import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
 import { AppRederect } from "./App.routing.redirect";
+import { MapPage } from "../../Modules/Map/Pages/MapPage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -36,6 +37,7 @@ export const AppRouting: React.FC = () => {
         <Route path="/caves/:caveId" element={<CavePage />} />
         <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
         <Route path="/caves/add" element={<AddCavesPage />} />
+        <Route path="/map" element={<MapPage />} />
         <Route path="/account/settings" element={<AccountSettingsPage />} />
         <Route path="/account/import" element={<ImportPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
