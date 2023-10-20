@@ -23,7 +23,6 @@ root.render(
 reportWebVitals();
 
 let baseUrl: string | undefined;
-
 if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = process.env.REACT_APP_SERVER_URL;
 } else if (process.env.NODE_ENV === "development") {

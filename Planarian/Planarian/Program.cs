@@ -59,7 +59,9 @@ builder.Configuration.AddAzureAppConfiguration(options =>
             isDevelopment ? "Development" : "Production");
 });
 
-if (isDevelopment) builder.Configuration.AddJsonFile("appsettings.Development.json", false);
+#if DEBUG
+builder.Configuration.AddJsonFile("appsettings.Development.json", false);
+#endif
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
