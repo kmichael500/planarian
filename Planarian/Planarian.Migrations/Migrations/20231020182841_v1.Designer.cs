@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20231012171254_v1")]
+    [Migration("20231020182841_v1")]
     partial class v1
     {
         /// <inheritdoc />

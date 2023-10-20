@@ -3,6 +3,7 @@ using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -48,9 +49,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
-builder.Configuration.AddAzureAppConfiguration(appConfigConnectionString);
-
 var isDevelopment = builder.Environment.IsDevelopment();
+
+builder.Configuration.AddAzureAppConfiguration(options =>
+{
+    options.Connect(appConfigConnectionString)
+        .Select(KeyFilter.Any, LabelFilter.Null)
+        .Select(KeyFilter.Any,
+            isDevelopment ? "Development" : "Production");
+});
+
 if (isDevelopment) builder.Configuration.AddJsonFile("appsettings.Development.json", false);
 
 builder.Services.AddControllers();
