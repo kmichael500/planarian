@@ -4,27 +4,40 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
-- script: dotnet build Planarian/Planarian/Planarian.csproj --configuration $(buildConfiguration)
-  displayName: 'Build'
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Job'
+    steps:
+    - script: dotnet build Planarian/Planarian/Planarian.csproj --configuration $(buildConfiguration)
+      displayName: 'Build'
 
-- task: DotNetCoreCLI@2
-  inputs:
-    command: publish
-    publishWebProjects: false
-    projects: 'Planarian/Planarian/Planarian.csproj'
-    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: true
+    - task: DotNetCoreCLI@2
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: 'Planarian/Planarian/Planarian.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    pathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    artifactName: 'webapp'
-    publishLocation: 'Container'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'webapp'
+        publishLocation: 'Container'
 
-- task: AzureRmWebAppDeployment@4
-  inputs:
-    ConnectionType: 'AzureRM'
-    azureSubscription: '$(azureSubscription)'
-    appType: 'webApp'
-    WebAppName: '$(webAppName)'
+- stage: Deploy
+  displayName: 'Deploy Stage'
+  dependsOn: Build
+  jobs:
+  - job: DeployJob
+    displayName: 'Deploy Job'
+    steps:
+    - task: AzureRmWebAppDeployment@4
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: '$(azureSubscription)'
+        appType: 'webApp'
+        WebAppName: '$(webAppName)'
