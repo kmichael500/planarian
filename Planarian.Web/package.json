@@ -19,6 +19,8 @@
     "csv-parse": "^5.4.0",
     "imask": "^6.4.3",
     "jwt-decode": "^3.1.2",
+    "leaflet": "^1.9.4",
+    "leaflet.locatecontrol": "^0.79.0",
     "node-sass": "^7.0.3",
     "object-to-formdata": "^4.4.2",
     "prettier": "^2.8.3",
@@ -30,6 +32,7 @@
     "react-helmet": "^6.1.0",
     "react-highlight-words": "^0.20.0",
     "react-leaflet": "^4.2.1",
+    "react-leaflet-cluster": "^2.1.0",
     "react-papaparse": "^4.1.0",
     "react-router-dom": "^6.4.2",
     "react-scripts": "5.0.1",
@@ -44,7 +47,8 @@
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "swa deploy --env production"
   },
   "eslintConfig": {
     "extends": [
@@ -65,7 +69,9 @@
     ]
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "^1.1.4",
     "@types/leaflet": "^1.9.3",
+    "@types/leaflet.locatecontrol": "^0.74.2",
     "@types/react-highlight-words": "^0.16.4",
     "@types/react-text-mask": "^5.4.11",
     "@types/uuid": "^9.0.0"
