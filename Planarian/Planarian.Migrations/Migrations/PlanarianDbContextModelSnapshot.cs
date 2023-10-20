@@ -643,7 +643,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<Point>("Location")
                         .IsRequired()
-                        .HasColumnType("geometry");
+                        .HasColumnType("geography(Point,4326)");
 
                     b.Property<string>("LocationQualityTagId")
                         .IsRequired()
