@@ -47,7 +47,8 @@
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "swa deploy --env production"
   },
   "eslintConfig": {
     "extends": [
@@ -68,6 +69,7 @@
     ]
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "^1.1.4",
     "@types/leaflet": "^1.9.3",
     "@types/leaflet.locatecontrol": "^0.74.2",
     "@types/react-highlight-words": "^0.16.4",
