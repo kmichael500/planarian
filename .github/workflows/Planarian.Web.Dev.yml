@@ -4,25 +4,46 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "Planarian.Web/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Planarian.Web/**" # Same filter applied for pull requests.
+
   workflow_dispatch:
 
 jobs:
   build_and_deploy_job:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
+    environment:
+      name: Development
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      # Cache node_modules
+      - name: Cache node modules
+        uses: actions/cache@v2
+        with:
+          path: Planarian.Web/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('Planarian.Web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install Dependencies
         run: |
-          cd cd Planarian.Web
+          cd Planarian.Web
           npm install
 
       - name: Build React App
         run: |
-          cd cd Planarian.Web
+          cd Planarian.Web
           npm run build
+        env:
+          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
 
       - name: Deploy to Azure Static Web App
         id: deploy
