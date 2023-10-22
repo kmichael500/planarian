@@ -5,10 +5,11 @@ import { ImportCaveComponent } from "./ImportCaves";
 import { ImportEntrancesComponent } from "./ImportEntrances";
 import { ImportInformationCardComponent } from "./ImportInformationCardComponent";
 import { Button } from "antd";
+import { ImportFilesComponent } from "./ImportFilesComponent";
 
 const ImportComponent = () => {
   const [step, setStep] = useState<number>(1);
-  const totalSteps = 3; // Change this to the total number of steps
+  const totalSteps = 4; // Change this to the total number of steps
 
   return (
     <>
@@ -25,6 +26,13 @@ const ImportComponent = () => {
           <ImportEntrancesComponent
             onUploaded={() => {
               setStep(4);
+            }}
+          />
+        )}
+        {step === 4 && (
+          <ImportFilesComponent
+            onUploaded={() => {
+              setStep(5);
             }}
           />
         )}

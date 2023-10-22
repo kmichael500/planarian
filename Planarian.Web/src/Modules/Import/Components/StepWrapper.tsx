@@ -41,6 +41,12 @@ const StepWrapper = ({
           style={{ cursor: "pointer" }}
           className="clickable-step"
         />
+        <Step
+          title="Upload Files"
+          onClick={() => setStep(4)}
+          style={{ cursor: "pointer" }}
+          className="clickable-step"
+        />
       </Steps>
       <div
         id="step-wrapper-container"
