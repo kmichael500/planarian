@@ -4,19 +4,42 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "Planarian.Web/**"
   pull_request:
     branches:
       - main
-    paths:
-      - "Planarian.Web/**" # Same filter applied for pull requests.
-
   workflow_dispatch:
 
 jobs:
-  build_and_deploy_job:
+  check_changes:
     runs-on: ubuntu-latest
+    outputs:
+      web_changed: ${{ steps.check_web.outputs.changed }}
+      api_changed: ${{ steps.check_api.outputs.changed }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Check Web changes
+        id: check_web
+        run: |
+          changed=$(git diff --quiet HEAD^ HEAD Planarian.Web/ || echo "changed")
+          echo "::set-output name=changed::$changed"
+
+      - name: Check API changes
+        id: check_api
+        run: |
+          changed=$(git diff --quiet HEAD^ HEAD Planarian/Planarian/ || echo "changed")
+          echo "::set-output name=changed::$changed"
+
+  build_and_deploy_web:
+    needs: check_changes
+    if: needs.check_changes.outputs.web_changed == 'changed'
+    runs-on: ubuntu-latest
+    name: Build and Deploy Web
+    environment:
+      name: Development
+    steps:
+      runs-on: ubuntu-latest
     name: Build and Deploy Job
     environment:
       name: Development
@@ -52,7 +75,100 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
           action: "upload"
-          app_location: "/Planarian.Web/build" # Path to your app's static assets
-          api_location: "" # API code location - optional, provide if you have an API
-          app_artifact_location: "" # Built app content directory - optional
+          app_locationame: "Planarian Web: Development"
 
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web_changed: ${{ steps.check_web.outputs.changed }}
+      api_changed: ${{ steps.check_api.outputs.changed }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Check Web changes
+        id: check_web
+        run: |
+          changed=$(git diff --quiet HEAD^ HEAD Planarian.Web/ || echo "changed")
+          echo "::set-output name=changed::$changed"
+
+      - name: Check API changes
+        id: check_api
+        run: |
+          changed=$(git diff --quiet HEAD^ HEAD Planarian/Planarian/ || echo "changed")
+          echo "::set-output name=changed::$changed"
+
+  build_and_deploy_web:
+    needs: check_changes
+    if: needs.check_changes.outputs.web_changed == 'changed'
+    runs-on: ubuntu-latest
+    name: Build and Deploy Web
+    environment:
+      name: Development
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      # Cache node_modules
+      - name: Cache node modules
+        uses: actions/cache@v2
+        with:
+          path: Planarian.Web/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('Planarian.Web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install Dependencies
+        run: |
+          cd Planarian.Web
+          npm install
+
+      - name: Build React App
+        run: |
+          cd Planarian.Web
+          npm run build
+        env:
+          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
+
+      - name: Deploy to Azure Static Web App
+        id: deploy
+        uses: azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "/Planarian.Web/build"
+          api_location: ""
+          app_artifact_location: ""
+
+  build_and_deploy_api:
+    needs: check_changes
+    if: needs.check_changes.outputs.api_changed == 'changed'
+    runs-on: ubuntu-latest
+    name: Build and Deploy .NET Core API
+    environment:
+      name: Development
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Extract .NET Version
+        id: get-dotnet-version
+        run: |
+          version=$(grep -oP '<TargetFramework>\K[^<]+' Planarian/Planarian/Planarian.csproj | sed 's/net//')
+          echo "::set-output name=dotnet-version::$version"
+          
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ steps.get-dotnet-version.outputs.dotnet-version }}
