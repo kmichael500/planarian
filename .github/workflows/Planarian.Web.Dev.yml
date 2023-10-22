@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "Planarian.Web/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Planarian.Web/**" # Same filter applied for pull requests.
+
   workflow_dispatch:
 
 jobs:
