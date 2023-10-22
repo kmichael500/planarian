@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -32,12 +33,13 @@ public class ImportService : ServiceBase
     private readonly NotificationService _notificationService;
     private readonly CaveRepository _repository;
     private readonly AccountRepository _accountRepository;
+    private readonly CaveRepository _caveRepository;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository tagRepository, SettingsRepository settingsRepository,
         TemporaryEntranceRepository temporaryEntranceRepository,
         NotificationService notificationService, CaveRepository repository,
-        AccountRepository accountRepository) : base(requestUser)
+        AccountRepository accountRepository, CaveRepository caveRepository) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -46,6 +48,7 @@ public class ImportService : ServiceBase
         _notificationService = notificationService;
         _repository = repository;
         _accountRepository = accountRepository;
+        _caveRepository = caveRepository;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -1040,4 +1043,57 @@ public class ImportService : ServiceBase
     }
 
     #endregion
+
+    public async Task<object?> AddFileForImport(Stream stream, string fileName, string? uuid,
+        CancellationToken cancellationToken)
+    {
+        var delimiterRegex = "-";
+        var countyCodeRegex = "[A-Z]+";
+        
+        var caveInfos = ExtractCountyInformation(fileName, delimiterRegex, countyCodeRegex);
+
+        foreach (var cave in caveInfos)
+        {
+            var caveId = await _caveRepository.GetCaveIdByCountyCodeNumber(cave.CountyCode, cave.CountyCaveNumber);
+            if (string.IsNullOrWhiteSpace(caveId))
+            {
+                throw ApiExceptionDictionary.BadRequest(
+                    $"Cave for county code '{cave.CountyCode}' and number '{cave.CountyCaveNumber}' does not exist.");
+            }
+            await _fileService.UploadCaveFile(stream, caveId, fileName, cancellationToken, uuid);
+        }
+        
+        return caveInfos;
+    }
+
+    public static List<CountyCaveInfo> ExtractCountyInformation(string fileName,
+        string delimiterRegex, string countyCodeRegex)
+    {
+        // Combining the county code, delimiter, and number patterns.
+        var combinedPattern = "(" + countyCodeRegex + ")" + delimiterRegex + "(\\d+)";
+
+        var matches = Regex.Matches(fileName, combinedPattern);
+        var resultList = new List<CountyCaveInfo>();
+
+        foreach (Match match in matches)
+        {
+            var countyCode = match.Groups[1].Value;
+            var countyNumber = int.Parse(match.Groups[2].Value); // Convert string to integer
+
+            resultList.Add(new CountyCaveInfo
+            {
+                CountyCode = countyCode,
+                CountyCaveNumber = countyNumber
+            });
+        }
+    
+        return resultList;
+    }
+
+    public class CountyCaveInfo
+    {
+        public string CountyCode { get; set; }
+        public int CountyCaveNumber { get; set; }
+    }
+
 }

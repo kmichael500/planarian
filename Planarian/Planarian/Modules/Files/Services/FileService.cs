@@ -72,7 +72,7 @@ public class FileService : ServiceBase<FileRepository>
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
         await Repository.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm
         {

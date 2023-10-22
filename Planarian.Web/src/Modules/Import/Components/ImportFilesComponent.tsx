@@ -94,15 +94,13 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     <>
       {!isUploaded && !uploadFailed && errorList.length === 0 && (
         <UploadComponent
-          draggerMessage="Click or drag your caves CSV file to this area to upload."
-          draggerTitle="Import Cave File"
+          draggerMessage="Click any files you would like to upload."
+          draggerTitle="Import Cave Files"
           hideCancelButton
-          singleFile
-          allowedFileTypes={[".csv"]}
           style={{ display: "flex" }}
           uploadFunction={async (params): Promise<FileVm> => {
             try {
-              const result = await AccountService.ImportCavesFile(
+              const result = await AccountService.ImportFile(
                 params.file,
                 params.uid,
                 params.onProgress
