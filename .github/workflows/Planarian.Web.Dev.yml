@@ -55,4 +55,3 @@ jobs:
           app_location: "/Planarian.Web/build" # Path to your app's static assets
           api_location: "" # API code location - optional, provide if you have an API
           app_artifact_location: "" # Built app content directory - optional
-
