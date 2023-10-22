@@ -38,7 +38,7 @@ public class ProjectRepository : RepositoryBase
                     ModifiedOn = e.ModifiedOn
                 }
             )
-            .QueryFilter(query.Conditions)
+            // .QueryFilter(query.Conditions)
             .ApplyPagingAsync(query.PageNumber, query.PageSize, e => e.ModifiedOn);
     }
 

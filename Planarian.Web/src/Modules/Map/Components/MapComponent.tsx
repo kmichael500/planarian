@@ -38,7 +38,7 @@ const PlanarianMap = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       map.invalidateSize();
-    }, 100); // Adjust timeout as needed
+    }, 100);
 
     return () => clearTimeout(timer); // Clean up timeout if component is unmounted
   }, [map]);
@@ -61,7 +61,7 @@ interface ExpandedViewBox {
   southWest: Coordinate;
 }
 
-const MapMarkers: React.FC = () => {
+const MapMarkers = ({ onDataLoaded }: { onDataLoaded?: () => void }) => {
   const [data, setData] = useState<MapData[]>([]);
   const [expandedViewBox, setExpandedViewBox] =
     useState<ExpandedViewBox | null>(null);
@@ -152,6 +152,9 @@ const MapMarkers: React.FC = () => {
           zoom
         );
         setData(newData);
+        if (onDataLoaded) {
+          onDataLoaded();
+        }
       } catch (error) {
         console.error("An error occurred while fetching data", error);
       }
@@ -164,7 +167,10 @@ const MapMarkers: React.FC = () => {
   });
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => {
+      loadData();
+    }, 300);
+    return () => clearTimeout(timer); // Clean up timeout if component is unmounted
   }, [map]);
 
   return (
@@ -194,6 +200,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   initialZoom,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     initialCenter || [0, 0]
   );
@@ -204,10 +211,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         try {
           const data = await MapService.getMapCenter();
           setMapCenter([data.latitude, data.longitude]);
+          setIsLoading(false);
         } catch (error) {
           console.error("An error occurred while fetching data", error);
         } finally {
-          setIsLoading(false);
         }
       };
       fetchData();
@@ -217,7 +224,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   }, [initialCenter]);
 
   return (
-    <Spin spinning={isLoading}>
+    <Spin spinning={isDataLoading}>
       {isLoading && <div style={{ height: "100%", width: "100%" }}></div>}
       {!isLoading && (
         <MapContainer
@@ -229,7 +236,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
           <PlanarianMap />
           <MapLayers />
 
-          <MapMarkers />
+          <MapMarkers
+            onDataLoaded={() => {
+              setIsDataLoading(false);
+            }}
+          />
           <LocateControl />
         </MapContainer>
       )}

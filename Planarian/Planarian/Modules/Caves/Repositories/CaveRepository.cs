@@ -31,8 +31,8 @@ public class CaveRepository : RepositoryBase
                     case "Name":
                         query = queryCondition.Operator switch
                         {
-                            QueryOperator.Contains => query.Where(e =>
-                                e.Name.Contains(queryCondition.Value) ||
+                            QueryOperator.Contains => query.Where(e => 
+                                EF.Functions.ToTsVector(e.Name).Matches(queryCondition.Value) ||
                                 (queryCondition.Value.Contains(e.County.DisplayId) &&
                                  queryCondition.Value.Contains(e.CountyNumber.ToString()))),
                             _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
@@ -114,7 +114,7 @@ public class CaveRepository : RepositoryBase
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.FreeText => query.Where(e =>
-                                e.Narrative != null && EF.Functions.FreeText(e.Narrative, queryCondition.Value)),
+                                e.Narrative != null && EF.Functions.ToTsVector(e.Narrative).Matches(queryCondition.Value)),
                             _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;
@@ -318,7 +318,7 @@ public class CaveRepository : RepositoryBase
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
                     }).FirstOrDefault(),
-                MapIds = e.Files.Select(e => e.Id),
+                MapIds = e.Files.Select(ee => ee.Id),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
                     {
                         Id = ee.Id,

@@ -4,29 +4,23 @@
 
 namespace Planarian.Migrations.Migrations
 {
-    public partial class v17 : Migration
+    /// <inheritdoc />
+    public partial class v2 : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateIndex(
-                name: "IX_Caves_DepthFeet",
+                name: "IX_Caves_Name",
                 table: "Caves",
-                column: "DepthFeet");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Caves_LengthFeet",
-                table: "Caves",
-                column: "LengthFeet");
+                column: "Name");
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
-                name: "IX_Caves_DepthFeet",
-                table: "Caves");
-
-            migrationBuilder.DropIndex(
-                name: "IX_Caves_LengthFeet",
+                name: "IX_Caves_Name",
                 table: "Caves");
         }
     }

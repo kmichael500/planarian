@@ -16,7 +16,7 @@ export interface CaveVm {
   reportedOn: string | null;
   reportedByName: string | null;
   isArchived: boolean;
-  primaryEntrance: EntranceVm;
+  primaryEntrance: EntranceVm | null;
   mapIds: string[];
   entrances: EntranceVm[];
   geologyTagIds: string[];

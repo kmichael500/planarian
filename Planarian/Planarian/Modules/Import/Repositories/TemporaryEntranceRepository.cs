@@ -2,6 +2,7 @@ using LinqToDB;
 using LinqToDB.Data;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
@@ -85,62 +86,75 @@ public class TemporaryEntranceRepository : RepositoryBase
         var tempEntranceTable = db.GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName);
         var entranceTable = db.GetTable<Entrance>();
 
-        // Selecting TemporaryEntrance records that are marked as IsPrimary
-        var invalidTempEntrances = await (from temp in tempEntranceTable.Where(e => e.IsPrimary)
+        var invalidTempEntrances = new List<string>();
+        int batchSize = 1000;
+        int offset = 0;
+    
+        while(true)  // Continue processing batches until the end of the table is reached
+        {
+            var batchQuery = (from temp in tempEntranceTable.Skip(offset).Take(batchSize).Where(e => e.IsPrimary)
+                where tempEntranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary && e.Id != temp.Id)
+                      || entranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary)
+                select temp.Id);
 
-            // Check if there is another TemporaryEntrance record marked as IsPrimary with the same CaveId
-            where tempEntranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary && e.Id != temp.Id)
+            var batchResult = await batchQuery.ToListAsyncLinqToDB();
+            invalidTempEntrances.AddRange(batchResult);
 
-                  // Union with TemporaryEntrance records that have a corresponding Entrance record marked as IsPrimary with the same CaveId
-                  || entranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary)
-            select temp.Id).ToListAsyncLinqToDB();
+            if(batchResult.Count < batchSize)
+            {
+                break;  // Exit loop if the end of the table is reached
+            }
+
+            offset += batchSize;  // Prepare to process the next batch
+        }
+
         return invalidTempEntrances;
     }
+
+
 
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
         var command = $@"
-        INSERT INTO {nameof(DbContext.Entrances)} (
-            {nameof(Entrance.Id)},
-            {nameof(Entrance.CaveId)},
-            {nameof(Entrance.LocationQualityTagId)},
-            {nameof(Entrance.Name)},
-            {nameof(Entrance.IsPrimary)},
-            {nameof(Entrance.Description)},
-            {nameof(Entrance.Location)},
-            {nameof(Entrance.ReportedOn)},
-            {nameof(Entrance.ReportedByUserId)},
-            {nameof(Entrance.ReportedByName)},
-            {nameof(Entrance.PitFeet)},
-            {nameof(Entrance.CreatedByUserId)},
-            {nameof(Entrance.ModifiedByUserId)},
-            {nameof(Entrance.CreatedOn)},
-            {nameof(Entrance.ModifiedOn)}
+        INSERT INTO {nameof(DbContext.Entrances).Quote()} (
+            {nameof(Entrance.Id).Quote()},
+            {nameof(Entrance.CaveId).Quote()},
+            {nameof(Entrance.LocationQualityTagId).Quote()},
+            {nameof(Entrance.Name).Quote()},
+            {nameof(Entrance.IsPrimary).Quote()},
+            {nameof(Entrance.Description).Quote()},
+            {nameof(Entrance.Location).Quote()},
+            {nameof(Entrance.ReportedOn).Quote()},
+            {nameof(Entrance.ReportedByUserId).Quote()},
+            {nameof(Entrance.ReportedByName).Quote()},
+            {nameof(Entrance.PitFeet).Quote()},
+            {nameof(Entrance.CreatedByUserId).Quote()},
+            {nameof(Entrance.ModifiedByUserId).Quote()},
+            {nameof(Entrance.CreatedOn).Quote()},
+            {nameof(Entrance.ModifiedOn).Quote()}
         )
         SELECT 
-            {nameof(TemporaryEntrance.Id)},
-            {nameof(TemporaryEntrance.CaveId)},
-            {nameof(TemporaryEntrance.LocationQualityTagId)},
-            {nameof(TemporaryEntrance.Name)},
-            {nameof(TemporaryEntrance.IsPrimary)},
-            {nameof(TemporaryEntrance.Description)},
-            geography::STPointFromText(
-                'POINT(' + 
-                CAST({nameof(TemporaryEntrance.Longitude)} AS VARCHAR(20)) + ' ' + 
-                CAST({nameof(TemporaryEntrance.Latitude)} AS VARCHAR(20)) + ' ' + 
-                CAST({nameof(TemporaryEntrance.Elevation)} AS VARCHAR(20)) + ')', 
-                4326
-            ), 
-            {nameof(TemporaryEntrance.ReportedOn)},
-            {nameof(TemporaryEntrance.ReportedByUserId)},
-            {nameof(TemporaryEntrance.ReportedByName)},
-            {nameof(TemporaryEntrance.PitFeet)},
-            {nameof(TemporaryEntrance.CreatedByUserId)},
-            {nameof(TemporaryEntrance.ModifiedByUserId)},
-            {nameof(TemporaryEntrance.CreatedOn)},
-            {nameof(TemporaryEntrance.ModifiedOn)}
-        FROM {_temporaryEntranceTableName}";
+            {nameof(TemporaryEntrance.Id).Quote()},
+            {nameof(TemporaryEntrance.CaveId).Quote()},
+            {nameof(TemporaryEntrance.LocationQualityTagId).Quote()},
+            {nameof(TemporaryEntrance.Name).Quote()},
+            {nameof(TemporaryEntrance.IsPrimary).Quote()},
+            {nameof(TemporaryEntrance.Description).Quote()},
+             ST_SetSRID(ST_MakePoint(
+                CAST({nameof(TemporaryEntrance.Longitude).Quote()} AS FLOAT),
+                CAST({nameof(TemporaryEntrance.Latitude).Quote()} AS FLOAT),
+                CAST({nameof(TemporaryEntrance.Elevation).Quote()} AS FLOAT)
+            ), 4326),
+            {nameof(TemporaryEntrance.ReportedOn).Quote()},
+            {nameof(TemporaryEntrance.ReportedByUserId).Quote()},
+            {nameof(TemporaryEntrance.ReportedByName).Quote()},
+            {nameof(TemporaryEntrance.PitFeet).Quote()},
+            {nameof(TemporaryEntrance.CreatedByUserId).Quote()},
+            {nameof(TemporaryEntrance.ModifiedByUserId).Quote()},
+            {nameof(TemporaryEntrance.CreatedOn).Quote()},
+            {nameof(TemporaryEntrance.ModifiedOn).Quote()}
+        FROM {_temporaryEntranceTableName.Quote()}";
 
 
         // execute raw sql

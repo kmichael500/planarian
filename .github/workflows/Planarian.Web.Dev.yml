@@ -1,0 +1,37 @@
+name: "Planarian Web: Development"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: |
+          cd /Planarian.Web
+          npm install
+
+      - name: Build React App
+        run: |
+          cd /Planarian.Web
+          npm run build
+
+      - name: Deploy to Azure Static Web App
+        id: deploy
+        uses: azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
+          action: "upload"
+          app_location: "/Planarian.Web/build" # Path to your app's static assets
+          api_location: "" # API code location - optional, provide if you have an API
+          app_artifact_location: "" # Built app content directory - optional
+
