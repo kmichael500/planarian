@@ -89,7 +89,7 @@ const CavesComponent: React.FC = () => {
         <NumberComparisonFormItem
           inputType={"number"}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.elevationFeet"}
+          field={"primaryEntrance.elevationFeet" as any}
           label={"Elevation (Feet)"}
         />
         <NumberComparisonFormItem
@@ -131,7 +131,7 @@ const CavesComponent: React.FC = () => {
         <TagFilterFormItem
           tagType={TagType.EntranceStatus}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceStatusTagIds"}
+          field={"primaryEntrance.entranceStatusTagIds" as any}
           label={"Entrance Status"}
         />
         <TagFilterFormItem
@@ -149,13 +149,13 @@ const CavesComponent: React.FC = () => {
         <TagFilterFormItem
           tagType={TagType.EntranceHydrology}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyTagIds"}
+          field={"primaryEntrance.entranceHydrologyTagIds" as any}
           label={"Entrance Hydrology"}
         />
         <TagFilterFormItem
           tagType={TagType.EntranceHydrologyFrequency}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyFrequencyTagIds"}
+          field={"primaryEntrance.entranceHydrologyFrequencyTagIds" as any}
           label={"Entrance Hydroloy Frequency"}
         />
         <TextFilterFormItem

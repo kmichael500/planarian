@@ -258,15 +258,17 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
           />
         )}
         <PlanarianDividerComponent title="Map" />
-        <div style={{ height: "400px" }}>
-          <MapComponent
-            initialCenter={[
-              cave?.primaryEntrance.latitude as number,
-              cave?.primaryEntrance.longitude as number,
-            ]}
-            initialZoom={15}
-          />
-        </div>
+        {cave?.primaryEntrance !== null && (
+          <div style={{ height: "400px" }}>
+            <MapComponent
+              initialCenter={[
+                cave?.primaryEntrance?.latitude as number,
+                cave?.primaryEntrance?.longitude as number,
+              ]}
+              initialZoom={15}
+            />
+          </div>
+        )}
       </Card>
     </>
   );

@@ -13,7 +13,9 @@ const LocateControl = () => {
     }).addTo(map);
     return () => {
       // Clean up the control to avoid memory leaks
-      map.removeControl(locateControl);
+      if (map && map.off()) {
+        map.removeControl(locateControl);
+      }
     };
   }, [map]);
   return null;

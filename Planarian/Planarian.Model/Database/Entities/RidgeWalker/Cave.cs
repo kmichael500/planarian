@@ -63,5 +63,6 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         builder.HasIndex(e => e.LengthFeet);
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);
+        builder.HasIndex(e => e.Name);
     }
 }
