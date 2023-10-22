@@ -16,12 +16,12 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          cd /Planarian.Web
+          cd cd Planarian.Web
           npm install
 
       - name: Build React App
         run: |
-          cd /Planarian.Web
+          cd cd Planarian.Web
           npm run build
 
       - name: Deploy to Azure Static Web App
