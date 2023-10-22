@@ -33,6 +33,8 @@ jobs:
         run: |
           cd Planarian.Web
           npm run build
+        env:
+          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
 
       - name: Deploy to Azure Static Web App
         id: deploy
