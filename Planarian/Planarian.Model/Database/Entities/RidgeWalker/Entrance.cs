@@ -57,4 +57,6 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
             .HasForeignKey(e => e.LocationQualityTagId)
             .OnDelete(DeleteBehavior.NoAction);
     }
+    
+    
 }
