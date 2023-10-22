@@ -10,7 +10,6 @@
     <ItemGroup>
         <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1"/>
         <PackageReference Include="CsvHelper" Version="30.0.1"/>
-<!--        <PackageReference Include="EFCore.BulkExtensions.SqlServer" Version="6.7.15"/>-->
         <PackageReference Include="Handlebars.Net" Version="2.1.2"/>
         <PackageReference Include="linq2db.EntityFrameworkCore" Version="7.5.0" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.10"/>
@@ -21,10 +20,10 @@
         </PackageReference>
         <PackageReference Include="Southport.Messaging.Email.Core" Version="1.19.1"/>
         <PackageReference Include="Southport.Messaging.Email.SendGrid" Version="2.3.1"/>
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.2-mauipre.1.22102.1&gt;5"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.2-mauipre.1.22102.15"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.2-mauipre.1.22102.15"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
 
     </ItemGroup>
 
