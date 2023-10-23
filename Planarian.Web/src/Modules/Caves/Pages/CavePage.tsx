@@ -9,6 +9,7 @@ import { CaveComponent } from "../Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { EditOutlined } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { Grid, Typography } from "antd";
 
 const CavePage = () => {
   const [cave, setCave] = useState<CaveVm>();
@@ -17,6 +18,11 @@ const CavePage = () => {
 
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const { caveId } = useParams();
+
+  const screens = Grid.useBreakpoint();
+  const isLargeScreenSize = Object.entries(screens).some(
+    ([key, value]) => value && (key === "lg" || key === "xl")
+  );
 
   useEffect(() => {
     setHeaderButtons([
@@ -33,7 +39,20 @@ const CavePage = () => {
 
   useEffect(() => {
     if (!isNullOrWhiteSpace(cave?.name)) {
-      setHeaderTitle([`${cave?.displayId} ${cave?.name ?? ""}`]);
+      setHeaderTitle([
+        <>
+          {isLargeScreenSize && (
+            <Typography.Title level={4} ellipsis>
+              {`${cave?.displayId} ${cave?.name ?? ""}`}
+            </Typography.Title>
+          )}
+          {!isLargeScreenSize && (
+            <Typography.Text ellipsis>
+              {`${cave?.displayId} ${cave?.name ?? ""}`}
+            </Typography.Text>
+          )}
+        </>,
+      ]);
     }
   }, [cave]);
   useEffect(() => {
