@@ -1047,8 +1047,8 @@ public class ImportService : ServiceBase
     public async Task<object?> AddFileForImport(Stream stream, string fileName, string? uuid,
         CancellationToken cancellationToken)
     {
-        var delimiterRegex = "-";
-        var countyCodeRegex = "[A-Z]+";
+        var delimiterRegex = @"";
+        const string countyCodeRegex = @"[A-Z]{2}";
         
         var caveInfos = ExtractCountyInformation(fileName, delimiterRegex, countyCodeRegex);
 
@@ -1057,9 +1057,9 @@ public class ImportService : ServiceBase
             var caveId = await _caveRepository.GetCaveIdByCountyCodeNumber(cave.CountyCode, cave.CountyCaveNumber);
             if (string.IsNullOrWhiteSpace(caveId))
             {
-                throw ApiExceptionDictionary.BadRequest(
-                    $"Cave for county code '{cave.CountyCode}' and number '{cave.CountyCaveNumber}' does not exist.");
+                continue;
             }
+
             await _fileService.UploadCaveFile(stream, caveId, fileName, cancellationToken, uuid);
         }
         

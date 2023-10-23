@@ -67,6 +67,7 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
+        stream.Position = 0;
         await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
         entity.BlobKey = blobKey;
