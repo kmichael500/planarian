@@ -5,11 +5,11 @@ on:
       - main
     paths:
       - "Planarian/Planarian/**"
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "Planarian/Planarian/**"
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "Planarian/Planarian/**"
   workflow_dispatch:
 
 jobs:
