@@ -7,6 +7,7 @@ const MapPage = () => {
 
   useEffect(() => {
     setHeaderTitle([`Map`]);
+    setHeaderButtons([]);
   }, []);
 
   return (
