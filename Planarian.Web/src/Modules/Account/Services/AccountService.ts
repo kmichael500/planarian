@@ -69,6 +69,29 @@ const AccountService = {
     );
     return response.data;
   },
+
+  async ImportFile(
+    file: string | Blob | RcFile,
+    uuid: string,
+    onProgress: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<FileVm> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress: onProgress, // Set the onUploadProgress callback
+    };
+
+    const response = await HttpClient.post<FileVm>(
+      `${baseUrl}/import/file?uuid=${uuid}`,
+      formData,
+      config
+    );
+    return response.data;
+  },
   //#endregion
 
   //#region Tags

@@ -1,6 +1,7 @@
 using NetTopologySuite.Geometries;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.DateTime;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
@@ -144,6 +145,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Description = entranceValue.Description;
                 entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
                 entrance.PitFeet = entranceValue.PitFeet;
+
+                entrance.ReportedOn = entrance.ReportedOn.Value.ToUtcKind();
 
                 entrance.Location =
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)

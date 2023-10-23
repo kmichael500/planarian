@@ -386,6 +386,14 @@ public class CaveRepository : RepositoryBase
 
         return usedCountyNumbers.ToHashSet();
     }
+
+    public async Task<string?> GetCaveIdByCountyCodeNumber(string countyDisplayId, int countyNumber)
+    {
+        var result = await DbContext.Caves.Where(e => e.County.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
+            .Select(e => e.Id).FirstOrDefaultAsync();
+
+        return result;
+    }
 }
 
 public class CaveQuery
