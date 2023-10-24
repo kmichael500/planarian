@@ -71,6 +71,9 @@ const UploadComponent = ({
 
   const [numberOfFilesToUpload, setNumberOfFilesToUpload] = useState(0);
   const [completedNumberOfUploads, setCompletedNumberOfUploads] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<
+    Record<string, { progress: number; name: string }>
+  >({});
 
   useEffect(() => {
     // Check if all uploads are completed
@@ -151,6 +154,14 @@ const UploadComponent = ({
       setNumberOfFilesToUpload((prevCount) => prevCount + 1);
 
       try {
+        setUploadProgress((prevProgress) => ({
+          ...prevProgress,
+          [(file as RcFile).uid]: {
+            progress: 0,
+            name: (file as RcFile).name,
+          },
+        }));
+
         const result = await uploadFunction({
           file,
           uid: (file as RcFile).uid,
@@ -160,6 +171,14 @@ const UploadComponent = ({
             );
 
             setSingleFileUploadPercent(percent);
+
+            setUploadProgress((prevProgress) => ({
+              ...prevProgress,
+              [(file as RcFile).uid]: {
+                progress: percent,
+                name: (file as RcFile).name,
+              },
+            }));
 
             if (onProgress) {
               onProgress({ percent });
@@ -205,6 +224,21 @@ const UploadComponent = ({
             <p className="ant-upload-text">{draggerMessage}</p>
             {singleFile && singleFileUploadPercent > 0 && (
               <Progress percent={singleFileUploadPercent} />
+            )}
+            {!singleFile && (
+              <div style={{ maxHeight: "200px", overflowY: "scroll" }}>
+                {Object.entries(uploadProgress).map(([key, value]) => (
+                  <div key={key} style={{ marginBottom: "10px" }}>
+                    <Progress
+                      percent={value.progress}
+                      // format={(percent) => `${percent?.toFixed(2)}%`}
+                    />
+                    <div>
+                      {value.name} - {value.progress?.toFixed(2)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </Dragger>
           <br />

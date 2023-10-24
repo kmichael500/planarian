@@ -387,10 +387,11 @@ public class CaveRepository : RepositoryBase
         return usedCountyNumbers.ToHashSet();
     }
 
-    public async Task<string?> GetCaveIdByCountyCodeNumber(string countyDisplayId, int countyNumber)
+    public async Task<string?> GetCaveIdByCountyCodeNumber(string countyDisplayId, int countyNumber,
+        CancellationToken cancellationToken)
     {
         var result = await DbContext.Caves.Where(e => e.County.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
-            .Select(e => e.Id).FirstOrDefaultAsync();
+            .Select(e => e.Id).FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
         return result;
     }

@@ -1049,12 +1049,14 @@ public class ImportService : ServiceBase
     {
         var delimiterRegex = @"";
         const string countyCodeRegex = @"[A-Z]{2}";
+        // const string countyCodeRegex = @"^T([A-Z]{2})";
         
-        var caveInfos = ExtractCountyInformation(fileName, delimiterRegex, countyCodeRegex);
+        var caveInfos = ExtractCountyInformation(fileName, delimiterRegex, countyCodeRegex, cancellationToken);
 
         foreach (var cave in caveInfos)
         {
-            var caveId = await _caveRepository.GetCaveIdByCountyCodeNumber(cave.CountyCode, cave.CountyCaveNumber);
+            cancellationToken.ThrowIfCancellationRequested();
+            var caveId = await _caveRepository.GetCaveIdByCountyCodeNumber(cave.CountyCode, cave.CountyCaveNumber, cancellationToken);
             if (string.IsNullOrWhiteSpace(caveId))
             {
                 continue;
@@ -1066,30 +1068,61 @@ public class ImportService : ServiceBase
         return caveInfos;
     }
 
+    // public static List<CountyCaveInfo> ExtractCountyInformation(string fileName,
+    //     string delimiterRegex, string countyCodeRegex, CancellationToken cancellationToken)
+    // {
+    //     // Combining the county code, delimiter, and number patterns.
+    //     var combinedPattern = countyCodeRegex + delimiterRegex + "(\\d+)";
+    //
+    //     var matches = Regex.Matches(fileName, combinedPattern);
+    //     var resultList = new List<CountyCaveInfo>();
+    //
+    //     foreach (Match match in matches)
+    //     {
+    //         cancellationToken.ThrowIfCancellationRequested();
+    //         var countyCode = match.Groups[1].Value;
+    //         var countyNumber = int.Parse(match.Groups[2].Value); // Convert string to integer
+    //
+    //         resultList.Add(new CountyCaveInfo
+    //         {
+    //             CountyCode = countyCode,
+    //             CountyCaveNumber = countyNumber
+    //         });
+    //     }
+    //
+    //     return resultList;
+    // }
+
     public static List<CountyCaveInfo> ExtractCountyInformation(string fileName,
-        string delimiterRegex, string countyCodeRegex)
+        string delimiterRegex, string countyCodeRegex, CancellationToken cancellationToken)
     {
-        // Combining the county code, delimiter, and number patterns.
-        var combinedPattern = "(" + countyCodeRegex + ")" + delimiterRegex + "(\\d+)";
-
-        var matches = Regex.Matches(fileName, combinedPattern);
+        var countyCodeMatches = Regex.Matches(fileName, countyCodeRegex);
+        
         var resultList = new List<CountyCaveInfo>();
-
-        foreach (Match match in matches)
+        foreach (Match countyCodeMatch in countyCodeMatches)
         {
-            var countyCode = match.Groups[1].Value;
-            var countyNumber = int.Parse(match.Groups[2].Value); // Convert string to integer
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            var countyCodeValue = countyCodeMatch.Groups[0].Value;
+            var combinedPattern = $"({countyCodeValue})" + delimiterRegex + @"(\d+)";
 
-            resultList.Add(new CountyCaveInfo
+            var matches = Regex.Matches(fileName, combinedPattern);
+            foreach (Match match in matches)
             {
-                CountyCode = countyCode,
-                CountyCaveNumber = countyNumber
-            });
+                cancellationToken.ThrowIfCancellationRequested();
+                var countyCode = match.Groups[1].Value;
+                var countyNumber = int.Parse(match.Groups[2].Value);
+
+                resultList.Add(new CountyCaveInfo
+                {
+                    CountyCode = countyCode,
+                    CountyCaveNumber = countyNumber
+                });
+            }
         }
-    
+        
         return resultList;
     }
-
     public class CountyCaveInfo
     {
         public string CountyCode { get; set; }
