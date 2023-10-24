@@ -174,4 +174,50 @@ public class MapRepository : RepositoryBase
         
         return new CoordinateDto{Latitude = averageLatitude, Longitude = averageLongitude};
     }
+
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
+    {
+        var query = @"
+        WITH tile AS (
+            SELECT ST_TileEnvelope({0}, {1}, {2}) AS bbox
+        )
+        SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
+        FROM (
+            SELECT 
+                ""ReportedByUserId"",
+                ""CaveId"",
+                ""LocationQualityTagId"",
+                ""Name"",
+                ""IsPrimary"",
+                ""Description"",
+                ST_AsMVTGeom(
+                    ST_Transform(""Location"", 3857),
+                    tile.bbox,
+                    4096,
+                    0,
+                    true
+                ) AS geom
+            FROM 
+                ""Entrances"",
+                tile
+            WHERE 
+                ST_Intersects(ST_Transform(""Location"", 3857), tile.bbox)
+        ) AS tile_geom";
+
+        query = string.Format(query, z, x, y);
+
+        await using var command = DbContext.Database.GetDbConnection().CreateCommand();
+        command.CommandText = query;
+
+        await DbContext.Database.OpenConnectionAsync();
+
+        await using var result = await command.ExecuteReaderAsync();
+        if (await result.ReadAsync())
+        {
+            return result["mvt"] as byte[];
+        }
+
+        return null;
+    }
+
 }

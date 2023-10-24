@@ -24,4 +24,11 @@ public class MapService : ServiceBase<MapRepository>
 
         return result;
     }
+
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
+    {
+        
+        var result = await Repository.GetEntrancesMVTAsync(z, x, y);
+        return result;
+    }
 }
