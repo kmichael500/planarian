@@ -3,10 +3,7 @@ import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
-import {
-  StringHelpers,
-  isNullOrWhiteSpace,
-} from "../../Shared/Helpers/StringHelpers";
+import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
 import { ProfileMenu } from "../Menu/ProfileMenuComponent";
@@ -64,7 +61,7 @@ const HeaderComponent: React.FC = () => {
           background: "white",
           position: "sticky",
           top: 0,
-          zIndex: 1,
+          zIndex: 1000,
           width: "100%",
           border: "1px solid #f0f0f0",
         }}

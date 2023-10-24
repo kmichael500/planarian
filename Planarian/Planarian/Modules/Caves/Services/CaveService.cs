@@ -231,8 +231,9 @@ public class CaveService : ServiceBase<CaveRepository>
                 foreach (var missingId in missingIds)
                 {
                     var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
-                    if (fileEntity != null) blobsToDelete.Add(fileEntity);
-
+                    if (fileEntity == null) continue;
+                    
+                    blobsToDelete.Add(fileEntity);
                     Repository.Delete(fileEntity);
                 }
             }

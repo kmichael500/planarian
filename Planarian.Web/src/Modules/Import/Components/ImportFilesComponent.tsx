@@ -34,9 +34,6 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   // Initializing states
   const [isUploaded, setIsUploaded] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
-  const [processError, setProcessError] = useState<string | null>(null);
-  const [isProcessed, setIsProcessed] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [errorList, setErrorList] = useState<FailedCsvRecord<CaveCsvModel>[]>(
     []
   );
@@ -59,33 +56,10 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       }))
     );
 
-  const handleProcessClick = async () => {
-    if (!uploadResult?.id) return message.error("File id not found");
-    setIsLoading(true);
-    setIsProcessing(true); // Set processing state to true when starting to process
-    try {
-      await AccountService.ImportCavesFileProcess(uploadResult.id);
-      setIsProcessed(true);
-    } catch (e) {
-      const error = e as ImportApiErrorResponse<CaveCsvModel>;
-
-      if (error.data) {
-        setErrorList(error.data);
-        setErrorList(error.data);
-      }
-      setProcessError(error.message);
-    } finally {
-      setIsLoading(false);
-      setIsProcessing(false);
-    }
-  };
-
   // Helper function to reset states
   const resetStates = () => {
     setIsUploaded(false);
-    setIsProcessed(false);
     setUploadFailed(false);
-    setProcessError(null);
     setErrorList([]);
     setUploadResult(undefined);
   };
@@ -94,7 +68,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     <>
       {!isUploaded && !uploadFailed && errorList.length === 0 && (
         <UploadComponent
-          draggerMessage="Click any files you would like to upload."
+          draggerMessage="Drag any files you would like to upload."
           draggerTitle="Import Cave Files"
           hideCancelButton
           style={{ display: "flex" }}
@@ -105,16 +79,13 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                 params.uid,
                 params.onProgress
               );
-              setUploadResult(result);
-              setIsUploaded(true);
+              // setUploadResult(result);
+              // setIsUploaded(true);
             } catch (e) {
               const error = e as ImportApiErrorResponse<CaveCsvModel>;
 
-              if (error.data) {
-                setErrorList(error.data);
-              } else {
-                setUploadFailed(true);
-              }
+              console.log("Failed", params.file, error);
+              // setUploadFailed(true);
 
               message.error(error.message);
             }
@@ -146,21 +117,13 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {isUploaded && !isProcessed && !isProcessing && processError === null && (
+      {isUploaded && (
         <Card style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Successfully Uploaded!"
             subTitle="Click the process button below to start processing. If not, no caves will be imported."
             extra={[
-              <PlanarianButton
-                onClick={handleProcessClick}
-                icon={<DeliveredProcedureOutlined />}
-                loading={isLoading}
-                type="primary"
-              >
-                Process
-              </PlanarianButton>,
               <Button onClick={tryAgain} icon={<RedoOutlined />}>
                 Reset
               </Button>,
@@ -169,47 +132,13 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {isProcessing && (
-        <Card style={{ width: "100%" }}>
-          <Result
-            icon={<DeliveredProcedureOutlined style={{ color: "#1890ff" }} />}
-            title="Processing..."
-            subTitle="Please wait while your data is being processed."
-            extra={[
-              <NotificationComponent
-                groupName={uploadResult?.id as string}
-                isLoading={isProcessing}
-              />,
-            ]}
-          />
-        </Card>
-      )}
-      {isProcessed && (
-        <Card style={{ width: "100%" }}>
-          <Result
-            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Successfully Processed!"
-            subTitle="Your cave CSV file has been successfully processed."
-            extra={[
-              <Button type="primary" key="console" onClick={onUploaded}>
-                Import Entrances
-              </Button>,
-              <Button key="buy" onClick={tryAgain} icon={<RedoOutlined />}>
-                Import Another Cave File
-              </Button>,
-            ]}
-          />
-        </Card>
-      )}
-
-      {(errorList.length > 0 || processError !== null) && (
+      {errorList.length > 0 && (
         <>
           <Card style={{ width: "100%" }}>
             <Result
               status="error"
               title="There were errors."
               subTitle={
-                processError ||
                 "Please click the button below to view the upload errors."
               }
               extra={[
@@ -225,9 +154,8 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             />
           </Card>
           <FullScreenModal>
-            <div>test</div>
             <Modal
-              title="Import Cave Errors"
+              title="Import Cave Files Errors"
               open={isModalOpen}
               onOk={handleOk}
               onCancel={handleOk}
