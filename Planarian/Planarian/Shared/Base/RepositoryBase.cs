@@ -1,6 +1,9 @@
+using System.Linq.Expressions;
 using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -65,4 +68,39 @@ public abstract class RepositoryBase
     {
         DbContext.Remove(entity);
     }
+
+    protected string GetTableName<TEntity>()
+    {
+        var tableName = DbContext.Model.FindEntityType(typeof(TEntity))?.GetTableName();
+
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            throw ApiExceptionDictionary.NotFound(nameof(tableName));
+        }
+
+        return tableName.Quote();
+    }
+
+    protected string GetColumnName<TEntity>(Expression<Func<TEntity, object?>> propertyExpression)
+    {
+        // Extract the property name from the expression
+        var memberExpression = propertyExpression.Body as MemberExpression ??
+                               (propertyExpression.Body as UnaryExpression)?.Operand as MemberExpression;
+        if (memberExpression == null)
+        {
+            throw new ArgumentException("Invalid property expression", nameof(propertyExpression));
+        }
+
+        var propertyName = memberExpression.Member.Name;
+
+        var columnName = DbContext.Model.FindEntityType(typeof(TEntity))?.FindProperty(propertyName)?.GetColumnName();
+
+        if (string.IsNullOrWhiteSpace(columnName))
+        {
+            throw ApiExceptionDictionary.NotFound(nameof(columnName));
+        }
+
+        return columnName.Quote();
+    }
+
 }
