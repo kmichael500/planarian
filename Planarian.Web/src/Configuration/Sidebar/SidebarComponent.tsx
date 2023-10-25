@@ -39,7 +39,7 @@ const SideBarComponent: React.FC = () => {
         style={{ width: "100%", justifyContent: "center" }}
       >
         <Link to="/">
-          <LogoIcon style={{ padding: "10px", fontSize: "50px" }} />
+          <LogoIcon style={{ width: "90px", paddingTop: "20px" }} />
         </Link>
       </Space>
       <Space
