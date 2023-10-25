@@ -44,40 +44,4 @@ public class MapController : PlanarianControllerBase<MapService>
         return File(mvtData, "application/vnd.mapbox-vector-tile");
     }
     
-    [AllowAnonymous]
-    [HttpGet("style")]
-    public IActionResult GetStyle()
-    {
-        var styleSpecification = new
-        {
-            version = 8,
-            name = "Custom Style",
-            sources = new Dictionary<string, object>
-            {
-                ["entrances"] = new
-                {
-                    type = "vector",
-                    tiles = new string[] { "https://localhost:7111/api/map/{z}/{x}/{y}.mvt" }
-                }
-            },
-            layers = new object[]
-            {
-                new Dictionary<string, object>
-                {
-                    ["id"] = "entrances",
-                    ["type"] = "circle",
-                    ["source"] = "entrances",
-                    ["source-layer"] = "entrances",
-                    ["paint"] = new Dictionary<string, object>
-                    {
-                        ["circle-radius"] = 5,
-                        ["circle-color"] = "#ff0000"
-                    }
-                }
-            }
-        };
-
-        return Ok(styleSpecification);
-    }
-
 }
