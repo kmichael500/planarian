@@ -14,6 +14,7 @@ import { Modal, Spin } from "antd";
 import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveService } from "../../Caves/Service/CaveService";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
+import { AppOptions } from "../../../Shared/Services/AppService";
 
 // import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -91,6 +92,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     setIsModalVisible(false);
   };
 
+  const [isModalLoading, setIsModalLoading] = useState(false);
   const [cave, setCave] = useState<CaveVm>();
 
   const handleMapClick = async (event: MapLayerMouseEvent) => {
@@ -99,19 +101,21 @@ const MapComponent: React.FC<MapComponentProps> = ({
       (feature: any) => feature.layer.id === "entrances"
     );
     if (clickedEntrance) {
-      console.log(clickedEntrance);
+      setIsModalLoading(true);
+      showModal();
+
       const result = await CaveService.GetCave(
         clickedEntrance.properties?.CaveId
       );
       setCave(result);
-      showModal();
+      setIsModalLoading(false);
     }
   };
 
   return (
     <>
-      <Spin spinning={isLoading}>
-        {!isLoading && (
+      <Spin spinning={isModalLoading || isLoading}>
+        {!isLoading && AppOptions.serverBaseUrl && (
           <>
             <Map
               interactiveLayerIds={["entrances"]}
@@ -121,7 +125,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 zoom: zoom,
               }}
               onClick={handleMapClick}
-              // style={{ width: 600, height: 400 }}
               mapStyle={mapStyle}
             >
               <NavigationControl />
@@ -129,7 +132,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
               <Source
                 id="entrances"
                 type="vector"
-                tiles={["https://localhost:7111/api/map/{z}/{x}/{y}.mvt"]}
+                tiles={[`${AppOptions.serverBaseUrl}/api/map/{z}/{x}/{y}.mvt`]}
               >
                 <Layer
                   source-layer="entrances"
@@ -227,12 +230,20 @@ const MapComponent: React.FC<MapComponentProps> = ({
               </Source>
             </Map>
             <Modal
-              title="Entrance Details"
+              title={cave?.name || "Cave"}
               visible={isModalVisible}
               onOk={handleOk}
               onCancel={handleCancel}
+              width="80vw"
+              bodyStyle={{ height: "65vh", overflow: "scroll", padding: "0px" }}
             >
-              <CaveComponent cave={cave} isLoading={cave === null} />
+              <Spin spinning={isModalLoading}>
+                <CaveComponent
+                  options={{ showMap: false }}
+                  cave={cave}
+                  isLoading={isModalLoading}
+                />
+              </Spin>
             </Modal>
           </>
         )}

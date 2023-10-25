@@ -21,10 +21,8 @@ public class AppService : ServiceBase<AppRepository>
 #if DEBUG
         _serverOptions.ServerBaseUrl = serverBaseUrl;
 #endif
-        var result = new AppInitializeVm
-        {
-            SignalrBaseUrl = $"{_serverOptions.ServerBaseUrl}/api/notificationHub"
-        };
+        var result = new AppInitializeVm(
+            _serverOptions.ServerBaseUrl, $"{_serverOptions.ServerBaseUrl}/api/notificationHub");
 
         if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result; // if not authenticated
 
