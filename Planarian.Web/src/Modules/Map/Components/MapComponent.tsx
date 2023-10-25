@@ -136,7 +136,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 tiles={[
                   `${
                     AppOptions.serverBaseUrl
-                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}`,
+                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}`,
                 ]}
               >
                 <Layer

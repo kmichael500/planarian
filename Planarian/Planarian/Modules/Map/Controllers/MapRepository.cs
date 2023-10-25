@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NetTopologySuite.Geometries.Utilities;
+using Npgsql;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
@@ -201,18 +202,19 @@ public class MapRepository : RepositoryBase
         FROM 
             ""Entrances""
         JOIN 
-            ""Caves"" ON ""Entrances"".""CaveId"" = ""Caves"".""Id"" -- Joining with Cave table on CaveId
+            ""Caves"" ON ""Entrances"".""CaveId"" = ""Caves"".""Id""
         ,   tile
         WHERE 
             ST_Intersects(ST_Transform(""Entrances"".""Location"", 3857), tile.bbox)
+            AND ""Caves"".""AccountId"" = '{3}'
+
     ) AS tile_geom";
 
 
-        query = string.Format(query, z, x, y);
+        query = string.Format(query, z, x, y, RequestUser.AccountId);
 
         await using var command = DbContext.Database.GetDbConnection().CreateCommand();
         command.CommandText = query;
-
         await DbContext.Database.OpenConnectionAsync();
 
         await using var result = await command.ExecuteReaderAsync();
