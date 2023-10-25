@@ -15,6 +15,7 @@ import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveService } from "../../Caves/Service/CaveService";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
 import { AppOptions } from "../../../Shared/Services/AppService";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 // import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -132,7 +133,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
               <Source
                 id="entrances"
                 type="vector"
-                tiles={[`${AppOptions.serverBaseUrl}/api/map/{z}/{x}/{y}.mvt`]}
+                tiles={[
+                  `${
+                    AppOptions.serverBaseUrl
+                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}`,
+                ]}
               >
                 <Layer
                   source-layer="entrances"
