@@ -265,7 +265,11 @@ public class CaveRepository : RepositoryBase
             PrimaryEntrance = new EntranceVm
             {
                 ElevationFeet = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                Latitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
+                    .FirstOrDefault(),
+                Longitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
+                    .FirstOrDefault(),
             },
             GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId)
         }).AsSplitQuery().ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet);
