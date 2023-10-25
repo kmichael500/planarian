@@ -178,31 +178,35 @@ public class MapRepository : RepositoryBase
     public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
     {
         var query = @"
-        WITH tile AS (
-            SELECT ST_TileEnvelope({0}, {1}, {2}) AS bbox
-        )
-        SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
-        FROM (
-            SELECT 
-                ""ReportedByUserId"",
-                ""CaveId"",
-                ""LocationQualityTagId"",
-                ""Name"",
-                ""IsPrimary"",
-                ""Description"",
-                ST_AsMVTGeom(
-                    ST_Transform(""Location"", 3857),
-                    tile.bbox,
-                    4096,
-                    0,
-                    true
-                ) AS geom
-            FROM 
-                ""Entrances"",
-                tile
-            WHERE 
-                ST_Intersects(ST_Transform(""Location"", 3857), tile.bbox)
-        ) AS tile_geom";
+    WITH tile AS (
+        SELECT ST_TileEnvelope({0}, {1}, {2}) AS bbox
+    )
+    SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
+    FROM (
+        SELECT 
+            ""Entrances"".""ReportedByUserId"",
+            ""Entrances"".""CaveId"",
+            ""Caves"".""Name"" as CaveName,  -- Grabbing the name from Cave table
+            ""Entrances"".""LocationQualityTagId"",
+            ""Entrances"".""Name"",
+            ""Entrances"".""IsPrimary"",
+            ""Entrances"".""Description"",
+            ST_AsMVTGeom(
+                ST_Transform(""Entrances"".""Location"", 3857),
+                tile.bbox,
+                4096,
+                0,
+                true
+            ) AS geom
+        FROM 
+            ""Entrances""
+        JOIN 
+            ""Caves"" ON ""Entrances"".""CaveId"" = ""Caves"".""Id"" -- Joining with Cave table on CaveId
+        ,   tile
+        WHERE 
+            ST_Intersects(ST_Transform(""Entrances"".""Location"", 3857), tile.bbox)
+    ) AS tile_geom";
+
 
         query = string.Format(query, z, x, y);
 
@@ -219,5 +223,6 @@ public class MapRepository : RepositoryBase
 
         return null;
     }
+
 
 }
