@@ -30,4 +30,18 @@ public class MapController : PlanarianControllerBase<MapService>
         CoordinateDto data = await Service.GetMapCenter();
         return Ok(data);
     }
+    
+    [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
+    public async Task<IActionResult> GetTile(int z, int x, int y)
+    {
+        var mvtData = await Service.GetEntrancesMVTAsync(z, x, y);
+        Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
+        if (mvtData == null)
+        {
+            return NotFound();
+        }
+
+        return File(mvtData, "application/vnd.mapbox-vector-tile");
+    }
+    
 }

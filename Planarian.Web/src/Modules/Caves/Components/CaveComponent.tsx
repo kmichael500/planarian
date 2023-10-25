@@ -23,22 +23,31 @@ import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTag
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
+import { MapComponent } from "../../Map/Components/MapComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
+import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { FileService } from "../../Files/Services/FileService";
 import { CaveService } from "../Service/CaveService";
-import { MapComponent } from "../../Map/Components/MapComponent";
 
 const { Panel } = Collapse;
 
+export interface CaveComponentOptions {
+  showMap?: boolean;
+}
 export interface CaveComponentProps {
   cave?: CaveVm;
   isLoading: boolean;
+  options?: CaveComponentOptions;
   updateCave?: () => void;
 }
 
-const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
+const CaveComponent = ({
+  cave,
+  isLoading,
+  options,
+  updateCave,
+}: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -257,17 +266,22 @@ const CaveComponent = ({ cave, isLoading, updateCave }: CaveComponentProps) => {
             updateFunction={FileService.UpdateFilesMetadata}
           />
         )}
-        <PlanarianDividerComponent title="Map" />
-        {cave?.primaryEntrance !== null && (
-          <div style={{ height: "400px" }}>
-            <MapComponent
-              initialCenter={[
-                cave?.primaryEntrance?.latitude as number,
-                cave?.primaryEntrance?.longitude as number,
-              ]}
-              initialZoom={15}
-            />
-          </div>
+
+        {options?.showMap !== false && (
+          <>
+            <PlanarianDividerComponent title="Map" />
+            {cave?.primaryEntrance !== null && (
+              <div style={{ height: "400px" }}>
+                <MapComponent
+                  initialCenter={[
+                    cave?.primaryEntrance?.latitude as number,
+                    cave?.primaryEntrance?.longitude as number,
+                  ]}
+                  initialZoom={15}
+                />
+              </div>
+            )}
+          </>
         )}
       </Card>
     </>

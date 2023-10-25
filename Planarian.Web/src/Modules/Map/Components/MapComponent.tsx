@@ -1,194 +1,23 @@
 import React, { useEffect, useState } from "react";
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  useMap,
-  useMapEvents,
-} from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import { MapService } from "../Services/MapService";
+import {
+  Map,
+  Source,
+  Layer,
+  GeolocateControl,
+  NavigationControl,
+  MapLayerMouseEvent,
+  FillLayer,
+} from "react-map-gl/maplibre";
+import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
+import { Modal, Spin } from "antd";
+import { CaveVm } from "../../Caves/Models/CaveVm";
+import { CaveService } from "../../Caves/Service/CaveService";
+import { CaveComponent } from "../../Caves/Components/CaveComponent";
+import { AppOptions } from "../../../Shared/Services/AppService";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
-import { MapLayers } from "./MapLayers";
-import L from "leaflet";
-import { Spin } from "antd";
-import MarkerClusterGroup from "react-leaflet-cluster";
-
-import { LocateControl } from "./LocateControll";
-import { MapData } from "./MapData";
-import { PolygonWithText } from "./PolygonWithText";
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/marker-icon-2x.png",
-  iconUrl: "/marker-icon.png",
-  shadowUrl: "/marker-shadow.png",
-});
-
-export interface Cluster {
-  latitude: number;
-  longitude: number;
-  count: number;
-  isCluster: true;
-  hullCoordinates: Coordinate[];
-}
-
-const PlanarianMap = () => {
-  const map = useMap();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-
-    return () => clearTimeout(timer); // Clean up timeout if component is unmounted
-  }, [map]);
-
-  return null;
-};
-
-interface Bounds {
-  getNorthEast: () => Coordinate;
-  getSouthWest: () => Coordinate;
-}
-
-export interface Coordinate {
-  latitude: number;
-  longitude: number;
-}
-
-interface ExpandedViewBox {
-  northEast: Coordinate;
-  southWest: Coordinate;
-}
-
-const MapMarkers = ({ onDataLoaded }: { onDataLoaded?: () => void }) => {
-  const [data, setData] = useState<MapData[]>([]);
-  const [expandedViewBox, setExpandedViewBox] =
-    useState<ExpandedViewBox | null>(null);
-  const [currentZoom, setCurrentZoom] = useState<number | null>(null); // New state to track the zoom level
-
-  const convertToBounds = (latLngBounds: L.LatLngBounds): Bounds => {
-    return {
-      getNorthEast: () => ({
-        latitude: latLngBounds.getNorthEast().lat,
-        longitude: latLngBounds.getNorthEast().lng,
-      }),
-      getSouthWest: () => ({
-        latitude: latLngBounds.getSouthWest().lat,
-        longitude: latLngBounds.getSouthWest().lng,
-      }),
-    };
-  };
-
-  const getBufferValue = (zoom: number) => {
-    console.log(zoom);
-    switch (zoom) {
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-      case 9:
-        return 2;
-      case 10:
-        return 1.5;
-      case 11:
-        return 1;
-      case 14:
-        return 1;
-      default:
-        return 0.5;
-    }
-  };
-
-  const calculateExpandedViewBox = (bounds: Bounds): ExpandedViewBox => {
-    const northEast = bounds.getNorthEast();
-    const southWest = bounds.getSouthWest();
-
-    const latDiff = northEast.latitude - southWest.latitude;
-    const lngDiff = northEast.longitude - southWest.longitude;
-
-    const bufferValue = getBufferValue(map.getZoom());
-
-    return {
-      northEast: {
-        latitude: northEast.latitude + latDiff * bufferValue,
-        longitude: northEast.longitude + lngDiff * bufferValue,
-      },
-      southWest: {
-        latitude: southWest.latitude - latDiff * bufferValue,
-        longitude: southWest.longitude - lngDiff * bufferValue,
-      },
-    };
-  };
-
-  const loadData = async () => {
-    const latLngBounds = map.getBounds();
-    const bounds = convertToBounds(latLngBounds);
-
-    const zoom = map.getZoom();
-
-    if (
-      zoom !== currentZoom || // Check if the zoom level has changed
-      !expandedViewBox ||
-      bounds.getNorthEast().latitude > expandedViewBox.northEast.latitude ||
-      bounds.getSouthWest().latitude < expandedViewBox.southWest.latitude ||
-      bounds.getNorthEast().longitude > expandedViewBox.northEast.longitude ||
-      bounds.getSouthWest().longitude < expandedViewBox.southWest.longitude
-    ) {
-      setCurrentZoom(zoom); // Update the current zoom level
-      const newExpandedViewBox = calculateExpandedViewBox(bounds);
-      setExpandedViewBox(newExpandedViewBox);
-
-      try {
-        const newData = await MapService.getMapData(
-          newExpandedViewBox.northEast.latitude,
-          newExpandedViewBox.southWest.latitude,
-          newExpandedViewBox.northEast.longitude,
-          newExpandedViewBox.southWest.longitude,
-          zoom
-        );
-        setData(newData);
-        if (onDataLoaded) {
-          onDataLoaded();
-        }
-      } catch (error) {
-        console.error("An error occurred while fetching data", error);
-      }
-    }
-  };
-
-  const map = useMapEvents({
-    // moveend: loadData,
-    // zoomend: loadData,
-  });
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadData();
-    }, 300);
-    return () => clearTimeout(timer); // Clean up timeout if component is unmounted
-  }, [map]);
-
-  return (
-    <MarkerClusterGroup>
-      <>
-        {data.map((item, idx) =>
-          item.isCluster ? (
-            <PolygonWithText item={item} idx={idx} />
-          ) : (
-            <Marker key={idx} position={[item.latitude, item.longitude]}>
-              <Popup>{item.name}</Popup>
-            </Marker>
-          )
-        )}
-      </>
-    </MarkerClusterGroup>
-  );
-};
+// import "maplibre-gl/dist/maplibre-gl.css";
 
 interface MapComponentProps {
   initialCenter?: [number, number];
@@ -200,16 +29,43 @@ const MapComponent: React.FC<MapComponentProps> = ({
   initialZoom,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     initialCenter || [0, 0]
   );
   const [zoom, setZoom] = useState(initialZoom || 7);
+
+  const mapStyle = {
+    glyphs:
+      "https://saplanarian.blob.core.windows.net/public/map/fonts/{fontstack}/{range}.pbf",
+    version: 8,
+    sources: {
+      "osm-tiles": {
+        type: "raster",
+        tiles: [
+          "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        ],
+        tileSize: 256,
+      },
+    },
+    layers: [
+      {
+        id: "osm-tiles-layer",
+        type: "raster",
+        source: "osm-tiles",
+        minzoom: 0,
+        maxzoom: 19,
+      },
+    ],
+  } as StyleSpecification;
+
   useEffect(() => {
     if (!initialCenter) {
       const fetchData = async () => {
         try {
           const data = await MapService.getMapCenter();
+          console.log("Center", data);
           setMapCenter([data.latitude, data.longitude]);
           setIsLoading(false);
         } catch (error) {
@@ -223,28 +79,181 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   }, [initialCenter]);
 
-  return (
-    <Spin spinning={isDataLoading}>
-      {isLoading && <div style={{ height: "100%", width: "100%" }}></div>}
-      {!isLoading && (
-        <MapContainer
-          style={{ height: "100%", width: "100%" }}
-          center={mapCenter}
-          zoom={zoom}
-          scrollWheelZoom={true}
-        >
-          <PlanarianMap />
-          <MapLayers />
+  const [isModalVisible, setIsModalVisible] = useState(false); // State to control Modal visibility
 
-          <MapMarkers
-            onDataLoaded={() => {
-              setIsDataLoading(false);
-            }}
-          />
-          <LocateControl />
-        </MapContainer>
-      )}
-    </Spin>
+  const showModal = () => {
+    setIsModalVisible(true);
+  };
+
+  const handleOk = () => {
+    setIsModalVisible(false);
+  };
+
+  const handleCancel = () => {
+    setIsModalVisible(false);
+  };
+
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [cave, setCave] = useState<CaveVm>();
+
+  const handleMapClick = async (event: MapLayerMouseEvent) => {
+    const clickedFeatures = event.features;
+    const clickedEntrance = clickedFeatures?.find(
+      (feature: any) => feature.layer.id === "entrances"
+    );
+    if (clickedEntrance) {
+      setIsModalLoading(true);
+      showModal();
+
+      const result = await CaveService.GetCave(
+        clickedEntrance.properties?.CaveId
+      );
+      setCave(result);
+      setIsModalLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Spin spinning={isModalLoading || isLoading}>
+        {!isLoading && AppOptions.serverBaseUrl && (
+          <>
+            <Map
+              interactiveLayerIds={["entrances"]}
+              initialViewState={{
+                longitude: mapCenter[1],
+                latitude: mapCenter[0],
+                zoom: zoom,
+              }}
+              onClick={handleMapClick}
+              mapStyle={mapStyle}
+            >
+              <NavigationControl />
+              <GeolocateControl />
+              <Source
+                id="entrances"
+                type="vector"
+                tiles={[
+                  `${
+                    AppOptions.serverBaseUrl
+                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}`,
+                ]}
+              >
+                <Layer
+                  source-layer="entrances"
+                  id="entrances"
+                  type="circle"
+                  paint={{
+                    "circle-radius": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      2, // At zoom level 5, radius is 2
+                      10,
+                      4, // At zoom level 10, radius is 4
+                      15,
+                      8, // At zoom level 15, radius is 8
+                    ],
+                    "circle-opacity": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      0.3, // At zoom level 5, opacity is 0.3
+                      10,
+                      0.6, // At zoom level 10, opacity is 0.6
+                      15,
+                      1, // At zoom level 15, opacity is 1
+                    ],
+                    "circle-color": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      "#aaccbb", // At zoom level 5, color is a lighter green
+                      10,
+                      "#66aa77", // At zoom level 10, color is a mid-tone green
+                      15,
+                      "#008800", // At zoom level 15, color is dark green
+                    ],
+                  }}
+                ></Layer>
+                <Layer
+                  source-layer="entrances"
+                  id="entrance-labels"
+                  type="symbol"
+                  layout={{
+                    "text-font": ["Open Sans Regular"], // Specify font
+                    "text-field": [
+                      "concat",
+                      ["get", "cavename"], // Always display 'cavename'
+                      [
+                        "case",
+                        ["all", ["has", "Name"], ["!=", ["get", "Name"], ""]],
+                        ["concat", " (", ["get", "Name"], ")"], // Only add ' (Name)' if 'Name' property exists and is not an empty string
+                        "",
+                      ],
+                      [
+                        "case",
+                        ["get", "IsPrimary"],
+                        "*", // Add a star symbol if 'IsPrimary' is true
+                        "", // Do nothing if 'IsPrimary' is false
+                      ],
+                    ],
+
+                    "text-size": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      0, // At zoom level 5, text size is 0 (effectively hiding the text)
+                      10,
+                      8, // At zoom level 10, text size is 8
+                      15,
+                      12, // At zoom level 15, text size is 12
+                    ],
+                    "text-offset": [0, 1.5], // This offset will position the text above the point
+                    "text-anchor": "top", // Anchor the text to the top of the point
+                    "text-allow-overlap": false, // This will prevent text from overlapping, reducing clutter
+                  }}
+                  paint={{
+                    "text-color": "#000", // Set text color to black
+                    "text-opacity": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      5,
+                      0, // At zoom level 5, text opacity is 0 (effectively hiding the text)
+                      10,
+                      0.8, // At zoom level 10, text opacity is 0.8
+                      15,
+                      1, // At zoom level 15, text opacity is 1
+                    ],
+                  }}
+                />
+              </Source>
+            </Map>
+            <Modal
+              title={cave?.name || "Cave"}
+              visible={isModalVisible}
+              onOk={handleOk}
+              onCancel={handleCancel}
+              width="80vw"
+              bodyStyle={{ height: "65vh", overflow: "scroll", padding: "0px" }}
+            >
+              <Spin spinning={isModalLoading}>
+                <CaveComponent
+                  options={{ showMap: false }}
+                  cave={cave}
+                  isLoading={isModalLoading}
+                />
+              </Spin>
+            </Modal>
+          </>
+        )}
+      </Spin>
+    </>
   );
 };
 
