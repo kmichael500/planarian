@@ -11,6 +11,8 @@ interface AppContextProps {
   ) => void;
   headerButtons: React.ReactElement[];
   setHeaderButtons: (buttons: React.ReactElement[]) => void;
+  hideBodyPadding: boolean;
+  setHideBodyPadding: (value: boolean) => void;
 }
 
 export const AppContext = createContext<AppContextProps>({
@@ -20,6 +22,8 @@ export const AppContext = createContext<AppContextProps>({
   headerTitle: ["", ""],
   headerButtons: [],
   setHeaderButtons: () => {},
+  hideBodyPadding: false,
+  setHideBodyPadding: () => {},
 });
 
 interface AppProviderProps {
@@ -36,6 +40,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   >(["", ""]);
   const [headerButtons, setHeaderButtons] = useState<React.ReactElement[]>([]);
 
+  const [hideBodyPadding, setHideBodyPadding] = useState<boolean>(false);
+
   return (
     <AppContext.Provider
       value={{
@@ -45,6 +51,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         setHeaderTitle: setHeaderTitle,
         headerButtons: headerButtons,
         setHeaderButtons: setHeaderButtons,
+        hideBodyPadding: hideBodyPadding,
+        setHideBodyPadding: setHideBodyPadding,
       }}
     >
       {props.children}
