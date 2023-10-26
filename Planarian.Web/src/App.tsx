@@ -1,16 +1,15 @@
-import { Col, Layout, Row, Space, Spin } from "antd";
-import React, { useState, useEffect } from "react";
+import { Col, Layout, Row, Spin } from "antd";
+import React, { useState, useEffect, useContext } from "react";
 import "./App.css";
 import { AppRouting } from "./Configuration/Routing/App.routing";
 import Favicon from "react-favicon";
 import logo from "./logo.svg";
 import { Helmet } from "react-helmet";
 import { BrowserRouter } from "react-router-dom";
-import { AppProvider } from "./Configuration/Context/AppContext";
+import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
 import { AppService } from "./Shared/Services/AppService";
-import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
 import { ApiErrorResponse } from "./Shared/Models/ApiErrorResponse";
 
@@ -35,6 +34,8 @@ const App: React.FC = () => {
     initializeApp();
   }, []);
 
+  // const { hideBodyPadding } = useContext(AppContext);
+
   return (
     <>
       <Helmet>
@@ -50,10 +51,16 @@ const App: React.FC = () => {
                 <SideBarComponent />
                 <Layout className="site-layout">
                   <HeaderComponent />
-                  <Content style={{ margin: "16px 16px" }}>
-                    <AppRouting />
-                  </Content>
-                  <Footer style={{ textAlign: "center" }}></Footer>
+                  <AppContext.Consumer>
+                    {({ hideBodyPadding }) => (
+                      <Content
+                        style={{ margin: hideBodyPadding ? "0px" : "16px" }}
+                      >
+                        <AppRouting />
+                      </Content>
+                    )}
+                  </AppContext.Consumer>
+                  {/* <Footer style={{ textAlign: "center" }}></Footer> */}
                 </Layout>
               </Layout>
             </AppProvider>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { MapService } from "../Services/MapService";
 import {
   Map,
@@ -16,6 +16,7 @@ import { CaveService } from "../../Caves/Service/CaveService";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 // import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -28,6 +29,13 @@ const MapComponent: React.FC<MapComponentProps> = ({
   initialCenter,
   initialZoom,
 }) => {
+  const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
+  useEffect(() => {
+    setHideBodyPadding(true);
+    return () => {
+      setHideBodyPadding(false);
+    };
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
     initialCenter || [0, 0]
@@ -116,7 +124,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   return (
     <>
       <Spin spinning={isModalLoading || isLoading}>
-        {!isLoading && AppOptions.serverBaseUrl && (
+        {!isLoading && AppOptions.serverBaseUrl && hideBodyPadding && (
           <>
             <Map
               interactiveLayerIds={["entrances"]}
