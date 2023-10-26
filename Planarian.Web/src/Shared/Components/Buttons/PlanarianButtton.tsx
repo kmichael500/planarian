@@ -19,7 +19,7 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
   const { alwaysShowChildren = false, neverShowChildren = false } = props;
 
   const isLargeScreenSize = Object.entries(screens).some(
-    ([key, value]) => value && (key === "lg" || key === "xl")
+    ([key, value]) => value && key === "xl"
   );
 
   return (
