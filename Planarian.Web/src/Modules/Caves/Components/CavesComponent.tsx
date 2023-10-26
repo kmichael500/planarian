@@ -1,4 +1,4 @@
-import { Row, Col, Typography, Card, Form, Collapse } from "antd";
+import { Row, Col, Typography, Card, Form } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -24,7 +24,7 @@ import { TagType } from "../../Tag/Models/TagType";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
-import CollapsePanel from "antd/lib/collapse/CollapsePanel";
+import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 
 const query = window.location.search.substring(1);
 
@@ -184,7 +184,12 @@ const CavesComponent: React.FC = () => {
           noDataCreateButton={<CaveCreateButtonComponent />}
           renderItem={(cave) => (
             // <Link to={`trip/${cave.id}`}>
-            <Card
+            <GridCard
+              style={{
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
               title={`${cave.displayId} ${cave.name} `}
               actions={[
                 <Link to={"/caves/" + cave.id}>
@@ -237,7 +242,8 @@ const CavesComponent: React.FC = () => {
                   ))}
                 </Row>
               </Typography.Paragraph>
-            </Card>
+            </GridCard>
+
             // </Link>
           )}
           itemKey={(trip) => trip.id}
