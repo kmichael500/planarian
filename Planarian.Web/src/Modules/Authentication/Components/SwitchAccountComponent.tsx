@@ -1,4 +1,4 @@
-import { Modal, Button, Form, Select, message } from "antd";
+import { Modal, Button, Form, List, message, Divider } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
 import React from "react";
@@ -16,6 +16,7 @@ const SwitchAccountComponent = ({
   handleCancel: onCancel,
 }: SwitchAccountComponentProps) => {
   const currentAccountId = AuthenticationService.GetAccountId();
+  const currentAccountName = AuthenticationService.GetAccountName();
   const accountList = AppOptions.accountIds.filter(
     (item) => item.value !== currentAccountId
   );
@@ -35,38 +36,63 @@ const SwitchAccountComponent = ({
 
   return (
     <Modal
-      title="Select an Account"
+      title="Switch Accounts"
       open={isOpen}
       onCancel={onCancel}
-      footer={[
-        <CancelButtonComponent key="cancel" onClick={onCancel} />,
-
-        <PlanarianButton
-          key="submit"
-          type="primary"
-          form="switchAccountForm"
-          htmlType="submit"
-          icon={<SwapOutlined />}
-        >
-          Switch
-        </PlanarianButton>,
-      ]}
+      footer={[<CancelButtonComponent key="cancel" onClick={onCancel} />]}
     >
       <Form
         id="switchAccountForm"
         onFinish={(values) => handleSwitch(values.account)}
       >
+        {/* Display the current account */}
+        <div
+          style={{
+            // fontWeight: "bold",
+            backgroundColor: "#f0f2f5",
+            padding: "10px",
+          }}
+        >
+          Your Current Account: {currentAccountName}
+        </div>
+        <div
+          style={{
+            paddingTop: "10px",
+            paddingBottom: "10px",
+            fontWeight: "bold",
+          }}
+        >
+          Please select one of the accounts below to switch to:
+        </div>
         <Form.Item
           name="account"
           rules={[{ required: true, message: "Please select an account!" }]}
         >
-          <Select placeholder="Select an account" style={{ width: "100%" }}>
-            {accountList.map((item) => (
-              <Select.Option key={item.value} value={item.value}>
+          <List
+            dataSource={accountList}
+            renderItem={(item) => (
+              <List.Item
+                key={item.value}
+                onClick={() => handleSwitch(item.value)}
+                style={{
+                  cursor: "pointer",
+                  transition: "background-color 0.3s, border-color 0.3s",
+                  padding: "10px",
+                  border: "1px solid #d9d9d9", // Adding a border
+                  borderRadius: "4px", // Optional: to give rounded corners
+                  marginBottom: "10px", // Optional: to space out items
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#e6f7ff")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "")
+                }
+              >
                 {item.display}
-              </Select.Option>
-            ))}
-          </Select>
+              </List.Item>
+            )}
+          />
         </Form.Item>
       </Form>
     </Modal>

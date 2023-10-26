@@ -7,7 +7,6 @@ import {
   GeolocateControl,
   NavigationControl,
   MapLayerMouseEvent,
-  FillLayer,
 } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { Modal, Spin } from "antd";
@@ -248,7 +247,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
               onOk={handleOk}
               onCancel={handleCancel}
               width="80vw"
-              bodyStyle={{ height: "65vh", overflow: "scroll", padding: "0px" }}
+              bodyStyle={{
+                height: "65vh",
+                overflow: "scroll",
+                padding: "0px",
+              }}
             >
               <Spin spinning={isModalLoading}>
                 <CaveComponent
