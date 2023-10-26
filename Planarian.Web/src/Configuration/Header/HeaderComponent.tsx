@@ -1,20 +1,25 @@
-import { Col, Drawer, Grid, Row, Spin, Typography } from "antd";
+import { Col, Drawer, Grid, Row, Spin, Tag, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
-import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
+import {
+  StringHelpers,
+  isNullOrWhiteSpace,
+} from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
 import { ProfileMenu } from "../Menu/ProfileMenuComponent";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
 import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 const { useBreakpoint } = Grid;
 
 const HeaderComponent: React.FC = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
   const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
+  const accountName = AuthenticationService.GetAccountName();
 
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -109,16 +114,33 @@ const HeaderComponent: React.FC = () => {
             </Col>
             {/* take up rest of space to push others to right and left side */}
             <Col flex="auto"></Col>
+            <Col>
+              <AccountNameTag />
+            </Col>
             {headerButtons.map((button, index) => (
               <Col key={index}>{button}</Col>
             ))}
-            <Col />
             <ProfileMenu />
           </Row>
         </Spin>
       </Header>
     </>
   );
+};
+
+const AccountNameTag = () => {
+  let accountName = "";
+  let accountNameAbbreviation = "";
+
+  const screens = useBreakpoint();
+
+  const isLargeScreenSize = Object.entries(screens).some(
+    ([key, value]) => value && key === "xl"
+  );
+  accountName = AuthenticationService.GetAccountName();
+  accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
+
+  return <Tag>{isLargeScreenSize ? accountName : accountNameAbbreviation}</Tag>;
 };
 
 export { HeaderComponent };
