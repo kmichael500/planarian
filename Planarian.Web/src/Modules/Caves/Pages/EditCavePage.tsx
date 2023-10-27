@@ -6,7 +6,12 @@ import { Card, Form, message } from "antd";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useBlocker,
+} from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
@@ -24,6 +29,34 @@ const EditCavePage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   const navigate = useNavigate();
+
+  const [isFormDirty, setIsFormDirty] = useState<boolean>(false);
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isFormDirty) {
+        event.preventDefault();
+        event.returnValue =
+          "You have unsaved changes! Are you sure you want to leave?";
+      }
+    };
+
+    // Attach the event listener
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isFormDirty]);
+
+  const location = useLocation();
+  const history = useContext(RouterContext); // if you need the history object
+
+  const unblock = history.block((location: any, action: any) => {
+    if (isFormDirty) {
+      return "You have unsaved changes! Are you sure you want to leave?";
+    }
+  });
 
   useEffect(() => {
     const getCave = async () => {
@@ -80,7 +113,9 @@ const EditCavePage: React.FC = () => {
   };
 
   const [form] = Form.useForm<AddCaveVm>();
-
+  const handleFormChange = () => {
+    setIsFormDirty(true);
+  };
   return (
     <>
       <Card loading={isLoading}>
@@ -88,6 +123,7 @@ const EditCavePage: React.FC = () => {
           layout="vertical"
           initialValues={cave}
           onFinish={handleFormSubmit}
+          onChange={handleFormChange} // Attach change handler
           form={form}
         >
           <AddCaveComponent isEditing={true} form={form} cave={cave} />

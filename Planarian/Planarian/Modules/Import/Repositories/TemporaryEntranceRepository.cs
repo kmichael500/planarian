@@ -62,10 +62,12 @@ public class TemporaryEntranceRepository : RepositoryBase
                     county => county.Id,
                     (cave, county) => new { cave, county })
                 .Where(joined => joined.cave.CountyNumber == te.CountyCaveNumber
-                                 && joined.county.DisplayId == te.CountyDisplayId)
+                                 && joined.county.DisplayId == te.CountyDisplayId
+                                 && joined.cave.AccountId == RequestUser.AccountId) // Include AccountId in the join condition
                 .Select(joined => joined.cave.Id)
                 .FirstOrDefault())
             .UpdateAsync();
+
 
         var unassociatedEntrances = await db.GetTable<TemporaryEntrance>()
             .TableName(_temporaryEntranceTableName) // Use dynamic table name
