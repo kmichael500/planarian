@@ -43,7 +43,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
   const mapStyle = {
     glyphs:
-      "https://saplanarian.blob.core.windows.net/public/map/fonts/{fontstack}/{range}.pbf",
+      "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODF0M2ZiMDloNTJpbzYzdXRrYWhrcSJ9.B8x4P8SK9Zpe-sdN6pJ3Eg",
     version: 8,
     sources: {
       "osm-tiles": {
@@ -142,7 +142,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 tiles={[
                   `${
                     AppOptions.serverBaseUrl
-                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}`,
+                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&test=1`,
                 ]}
               >
                 <Layer
@@ -162,35 +162,47 @@ const MapComponent: React.FC<MapComponentProps> = ({
                       8, // At zoom level 15, radius is 8
                     ],
                     "circle-opacity": [
-                      "interpolate",
-                      ["linear"],
+                      "step",
                       ["zoom"],
-                      5,
-                      0.3, // At zoom level 5, opacity is 0.3
-                      10,
-                      0.6, // At zoom level 10, opacity is 0.6
-                      15,
-                      1, // At zoom level 15, opacity is 1
+                      0, // invisible at zoom levels < 13
+                      9,
+                      0.6, // visible at zoom levels >= 13
                     ],
-                    "circle-color": [
-                      "interpolate",
-                      ["linear"],
-                      ["zoom"],
-                      5,
-                      "#aaccbb", // At zoom level 5, color is a lighter green
-                      10,
-                      "#66aa77", // At zoom level 10, color is a mid-tone green
-                      15,
-                      "#008800", // At zoom level 15, color is dark green
-                    ],
+
+                    // "circle-color": "#161616",
                   }}
                 ></Layer>
+
+                <Layer
+                  source-layer="entrances"
+                  id="entrances-heatmap"
+                  type="heatmap"
+                  paint={{
+                    "heatmap-radius": [
+                      "interpolate",
+                      ["linear"],
+                      ["zoom"],
+                      0,
+                      0.000001, // At zoom level 0, radius is 1
+                      22,
+                      30, // At zoom level 22, radius is 30
+                    ],
+                    "heatmap-opacity": [
+                      "step",
+                      ["zoom"],
+                      0.6,
+                      9,
+                      0, // invisible at zoom levels > 9
+                    ],
+                  }}
+                />
+
                 <Layer
                   source-layer="entrances"
                   id="entrance-labels"
                   type="symbol"
                   layout={{
-                    "text-font": ["Open Sans Regular"], // Specify font
+                    "text-font": ["Open Sans Regular"],
                     "text-field": [
                       "concat",
                       ["get", "cavename"], // Always display 'cavename'
@@ -226,13 +238,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   paint={{
                     "text-color": "#000", // Set text color to black
                     "text-opacity": [
-                      "interpolate",
-                      ["linear"],
+                      "step", // Change interpolation type to 'step'
                       ["zoom"],
-                      5,
-                      0, // At zoom level 5, text opacity is 0 (effectively hiding the text)
-                      10,
-                      0.8, // At zoom level 10, text opacity is 0.8
+                      0, // Default opacity is 0
+                      9,
+                      0.8, // At zoom level 9, text opacity is 0.8
                       15,
                       1, // At zoom level 15, text opacity is 1
                     ],
