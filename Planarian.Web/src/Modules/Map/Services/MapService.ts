@@ -39,26 +39,8 @@ const MapService = {
   // },
 
   getMapCenter: async () => {
-    const accountId = AuthenticationService.GetAccountId();
-    if (!accountId) {
-      throw new PlanarianError("No account id found");
-    }
-    const cacheKey = `mapCenter-${accountId}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    const now = Date.now();
-
-    if (cachedData) {
-      const { data, timestamp } = JSON.parse(cachedData);
-      if (now - timestamp < cacheDuration) {
-        return data;
-      }
-    }
-
     const response = await HttpClient.get<CoordinateDto>(`${baseUrl}/center`);
-    localStorage.setItem(
-      cacheKey,
-      JSON.stringify({ data: response.data, timestamp: now })
-    );
+
     return response.data;
   },
 };
