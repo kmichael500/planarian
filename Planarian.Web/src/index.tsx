@@ -61,4 +61,17 @@ const HttpClient = axios.create({
   baseURL: baseUrl,
 });
 
+// Override default axios error handler to throw custom error data
+HttpClient.interceptors.response.use(
+  function (response) {
+    return response;
+  },
+  function (error) {
+    if (error.response) {
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export { HttpClient, baseUrl };
