@@ -5,13 +5,7 @@ import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButt
 import { Card, Form, message } from "antd";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
-import {
-  useLocation,
-  useNavigate,
-  useParams,
-  useBlocker,
-} from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
@@ -49,20 +43,10 @@ const EditCavePage: React.FC = () => {
     };
   }, [isFormDirty]);
 
-  const location = useLocation();
-  const history = useContext(RouterContext); // if you need the history object
-
-  const unblock = history.block((location: any, action: any) => {
-    if (isFormDirty) {
-      return "You have unsaved changes! Are you sure you want to leave?";
-    }
-  });
-
   useEffect(() => {
     const getCave = async () => {
       const caveResponse = await CaveService.GetCave(caveId);
 
-      // const caveResponse = {} as CaveVm;
       // antd input requires date to be in format yyyy-MM-DD otherwise it will not be displayed
       caveResponse.reportedOn = formatDateTime(
         caveResponse.reportedOn,
