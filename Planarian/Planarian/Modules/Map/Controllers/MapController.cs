@@ -35,7 +35,7 @@ public class MapController : PlanarianControllerBase<MapService>
     public async Task<IActionResult> GetTile(int z, int x, int y)
     {
         var mvtData = await Service.GetEntrancesMVTAsync(z, x, y);
-        Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
+        // Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
         if (mvtData == null)
         {
             return NotFound();
