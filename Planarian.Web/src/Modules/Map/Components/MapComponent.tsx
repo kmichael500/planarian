@@ -43,7 +43,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
   const mapStyle = {
     glyphs:
-      "https://saplanarian.blob.core.windows.net/public/map/fonts/{fontstack}/{range}.pbf",
+      "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODF0M2ZiMDloNTJpbzYzdXRrYWhrcSJ9.B8x4P8SK9Zpe-sdN6pJ3Eg",
     version: 8,
     sources: {
       "osm-tiles": {
@@ -190,9 +190,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
                     "heatmap-opacity": [
                       "step",
                       ["zoom"],
-                      0.8, // invisible at zoom levels < 13
+                      0.6,
                       9,
-                      0, // visible at zoom levels >= 13
+                      0, // invisible at zoom levels > 9
                     ],
                   }}
                 />
@@ -202,7 +202,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   id="entrance-labels"
                   type="symbol"
                   layout={{
-                    "text-font": ["Open Sans Regular"], // Specify font
+                    "text-font": ["Open Sans Regular"],
                     "text-field": [
                       "concat",
                       ["get", "cavename"], // Always display 'cavename'
