@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
-import axios from "axios";
+import axios, { AxiosRequestTransformer } from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 import { AppService } from "./Shared/Services/AppService";
@@ -31,38 +31,32 @@ if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = "https://wa-planarian.azurewebsites.net";
 }
 
-let headers = {};
-if (AuthenticationService.IsAuthenticated()) {
-  headers = {
-    Authorization: `Bearer ${AuthenticationService.GetToken()}`,
-  };
+const setAuthHeaders: AxiosRequestTransformer = (data: any, headers) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    const accountId = AuthenticationService.GetAccountId();
+    if (accountId) {
+      headers["x-account"] = accountId;
+    }
+  } else {
+    delete headers["Authorization"];
+    delete headers["x-account"];
+  }
+
+  return data;
+};
+
+if (!Array.isArray(axios.defaults.transformRequest)) {
+  axios.defaults.transformRequest = [];
 }
+
+axios.defaults.transformRequest = [setAuthHeaders].concat(
+  axios.defaults.transformRequest
+);
 
 const HttpClient = axios.create({
-  // .. where we make our configurations
   baseURL: baseUrl,
-  headers: headers,
 });
-
-const accountId = AuthenticationService.GetAccountId();
-if (!isNullOrWhiteSpace(accountId)) {
-  AppService.InitializeApp().then(() => {
-    AuthenticationService.SwitchAccount(accountId);
-  });
-}
-// Override default axios error handler to throw custom error data
-HttpClient.interceptors.response.use(
-  function (response) {
-    // Do something with response data
-    return response;
-  },
-  function (error) {
-    if (error.response) {
-      return Promise.reject(error.response.data);
-    }
-    // Do something with response error
-    return Promise.reject(error);
-  }
-);
 
 export { HttpClient, baseUrl };

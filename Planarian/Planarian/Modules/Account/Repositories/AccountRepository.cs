@@ -23,7 +23,9 @@ public class AccountRepository : RepositoryBase
         do
         {
             deletedCount = await DbContext.Caves
+                .Where(e=>e.AccountId == RequestUser.AccountId)
                 .Where(c => DbContext.Caves
+                    .Where(e=>e.AccountId == RequestUser.AccountId)
                     .Take(batchSize)
                     .Select(w => w.Id)
                     .Contains(c.Id) && c.AccountId == RequestUser.AccountId)
@@ -42,7 +44,9 @@ public class AccountRepository : RepositoryBase
         do
         {
             deletedCount = await DbContext.TagTypes
+                .Where(e=>e.AccountId ==  RequestUser.AccountId)
                 .Where(tt => DbContext.TagTypes
+                    .Where(e=>e.AccountId == RequestUser.AccountId)
                     .Take(batchSize)
                     .Select(w => w.Id)
                     .Contains(tt.Id) && tt.AccountId == RequestUser.AccountId)

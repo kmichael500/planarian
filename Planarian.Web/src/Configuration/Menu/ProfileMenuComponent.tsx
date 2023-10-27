@@ -10,13 +10,18 @@ import {
 import { AppContext } from "../Context/AppContext";
 import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
 import { AppOptions } from "../../Shared/Services/AppService";
-import { StringHelpers } from "../../Shared/Helpers/StringHelpers";
+import {
+  StringHelpers,
+  isNullOrWhiteSpace,
+} from "../../Shared/Helpers/StringHelpers";
 
 function ProfileMenu() {
   const getUserInitials = () => {
     const name = AuthenticationService.GetName();
     return `${StringHelpers.GenerateAbbreviation(name ?? "")}`;
   };
+
+  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
 
   const navigate = useNavigate();
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
@@ -44,22 +49,25 @@ function ProfileMenu() {
       key: "logout",
 
       icon: <LogoutOutlined />,
-      action: () => {
-        AuthenticationService.Logout();
+      action: async () => {
+        await AuthenticationService.Logout();
         setIsAuthenticated(false);
         navigate("/login");
       },
       label: "Logout",
+
       requiresAuthentication: true,
     },
   ] as PlanarianMenuItem[];
 
   return (
     <>
-      <SwitchAccountComponent
-        isVisible={isModalOpen}
-        handleCancel={() => setIsModalOpen(false)}
-      />
+      {hasAccount && (
+        <SwitchAccountComponent
+          isVisible={isModalOpen}
+          handleCancel={() => setIsModalOpen(false)}
+        />
+      )}
       {isAuthenticated && (
         <Dropdown
           overlay={

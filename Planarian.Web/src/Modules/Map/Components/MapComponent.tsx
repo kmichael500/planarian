@@ -72,7 +72,6 @@ const MapComponent: React.FC<MapComponentProps> = ({
       const fetchData = async () => {
         try {
           const data = await MapService.getMapCenter();
-          console.log("Center", data);
           setMapCenter([data.latitude, data.longitude]);
           setIsLoading(false);
         } catch (error) {

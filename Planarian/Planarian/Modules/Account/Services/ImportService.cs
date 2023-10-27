@@ -141,7 +141,7 @@ public class ImportService : ServiceBase
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing geology");
             var allGeologyTags = (await _tagRepository.GetGeologyTags()).ToList();
-            var geologyTags = caveRecords.SelectMany(e => e.Geology.Split(',').Select(g => g.Trim())).Distinct()
+            var geologyTags = caveRecords.Where(e=>!string.IsNullOrWhiteSpace(e.Geology)).SelectMany(e => e.Geology.Split(',').Select(g => g.Trim())).Distinct()
                 .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => new TagType
                 {
                     AccountId = RequestUser.AccountId, CreatedByUserId = RequestUser.Id, CreatedOn = DateTime.UtcNow,

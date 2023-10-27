@@ -3,9 +3,7 @@ import { TOKEN_KEY } from "../../../Shared/Constants/TokenKeyConstant";
 import { UserLoginVm } from "../Models/UserLoginVm";
 import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { AppOptions } from "../../../Shared/Services/AppService";
-import { message } from "antd";
-import App from "../../../App";
+import { AppOptions, AppService } from "../../../Shared/Services/AppService";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
@@ -34,11 +32,17 @@ const AuthenticationService = {
   async Login(values: UserLoginVm): Promise<string> {
     const response = await HttpClient.post<string>(`${baseUrl}/login`, values);
     this.SetToken(response.data);
+    const accountId = this.GetAccountId();
+    if (accountId) {
+      this.SwitchAccount(accountId);
+    }
+    await AppService.InitializeApp();
     this.notifyAuthChange();
     return response.data;
   },
-  Logout(): void {
+  async Logout(): Promise<void> {
     this.RemoveToken();
+    await AppService.InitializeApp();
     this.notifyAuthChange();
   },
   GetToken(): string | null {
@@ -48,13 +52,10 @@ const AuthenticationService = {
     HttpClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
     localStorage.setItem(TOKEN_KEY, token);
-
-    this.notifyAuthChange();
   },
   RemoveToken(): void {
-    delete HttpClient.defaults.headers.common["Authorization"];
-    delete HttpClient.defaults.headers.common["x-account"];
     localStorage.removeItem(TOKEN_KEY);
+
     this.notifyAuthChange();
   },
   IsAuthenticated(): boolean {
@@ -136,8 +137,6 @@ const AuthenticationService = {
     if (userId == null) throw new NotFoundError("user");
     sessionStorage.setItem(currentIdStorageKey(userId), accountId);
     localStorage.setItem(currentIdStorageKey(userId), accountId);
-    HttpClient.defaults.headers.common["x-account"] = accountId;
-    this.notifyAuthChange();
   },
 };
 
