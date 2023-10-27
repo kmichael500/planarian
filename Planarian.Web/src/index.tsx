@@ -31,6 +31,8 @@ if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = "https://wa-planarian.azurewebsites.net";
 }
 
+// using tranform request instead of interceptors because
+// it's not clearing  the headers when the user logs out and we call delete on the token
 const setAuthHeaders: AxiosRequestTransformer = (data: any, headers) => {
   const token = localStorage.getItem("token");
   if (token) {
