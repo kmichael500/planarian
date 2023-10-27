@@ -16,10 +16,12 @@ import { AuthenticationService } from "../../Modules/Authentication/Services/Aut
 
 const { useBreakpoint } = Grid;
 
-const HeaderComponent: React.FC = () => {
+const HeaderComponent = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
   const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
-  const accountName = AuthenticationService.GetAccountName();
+
+  const isAuthenticated = AuthenticationService.IsAuthenticated();
+  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
 
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -114,13 +116,15 @@ const HeaderComponent: React.FC = () => {
             </Col>
             {/* take up rest of space to push others to right and left side */}
             <Col flex="auto"></Col>
-            <Col>
-              <AccountNameTag />
-            </Col>
+            {hasAccount && (
+              <Col>
+                <AccountNameTag />
+              </Col>
+            )}
             {headerButtons.map((button, index) => (
               <Col key={index}>{button}</Col>
             ))}
-            <ProfileMenu />
+            {isAuthenticated && <ProfileMenu />}
           </Row>
         </Spin>
       </Header>

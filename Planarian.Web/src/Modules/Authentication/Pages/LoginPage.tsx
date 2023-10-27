@@ -16,15 +16,13 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 import { UserLoginVm } from "../Models/UserLoginVm";
 import { AuthenticationService } from "../Services/AuthenticationService";
-import { AppService } from "../../../Shared/Services/AppService";
 import React from "react";
-import { HttpClient } from "../../..";
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm<UserLoginVm>();
   const { setIsAuthenticated, setHeaderTitle, setHeaderButtons } =
     useContext(AppContext);
-  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [isLoggingIn, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     setHeaderTitle(["Login"]);
@@ -45,19 +43,15 @@ const LoginPage: React.FC = () => {
 
   const onSubmit = async (values: UserLoginVm) => {
     try {
-      setIsLoggingIn(true);
+      setIsLoading(true);
       await AuthenticationService.Login(values);
       setIsAuthenticated(true);
-      await AppService.InitializeApp();
-      const accountId = AuthenticationService.GetAccountId();
-      if (accountId) {
-        AuthenticationService.SwitchAccount(accountId);
-      }
+
       navigate(redirectUrl);
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
-      setIsLoggingIn(false);
+      setIsLoading(false);
     }
   };
 

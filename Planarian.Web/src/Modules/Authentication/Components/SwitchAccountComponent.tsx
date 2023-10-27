@@ -1,10 +1,11 @@
 import { Modal, Button, Form, List, message, Divider } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { SwapOutlined } from "@ant-design/icons";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -17,14 +18,33 @@ const SwitchAccountComponent = ({
 }: SwitchAccountComponentProps) => {
   const currentAccountId = AuthenticationService.GetAccountId();
   const currentAccountName = AuthenticationService.GetAccountName();
-  const accountList = AppOptions.accountIds.filter(
-    (item) => item.value !== currentAccountId
-  );
+
+  const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
+
+  useEffect(() => {
+    if (!accountList) {
+      const result = AppOptions.accountIds.filter(
+        (item) => item.value !== currentAccountId
+      );
+      setAccountList(result);
+    }
+    const unsubscribe = AuthenticationService.onAuthChange(() => {
+      console.log("Test");
+      const result = AppOptions.accountIds.filter(
+        (item) => item.value !== currentAccountId
+      );
+      setAccountList(result);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []); // empty dependency array ensures this runs once on mount and once on unmount
 
   const handleSwitch = async (accountId: string) => {
     try {
       AuthenticationService.SwitchAccount(accountId);
-      const accountName = accountList.find(
+      const accountName = accountList?.find(
         (item) => item.value === accountId
       )?.display;
       message.success(`Switched to account ${accountName}`);
