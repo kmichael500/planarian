@@ -33,7 +33,11 @@ const MapComponent = ({ initialCenter, initialZoom }: MapComponentProps) => {
 
   return (
     <>
-      <MapBaseComponent onCaveClicked={handleCaveClick} />
+      <MapBaseComponent
+        initialCenter={initialCenter}
+        initialZoom={initialZoom}
+        onCaveClicked={handleCaveClick}
+      />
       <MapClickModal
         isModalVisible={isModalVisible}
         isModalLoading={isModalLoading}
