@@ -208,7 +208,6 @@ const ControlPanel = styled.div`
   position: absolute;
   top: 0;
   right: 0;
-  max-width: 300px;
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px 8px;
@@ -225,7 +224,7 @@ const ControlPanel = styled.div`
 
 const HoverIcon = styled.div`
   display: block;
-  width: 24px;
+  width: 28px;
   height: 24px;
   cursor: pointer;
   ${ControlPanel}:hover & {
