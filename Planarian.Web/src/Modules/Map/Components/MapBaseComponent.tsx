@@ -22,6 +22,16 @@ interface MapBaseComponentProps {
   onCaveClicked: (caveId: string) => void;
 }
 
+// MUST be defined outside the function or in useMemo (still bugs with this tho on mobile?) otherwise the map re-renders every time the you click on it
+const mapStyle = {
+  glyphs:
+    "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODF0M2ZiMDloNTJpbzYzdXRrYWhrcSJ9.B8x4P8SK9Zpe-sdN6pJ3Eg",
+  version: 8,
+
+  sources: {},
+  layers: [],
+} as StyleSpecification;
+
 const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
   initialZoom,
@@ -39,20 +49,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     initialCenter || [0, 0]
   );
   const [zoom, setZoom] = useState(initialZoom || 7);
-
-  // MUST be defined outside the function or in useMemo otherwise the map re-renders every time the you click on it
-  const mapStyle = useMemo(
-    () =>
-      ({
-        glyphs:
-          "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODF0M2ZiMDloNTJpbzYzdXRrYWhrcSJ9.B8x4P8SK9Zpe-sdN6pJ3Eg",
-        version: 8,
-
-        sources: {},
-        layers: [],
-      } as StyleSpecification),
-    []
-  ); // dependencies array is empty as mapStyle doesn't depend on any props or state
 
   useEffect(() => {
     if (!initialCenter) {
