@@ -47,6 +47,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         glyphs:
           "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODF0M2ZiMDloNTJpbzYzdXRrYWhrcSJ9.B8x4P8SK9Zpe-sdN6pJ3Eg",
         version: 8,
+
         sources: {},
         layers: [],
       } as StyleSpecification),

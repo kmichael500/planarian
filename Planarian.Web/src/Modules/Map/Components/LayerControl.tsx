@@ -13,21 +13,20 @@ interface PlanarianMapLayer extends maplibregl.Layer {
 
 const LAYERS = [
   {
-    id: "3-dep-hillshade-usgs",
-    displayName: "USGS Hillshade",
+    id: "open-topo",
+    displayName: "Topo",
     type: "raster",
     source: {
       type: "raster",
-      tiles: [
-        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
-      ],
+      tiles: ["https://tile.opentopomap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
     },
-    isActive: false,
+    isActive: false, // Set to true if you want it active by default
     opacity: 1,
   },
   {
     id: "open street map",
-    displayName: "Open Street Map",
+    displayName: "Street",
     type: "raster",
     source: {
       type: "raster",
@@ -39,6 +38,64 @@ const LAYERS = [
       tileSize: 256,
     },
     isActive: true,
+    opacity: 1,
+  },
+  {
+    id: "usgs-imagery",
+    displayName: "Satellite",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/WMTS/tile/1.0.0/USGSImageryOnly/default/GoogleMapsCompatible/{z}/{y}/{x}.png",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    // maxzoom: 16,
+    opacity: 1,
+  },
+  {
+    id: "3-dep-hillshade-usgs",
+    displayName: "Hillshade",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
+      ],
+    },
+
+    isActive: false,
+    opacity: 1,
+  },
+  {
+    id: "usgs-hydro",
+    displayName: "Hydrology",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=0,1,2,3,4,5,6,7,8,9,10,11,12&styles=",
+      ],
+      tileSize: 256,
+    },
+    paint: {
+      "raster-opacity": 1,
+    },
+    isActive: false,
+    opacity: 1,
+  },
+  {
+    id: "macrostrat",
+    displayName: "Geology",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
+      tileSize: 256,
+    },
+    isActive: false, // Set to true if you want it active by default
     opacity: 1,
   },
 ] as PlanarianMapLayer[];
