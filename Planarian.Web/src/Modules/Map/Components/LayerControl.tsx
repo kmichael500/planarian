@@ -146,7 +146,8 @@ const LayerControl: React.FC = () => {
   };
 
   const onTerrainToggle = () => {
-    console.log("terrain", isTerrainActive);
+    setIsTerrainActive((prevState) => !prevState);
+
     if (isTerrainActive) {
       map?.getMap().setTerrain(null);
     } else {
@@ -155,7 +156,6 @@ const LayerControl: React.FC = () => {
         exaggeration: terrainExaggeration,
       });
     }
-    setIsTerrainActive((prevState) => !prevState);
   };
 
   return (
@@ -164,7 +164,7 @@ const LayerControl: React.FC = () => {
         id="terrainLayer"
         type="raster-dem"
         tiles={[
-          "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=6JQDOsXI3NYIDosH94bV",
+          "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=G0kZR1vCDJukD1MigCcI",
         ]}
         tileSize={256}
       >
