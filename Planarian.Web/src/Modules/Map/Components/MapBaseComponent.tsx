@@ -97,11 +97,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 }}
                 onClick={handleMapClick}
                 mapStyle={mapStyle}
+                // terrain={{ exaggeration: 1.5, source: "terrainLayer" }}
               >
                 <LayerControl />
-
-                <NavigationControl position={zoomControlPosition} />
-                <GeolocateControl position={zoomControlPosition} />
                 <Source
                   id="entrances"
                   type="vector"
@@ -215,6 +213,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     }}
                   />
                 </Source>
+
+                <NavigationControl position={zoomControlPosition} />
+                <GeolocateControl position={zoomControlPosition} />
               </Map>
             </MapProvider>
           </>
