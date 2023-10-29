@@ -1,14 +1,25 @@
-import { Checkbox, Slider } from "antd";
-import maplibregl from "maplibre-gl";
+import { Button, Checkbox, InputNumber, Slider } from "antd";
 import React from "react";
-import { useEffect, useRef, useState } from "react";
-import { useMap } from "react-map-gl/maplibre";
+import { useState } from "react";
+import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { BuildOutlined } from "@ant-design/icons";
 
-interface PlanarianMapLayer extends maplibregl.Layer {
+interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
   opacity: number;
+  id: string;
+  type: string; // Added
+  source: {
+    type: string;
+    tiles: string[];
+    tileSize: number;
+  }; // Added
+  paint?: {
+    "raster-opacity"?: number;
+  };
 }
 
 const LAYERS = [
@@ -37,7 +48,7 @@ const LAYERS = [
       tiles: ["https://tile.opentopomap.org/{z}/{x}/{y}.png"],
       tileSize: 256,
     },
-    isActive: false, // Set to true if you want it active by default
+    isActive: false,
     opacity: 1,
   },
 
@@ -96,111 +107,156 @@ const LAYERS = [
       tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
       tileSize: 256,
     },
-    isActive: false, // Set to true if you want it active by default
+    isActive: false,
     opacity: 1,
   },
 ] as PlanarianMapLayer[];
 
 const LayerControl: React.FC = () => {
   const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
+  const [isTerrainActive, setIsTerrainActive] = useState(false);
+  const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
 
   const { current: map } = useMap();
 
-  useEffect(() => {
-    if (map) {
-      const mapInstance = map.getMap();
+  const onLayerChecked = (layer: PlanarianMapLayer) => {
+    const newLayers = mapLayers.map((l) => {
+      if (l.id === layer.id) {
+        return {
+          ...l,
+          isActive: !l.isActive,
+        };
+      }
+      return l;
+    });
+    setMapLayers(newLayers);
+  };
 
-      const handleLoad = () => {
-        mapLayers.forEach((layer) => {
-          if (layer.isActive) {
-            addLayer(layer);
-          }
-        });
-      };
-      mapInstance.on("load", handleLoad); // Listen for the load event
+  const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
+    const newLayers = mapLayers.map((l) => {
+      if (l.id === layer.id) {
+        return {
+          ...l,
+          opacity,
+        };
+      }
+      return l;
+    });
+    setMapLayers(newLayers);
+  };
 
-      return () => {
-        mapInstance.off("load", handleLoad); // Clean up the event listener
-      };
-    }
-  }, [map]); // Depend on map and mapLayers
-
-  const toggleLayer = (layer: PlanarianMapLayer) => {
-    if (!layer.isActive) {
-      addLayer(layer);
+  const onTerrainToggle = () => {
+    console.log("terrain", isTerrainActive);
+    if (isTerrainActive) {
+      map?.getMap().setTerrain(null);
     } else {
-      removeLayer(layer);
+      map?.getMap().setTerrain({
+        source: "terrainLayer",
+        exaggeration: terrainExaggeration,
+      });
     }
-  };
-
-  const handleOpacityChange = (layer: PlanarianMapLayer, value: number) => {
-    if (map) {
-      const updatedLayers = mapLayers.map((l) =>
-        l.id === layer.id ? { ...l, opacity: value } : l
-      );
-      setMapLayers(updatedLayers);
-
-      map.getMap().setPaintProperty(layer.id, "raster-opacity", value);
-    }
-  };
-
-  const addLayer = (layer: PlanarianMapLayer) => {
-    if (map) {
-      const firstLayerId = map.getMap().getStyle().layers?.[0].id;
-      map.getMap().addLayer(layer as maplibregl.AnyLayer, firstLayerId);
-
-      const updatedLayers = mapLayers.map((l) =>
-        l.id === layer.id ? { ...l, isActive: true } : l
-      );
-      setMapLayers(updatedLayers);
-    }
-  };
-
-  const removeLayer = (layer: PlanarianMapLayer) => {
-    if (map) {
-      map.getMap().removeLayer(layer.id);
-      map.getMap().removeSource(layer.id);
-
-      const updatedLayers = mapLayers.map((l) =>
-        l.id === layer.id ? { ...l, isActive: false } : l
-      );
-      setMapLayers(updatedLayers);
-    }
+    setIsTerrainActive((prevState) => !prevState);
   };
 
   return (
-    <ControlPanel>
-      <HoverIcon>
-        {/* You can replace this with your desired icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          height="24px"
-          viewBox="0 0 576 512"
+    <>
+      <Source
+        id="terrainLayer"
+        type="raster-dem"
+        tiles={[
+          "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=6JQDOsXI3NYIDosH94bV",
+        ]}
+        tileSize={256}
+      >
+        <Layer
+          id="terrainLayer"
+          source="terrainLayer"
+          type="hillshade"
+          layout={{ visibility: "visible" }}
+          paint={{
+            "hillshade-illumination-direction": 315,
+            "hillshade-illumination-anchor": "viewport",
+          }}
+        />
+      </Source>
+
+      {mapLayers.map((layer) => (
+        <Source
+          key={layer.id}
+          id={layer.id}
+          type={"raster"}
+          tiles={layer.source.tiles}
         >
-          <path d="M264.5 5.2c14.9-6.9 32.1-6.9 47 0l218.6 101c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 149.8C37.4 145.8 32 137.3 32 128s5.4-17.9 13.9-21.8L264.5 5.2zM476.9 209.6l53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 277.8C37.4 273.8 32 265.3 32 256s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0l152-70.2zm-152 198.2l152-70.2 53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 405.8C37.4 401.8 32 393.3 32 384s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0z" />
-        </svg>
-      </HoverIcon>
-      <ContentWrapper>
-        Layers
-        {mapLayers.map((layer) => (
-          <div key={layer.id}>
-            <Checkbox
-              checked={layer.isActive}
-              onChange={(e) => toggleLayer(layer)}
-            >
-              {layer.displayName}
-            </Checkbox>
-            <Slider
-              min={0}
-              max={1}
-              step={0.1}
-              value={layer.opacity}
-              onChange={(value: number) => handleOpacityChange(layer, value)}
-            />
-          </div>
-        ))}
-      </ContentWrapper>
-    </ControlPanel>
+          <Layer
+            key={layer.id}
+            source={layer.id}
+            paint={{ "raster-opacity": layer.opacity }}
+            type="raster"
+            layout={{ visibility: layer.isActive ? "visible" : "none" }}
+          ></Layer>
+        </Source>
+      ))}
+
+      <ControlPanel>
+        <HoverIcon>
+          {/* You can replace this with your desired icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="24px"
+            viewBox="0 0 576 512"
+          >
+            <path d="M264.5 5.2c14.9-6.9 32.1-6.9 47 0l218.6 101c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 149.8C37.4 145.8 32 137.3 32 128s5.4-17.9 13.9-21.8L264.5 5.2zM476.9 209.6l53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 277.8C37.4 273.8 32 265.3 32 256s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0l152-70.2zm-152 198.2l152-70.2 53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 405.8C37.4 401.8 32 393.3 32 384s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0z" />
+          </svg>
+        </HoverIcon>
+        <ContentWrapper>
+          Layers
+          {mapLayers.map((layer) => (
+            <div key={layer.id}>
+              <Checkbox
+                onChange={() => {
+                  onLayerChecked(layer);
+                }}
+                checked={layer.isActive}
+              >
+                {layer.displayName}
+              </Checkbox>
+              <Slider
+                min={0}
+                max={1}
+                step={0.1}
+                value={layer.opacity}
+                onChange={(value: number) =>
+                  onLayerOpacityChanged(layer, value)
+                }
+              />
+            </div>
+          ))}
+          <Button onClick={onTerrainToggle} icon={<BuildOutlined />}>
+            {isTerrainActive ? "Disable 3D Terrain" : "Enable 3D Terrain"}
+          </Button>
+          {isTerrainActive && (
+            <div>
+              Exaggeration:
+              <InputNumber
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={terrainExaggeration}
+                onChange={(value) => {
+                  if (value !== null) {
+                    setTerrainExaggeration(value);
+                    map?.getMap().setTerrain({
+                      source: "terrainLayer",
+                      exaggeration: value,
+                    });
+                  }
+                }}
+              />
+            </div>
+          )}
+        </ContentWrapper>
+      </ControlPanel>
+    </>
   );
 };
 
