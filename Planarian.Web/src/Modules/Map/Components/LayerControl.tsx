@@ -1,4 +1,4 @@
-import { Button, Checkbox, InputNumber, Slider } from "antd";
+import { Button, Checkbox, InputNumber, Slider, Space } from "antd";
 import React from "react";
 import { useState } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
@@ -81,6 +81,19 @@ const LAYERS = [
     isActive: false,
     opacity: 1,
   },
+
+  {
+    id: "macrostrat",
+    displayName: "Geology",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+  },
   {
     id: "usgs-hydro",
     displayName: "Hydrology",
@@ -94,18 +107,6 @@ const LAYERS = [
     },
     paint: {
       "raster-opacity": 1,
-    },
-    isActive: false,
-    opacity: 1,
-  },
-  {
-    id: "macrostrat",
-    displayName: "Geology",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
-      tileSize: 256,
     },
     isActive: false,
     opacity: 1,
@@ -168,16 +169,16 @@ const LayerControl: React.FC = () => {
         ]}
         tileSize={256}
       >
-        <Layer
+        {/* <Layer
           id="terrainLayer"
           source="terrainLayer"
           type="hillshade"
-          layout={{ visibility: "visible" }}
+          layout={{ visibility: "none" }}
           paint={{
             "hillshade-illumination-direction": 315,
             "hillshade-illumination-anchor": "viewport",
           }}
-        />
+        /> */}
       </Source>
 
       {mapLayers.map((layer) => (
@@ -231,29 +232,35 @@ const LayerControl: React.FC = () => {
               />
             </div>
           ))}
-          <Button onClick={onTerrainToggle} icon={<BuildOutlined />}>
-            {isTerrainActive ? "Disable 3D Terrain" : "Enable 3D Terrain"}
-          </Button>
-          {isTerrainActive && (
-            <div>
-              Exaggeration:
-              <InputNumber
-                min={0.1}
-                max={10}
-                step={0.1}
-                value={terrainExaggeration}
-                onChange={(value) => {
-                  if (value !== null) {
-                    setTerrainExaggeration(value);
-                    map?.getMap().setTerrain({
-                      source: "terrainLayer",
-                      exaggeration: value,
-                    });
-                  }
-                }}
-              />
-            </div>
-          )}
+          <Space direction="vertical">
+            <PlanarianButton
+              alwaysShowChildren
+              onClick={onTerrainToggle}
+              icon={<BuildOutlined />}
+            >
+              {isTerrainActive ? "Disable 3D Terrain" : "Enable 3D Terrain"}
+            </PlanarianButton>
+            {isTerrainActive && (
+              <div>
+                Exaggeration:
+                <InputNumber
+                  min={0}
+                  max={10}
+                  step={0.1}
+                  value={terrainExaggeration}
+                  onChange={(value) => {
+                    if (value !== null) {
+                      setTerrainExaggeration(value);
+                      map?.getMap().setTerrain({
+                        source: "terrainLayer",
+                        exaggeration: value,
+                      });
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </Space>
         </ContentWrapper>
       </ControlPanel>
     </>

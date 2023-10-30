@@ -89,6 +89,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
             <MapProvider>
               <Map
                 reuseMaps
+                antialias
                 interactiveLayerIds={["entrances"]}
                 initialViewState={{
                   longitude: mapCenter[1],
@@ -97,7 +98,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 }}
                 onClick={handleMapClick}
                 mapStyle={mapStyle}
-                // terrain={{ exaggeration: 1.5, source: "terrainLayer" }}
               >
                 <LayerControl />
                 <Source
