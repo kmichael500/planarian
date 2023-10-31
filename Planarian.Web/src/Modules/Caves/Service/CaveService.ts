@@ -1,6 +1,5 @@
 import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
-import { UploadedFileResponse } from "../../Files/Services/FileService";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { AddCaveVm } from "../Models/AddCaveVm";
