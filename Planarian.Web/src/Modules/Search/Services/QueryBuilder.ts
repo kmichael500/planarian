@@ -42,7 +42,7 @@ class QueryBuilder<T extends object> {
   private currentPage: number;
   private pageSize: number;
 
-  constructor(queryString: string) {
+  constructor(queryString: string, private pushToBrowser: boolean = true) {
     const filerQuery =
       QueryStringParser.parseQueryString<FilterQuery>(queryString);
 
@@ -181,7 +181,9 @@ class QueryBuilder<T extends object> {
       conditionsQueryString
     );
 
-    window.history.pushState({}, "", `?${queryString}`);
+    if (this.pushToBrowser) {
+      window.history.pushState({}, "", `?${queryString}`);
+    }
 
     return queryString;
   }

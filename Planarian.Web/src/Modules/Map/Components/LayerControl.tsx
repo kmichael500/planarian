@@ -11,7 +11,8 @@ interface PlanarianMapLayer {
   isActive: boolean;
   opacity: number;
   id: string;
-  type: string; // Added
+  type: string;
+  attribution?: string;
   source: {
     type: string;
     tiles: string[];
@@ -38,6 +39,7 @@ const LAYERS = [
     },
     isActive: true,
     opacity: 1,
+    attribution: "© OpenStreetMap contributors",
   },
   {
     id: "open-topo",
@@ -50,6 +52,7 @@ const LAYERS = [
     },
     isActive: false,
     opacity: 1,
+    attribution: "© OpenStreetMap contributors",
   },
 
   {
@@ -66,6 +69,7 @@ const LAYERS = [
     isActive: false,
     // maxzoom: 16,
     opacity: 1,
+    attribution: "© USGS",
   },
   {
     id: "3-dep-hillshade-usgs",
@@ -80,6 +84,7 @@ const LAYERS = [
 
     isActive: false,
     opacity: 1,
+    attribution: "USGS 3DEP Elevation Program",
   },
 
   {
@@ -93,6 +98,7 @@ const LAYERS = [
     },
     isActive: false,
     opacity: 1,
+    attribution: "© Macrostrat",
   },
   {
     id: "usgs-hydro",
@@ -110,6 +116,7 @@ const LAYERS = [
     },
     isActive: false,
     opacity: 1,
+    attribution: "© USGS",
   },
 ] as PlanarianMapLayer[];
 
@@ -168,18 +175,20 @@ const LayerControl: React.FC = () => {
           "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=G0kZR1vCDJukD1MigCcI",
         ]}
         tileSize={256}
-      >
-        {/* <Layer
-          id="terrainLayer"
-          source="terrainLayer"
-          type="hillshade"
-          layout={{ visibility: "none" }}
-          paint={{
-            "hillshade-illumination-direction": 315,
-            "hillshade-illumination-anchor": "viewport",
-          }}
-        /> */}
-      </Source>
+      ></Source>
+
+      <Layer
+        id="sky"
+        type={"sky" as any}
+        paint={
+          {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0.0, 50.0],
+            "sky-atmosphere-sun-intensity": 15,
+          } as any
+        }
+        layout={{ visibility: "visible" }}
+      ></Layer>
 
       {mapLayers.map((layer) => (
         <Source
@@ -187,6 +196,7 @@ const LayerControl: React.FC = () => {
           id={layer.id}
           type={"raster"}
           tiles={layer.source.tiles}
+          attribution={layer.attribution}
         >
           <Layer
             key={layer.id}
@@ -269,7 +279,7 @@ const LayerControl: React.FC = () => {
 
 const ControlPanel = styled.div`
   position: absolute;
-  top: 0;
+  top: 50px;
   right: 0;
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);

@@ -15,6 +15,7 @@ import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { LayerControl } from "./LayerControl";
+import { CaveSearchMapControl } from "./CaveSearchMapControl";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -81,6 +82,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   };
 
   const zoomControlPosition = "top-left";
+  const accountName = AuthenticationService.GetAccountName();
   return (
     <>
       <Spin spinning={isLoading}>
@@ -88,6 +90,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
           <>
             <MapProvider>
               <Map
+                maxPitch={85}
                 reuseMaps
                 antialias
                 interactiveLayerIds={["entrances"]}
@@ -100,6 +103,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 mapStyle={mapStyle}
               >
                 <LayerControl />
+                <CaveSearchMapControl />
                 <Source
                   id="entrances"
                   type="vector"
@@ -108,6 +112,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                       AppOptions.serverBaseUrl
                     }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&test=1`,
                   ]}
+                  attribution={`© ${accountName}`}
                 >
                   <Layer
                     source-layer="entrances"
