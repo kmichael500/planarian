@@ -177,19 +177,6 @@ const LayerControl: React.FC = () => {
         tileSize={256}
       ></Source>
 
-      <Layer
-        id="sky"
-        type={"sky" as any}
-        paint={
-          {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0.0, 50.0],
-            "sky-atmosphere-sun-intensity": 15,
-          } as any
-        }
-        layout={{ visibility: "visible" }}
-      ></Layer>
-
       {mapLayers.map((layer) => (
         <Source
           key={layer.id}
