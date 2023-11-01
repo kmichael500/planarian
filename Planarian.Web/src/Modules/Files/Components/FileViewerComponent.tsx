@@ -1,6 +1,6 @@
-import { Modal, Tag, Table, Spin, Result } from "antd";
+import { Modal, Tag, Table, Spin, Result, Drawer, Button } from "antd";
 import Papa from "papaparse";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CloudDownloadOutlined } from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import "./FileViewerComponent.scss";
@@ -72,10 +72,26 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
   return (
     <>
-      <Modal open={open} onCancel={onCancel} footer={null}>
-        <h2>
-          {displayName} <Tag>{fileType}</Tag>
-        </h2>
+      <Drawer
+        width="100VW"
+        height="100VH"
+        open={open}
+        autoFocus={true} // add autoFocus prop
+        extra={[<>{downloadButton}</>]}
+        title={
+          <>
+            {displayName} <Tag>{fileType}</Tag>
+          </>
+        }
+        onClose={(e) => {
+          {
+            if (onCancel) {
+              onCancel(e as any);
+            }
+          }
+        }}
+        footer={null}
+      >
         {isSupported && (
           <>
             {isImage && (
@@ -107,7 +123,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
               <pre
                 style={{
                   overflow: "auto",
-                  height: "100%",
+                  height: "50%",
                   padding: "1rem",
                   border: "1px solid rgb(240, 240, 240)",
                 }}
@@ -115,7 +131,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 {isLoading ? <Spin /> : fileContent}
               </pre>
             )}{" "}
-            {downloadButton}
           </>
         )}
 
@@ -126,7 +141,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
             extra={downloadButton}
           />
         )}
-      </Modal>
+      </Drawer>
     </>
   );
 };

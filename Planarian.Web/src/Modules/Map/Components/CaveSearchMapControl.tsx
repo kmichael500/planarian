@@ -30,7 +30,7 @@ export const CaveSearchMapControl = () => {
         setIsLoading(true);
         const caves = await CaveService.GetCaves(queryBuilder);
         const formattedOptions = caves.results.map((cave) => ({
-          value: cave.name,
+          value: cave.id,
           label: `${cave.displayId} ${cave.name}`,
           cave: cave,
         }));

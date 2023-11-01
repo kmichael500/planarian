@@ -42,7 +42,7 @@ const FileListItemComponent = ({ file }: { file: FileVm }) => {
   const fileType = getFileType(file.fileName);
 
   return (
-    <FullScreenModal>
+    <>
       <List.Item
         actions={[
           <Typography.Link onClick={onFileClick}>View</Typography.Link>,
@@ -62,7 +62,7 @@ const FileListItemComponent = ({ file }: { file: FileVm }) => {
         displayName={file.displayName}
         fileType={fileType}
       />
-    </FullScreenModal>
+    </>
   );
 };
 
