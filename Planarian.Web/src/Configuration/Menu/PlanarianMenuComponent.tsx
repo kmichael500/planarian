@@ -25,6 +25,8 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
   const [openedKeys, setOpenedKeys] = useState<string[]>([]);
   const { isAuthenticated } = useContext(AppContext);
 
+  console.log("PlanarianMenuComponent", props.menuItems);
+
   const filteredMenuItems = props.menuItems.filter(
     (item) => item.requiresAuthentication === isAuthenticated
   );
@@ -41,10 +43,19 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
       );
     } else {
       return (
-        <Menu.Item key={item.key} icon={item.icon}>
-          {!item.action && <Link to={String(item.key)}>{item.label}</Link>}
-          {item.action && `${item.label}`}
-        </Menu.Item>
+        <>
+          {item.key !== undefined && item.key !== null && (
+            <>
+              <Menu.Item key={item.key} icon={item.icon}>
+                {!item.action && (
+                  <Link to={String(item.key)}>{item.label}</Link>
+                )}
+                {item.action && `${item.label}`}
+              </Menu.Item>
+            </>
+          )}
+          {(item.key === undefined || item.key === null) && <>{item.icon}</>}
+        </>
       );
     }
   };
