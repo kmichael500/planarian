@@ -2,7 +2,7 @@ export function isImageFileType(fileType: string | null | undefined): boolean {
   if (!fileType) {
     return false;
   }
-  return ["jpeg", "jpg", "gif", "png"].includes(fileType);
+  return ["jpeg", "jpg", "gif", "png"].includes(fileType.toLowerCase());
 }
 
 export function isPdfFileType(fileType: string | null | undefined): boolean {
