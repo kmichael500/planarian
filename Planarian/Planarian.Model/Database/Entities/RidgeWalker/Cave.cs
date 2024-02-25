@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
@@ -23,7 +22,6 @@ public class Cave : EntityBase
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
 
     public virtual Account Account { get; set; } = null!;
@@ -33,6 +31,26 @@ public class Cave : EntityBase
     public virtual ICollection<File> Files { get; set; } = new HashSet<File>();
     public virtual ICollection<Entrance> Entrances { get; set; } = new HashSet<Entrance>();
     public virtual ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
+    public virtual ICollection<CaveAlternateNameTag> AlternateNameTags { get; set; } = new HashSet<CaveAlternateNameTag>();
+    public virtual ICollection<MapStatusTag> MapStatusTags { get; set; } = new HashSet<MapStatusTag>();
+    public virtual ICollection<GeologicAgeTag> GeologicAgeTags { get; set; } =
+        new HashSet<GeologicAgeTag>();
+    public virtual ICollection<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } =
+        new HashSet<PhysiographicProvinceTag>();
+    public virtual ICollection<BiologyTag> BiologyTags { get; set; } =
+        new HashSet<BiologyTag>();
+    public virtual ICollection<ArcheologyTag> ArcheologyTags { get; set; } =
+        new HashSet<ArcheologyTag>();
+    public virtual ICollection<CartographerNameTag> CartographerNameTags { get; set; } =
+        new HashSet<CartographerNameTag>();
+    public virtual ICollection<CaveReportedByNameTag> ReportedByNameTags { get; set; } =
+        new HashSet<CaveReportedByNameTag>();
+    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
+        new HashSet<EntranceReportedByNameTag>();
+
+    public virtual ICollection<OtherTag> OtherTags { get; set; } =
+        new HashSet<OtherTag>();
+
 }
 
 public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>

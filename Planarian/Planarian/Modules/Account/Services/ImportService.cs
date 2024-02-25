@@ -572,7 +572,6 @@ public class ImportService : ServiceBase
 
             var entranceStatusTags = new List<EntranceStatusTag>();
             var entranceHydrologyTags = new List<EntranceHydrologyTag>();
-            var entranceHydrologyFrequencyTags = new List<EntranceHydrologyFrequencyTag>();
             var entranceFieldIndicationTags = new List<FieldIndicationTag>();
 
             #endregion
@@ -697,14 +696,7 @@ public class ImportService : ServiceBase
                         entranceHydrologyTags,
                         e => e.EntranceHydrology,
                         allEntranceHydrologyTags);
-
-                    CreateEntranceTags(
-                        entranceRecord, entrance.Id,
-                        nameof(entranceRecord.EntranceHydrologyFrequency),
-                        entranceHydrologyFrequencyTags,
-                        e => e.EntranceHydrologyFrequency,
-                        allEntranceHydrologyFrequencyTags);
-
+                    
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.FieldIndication),
@@ -808,9 +800,6 @@ public class ImportService : ServiceBase
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrance hydrology frequency tags");
-            await _repository.BulkInsertAsync(entranceHydrologyFrequencyTags, onBatchProcessed: OnBatchProcessed,
-                batchSize: batchSize,
-                cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting field indication tags");
             await _repository.BulkInsertAsync(entranceFieldIndicationTags, onBatchProcessed: OnBatchProcessed,
                 batchSize: batchSize,

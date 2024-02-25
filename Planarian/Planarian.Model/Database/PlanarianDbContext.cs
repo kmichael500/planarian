@@ -58,7 +58,6 @@ public class PlanarianDbContext : DbContext
     public DbSet<Cave> Caves { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
-    public DbSet<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } = null!;
     public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;

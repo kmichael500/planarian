@@ -16,7 +16,6 @@ public class EntranceVm
         ElevationFeet = elevationFeet;
 
         EntranceStatusTagIds = entranceStatusTagIds;
-        EntranceHydrologyFrequencyTagIds = entranceHydrologyFrequencyTagIds;
         FieldIndicationTagIds = fieldIndicationTagIds;
         EntranceHydrologyTagIds = entranceHydrologyTagIds;
     }
@@ -62,7 +61,6 @@ public class EntranceVm
     public double? PitFeet { get; set; }
 
     public IEnumerable<string> EntranceStatusTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> EntranceHydrologyFrequencyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
 }
