@@ -178,16 +178,6 @@ public class CaveRepository : RepositoryBase
                         };
 
                         break;
-                    case "PrimaryEntrance.entranceHydrologyFrequencyTagIds":
-                        var entranceHydrologyFrequencyTagIds = queryCondition.Value.SplitAndTrim();
-                        query = queryCondition.Operator switch
-                        {
-                            QueryOperator.In => query = query.Where(e =>
-                                e.Entrances.SelectMany(ee => ee.EntranceHydrologyFrequencyTags)
-                                    .Any(ee => entranceHydrologyFrequencyTagIds.Contains(ee.TagTypeId))),
-                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
-                        };
-                        break;
                     case "LocationQualityTagIds":
                         var entranceLocationQualityTagIds = queryCondition.Value.SplitAndTrim();
                         query = queryCondition.Operator switch
@@ -210,15 +200,15 @@ public class CaveRepository : RepositoryBase
                         query = queryCondition.Operator switch
                         {
                             QueryOperator.LessThan => query.Where(e =>
-                                e.Entrances.Any(ee => ee.PitFeet < double.Parse(queryCondition.Value))),
+                                e.Entrances.Any(ee => ee.PitDepthFeet < double.Parse(queryCondition.Value))),
                             QueryOperator.LessThanOrEqual => query.Where(e =>
-                                e.Entrances.Any(ee => ee.PitFeet <= double.Parse(queryCondition.Value))),
+                                e.Entrances.Any(ee => ee.PitDepthFeet <= double.Parse(queryCondition.Value))),
                             QueryOperator.Equal => query.Where(e =>
-                                e.Entrances.Any(ee => ee.PitFeet == double.Parse(queryCondition.Value))),
+                                e.Entrances.Any(ee => ee.PitDepthFeet == double.Parse(queryCondition.Value))),
                             QueryOperator.GreaterThanOrEqual => query.Where(e =>
-                                e.Entrances.Any(ee => ee.PitFeet >= double.Parse(queryCondition.Value))),
+                                e.Entrances.Any(ee => ee.PitDepthFeet >= double.Parse(queryCondition.Value))),
                             QueryOperator.GreaterThan => query.Where(e =>
-                                e.Entrances.Any(ee => ee.PitFeet > double.Parse(queryCondition.Value))),
+                                e.Entrances.Any(ee => ee.PitDepthFeet > double.Parse(queryCondition.Value))),
                             _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;
@@ -316,8 +306,6 @@ public class CaveRepository : RepositoryBase
                         Longitude = ee.Location.X,
                         ElevationFeet = ee.Location.Z,
                         EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId).ToList(),
-                        EntranceHydrologyFrequencyTagIds = ee.EntranceHydrologyFrequencyTags
-                            .Select(y => y.TagTypeId).ToList(),
                         FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
@@ -336,10 +324,8 @@ public class CaveRepository : RepositoryBase
                         ElevationFeet = ee.Location.Z,
                         ReportedOn = ee.ReportedOn,
                         ReportedByName = ee.ReportedByName,
-                        PitFeet = ee.PitFeet,
+                        PitFeet = ee.PitDepthFeet,
                         EntranceStatusTagIds = ee.EntranceStatusTags.Select(e => e.TagTypeId),
-                        EntranceHydrologyFrequencyTagIds =
-                            ee.EntranceHydrologyFrequencyTags.Select(e => e.TagTypeId),
                         FieldIndicationTagIds = ee.FieldIndicationTags.Select(e => e.TagTypeId),
                         EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(e => e.TagTypeId)
                     })
@@ -365,7 +351,6 @@ public class CaveRepository : RepositoryBase
             .Include(e => e.EntranceHydrologyTags)
             .Include(e => e.EntranceStatusTags)
             .Include(e => e.FieldIndicationTags)
-            .Include(e => e.EntranceHydrologyFrequencyTags)
             .Where(e => e.Id == id && e.Cave.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
     }
 

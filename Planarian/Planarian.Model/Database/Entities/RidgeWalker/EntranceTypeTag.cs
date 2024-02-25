@@ -6,7 +6,7 @@ using Planarian.Model.Shared.Base;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker;
 
-public class EntranceHydrologyFrequencyTag : EntityBase, IEntranceTag
+public class EntranceTypeTag : EntityBase, IEntranceTag
 {
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;
@@ -15,9 +15,9 @@ public class EntranceHydrologyFrequencyTag : EntityBase, IEntranceTag
     public Entrance Entrance { get; set; }
 }
 
-public class LeadTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrologyFrequencyTag>
+public class EntranceTypeTagConfiguration : BaseEntityTypeConfiguration<EntranceTypeTag>
 {
-    public override void Configure(EntityTypeBuilder<EntranceHydrologyFrequencyTag> builder)
+    public override void Configure(EntityTypeBuilder<EntranceTypeTag> builder)
     {
         base.Configure(builder);
 
@@ -25,12 +25,12 @@ public class LeadTagConfiguration : BaseEntityTypeConfiguration<EntranceHydrolog
 
         builder
             .HasOne(e => e.TagType)
-            .WithMany(e => e.EntranceHydrologyFrequencyTags)
+            .WithMany(e => e.EntranceTypeTags)
             .HasForeignKey(bc => bc.TagTypeId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(e => e.Entrance)
-            .WithMany(e => e.EntranceHydrologyFrequencyTags)
+            .WithMany(e => e.EntranceTypeTags)
             .HasForeignKey(e => e.EntranceId)
             .OnDelete(DeleteBehavior.Cascade);
     }

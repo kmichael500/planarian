@@ -130,7 +130,7 @@ public class TemporaryEntranceRepository : RepositoryBase
             {nameof(Entrance.ReportedOn).Quote()},
             {nameof(Entrance.ReportedByUserId).Quote()},
             {nameof(Entrance.ReportedByName).Quote()},
-            {nameof(Entrance.PitFeet).Quote()},
+            {nameof(Entrance.PitDepthFeet).Quote()},
             {nameof(Entrance.CreatedByUserId).Quote()},
             {nameof(Entrance.ModifiedByUserId).Quote()},
             {nameof(Entrance.CreatedOn).Quote()},

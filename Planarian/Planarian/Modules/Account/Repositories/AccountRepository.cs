@@ -86,7 +86,6 @@ public class AccountRepository : RepositoryBase
                               e.LeadTags.Count +
                               e.EntranceStatusTags.Count +
                               e.EntranceHydrologyTags.Count +
-                              e.EntranceHydrologyFrequencyTags.Count +
                               e.FieldIndicationTags.Count +
                               e.EntranceLocationQualitiesTags.Count +
                               e.GeologyTags.Count +
@@ -109,7 +108,6 @@ public class AccountRepository : RepositoryBase
                          e.LeadTags.Count +
                          e.EntranceStatusTags.Count +
                          e.EntranceHydrologyTags.Count +
-                         e.EntranceHydrologyFrequencyTags.Count +
                          e.FieldIndicationTags.Count +
                          e.EntranceLocationQualitiesTags.Count +
                          e.GeologyTags.Count +
@@ -172,11 +170,6 @@ public class AccountRepository : RepositoryBase
                 .UpdateAsync();
 
             await DbContext.EntranceHydrologyTags
-                .Where(e => e.TagTypeId == tagTypeId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.EntranceHydrologyFrequencyTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();

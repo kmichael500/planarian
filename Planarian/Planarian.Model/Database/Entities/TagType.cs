@@ -34,8 +34,6 @@ public class TagType : EntityBaseNameId
     public virtual ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } =
         new HashSet<EntranceHydrologyTag>();
 
-    public virtual ICollection<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } =
-        new HashSet<EntranceHydrologyFrequencyTag>();
 
     public virtual ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } =
         new HashSet<FieldIndicationTag>();
@@ -43,6 +41,17 @@ public class TagType : EntityBaseNameId
     public ICollection<Entrance> EntranceLocationQualitiesTags { get; set; } = new HashSet<Entrance>();
     public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
     public ICollection<File> FileTypeTags { get; set; } = new HashSet<File>();
+    public ICollection<MapStatusTag> MapStatusTags { get; set; }
+    public ICollection<CaveAlternateNameTag> AlternateNameTags { get; set; }
+    public ICollection<GeologicAgeTag> GeologicAgeTags { get; set; }
+    public ICollection<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } =
+        new HashSet<PhysiographicProvinceTag>();
+    public ICollection<BiologyTag> BiologyTags { get; set; } = new HashSet<BiologyTag>();
+    public ICollection<ArcheologyTag> ArcheologyTags { get; set; } = new HashSet<ArcheologyTag>();
+    public ICollection<PeopleTag> PeopleTags { get; set; } = new HashSet<PeopleTag>();
+    public ICollection<OtherTag> OtherTags { get; set; } = new HashSet<OtherTag>();
+    public ICollection<EntranceTypeTag> EntranceTypeTags { get; set; } = new HashSet<EntranceTypeTag>();
+
     public virtual Project? Project { get; set; }
     public virtual Account? Account { get; set; }
 }

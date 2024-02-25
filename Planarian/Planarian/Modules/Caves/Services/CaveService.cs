@@ -143,14 +143,14 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
-                entrance.ReportedOn = entranceValue.ReportedOn;
-                entrance.PitFeet = entranceValue.PitFeet;
+                entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
+                entrance.PitDepthFeet = entranceValue.PitFeet;
 
                 entrance.ReportedOn = entrance.ReportedOn.Value.ToUtcKind();
 
                 entrance.Location =
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)
-                        { SRID = 4326 };
+                    { SRID = 4326 };
 
                 if (string.IsNullOrWhiteSpace(entrance.ReportedByName)) entrance.ReportedByName = RequestUser.FullName;
 
@@ -162,16 +162,6 @@ public class CaveService : ServiceBase<CaveRepository>
                         TagTypeId = tagId
                     };
                     entrance.EntranceStatusTags.Add(tag);
-                }
-
-                entrance.EntranceHydrologyFrequencyTags.Clear();
-                foreach (var tagId in entranceValue.EntranceHydrologyFrequencyTagIds)
-                {
-                    var tag = new EntranceHydrologyFrequencyTag()
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.EntranceHydrologyFrequencyTags.Add(tag);
                 }
 
                 entrance.FieldIndicationTags.Clear();
@@ -232,7 +222,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
                     if (fileEntity == null) continue;
-                    
+
                     blobsToDelete.Add(fileEntity);
                     Repository.Delete(fileEntity);
                 }
