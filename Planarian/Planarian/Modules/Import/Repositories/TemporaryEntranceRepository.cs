@@ -118,49 +118,50 @@ public class TemporaryEntranceRepository : RepositoryBase
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
-        var command = $@"
-        INSERT INTO {nameof(DbContext.Entrances).Quote()} (
-            {nameof(Entrance.Id).Quote()},
-            {nameof(Entrance.CaveId).Quote()},
-            {nameof(Entrance.LocationQualityTagId).Quote()},
-            {nameof(Entrance.Name).Quote()},
-            {nameof(Entrance.IsPrimary).Quote()},
-            {nameof(Entrance.Description).Quote()},
-            {nameof(Entrance.Location).Quote()},
-            {nameof(Entrance.ReportedOn).Quote()},
-            {nameof(Entrance.ReportedByUserId).Quote()},
-            {nameof(Entrance.ReportedByName).Quote()},
-            {nameof(Entrance.PitDepthFeet).Quote()},
-            {nameof(Entrance.CreatedByUserId).Quote()},
-            {nameof(Entrance.ModifiedByUserId).Quote()},
-            {nameof(Entrance.CreatedOn).Quote()},
-            {nameof(Entrance.ModifiedOn).Quote()}
-        )
-        SELECT 
-            {nameof(TemporaryEntrance.Id).Quote()},
-            {nameof(TemporaryEntrance.CaveId).Quote()},
-            {nameof(TemporaryEntrance.LocationQualityTagId).Quote()},
-            {nameof(TemporaryEntrance.Name).Quote()},
-            {nameof(TemporaryEntrance.IsPrimary).Quote()},
-            {nameof(TemporaryEntrance.Description).Quote()},
-             ST_SetSRID(ST_MakePoint(
-                CAST({nameof(TemporaryEntrance.Longitude).Quote()} AS FLOAT),
-                CAST({nameof(TemporaryEntrance.Latitude).Quote()} AS FLOAT),
-                CAST({nameof(TemporaryEntrance.Elevation).Quote()} AS FLOAT)
-            ), 4326),
-            {nameof(TemporaryEntrance.ReportedOn).Quote()},
-            {nameof(TemporaryEntrance.ReportedByUserId).Quote()},
-            {nameof(TemporaryEntrance.ReportedByName).Quote()},
-            {nameof(TemporaryEntrance.PitFeet).Quote()},
-            {nameof(TemporaryEntrance.CreatedByUserId).Quote()},
-            {nameof(TemporaryEntrance.ModifiedByUserId).Quote()},
-            {nameof(TemporaryEntrance.CreatedOn).Quote()},
-            {nameof(TemporaryEntrance.ModifiedOn).Quote()}
-        FROM {_temporaryEntranceTableName.Quote()}";
+        // TODO Reported by name
+        // var command = $@"
+        // INSERT INTO {nameof(DbContext.Entrances).Quote()} (
+        //     {nameof(Entrance.Id).Quote()},
+        //     {nameof(Entrance.CaveId).Quote()},
+        //     {nameof(Entrance.LocationQualityTagId).Quote()},
+        //     {nameof(Entrance.Name).Quote()},
+        //     {nameof(Entrance.IsPrimary).Quote()},
+        //     {nameof(Entrance.Description).Quote()},
+        //     {nameof(Entrance.Location).Quote()},
+        //     {nameof(Entrance.ReportedOn).Quote()},
+        //     {nameof(Entrance.ReportedByUserId).Quote()},
+        //     {nameof(Entrance.ReportedByName).Quote()},
+        //     {nameof(Entrance.PitDepthFeet).Quote()},
+        //     {nameof(Entrance.CreatedByUserId).Quote()},
+        //     {nameof(Entrance.ModifiedByUserId).Quote()},
+        //     {nameof(Entrance.CreatedOn).Quote()},
+        //     {nameof(Entrance.ModifiedOn).Quote()}
+        // )
+        // SELECT 
+        //     {nameof(TemporaryEntrance.Id).Quote()},
+        //     {nameof(TemporaryEntrance.CaveId).Quote()},
+        //     {nameof(TemporaryEntrance.LocationQualityTagId).Quote()},
+        //     {nameof(TemporaryEntrance.Name).Quote()},
+        //     {nameof(TemporaryEntrance.IsPrimary).Quote()},
+        //     {nameof(TemporaryEntrance.Description).Quote()},
+        //      ST_SetSRID(ST_MakePoint(
+        //         CAST({nameof(TemporaryEntrance.Longitude).Quote()} AS FLOAT),
+        //         CAST({nameof(TemporaryEntrance.Latitude).Quote()} AS FLOAT),
+        //         CAST({nameof(TemporaryEntrance.Elevation).Quote()} AS FLOAT)
+        //     ), 4326),
+        //     {nameof(TemporaryEntrance.ReportedOn).Quote()},
+        //     {nameof(TemporaryEntrance.ReportedByUserId).Quote()},
+        //     {nameof(TemporaryEntrance.ReportedByName).Quote()},
+        //     {nameof(TemporaryEntrance.PitFeet).Quote()},
+        //     {nameof(TemporaryEntrance.CreatedByUserId).Quote()},
+        //     {nameof(TemporaryEntrance.ModifiedByUserId).Quote()},
+        //     {nameof(TemporaryEntrance.CreatedOn).Quote()},
+        //     {nameof(TemporaryEntrance.ModifiedOn).Quote()}
+        // FROM {_temporaryEntranceTableName.Quote()}";
 
 
         // execute raw sql
-        await DbContext.Database.ExecuteSqlRawAsync(command);
+        // await DbContext.Database.ExecuteSqlRawAsync(command);
     }
 
     public List<TemporaryEntrance> GetEntrancesById(string id)

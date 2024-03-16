@@ -35,7 +35,7 @@ public class Entrance : EntityBase
 
 
     public ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
-    public virtual ICollection<EntranceReportedByNameTag> ReportedByNameTags { get; set; } =
+    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
         new HashSet<EntranceReportedByNameTag>();
 
 }

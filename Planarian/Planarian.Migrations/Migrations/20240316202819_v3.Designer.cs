@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20240225012945_v3")]
+    [Migration("20240316202819_v3")]
     partial class v3
     {
         /// <inheritdoc />
@@ -1328,7 +1328,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("PeopleTag");
+                    b.ToTable("PeopleTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.PhysiographicProvinceTag", b =>
@@ -1945,7 +1945,7 @@ namespace Planarian.Migrations.Migrations
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveReportedByNameTag", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
-                        .WithMany("ReportedByNameTags")
+                        .WithMany("CaveReportedByNameTags")
                         .HasForeignKey("CaveId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2062,7 +2062,7 @@ namespace Planarian.Migrations.Migrations
                         .HasForeignKey("CreatedByUserId");
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", null)
-                        .WithMany("ReportedByNameTags")
+                        .WithMany("EntranceReportedByNameTags")
                         .HasForeignKey("EntranceId");
 
                     b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
@@ -2492,6 +2492,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("CartographerNameTags");
 
+                    b.Navigation("CaveReportedByNameTags");
+
                     b.Navigation("EntranceReportedByNameTags");
 
                     b.Navigation("Entrances");
@@ -2507,8 +2509,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("OtherTags");
 
                     b.Navigation("PhysiographicProvinceTags");
-
-                    b.Navigation("ReportedByNameTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -2520,13 +2520,13 @@ namespace Planarian.Migrations.Migrations
                 {
                     b.Navigation("EntranceHydrologyTags");
 
+                    b.Navigation("EntranceReportedByNameTags");
+
                     b.Navigation("EntranceStatusTags");
 
                     b.Navigation("EntranceTypeTags");
 
                     b.Navigation("FieldIndicationTags");
-
-                    b.Navigation("ReportedByNameTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.PeopleTag", b =>

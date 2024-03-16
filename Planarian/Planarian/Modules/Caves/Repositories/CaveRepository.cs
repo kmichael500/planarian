@@ -119,12 +119,13 @@ public class CaveRepository : RepositoryBase
                         };
                         break;
                     case "ReportedByName":
-                        query = queryCondition.Operator switch
-                        {
-                            QueryOperator.Contains => query.Where(e =>
-                                e.ReportedByName != null && e.ReportedByName.Contains(queryCondition.Value)),
-                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
-                        };
+                        // TODO
+                        // query = queryCondition.Operator switch
+                        // {
+                        //     QueryOperator.Contains => query.Where(e =>
+                        //         e.ReportedByName != null && e.ReportedByName.Contains(queryCondition.Value)),
+                        //     _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                        // };
                         break;
                     case "PrimaryEntrance.entranceStatusTagIds":
                         var entranceStatusTagIds = queryCondition.Value.SplitAndTrim();
@@ -188,13 +189,14 @@ public class CaveRepository : RepositoryBase
                         };
                         break;
                     case "EntranceReportedOnBy":
-                        query = queryCondition.Operator switch
-                        {
-                            QueryOperator.Contains => query.Where(e =>
-                                e.Entrances.Any(ee => ee.ReportedByName != null &&
-                                                      ee.ReportedByName.Contains(queryCondition.Value))),
-                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
-                        };
+                        //TODO
+                        // query = queryCondition.Operator switch
+                        // {
+                        //     QueryOperator.Contains => query.Where(e =>
+                        //         e.Entrances.Any(ee => ee.ReportedByName != null &&
+                        //                               ee.ReportedByName.Contains(queryCondition.Value))),
+                        //     _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                        // };
                         break;
                     case "EntrancePitDepth":
                         query = queryCondition.Operator switch
@@ -295,7 +297,7 @@ public class CaveRepository : RepositoryBase
                 NumberOfPits = e.NumberOfPits,
                 Narrative = e.Narrative,
                 ReportedOn = e.ReportedOn,
-                ReportedByName = e.ReportedByName,
+                // ReportedByName = e.ReportedByName, // TODO
                 IsArchived = e.IsArchived,
                 PrimaryEntrance = e.Entrances.Where(ee => ee.IsPrimary).Select(ee =>
                     new EntranceVm
@@ -310,7 +312,7 @@ public class CaveRepository : RepositoryBase
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
                     }).FirstOrDefault(),
-                MapIds = e.Files.Select(ee => ee.Id),
+                MapIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
                     {
                         Id = ee.Id,
@@ -323,7 +325,7 @@ public class CaveRepository : RepositoryBase
                         Longitude = ee.Location.X,
                         ElevationFeet = ee.Location.Z,
                         ReportedOn = ee.ReportedOn,
-                        ReportedByName = ee.ReportedByName,
+                        // ReportedByName = ee.ReportedByName, // TODO
                         PitFeet = ee.PitDepthFeet,
                         EntranceStatusTagIds = ee.EntranceStatusTags.Select(e => e.TagTypeId),
                         FieldIndicationTagIds = ee.FieldIndicationTags.Select(e => e.TagTypeId),
@@ -331,7 +333,7 @@ public class CaveRepository : RepositoryBase
                     })
                     .OrderByDescending(ee => ee.IsPrimary)
                     .ThenBy(ee => ee.ReportedOn).ToList(),
-                GeologyTagIds = e.GeologyTags.Select(e => e.TagTypeId),
+                GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
                 Files = e.Files.Select(ee => new FileVm
                 {
                     Id = ee.Id,

@@ -301,7 +301,7 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "PeopleTag",
+                name: "PeopleTags",
                 columns: table => new
                 {
                     TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
@@ -313,20 +313,20 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PeopleTag", x => x.TagTypeId);
+                    table.PrimaryKey("PK_PeopleTags", x => x.TagTypeId);
                     table.ForeignKey(
-                        name: "FK_PeopleTag_TagTypes_TagTypeId",
+                        name: "FK_PeopleTags_TagTypes_TagTypeId",
                         column: x => x.TagTypeId,
                         principalTable: "TagTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_PeopleTag_Users_CreatedByUserId",
+                        name: "FK_PeopleTags_Users_CreatedByUserId",
                         column: x => x.CreatedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_PeopleTag_Users_ModifiedByUserId",
+                        name: "FK_PeopleTags_Users_ModifiedByUserId",
                         column: x => x.ModifiedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
@@ -393,9 +393,9 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_CartographerNameTag_PeopleTag_PeopleTagId",
+                        name: "FK_CartographerNameTag_PeopleTags_PeopleTagId",
                         column: x => x.PeopleTagId,
-                        principalTable: "PeopleTag",
+                        principalTable: "PeopleTags",
                         principalColumn: "TagTypeId",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -432,9 +432,9 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_CaveReportedByNameTag_PeopleTag_PeopleTagId",
+                        name: "FK_CaveReportedByNameTag_PeopleTags_PeopleTagId",
                         column: x => x.PeopleTagId,
-                        principalTable: "PeopleTag",
+                        principalTable: "PeopleTags",
                         principalColumn: "TagTypeId",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -477,9 +477,9 @@ namespace Planarian.Migrations.Migrations
                         principalTable: "Entrances",
                         principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_PeopleTag_PeopleTagId",
+                        name: "FK_EntranceReportedByNameTag_PeopleTags_PeopleTagId",
                         column: x => x.PeopleTagId,
-                        principalTable: "PeopleTag",
+                        principalTable: "PeopleTags",
                         principalColumn: "TagTypeId",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -650,13 +650,13 @@ namespace Planarian.Migrations.Migrations
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_PeopleTag_CreatedByUserId",
-                table: "PeopleTag",
+                name: "IX_PeopleTags_CreatedByUserId",
+                table: "PeopleTags",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_PeopleTag_ModifiedByUserId",
-                table: "PeopleTag",
+                name: "IX_PeopleTags_ModifiedByUserId",
+                table: "PeopleTags",
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
@@ -712,7 +712,7 @@ namespace Planarian.Migrations.Migrations
                 name: "PhysiographicProvinceTag");
 
             migrationBuilder.DropTable(
-                name: "PeopleTag");
+                name: "PeopleTags");
 
             migrationBuilder.RenameColumn(
                 name: "PitDepthFeet",

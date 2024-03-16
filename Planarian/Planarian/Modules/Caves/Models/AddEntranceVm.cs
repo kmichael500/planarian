@@ -61,6 +61,8 @@ public class AddEntranceVm
     public IEnumerable<string> EntranceHydrologyFrequencyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<ReportedByNameVm> ReportedByNameTagIds { get; set; } = new HashSet<ReportedByNameVm>();
+
 }
 
 public class EditEntranceVm : AddEntranceVm

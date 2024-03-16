@@ -170,6 +170,7 @@ builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
+builder.Services.AddScoped<PeopleRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
 
 #endregion

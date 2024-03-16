@@ -1,3 +1,4 @@
+using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Controllers;
@@ -55,4 +56,5 @@ public class AddCaveVm
     public IEnumerable<AddEntranceVm> Entrances { get; set; } = new HashSet<AddEntranceVm>();
     public IEnumerable<EditFileMetadataVm>? Files { get; set; } = new HashSet<EditFileMetadataVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<ReportedByNameVm> ReportedByNameTagIds { get; set; }
 }

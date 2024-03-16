@@ -291,7 +291,7 @@ public class ImportService : ServiceBase
                         CountyNumber = caveRecord.CountyCaveNumber,
                         StateId = state.Id,
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
-                        ReportedByName = caveRecord.ReportedByName?.Trim(),
+                        // ReportedByName = caveRecord.ReportedByName?.Trim(), // TODO
                         IsArchived = (bool)caveRecord.IsArchived,
                         CreatedOn = DateTime.UtcNow,
                         CreatedByUserId = RequestUser.Id

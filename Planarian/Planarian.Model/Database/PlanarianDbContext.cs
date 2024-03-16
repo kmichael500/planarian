@@ -50,12 +50,13 @@ public class PlanarianDbContext : DbContext
 
     #endregion
 
-    #region RidgeWalker
+    #region Cave
 
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<AccountState> AccountStates { get; set; } = null!;
     public DbSet<AccountUser> AccountUsers { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<PeopleTag> PeopleTags { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
     public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;

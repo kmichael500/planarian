@@ -31,6 +31,8 @@ public static class TagTypeKeyConstant
     public const string EntranceHydrology = "EntranceHydrology";
     public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
     public const string File = "File";
+    public const string People = "People";
+
     private static readonly List<string> AllProjectTags = new() { Default, Trip, Photo };
 
     private static readonly List<string> AllAccountTags = new()
@@ -41,6 +43,7 @@ public static class TagTypeKeyConstant
         Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency,
         File
     };
+
 
     public static bool IsValidTagKey(string tagKey)
     {
