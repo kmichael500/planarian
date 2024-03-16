@@ -79,11 +79,6 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetEntranceHydrologyTags();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyFrequencyTags()
-    {
-        return await Repository.GetEntranceHydrologyFrequencyTags();
-    }
-
     public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
     {
         return await Repository.GetFileTags();

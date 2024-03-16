@@ -40,11 +40,9 @@ public class TagService : ServiceBase<TagRepository>
             case TagTypeKeyConstant.EntranceStatus:
             case TagTypeKeyConstant.FieldIndication:
             case TagTypeKeyConstant.EntranceHydrology:
-            case TagTypeKeyConstant.EntranceHydrologyFrequency:
             case TagTypeKeyConstant.File:
                 entity.AccountId = RequestUser.AccountId;
                 break;
-
             #endregion
 
             default:

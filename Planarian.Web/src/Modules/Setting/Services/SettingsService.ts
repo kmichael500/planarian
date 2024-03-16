@@ -79,12 +79,6 @@ const SettingsService = {
     );
     return response.data;
   },
-  async GetEntranceHydrologyFrequencyTags(): Promise<SelectListItem<string>[]> {
-    const response = await HttpClient.get<SelectListItem<string>[]>(
-      `${baseUrl}/tags/entrance-hydrology-frequency`
-    );
-    return response.data;
-  },
   async GetFileTags(): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
       `${baseUrl}/tags/file`

@@ -347,23 +347,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Hydrology Frequency"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>(
-                                "entranceHydrologyFrequencyTagIds"
-                              ),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              tagType={TagType.EntranceHydrologyFrequency}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
                         <Col {...fourColProps}>
                           <Form.Item
                             {...field}

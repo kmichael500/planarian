@@ -41,7 +41,6 @@ const AddCavesPage: React.FC = () => {
         reportedByName: AuthenticationService.GetName(),
         pitFeet: null,
         entranceStatusTagIds: [],
-        entranceHydrologyFrequencyTagIds: [],
         fieldIndicationTagIds: [],
         entranceHydrologyTagIds: [],
       },

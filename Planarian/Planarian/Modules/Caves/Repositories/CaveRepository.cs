@@ -399,12 +399,10 @@ public class CaveQuery
     public string Narrative { get; set; } = null!;
     public string PrimaryEntranceStatus { get; set; } = null!;
     public string PrimaryEntranceHydrology { get; set; } = null!;
-    public string PrimaryEntranceHydrologyFrequency { get; set; } = null!;
     public string Geology { get; set; } = null!;
     public string State { get; set; } = null!;
 
     public IEnumerable<string> PrimaryEntranceEntranceHydrologyTagIds { get; set; } = new List<string>();
     public IEnumerable<string> PrimaryEntranceStatusTagIds { get; set; } = new List<string>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new List<string>();
-    public IEnumerable<string> PrimaryEntranceEntranceHydrologyFrequencyTagIds { get; set; } = new List<string>();
 }

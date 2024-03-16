@@ -83,13 +83,6 @@ public class TagRepository : RepositoryBase
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<TagType>> GetEntranceHydrologyFrequencyTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.EntranceHydrologyFrequency && e.AccountId == RequestUser.AccountId)
-            .ToListAsync();
-    }
-
     public async Task<IEnumerable<TagType>> GetFieldIndicationTags()
     {
         return await DbContext.TagTypes

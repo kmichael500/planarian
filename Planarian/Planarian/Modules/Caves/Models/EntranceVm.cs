@@ -6,8 +6,7 @@ namespace Planarian.Modules.Caves.Models;
 public class EntranceVm
 {
     public EntranceVm(string id, double latitude, double longitude, double elevationFeet,
-        IEnumerable<string> entranceStatusTagIds,
-        IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
+        IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds)
     {
         Id = id;
@@ -24,11 +23,9 @@ public class EntranceVm
     public EntranceVm(string id, string name, string description, double latitude, double longitude,
         double elevationFeet,
         double pitFeet, string locationQualityTagId, string reportedByUserId, string reportedByName,
-        DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds,
-        IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
+        DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet,
-        entranceStatusTagIds,
-        entranceHydrologyFrequencyTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
+        entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
         PitFeet = pitFeet;

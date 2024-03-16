@@ -562,9 +562,6 @@ public class ImportService : ServiceBase
                 _tagRepository.GetEntranceHydrologyTags,
                 TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), signalRGroup,
                 cancellationToken);
-            var allEntranceHydrologyFrequencyTags = await CreateAndProcessTags(entranceRecords,
-                _tagRepository.GetEntranceHydrologyFrequencyTags, TagTypeKeyConstant.EntranceHydrologyFrequency,
-                e => e.EntranceHydrologyFrequency?.Split(','), signalRGroup, cancellationToken);
             var allFieldIndicationTags = await CreateAndProcessTags(entranceRecords,
                 _tagRepository.GetFieldIndicationTags,
                 TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.Split(','), signalRGroup,

@@ -152,12 +152,7 @@ const CavesComponent: React.FC = () => {
           field={"primaryEntrance.entranceHydrologyTagIds" as any}
           label={"Entrance Hydrology"}
         />
-        <TagFilterFormItem
-          tagType={TagType.EntranceHydrologyFrequency}
-          queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyFrequencyTagIds" as any}
-          label={"Entrance Hydroloy Frequency"}
-        />
+
         <TextFilterFormItem
           queryBuilder={queryBuilder}
           field={"entranceReportedOnBy" as any}

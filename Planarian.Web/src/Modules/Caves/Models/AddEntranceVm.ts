@@ -11,7 +11,6 @@ export interface AddEntranceVm {
   reportedByName: string | null;
   pitFeet: number | null;
   entranceStatusTagIds: string[];
-  entranceHydrologyFrequencyTagIds: string[];
   fieldIndicationTagIds: string[];
   entranceHydrologyTagIds: string[];
 }

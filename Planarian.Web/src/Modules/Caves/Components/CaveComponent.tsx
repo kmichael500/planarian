@@ -192,17 +192,6 @@ const CaveComponent = ({
                         ))}
                       </Row>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Hydrology Frequency">
-                      <Row>
-                        {entrance.entranceHydrologyFrequencyTagIds.map(
-                          (tagId) => (
-                            <Col key={tagId}>
-                              <TagComponent tagId={tagId} />
-                            </Col>
-                          )
-                        )}
-                      </Row>
-                    </Descriptions.Item>
                   </Descriptions>
                   {!isNullOrWhiteSpace(entrance.description) && (
                     <>

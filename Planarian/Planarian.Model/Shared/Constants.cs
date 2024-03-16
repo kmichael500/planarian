@@ -29,18 +29,17 @@ public static class TagTypeKeyConstant
     public const string EntranceStatus = "EntranceStatus";
     public const string FieldIndication = "FieldIndication";
     public const string EntranceHydrology = "EntranceHydrology";
-    public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
     public const string File = "File";
     public const string People = "People";
 
     private static readonly List<string> AllProjectTags = new() { Default, Trip, Photo };
 
     private static readonly List<string> AllAccountTags = new()
-        { Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency, File };
+        { Geology, EntranceStatus, FieldIndication, EntranceHydrology, File };
 
     private static readonly List<string> All = new()
     {
-        Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency,
+        Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology,
         File
     };
 

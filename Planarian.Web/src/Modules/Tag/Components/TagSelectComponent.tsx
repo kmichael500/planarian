@@ -59,11 +59,6 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
           setTags(entranceHydrologyTags);
 
           break;
-        case TagType.EntranceHydrologyFrequency:
-          const entranceHydrologyFrequencyTags =
-            await SettingsService.GetEntranceHydrologyFrequencyTags();
-          setTags(entranceHydrologyFrequencyTags);
-          break;
         case TagType.EntranceStatus:
           const entranceStatusTags =
             await SettingsService.GetEntranceStatusTags();

@@ -86,14 +86,6 @@ public class SettingsRepository : RepositoryBase
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyFrequencyTags()
-    {
-        return await DbContext.TagTypes.Where(e =>
-                e.Key == TagTypeKeyConstant.EntranceHydrologyFrequency &&
-                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
     public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
     {
         return await DbContext.TagTypes.Where(e =>

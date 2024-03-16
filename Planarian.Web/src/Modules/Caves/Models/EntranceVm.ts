@@ -15,5 +15,4 @@ export interface EntranceVm {
   entranceStatusTagIds: string[];
   fieldIndicationTagIds: string[];
   entranceHydrologyTagIds: string[];
-  entranceHydrologyFrequencyTagIds: string[];
 }
