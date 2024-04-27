@@ -45,7 +45,6 @@ public class TagType : EntityBaseNameId
     public ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
     public ICollection<File> FileTypeTags { get; set; } = new HashSet<File>();
     public ICollection<MapStatusTag> MapStatusTags { get; set; }
-    public ICollection<CaveAlternateNameTag> AlternateNameTags { get; set; }
     public ICollection<GeologicAgeTag> GeologicAgeTags { get; set; }
     public ICollection<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } =
         new HashSet<PhysiographicProvinceTag>();

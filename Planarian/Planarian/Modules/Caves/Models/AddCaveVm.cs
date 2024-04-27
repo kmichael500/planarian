@@ -39,6 +39,8 @@ public class AddCaveVm
 
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    public IEnumerable<string> AlternateNames { get; set; } = new HashSet<string>();
+
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; }
 

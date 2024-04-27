@@ -8,6 +8,7 @@ export interface CaveVm {
   countyId: string;
   stateId: string;
   name: string;
+  alternateNames: string[];
   lengthFeet: number;
   depthFeet: number;
   maxPitDepthFeet: number;

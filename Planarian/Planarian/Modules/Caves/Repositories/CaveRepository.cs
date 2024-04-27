@@ -295,6 +295,7 @@ public class CaveRepository : RepositoryBase
                 CountyId = e.CountyId,
                 DisplayId = $"{e.County.DisplayId}{e.CountyNumber}",
                 Name = e.Name,
+                AlternateNames = e.AlternateNames,
                 LengthFeet = e.LengthFeet,
                 DepthFeet = e.DepthFeet,
                 MaxPitDepthFeet = e.MaxPitDepthFeet,

@@ -94,7 +94,6 @@ public class AccountRepository : RepositoryBase
                               e.EntranceReportedByNameTags.Count +
                               e.FileTypeTags.Count +
                               e.MapStatusTags.Count +
-                              e.AlternateNameTags.Count +
                               e.GeologicAgeTags.Count +
                               e.PhysiographicProvinceTags.Count +
                               e.BiologyTags.Count +
@@ -126,7 +125,6 @@ public class AccountRepository : RepositoryBase
                          e.EntranceReportedByNameTags.Count +
                          e.FileTypeTags.Count +
                          e.MapStatusTags.Count +
-                         e.AlternateNameTags.Count +
                          e.GeologicAgeTags.Count +
                          e.PhysiographicProvinceTags.Count +
                          e.BiologyTags.Count +

@@ -64,6 +64,16 @@ const CaveComponent = ({
         <PlanarianDividerComponent title="Information" />
         <Descriptions bordered>
           <Descriptions.Item label="ID">{cave?.displayId}</Descriptions.Item>
+          <Descriptions.Item label="Alternative Names">
+            <Row>
+              {cave?.alternateNames.map((name) => (
+                <Col key={name}>
+                  <Tag>{name}</Tag>
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+
           <Descriptions.Item label="State">
             <StateTagComponent stateId={cave?.stateId} />
           </Descriptions.Item>

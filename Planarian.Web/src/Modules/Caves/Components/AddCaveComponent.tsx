@@ -135,13 +135,26 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       <Form.Item name="id" noStyle>
         <Input type="hidden" />
       </Form.Item>
-      <Col span={24}>
+      <Col span={12}>
         <Form.Item
           label="Name"
           name={nameof<AddCaveVm>("name")}
           rules={[{ required: true, message: "Please enter a name" }]}
         >
           <Input />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item
+          label="Alternate Names"
+          name={nameof<AddCaveVm>("alternateNames")}
+        >
+          <Select
+            mode="tags"
+            style={{ width: "100%" }}
+            placeholder="Add alternate names"
+            allowClear
+          ></Select>
         </Form.Item>
       </Col>
       <Col {...twoColProps}>
@@ -417,7 +430,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
@@ -433,6 +445,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
+                        ``
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
@@ -472,7 +485,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col {...fourColProps}>
                           <Form.Item
                             {...field}
@@ -535,7 +547,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={24}>
                           <Form.Item
                             {...field}
@@ -560,7 +571,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             <Input.TextArea rows={6} />
                           </Form.Item>
                         </Col>
-
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
@@ -573,7 +583,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             <Input type="date" />
                           </Form.Item>
                         </Col>
-
                         <Col {...twoColProps}>
                           <Form.Item
                             label="Reported By"

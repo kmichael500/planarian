@@ -19,6 +19,7 @@ const AddCavesPage: React.FC = () => {
 
   const initialValues: AddCaveVm = {
     name: "",
+    alternateNames: [],
     countyId: null,
     stateId: "",
     lengthFeet: 0,
