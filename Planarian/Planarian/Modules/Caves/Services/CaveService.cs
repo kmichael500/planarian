@@ -23,16 +23,14 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
-    private readonly PeopleRepository _peopleRepository;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository, PeopleRepository peopleRepository) : base(
+        FileRepository fileRepository, TagRepository tagRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _tagRepository = tagRepository;
-        _peopleRepository = peopleRepository;
     }
 
     #region Caves
@@ -107,7 +105,7 @@ public class CaveService : ServiceBase<CaveRepository>
             entity.MaxPitDepthFeet = values.MaxPitDepthFeet;
             entity.NumberOfPits = values.NumberOfPits;
             entity.Narrative = values.Narrative?.Trim();
-            entity.ReportedOn = values.ReportedOn;
+            entity.ReportedOn = values.ReportedOn?.ToUtcKind();
             entity.AccountId = RequestUser.AccountId;
 
             entity.GeologyTags.Clear();
@@ -119,39 +117,92 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.GeologyTags.Add(tag);
             }
-
-            entity.CaveReportedByNameTags.Clear();
-            foreach (var person in values.ReportedByNameTagIds)
+            
+            entity.ArcheologyTags.Clear();
+            foreach (var tagId in values.ArcheologyTagIds)
             {
-                if (string.IsNullOrWhiteSpace(person.TagTypeId))
+                var tag = new ArcheologyTag()
                 {
-                    var personName = person.Name?.Trim();
-                    if (string.IsNullOrWhiteSpace(personName))
-                        throw ApiExceptionDictionary.BadRequest("Person name is required!");
-
-                    var reportedByNameTag = new CaveReportedByNameTag()
-                    {
-                        PeopleTag = new PeopleTag
-                        {
-                            TagType = new TagType
-                            {
-                                Name = personName,
-                                ProjectId = null,
-                                AccountId = RequestUser.AccountId,
-                                Key = TagTypeKeyConstant.People,
-                            }
-                        }
-                    };
-
-                    entity.CaveReportedByNameTags.Add(reportedByNameTag);
-                }
-
-                var peopleTag = await _peopleRepository.GetByTagTypeId(person.TagTypeId);
-                if (peopleTag == null) throw ApiExceptionDictionary.NotFound(nameof(ReportedByNameVm.TagTypeId));
-                var tag = new CaveReportedByNameTag()
-                {
-                    PeopleTag = peopleTag
+                    TagTypeId = tagId
                 };
+                entity.ArcheologyTags.Add(tag);
+            }
+            
+            entity.BiologyTags.Clear();
+            foreach (var tagId in values.BiologyTagIds)
+            {
+                var tag = new BiologyTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.BiologyTags.Add(tag);
+            }
+            
+            entity.CartographerNameTags.Clear();
+            foreach (var tagId in values.CartographerNameTagIds)
+            {
+                var tag = new CartographerNameTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.CartographerNameTags.Add(tag);
+            }
+            
+            entity.MapStatusTags.Clear();
+            foreach (var tagId in values.MapStatusTagIds)
+            {
+                var tag = new MapStatusTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.MapStatusTags.Add(tag);
+            }
+            
+            entity.GeologicAgeTags.Clear();
+            foreach (var tagId in values.GeologicAgeTagIds)
+            {
+                var tag = new GeologicAgeTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.GeologicAgeTags.Add(tag);
+            }
+            
+            entity.PhysiographicProvinceTags.Clear();
+            foreach (var tagId in values.PhysiographicProvinceTagIds)
+            {
+                var tag = new PhysiographicProvinceTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.PhysiographicProvinceTags.Add(tag);
+            }
+            
+            entity.CaveOtherTags.Clear();
+            foreach (var tagId in values.OtherTagIds)
+            {
+                var tag = new CaveOtherTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.CaveOtherTags.Add(tag);
+            }
+            
+            entity.CaveReportedByNameTags.Clear();
+            foreach (var personTagTypeId in values.ReportedByNameTagIds)
+            {
+                var tagType = await _tagRepository.GetTag(personTagTypeId);
+                tagType ??= new TagType
+                {
+                    Name = personTagTypeId.Trim(),
+                    AccountId = RequestUser.AccountId,
+                    Key = TagTypeKeyConstant.People,
+                };
+                var tag = new CaveReportedByNameTag
+                {
+                    TagType = tagType
+                };
+                
                 entity.CaveReportedByNameTags.Add(tag);
             }
 
@@ -179,7 +230,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
-                entrance.ReportedOn = entranceValue.ReportedOn ?? DateTime.UtcNow;
+                entrance.ReportedOn = entranceValue.ReportedOn?.ToUtcKind();
                 entrance.PitDepthFeet = entranceValue.PitFeet;
 
                 entrance.ReportedOn = entrance.ReportedOn.Value.ToUtcKind();
@@ -197,7 +248,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     };
                     entrance.EntranceStatusTags.Add(tag);
                 }
-
+                
                 entrance.FieldIndicationTags.Clear();
                 foreach (var tagId in entranceValue.FieldIndicationTagIds)
                 {
@@ -206,6 +257,16 @@ public class CaveService : ServiceBase<CaveRepository>
                         TagTypeId = tagId
                     };
                     entrance.FieldIndicationTags.Add(tag);
+                }
+                
+                entrance.EntranceOtherTags.Clear();
+                foreach (var tagId in entranceValue.EntranceOtherTagIds)
+                {
+                    var tag = new EntranceOtherTag
+                    {
+                        TagTypeId = tagId
+                    };
+                    entrance.EntranceOtherTags.Add(tag);
                 }
 
                 entrance.EntranceHydrologyTags.Clear();
@@ -219,40 +280,23 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
 
                 entrance.EntranceReportedByNameTags.Clear();
-                foreach (var person in entranceValue.ReportedByNameTagIds)
+                foreach (var personTagTypeId in entranceValue.ReportedByNameTagIds)
                 {
-                    if (string.IsNullOrWhiteSpace(person.TagTypeId))
+                    var peopleTag = await _tagRepository.GetTag(personTagTypeId);
+                    peopleTag ??= new TagType
                     {
-                        var personName = person.Name?.Trim();
-                        if (string.IsNullOrWhiteSpace(personName))
-                            throw ApiExceptionDictionary.BadRequest("Person name is required!");
-
-                        var reportedByNameTag = new EntranceReportedByNameTag()
-                        {
-                            PeopleTag = new PeopleTag
-                            {
-                                TagType = new TagType
-                                {
-                                    Name = personName,
-                                    ProjectId = null,
-                                    AccountId = RequestUser.AccountId,
-                                    Key = TagTypeKeyConstant.People,
-                                }
-                            }
-                        };
-
-                        entrance.EntranceReportedByNameTags.Add(reportedByNameTag);
-                    }
-
-                    var peopleTag = await _peopleRepository.GetByTagTypeId(person.TagTypeId);
-                    if (peopleTag == null) throw ApiExceptionDictionary.NotFound(nameof(ReportedByNameVm.TagTypeId));
-                    var tag = new CaveReportedByNameTag()
-                    {
-                        PeopleTag = peopleTag
+                        Name = personTagTypeId.Trim(),
+                        AccountId = RequestUser.AccountId,
+                        Key = TagTypeKeyConstant.People,
                     };
-                    entity.CaveReportedByNameTags.Add(tag);
+                    var tag = new EntranceReportedByNameTag()
+                    {
+                        TagType = peopleTag
+                    };
+                    entrance.EntranceReportedByNameTags.Add(tag);
 
                 }
+
                 entrance.IsPrimary = entranceValue.IsPrimary;
 
                 if (isNewEntrance) entity.Entrances.Add(entrance);

@@ -118,14 +118,18 @@ public class CaveRepository : RepositoryBase
                             _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;
-                    case "ReportedByName":
-                        // TODO
-                        // query = queryCondition.Operator switch
-                        // {
-                        //     QueryOperator.Contains => query.Where(e =>
-                        //         e.ReportedByName != null && e.ReportedByName.Contains(queryCondition.Value)),
-                        //     _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
-                        // };
+                    case "ReportedByNameTagIds":
+                        var reportedByNameTagIds = queryCondition.Value.SplitAndTrim();
+
+                        query = queryCondition.Operator switch
+                        {
+                            QueryOperator.In => query = query.Where(e =>
+                                e.CaveReportedByNameTags.Any(ee =>
+                                    reportedByNameTagIds.Contains(ee.TagTypeId))),
+                            _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                        };
+                        break;
+                        
                         break;
                     case "PrimaryEntrance.entranceStatusTagIds":
                         var entranceStatusTagIds = queryCondition.Value.SplitAndTrim();
@@ -297,7 +301,7 @@ public class CaveRepository : RepositoryBase
                 NumberOfPits = e.NumberOfPits,
                 Narrative = e.Narrative,
                 ReportedOn = e.ReportedOn,
-                // ReportedByName = e.ReportedByName, // TODO
+                ReportedByNameTagIds = e.CaveReportedByNameTags.Select(e => e.TagTypeId),
                 IsArchived = e.IsArchived,
                 PrimaryEntrance = e.Entrances.Where(ee => ee.IsPrimary).Select(ee =>
                     new EntranceVm
@@ -307,10 +311,10 @@ public class CaveRepository : RepositoryBase
                         Latitude = ee.Location.Y,
                         Longitude = ee.Location.X,
                         ElevationFeet = ee.Location.Z,
-                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(ee => ee.TagTypeId).ToList(),
+                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId).ToList(),
                         FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
                         EntranceHydrologyTagIds =
-                            ee.EntranceHydrologyTags.Select(ee => ee.TagTypeId).ToList()
+                            ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId).ToList()
                     }).FirstOrDefault(),
                 MapIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
@@ -325,11 +329,11 @@ public class CaveRepository : RepositoryBase
                         Longitude = ee.Location.X,
                         ElevationFeet = ee.Location.Z,
                         ReportedOn = ee.ReportedOn,
-                        // ReportedByName = ee.ReportedByName, // TODO
                         PitFeet = ee.PitDepthFeet,
-                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(e => e.TagTypeId),
-                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(e => e.TagTypeId),
-                        EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(e => e.TagTypeId)
+                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId),
+                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(eee => eee.TagTypeId),
+                        EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId),
+                        ReportedByNameTagIds = ee.EntranceReportedByNameTags.Select(eee => eee.TagTypeId)
                     })
                     .OrderByDescending(ee => ee.IsPrimary)
                     .ThenBy(ee => ee.ReportedOn).ToList(),
@@ -341,7 +345,14 @@ public class CaveRepository : RepositoryBase
                     FileName = ee.FileName,
                     FileTypeKey = ee.FileTypeTag.Name,
                     FileTypeTagId = ee.FileTypeTagId
-                })
+                }),
+                BiologyTagIds = e.BiologyTags.Select(ee => ee.TagTypeId),
+                ArcheologyTagIds = e.ArcheologyTags.Select(ee => ee.TagTypeId),
+                CartographerNameTagIds = e.CartographerNameTags.Select(ee => ee.TagTypeId),
+                GeologicAgeTagIds = e.GeologicAgeTags.Select(ee => ee.TagTypeId),
+                PhysiographicProvinceTagIds = e.PhysiographicProvinceTags.Select(ee => ee.TagTypeId),
+                OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
+                MapStatusTagIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
             })
             .AsSplitQuery()
             .FirstOrDefaultAsync();
@@ -350,18 +361,30 @@ public class CaveRepository : RepositoryBase
     public async Task<Entrance?> GetEntrance(string? id)
     {
         return await DbContext.Entrances
-            .Include(e => e.EntranceHydrologyTags)
             .Include(e => e.EntranceStatusTags)
             .Include(e => e.FieldIndicationTags)
+            .Include(e => e.EntranceOtherTags)
+            .Include(e => e.EntranceHydrologyTags)
+            .Include(e => e.EntranceReportedByNameTags)
             .Where(e => e.Id == id && e.Cave.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
     }
 
     public async Task<Cave?> GetAsync(string? id)
     {
         return await DbContext.Caves.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
-            .Include(e => e.Files)
             .Include(e => e.GeologyTags)
+            .Include(e => e.ArcheologyTags)    
+            .Include(e => e.BiologyTags)    
+            .Include(e => e.CartographerNameTags)    
+            .Include(e => e.MapStatusTags)    
+            .Include(e => e.GeologicAgeTags)    
+            .Include(e => e.PhysiographicProvinceTags)    
+            .Include(e => e.CaveOtherTags)    
+            .Include(e => e.CaveReportedByNameTags)    
+            .Include(e => e.Files)
             .Include(e => e.Entrances)
+
+            .Include(e => e.CaveReportedByNameTags)
             .FirstOrDefaultAsync();
     }
 

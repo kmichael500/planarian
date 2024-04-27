@@ -29,7 +29,6 @@ const SwitchAccountComponent = ({
       setAccountList(result);
     }
     const unsubscribe = AuthenticationService.onAuthChange(() => {
-      console.log("Test");
       const result = AppOptions.accountIds.filter(
         (item) => item.value !== currentAccountId
       );

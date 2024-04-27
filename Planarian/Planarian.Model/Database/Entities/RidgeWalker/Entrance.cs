@@ -30,14 +30,11 @@ public class Entrance : EntityBase
     public ICollection<EntranceStatusTag> EntranceStatusTags { get; set; } = new HashSet<EntranceStatusTag>();
     public ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = new HashSet<EntranceHydrologyTag>();
 
-    public ICollection<EntranceTypeTag> EntranceTypeTags { get; set; } =
-        new HashSet<EntranceTypeTag>();
-
-
     public ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
     public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
         new HashSet<EntranceReportedByNameTag>();
 
+    public virtual ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
 }
 
 public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>

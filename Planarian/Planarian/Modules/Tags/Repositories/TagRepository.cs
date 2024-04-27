@@ -89,5 +89,5 @@ public class TagRepository : RepositoryBase
             .Where(e => e.Key == TagTypeKeyConstant.FieldIndication && e.AccountId == RequestUser.AccountId)
             .ToListAsync();
     }
-    
+
 }

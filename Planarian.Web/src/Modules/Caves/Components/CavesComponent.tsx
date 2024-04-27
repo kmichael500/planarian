@@ -116,11 +116,12 @@ const CavesComponent: React.FC = () => {
           field={"numberOfPits"}
           label={"Number of Pits (Feet)"}
         />
-        <TextFilterFormItem
+
+        <TagFilterFormItem
+          tagType={TagType.People}
           queryBuilder={queryBuilder}
-          field={"reportedByName"}
-          label={"Repored By Name"}
-          queryOperator={QueryOperator.Contains}
+          field={"reportedByNameTagIds"}
+          label={"Reported By"}
         />
         <TagFilterFormItem
           tagType={TagType.Geology}

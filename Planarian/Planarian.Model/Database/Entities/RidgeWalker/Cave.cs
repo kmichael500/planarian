@@ -45,11 +45,9 @@ public class Cave : EntityBase
         new HashSet<CartographerNameTag>();
     public virtual ICollection<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } =
         new HashSet<CaveReportedByNameTag>();
-    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
-        new HashSet<EntranceReportedByNameTag>();
 
-    public virtual ICollection<OtherTag> OtherTags { get; set; } =
-        new HashSet<OtherTag>();
+    public virtual ICollection<CaveOtherTag> CaveOtherTags { get; set; } =
+        new HashSet<CaveOtherTag>();
 
 }
 

@@ -2,6 +2,7 @@ using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
@@ -9,6 +10,7 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Account.Services;
@@ -154,7 +156,6 @@ public class AccountService : ServiceBase<AccountRepository>
     {
         foreach (var id in tagTypeIds)
         {
-            var tagType = await _tagRepository.GetTag(id);
             await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId);
         }
     }

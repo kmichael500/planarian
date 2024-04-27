@@ -8,11 +8,11 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class EntranceReportedByNameTag : EntityBase
 {
-    [MaxLength(PropertyLength.Id)] public string PeopleTagId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;
 
-    public PeopleTag PeopleTag { get; set; }
-    public Cave Cave { get; set; }
+    public TagType TagType { get; set; }
+    public Entrance Entrance { get; set; }
 }
 
 public class EntranceReportedByNameTagConfiguration : BaseEntityTypeConfiguration<EntranceReportedByNameTag>
@@ -20,17 +20,17 @@ public class EntranceReportedByNameTagConfiguration : BaseEntityTypeConfiguratio
     public override void Configure(EntityTypeBuilder<EntranceReportedByNameTag> builder)
     {
         base.Configure(builder);
-        builder.HasKey(e => new { e.PeopleTagId, e.CaveId });
+        builder.HasKey(e => new { e.TagTypeId, e.EntranceId });
 
         builder
-            .HasOne(e => e.PeopleTag)
+            .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceReportedByNameTags)
-            .HasForeignKey(bc => bc.PeopleTagId)
+            .HasForeignKey(e => e.TagTypeId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(e => e.Cave)
+        builder.HasOne(e => e.Entrance)
             .WithMany(e => e.EntranceReportedByNameTags)
-            .HasForeignKey(e => e.CaveId)
+            .HasForeignKey(e => e.EntranceId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

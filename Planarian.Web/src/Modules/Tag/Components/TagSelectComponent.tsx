@@ -10,10 +10,13 @@ import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 export interface TagSelectComponentProps extends SelectProps<string> {
   tagType: TagType;
   projectId?: string;
+  allowCustomTags?: boolean;
 }
 const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   tagType,
   projectId,
+  allowCustomTags = false,
+
   onChange,
   ...rest
 }) => {
@@ -68,6 +71,35 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
         case TagType.File:
           const fileTags = await SettingsService.GetFileTags();
           setTags(fileTags);
+          break;
+        case TagType.People:
+          const peopleTags = await SettingsService.GetPeopleTags();
+          setTags(peopleTags);
+          break;
+        case TagType.Biology:
+          const biologyTags = await SettingsService.GetBiologyTags();
+          setTags(biologyTags);
+          break;
+        case TagType.Archeology:
+          const archeologyTags = await SettingsService.GetArcheologyTags();
+          setTags(archeologyTags);
+          break;
+        case TagType.MapStatus:
+          const mapStatusTags = await SettingsService.GetMapStatusTags();
+          setTags(mapStatusTags);
+          break;
+        case TagType.CaveOther:
+          const otherTags = await SettingsService.GetOtherTags();
+          setTags(otherTags);
+          break;
+        case TagType.GeologicAge:
+          const geologicAgeTags = await SettingsService.GetGeologicAgeTags();
+          setTags(geologicAgeTags);
+          break;
+        case TagType.PhysiographicProvince:
+          const physiographicProvinceTags =
+            await SettingsService.GetPhysiographicProvinceTags();
+          setTags(physiographicProvinceTags);
           break;
 
         default:

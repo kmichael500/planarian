@@ -106,6 +106,45 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CartographerNameTag",
+                columns: table => new
+                {
+                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CartographerNameTag", x => new { x.TagTypeId, x.CaveId });
+                    table.ForeignKey(
+                        name: "FK_CartographerNameTag_Caves_CaveId",
+                        column: x => x.CaveId,
+                        principalTable: "Caves",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CartographerNameTag_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CartographerNameTag_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_CartographerNameTag_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "CaveAlternateNameTag",
                 columns: table => new
                 {
@@ -145,7 +184,85 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "EntranceTypeTag",
+                name: "CaveOtherTag",
+                columns: table => new
+                {
+                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CaveOtherTag", x => new { x.TagTypeId, x.CaveId });
+                    table.ForeignKey(
+                        name: "FK_CaveOtherTag_Caves_CaveId",
+                        column: x => x.CaveId,
+                        principalTable: "Caves",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CaveOtherTag_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CaveOtherTag_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_CaveOtherTag_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CaveReportedByNameTags",
+                columns: table => new
+                {
+                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CaveReportedByNameTags", x => new { x.TagTypeId, x.CaveId });
+                    table.ForeignKey(
+                        name: "FK_CaveReportedByNameTags_Caves_CaveId",
+                        column: x => x.CaveId,
+                        principalTable: "Caves",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CaveReportedByNameTags_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CaveReportedByNameTags_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_CaveReportedByNameTags_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "EntranceOtherTag",
                 columns: table => new
                 {
                     TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
@@ -158,26 +275,65 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_EntranceTypeTag", x => new { x.TagTypeId, x.EntranceId });
+                    table.PrimaryKey("PK_EntranceOtherTag", x => new { x.TagTypeId, x.EntranceId });
                     table.ForeignKey(
-                        name: "FK_EntranceTypeTag_Entrances_EntranceId",
+                        name: "FK_EntranceOtherTag_Entrances_EntranceId",
                         column: x => x.EntranceId,
                         principalTable: "Entrances",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_EntranceTypeTag_TagTypes_TagTypeId",
+                        name: "FK_EntranceOtherTag_TagTypes_TagTypeId",
                         column: x => x.TagTypeId,
                         principalTable: "TagTypes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_EntranceTypeTag_Users_CreatedByUserId",
+                        name: "FK_EntranceOtherTag_Users_CreatedByUserId",
                         column: x => x.CreatedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_EntranceTypeTag_Users_ModifiedByUserId",
+                        name: "FK_EntranceOtherTag_Users_ModifiedByUserId",
+                        column: x => x.ModifiedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "EntranceReportedByNameTags",
+                columns: table => new
+                {
+                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    EntranceId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EntranceReportedByNameTags", x => new { x.TagTypeId, x.EntranceId });
+                    table.ForeignKey(
+                        name: "FK_EntranceReportedByNameTags_Entrances_EntranceId",
+                        column: x => x.EntranceId,
+                        principalTable: "Entrances",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_EntranceReportedByNameTags_TagTypes_TagTypeId",
+                        column: x => x.TagTypeId,
+                        principalTable: "TagTypes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_EntranceReportedByNameTags_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_EntranceReportedByNameTags_Users_ModifiedByUserId",
                         column: x => x.ModifiedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
@@ -262,77 +418,6 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "OtherTag",
-                columns: table => new
-                {
-                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_OtherTag", x => new { x.TagTypeId, x.CaveId });
-                    table.ForeignKey(
-                        name: "FK_OtherTag_Caves_CaveId",
-                        column: x => x.CaveId,
-                        principalTable: "Caves",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_OtherTag_TagTypes_TagTypeId",
-                        column: x => x.TagTypeId,
-                        principalTable: "TagTypes",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_OtherTag_Users_CreatedByUserId",
-                        column: x => x.CreatedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_OtherTag_Users_ModifiedByUserId",
-                        column: x => x.ModifiedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PeopleTags",
-                columns: table => new
-                {
-                    TagTypeId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PeopleTags", x => x.TagTypeId);
-                    table.ForeignKey(
-                        name: "FK_PeopleTags_TagTypes_TagTypeId",
-                        column: x => x.TagTypeId,
-                        principalTable: "TagTypes",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PeopleTags_Users_CreatedByUserId",
-                        column: x => x.CreatedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_PeopleTags_Users_ModifiedByUserId",
-                        column: x => x.ModifiedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "PhysiographicProvinceTag",
                 columns: table => new
                 {
@@ -366,129 +451,6 @@ namespace Planarian.Migrations.Migrations
                         principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_PhysiographicProvinceTag_Users_ModifiedByUserId",
-                        column: x => x.ModifiedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "CartographerNameTag",
-                columns: table => new
-                {
-                    PeopleTagId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CartographerNameTag", x => new { x.PeopleTagId, x.CaveId });
-                    table.ForeignKey(
-                        name: "FK_CartographerNameTag_Caves_CaveId",
-                        column: x => x.CaveId,
-                        principalTable: "Caves",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CartographerNameTag_PeopleTags_PeopleTagId",
-                        column: x => x.PeopleTagId,
-                        principalTable: "PeopleTags",
-                        principalColumn: "TagTypeId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CartographerNameTag_Users_CreatedByUserId",
-                        column: x => x.CreatedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CartographerNameTag_Users_ModifiedByUserId",
-                        column: x => x.ModifiedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "CaveReportedByNameTag",
-                columns: table => new
-                {
-                    PeopleTagId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CaveReportedByNameTag", x => new { x.PeopleTagId, x.CaveId });
-                    table.ForeignKey(
-                        name: "FK_CaveReportedByNameTag_Caves_CaveId",
-                        column: x => x.CaveId,
-                        principalTable: "Caves",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CaveReportedByNameTag_PeopleTags_PeopleTagId",
-                        column: x => x.PeopleTagId,
-                        principalTable: "PeopleTags",
-                        principalColumn: "TagTypeId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CaveReportedByNameTag_Users_CreatedByUserId",
-                        column: x => x.CreatedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_CaveReportedByNameTag_Users_ModifiedByUserId",
-                        column: x => x.ModifiedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "EntranceReportedByNameTag",
-                columns: table => new
-                {
-                    PeopleTagId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    EntranceId = table.Column<string>(type: "character varying(10)", nullable: true),
-                    Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ModifiedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_EntranceReportedByNameTag", x => new { x.PeopleTagId, x.CaveId });
-                    table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_Caves_CaveId",
-                        column: x => x.CaveId,
-                        principalTable: "Caves",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_Entrances_EntranceId",
-                        column: x => x.EntranceId,
-                        principalTable: "Entrances",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_PeopleTags_PeopleTagId",
-                        column: x => x.PeopleTagId,
-                        principalTable: "PeopleTags",
-                        principalColumn: "TagTypeId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_Users_CreatedByUserId",
-                        column: x => x.CreatedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_EntranceReportedByNameTag_Users_ModifiedByUserId",
                         column: x => x.ModifiedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
@@ -555,53 +517,63 @@ namespace Planarian.Migrations.Migrations
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveReportedByNameTag_CaveId",
-                table: "CaveReportedByNameTag",
+                name: "IX_CaveOtherTag_CaveId",
+                table: "CaveOtherTag",
                 column: "CaveId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveReportedByNameTag_CreatedByUserId",
-                table: "CaveReportedByNameTag",
+                name: "IX_CaveOtherTag_CreatedByUserId",
+                table: "CaveOtherTag",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveReportedByNameTag_ModifiedByUserId",
-                table: "CaveReportedByNameTag",
+                name: "IX_CaveOtherTag_ModifiedByUserId",
+                table: "CaveOtherTag",
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceReportedByNameTag_CaveId",
-                table: "EntranceReportedByNameTag",
+                name: "IX_CaveReportedByNameTags_CaveId",
+                table: "CaveReportedByNameTags",
                 column: "CaveId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceReportedByNameTag_CreatedByUserId",
-                table: "EntranceReportedByNameTag",
+                name: "IX_CaveReportedByNameTags_CreatedByUserId",
+                table: "CaveReportedByNameTags",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceReportedByNameTag_EntranceId",
-                table: "EntranceReportedByNameTag",
-                column: "EntranceId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_EntranceReportedByNameTag_ModifiedByUserId",
-                table: "EntranceReportedByNameTag",
+                name: "IX_CaveReportedByNameTags_ModifiedByUserId",
+                table: "CaveReportedByNameTags",
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceTypeTag_CreatedByUserId",
-                table: "EntranceTypeTag",
+                name: "IX_EntranceOtherTag_CreatedByUserId",
+                table: "EntranceOtherTag",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceTypeTag_EntranceId",
-                table: "EntranceTypeTag",
+                name: "IX_EntranceOtherTag_EntranceId",
+                table: "EntranceOtherTag",
                 column: "EntranceId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EntranceTypeTag_ModifiedByUserId",
-                table: "EntranceTypeTag",
+                name: "IX_EntranceOtherTag_ModifiedByUserId",
+                table: "EntranceOtherTag",
+                column: "ModifiedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EntranceReportedByNameTags_CreatedByUserId",
+                table: "EntranceReportedByNameTags",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EntranceReportedByNameTags_EntranceId",
+                table: "EntranceReportedByNameTags",
+                column: "EntranceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EntranceReportedByNameTags_ModifiedByUserId",
+                table: "EntranceReportedByNameTags",
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
@@ -632,31 +604,6 @@ namespace Planarian.Migrations.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_MapStatusTag_ModifiedByUserId",
                 table: "MapStatusTag",
-                column: "ModifiedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_OtherTag_CaveId",
-                table: "OtherTag",
-                column: "CaveId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_OtherTag_CreatedByUserId",
-                table: "OtherTag",
-                column: "CreatedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_OtherTag_ModifiedByUserId",
-                table: "OtherTag",
-                column: "ModifiedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PeopleTags_CreatedByUserId",
-                table: "PeopleTags",
-                column: "CreatedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PeopleTags_ModifiedByUserId",
-                table: "PeopleTags",
                 column: "ModifiedByUserId");
 
             migrationBuilder.CreateIndex(
@@ -691,13 +638,16 @@ namespace Planarian.Migrations.Migrations
                 name: "CaveAlternateNameTag");
 
             migrationBuilder.DropTable(
-                name: "CaveReportedByNameTag");
+                name: "CaveOtherTag");
 
             migrationBuilder.DropTable(
-                name: "EntranceReportedByNameTag");
+                name: "CaveReportedByNameTags");
 
             migrationBuilder.DropTable(
-                name: "EntranceTypeTag");
+                name: "EntranceOtherTag");
+
+            migrationBuilder.DropTable(
+                name: "EntranceReportedByNameTags");
 
             migrationBuilder.DropTable(
                 name: "GeologicAgeTag");
@@ -706,13 +656,7 @@ namespace Planarian.Migrations.Migrations
                 name: "MapStatusTag");
 
             migrationBuilder.DropTable(
-                name: "OtherTag");
-
-            migrationBuilder.DropTable(
                 name: "PhysiographicProvinceTag");
-
-            migrationBuilder.DropTable(
-                name: "PeopleTags");
 
             migrationBuilder.RenameColumn(
                 name: "PitDepthFeet",

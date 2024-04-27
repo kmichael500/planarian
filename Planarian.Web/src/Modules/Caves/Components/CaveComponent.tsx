@@ -86,11 +86,80 @@ const CaveComponent = ({
             {formatDateTime(cave?.reportedOn)}
           </Descriptions.Item>
           <Descriptions.Item label="Reported By">
-            {cave?.reportedByName}
+            <Row>
+              {cave?.reportedByNameTagIds.map((e) => (
+                <Col key={e}>
+                  <TagComponent tagId={e} />
+                </Col>
+              ))}
+            </Row>
           </Descriptions.Item>
           <Descriptions.Item label="Geology">
             <Row>
               {cave?.geologyTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Geologic Age">
+            <Row>
+              {cave?.geologicAgeTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Physigraphic Province">
+            <Row>
+              {cave?.physiographicProvinceTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Biology">
+            <Row>
+              {cave?.biologyTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Archeology">
+            <Row>
+              {cave?.archeologyTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Map Status">
+            <Row>
+              {cave?.mapStatusTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Cartographers">
+            <Row>
+              {cave?.cartographerNameTagIds.map((tagId) => (
+                <Col key={tagId}>
+                  <TagComponent tagId={tagId} />
+                </Col>
+              ))}
+            </Row>
+          </Descriptions.Item>
+          <Descriptions.Item label="Other">
+            <Row>
+              {cave?.otherTagIds.map((tagId) => (
                 <Col key={tagId}>
                   <TagComponent tagId={tagId} />
                 </Col>
@@ -159,8 +228,15 @@ const CaveComponent = ({
                     <Descriptions.Item label="Reported On">
                       {formatDateTime(entrance.reportedOn)}
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Reported By">
-                      {entrance.reportedByName}
+                      <Row>
+                        {entrance?.reportedByNameTagIds.map((e) => (
+                          <Col key={e}>
+                            <TagComponent tagId={e} />
+                          </Col>
+                        ))}
+                      </Row>
                     </Descriptions.Item>
                     <Descriptions.Item label="Pit Depth">
                       {convertDistance(entrance.pitFeet)}
@@ -174,6 +250,7 @@ const CaveComponent = ({
                         ))}
                       </Row>
                     </Descriptions.Item>
+
                     <Descriptions.Item label="Field Indication">
                       <Row>
                         {entrance.fieldIndicationTagIds.map((tagId) => (

@@ -56,5 +56,12 @@ public class AddCaveVm
     public IEnumerable<AddEntranceVm> Entrances { get; set; } = new HashSet<AddEntranceVm>();
     public IEnumerable<EditFileMetadataVm>? Files { get; set; } = new HashSet<EditFileMetadataVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<ReportedByNameVm> ReportedByNameTagIds { get; set; }
+    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ArcheologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> CartographerNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> GeologicAgeTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> PhysiographicProvinceTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
 }

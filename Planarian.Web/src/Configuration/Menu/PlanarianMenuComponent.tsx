@@ -25,8 +25,6 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
   const [openedKeys, setOpenedKeys] = useState<string[]>([]);
   const { isAuthenticated } = useContext(AppContext);
 
-  console.log("PlanarianMenuComponent", props.menuItems);
-
   const filteredMenuItems = props.menuItems.filter(
     (item) => item.requiresAuthentication === isAuthenticated
   );

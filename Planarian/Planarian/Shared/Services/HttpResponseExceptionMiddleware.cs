@@ -41,6 +41,12 @@ public class HttpResponseExceptionMiddleware
         catch (Exception e)
         {
             var error = new ApiErrorResponse("There was an unexpected issue! Please try again or contact support!", -1);
+            
+            #if DEBUG
+            
+            error = new ApiErrorResponse($"There was an unexpected issue: {e.Message}", -1);
+            
+            #endif
 
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             context.Response.ContentType = "application/json";

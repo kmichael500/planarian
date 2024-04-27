@@ -8,10 +8,10 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 
 public class CartographerNameTag : EntityBase
 {
-    [MaxLength(PropertyLength.Id)] public string PeopleTagId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
 
-    public PeopleTag PeopleTag { get; set; }
+    public TagType TagType { get; set; }
     public Cave Cave { get; set; }
 }
 
@@ -20,12 +20,12 @@ public class CartographerNameTagConfiguration : BaseEntityTypeConfiguration<Cart
     public override void Configure(EntityTypeBuilder<CartographerNameTag> builder)
     {
         base.Configure(builder);
-        builder.HasKey(e => new { e.PeopleTagId, e.CaveId });
+        builder.HasKey(e => new { e.TagTypeId, e.CaveId });
 
         builder
-            .HasOne(e => e.PeopleTag)
+            .HasOne(e => e.TagType)
             .WithMany(e => e.CartographerNameTags)
-            .HasForeignKey(bc => bc.PeopleTagId)
+            .HasForeignKey(bc => bc.TagTypeId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(e => e.Cave)

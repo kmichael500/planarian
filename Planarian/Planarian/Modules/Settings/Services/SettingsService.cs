@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
@@ -84,6 +85,11 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetFileTags();
     }
 
+    public async Task<IEnumerable<SelectListItem<string>>> GetPeopleTags()
+    {
+        return await Repository.GetPeopleTags();
+    }
+
     public async Task<string?> GetCountyName(string countyId)
     {
         return await Repository.GetCountyId(countyId);
@@ -92,5 +98,35 @@ public class SettingsService : ServiceBase<SettingsRepository>
     public async Task<string?> GetStateName(string stateId)
     {
         return await Repository.GetStateName(stateId);
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetBiologyTags()
+    {
+return await Repository.GetBiologyTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetArcheologyTags()
+    {
+        return await Repository.GetArcheologyTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetMapStatusTags()
+    {
+        return await Repository.GetMapStatusTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetOtherTags()
+    {
+        return await Repository.GetOtherTags();
+    }
+    
+    public async Task<IEnumerable<SelectListItem<string>>> GetPhysiographicProvinceTags()
+    {
+        return await Repository.GetPhysiographicProvinceTags();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetGeologicAgeTags()
+    {
+        return await Repository.GetGeologicAgeTags();
     }
 }

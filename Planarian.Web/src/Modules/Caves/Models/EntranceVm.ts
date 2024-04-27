@@ -9,10 +9,10 @@ export interface EntranceVm {
   longitude: number;
   elevationFeet: number;
   reportedOn: string | null;
-  reportedByName: string | null;
   pitFeet: number | null;
 
   entranceStatusTagIds: string[];
   fieldIndicationTagIds: string[];
   entranceHydrologyTagIds: string[];
+  reportedByNameTagIds: string[];
 }

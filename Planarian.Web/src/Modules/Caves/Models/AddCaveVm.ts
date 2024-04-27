@@ -12,8 +12,15 @@ export interface AddCaveVm {
   numberOfPits: number;
   narrative: string | null;
   reportedOn: string | null;
-  reportedByName: string | null;
   entrances: AddEntranceVm[];
   geologyTagIds: string[];
   files?: EditFileMetadataVm[];
+  reportedByNameTagIds: string[];
+  biologyTagIds: string[];
+  archeologyTagIds: string[];
+  cartographerNameTagIds: string[];
+  mapStatusTagIds: string[];
+  geologicAgeTagIds: string[];
+  physiographicProvinceTagIds: string[];
+  otherTagIds: string[];
 }

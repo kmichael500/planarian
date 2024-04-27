@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 
@@ -31,7 +32,7 @@ public class CaveVm
 
 
     public CaveVm(string id, string reportedByUserId, string narrative, DateTime? reportedOn,
-        string reportedByName, string stateId, string countyId, string displayId, string name,
+        IEnumerable<string> reportedByNameTagIds, string stateId, string countyId, string displayId, string name,
         double lengthFeet,
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
@@ -45,7 +46,7 @@ public class CaveVm
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
         ReportedOn = reportedOn;
-        ReportedByName = reportedByName;
+        ReportedByNameTagIds = reportedByNameTagIds;
     }
 
     public CaveVm()
@@ -69,7 +70,6 @@ public class CaveVm
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
     public IEnumerable<FileVm> Files { get; set; } = new HashSet<FileVm>();
 
@@ -78,4 +78,12 @@ public class CaveVm
     public IEnumerable<string> MapIds { get; set; } = new HashSet<string>();
     public IEnumerable<EntranceVm> Entrances { get; set; } = new HashSet<EntranceVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ArcheologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> CartographerNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> GeologicAgeTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> PhysiographicProvinceTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
 }

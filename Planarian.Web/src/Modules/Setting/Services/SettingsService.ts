@@ -85,6 +85,48 @@ const SettingsService = {
     );
     return response.data;
   },
+  async GetPeopleTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/people`
+    );
+    return response.data;
+  },
+  async GetBiologyTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/biology`
+    );
+    return response.data;
+  },
+  async GetArcheologyTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/archeology`
+    );
+    return response.data;
+  },
+  async GetMapStatusTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/map-status`
+    );
+    return response.data;
+  },
+  async GetOtherTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/other`
+    );
+    return response.data;
+  },
+  async GetGeologicAgeTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/geologic-age`
+    );
+    return response.data;
+  },
+  async GetPhysiographicProvinceTags(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/tags/physiographic-province`
+    );
+    return response.data;
+  },
   async GetTagName(tagId: string): Promise<string> {
     const cacheKey = `tag-name-${tagId}`;
     const cachedDisplayValue = CacheService.get<string>(cacheKey);

@@ -89,7 +89,17 @@ public class AccountRepository : RepositoryBase
                               e.FieldIndicationTags.Count +
                               e.EntranceLocationQualitiesTags.Count +
                               e.GeologyTags.Count +
-                              e.FileTypeTags.Count
+                              e.CaveReportedByNameTags.Count +
+                              e.CartographerNameTags.Count +
+                              e.EntranceReportedByNameTags.Count +
+                              e.FileTypeTags.Count +
+                              e.MapStatusTags.Count +
+                              e.AlternateNameTags.Count +
+                              e.GeologicAgeTags.Count +
+                              e.PhysiographicProvinceTags.Count +
+                              e.BiologyTags.Count +
+                              e.ArcheologyTags.Count +
+                              e.CaveOtherTags.Count
             })
             .OrderBy(e => e.Name)
             .ToListAsync(cancellationToken);
@@ -111,7 +121,18 @@ public class AccountRepository : RepositoryBase
                          e.FieldIndicationTags.Count +
                          e.EntranceLocationQualitiesTags.Count +
                          e.GeologyTags.Count +
-                         e.FileTypeTags.Count)
+                         e.CaveReportedByNameTags.Count +
+                         e.CartographerNameTags.Count +
+                         e.EntranceReportedByNameTags.Count +
+                         e.FileTypeTags.Count +
+                         e.MapStatusTags.Count +
+                         e.AlternateNameTags.Count +
+                         e.GeologicAgeTags.Count +
+                         e.PhysiographicProvinceTags.Count +
+                         e.BiologyTags.Count +
+                         e.ArcheologyTags.Count +
+                         e.CaveOtherTags.Count
+                         )
             .FirstOrDefaultAsync();
         return result;
     }
@@ -188,6 +209,19 @@ public class AccountRepository : RepositoryBase
                 .Where(e => e.FileTypeTagId == tagTypeId)
                 .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
                 .UpdateAsync();
+
+
+            await DbContext.CaveReportedByNameTags
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            await DbContext.EntranceReportedByNameTags
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            //TODO?
         }
 
         await DbContext.SaveChangesAsync();

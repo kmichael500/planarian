@@ -120,4 +120,54 @@ public class SettingsRepository : RepositoryBase
 
         return county;
     }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetPeopleTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.People && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetBiologyTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.Biology && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetArcheologyTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.Archeology && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetMapStatusTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.MapStatus && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetOtherTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.CaveOther && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetGeologicAgeTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.GeologicAge && e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetPhysiographicProvinceTags()
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == TagTypeKeyConstant.PhysiographicProvince &&
+                        e.AccountId == RequestUser.AccountId)
+            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+    }
 }

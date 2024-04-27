@@ -32,17 +32,26 @@ public static class TagTypeKeyConstant
     public const string File = "File";
     public const string People = "People";
 
+    public const string Biology = "Biology";
+    public const string Archeology = "Archeology";
+    public const string MapStatus = "MapStatus";
+    public const string CaveOther = "CaveOther";
+    public const string GeologicAge = "GeologicAge";
+    public const string PhysiographicProvince = "PhysiographicProvince";
+
     private static readonly List<string> AllProjectTags = new() { Default, Trip, Photo };
 
     private static readonly List<string> AllAccountTags = new()
-        { Geology, EntranceStatus, FieldIndication, EntranceHydrology, File };
+    {
+        Geology, EntranceStatus, FieldIndication, EntranceHydrology, File, People, Biology, Archeology, MapStatus,
+        CaveOther, GeologicAge, PhysiographicProvince,
+    };
 
     private static readonly List<string> All = new()
     {
         Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology,
-        File
+        File, People, Biology, Archeology, MapStatus, CaveOther, GeologicAge, PhysiographicProvince,
     };
-
 
     public static bool IsValidTagKey(string tagKey)
     {

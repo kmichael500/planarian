@@ -43,6 +43,7 @@ public class TagService : ServiceBase<TagRepository>
             case TagTypeKeyConstant.File:
                 entity.AccountId = RequestUser.AccountId;
                 break;
+
             #endregion
 
             default:

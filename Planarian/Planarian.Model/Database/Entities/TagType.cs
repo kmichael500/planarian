@@ -25,6 +25,9 @@ public class TagType : EntityBaseNameId
 
     [MaxLength(450)] public string Key { get; set; } = null!;
     public bool IsDefault { get; set; } = false;
+    
+    public virtual Project? Project { get; set; }
+    public virtual Account? Account { get; set; }
 
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<TripTag> TripTags { get; set; } = new HashSet<TripTag>();
@@ -48,12 +51,17 @@ public class TagType : EntityBaseNameId
         new HashSet<PhysiographicProvinceTag>();
     public ICollection<BiologyTag> BiologyTags { get; set; } = new HashSet<BiologyTag>();
     public ICollection<ArcheologyTag> ArcheologyTags { get; set; } = new HashSet<ArcheologyTag>();
-    public ICollection<PeopleTag> PeopleTags { get; set; } = new HashSet<PeopleTag>();
-    public ICollection<OtherTag> OtherTags { get; set; } = new HashSet<OtherTag>();
-    public ICollection<EntranceTypeTag> EntranceTypeTags { get; set; } = new HashSet<EntranceTypeTag>();
+    public ICollection<CaveOtherTag> CaveOtherTags { get; set; } = new HashSet<CaveOtherTag>();
+    public virtual ICollection<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } =
+        new HashSet<CaveReportedByNameTag>();
 
-    public virtual Project? Project { get; set; }
-    public virtual Account? Account { get; set; }
+    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
+        new HashSet<EntranceReportedByNameTag>();
+
+    public virtual ICollection<CartographerNameTag> CartographerNameTags { get; set; } =
+        new HashSet<CartographerNameTag>();
+
+    public virtual ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
 }
 
 public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
