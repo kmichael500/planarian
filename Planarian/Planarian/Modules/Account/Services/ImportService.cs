@@ -6,6 +6,7 @@ using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
@@ -291,14 +292,14 @@ public class ImportService : ServiceBase
                         CountyNumber = caveRecord.CountyCaveNumber,
                         StateId = state.Id,
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
-                        // ReportedByName = caveRecord.ReportedByName?.Trim(), // TODO
+                        // ReportedByName = caveRecord.ReportedByNames?.SplitAndTrim(), // TODO
                         IsArchived = (bool)caveRecord.IsArchived,
                         CreatedOn = DateTime.UtcNow,
                         CreatedByUserId = RequestUser.Id
                     };
                     if (caveRecord.Geology != null)
                     {
-                        var geologyNames = caveRecord.Geology.Split(',').Select(g => g.Trim())
+                        var geologyNames = caveRecord.Geology.SplitAndTrim()
                             .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
                         foreach (var geologyName in geologyNames)
                         {
@@ -392,21 +393,12 @@ public class ImportService : ServiceBase
 
                 TryGetFieldValue(csv, nameof(record.CaveName), true, errors, out string? caveName);
                 if (!string.IsNullOrWhiteSpace(caveName)) record.CaveName = caveName;
-
-                TryGetFieldValue(csv, nameof(record.CaveLengthFt), true, errors, out double caveLengthFt);
-                record.CaveLengthFt = caveLengthFt;
-
-                TryGetFieldValue(csv, nameof(record.CaveDepthFt), true, errors, out double caveDepthFt);
-                record.CaveDepthFt = caveDepthFt;
-
-                TryGetFieldValue(csv, nameof(record.MaxPitDepthFt), true, errors, out double maxPitDepthFt);
-                record.MaxPitDepthFt = maxPitDepthFt;
-
-                TryGetFieldValue(csv, nameof(record.NumberOfPits), true, errors, out int numberOfPits);
-                record.NumberOfPits = numberOfPits;
-
-                TryGetFieldValue(csv, nameof(record.Narrative), false, errors, out string? narrative);
-                record.Narrative = narrative;
+                
+                TryGetFieldValue(csv, nameof(record.AlternateNames), false, errors, out string? alternateName);
+                record.AlternateNames = alternateName;
+                
+                TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
+                if (!string.IsNullOrWhiteSpace(state)) record.State = state;
 
                 TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
                 if (!string.IsNullOrWhiteSpace(countyCode)) record.CountyCode = countyCode;
@@ -416,22 +408,55 @@ public class ImportService : ServiceBase
 
                 TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out int countyCaveNumber);
                 record.CountyCaveNumber = countyCaveNumber;
+                
+                TryGetFieldValue(csv, nameof(record.MapStatuses), false, errors, out string? mapStatuses);
+                record.MapStatuses = mapStatuses;
+                
+                TryGetFieldValue(csv, nameof(record.CartographerNames), false, errors, out string? cartographerNames);
+                record.CartographerNames = cartographerNames;
 
-                TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
-                if (!string.IsNullOrWhiteSpace(state)) record.State = state;
+                TryGetFieldValue(csv, nameof(record.CaveLengthFt), false, errors, out double? caveLengthFt);
+                record.CaveLengthFt = caveLengthFt;
 
+                TryGetFieldValue(csv, nameof(record.CaveDepthFt), false, errors, out double? caveDepthFt);
+                record.CaveDepthFt = caveDepthFt;
+
+                TryGetFieldValue(csv, nameof(record.MaxPitDepthFt), false, errors, out double? maxPitDepthFt);
+                record.MaxPitDepthFt = maxPitDepthFt;
+
+                TryGetFieldValue(csv, nameof(record.NumberOfPits), false, errors, out int? numberOfPits);
+                record.NumberOfPits = numberOfPits;                
+                
+                TryGetFieldValue(csv, nameof(record.Narrative), false, errors, out string? narrative);
+                record.Narrative = narrative;
+                
                 TryGetFieldValue(csv, nameof(record.Geology), false, errors, out string? geology);
                 record.Geology = geology;
-
+                
+                TryGetFieldValue(csv, nameof(record.GeologicAges), false, errors, out string? geologicAges);
+                record.GeologicAges = geologicAges;
+                
+                TryGetFieldValue(csv, nameof(record.PhysiographicProvinces), false, errors, out string? physiographicProvinces);
+                record.PhysiographicProvinces = physiographicProvinces;
+                
+                TryGetFieldValue(csv, nameof(record.Archeology), false, errors, out string? archeology);
+                record.Archeology = archeology;
+                
+                TryGetFieldValue(csv, nameof(record.Biology), false, errors, out string? biology);
+                record.Biology = biology;
+                
+                TryGetFieldValue(csv, nameof(record.IsArchived), false, errors, out bool isArchived);
+                record.IsArchived = isArchived;
+                
                 TryGetFieldValue(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOnDate);
                 record.ReportedOnDate = reportedOnDate;
 
-                TryGetFieldValue(csv, nameof(record.ReportedByName), false, errors, out string? reportedByName);
-                record.ReportedByName = reportedByName;
+                TryGetFieldValue(csv, nameof(record.ReportedByNames), false, errors, out string? reportedByName);
+                record.ReportedByNames = reportedByName;
 
-                TryGetFieldValue(csv, nameof(record.IsArchived), false, errors, out bool isArchived);
-                record.IsArchived = isArchived;
-
+                TryGetFieldValue(csv, nameof(record.OtherTags), false, errors, out string? otherTags);
+                record.OtherTags = otherTags;
+                
                 if (errors.Any())
                     foreach (var error in errors)
                         failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(record, index, error));
@@ -557,7 +582,7 @@ public class ImportService : ServiceBase
 
             var allEntranceStatusTags = await CreateAndProcessTags(entranceRecords,
                 _tagRepository.GetEntranceStatusTags,
-                TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatus?.Split(','), signalRGroup, cancellationToken);
+                TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatuses?.Split(','), signalRGroup, cancellationToken);
             var allEntranceHydrologyTags = await CreateAndProcessTags(entranceRecords,
                 _tagRepository.GetEntranceHydrologyTags,
                 TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.Split(','), signalRGroup,
@@ -670,7 +695,7 @@ public class ImportService : ServiceBase
                         Elevation = (double)entranceRecord.EntranceElevationFt,
                         LocationQualityTagId = locationQualityTag.Id,
                         ReportedOn = isValidReportedOn ? reportedOnDate : null,
-                        ReportedByName = entranceRecord.ReportedByName,
+                        ReportedByName = entranceRecord.ReportedByNames,
                         CaveId = null, // intentionally null
                         CreatedOn = DateTime.UtcNow,
                         CreatedByUserId = RequestUser.Id
@@ -682,9 +707,9 @@ public class ImportService : ServiceBase
 
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
-                        nameof(entranceRecord.EntranceStatus),
+                        nameof(entranceRecord.EntranceStatuses),
                         entranceStatusTags,
-                        e => e.EntranceStatus,
+                        e => e.EntranceStatuses,
                         allEntranceStatusTags);
 
                     CreateEntranceTags(
@@ -840,38 +865,16 @@ public class ImportService : ServiceBase
                 var record = new EntranceCsvModel();
                 var errors = new List<string>();
 
+                TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
+                if (!string.IsNullOrWhiteSpace(countyCode))
+                    record.CountyCode = countyCode;
+
                 TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out string? countyCaveNumber);
                 if (!string.IsNullOrWhiteSpace(countyCaveNumber))
                     record.CountyCaveNumber = countyCaveNumber;
 
                 TryGetFieldValue(csv, nameof(record.EntranceName), false, errors, out string? entranceName);
                 record.EntranceName = entranceName;
-
-                TryGetFieldValue(csv, nameof(record.EntranceDescription), false, errors,
-                    out string? entranceDescription);
-                record.EntranceDescription = entranceDescription;
-
-                TryGetFieldValue(csv, nameof(record.IsPrimaryEntrance), false, errors, out bool isPrimaryEntrance);
-                record.IsPrimaryEntrance = isPrimaryEntrance;
-
-                TryGetFieldValue(csv, nameof(record.EntrancePitDepth), false, errors, out double entrancePitDepth);
-                record.EntrancePitDepth = entrancePitDepth;
-
-                TryGetFieldValue(csv, nameof(record.EntranceStatus), false, errors, out string? entranceStatus);
-                record.EntranceStatus = entranceStatus;
-
-                TryGetFieldValue(csv, nameof(record.EntranceHydrology), false, errors, out string? entranceHydrology);
-                record.EntranceHydrology = entranceHydrology;
-
-                TryGetFieldValue(csv, nameof(record.EntranceHydrologyFrequency), false, errors,
-                    out string? entranceHydrologyFrequency);
-                record.EntranceHydrologyFrequency = entranceHydrologyFrequency;
-
-                TryGetFieldValue(csv, nameof(record.FieldIndication), false, errors, out string? fieldIndication);
-                record.FieldIndication = fieldIndication;
-
-                TryGetFieldValue(csv, nameof(record.CountyCode), true, errors, out string? countyCode);
-                record.CountyCode = countyCode;
 
                 TryGetFieldValue(csv, nameof(record.DecimalLatitude), true, errors, out double decimalLatitude);
                 record.DecimalLatitude = decimalLatitude;
@@ -883,18 +886,33 @@ public class ImportService : ServiceBase
                     out double entranceElevationFt);
                 record.EntranceElevationFt = entranceElevationFt;
 
-                TryGetFieldValue(csv, nameof(record.GeologyFormation), false, errors, out string? geologyFormation);
-                record.GeologyFormation = geologyFormation;
+                TryGetFieldValue(csv, nameof(record.LocationQuality), true, errors, out string? locationQuality);
+                record.LocationQuality = locationQuality ?? string.Empty;
+
+                TryGetFieldValue(csv, nameof(record.EntranceDescription), false, errors,
+                    out string? entranceDescription);
+                record.EntranceDescription = entranceDescription;
+
+                TryGetFieldValue(csv, nameof(record.EntrancePitDepth), false, errors, out double entrancePitDepth);
+                record.EntrancePitDepth = entrancePitDepth;
+
+                TryGetFieldValue(csv, nameof(record.EntranceStatuses), false, errors, out string? entranceStatus);
+                record.EntranceStatuses = entranceStatus;
+
+                TryGetFieldValue(csv, nameof(record.EntranceHydrology), false, errors, out string? entranceHydrology);
+                record.EntranceHydrology = entranceHydrology;
+
+                TryGetFieldValue(csv, nameof(record.FieldIndication), false, errors, out string? fieldIndication);
+                record.FieldIndication = fieldIndication;
 
                 TryGetFieldValue(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOnDate);
                 record.ReportedOnDate = reportedOnDate;
 
-                TryGetFieldValue(csv, nameof(record.ReportedByName), false, errors, out string? reportedByName);
-                record.ReportedByName = reportedByName;
+                TryGetFieldValue(csv, nameof(record.ReportedByNames), false, errors, out string? reportedByName);
+                record.ReportedByNames = reportedByName;
 
-                TryGetFieldValue(csv, nameof(record.LocationQuality), true, errors, out string? locationQuality);
-                record.LocationQuality = locationQuality;
-
+                TryGetFieldValue(csv, nameof(record.IsPrimaryEntrance), false, errors, out bool isPrimaryEntrance);
+                record.IsPrimaryEntrance = isPrimaryEntrance;
 
                 // Add record to the list if there are no errors, else add errors to the failedRecords list
                 if (errors.Any())
@@ -955,7 +973,7 @@ public class ImportService : ServiceBase
         Func<EntranceCsvModel, string?> entranceTagSelector,
         List<TagType> allTags) where TTag : EntityBase, IEntranceTag, new()
     {
-        var entranceTagNames = entranceTagSelector(entranceRecord)?.Split(',').Select(g => g.Trim())
+        var entranceTagNames = entranceTagSelector(entranceRecord)?.SplitAndTrim()
             .Where(e => !string.IsNullOrWhiteSpace(e)).ToList() ?? new List<string>();
 
         foreach (var tagName in entranceTagNames)

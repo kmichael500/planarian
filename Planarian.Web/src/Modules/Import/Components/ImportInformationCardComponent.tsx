@@ -8,12 +8,6 @@ import { CloudDownloadOutlined } from "@ant-design/icons";
 
 const { Title, Paragraph } = Typography;
 
-interface ImportData {
-  description: string;
-  example: string;
-  isRequired: boolean;
-}
-
 const caveImportHeadersData = [
   // Identification
   {
@@ -26,13 +20,12 @@ const caveImportHeadersData = [
     },
   },
   {
-    display: "County Cave Number",
-    value: "CountyCaveNumber",
+    display: "Alternate Names",
+    value: "AlternateNames",
     data: {
-      description:
-        "The county cave number of the cave. This is unique per county.",
-      example: "1",
-      isRequired: true,
+      description: "Comma-seperated list of alternate names for the cave.",
+      example: "Blowing Wind Cave, Windy Cave",
+      isRequired: false,
     },
   },
 
@@ -41,7 +34,7 @@ const caveImportHeadersData = [
     display: "State",
     value: "State",
     data: {
-      description: "The state of the cave.",
+      description: "The state the cave is in (abbreviation or full name).",
       example: "TN",
       isRequired: true,
     },
@@ -60,9 +53,38 @@ const caveImportHeadersData = [
     display: "County Name",
     value: "CountyName",
     data: {
-      description: "The county name of the cave.",
+      description: "The name of the county the cave is in.",
       example: "Perry County",
       isRequired: true,
+    },
+  },
+  {
+    display: "County Cave Number",
+    value: "CountyCaveNumber",
+    data: {
+      description:
+        "The county cave number of the cave. This is unique per county.",
+      example: "1",
+      isRequired: true,
+    },
+  },
+  {
+    display: "Map Statuses",
+    value: "MapStatuses",
+    data: {
+      description: "Comma-seperated list of the map statuses of the cave.",
+      example: "Grade V, Tape & Compass",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Cartographer Names",
+    value: "CartographerNames",
+    data: {
+      description:
+        "Comma-seperated list of the cartographer names of the cave.",
+      example: "John Doe, Jane Doe",
+      isRequired: false,
     },
   },
 
@@ -73,7 +95,7 @@ const caveImportHeadersData = [
     data: {
       description: "The length of the cave in feet.",
       example: "1000",
-      isRequired: true,
+      isRequired: false,
     },
   },
   {
@@ -82,7 +104,7 @@ const caveImportHeadersData = [
     data: {
       description: "The depth of the cave in feet.",
       example: "200",
-      isRequired: true,
+      isRequired: false,
     },
   },
   {
@@ -91,7 +113,7 @@ const caveImportHeadersData = [
     data: {
       description: "The deepest pit in the cave in feet.",
       example: "200",
-      isRequired: true,
+      isRequired: false,
     },
   },
   {
@@ -100,7 +122,16 @@ const caveImportHeadersData = [
     data: {
       description: "The number of pits in the cave.",
       example: "2",
-      isRequired: true,
+      isRequired: false,
+    },
+  },
+  {
+    display: "Narrative",
+    value: "Narrative",
+    data: {
+      description: "A description of the cave.",
+      example: "This is a cave",
+      isRequired: false,
     },
   },
   {
@@ -108,8 +139,45 @@ const caveImportHeadersData = [
     value: "Geology",
     data: {
       description:
-        "The geological formation that the cave is in. This is a comma-separated list.",
+        "Comma-seperated list of the of the geological formation that the cave is in.",
       example: "Monteagle, Bangor",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Geologic Ages",
+    value: "GeologicAges",
+    data: {
+      description: "Comma-seperated list of the geologic ages of the cave.",
+      example: "Ordovician, Silurian",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Physiographic Provinces",
+    value: "PhysiographicProvinces",
+    data: {
+      description:
+        "Comma-seperated list of the physiographic provinces of the cave.",
+      example: "Valley and Ridge, Blue Ridge",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Archeology",
+    value: "Archeology",
+    data: {
+      description: "Comma-seperated list of the archeological tags.",
+      example: "Yes, No",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Biology",
+    value: "Biology",
+    data: {
+      description: "Comma-seperated list of the biological tags.",
+      example: "Salamander, Bat",
       isRequired: false,
     },
   },
@@ -125,25 +193,18 @@ const caveImportHeadersData = [
     },
   },
   {
-    display: "Reported By Name",
-    value: "ReportedByName",
+    display: "Reported By Names",
+    value: "ReportedByNames",
     data: {
-      description: "The name of the person who reported the cave.",
-      example: "John Doe",
+      description:
+        "Comma-seperated list of the names of the people who reported the cave",
+      example: "John Doe, Jane Doe",
       isRequired: false,
     },
   },
 
   // Miscellaneous
-  {
-    display: "Narrative",
-    value: "Narrative",
-    data: {
-      description: "A description of the cave.",
-      example: "This is a cave",
-      isRequired: false,
-    },
-  },
+
   {
     display: "Is Archived",
     value: "IsArchived",
@@ -151,6 +212,16 @@ const caveImportHeadersData = [
       description:
         "Whether or not the cave is archived. If archived, it will not show up in the main cave list.",
       example: "false",
+      isRequired: false,
+    },
+  },
+  {
+    display: "Other Tags",
+    value: "OtherTags",
+    data: {
+      description:
+        "Comma-seperated list of other tags. This is useful for things that don't fit into the other categories.",
+      example: "Tag1, Tag2",
       isRequired: false,
     },
   },
@@ -246,11 +317,11 @@ const entranceImportHeadersData = [
     },
   },
   {
-    display: "Entrance Status",
-    value: "EntranceStatus",
+    display: "Entrance Statuses",
+    value: "EntranceStatuses",
     data: {
-      description: "The status of the entrance.",
-      example: "Permission Needed",
+      description: "Comma-seperated list of the entrance statuses.",
+      example: "Permission Needed, Gated",
       isRequired: false,
     },
   },
@@ -258,25 +329,17 @@ const entranceImportHeadersData = [
     display: "Entrance Hydrology",
     value: "EntranceHydrology",
     data: {
-      description: "The hydrology of the entrance.",
-      example: "Karst Window",
+      description: "Comma-seperated list of the entrance hydrology.",
+      example: "Karst Window, Perennial",
       isRequired: false,
     },
   },
-  {
-    display: "Entrance Hydrology Frequency",
-    value: "EntranceHydrologyFrequency",
-    data: {
-      description: "The hydrology frequency of the entrance.",
-      example: "Perennial",
-      isRequired: false,
-    },
-  },
+
   {
     display: "Field Indication",
     value: "FieldIndication",
     data: {
-      description: "The field indication of the entrance.",
+      description: "Comma-seperated list of the entrance field indication.",
       example: "Bluff",
       isRequired: false,
     },
@@ -293,11 +356,12 @@ const entranceImportHeadersData = [
     },
   },
   {
-    display: "Reported By Name",
-    value: "ReportedByName",
+    display: "Reported By Names",
+    value: "ReportedByNames",
     data: {
-      description: "The name of the person who reported the entrance.",
-      example: "John Doe",
+      description:
+        "Comma-seperated list of the names of the people who reported the entrance.",
+      example: "John Doe, Jane Doe",
       isRequired: false,
     },
   },
@@ -330,7 +394,7 @@ const ImportInformationCardComponent = () => {
           <Title level={4}>Templates</Title>
           <Paragraph>
             You will need to split your data into two files. A file containing
-            entrnace data and a file containing cave data. You will find a
+            entrance data and a file containing cave data. You will find a
             sample template to download for each file as well as descriptions
             and examples (on hover) . The two files will be merged using the
             county code and county cave number. The cave record must exist

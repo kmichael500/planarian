@@ -65,10 +65,10 @@ public class CaveVm
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     public IEnumerable<string> AlternateNames { get; set; }
 
-    public double LengthFeet { get; set; }
-    public double DepthFeet { get; set; }
-    public double MaxPitDepthFeet { get; set; }
-    public int NumberOfPits { get; set; } = 0;
+    public double? LengthFeet { get; set; }
+    public double? DepthFeet { get; set; }
+    public double? MaxPitDepthFeet { get; set; }
+    public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
 

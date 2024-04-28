@@ -157,7 +157,7 @@ const CavesComponent: React.FC = () => {
         <TextFilterFormItem
           queryBuilder={queryBuilder}
           field={"entranceReportedOnBy" as any}
-          label={"Entrnace Repored By Name"}
+          label={"Entrance Repored By Name"}
           queryOperator={QueryOperator.Contains}
         />
         <TagFilterFormItem

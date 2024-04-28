@@ -17,10 +17,10 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
     public int CountyNumber { get; set; } // max of highest cave number in county + 1
-    public double LengthFeet { get; set; }
-    public double DepthFeet { get; set; }
-    public double MaxPitDepthFeet { get; set; } = 0;
-    public int NumberOfPits { get; set; } = 0;
+    public double? LengthFeet { get; set; }
+    public double? DepthFeet { get; set; }
+    public double? MaxPitDepthFeet { get; set; } = 0;
+    public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
 
