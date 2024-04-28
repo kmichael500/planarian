@@ -44,7 +44,7 @@ public static class TagTypeKeyConstant
     private static readonly List<string> AllAccountTags = new()
     {
         Geology, EntranceStatus, FieldIndication, EntranceHydrology, File, People, Biology, Archeology, MapStatus,
-        CaveOther, GeologicAge, PhysiographicProvince,
+        CaveOther, GeologicAge, PhysiographicProvince, LocationQuality
     };
 
     private static readonly List<string> All = new()

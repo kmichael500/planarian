@@ -103,7 +103,7 @@ public class AccountRepository : RepositoryBase
             .OrderBy(e => e.Name)
             .ToListAsync(cancellationToken);
 
-        if (key.Equals(TagTypeKeyConstant.File))
+        if (key.Equals(TagTypeKeyConstant.File) || key.Equals(TagTypeKeyConstant.LocationQuality))
             foreach (var tag in result)
                 tag.IsUserModifiable = tag is { IsUserModifiable: true, Occurrences: 0 };
         return result;
@@ -168,17 +168,37 @@ public class AccountRepository : RepositoryBase
             if (tagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
 
             // Update the TagTypeId in each tag table
+
+            #region Trip Data
+
             await DbContext.TripTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
-
-            await DbContext.Entrances
-                .Where(e => e.LocationQualityTagId == tagTypeId)
-                .Set(e => e.LocationQualityTagId, destinationTagTypeId)
-                .UpdateAsync();
-
+            
             await DbContext.LeadTags
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            #endregion
+            
+            await DbContext.ArcheologyTag
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            await DbContext.BiologyTag
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            await DbContext.CaveOtherTag
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
+            await DbContext.EntranceHydrologyTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -187,13 +207,18 @@ public class AccountRepository : RepositoryBase
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
-
-            await DbContext.EntranceHydrologyTags
+            
+            await DbContext.FieldIndicationTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
+            
+            await DbContext.Files
+                .Where(e => e.FileTypeTagId == tagTypeId)
+                .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
+                .UpdateAsync();
 
-            await DbContext.FieldIndicationTags
+            await DbContext.GeologicAgeTag
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -203,23 +228,31 @@ public class AccountRepository : RepositoryBase
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
-            await DbContext.Files
-                .Where(e => e.FileTypeTagId == tagTypeId)
-                .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
+            await DbContext.Entrances
+                .Where(e => e.LocationQualityTagId == tagTypeId)
+                .Set(e => e.LocationQualityTagId, destinationTagTypeId)
                 .UpdateAsync();
-
-
+            
+            await DbContext.MapStatusTag
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
+            
             await DbContext.CaveReportedByNameTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
             
+            // TODO: Error when merging someone who already has the same tag type for CartographerNameTag
             await DbContext.EntranceReportedByNameTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
             
-            //TODO?
+            await DbContext.PhysiographicProvinceTag
+                .Where(e => e.TagTypeId == tagTypeId)
+                .Set(e => e.TagTypeId, destinationTagTypeId)
+                .UpdateAsync();
         }
 
         await DbContext.SaveChangesAsync();

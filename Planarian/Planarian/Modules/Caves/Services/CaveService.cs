@@ -235,7 +235,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.ReportedOn = entranceValue.ReportedOn?.ToUtcKind();
                 entrance.PitDepthFeet = entranceValue.PitFeet;
 
-                entrance.ReportedOn = entrance.ReportedOn.Value.ToUtcKind();
+                entrance.ReportedOn = entrance.ReportedOn?.ToUtcKind();
 
                 entrance.Location =
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)

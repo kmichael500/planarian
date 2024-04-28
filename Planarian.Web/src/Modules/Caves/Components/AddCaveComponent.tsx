@@ -445,7 +445,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        ``
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
