@@ -53,6 +53,7 @@ public class PlanarianDbContext : DbContext
     #region Cave
 
     public DbSet<ArcheologyTag> ArcheologyTag { get; set; } = null!;
+    public DbSet<CartographerNameTag> CartographerNameTag { get; set; } = null!;
     public DbSet<MapStatusTag> MapStatusTag { get; set; } = null!;
     public DbSet<PhysiographicProvinceTag> PhysiographicProvinceTag { get; set; } = null!;
     public DbSet<CaveOtherTag> CaveOtherTag { get; set; } = null!;

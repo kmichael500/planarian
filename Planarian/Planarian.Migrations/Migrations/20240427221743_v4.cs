@@ -19,7 +19,7 @@ namespace Planarian.Migrations.Migrations
                 table: "Caves",
                 type: "text",
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "[]");
         }
 
         /// <inheritdoc />
