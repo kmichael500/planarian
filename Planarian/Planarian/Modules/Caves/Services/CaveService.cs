@@ -98,7 +98,7 @@ public class CaveService : ServiceBase<CaveRepository>
             var isNewCounty = entity.CountyId != values.CountyId;
 
             entity.Name = values.Name.Trim();
-            entity.AlternateNames = values.AlternateNames.Select(e => e.Trim());
+            entity.SetAlternateNamesList(values.AlternateNames.Select(e => e.Trim()));
             
             entity.CountyId = values.CountyId.Trim();
             entity.StateId = values.StateId.Trim();

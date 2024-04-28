@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -15,7 +16,7 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
+    [MaxLength(PropertyLength.Max)] public string AlternateNames { get; private set; } = "[]";
     public int CountyNumber { get; set; } // max of highest cave number in county + 1
     public double? LengthFeet { get; set; }
     public double? DepthFeet { get; set; }
@@ -36,21 +37,34 @@ public class Cave : EntityBase
     public virtual ICollection<Entrance> Entrances { get; set; } = new HashSet<Entrance>();
     public virtual ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
     public virtual ICollection<MapStatusTag> MapStatusTags { get; set; } = new HashSet<MapStatusTag>();
+
     public virtual ICollection<GeologicAgeTag> GeologicAgeTags { get; set; } =
         new HashSet<GeologicAgeTag>();
+
     public virtual ICollection<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } =
         new HashSet<PhysiographicProvinceTag>();
+
     public virtual ICollection<BiologyTag> BiologyTags { get; set; } =
         new HashSet<BiologyTag>();
+
     public virtual ICollection<ArcheologyTag> ArcheologyTags { get; set; } =
         new HashSet<ArcheologyTag>();
+
     public virtual ICollection<CartographerNameTag> CartographerNameTags { get; set; } =
         new HashSet<CartographerNameTag>();
+
     public virtual ICollection<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } =
         new HashSet<CaveReportedByNameTag>();
 
     public virtual ICollection<CaveOtherTag> CaveOtherTags { get; set; } =
         new HashSet<CaveOtherTag>();
+
+    [NotMapped]
+    public IEnumerable<string> AlternateNamesList =>
+        JsonSerializer.Deserialize<List<string>>(AlternateNames) ?? new List<string>();
+
+    public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>
+        AlternateNames = JsonSerializer.Serialize(alternateNames);
 
 }
 
@@ -83,17 +97,5 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);
         builder.HasIndex(e => e.Name);
-
-        var alternateNamesConverter = new ValueConverter<IEnumerable<string>, string>(
-            v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
-            v => JsonSerializer.Deserialize<IEnumerable<string>>(v, JsonSerializerOptions.Default) ??
-                 new List<string>());
-
-
-        builder.Property(e => e.AlternateNames)
-            .HasConversion(alternateNamesConverter);
-        
-        
-
     }
 }
