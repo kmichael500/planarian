@@ -78,9 +78,19 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   const searchInput = useRef<InputRef>(null);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
-  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]); // Add this state to manage selected rows
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+  const [isDeleteSelectedDisabled, setIsDeleteSelectedDisabled] =
+    useState(false);
   const onSelectChange = (selectedKeys: string[]) => {
     setSelectedRowKeys(selectedKeys);
+
+    const anyNonModifiable = !selectedKeys.some(
+      (key) =>
+        !localTagTypes.find((tagType) => tagType.tagTypeId === key)
+          ?.isUserModifiable
+    );
+
+    setIsDeleteSelectedDisabled(anyNonModifiable);
   };
 
   useEffect(() => {
@@ -441,20 +451,22 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
             <Button type="primary" onClick={() => setIsMergeModalOpen(true)}>
               Merge Selected
             </Button>
-            <ConfirmationModalComponent
-              okText="Yes"
-              cancelText="No"
-              modalMessage={
-                <>
-                  Are you sure you want to delete these tag types? This is an
-                  irreversible action!
-                </>
-              }
-              confirmationWord={`DELETE SELECTED TAGS`}
-              onConfirm={onMassDeleteConfirm}
-            >
-              Delete Selected
-            </ConfirmationModalComponent>
+            {isDeleteSelectedDisabled && (
+              <ConfirmationModalComponent
+                okText="Yes"
+                cancelText="No"
+                modalMessage={
+                  <>
+                    Are you sure you want to delete these tag types? This is an
+                    irreversible action!
+                  </>
+                }
+                confirmationWord={`DELETE SELECTED TAGS`}
+                onConfirm={onMassDeleteConfirm}
+              >
+                Delete Selected
+              </ConfirmationModalComponent>
+            )}
           </Space>
         )}
         <Table

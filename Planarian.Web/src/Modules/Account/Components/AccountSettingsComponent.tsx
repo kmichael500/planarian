@@ -22,8 +22,8 @@ const AccountSettingsComponent = () => {
     TagType.Biology,
     TagType.Archeology,
     TagType.MapStatus,
-    TagType.CaveOther,
   ].sort();
+  includedTagTypes.push(TagType.CaveOther);
 
   const navigate = useNavigate();
   const location = useLocation();

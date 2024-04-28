@@ -20,8 +20,8 @@ public class TagType : EntityBaseNameId
     {
     }
 
-    public string? ProjectId { get; set; } = null!;
-    public string? AccountId { get; set; } = null!;
+    public string? ProjectId { get; set; }
+    public string? AccountId { get; set; }
 
     [MaxLength(450)] public string Key { get; set; } = null!;
     public bool IsDefault { get; set; } = false;
