@@ -52,26 +52,26 @@ public class PlanarianDbContext : DbContext
 
     #region Cave
 
-    public DbSet<ArcheologyTag> ArcheologyTag { get; set; } = null!;
-    public DbSet<CartographerNameTag> CartographerNameTag { get; set; } = null!;
-    public DbSet<MapStatusTag> MapStatusTag { get; set; } = null!;
-    public DbSet<PhysiographicProvinceTag> PhysiographicProvinceTag { get; set; } = null!;
-    public DbSet<CaveOtherTag> CaveOtherTag { get; set; } = null!;
-    public DbSet<BiologyTag> BiologyTag { get; set; } = null!;
-    public DbSet<GeologicAgeTag> GeologicAgeTag { get; set; } = null!;
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<AccountState> AccountStates { get; set; } = null!;
     public DbSet<AccountUser> AccountUsers { get; set; } = null!;
+    public DbSet<ArcheologyTag> ArcheologyTags { get; set; } = null!;
+    public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
+    public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
     public DbSet<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } = null!;
-    public DbSet<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
     public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;
+    public DbSet<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } = null!;
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
-    public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
+    public DbSet<GeologicAgeTag> GeologicAgeTags { get; set; } = null!;
+    public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
+    public DbSet<MapStatusTag> MapStatusTags { get; set; } = null!;
+    public DbSet<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
 
     #endregion

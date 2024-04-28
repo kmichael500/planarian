@@ -183,17 +183,17 @@ public class AccountRepository : RepositoryBase
 
             #endregion
 
-            await DbContext.ArcheologyTag
+            await DbContext.ArcheologyTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
-            await DbContext.BiologyTag
+            await DbContext.BiologyTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
-            await DbContext.CaveOtherTag
+            await DbContext.CaveOtherTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -218,7 +218,7 @@ public class AccountRepository : RepositoryBase
                 .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
                 .UpdateAsync();
 
-            await DbContext.GeologicAgeTag
+            await DbContext.GeologicAgeTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -233,7 +233,7 @@ public class AccountRepository : RepositoryBase
                 .Set(e => e.LocationQualityTagId, destinationTagTypeId)
                 .UpdateAsync();
 
-            await DbContext.MapStatusTag
+            await DbContext.MapStatusTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -241,7 +241,7 @@ public class AccountRepository : RepositoryBase
             #region People Tags
 
             // TODO: Error when merging someone who already has the same tag type for CartographerNameTag
-            await DbContext.CartographerNameTag
+            await DbContext.CartographerNameTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
@@ -257,7 +257,7 @@ public class AccountRepository : RepositoryBase
 
             #endregion
 
-            await DbContext.PhysiographicProvinceTag
+            await DbContext.PhysiographicProvinceTags
                 .Where(e => e.TagTypeId == tagTypeId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
