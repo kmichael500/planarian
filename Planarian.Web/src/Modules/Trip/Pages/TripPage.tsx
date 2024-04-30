@@ -30,6 +30,7 @@ import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditBut
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { TagType } from "../../Tag/Models/TagType";
 
 const { Title, Paragraph } = Typography;
 
@@ -137,7 +138,9 @@ const TripPage: React.FC = () => {
             getTags={() => {
               return TripService.GetTags(tripId as string);
             }}
-            getTagTypes={SettingsService.GetTripTags}
+            getTagTypes={() =>
+              SettingsService.GetTags(TagType.Trip, projectId as string)
+            }
             tripId={tripId as string}
           />
         </Col>

@@ -17,6 +17,7 @@ public static class PropertyLength
     public const int PasswordResetCode = 20;
     public const int EmailConfirmationCode = 20;
     public const int FileName = 1000;
+    public const int Delimiter = 10;
 }
 
 public static class TagTypeKeyConstant

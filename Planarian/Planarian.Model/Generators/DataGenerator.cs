@@ -202,7 +202,7 @@ public class DataGenerator
     {
         var locationQualityTags = new List<TagType>
         {
-            new() { Id = "oF8MuzX7OI", Name = "Unverified" },
+            new() { Id = "psv2C6Mh2k", Name = "Unverified" },
             new() { Id = "oF8MuzX7OI", Name = "Approximate" },
             new() { Id = "Tndm7SgjVg", Name = "GPS Point" },
             new() { Id = "XY80k3iZ8", Name = "Lidar / GIS Assisted" },
@@ -215,7 +215,7 @@ public class DataGenerator
             Name = e.Name,
             Key = TagTypeKeyConstant.LocationQuality,
             IsDefault = true,
-            CreatedOn = DateTime.UtcNow
+            CreatedOn = Now
         }).ToList();
     }
 

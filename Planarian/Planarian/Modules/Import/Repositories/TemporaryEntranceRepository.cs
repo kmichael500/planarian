@@ -63,7 +63,7 @@ public class TemporaryEntranceRepository : RepositoryBase
                     (cave, county) => new { cave, county })
                 .Where(joined => joined.cave.CountyNumber == te.CountyCaveNumber
                                  && joined.county.DisplayId == te.CountyDisplayId
-                                 && joined.cave.AccountId == RequestUser.AccountId) // Include AccountId in the join condition
+                                 && joined.cave.AccountId == RequestUser.AccountId)
                 .Select(joined => joined.cave.Id)
                 .FirstOrDefault())
             .UpdateAsync();

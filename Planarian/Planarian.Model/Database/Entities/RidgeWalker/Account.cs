@@ -9,7 +9,7 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class Account : EntityBase
 {
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    // [MaxLength(PropertyLength.Name)] public string IdDelimiter { get; set; } = null!;
+    [MaxLength(PropertyLength.Delimiter)] public string? CountyIdDelimiter { get; set; } = null!;
 
     public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
     public ICollection<Cave> Caves { get; set; } = new HashSet<Cave>();

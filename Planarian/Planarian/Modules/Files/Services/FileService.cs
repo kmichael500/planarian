@@ -35,7 +35,7 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
 
-        var allFileTypes = await _settingsRepository.GetFileTags();
+        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         // check if tag type name exists in the file name
         var autoTagType =

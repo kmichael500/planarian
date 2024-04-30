@@ -13,11 +13,6 @@ public class SettingsRepository : RepositoryBase
     {
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
-    {
-        return await DbContext.TagTypes.Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
     public async Task<string> GetTagTypeName(string tagTypeId)
     {
         return await DbContext.TagTypes.Where(e => e.Id == tagTypeId).Select(e => e.Name).FirstAsync();
@@ -47,51 +42,18 @@ public class SettingsRepository : RepositoryBase
             .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetGeologyTags()
+    public async Task<IEnumerable<SelectListItem<string>>> GetTags(string key, string? projectId = null)
     {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.Geology && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetLocationQualityTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.LocationQuality &&
-                        e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceStatusTags()
-    {
-        return await DbContext.TagTypes.Where(e =>
-                e.Key == TagTypeKeyConstant.EntranceStatus &&
-                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetFieldIndicationTags()
-    {
-        return await DbContext.TagTypes.Where(e =>
-                e.Key == TagTypeKeyConstant.FieldIndication &&
-                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyTags()
-    {
-        return await DbContext.TagTypes.Where(e =>
-                e.Key == TagTypeKeyConstant.EntranceHydrology &&
-                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
-    {
-        return await DbContext.TagTypes.Where(e =>
-                e.Key == TagTypeKeyConstant.File &&
-                (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId)))
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+        return string.IsNullOrWhiteSpace(projectId)
+            // Cave Tags
+            ? await DbContext.TagTypes
+                .Where(e => e.Key == key && (e.AccountId == RequestUser.AccountId || e.IsDefault))
+                .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync()
+            // Project Tags
+            : await DbContext.TagTypes
+                .Where(e => e.Key == key && e.AccountId == null &&
+                            e.ProjectId == projectId)
+                .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
     public async Task<string?> GetCountyId(string countyId)
@@ -119,55 +81,5 @@ public class SettingsRepository : RepositoryBase
             .Where(e => e.DisplayId == displayId && e.StateId == stateId).FirstOrDefaultAsync();
 
         return county;
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetPeopleTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.People && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetBiologyTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.Biology && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetArcheologyTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.Archeology && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetMapStatusTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.MapStatus && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetOtherTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.CaveOther && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetGeologicAgeTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.GeologicAge && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetPhysiographicProvinceTags()
-    {
-        return await DbContext.TagTypes
-            .Where(e => e.Key == TagTypeKeyConstant.PhysiographicProvince &&
-                        e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 }

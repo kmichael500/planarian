@@ -37,6 +37,13 @@ export function convertDistance(
   return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`; // Add commas for thousands in feet
 }
 
+export function displayCountyId(
+  countyId: string,
+  countyNumber: string
+): string {
+  return `${countyId} - ${countyNumber}`;
+}
+
 export function isNullOrWhiteSpace(
   input: string | null | undefined
 ): input is null | undefined {

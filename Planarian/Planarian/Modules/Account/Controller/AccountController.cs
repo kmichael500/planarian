@@ -67,14 +67,14 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
         return new JsonResult(result);
     }
-    
+
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/file")]
-    public async Task<IActionResult> ImportFile(string? uuid, [FromForm] IFormFile file,
+    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string countyCodeRegex, [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =
-            await _importService.AddFileForImport(file.OpenReadStream(), file.FileName, uuid,
+            await _importService.AddFileForImport(file.OpenReadStream(), file.FileName, countyCodeRegex, delimiterRegex, uuid,
                 cancellationToken);
 
         return new JsonResult(result);

@@ -90,4 +90,10 @@ public class TagRepository : RepositoryBase
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<TagType>> GetTags(string key)
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Key == key &&
+                        (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId))).ToListAsync();
+    }
 }

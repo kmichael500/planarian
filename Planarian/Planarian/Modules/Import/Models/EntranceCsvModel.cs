@@ -5,13 +5,13 @@ namespace Planarian.Modules.Import.Models;
 
 public class EntranceCsvModel
 {
-    public string CountyCode { get; set; }
-    public string CountyCaveNumber { get; set; }
+    public string? CountyCode { get; set; }
+    public string? CountyCaveNumber { get; set; }
     public string? EntranceName { get; set; }
-    public double DecimalLatitude { get; set; }
-    public double DecimalLongitude { get; set; }
-    public double EntranceElevationFt { get; set; }
-    public string LocationQuality { get; set; }
+    public double? DecimalLatitude { get; set; }
+    public double? DecimalLongitude { get; set; }
+    public double? EntranceElevationFt { get; set; }
+    public string? LocationQuality { get; set; }
     public string? EntranceDescription { get; set; }
     public double? EntrancePitDepth { get; set; }
     public string? EntranceStatuses { get; set; }

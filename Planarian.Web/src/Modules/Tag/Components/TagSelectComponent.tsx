@@ -27,10 +27,6 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   useEffect(() => {
     const getTags = async () => {
       switch (tagType) {
-        case TagType.Trip:
-          const tripTags = await SettingsService.GetTripTags();
-          setTags(tripTags);
-          break;
         case TagType.ProjectMember:
           if (!projectId) {
             throw new Error("Project id is required");
@@ -41,69 +37,10 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
           setTags(projectMembers);
 
           break;
-        case TagType.Geology:
-          const geologyTags = await SettingsService.GetGeology();
-          setTags(geologyTags);
-          break;
-        case TagType.LocationQuality:
-          const locationQualityTagss =
-            await SettingsService.GetLocationQualityTags();
-          setTags(locationQualityTagss);
-          break;
-        case TagType.FieldIndication:
-          const fieldIndicationTags =
-            await SettingsService.GetFieldIndicationTags();
-          setTags(fieldIndicationTags);
-          break;
-
-        case TagType.EntranceHydrology:
-          const entranceHydrologyTags =
-            await SettingsService.GetEntranceHydrology();
-          setTags(entranceHydrologyTags);
-
-          break;
-        case TagType.EntranceStatus:
-          const entranceStatusTags =
-            await SettingsService.GetEntranceStatusTags();
-          setTags(entranceStatusTags);
-          break;
-
-        case TagType.File:
-          const fileTags = await SettingsService.GetFileTags();
-          setTags(fileTags);
-          break;
-        case TagType.People:
-          const peopleTags = await SettingsService.GetPeopleTags();
-          setTags(peopleTags);
-          break;
-        case TagType.Biology:
-          const biologyTags = await SettingsService.GetBiologyTags();
-          setTags(biologyTags);
-          break;
-        case TagType.Archeology:
-          const archeologyTags = await SettingsService.GetArcheologyTags();
-          setTags(archeologyTags);
-          break;
-        case TagType.MapStatus:
-          const mapStatusTags = await SettingsService.GetMapStatusTags();
-          setTags(mapStatusTags);
-          break;
-        case TagType.CaveOther:
-          const otherTags = await SettingsService.GetOtherTags();
-          setTags(otherTags);
-          break;
-        case TagType.GeologicAge:
-          const geologicAgeTags = await SettingsService.GetGeologicAgeTags();
-          setTags(geologicAgeTags);
-          break;
-        case TagType.PhysiographicProvince:
-          const physiographicProvinceTags =
-            await SettingsService.GetPhysiographicProvinceTags();
-          setTags(physiographicProvinceTags);
-          break;
 
         default:
-          throw new Error("Invalid tag type");
+          const tags = await SettingsService.GetTags(tagType);
+          setTags(tags);
       }
       setIsLoading(false);
     };

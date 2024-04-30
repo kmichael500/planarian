@@ -358,7 +358,7 @@ public class CaveRepository : RepositoryBase
         {
             Id = e.Id,
             CountyId = e.CountyId,
-            DisplayId = $"{e.County.DisplayId}{e.CountyNumber}",
+            DisplayId = $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
             Name = e.Name,
             LengthFeet = e.LengthFeet,
             DepthFeet = e.DepthFeet,
@@ -398,7 +398,7 @@ public class CaveRepository : RepositoryBase
                 ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
                 CountyId = e.CountyId,
-                DisplayId = $"{e.County.DisplayId}{e.CountyNumber}",
+                DisplayId = $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
                 Name = e.Name,
                 AlternateNames = e.AlternateNamesList,
                 LengthFeet = e.LengthFeet,

@@ -73,6 +73,8 @@ const AccountService = {
   async ImportFile(
     file: string | Blob | RcFile,
     uuid: string,
+    delmiterRegex: string,
+    countyCodeRegex: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileVm> {
     const formData = new FormData();
@@ -85,8 +87,12 @@ const AccountService = {
       onUploadProgress: onProgress, // Set the onUploadProgress callback
     };
 
+    const regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
+      delmiterRegex
+    )}&countyCodeRegex=${countyCodeRegex}`;
+
     const response = await HttpClient.post<FileVm>(
-      `${baseUrl}/import/file?uuid=${uuid}`,
+      `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,
       formData,
       config
     );

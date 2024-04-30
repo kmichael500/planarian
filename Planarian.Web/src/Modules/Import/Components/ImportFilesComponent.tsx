@@ -1,10 +1,15 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Modal, message } from "antd";
 import {
-  DeliveredProcedureOutlined,
-  CheckCircleOutlined,
-  RedoOutlined,
-} from "@ant-design/icons";
+  Card,
+  Result,
+  Button,
+  Modal,
+  message,
+  Input,
+  Form,
+  Typography,
+} from "antd";
+import { CheckCircleOutlined, RedoOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
 
 // Importing components and services
@@ -19,10 +24,10 @@ import { FileVm } from "../../Files/Models/FileVm";
 // Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { NotificationComponent } from "./NotificationComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
+import { nameof } from "../../../Shared/Helpers/StringHelpers";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -41,10 +46,17 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
   const [isLoading, setIsLoading] = useState(false);
 
+  const [form] = Form.useForm<DelimiterFormFields>();
+  const [inputsConfirmed, setInputsConfirmed] = useState(false);
+
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
   const handleOk = () => setIsModalOpen(false);
   const tryAgain = () => resetStates();
+  const confirmInputs = () => {
+    form.submit();
+  };
+
   const convertErrorListToCsv = (
     errorList: FailedCsvRecord<CaveCsvModel>[]
   ): string =>
@@ -66,7 +78,67 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
 
   return (
     <>
-      {!isUploaded && !uploadFailed && errorList.length === 0 && (
+      {!inputsConfirmed && (
+        <Card style={{ width: "100%", marginBottom: "20px" }}>
+          <Typography.Title level={4}>File Import Settings</Typography.Title>
+          <Typography.Paragraph>
+            A <strong>delimiter</strong> is a character that separates the
+            county code and the county cave number in your file name. For
+            example, if your county code is "AB" and your cave number follows
+            it, using a delimiter like a dash would look like "AB-123". If you
+            don't specify a delimter, it will be assumed that there is no
+            delimter and that the county code and cave number are directly next
+            to each other.
+          </Typography.Paragraph>
+          <Typography.Paragraph>
+            The <strong>county code regex</strong> is a pattern that matches the
+            format of your county codes. This is to tie the file with the
+            correct cave. For instance, For example, the regex pattern '
+            {`[A-Z]{2}`}' ensures each code is exactly two uppercase letters,
+            such as "AB", "DB", or "BU" but it would not match "A", "ABC", or
+            "Ab". You can use a site like{" "}
+            <a href="https://regexr.com" target="_blank">
+              https://regexr.com
+            </a>
+          </Typography.Paragraph>
+
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={(values) => {
+              setInputsConfirmed(true);
+            }}
+          >
+            <Form.Item
+              label="Delimiter"
+              name={nameof<DelimiterFormFields>("delimiter")}
+              initialValue=""
+            >
+              <Input placeholder="-" />
+            </Form.Item>
+            <Form.Item
+              label="County Code Regex"
+              name={nameof<DelimiterFormFields>("countyCodeRegex")}
+              rules={[
+                {
+                  required: true,
+                  message: "Please input a county code regex!",
+                },
+              ]}
+              initialValue=""
+            >
+              <Input placeholder="^\\d{3}$" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                Confirm Settings
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+      )}
+
+      {inputsConfirmed && !uploadFailed && errorList.length === 0 && (
         <UploadComponent
           draggerMessage="Drag any files you would like to upload."
           draggerTitle="Import Cave Files"
@@ -77,6 +149,8 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               const result = await AccountService.ImportFile(
                 params.file,
                 params.uid,
+                form.getFieldValue("delimiter"),
+                form.getFieldValue("countyCodeRegex"),
                 params.onProgress
               );
               // setUploadResult(result);
@@ -171,3 +245,8 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
 };
 
 export { ImportFilesComponent };
+
+interface DelimiterFormFields {
+  delimiter: string;
+  countyCodeRegex: string;
+}

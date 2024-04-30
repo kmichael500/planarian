@@ -10,6 +10,7 @@ import { CreateOrEditTripVm } from "../Models/CreateOrEditTripVm";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
+import { TagType } from "../../Tag/Models/TagType";
 
 interface TripCreateButtonProps {
   projectId: string;
@@ -43,7 +44,10 @@ const TripCreateButtonComponent: React.FC<TripCreateButtonProps> = (
     }
     if (tripTags == undefined) {
       const GetTripTags = async (): Promise<void> => {
-        const response = await SettingsService.GetTripTags();
+        const response = await SettingsService.GetTags(
+          TagType.Trip,
+          props.projectId
+        );
 
         setTripTags(
           response.map(

@@ -81,7 +81,7 @@ public class AccountRepository : RepositoryBase
             {
                 TagTypeId = e.Id,
                 Name = e.Name,
-                IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId),
+                IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
                 Occurrences = e.TripTags.Count +
                               e.LeadTags.Count +
                               e.EntranceStatusTags.Count +

@@ -23,7 +23,6 @@ public class TemporaryEntrance : EntityBase
     public double Elevation { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public double? PitFeet { get; set; }
 }
