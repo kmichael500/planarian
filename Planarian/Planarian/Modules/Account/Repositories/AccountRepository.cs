@@ -1,4 +1,5 @@
 using LinqToDB;
+using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -16,16 +17,16 @@ public class AccountRepository : RepositoryBase
     public async Task DeleteAllCaves(IProgress<string> progress, CancellationToken cancellationToken)
     {
         const int batchSize = 500; // Adjust based on your needs
-        var cavesCount = await DbContext.Caves.CountAsync(e => e.AccountId == RequestUser.AccountId, cancellationToken);
+        var cavesCount = await AsyncExtensions.CountAsync(DbContext.Caves, e => e.AccountId == RequestUser.AccountId, cancellationToken);
         // Batch delete for Caves
         int deletedCount;
         var totalDeleted = 0;
         do
         {
             deletedCount = await DbContext.Caves
-                .Where(e=>e.AccountId == RequestUser.AccountId)
+                .Where(e => e.AccountId == RequestUser.AccountId)
                 .Where(c => DbContext.Caves
-                    .Where(e=>e.AccountId == RequestUser.AccountId)
+                    .Where(e => e.AccountId == RequestUser.AccountId)
                     .Take(batchSize)
                     .Select(w => w.Id)
                     .Contains(c.Id) && c.AccountId == RequestUser.AccountId)
@@ -40,13 +41,13 @@ public class AccountRepository : RepositoryBase
 
         // Batch delete for TagTypes
         var tagTypesCount =
-            await DbContext.TagTypes.CountAsync(e => e.AccountId == RequestUser.AccountId, cancellationToken);
+            await AsyncExtensions.CountAsync(DbContext.TagTypes, e => e.AccountId == RequestUser.AccountId, cancellationToken);
         do
         {
             deletedCount = await DbContext.TagTypes
-                .Where(e=>e.AccountId ==  RequestUser.AccountId)
+                .Where(e => e.AccountId == RequestUser.AccountId)
                 .Where(tt => DbContext.TagTypes
-                    .Where(e=>e.AccountId == RequestUser.AccountId)
+                    .Where(e => e.AccountId == RequestUser.AccountId)
                     .Take(batchSize)
                     .Select(w => w.Id)
                     .Contains(tt.Id) && tt.AccountId == RequestUser.AccountId)
@@ -69,39 +70,38 @@ public class AccountRepository : RepositoryBase
 
     public async Task<IEnumerable<AccountState>> GetAllAccountStates()
     {
-        return await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).ToListAsync();
+        return await AsyncExtensions.ToListAsync(DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId));
     }
 
     public async Task<IEnumerable<TagTypeTableVm>> GetTagsForTable(string key, CancellationToken cancellationToken)
     {
-        var result = await DbContext.TagTypes
-            .Where(e => e.Key == key)
-            .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault)
-            .Select(e => new TagTypeTableVm
-            {
-                TagTypeId = e.Id,
-                Name = e.Name,
-                IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
-                Occurrences = e.TripTags.Count +
-                              e.LeadTags.Count +
-                              e.EntranceStatusTags.Count +
-                              e.EntranceHydrologyTags.Count +
-                              e.FieldIndicationTags.Count +
-                              e.EntranceLocationQualitiesTags.Count +
-                              e.GeologyTags.Count +
-                              e.CaveReportedByNameTags.Count +
-                              e.CartographerNameTags.Count +
-                              e.EntranceReportedByNameTags.Count +
-                              e.FileTypeTags.Count +
-                              e.MapStatusTags.Count +
-                              e.GeologicAgeTags.Count +
-                              e.PhysiographicProvinceTags.Count +
-                              e.BiologyTags.Count +
-                              e.ArcheologyTags.Count +
-                              e.CaveOtherTags.Count
-            })
-            .OrderBy(e => e.Name)
-            .ToListAsync(cancellationToken);
+        var result = await AsyncExtensions.ToListAsync(DbContext.TagTypes
+                .Where(e => e.Key == key)
+                .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault)
+                .Select(e => new TagTypeTableVm
+                {
+                    TagTypeId = e.Id,
+                    Name = e.Name,
+                    IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
+                    Occurrences = e.TripTags.Count +
+                                  e.LeadTags.Count +
+                                  e.EntranceStatusTags.Count +
+                                  e.EntranceHydrologyTags.Count +
+                                  e.FieldIndicationTags.Count +
+                                  e.EntranceLocationQualitiesTags.Count +
+                                  e.GeologyTags.Count +
+                                  e.CaveReportedByNameTags.Count +
+                                  e.CartographerNameTags.Count +
+                                  e.EntranceReportedByNameTags.Count +
+                                  e.FileTypeTags.Count +
+                                  e.MapStatusTags.Count +
+                                  e.GeologicAgeTags.Count +
+                                  e.PhysiographicProvinceTags.Count +
+                                  e.BiologyTags.Count +
+                                  e.ArcheologyTags.Count +
+                                  e.CaveOtherTags.Count
+                })
+                .OrderBy(e => e.Name), cancellationToken);
 
         if (key.Equals(TagTypeKeyConstant.File) || key.Equals(TagTypeKeyConstant.LocationQuality))
             foreach (var tag in result)
@@ -111,27 +111,26 @@ public class AccountRepository : RepositoryBase
 
     public async Task<int> GetNumberOfOccurrences(string tagTypeId)
     {
-        var result = await DbContext.TagTypes
-            .Where(e => e.Id == tagTypeId)
-            .Select(e => e.TripTags.Count +
-                         e.LeadTags.Count +
-                         e.EntranceStatusTags.Count +
-                         e.EntranceHydrologyTags.Count +
-                         e.FieldIndicationTags.Count +
-                         e.EntranceLocationQualitiesTags.Count +
-                         e.GeologyTags.Count +
-                         e.CaveReportedByNameTags.Count +
-                         e.CartographerNameTags.Count +
-                         e.EntranceReportedByNameTags.Count +
-                         e.FileTypeTags.Count +
-                         e.MapStatusTags.Count +
-                         e.GeologicAgeTags.Count +
-                         e.PhysiographicProvinceTags.Count +
-                         e.BiologyTags.Count +
-                         e.ArcheologyTags.Count +
-                         e.CaveOtherTags.Count
-                         )
-            .FirstOrDefaultAsync();
+        var result = await AsyncExtensions.FirstOrDefaultAsync(DbContext.TagTypes
+                .Where(e => e.Id == tagTypeId)
+                .Select(e => e.TripTags.Count +
+                             e.LeadTags.Count +
+                             e.EntranceStatusTags.Count +
+                             e.EntranceHydrologyTags.Count +
+                             e.FieldIndicationTags.Count +
+                             e.EntranceLocationQualitiesTags.Count +
+                             e.GeologyTags.Count +
+                             e.CaveReportedByNameTags.Count +
+                             e.CartographerNameTags.Count +
+                             e.EntranceReportedByNameTags.Count +
+                             e.FileTypeTags.Count +
+                             e.MapStatusTags.Count +
+                             e.GeologicAgeTags.Count +
+                             e.PhysiographicProvinceTags.Count +
+                             e.BiologyTags.Count +
+                             e.ArcheologyTags.Count +
+                             e.CaveOtherTags.Count
+                ));
         return result;
     }
 
@@ -272,5 +271,70 @@ public class AccountRepository : RepositoryBase
         if (propertyInfo == null) return;
 
         foreach (var tag in tags) propertyInfo.SetValue(tag, destinationTagTypeId);
+    }
+
+    public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
+        CancellationToken cancellationToken)
+    {
+        var result = await AsyncExtensions.ToListAsync(DbContext.Counties
+                .Where(e => e.AccountId == RequestUser.AccountId && e.StateId == stateId)
+                .Select(e => new TagTypeTableCountyVm
+                {
+                    TagTypeId = e.Id,
+                    CountyDisplayId = e.DisplayId,
+                    Name = e.Name,
+                    IsUserModifiable = !e.Caves.Any(),
+                    Occurrences = e.Caves.Count()
+
+                })
+                .OrderBy(e => e.Name), cancellationToken);
+
+        return result;
+    }
+
+    public async Task<County?> GetCounty(string? countyId, CancellationToken cancellationToken)
+    {
+        return await AsyncExtensions.FirstOrDefaultAsync(DbContext.Counties, e => e.Id == countyId);
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
+    {
+        return await AsyncExtensions.ToListAsync(DbContext.States
+                .Select(e => new SelectListItem<string>
+                {
+                    Value = e.Id,
+                    Display = e.Abbreviation
+                })
+                .OrderBy(e => e.Display), cancellationToken);
+    }
+
+    public async Task<bool> IsDuplicateCountyCode(string countyDisplayId, string stateId,
+        CancellationToken cancellationToken)
+    {
+        return await EntityFrameworkQueryableExtensions.AnyAsync(DbContext.Counties, e =>
+                EF.Functions.ILike(e.DisplayId, $"{countyDisplayId}") && e.DisplayId.Length == countyDisplayId.Length &&
+                e.StateId == stateId && e.AccountId == RequestUser.AccountId,
+            cancellationToken);
+    }
+
+    public async Task<bool> CanDeleteCounty(string countyId)
+    {
+        return DbContext.Counties.Any(e =>
+            e.Id == countyId && e.Caves.Count.Equals(0) && e.AccountId == RequestUser.AccountId);
+    }
+
+    public async Task MergeCounties(string[] countyIds, string destinationCountyId)
+    {
+        foreach (var countyId in countyIds)
+        {
+            if (countyId == destinationCountyId) continue;
+
+            await DbContext.Caves
+                .Where(e => e.CountyId == countyId)
+                .Set(e => e.CountyId, destinationCountyId)
+                .UpdateAsync();
+        }
+
+        await DbContext.SaveChangesAsync();
     }
 }

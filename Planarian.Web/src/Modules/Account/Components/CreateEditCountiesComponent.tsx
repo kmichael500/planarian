@@ -21,34 +21,40 @@ import {
 import { SearchOutlined } from "@ant-design/icons";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { SettingsService } from "../../Setting/Services/SettingsService";
 import { TagType } from "../../Tag/Models/TagType";
 import { AccountService } from "../Services/AccountService";
 import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
-import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import {
+  isNullOrWhiteSpace,
+  nameof,
+} from "../../../Shared/Helpers/StringHelpers";
 import { searchFilterSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
-import { TagTypeTableVm } from "../Models/TagTypeTableVm";
+import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
 import { MergeForm } from "../Models/MergeForm";
+import { CreateCountyVm } from "../Models/CreateEditCountyVm";
+import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
-interface TagTypeEditComponentProps {
-  tagType: TagType;
+interface CreateEditCountiesComponentProps {
+  stateId: string;
 }
 
-const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
-  tagType,
-}) => {
-  const [editedTagType, setEditedTagType] = useState<TagTypeTableVm | null>(
-    null
-  );
+const CreateEditCountiesComponent = (
+  props: CreateEditCountiesComponentProps
+) => {
+  const [editedTagType, setEditedTagType] =
+    useState<TagTypeTableCountyVm | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15); // Assuming default page size is 10
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [tagTypes, setTagTypes] = useState<TagTypeTableVm[]>([]);
+  const [tagTypes, setTagTypes] = useState<TagTypeTableCountyVm[]>([]);
   useEffect(() => {
     const getTags = async () => {
-      var tags = await AccountService.GetTagsForTable(tagType);
+      var tags = await AccountService.GetCountiesForTable(props.stateId);
       setTagTypes(tags);
       setIsLoading(false);
     };
@@ -56,8 +62,8 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   }, []);
 
   const [localTagTypes, setLocalTagTypes] =
-    useState<TagTypeTableVm[]>(tagTypes);
-  const [form] = Form.useForm<CreateEditTagTypeVm>();
+    useState<TagTypeTableCountyVm[]>(tagTypes);
+  const [form] = Form.useForm<CreateCountyVm>();
   const [mergeForm] = Form.useForm<MergeForm>();
 
   const [searchText, setSearchText] = useState<string>("");
@@ -89,10 +95,16 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   }, [tagTypes]);
 
   const onAdd = async () => {
+    let values: CreateCountyVm;
     try {
-      const values = await form.validateFields();
+      try {
+        values = await form.validateFields();
+      } catch (error) {
+        return;
+      }
+
       setIsLoading(true);
-      const newTagType = await AccountService.AddTagType(values);
+      const newTagType = await AccountService.AddCounty(values, props.stateId);
       const insertionIndex = (currentPage - 1) * pageSize;
       setLocalTagTypes((prev) => [
         ...prev.slice(0, insertionIndex),
@@ -100,9 +112,10 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
         ...prev.slice(insertionIndex),
       ]);
       form.resetFields();
-      message.success("Tag Type added successfully!");
-    } catch (error) {
-      message.error("Failed to add Tag Type!");
+      message.success("County added successfully!");
+    } catch (err) {
+      const error = err as ApiErrorResponse;
+      message.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +124,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   const rowSelection = {
     selectedRowKeys,
     onChange: onSelectChange,
-  } as TableRowSelection<TagTypeTableVm>;
+  } as TableRowSelection<TagTypeTableCountyVm>;
 
   const hasSelected = selectedRowKeys.length > 0;
 
@@ -131,21 +144,44 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
     }
   };
 
-  const onSave = async (tagType: TagTypeTableVm) => {
+  const onSave = async (tagType: TagTypeTableCountyVm) => {
     try {
+      if (isNullOrWhiteSpace(tagType.name)) {
+        message.error("Name is required");
+        return;
+      }
+      if (isNullOrWhiteSpace(tagType.countyDisplayId)) {
+        message.error("County code is required");
+        return;
+      }
+      if (tagType.countyDisplayId.length > PropertyLength.SMALL_TEXT) {
+        message.error(
+          `County code must be less than ${PropertyLength.SMALL_TEXT} characters!`
+        );
+        return;
+      }
+      if (tagType.name.length > PropertyLength.NAME) {
+        message.error(
+          `County name must be less than ${PropertyLength.NAME} characters!`
+        );
+        return;
+      }
       setIsLoading(true);
-      await AccountService.UpdateTagTypes(tagType.tagTypeId, {
-        name: tagType.name,
-      });
+      await AccountService.UpdateCounties(
+        tagType.tagTypeId,
+        props.stateId,
+        tagType
+      );
       setLocalTagTypes((prev) =>
         prev.map((t) => (t.tagTypeId === tagType.tagTypeId ? tagType : t))
       );
       message.success("Tag Type saved successfully!");
-    } catch (error) {
-      message.error("Failed to save Tag Type!");
+      setEditedTagType(null);
+    } catch (err) {
+      const error = err as ApiErrorResponse;
+      message.error(error.message);
     } finally {
       setIsLoading(false);
-      setEditedTagType(null);
     }
   };
 
@@ -164,7 +200,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
 
   const getColumnSearchProps = (
     dataIndex: string
-  ): ColumnType<TagTypeTableVm> => ({
+  ): ColumnType<TagTypeTableCountyVm> => ({
     filterDropdown: ({
       setSelectedKeys,
       selectedKeys,
@@ -209,8 +245,8 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       <SearchOutlined style={{ color: filtered ? "#1677ff" : undefined }} />
     ),
     onFilter: (value, record) =>
-      !!record[dataIndex as keyof TagTypeTableVm]
-        ? record[dataIndex as keyof TagTypeTableVm]
+      !!record[dataIndex as keyof TagTypeTableCountyVm]
+        ? record[dataIndex as keyof TagTypeTableCountyVm]
             .toString()
             .toLowerCase()
             .includes((value as string).toLowerCase())
@@ -251,17 +287,21 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   const columns = [
     {
       title: "Name",
-      dataIndex: "name",
-      key: "name",
-      ...getColumnSearchProps("name"), // Apply the search props to this column
-      sorter: (a: TagTypeTableVm, b: TagTypeTableVm) =>
-        a.name.localeCompare(b.name), // Enable sorting
+      dataIndex: nameof<TagTypeTableCountyVm>("name"),
+      key: nameof<TagTypeTableCountyVm>("name"),
+      ...getColumnSearchProps(nameof<TagTypeTableCountyVm>("name")),
+      sorter: (a: TagTypeTableCountyVm, b: TagTypeTableCountyVm) =>
+        a.name.localeCompare(b.name),
 
-      render: (text: string, record: TagTypeTableVm) => {
+      render: (text: string, record: TagTypeTableCountyVm) => {
         if (editedTagType && editedTagType.tagTypeId === record.tagTypeId) {
           return (
             <Form onFinish={() => onSave(editedTagType)}>
-              <Form.Item name="name" initialValue={text} noStyle>
+              <Form.Item
+                name={nameof<TagTypeTableCountyVm>("name")}
+                initialValue={text}
+                noStyle
+              >
                 <Input
                   autoFocus
                   onChange={(e) =>
@@ -276,17 +316,49 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
       },
     },
     {
+      title: "County Code",
+      dataIndex: nameof<TagTypeTableCountyVm>("countyDisplayId"),
+      key: nameof<TagTypeTableCountyVm>("countyDisplayId"),
+      ...getColumnSearchProps(nameof<TagTypeTableCountyVm>("countyDisplayId")),
+      sorter: (a: TagTypeTableCountyVm, b: TagTypeTableCountyVm) =>
+        a.countyDisplayId.localeCompare(b.countyDisplayId),
+      render: (text: string, record: TagTypeTableCountyVm) => {
+        if (editedTagType && editedTagType.tagTypeId === record.tagTypeId) {
+          return (
+            <Form onFinish={() => onSave(editedTagType)}>
+              <Form.Item
+                name={nameof<TagTypeTableCountyVm>("countyDisplayId")}
+                initialValue={text}
+                noStyle
+              >
+                <Input
+                  autoFocus
+                  onChange={(e) =>
+                    setEditedTagType({
+                      ...editedTagType,
+                      countyDisplayId: e.target.value,
+                    })
+                  }
+                />
+              </Form.Item>
+            </Form>
+          );
+        }
+        return text;
+      },
+    },
+    {
       title: "Occurrences",
       dataIndex: "occurrences",
       key: "occurrences",
-      sorter: (a: TagTypeTableVm, b: TagTypeTableVm) =>
+      sorter: (a: TagTypeTableCountyVm, b: TagTypeTableCountyVm) =>
         a.occurrences - b.occurrences,
       // defaultSortOrder: "descend",
     },
     {
       title: "Action",
       key: "action",
-      render: (text: string, record: TagTypeTableVm) => (
+      render: (text: string, record: TagTypeTableCountyVm) => (
         <span>
           <Space>
             {editedTagType && editedTagType.tagTypeId === record.tagTypeId ? (
@@ -299,7 +371,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
             ) : (
               <Button onClick={() => setEditedTagType(record)}>Edit</Button>
             )}
-            {record.tagTypeId !== editedTagType?.tagTypeId && (
+            {/* {record.tagTypeId !== editedTagType?.tagTypeId && (
               <Button
                 onClick={() => {
                   setSingleMergeTagTypeId(record.tagTypeId);
@@ -308,7 +380,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
               >
                 Merge
               </Button>
-            )}
+            )} */}
             {record.isUserModifiable && (
               <>
                 <ConfirmationModalComponent
@@ -333,7 +405,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
         </span>
       ),
     },
-  ] as ColumnsType<TagTypeTableVm>;
+  ] as ColumnsType<TagTypeTableCountyVm>;
 
   const onMassMerge = async () => {
     try {
@@ -415,18 +487,30 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
                   rules={[
                     {
                       required: true,
-                      message: "Please input the name of the tag type!",
+                      message: "County name is required",
+                    },
+                    {
+                      max: PropertyLength.NAME,
+                      message: `County name must be less than ${PropertyLength.NAME} characters!`,
                     },
                   ]}
                 >
-                  <Input placeholder="New Tag Type Name" />
+                  <Input placeholder="County Name" />
                 </Form.Item>
                 <Form.Item
-                  name={nameof<CreateEditTagTypeVm>("key")}
-                  initialValue={tagType}
-                  style={{ display: "none" }}
+                  name={nameof<CreateCountyVm>("countyDisplayId")}
+                  rules={[
+                    {
+                      required: true,
+                      message: "County code is required.",
+                    },
+                    {
+                      max: PropertyLength.SMALL_TEXT,
+                      message: `County code must be less than ${PropertyLength.SMALL_TEXT} characters!`,
+                    },
+                  ]}
                 >
-                  <Input type="hidden" />
+                  <Input placeholder="County Code" />
                 </Form.Item>
                 <Form.Item shouldUpdate>
                   <Button type="primary" onClick={onAdd}>
@@ -515,4 +599,4 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   );
 };
 
-export default TagTypeEditComponent;
+export default CreateEditCountiesComponent;

@@ -1,5 +1,6 @@
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
@@ -154,5 +155,94 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId);
         }
+    }
+
+    public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
+        CancellationToken cancellationToken)
+    {
+        return await Repository.GetCountiesForTable(stateId, cancellationToken);
+    }
+
+    public async Task<TagTypeTableCountyVm> CreateOrUpdateCounty(string stateId, CreateCountyVm county,
+        string? countyId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(county.Name)) throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(county.CountyDisplayId)) throw ApiExceptionDictionary.BadRequest("County Code cannot be empty.");
+
+        var isNewCounty = string.IsNullOrWhiteSpace(countyId);
+        var entity = !isNewCounty ? await Repository.GetCounty(countyId, cancellationToken) : new County();
+
+        if (entity == null) throw ApiExceptionDictionary.NotFound("County Id");
+        
+        var isDuplicateCountyCode = await Repository.IsDuplicateCountyCode(county.CountyDisplayId, stateId, cancellationToken);
+
+        if (isDuplicateCountyCode)
+            throw ApiExceptionDictionary.BadRequest(
+                $"The county code '{county.CountyDisplayId}' is already in use for the selected state.");
+
+        entity.Name = county.Name;
+        entity.DisplayId = county.CountyDisplayId;
+        entity.StateId = stateId;
+
+        if (isNewCounty)
+        {
+            entity.AccountId = RequestUser.AccountId ?? throw new InvalidOperationException();
+            Repository.Add(entity);
+        }
+
+        await Repository.SaveChangesAsync();
+
+        var result = new TagTypeTableCountyVm
+        {
+            TagTypeId = entity.Id,
+            Name = entity.Name,
+            IsUserModifiable = true,
+            Occurrences = 0,
+            CountyDisplayId = entity.DisplayId
+        };
+
+        return result;
+    }
+    
+    public async Task DeleteCounties(IEnumerable<string> countyIds, CancellationToken cancellationToken)
+    {
+        countyIds = countyIds.ToList();
+        var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var countyId in countyIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var canDelete = await Repository.CanDeleteCounty(countyId);
+                if (!canDelete)
+                {
+                    throw ApiExceptionDictionary.BadRequest("Cannot delete county because it is in use.");
+                }
+
+                Repository.Delete(new County { Id = countyId });
+            }
+
+            await Repository.SaveChangesAsync();
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+    }
+    
+    public async Task MergeCounties(string[] countyIds, string destinationCountyId, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+        foreach (var id in countyIds)
+        {
+            await Repository.MergeCounties(countyIds, destinationCountyId);
+        }
+    }
+
+    public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
+    {
+        return await Repository.GetAllStates(cancellationToken);
     }
 }

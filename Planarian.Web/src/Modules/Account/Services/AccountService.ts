@@ -3,8 +3,10 @@ import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../..";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
-import { TagTypeTableVm } from "../Components/TagTypeEditComponent";
-import { CreateEditTagTypeVm } from "../Components/CreateEditTagTypeVm";
+import { TagTypeTableVm } from "../Models/TagTypeTableVm";
+import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
+import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
+import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -101,10 +103,36 @@ const AccountService = {
   //#endregion
 
   //#region Tags
-
+  async GetCountiesForTable(stateId: string): Promise<TagTypeTableCountyVm[]> {
+    const response = await HttpClient.get<TagTypeTableCountyVm[]>(
+      `${baseUrl}/counties-table/${stateId}`
+    );
+    return response.data;
+  },
+  async AddCounty(
+    tag: CreateCountyVm,
+    stateId: string
+  ): Promise<TagTypeTableCountyVm> {
+    const response = await HttpClient.post<TagTypeTableCountyVm>(
+      `${baseUrl}/states/${stateId}/counties`,
+      tag
+    );
+    return response.data;
+  },
   async GetTagsForTable(tagType: TagType): Promise<TagTypeTableVm[]> {
     const response = await HttpClient.get<TagTypeTableVm[]>(
       `${baseUrl}/tags-table/${tagType}`
+    );
+    return response.data;
+  },
+  async UpdateCounties(
+    countyId: string,
+    stateId: string,
+    tag: TagTypeTableCountyVm
+  ): Promise<TagTypeTableCountyVm> {
+    const response = await HttpClient.put<TagTypeTableCountyVm>(
+      `${baseUrl}/states/${stateId}/counties/${countyId}`,
+      tag
     );
     return response.data;
   },

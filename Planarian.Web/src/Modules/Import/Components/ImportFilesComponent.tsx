@@ -99,7 +99,10 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             "Ab". You can use a site like{" "}
             <a href="https://regexr.com" target="_blank">
               https://regexr.com
-            </a>
+            </a>{" "}
+            to test your regex against your filenames to ensure it matches. The
+            first match of the county code regex combined with the delimiter and
+            followed by the cave number will be used to match the cave.
           </Typography.Paragraph>
 
           <Form
