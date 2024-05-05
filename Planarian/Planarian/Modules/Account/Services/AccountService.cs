@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -167,14 +168,16 @@ public class AccountService : ServiceBase<AccountRepository>
         string? countyId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(county.Name)) throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
-        if (string.IsNullOrWhiteSpace(county.CountyDisplayId)) throw ApiExceptionDictionary.BadRequest("County Code cannot be empty.");
+        if (string.IsNullOrWhiteSpace(county.CountyDisplayId))
+            throw ApiExceptionDictionary.BadRequest("County Code cannot be empty.");
 
         var isNewCounty = string.IsNullOrWhiteSpace(countyId);
         var entity = !isNewCounty ? await Repository.GetCounty(countyId, cancellationToken) : new County();
 
         if (entity == null) throw ApiExceptionDictionary.NotFound("County Id");
-        
-        var isDuplicateCountyCode = await Repository.IsDuplicateCountyCode(county.CountyDisplayId, stateId, cancellationToken);
+
+        var isDuplicateCountyCode =
+            await Repository.IsDuplicateCountyCode(county.CountyDisplayId, stateId, cancellationToken);
 
         if (isDuplicateCountyCode)
             throw ApiExceptionDictionary.BadRequest(
@@ -203,7 +206,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         return result;
     }
-    
+
     public async Task DeleteCounties(IEnumerable<string> countyIds, CancellationToken cancellationToken)
     {
         countyIds = countyIds.ToList();
@@ -231,9 +234,10 @@ public class AccountService : ServiceBase<AccountRepository>
         }
 
     }
-    
+
     public async Task MergeCounties(string[] countyIds, string destinationCountyId, CancellationToken cancellationToken)
     {
+        // TODO: Need to update county ids
         throw new NotImplementedException();
         foreach (var id in countyIds)
         {
@@ -244,5 +248,72 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
     {
         return await Repository.GetAllStates(cancellationToken);
+    }
+
+    public async Task<MiscAccountSettingsVm?> GetMiscAccountSettingsVm(CancellationToken cancellationToken)
+    {
+        return await Repository.GetMiscAccountSettingsVm(cancellationToken);
+    }
+
+    public async Task<string> UpdateMiscAccountSettingsVm(MiscAccountSettingsVm values,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        var account = await Repository.GetAccount(cancellationToken);
+
+        if (account == null) throw ApiExceptionDictionary.NotFound("Account");
+
+        try
+        {
+            account.Name = values.AccountName;
+            account.CountyIdDelimiter = values.CountyIdDelimiter;
+
+            // check which states are missing
+            var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
+            
+            // check which states are new
+            var deletedStateIds = account.AccountStates.Select(x => x.StateId).Except(values.StateIds).ToList();
+
+            foreach (var deletedStateId in deletedStateIds)
+            {
+                var numberOfCavesForState =
+                    await Repository.GetNumberOfCavesForState(deletedStateId, cancellationToken);
+
+                if (numberOfCavesForState > 0)
+                {
+                    throw ApiExceptionDictionary.BadRequest(
+                        $"One or more states have caves associated with them. Please remove the caves before removing the state.");
+                }
+                var accountState = await Repository.GetAccountState(account.Id, deletedStateId);
+                if (accountState == null)
+                {
+                    throw ApiExceptionDictionary.NotFound("Account State");
+                }
+                
+                Repository.Delete(accountState);
+                await Repository.SaveChangesAsync(cancellationToken);
+            }
+
+            foreach (var newStateId in newStateIds)
+            {
+                var state = new AccountState()
+                {
+                    StateId = newStateId,
+                    AccountId = RequestUser.AccountId ?? throw new InvalidOperationException()
+                };
+
+                Repository.Add(state);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            
+            return account.Id;
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 }

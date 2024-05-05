@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toEnum } from "../../../Shared/Helpers/EnumHelpers";
 import CreateEditCountiesComponent from "./CreateEditCountiesComponent";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { MiscAccountSettings } from "./MiscAccountSettingsComponent";
 
 const AccountSettingsComponent = () => {
   const includedTagTypes = [
@@ -41,16 +42,16 @@ const AccountSettingsComponent = () => {
     if (tagType && includedTagTypes.includes(tagType)) {
       setTagsActiveKey(tagType);
     } else if (includedTagTypes.length > 0) {
-      setTagsActiveKey(includedTagTypes[0]); // Default to the first tag type if none is specified
+      setTagsActiveKey(includedTagTypes[0]);
     }
 
     const countyId = params.get("countyId");
-    if (countyId) {
+    if (countyId && states.length > 0) {
       setCountyActiveKey(countyId);
     } else if (states.length > 0) {
       setCountyActiveKey(states[0].value);
     }
-  }, [location.search, includedTagTypes]);
+  }, [location.search, includedTagTypes, states]);
 
   const onTagTypeTabChange = (key: string) => {
     setTagsActiveKey(key);
@@ -63,17 +64,6 @@ const AccountSettingsComponent = () => {
   };
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const tagType = toEnum(TagType, searchParams.get("tagType"));
-    if (tagType && includedTagTypes.includes(tagType)) {
-      setTagsActiveKey(tagType);
-    } else if (includedTagTypes.length > 0) {
-      setTagsActiveKey(includedTagTypes[0]);
-      navigate(`?tagType=${includedTagTypes[0]}`, { replace: true });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
     getStates();
   }, []);
 
@@ -82,9 +72,14 @@ const AccountSettingsComponent = () => {
     setStates(cavesResponse);
   };
 
+  const onStatesChange = (value: string[]) => {
+    getStates();
+  };
+
   return (
     <>
       <Space direction="vertical">
+        <MiscAccountSettings onStatesChange={onStatesChange} />
         <Card title="Manage Tags">
           <Tabs
             type="card"
@@ -99,10 +94,6 @@ const AccountSettingsComponent = () => {
             ))}
           </Tabs>
         </Card>
-
-        {/* <Card title="Manage Counties">
-          <CreateEditCountiesComponent stateId={"c1d2e3f4g5"} />
-        </Card> */}
 
         <Card title="Manage Counties">
           <Tabs

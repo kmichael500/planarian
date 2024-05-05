@@ -22,9 +22,9 @@ public abstract class RepositoryBase
         DbContext.RequestUser = requestUser;
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var result = await DbContext.SaveChangesAsync();
+        var result = await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)

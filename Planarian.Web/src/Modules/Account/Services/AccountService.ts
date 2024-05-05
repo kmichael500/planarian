@@ -7,11 +7,29 @@ import { TagTypeTableVm } from "../Models/TagTypeTableVm";
 import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
 import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
 import { CreateCountyVm } from "../Models/CreateEditCountyVm";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
 
 const baseUrl = "api/account";
 const AccountService = {
   async ResetAccount() {
     await HttpClient.delete(`${baseUrl}/reset`);
+  },
+
+  //#region Settings
+
+  async GetSettings() {
+    const response = await HttpClient.get<MiscAccountSettingsVm>(
+      `${baseUrl}/settings`
+    );
+    return response.data;
+  },
+  async UpdateSettings(settings: MiscAccountSettingsVm) {
+    const response = await HttpClient.put<MiscAccountSettingsVm>(
+      `${baseUrl}/settings`,
+      settings
+    );
+    return response.data;
   },
 
   //#region Import
@@ -103,6 +121,12 @@ const AccountService = {
   //#endregion
 
   //#region Tags
+  async GetAllStates(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/states`
+    );
+    return response.data;
+  },
   async GetCountiesForTable(stateId: string): Promise<TagTypeTableCountyVm[]> {
     const response = await HttpClient.get<TagTypeTableCountyVm[]>(
       `${baseUrl}/counties-table/${stateId}`

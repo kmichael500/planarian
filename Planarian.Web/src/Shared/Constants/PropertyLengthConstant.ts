@@ -5,6 +5,7 @@ enum PropertyLength {
   PHONE_NUMBER = 20,
   MEDIUM_TEXT = 255,
   SMALL_TEXT = 50,
+  DELIMITER = 10,
 }
 
 export { PropertyLength };

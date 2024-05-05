@@ -33,6 +33,35 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return Ok();
     }
 
+    #region Misc Settings
+    
+    [HttpGet("settings")]
+    public async Task<ActionResult<MiscAccountSettingsVm?>> GetSettings(CancellationToken cancellationToken)
+    {
+        var result = await Service.GetMiscAccountSettingsVm(cancellationToken);
+        return Ok(result);
+    }
+    
+    [HttpPut("settings")]
+    public async Task<ActionResult<MiscAccountSettingsVm>> UpdateSettings([FromBody] MiscAccountSettingsVm settings,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.UpdateMiscAccountSettingsVm(settings, cancellationToken);
+        return Ok(result);
+    }
+    
+    // [HttpPost("settings")]
+    // public async Task<ActionResult<MiscAccountSettingsVm>> CreateSettings([FromBody] MiscAccountSettingsVm settings,
+    //     CancellationToken cancellationToken)
+    // {
+    //     var result = await Service.CreateOrUpdateMiscAccountSettingsVm(settings, cancellationToken);
+    //     return Ok(result);
+    // }
+
+    
+
+    #endregion
+
     #region Import
 
     [DisableRequestSizeLimit] //TODO
