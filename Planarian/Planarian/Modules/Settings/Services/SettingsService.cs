@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
@@ -20,7 +21,16 @@ public class SettingsService : ServiceBase<SettingsRepository>
     {
         return await Repository.GetTagTypeName(tagTypeId);
     }
+    
+    public async Task<string?> GetCountyName(string countyId)
+    {
+        return await Repository.GetCountyId(countyId);
+    }
 
+    public async Task<string?> GetStateName(string stateId)
+    {
+        return await Repository.GetStateName(stateId);
+    }
     public async Task<NameProfilePhotoVm> GetUsersName(string userId)
     {
         var user = await Repository.GetUserNameProfilePhoto(userId);
@@ -49,53 +59,9 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetStateCounties(stateId);
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetTripTags()
+    public async Task<IEnumerable<SelectListItem<string>>> GetTags(string key, string? projectId = null)
     {
-        return await Repository.GetTripTags();
+        return await Repository.GetTags(key, projectId);
     }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetGeologyTags()
-    {
-        return await Repository.GetGeologyTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetLocationQualityTags()
-    {
-        return await Repository.GetLocationQualityTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>?> GetEntranceStatusTags()
-    {
-        return await Repository.GetEntranceStatusTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetFieldIndicationTags()
-    {
-        return await Repository.GetFieldIndicationTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyTags()
-    {
-        return await Repository.GetEntranceHydrologyTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetEntranceHydrologyFrequencyTags()
-    {
-        return await Repository.GetEntranceHydrologyFrequencyTags();
-    }
-
-    public async Task<IEnumerable<SelectListItem<string>>> GetFileTags()
-    {
-        return await Repository.GetFileTags();
-    }
-
-    public async Task<string?> GetCountyName(string countyId)
-    {
-        return await Repository.GetCountyId(countyId);
-    }
-
-    public async Task<string?> GetStateName(string stateId)
-    {
-        return await Repository.GetStateName(stateId);
-    }
+    
 }

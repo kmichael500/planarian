@@ -19,6 +19,7 @@ const AddCavesPage: React.FC = () => {
 
   const initialValues: AddCaveVm = {
     name: "",
+    alternateNames: [],
     countyId: null,
     stateId: "",
     lengthFeet: 0,
@@ -27,7 +28,7 @@ const AddCavesPage: React.FC = () => {
     numberOfPits: 0,
     narrative: null,
     reportedOn: null,
-    reportedByName: AuthenticationService.GetName(),
+    reportedByNameTagIds: [],
     entrances: [
       {
         isPrimary: true,
@@ -38,15 +39,21 @@ const AddCavesPage: React.FC = () => {
         longitude: 0,
         elevationFeet: 0,
         reportedOn: null,
-        reportedByName: AuthenticationService.GetName(),
+        reportedByNameTagIds: [],
         pitFeet: null,
         entranceStatusTagIds: [],
-        entranceHydrologyFrequencyTagIds: [],
         fieldIndicationTagIds: [],
         entranceHydrologyTagIds: [],
       },
     ],
     geologyTagIds: [],
+    biologyTagIds: [],
+    archeologyTagIds: [],
+    cartographerNameTagIds: [],
+    mapStatusTagIds: [],
+    geologicAgeTagIds: [],
+    physiographicProvinceTagIds: [],
+    otherTagIds: [],
   };
 
   const handleFormSubmit = async (values: AddCaveVm) => {

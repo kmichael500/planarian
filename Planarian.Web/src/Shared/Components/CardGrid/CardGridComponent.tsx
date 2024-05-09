@@ -4,19 +4,22 @@ import { Key } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
 import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
 
-interface CardGridComponentProps<T extends object> {
+interface CardGridComponentProps<
+  T extends object,
+  TQueryBuilder extends object
+> {
   renderItem: (item: T) => React.ReactNode;
   itemKey: (item: T) => string;
   items?: T[] | undefined;
   pagedItems?: PagedResult<T> | undefined;
   noDataDescription?: string;
   noDataCreateButton?: React.ReactNode;
-  queryBuilder?: QueryBuilder<T>;
+  queryBuilder?: QueryBuilder<TQueryBuilder>;
   onSearch?: () => Promise<void>;
   useList?: boolean;
 }
 
-const CardGridComponent = <T extends object>({
+const CardGridComponent = <T extends object, TQueryBuilder extends object>({
   renderItem,
   itemKey,
   items,
@@ -26,7 +29,7 @@ const CardGridComponent = <T extends object>({
   queryBuilder,
   onSearch,
   useList,
-}: CardGridComponentProps<T>) => {
+}: CardGridComponentProps<T, TQueryBuilder>) => {
   let data: T[] = [];
 
   if (items) {

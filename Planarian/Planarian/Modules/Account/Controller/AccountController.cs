@@ -33,6 +33,35 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return Ok();
     }
 
+    #region Misc Settings
+    
+    [HttpGet("settings")]
+    public async Task<ActionResult<MiscAccountSettingsVm?>> GetSettings(CancellationToken cancellationToken)
+    {
+        var result = await Service.GetMiscAccountSettingsVm(cancellationToken);
+        return Ok(result);
+    }
+    
+    [HttpPut("settings")]
+    public async Task<ActionResult<MiscAccountSettingsVm>> UpdateSettings([FromBody] MiscAccountSettingsVm settings,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.UpdateMiscAccountSettingsVm(settings, cancellationToken);
+        return Ok(result);
+    }
+    
+    // [HttpPost("settings")]
+    // public async Task<ActionResult<MiscAccountSettingsVm>> CreateSettings([FromBody] MiscAccountSettingsVm settings,
+    //     CancellationToken cancellationToken)
+    // {
+    //     var result = await Service.CreateOrUpdateMiscAccountSettingsVm(settings, cancellationToken);
+    //     return Ok(result);
+    // }
+
+    
+
+    #endregion
+
     #region Import
 
     [DisableRequestSizeLimit] //TODO
@@ -67,14 +96,14 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
         return new JsonResult(result);
     }
-    
+
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/file")]
-    public async Task<IActionResult> ImportFile(string? uuid, [FromForm] IFormFile file,
+    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string countyCodeRegex, [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =
-            await _importService.AddFileForImport(file.OpenReadStream(), file.FileName, uuid,
+            await _importService.AddFileForImport(file.OpenReadStream(), file.FileName, countyCodeRegex, delimiterRegex, uuid,
                 cancellationToken);
 
         return new JsonResult(result);
@@ -100,6 +129,57 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetTagsForTable(key, cancellationToken);
         return Ok(result);
     }
+    
+    [HttpGet("counties-table/{stateId:length(10)}")]
+    public async Task<ActionResult<IEnumerable<TagTypeTableCountyVm>>> GetCountiesForTable(string stateId, CancellationToken cancellationToken)
+    {
+        var result = await Service.GetCountiesForTable(stateId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("states")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetAllStates(CancellationToken cancellationToken)
+    {
+        var result = await Service.GetAllStates(cancellationToken);
+        return Ok(result);
+    }
+
+
+    [HttpPost("states/{stateId:length(10)}/counties")]
+    public async Task<ActionResult<TagTypeTableCountyVm>> AddCounty(string stateId,
+        [FromBody] CreateCountyVm county, CancellationToken cancellationToken)
+    {
+        var result = await Service.CreateOrUpdateCounty(stateId, county, null, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPut("states/{stateId:length(10)}/counties/{countyId:length(10)}")]
+    public async Task<ActionResult<TagTypeTableCountyVm>> AddCounty(string stateId, string countyId,
+        [FromBody] CreateCountyVm county, CancellationToken cancellationToken)
+    {
+        var result = await Service.CreateOrUpdateCounty(stateId, county, countyId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("states/{stateId:length(10)}/counties/merge/{destinationCountyId:length(10)}")]
+    public async Task<ActionResult> MergeCounties([FromQuery] string sourceCountyIds, string destinationCountyId,
+        CancellationToken cancellationToken)
+    {
+        var ids = sourceCountyIds.SplitAndTrim();
+        await Service.MergeCounties(ids, destinationCountyId, cancellationToken);
+        return Ok();
+    }
+
+    [HttpDelete("states/{stateId:length(10)}/counties")]
+    public async Task<ActionResult> DeleteCounties([FromQuery] string countyIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = countyIds.SplitAndTrim();
+        await Service.DeleteCounties(ids, cancellationToken);
+        return Ok();
+    }
+    
+    
 
     [HttpPut("tags/{tagTypeId:length(10)}")]
     public async Task<ActionResult<TagTypeTableVm>> UpdateTagTypeName(string tagTypeId,

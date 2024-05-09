@@ -4,6 +4,7 @@ import { AddEntranceVm } from "./AddEntranceVm";
 export interface AddCaveVm {
   id?: string;
   name: string;
+  alternateNames: string[];
   countyId: string | null;
   stateId: string;
   lengthFeet: number;
@@ -12,8 +13,15 @@ export interface AddCaveVm {
   numberOfPits: number;
   narrative: string | null;
   reportedOn: string | null;
-  reportedByName: string | null;
   entrances: AddEntranceVm[];
   geologyTagIds: string[];
   files?: EditFileMetadataVm[];
+  reportedByNameTagIds: string[];
+  biologyTagIds: string[];
+  archeologyTagIds: string[];
+  cartographerNameTagIds: string[];
+  mapStatusTagIds: string[];
+  geologicAgeTagIds: string[];
+  physiographicProvinceTagIds: string[];
+  otherTagIds: string[];
 }

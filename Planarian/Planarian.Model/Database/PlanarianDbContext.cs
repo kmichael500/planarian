@@ -50,20 +50,28 @@ public class PlanarianDbContext : DbContext
 
     #endregion
 
-    #region RidgeWalker
+    #region Cave
 
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<AccountState> AccountStates { get; set; } = null!;
     public DbSet<AccountUser> AccountUsers { get; set; } = null!;
+    public DbSet<ArcheologyTag> ArcheologyTags { get; set; } = null!;
+    public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
+    public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
+    public DbSet<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
-    public DbSet<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } = null!;
     public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;
+    public DbSet<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } = null!;
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
-    public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
+    public DbSet<GeologicAgeTag> GeologicAgeTags { get; set; } = null!;
+    public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
+    public DbSet<MapStatusTag> MapStatusTags { get; set; } = null!;
+    public DbSet<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
 
     #endregion

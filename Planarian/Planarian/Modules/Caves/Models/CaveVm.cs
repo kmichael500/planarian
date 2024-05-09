@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 
@@ -7,6 +8,7 @@ namespace Planarian.Modules.Caves.Models;
 public class CaveVm
 {
     public CaveVm(string id, string stateId, string countyId, string displayId, string name,
+        IEnumerable<string> alternateNames,
         double lengthFeet,
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
@@ -18,6 +20,7 @@ public class CaveVm
         CountyId = countyId;
         DisplayId = displayId;
         Name = name;
+        AlternateNames = alternateNames;
         LengthFeet = lengthFeet;
         DepthFeet = depthFeet;
         NumberOfPits = numberOfPits;
@@ -31,21 +34,21 @@ public class CaveVm
 
 
     public CaveVm(string id, string reportedByUserId, string narrative, DateTime? reportedOn,
-        string reportedByName, string stateId, string countyId, string displayId, string name,
+        IEnumerable<string> reportedByNameTagIds, string stateId, string countyId, string displayId, string name,
+        IEnumerable<string> alternateNames,
         double lengthFeet,
         double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
         IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files) : this(id,
         stateId,
-        countyId, displayId, name, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived, primaryEntrance,
-        mapIds, entrances, geologyTagIds, files)
+        countyId, displayId, name, alternateNames, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived, primaryEntrance, mapIds, entrances, geologyTagIds, files)
     {
         ReportedByUserId = reportedByUserId;
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
         ReportedOn = reportedOn;
-        ReportedByName = reportedByName;
+        ReportedByNameTagIds = reportedByNameTagIds;
     }
 
     public CaveVm()
@@ -60,16 +63,16 @@ public class CaveVm
     public string DisplayId { get; set; } = null!;
 
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    public IEnumerable<string> AlternateNames { get; set; }
 
-    public double LengthFeet { get; set; }
-    public double DepthFeet { get; set; }
-    public double MaxPitDepthFeet { get; set; }
-    public int NumberOfPits { get; set; } = 0;
+    public double? LengthFeet { get; set; }
+    public double? DepthFeet { get; set; }
+    public double? MaxPitDepthFeet { get; set; }
+    public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
     public IEnumerable<FileVm> Files { get; set; } = new HashSet<FileVm>();
 
@@ -78,4 +81,12 @@ public class CaveVm
     public IEnumerable<string> MapIds { get; set; } = new HashSet<string>();
     public IEnumerable<EntranceVm> Entrances { get; set; } = new HashSet<EntranceVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ArcheologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> CartographerNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> GeologicAgeTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> PhysiographicProvinceTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
 }

@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -14,17 +16,18 @@ public class Cave : EntityBase
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    [MaxLength(PropertyLength.Max)] public string AlternateNames { get; private set; } = "[]";
     public int CountyNumber { get; set; } // max of highest cave number in county + 1
-    public double LengthFeet { get; set; }
-    public double DepthFeet { get; set; }
-    public double MaxPitDepthFeet { get; set; } = 0;
-    public int NumberOfPits { get; set; } = 0;
+    public double? LengthFeet { get; set; }
+    public double? DepthFeet { get; set; }
+    public double? MaxPitDepthFeet { get; set; } = 0;
+    public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
     public bool IsArchived { get; set; } = false;
+
 
     public virtual Account Account { get; set; } = null!;
     public virtual User? ReportedByUser { get; set; } = null!;
@@ -33,6 +36,36 @@ public class Cave : EntityBase
     public virtual ICollection<File> Files { get; set; } = new HashSet<File>();
     public virtual ICollection<Entrance> Entrances { get; set; } = new HashSet<Entrance>();
     public virtual ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();
+    public virtual ICollection<MapStatusTag> MapStatusTags { get; set; } = new HashSet<MapStatusTag>();
+
+    public virtual ICollection<GeologicAgeTag> GeologicAgeTags { get; set; } =
+        new HashSet<GeologicAgeTag>();
+
+    public virtual ICollection<PhysiographicProvinceTag> PhysiographicProvinceTags { get; set; } =
+        new HashSet<PhysiographicProvinceTag>();
+
+    public virtual ICollection<BiologyTag> BiologyTags { get; set; } =
+        new HashSet<BiologyTag>();
+
+    public virtual ICollection<ArcheologyTag> ArcheologyTags { get; set; } =
+        new HashSet<ArcheologyTag>();
+
+    public virtual ICollection<CartographerNameTag> CartographerNameTags { get; set; } =
+        new HashSet<CartographerNameTag>();
+
+    public virtual ICollection<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } =
+        new HashSet<CaveReportedByNameTag>();
+
+    public virtual ICollection<CaveOtherTag> CaveOtherTags { get; set; } =
+        new HashSet<CaveOtherTag>();
+
+    [NotMapped]
+    public IEnumerable<string> AlternateNamesList =>
+        JsonSerializer.Deserialize<List<string>>(AlternateNames) ?? new List<string>();
+
+    public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>
+        AlternateNames = JsonSerializer.Serialize(alternateNames);
+
 }
 
 public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>

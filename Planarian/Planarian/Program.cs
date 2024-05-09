@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
+using Planarian.Model.Generators;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
@@ -253,6 +254,18 @@ builder.Services.AddSession();
 #endregion
 
 var app = builder.Build();
+
+
+if (false)
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+
+    var dbContext = services.GetRequiredService<PlanarianDbContext>();
+    var dataGenerator = new DataGenerator(dbContext);
+    
+    await dataGenerator.AddOrUpdateDefaultData();
+}
 
 app.UseSession();
 

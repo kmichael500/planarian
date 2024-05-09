@@ -6,8 +6,7 @@ namespace Planarian.Modules.Caves.Models;
 public class EntranceVm
 {
     public EntranceVm(string id, double latitude, double longitude, double elevationFeet,
-        IEnumerable<string> entranceStatusTagIds,
-        IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
+        IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds)
     {
         Id = id;
@@ -16,7 +15,6 @@ public class EntranceVm
         ElevationFeet = elevationFeet;
 
         EntranceStatusTagIds = entranceStatusTagIds;
-        EntranceHydrologyFrequencyTagIds = entranceHydrologyFrequencyTagIds;
         FieldIndicationTagIds = fieldIndicationTagIds;
         EntranceHydrologyTagIds = entranceHydrologyTagIds;
     }
@@ -24,20 +22,19 @@ public class EntranceVm
 
     public EntranceVm(string id, string name, string description, double latitude, double longitude,
         double elevationFeet,
-        double pitFeet, string locationQualityTagId, string reportedByUserId, string reportedByName,
-        DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds,
-        IEnumerable<string> entranceHydrologyFrequencyTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet,
-        entranceStatusTagIds,
-        entranceHydrologyFrequencyTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
+        double pitFeet, string locationQualityTagId, string reportedByUserId, IEnumerable<string> reportedByNameTagIds,
+        DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
+        IEnumerable<string> entranceHydrologyTagIds, IEnumerable<string> entranceTypeTagIds) : this(id, latitude, longitude, elevationFeet,
+        entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
         PitFeet = pitFeet;
         Description = description;
         LocationQualityTagId = locationQualityTagId;
         ReportedByUserId = reportedByUserId;
-        ReportedByName = reportedByName;
+        ReportedByNameTagIds = reportedByNameTagIds;
         ReportedOn = reportedOn;
+        EntranceTypeTagIds = entranceTypeTagIds;
     }
 
     public EntranceVm()
@@ -57,12 +54,13 @@ public class EntranceVm
     public double ElevationFeet { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public double? PitFeet { get; set; }
 
     public IEnumerable<string> EntranceStatusTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> EntranceHydrologyFrequencyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
+
+    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> EntranceTypeTagIds { get; set; } = new HashSet<string>();
 }

@@ -2,6 +2,7 @@ using NetTopologySuite.Geometries;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
@@ -11,6 +12,7 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
@@ -96,6 +98,8 @@ public class CaveService : ServiceBase<CaveRepository>
             var isNewCounty = entity.CountyId != values.CountyId;
 
             entity.Name = values.Name.Trim();
+            entity.SetAlternateNamesList(values.AlternateNames.Select(e => e.Trim()));
+            
             entity.CountyId = values.CountyId.Trim();
             entity.StateId = values.StateId.Trim();
             entity.LengthFeet = values.LengthFeet;
@@ -103,11 +107,8 @@ public class CaveService : ServiceBase<CaveRepository>
             entity.MaxPitDepthFeet = values.MaxPitDepthFeet;
             entity.NumberOfPits = values.NumberOfPits;
             entity.Narrative = values.Narrative?.Trim();
-            entity.ReportedOn = values.ReportedOn;
-            entity.ReportedByName = values.ReportedByName?.Trim();
+            entity.ReportedOn = values.ReportedOn?.ToUtcKind();
             entity.AccountId = RequestUser.AccountId;
-
-            if (string.IsNullOrWhiteSpace(entity.ReportedByName)) entity.ReportedByName = RequestUser.FullName;
 
             entity.GeologyTags.Clear();
             foreach (var tagId in values.GeologyTagIds)
@@ -117,6 +118,94 @@ public class CaveService : ServiceBase<CaveRepository>
                     TagTypeId = tagId
                 };
                 entity.GeologyTags.Add(tag);
+            }
+            
+            entity.ArcheologyTags.Clear();
+            foreach (var tagId in values.ArcheologyTagIds)
+            {
+                var tag = new ArcheologyTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.ArcheologyTags.Add(tag);
+            }
+            
+            entity.BiologyTags.Clear();
+            foreach (var tagId in values.BiologyTagIds)
+            {
+                var tag = new BiologyTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.BiologyTags.Add(tag);
+            }
+            
+            entity.CartographerNameTags.Clear();
+            foreach (var tagId in values.CartographerNameTagIds)
+            {
+                var tag = new CartographerNameTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.CartographerNameTags.Add(tag);
+            }
+            
+            entity.MapStatusTags.Clear();
+            foreach (var tagId in values.MapStatusTagIds)
+            {
+                var tag = new MapStatusTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.MapStatusTags.Add(tag);
+            }
+            
+            entity.GeologicAgeTags.Clear();
+            foreach (var tagId in values.GeologicAgeTagIds)
+            {
+                var tag = new GeologicAgeTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.GeologicAgeTags.Add(tag);
+            }
+            
+            entity.PhysiographicProvinceTags.Clear();
+            foreach (var tagId in values.PhysiographicProvinceTagIds)
+            {
+                var tag = new PhysiographicProvinceTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.PhysiographicProvinceTags.Add(tag);
+            }
+            
+            entity.CaveOtherTags.Clear();
+            foreach (var tagId in values.OtherTagIds)
+            {
+                var tag = new CaveOtherTag()
+                {
+                    TagTypeId = tagId
+                };
+                entity.CaveOtherTags.Add(tag);
+            }
+            
+            entity.CaveReportedByNameTags.Clear();
+            foreach (var personTagTypeId in values.ReportedByNameTagIds)
+            {
+                var tagType = await _tagRepository.GetTag(personTagTypeId);
+                tagType ??= new TagType
+                {
+                    Name = personTagTypeId.Trim(),
+                    AccountId = RequestUser.AccountId,
+                    Key = TagTypeKeyConstant.People,
+                };
+                var tag = new CaveReportedByNameTag
+                {
+                    TagType = tagType
+                };
+                
+                entity.CaveReportedByNameTags.Add(tag);
             }
 
             if (isNewCounty) entity.CountyNumber = await Repository.GetNewDisplayId(entity.CountyId);
@@ -143,16 +232,14 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
-                entrance.ReportedOn = entranceValue.ReportedOn;
-                entrance.PitFeet = entranceValue.PitFeet;
+                entrance.ReportedOn = entranceValue.ReportedOn?.ToUtcKind();
+                entrance.PitDepthFeet = entranceValue.PitFeet;
 
-                entrance.ReportedOn = entrance.ReportedOn.Value.ToUtcKind();
+                entrance.ReportedOn = entrance.ReportedOn?.ToUtcKind();
 
                 entrance.Location =
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)
                         { SRID = 4326 };
-
-                if (string.IsNullOrWhiteSpace(entrance.ReportedByName)) entrance.ReportedByName = RequestUser.FullName;
 
                 entrance.EntranceStatusTags.Clear();
                 foreach (var tagId in entranceValue.EntranceStatusTagIds)
@@ -163,17 +250,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     };
                     entrance.EntranceStatusTags.Add(tag);
                 }
-
-                entrance.EntranceHydrologyFrequencyTags.Clear();
-                foreach (var tagId in entranceValue.EntranceHydrologyFrequencyTagIds)
-                {
-                    var tag = new EntranceHydrologyFrequencyTag()
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.EntranceHydrologyFrequencyTags.Add(tag);
-                }
-
+                
                 entrance.FieldIndicationTags.Clear();
                 foreach (var tagId in entranceValue.FieldIndicationTagIds)
                 {
@@ -182,6 +259,16 @@ public class CaveService : ServiceBase<CaveRepository>
                         TagTypeId = tagId
                     };
                     entrance.FieldIndicationTags.Add(tag);
+                }
+                
+                entrance.EntranceOtherTags.Clear();
+                foreach (var tagId in entranceValue.EntranceOtherTagIds)
+                {
+                    var tag = new EntranceOtherTag
+                    {
+                        TagTypeId = tagId
+                    };
+                    entrance.EntranceOtherTags.Add(tag);
                 }
 
                 entrance.EntranceHydrologyTags.Clear();
@@ -194,6 +281,23 @@ public class CaveService : ServiceBase<CaveRepository>
                     entrance.EntranceHydrologyTags.Add(tag);
                 }
 
+                entrance.EntranceReportedByNameTags.Clear();
+                foreach (var personTagTypeId in entranceValue.ReportedByNameTagIds)
+                {
+                    var peopleTag = await _tagRepository.GetTag(personTagTypeId);
+                    peopleTag ??= new TagType
+                    {
+                        Name = personTagTypeId.Trim(),
+                        AccountId = RequestUser.AccountId,
+                        Key = TagTypeKeyConstant.People,
+                    };
+                    var tag = new EntranceReportedByNameTag()
+                    {
+                        TagType = peopleTag
+                    };
+                    entrance.EntranceReportedByNameTags.Add(tag);
+
+                }
 
                 entrance.IsPrimary = entranceValue.IsPrimary;
 
@@ -201,59 +305,62 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             var blobsToDelete = new List<File>();
-            if (values.Files != null)
-            {
-                foreach (var file in values.Files)
+                if (values.Files != null)
                 {
-                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
-
-                    if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
-
-                    if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
-                        !string.Equals(file.DisplayName, fileEntity.DisplayName))
+                    foreach (var file in values.Files)
                     {
-                        fileEntity.DisplayName = file.DisplayName;
-                        fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
+                        var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
+
+                        if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
+
+                        if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
+                            !string.Equals(file.DisplayName, fileEntity.DisplayName))
+                        {
+                            fileEntity.DisplayName = file.DisplayName;
+                            fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
+                            !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
+                        {
+                            var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
+                            if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag");
+
+                            fileEntity.FileTypeTagId = tagType.Id;
+                        }
                     }
 
-                    if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
-                        !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
+                    // check if any ids are missing from the request compared to the db and delete the ones that are missing
+                    var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
+                    foreach (var missingId in missingIds)
                     {
-                        var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
-                        if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag");
+                        var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
+                        if (fileEntity == null) continue;
 
-                        fileEntity.FileTypeTagId = tagType.Id;
+                        blobsToDelete.Add(fileEntity);
+                        Repository.Delete(fileEntity);
                     }
                 }
 
-                // check if any ids are missing from the request compared to the db and delete the ones that are missing
-                var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
-                foreach (var missingId in missingIds)
-                {
-                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
-                    if (fileEntity == null) continue;
-                    
-                    blobsToDelete.Add(fileEntity);
-                    Repository.Delete(fileEntity);
-                }
-            }
+                if (isNew) Repository.Add(entity);
 
-            if (isNew) Repository.Add(entity);
+                await Repository.SaveChangesAsync();
 
-            await Repository.SaveChangesAsync();
+                await transaction.CommitAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
+                foreach (var blobProperties in blobsToDelete)
+                    await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
 
-            foreach (var blobProperties in blobsToDelete)
-                await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
+                return entity.Id;
 
-            return entity.Id;
+            
         }
         catch (Exception e)
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+
     }
 
     public async Task<CaveVm?> GetCave(string caveId)

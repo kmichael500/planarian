@@ -17,14 +17,6 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
     #region Tags
 
-    [HttpGet("tags/trip")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetTripTags()
-    {
-        var tripTags = await Service.GetTripTags();
-
-        return new JsonResult(tripTags);
-    }
-
     [HttpGet("tags/states/{stateId:length(10)}/counties")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateCounties(string stateId)
     {
@@ -57,61 +49,13 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
         return new JsonResult(stateName);
     }
 
-    [HttpGet("tags/geology/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetGeologyTags()
+    [HttpGet("tags")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetGeologyTags(string key,
+        string? projectId = null)
     {
-        var geologyTags = await Service.GetGeologyTags();
+        var geologyTags = await Service.GetTags(key);
 
         return new JsonResult(geologyTags);
-    }
-
-    [HttpGet("tags/location-quality/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetLocationQualityTags()
-    {
-        var locationQualityTags = await Service.GetLocationQualityTags();
-
-        return new JsonResult(locationQualityTags);
-    }
-
-    [HttpGet("tags/entrance-status/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceStatusTags()
-    {
-        var entranceStatusTags = await Service.GetEntranceStatusTags();
-
-        return new JsonResult(entranceStatusTags);
-    }
-
-    [HttpGet("tags/field-indication/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetFieldIndicationTags()
-    {
-        IEnumerable<SelectListItem<string>> fieldIndicationTags = await Service.GetFieldIndicationTags();
-
-        return new JsonResult(fieldIndicationTags);
-    }
-
-    [HttpGet("tags/entrance-hydrology/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceHydrologyTags()
-    {
-        IEnumerable<SelectListItem<string>> entranceHydrologyTags = await Service.GetEntranceHydrologyTags();
-
-        return new JsonResult(entranceHydrologyTags);
-    }
-
-
-    [HttpGet("tags/entrance-hydrology-frequency/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetEntranceHydrologyFrequencyTags()
-    {
-        var entranceHydrologyFrequencyTags = await Service.GetEntranceHydrologyFrequencyTags();
-
-        return new JsonResult(entranceHydrologyFrequencyTags);
-    }
-
-    [HttpGet("tags/file/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetFileTags()
-    {
-        var fileTags = await Service.GetFileTags();
-
-        return new JsonResult(fileTags);
     }
 
     [HttpGet("tags/{tagTypeId:length(10)}")]

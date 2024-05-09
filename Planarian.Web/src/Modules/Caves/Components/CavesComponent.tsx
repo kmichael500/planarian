@@ -1,4 +1,4 @@
-import { Row, Col, Typography, Card, Form } from "antd";
+import { Row, Col, Typography, Form, Divider } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -11,6 +11,7 @@ import {
 } from "../../Search/Services/QueryBuilder";
 import { CaveService } from "../Service/CaveService";
 import { CaveVm } from "../Models/CaveVm";
+import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { CaveCreateButtonComponent } from "./CaveCreateButtonComponent";
 import {
   convertDistance,
@@ -28,12 +29,12 @@ import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 
 const query = window.location.search.substring(1);
 
-const queryBuilder = new QueryBuilder<CaveVm>(query);
+const queryBuilder = new QueryBuilder<CaveSearchVm>(query);
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveVm>>();
   let [isCavesLoading, setIsCavesLoading] = useState(true);
-  const [form] = Form.useForm<CaveVm>();
+  const [form] = Form.useForm<CaveSearchVm>();
 
   useEffect(() => {
     getCaves();
@@ -60,6 +61,8 @@ const CavesComponent: React.FC = () => {
         queryBuilder={queryBuilder}
         form={form}
       >
+        <Divider>Cave</Divider>
+
         <TextFilterFormItem
           queryBuilder={queryBuilder}
           field={"narrative"}
@@ -68,6 +71,7 @@ const CavesComponent: React.FC = () => {
         />
         <StateCountyFilterFormItem
           queryBuilder={queryBuilder}
+          autoSelectFirst={true}
           stateField={"stateId"}
           stateLabel={"State"}
           countyField={"countyId"}
@@ -89,26 +93,8 @@ const CavesComponent: React.FC = () => {
         <NumberComparisonFormItem
           inputType={"number"}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.elevationFeet" as any}
+          field={"elevationFeet"}
           label={"Elevation (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"numberOfPits"}
-          label={"Numberof Pits"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"maxPitDepthFeet"}
-          label={"Max Pit Depth (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"entrancePitDepth" as any}
-          label={"Entrance Pit Depth (Feet)"}
         />
         <NumberComparisonFormItem
           inputType={"number"}
@@ -116,11 +102,24 @@ const CavesComponent: React.FC = () => {
           field={"numberOfPits"}
           label={"Number of Pits (Feet)"}
         />
-        <TextFilterFormItem
+        <NumberComparisonFormItem
+          inputType={"number"}
           queryBuilder={queryBuilder}
-          field={"reportedByName"}
-          label={"Repored By Name"}
-          queryOperator={QueryOperator.Contains}
+          field={"maxPitDepthFeet"}
+          label={"Max Pit Depth (Feet)"}
+        />
+
+        <TagFilterFormItem
+          tagType={TagType.MapStatus}
+          queryBuilder={queryBuilder}
+          field={"mapStatuses"}
+          label={"Map Status"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.People}
+          queryBuilder={queryBuilder}
+          field={"cartographerNamePeopleTagIds"}
+          label={"Cartographer Names"}
         />
         <TagFilterFormItem
           tagType={TagType.Geology}
@@ -129,50 +128,110 @@ const CavesComponent: React.FC = () => {
           label={"Geology"}
         />
         <TagFilterFormItem
+          tagType={TagType.GeologicAge}
+          queryBuilder={queryBuilder}
+          field={"geologicAgeTagIds"}
+          label={"Geologic Age"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.PhysiographicProvince}
+          queryBuilder={queryBuilder}
+          field={"physiographicProvinceTagIds"}
+          label={"Physiographic Province"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.Biology}
+          queryBuilder={queryBuilder}
+          field={"biologyTagIds"}
+          label={"Biology"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.Archeology}
+          queryBuilder={queryBuilder}
+          field={"archaeologyTagIds" as any}
+          label={"Archeology"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.CaveOther}
+          queryBuilder={queryBuilder}
+          field={"caveOtherTagIds"}
+          label={"Other"}
+        />
+        <TagFilterFormItem
+          tagType={TagType.People}
+          queryBuilder={queryBuilder}
+          field={"caveReportedByNameTagIds"}
+          label={"Reported By"}
+        />
+        <NumberComparisonFormItem
+          inputType={"date"}
+          queryBuilder={queryBuilder}
+          field={"caveReportedOnDate"}
+          label={"Reported On"}
+        />
+
+        <Divider>Entrance</Divider>
+
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"entranceDescription"}
+          label={"Entrance Description"}
+          queryOperator={QueryOperator.FreeText}
+        />
+        <TagFilterFormItem
           tagType={TagType.EntranceStatus}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceStatusTagIds" as any}
+          field={"entranceStatusTagIds"}
           label={"Entrance Status"}
         />
         <TagFilterFormItem
           tagType={TagType.FieldIndication}
           queryBuilder={queryBuilder}
-          field={"entranceFieldIndication" as any}
+          field={"entranceFieldIndicationTagIds"}
           label={"Entrance Field Indication"}
         />
+
         <TagFilterFormItem
           tagType={TagType.LocationQuality}
           queryBuilder={queryBuilder}
-          field={"locationQualityTagIds" as any}
+          field={"locationQualityTagIds"}
           label={"Entrance Location Quality"}
         />
         <TagFilterFormItem
           tagType={TagType.EntranceHydrology}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyTagIds" as any}
+          field={"entranceHydrologyTagIds"}
           label={"Entrance Hydrology"}
         />
+        <NumberComparisonFormItem
+          inputType={"number"}
+          queryBuilder={queryBuilder}
+          field={"entrancePitDepthFeet"}
+          label={"Entrance Pit Depth (Feet)"}
+        />
         <TagFilterFormItem
-          tagType={TagType.EntranceHydrologyFrequency}
+          tagType={TagType.People}
           queryBuilder={queryBuilder}
-          field={"primaryEntrance.entranceHydrologyFrequencyTagIds" as any}
-          label={"Entrance Hydroloy Frequency"}
+          field={"entranceReportedByPeopleTagIds"}
+          label={"Entrance Reported By"}
         />
-        <TextFilterFormItem
+        <NumberComparisonFormItem
+          inputType={"date"}
           queryBuilder={queryBuilder}
-          field={"entranceReportedOnBy" as any}
-          label={"Entrnace Repored By Name"}
-          queryOperator={QueryOperator.Contains}
+          field={"entranceReportedOnDate"}
+          label={"Entrance Reported On"}
         />
+
+        <Divider>Files</Divider>
         <TagFilterFormItem
           tagType={TagType.File}
           queryBuilder={queryBuilder}
-          field={"fileTypeTagIds" as any}
+          field={"fileTypeTagIds"}
           label={"File Types"}
         />
         <TextFilterFormItem
           queryBuilder={queryBuilder}
-          field={"fileDisplayName" as any}
+          field={"fileDisplayName"}
           label={"File Name"}
           queryOperator={QueryOperator.Contains}
         />

@@ -10,6 +10,7 @@ import {
   ColProps,
   Collapse,
   Space,
+  Select,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
@@ -119,14 +120,22 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     sm: 12,
     xs: 24,
   } as ColProps;
+
+  const oneColProps = {
+    xxl: 24,
+    xl: 24,
+    lg: 24,
+    md: 24,
+    sm: 24,
+    xs: 24,
+  } as ColProps;
   //#endregion
   return (
     <Row style={{ marginBottom: 10 }} gutter={5}>
       <Form.Item name="id" noStyle>
         <Input type="hidden" />
       </Form.Item>
-
-      <Col span={24}>
+      <Col span={12}>
         <Form.Item
           label="Name"
           name={nameof<AddCaveVm>("name")}
@@ -135,7 +144,20 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Input />
         </Form.Item>
       </Col>
-      <Col {...threeColProps}>
+      <Col span={12}>
+        <Form.Item
+          label="Alternate Names"
+          name={nameof<AddCaveVm>("alternateNames")}
+        >
+          <Select
+            mode="tags"
+            style={{ width: "100%" }}
+            placeholder="Add alternate names"
+            allowClear
+          ></Select>
+        </Form.Item>
+      </Col>
+      <Col {...twoColProps}>
         <Form.Item
           label="State"
           name={nameof<AddCaveVm>("stateId")}
@@ -151,7 +173,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           />
         </Form.Item>
       </Col>
-      <Col {...threeColProps}>
+      <Col {...twoColProps}>
         <Form.Item
           label="County"
           name={nameof<AddCaveVm>("countyId")}
@@ -162,10 +184,58 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           )}
         </Form.Item>
       </Col>
+      <Col {...twoColProps}>
+        <Form.Item
+          label="Map Status"
+          name={nameof<AddCaveVm>("mapStatusTagIds")}
+        >
+          <TagSelectComponent
+            tagType={TagType.MapStatus}
+            projectId={""}
+            mode="multiple"
+          />
+        </Form.Item>
+      </Col>
+      <Col {...twoColProps}>
+        <Form.Item
+          label="Cartographer Name"
+          name={nameof<AddCaveVm>("cartographerNameTagIds")}
+        >
+          <TagSelectComponent
+            tagType={TagType.People}
+            projectId={""}
+            mode="tags"
+          />
+        </Form.Item>
+      </Col>
       <Col {...threeColProps}>
         <Form.Item label="Geology" name={nameof<AddCaveVm>("geologyTagIds")}>
           <TagSelectComponent
             tagType={TagType.Geology}
+            projectId={""}
+            mode="multiple"
+          />
+        </Form.Item>
+      </Col>
+      <Col {...threeColProps}>
+        <Form.Item
+          label="Geologic Age"
+          name={nameof<AddCaveVm>("geologicAgeTagIds")}
+        >
+          <TagSelectComponent
+            tagType={TagType.GeologicAge}
+            projectId={""}
+            mode="multiple"
+          />
+        </Form.Item>
+      </Col>
+      <Col {...threeColProps}>
+        <Form.Item
+          label="Physiographic Province"
+          name={nameof<AddCaveVm>("physiographicProvinceTagIds")}
+        >
+          <TagSelectComponent
+            tagType={TagType.PhysiographicProvince}
             projectId={""}
             mode="multiple"
           />
@@ -224,9 +294,39 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <InputNumber min={0} style={{ width: "100%" }} />
         </Form.Item>
       </Col>
+      <Col {...twoColProps}>
+        <Form.Item label="Biology" name={nameof<AddCaveVm>("biologyTagIds")}>
+          <TagSelectComponent
+            allowCustomTags
+            tagType={TagType.Biology}
+            mode="tags"
+          />
+        </Form.Item>
+      </Col>
+      <Col {...twoColProps}>
+        <Form.Item
+          label="Archeology"
+          name={nameof<AddCaveVm>("archeologyTagIds")}
+        >
+          <TagSelectComponent
+            allowCustomTags
+            tagType={TagType.Archeology}
+            mode="tags"
+          />
+        </Form.Item>
+      </Col>
       <Col span={24}>
         <Form.Item label="Narrative" name={nameof<AddCaveVm>("narrative")}>
           <Input.TextArea rows={15} />
+        </Form.Item>
+      </Col>{" "}
+      <Col {...oneColProps}>
+        <Form.Item label="Other Tags" name={nameof<AddCaveVm>("otherTagIds")}>
+          <TagSelectComponent
+            tagType={TagType.CaveOther}
+            projectId={""}
+            mode="multiple"
+          />
         </Form.Item>
       </Col>
       <Col {...twoColProps}>
@@ -237,9 +337,13 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       <Col {...twoColProps}>
         <Form.Item
           label="Reported By"
-          name={nameof<AddCaveVm>("reportedByName")}
+          name={nameof<AddCaveVm>("reportedByNameTagIds")}
         >
-          <Input />
+          <TagSelectComponent
+            allowCustomTags
+            tagType={TagType.People}
+            mode="tags"
+          />
         </Form.Item>
       </Col>
       <Col span={24}>
@@ -305,6 +409,15 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
+                            label="Name"
+                            name={[field.name, nameof<AddEntranceVm>("name")]}
+                          >
+                            <Input />
+                          </Form.Item>
+                        </Col>
+                        <Col {...twoColProps}>
+                          <Form.Item
+                            {...field}
                             label="Status"
                             name={[
                               field.name,
@@ -347,23 +460,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Hydrology Frequency"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>(
-                                "entranceHydrologyFrequencyTagIds"
-                              ),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              tagType={TagType.EntranceHydrologyFrequency}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
                         <Col {...fourColProps}>
                           <Form.Item
                             {...field}
@@ -388,7 +484,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col {...fourColProps}>
                           <Form.Item
                             {...field}
@@ -454,15 +549,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                         <Col span={24}>
                           <Form.Item
                             {...field}
-                            label="Name"
-                            name={[field.name, nameof<AddEntranceVm>("name")]}
-                          >
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col span={24}>
-                          <Form.Item
-                            {...field}
                             label="Pit Depth"
                             name={[
                               field.name,
@@ -484,7 +570,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             <Input.TextArea rows={6} />
                           </Form.Item>
                         </Col>
-
                         <Col {...twoColProps}>
                           <Form.Item
                             {...field}
@@ -499,14 +584,17 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                         </Col>
                         <Col {...twoColProps}>
                           <Form.Item
-                            {...field}
-                            label="Reported By Name"
+                            label="Reported By"
                             name={[
                               field.name,
-                              nameof<AddEntranceVm>("reportedByName"),
+                              nameof<AddEntranceVm>("reportedByNameTagIds"),
                             ]}
                           >
-                            <Input />
+                            <TagSelectComponent
+                              allowCustomTags
+                              tagType={TagType.People}
+                              mode="tags"
+                            />
                           </Form.Item>
                         </Col>
                       </Row>

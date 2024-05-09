@@ -9,6 +9,7 @@ public static class PropertyLength
     public const int PhoneNumber = 20;
     public const int SmallText = 50;
     public const int MediumText = 255;
+    public const int Max = Int32.MaxValue;
     public const int BlobKey = 255;
     public const int FileType = 10;
     public const int StationName = 100;
@@ -16,6 +17,7 @@ public static class PropertyLength
     public const int PasswordResetCode = 20;
     public const int EmailConfirmationCode = 20;
     public const int FileName = 1000;
+    public const int Delimiter = 10;
 }
 
 public static class TagTypeKeyConstant
@@ -29,17 +31,28 @@ public static class TagTypeKeyConstant
     public const string EntranceStatus = "EntranceStatus";
     public const string FieldIndication = "FieldIndication";
     public const string EntranceHydrology = "EntranceHydrology";
-    public const string EntranceHydrologyFrequency = "EntranceHydrologyFrequency";
     public const string File = "File";
+    public const string People = "People";
+
+    public const string Biology = "Biology";
+    public const string Archeology = "Archeology";
+    public const string MapStatus = "MapStatus";
+    public const string CaveOther = "CaveOther";
+    public const string GeologicAge = "GeologicAge";
+    public const string PhysiographicProvince = "PhysiographicProvince";
+
     private static readonly List<string> AllProjectTags = new() { Default, Trip, Photo };
 
     private static readonly List<string> AllAccountTags = new()
-        { Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency, File };
+    {
+        Geology, EntranceStatus, FieldIndication, EntranceHydrology, File, People, Biology, Archeology, MapStatus,
+        CaveOther, GeologicAge, PhysiographicProvince, LocationQuality
+    };
 
     private static readonly List<string> All = new()
     {
-        Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology, EntranceHydrologyFrequency,
-        File
+        Default, Trip, Photo, Geology, EntranceStatus, FieldIndication, EntranceHydrology,
+        File, People, Biology, Archeology, MapStatus, CaveOther, GeologicAge, PhysiographicProvince,
     };
 
     public static bool IsValidTagKey(string tagKey)

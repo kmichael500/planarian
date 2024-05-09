@@ -377,6 +377,10 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("CountyIdDelimiter")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("CreatedByUserId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -471,6 +475,123 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("AccountUsers");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.ArcheologyTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("ArcheologyTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.BiologyTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("BiologyTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CartographerNameTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("CartographerNameTags");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>
                 {
                     b.Property<string>("Id")
@@ -481,6 +602,11 @@ namespace Planarian.Migrations.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AlternateNames")
+                        .IsRequired()
+                        .HasMaxLength(2147483647)
+                        .HasColumnType("text");
 
                     b.Property<string>("CountyId")
                         .IsRequired()
@@ -497,16 +623,16 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<double>("DepthFeet")
+                    b.Property<double?>("DepthFeet")
                         .HasColumnType("double precision");
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
-                    b.Property<double>("LengthFeet")
+                    b.Property<double?>("LengthFeet")
                         .HasColumnType("double precision");
 
-                    b.Property<double>("MaxPitDepthFeet")
+                    b.Property<double?>("MaxPitDepthFeet")
                         .HasColumnType("double precision");
 
                     b.Property<string>("ModifiedByUserId")
@@ -524,12 +650,8 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("Narrative")
                         .HasColumnType("text");
 
-                    b.Property<int>("NumberOfPits")
+                    b.Property<int?>("NumberOfPits")
                         .HasColumnType("integer");
-
-                    b.Property<string>("ReportedByName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ReportedByUserId")
                         .HasMaxLength(10)
@@ -565,6 +687,84 @@ namespace Planarian.Migrations.Migrations
                         .IsUnique();
 
                     b.ToTable("Caves");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveOtherTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("CaveOtherTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveReportedByNameTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("CaveReportedByNameTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -609,11 +809,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DisplayId");
-
                     b.HasIndex("StateId");
 
-                    b.HasIndex("AccountId", "DisplayId")
+                    b.HasIndex("AccountId", "StateId", "DisplayId")
                         .IsUnique();
 
                     b.ToTable("Counties");
@@ -663,12 +861,8 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<double?>("PitFeet")
+                    b.Property<double?>("PitDepthFeet")
                         .HasColumnType("double precision");
-
-                    b.Property<string>("ReportedByName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ReportedByUserId")
                         .HasMaxLength(10)
@@ -686,45 +880,6 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ReportedByUserId");
 
                     b.ToTable("Entrances");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceHydrologyFrequencyTag", b =>
-                {
-                    b.Property<string>("TagTypeId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("EntranceId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("TagTypeId", "EntranceId");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("EntranceId");
-
-                    b.HasIndex("ModifiedByUserId");
-
-                    b.ToTable("EntranceHydrologyFrequencyTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceHydrologyTag", b =>
@@ -764,6 +919,84 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ModifiedByUserId");
 
                     b.ToTable("EntranceHydrologyTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceOtherTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("EntranceId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "EntranceId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("EntranceId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("EntranceOtherTag");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceReportedByNameTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("EntranceId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "EntranceId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("EntranceId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("EntranceReportedByNameTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceStatusTag", b =>
@@ -908,6 +1141,45 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Files");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologicAgeTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("GeologicAgeTags");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologyTag", b =>
                 {
                     b.Property<string>("TagTypeId")
@@ -945,6 +1217,84 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ModifiedByUserId");
 
                     b.ToTable("GeologyTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.MapStatusTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("MapStatusTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.PhysiographicProvinceTag", b =>
+                {
+                    b.Property<string>("TagTypeId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TagTypeId", "CaveId");
+
+                    b.HasIndex("CaveId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.ToTable("PhysiographicProvinceTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
@@ -1361,6 +1711,99 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.ArcheologyTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("ArcheologyTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("ArcheologyTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.BiologyTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("BiologyTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("BiologyTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CartographerNameTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("CartographerNameTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("CartographerNameTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
@@ -1393,6 +1836,68 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("ReportedByUser");
 
                     b.Navigation("State");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveOtherTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("CaveOtherTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("CaveOtherTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveReportedByNameTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("CaveReportedByNameTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("CaveReportedByNameTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -1440,37 +1945,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("ReportedByUser");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceHydrologyFrequencyTag", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", "Entrance")
-                        .WithMany("EntranceHydrologyFrequencyTags")
-                        .HasForeignKey("EntranceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
-                        .WithMany()
-                        .HasForeignKey("ModifiedByUserId");
-
-                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
-                        .WithMany("EntranceHydrologyFrequencyTags")
-                        .HasForeignKey("TagTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Entrance");
-
-                    b.Navigation("ModifiedByUser");
-
-                    b.Navigation("TagType");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceHydrologyTag", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
@@ -1489,6 +1963,68 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
                         .WithMany("EntranceHydrologyTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Entrance");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceOtherTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", "Entrance")
+                        .WithMany("EntranceOtherTags")
+                        .HasForeignKey("EntranceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("EntranceOtherTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Entrance");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceReportedByNameTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", "Entrance")
+                        .WithMany("EntranceReportedByNameTags")
+                        .HasForeignKey("EntranceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("EntranceReportedByNameTags")
                         .HasForeignKey("TagTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1588,6 +2124,37 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("FileTypeTag");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologicAgeTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("GeologicAgeTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("GeologicAgeTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologyTag", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
@@ -1606,6 +2173,68 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
                         .WithMany("GeologyTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.MapStatusTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("MapStatusTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("MapStatusTags")
+                        .HasForeignKey("TagTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+
+                    b.Navigation("TagType");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.PhysiographicProvinceTag", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("PhysiographicProvinceTags")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.TagType", "TagType")
+                        .WithMany("PhysiographicProvinceTags")
                         .HasForeignKey("TagTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1724,11 +2353,27 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>
                 {
+                    b.Navigation("ArcheologyTags");
+
+                    b.Navigation("BiologyTags");
+
+                    b.Navigation("CartographerNameTags");
+
+                    b.Navigation("CaveOtherTags");
+
+                    b.Navigation("CaveReportedByNameTags");
+
                     b.Navigation("Entrances");
 
                     b.Navigation("Files");
 
+                    b.Navigation("GeologicAgeTags");
+
                     b.Navigation("GeologyTags");
+
+                    b.Navigation("MapStatusTags");
+
+                    b.Navigation("PhysiographicProvinceTags");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -1738,9 +2383,11 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Entrance", b =>
                 {
-                    b.Navigation("EntranceHydrologyFrequencyTags");
-
                     b.Navigation("EntranceHydrologyTags");
+
+                    b.Navigation("EntranceOtherTags");
+
+                    b.Navigation("EntranceReportedByNameTags");
 
                     b.Navigation("EntranceStatusTags");
 
@@ -1758,11 +2405,23 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
-                    b.Navigation("EntranceHydrologyFrequencyTags");
+                    b.Navigation("ArcheologyTags");
+
+                    b.Navigation("BiologyTags");
+
+                    b.Navigation("CartographerNameTags");
+
+                    b.Navigation("CaveOtherTags");
+
+                    b.Navigation("CaveReportedByNameTags");
 
                     b.Navigation("EntranceHydrologyTags");
 
                     b.Navigation("EntranceLocationQualitiesTags");
+
+                    b.Navigation("EntranceOtherTags");
+
+                    b.Navigation("EntranceReportedByNameTags");
 
                     b.Navigation("EntranceStatusTags");
 
@@ -1770,9 +2429,15 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("FileTypeTags");
 
+                    b.Navigation("GeologicAgeTags");
+
                     b.Navigation("GeologyTags");
 
                     b.Navigation("LeadTags");
+
+                    b.Navigation("MapStatusTags");
+
+                    b.Navigation("PhysiographicProvinceTags");
 
                     b.Navigation("TripTags");
 

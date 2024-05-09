@@ -21,9 +21,8 @@ public class Entrance : EntityBase
     public Point Location { get; set; } = null!;
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
-    public double? PitFeet { get; set; } // TODO: Rename to PitDepthFeet
+    public double? PitDepthFeet { get; set; }
 
     public User? ReportedByUser { get; set; }
     public virtual Cave Cave { get; set; } = null!;
@@ -31,10 +30,11 @@ public class Entrance : EntityBase
     public ICollection<EntranceStatusTag> EntranceStatusTags { get; set; } = new HashSet<EntranceStatusTag>();
     public ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = new HashSet<EntranceHydrologyTag>();
 
-    public ICollection<EntranceHydrologyFrequencyTag> EntranceHydrologyFrequencyTags { get; set; } =
-        new HashSet<EntranceHydrologyFrequencyTag>();
-
     public ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
+    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
+        new HashSet<EntranceReportedByNameTag>();
+
+    public virtual ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
 }
 
 public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>

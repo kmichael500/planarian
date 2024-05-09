@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Planarian.Model.Database;
+using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 
@@ -37,15 +38,18 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 {
                     case EntityState.Added:
                         ((EntityBase)entity.Entity).CreatedOn = DateTime.UtcNow;
-                        ((EntityBase)entity.Entity).CreatedByUserId = !string.IsNullOrWhiteSpace(context.RequestUser.Id)
+                        ((EntityBase)entity.Entity).CreatedByUserId = !string.IsNullOrWhiteSpace(context?.RequestUser?.Id)
                             ? context.RequestUser.Id
                             : null;
-                        ((EntityBase)entity.Entity).Id = IdGenerator.Generate();
+                        ((EntityBase)entity.Entity).Id = !string.IsNullOrWhiteSpace(((EntityBase)entity.Entity).Id) &&
+                                                         ((EntityBase)entity.Entity).Id.Length == PropertyLength.Id
+                            ? ((EntityBase)entity.Entity).Id // use the provided id if it matches our id format
+                            : IdGenerator.Generate();
                         break;
                     case EntityState.Modified:
                         ((EntityBase)entity.Entity).ModifiedOn = DateTime.UtcNow;
                         ((EntityBase)entity.Entity).ModifiedByUserId =
-                            !string.IsNullOrWhiteSpace(context.RequestUser.Id)
+                            !string.IsNullOrWhiteSpace(context?.RequestUser?.Id)
                                 ? context.RequestUser.Id
                                 : null;
                         break;

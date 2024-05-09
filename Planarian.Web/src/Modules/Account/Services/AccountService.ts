@@ -3,13 +3,33 @@ import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../..";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
-import { TagTypeTableVm } from "../Components/TagTypeEditComponent";
-import { CreateEditTagTypeVm } from "../Components/CreateEditTagTypeVm";
+import { TagTypeTableVm } from "../Models/TagTypeTableVm";
+import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
+import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
+import { CreateCountyVm } from "../Models/CreateEditCountyVm";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
 
 const baseUrl = "api/account";
 const AccountService = {
   async ResetAccount() {
     await HttpClient.delete(`${baseUrl}/reset`);
+  },
+
+  //#region Settings
+
+  async GetSettings() {
+    const response = await HttpClient.get<MiscAccountSettingsVm>(
+      `${baseUrl}/settings`
+    );
+    return response.data;
+  },
+  async UpdateSettings(settings: MiscAccountSettingsVm) {
+    const response = await HttpClient.put<MiscAccountSettingsVm>(
+      `${baseUrl}/settings`,
+      settings
+    );
+    return response.data;
   },
 
   //#region Import
@@ -73,6 +93,8 @@ const AccountService = {
   async ImportFile(
     file: string | Blob | RcFile,
     uuid: string,
+    delmiterRegex: string,
+    countyCodeRegex: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileVm> {
     const formData = new FormData();
@@ -85,8 +107,12 @@ const AccountService = {
       onUploadProgress: onProgress, // Set the onUploadProgress callback
     };
 
+    const regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
+      delmiterRegex
+    )}&countyCodeRegex=${countyCodeRegex}`;
+
     const response = await HttpClient.post<FileVm>(
-      `${baseUrl}/import/file?uuid=${uuid}`,
+      `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,
       formData,
       config
     );
@@ -95,10 +121,42 @@ const AccountService = {
   //#endregion
 
   //#region Tags
-
+  async GetAllStates(): Promise<SelectListItem<string>[]> {
+    const response = await HttpClient.get<SelectListItem<string>[]>(
+      `${baseUrl}/states`
+    );
+    return response.data;
+  },
+  async GetCountiesForTable(stateId: string): Promise<TagTypeTableCountyVm[]> {
+    const response = await HttpClient.get<TagTypeTableCountyVm[]>(
+      `${baseUrl}/counties-table/${stateId}`
+    );
+    return response.data;
+  },
+  async AddCounty(
+    tag: CreateCountyVm,
+    stateId: string
+  ): Promise<TagTypeTableCountyVm> {
+    const response = await HttpClient.post<TagTypeTableCountyVm>(
+      `${baseUrl}/states/${stateId}/counties`,
+      tag
+    );
+    return response.data;
+  },
   async GetTagsForTable(tagType: TagType): Promise<TagTypeTableVm[]> {
     const response = await HttpClient.get<TagTypeTableVm[]>(
       `${baseUrl}/tags-table/${tagType}`
+    );
+    return response.data;
+  },
+  async UpdateCounties(
+    countyId: string,
+    stateId: string,
+    tag: TagTypeTableCountyVm
+  ): Promise<TagTypeTableCountyVm> {
+    const response = await HttpClient.put<TagTypeTableCountyVm>(
+      `${baseUrl}/states/${stateId}/counties/${countyId}`,
+      tag
     );
     return response.data;
   },

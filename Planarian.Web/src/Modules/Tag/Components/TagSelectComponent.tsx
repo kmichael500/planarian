@@ -10,10 +10,13 @@ import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 export interface TagSelectComponentProps extends SelectProps<string> {
   tagType: TagType;
   projectId?: string;
+  allowCustomTags?: boolean;
 }
 const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   tagType,
   projectId,
+  allowCustomTags = false,
+
   onChange,
   ...rest
 }) => {
@@ -24,10 +27,6 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   useEffect(() => {
     const getTags = async () => {
       switch (tagType) {
-        case TagType.Trip:
-          const tripTags = await SettingsService.GetTripTags();
-          setTags(tripTags);
-          break;
         case TagType.ProjectMember:
           if (!projectId) {
             throw new Error("Project id is required");
@@ -38,45 +37,10 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
           setTags(projectMembers);
 
           break;
-        case TagType.Geology:
-          const geologyTags = await SettingsService.GetGeology();
-          setTags(geologyTags);
-          break;
-        case TagType.LocationQuality:
-          const locationQualityTagss =
-            await SettingsService.GetLocationQualityTags();
-          setTags(locationQualityTagss);
-          break;
-        case TagType.FieldIndication:
-          const fieldIndicationTags =
-            await SettingsService.GetFieldIndicationTags();
-          setTags(fieldIndicationTags);
-          break;
-
-        case TagType.EntranceHydrology:
-          const entranceHydrologyTags =
-            await SettingsService.GetEntranceHydrology();
-          setTags(entranceHydrologyTags);
-
-          break;
-        case TagType.EntranceHydrologyFrequency:
-          const entranceHydrologyFrequencyTags =
-            await SettingsService.GetEntranceHydrologyFrequencyTags();
-          setTags(entranceHydrologyFrequencyTags);
-          break;
-        case TagType.EntranceStatus:
-          const entranceStatusTags =
-            await SettingsService.GetEntranceStatusTags();
-          setTags(entranceStatusTags);
-          break;
-
-        case TagType.File:
-          const fileTags = await SettingsService.GetFileTags();
-          setTags(fileTags);
-          break;
 
         default:
-          throw new Error("Invalid tag type");
+          const tags = await SettingsService.GetTags(tagType);
+          setTags(tags);
       }
       setIsLoading(false);
     };

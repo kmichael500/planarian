@@ -8,17 +8,25 @@ export interface CaveVm {
   countyId: string;
   stateId: string;
   name: string;
+  alternateNames: string[];
   lengthFeet: number;
   depthFeet: number;
   maxPitDepthFeet: number;
   numberOfPits: number;
   narrative: string | null;
   reportedOn: string | null;
-  reportedByName: string | null;
   isArchived: boolean;
   primaryEntrance: EntranceVm | null;
   mapIds: string[];
   entrances: EntranceVm[];
   geologyTagIds: string[];
   files: FileVm[];
+  reportedByNameTagIds: string[];
+  biologyTagIds: string[];
+  archeologyTagIds: string[];
+  cartographerNameTagIds: string[];
+  mapStatusTagIds: string[];
+  geologicAgeTagIds: string[];
+  physiographicProvinceTagIds: string[];
+  otherTagIds: string[];
 }

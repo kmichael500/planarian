@@ -30,7 +30,6 @@ public class CountyConfiguration : BaseEntityTypeConfiguration<County>
             .WithMany(e => e.Counties)
             .HasForeignKey(e => e.StateId)
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasIndex(e => new { e.AccountId, e.DisplayId }).IsUnique();
-        builder.HasIndex(e => e.DisplayId);
+        builder.HasIndex(e => new { e.AccountId, e.StateId, e.DisplayId }).IsUnique();
     }
 }
