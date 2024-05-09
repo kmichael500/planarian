@@ -73,6 +73,7 @@ const MiscAccountSettings = ({
       <Form
         form={form}
         onFinish={onFinish}
+        layout="vertical"
         initialValues={{ name: "", delimiter: "", states: [] }}
       >
         <Form.Item
@@ -96,7 +97,7 @@ const MiscAccountSettings = ({
           rules={[
             { required: true, message: "Please select at least one state!" },
           ]}
-          help="These are states available for data entry in the state survey."
+          help="These are states available for data entry in the state survey. You can only remove states that have no caves associated with them."
         >
           <Select mode="multiple" placeholder="Please select">
             {states.map((state) => (

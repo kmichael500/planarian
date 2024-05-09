@@ -130,7 +130,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               ]}
               initialValue=""
             >
-              <Input placeholder="^\\d{3}$" />
+              <Input placeholder="[A-Z]{2}" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit">

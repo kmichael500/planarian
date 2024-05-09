@@ -6,6 +6,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { SwapOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -18,6 +19,9 @@ const SwitchAccountComponent = ({
 }: SwitchAccountComponentProps) => {
   const currentAccountId = AuthenticationService.GetAccountId();
   const currentAccountName = AuthenticationService.GetAccountName();
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
 
@@ -47,6 +51,13 @@ const SwitchAccountComponent = ({
         (item) => item.value === accountId
       )?.display;
       message.success(`Switched to account ${accountName}`);
+      if (location.pathname.startsWith("/caves")) {
+        if (location.pathname === "/caves") {
+          navigate("/caves", { replace: true, state: {} });
+        } else {
+          navigate("/caves", { replace: true });
+        }
+      }
       window.location.reload();
     } catch (error) {
       message.error("Failed to switch account");
