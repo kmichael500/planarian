@@ -141,12 +141,21 @@ public class CaveService : ServiceBase<CaveRepository>
             }
             
             entity.CartographerNameTags.Clear();
-            foreach (var tagId in values.CartographerNameTagIds)
+            foreach (var personTagTypeId in values.CartographerNameTagIds)
             {
-                var tag = new CartographerNameTag()
+                
+                var tagType = await _tagRepository.GetTag(personTagTypeId);
+                tagType ??= new TagType
                 {
-                    TagTypeId = tagId
+                    Name = personTagTypeId.Trim(),
+                    AccountId = RequestUser.AccountId,
+                    Key = TagTypeKeyConstant.People,
                 };
+                var tag = new CartographerNameTag
+                {
+                    TagType = tagType
+                };
+                
                 entity.CartographerNameTags.Add(tag);
             }
             
