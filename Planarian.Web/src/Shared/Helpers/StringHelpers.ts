@@ -97,6 +97,13 @@ export function formatDateTime(
   return moment(date).format(formatString);
 }
 
+export function formatNumber(value: number | null | undefined): string | null {
+  if (value !== null && value !== undefined) {
+    return value.toLocaleString();
+  }
+  return null;
+}
+
 export function splitCamelCase(input: string): string {
   const result = input.replace(/([a-z])([A-Z])/g, "$1 $2");
   return result;

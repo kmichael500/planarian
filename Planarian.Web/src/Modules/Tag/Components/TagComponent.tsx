@@ -3,7 +3,10 @@ import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
+import {
+  defaultIfEmpty,
+  splitCamelCase,
+} from "../../../Shared/Helpers/StringHelpers";
 
 export interface TripTagComponentProps {
   tagId: string;
@@ -30,7 +33,7 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
   return (
     <Spin spinning={isTagNameLoading}>
       <Tag key={props.tagId} color={props.color}>
-        {tagName}
+        {defaultIfEmpty(tagName)}
       </Tag>
     </Spin>
   );

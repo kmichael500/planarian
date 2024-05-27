@@ -19,6 +19,7 @@ import {
   getDirectionsUrl,
   formatDateTime,
   defaultIfEmpty,
+  formatNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -49,7 +50,12 @@ const CavesComponent: React.FC = () => {
     if (savedFeatures) {
       setSelectedFeatures(JSON.parse(savedFeatures));
     } else {
-      setSelectedFeatures(["displayId", "countyId", "reportedOn"]); // Default values
+      setSelectedFeatures([
+        "countyId",
+        "lengthFeet",
+        "depthFeet",
+        "reportedOn",
+      ]);
     }
     getCaves();
   }, []);
@@ -68,9 +74,9 @@ const CavesComponent: React.FC = () => {
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
     { display: "ID", value: "displayId" },
     { display: "County", value: "countyId" },
-    { display: "Reported On", value: "reportedOn" },
     { display: "Length", value: "lengthFeet" },
     { display: "Depth", value: "depthFeet" },
+    { display: "Reported On", value: "reportedOn" },
     { display: "Max Pit Depth", value: "maxPitDepthFeet" },
     { display: "Number of Pits", value: "numberOfPits" },
     { display: "Map Status", value: "mapStatusTagIds" },
@@ -126,6 +132,7 @@ const CavesComponent: React.FC = () => {
         }
         return (
           <div style={{ display: "flex", flexWrap: "wrap" }}>
+            {" "}
             {(cave[featureKey as keyof CaveSearchVm] as string[])?.map(
               (tagId: string) => (
                 <TagComponent key={tagId} tagId={tagId} />
@@ -341,7 +348,11 @@ const CavesComponent: React.FC = () => {
             }}
           />
         </div>
-
+        {caves && (
+          <Typography.Text>
+            {formatNumber(caves.totalCount)} results found
+          </Typography.Text>
+        )}
         <SpinnerCardComponent spinning={isCavesLoading}>
           <CardGridComponent
             noDataDescription={"No caves found"}

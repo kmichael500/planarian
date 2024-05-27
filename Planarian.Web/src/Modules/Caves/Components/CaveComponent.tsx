@@ -15,7 +15,9 @@ import {
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import {
   convertDistance,
+  defaultIfEmpty,
   formatDateTime,
+  formatNumber,
   getDirectionsUrl,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
@@ -42,6 +44,19 @@ export interface CaveComponentProps {
   updateCave?: () => void;
 }
 
+// Common function to generate tags
+const generateTags = (tagIds: string[] | undefined) => {
+  if (!tagIds || tagIds?.length === 0) {
+    return defaultIfEmpty(null);
+  }
+
+  return tagIds?.map((tagId) => (
+    <Col key={tagId}>
+      <TagComponent tagId={tagId} />
+    </Col>
+  ));
+};
+
 const CaveComponent = ({
   cave,
   isLoading,
@@ -63,7 +78,9 @@ const CaveComponent = ({
       >
         <PlanarianDividerComponent title="Information" />
         <Descriptions bordered>
-          <Descriptions.Item label="ID">{cave?.displayId}</Descriptions.Item>
+          <Descriptions.Item label="ID">
+            {defaultIfEmpty(cave?.displayId)}
+          </Descriptions.Item>
           <Descriptions.Item label="Alternative Names">
             <Row>
               {cave?.alternateNames.map((name) => (
@@ -81,100 +98,46 @@ const CaveComponent = ({
             <CountyTagComponent countyId={cave?.countyId} />
           </Descriptions.Item>
           <Descriptions.Item label="Length">
-            {convertDistance(cave?.lengthFeet)}
+            {defaultIfEmpty(convertDistance(cave?.lengthFeet))}
           </Descriptions.Item>
           <Descriptions.Item label="Depth">
-            {convertDistance(cave?.depthFeet)}
+            {defaultIfEmpty(convertDistance(cave?.depthFeet))}
           </Descriptions.Item>
           <Descriptions.Item label="Max Pit Depth">
-            {convertDistance(cave?.maxPitDepthFeet)}
+            {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
           </Descriptions.Item>
           <Descriptions.Item label="Number of Pits">
-            {cave?.numberOfPits}
+            {defaultIfEmpty(formatNumber(cave?.numberOfPits)).toString()}
           </Descriptions.Item>
           <Descriptions.Item label="Reported On">
-            {formatDateTime(cave?.reportedOn)}
+            {defaultIfEmpty(formatDateTime(cave?.reportedOn))}
           </Descriptions.Item>
           <Descriptions.Item label="Reported By">
-            <Row>
-              {cave?.reportedByNameTagIds.map((e) => (
-                <Col key={e}>
-                  <TagComponent tagId={e} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.reportedByNameTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Geology">
-            <Row>
-              {cave?.geologyTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.geologyTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Geologic Age">
-            <Row>
-              {cave?.geologicAgeTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.geologicAgeTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Physigraphic Province">
-            <Row>
-              {cave?.physiographicProvinceTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.physiographicProvinceTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Biology">
-            <Row>
-              {cave?.biologyTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.biologyTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Archeology">
-            <Row>
-              {cave?.archeologyTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.archeologyTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Map Status">
-            <Row>
-              {cave?.mapStatusTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.mapStatusTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Cartographers">
-            <Row>
-              {cave?.cartographerNameTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.cartographerNameTagIds)}</Row>
           </Descriptions.Item>
           <Descriptions.Item label="Other">
-            <Row>
-              {cave?.otherTagIds.map((tagId) => (
-                <Col key={tagId}>
-                  <TagComponent tagId={tagId} />
-                </Col>
-              ))}
-            </Row>
+            <Row>{generateTags(cave?.otherTagIds)}</Row>
           </Descriptions.Item>
         </Descriptions>
         {cave?.entrances && cave?.entrances.length > 0 && (
@@ -225,7 +188,9 @@ const CaveComponent = ({
                     </Descriptions.Item>
                     {cave.primaryEntrance && (
                       <Descriptions.Item label="Elevation">
-                        {convertDistance(entrance.elevationFeet)}
+                        {defaultIfEmpty(
+                          convertDistance(entrance.elevationFeet)
+                        )}
                       </Descriptions.Item>
                     )}
                     <Descriptions.Item label="Location Quality">
@@ -236,47 +201,25 @@ const CaveComponent = ({
                     </Descriptions.Item>
 
                     <Descriptions.Item label="Reported On">
-                      {formatDateTime(entrance.reportedOn)}
+                      {defaultIfEmpty(formatDateTime(entrance.reportedOn))}
                     </Descriptions.Item>
 
                     <Descriptions.Item label="Reported By">
-                      <Row>
-                        {entrance?.reportedByNameTagIds.map((e) => (
-                          <Col key={e}>
-                            <TagComponent tagId={e} />
-                          </Col>
-                        ))}
-                      </Row>
+                      <Row>{generateTags(entrance?.reportedByNameTagIds)}</Row>
                     </Descriptions.Item>
                     <Descriptions.Item label="Pit Depth">
-                      {convertDistance(entrance.pitFeet)}
+                      {defaultIfEmpty(convertDistance(entrance.pitFeet))}
                     </Descriptions.Item>
                     <Descriptions.Item label="Status">
-                      <Row>
-                        {entrance.entranceStatusTagIds.map((tagId) => (
-                          <Col key={tagId}>
-                            <TagComponent tagId={tagId} key={tagId} />
-                          </Col>
-                        ))}
-                      </Row>
+                      <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>
                     </Descriptions.Item>
 
                     <Descriptions.Item label="Field Indication">
-                      <Row>
-                        {entrance.fieldIndicationTagIds.map((tagId) => (
-                          <Col key={tagId}>
-                            <TagComponent tagId={tagId} />
-                          </Col>
-                        ))}
-                      </Row>
+                      <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>
                     </Descriptions.Item>
                     <Descriptions.Item label="Hydrology">
                       <Row>
-                        {entrance.entranceHydrologyTagIds.map((tagId) => (
-                          <Col key={tagId}>
-                            <TagComponent tagId={tagId} />
-                          </Col>
-                        ))}
+                        {generateTags(entrance.entranceHydrologyTagIds)}
                       </Row>
                     </Descriptions.Item>
                   </Descriptions>
