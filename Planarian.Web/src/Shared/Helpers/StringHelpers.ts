@@ -102,6 +102,12 @@ export function splitCamelCase(input: string): string {
   return result;
 }
 
+export function defaultIfEmpty(value: string | null | undefined) {
+  if (isNullOrWhiteSpace(value)) {
+    return "Not Provided";
+  } else return value;
+}
+
 type AbbreviationOptions = {
   delimiter?: string;
   maxLength?: number;

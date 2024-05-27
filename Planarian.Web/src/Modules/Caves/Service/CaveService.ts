@@ -4,16 +4,17 @@ import { PagedResult } from "../../Search/Models/PagedResult";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
-import { CaveSearchVm } from "../Models/CaveSearchVm";
+import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { FileVm } from "../../Files/Models/FileVm";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
+import { CaveSearchVm } from "../Models/CaveSearchVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
   async GetCaves(
-    queryBuilder: QueryBuilder<CaveSearchVm>
-  ): Promise<PagedResult<CaveVm>> {
-    const response = await HttpClient.get<PagedResult<CaveVm>>(
+    queryBuilder: QueryBuilder<CaveSearchParamsVm>
+  ): Promise<PagedResult<CaveSearchVm>> {
+    const response = await HttpClient.get<PagedResult<CaveSearchVm>>(
       `${baseUrl}?${queryBuilder.buildAsQueryString()}`
     );
     return response.data;
