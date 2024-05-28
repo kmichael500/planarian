@@ -1,38 +1,24 @@
 export interface CaveSearchVm {
-  //#region Cave
   id: string;
   name: string;
-  narrative: string;
-  stateId: string;
+  reportedOn: string | null;
+  isArchived: boolean;
+  depthFeet: number | null;
+  lengthFeet: number | null;
+  maxPitDepthFeet: number | null;
+  numberOfPits: number | null;
   countyId: string;
-  lengthFeet: number;
-  depthFeet: number;
-  elevationFeet: number;
-  numberOfPits: number;
-  maxPitDepthFeet: number;
-  mapStatuses: string;
-  cartographerNamePeopleTagIds: string;
-  geologyTagIds: string;
-  geologicAgeTagIds: string;
-  physiographicProvinceTagIds: string;
-  biologyTagIds: string;
-  archaeologyTagIds: string;
-  caveReportedByNameTagIds: string;
-  caveReportedOnDate: string;
-  caveOtherTagIds: string;
-
-  //#endregion
-  //#region Entrance
-  entranceStatusTagIds: string;
-  entranceDescription: string;
-  entranceFieldIndicationTagIds: string;
-  entrancePitDepthFeet: number;
-  locationQualityTagIds: string;
-  entranceHydrologyTagIds: string;
-  entranceReportedByPeopleTagIds: string;
-  entranceReportedOnDate: string;
-  //#endregion
-  //#region Files
-  fileTypeTagIds: string;
-  fileDisplayName: string;
+  displayId: string;
+  primaryEntranceLatitude: number | null;
+  primaryEntranceLongitude: number | null;
+  primaryEntranceElevationFeet: number | null;
+  archaeologyTagIds: string[];
+  biologyTagIds: string[];
+  cartographerNameTagIds: string[];
+  geologicAgeTagIds: string[];
+  geologyTagIds: string[];
+  mapStatusTagIds: string[];
+  otherTagIds: string[];
+  physiographicProvinceTagIds: string[];
+  reportedByTagIds: string[];
 }

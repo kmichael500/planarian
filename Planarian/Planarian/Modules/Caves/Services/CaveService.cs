@@ -35,7 +35,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
     #region Caves
 
-    public async Task<PagedResult<CaveVm>> GetCaves(FilterQuery query)
+    public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery query)
     {
         return await Repository.GetCaves(query);
     }

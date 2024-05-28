@@ -7,14 +7,14 @@ import {
   QueryBuilder,
   QueryOperator,
 } from "../../Search/Services/QueryBuilder";
-import { CaveVm } from "../../Caves/Models/CaveVm";
-import { CaveSearchVm } from "../../Caves/Models/CaveSearchVm";
+import { CaveSearchParamsVm } from "../../Caves/Models/CaveSearchParamsVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { CaveSearchVm } from "../../Caves/Models/CaveSearchVm";
 
-var queryBuilder = new QueryBuilder<CaveSearchVm>("", false);
+var queryBuilder = new QueryBuilder<CaveSearchParamsVm>("", false);
 export const CaveSearchMapControl = () => {
   const [options, setOptions] = useState<
-    { value: string; label: string; cave: CaveVm | null }[]
+    { value: string; label: string; cave: CaveSearchVm | null }[]
   >([]);
   const map = useMap();
 
@@ -56,14 +56,14 @@ export const CaveSearchMapControl = () => {
 
   const handleSelect = (
     value: string,
-    option: { value: string; label: string; cave: CaveVm | null }
+    option: { value: string; label: string; cave: CaveSearchVm | null }
   ) => {
     if (option.cave) {
       const { cave } = option;
-      const entrance = cave.primaryEntrance;
-      if (entrance && entrance.latitude && entrance.longitude) {
+      const entrance = cave.primaryEntranceLatitude;
+      if (cave.primaryEntranceLatitude && cave.primaryEntranceLongitude) {
         map.current?.flyTo({
-          center: [entrance.longitude, entrance.latitude],
+          center: [cave.primaryEntranceLongitude, cave.primaryEntranceLatitude],
           zoom: 16,
         });
       }
