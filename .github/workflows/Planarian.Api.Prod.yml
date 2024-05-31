@@ -17,6 +17,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      - name: Log Web App Name
+        run: |
+          echo "Web App Name: ${{ secrets.AZURE_WEBAPP_NAME }}"
+
       - name: Extract .NET Version
         id: get-dotnet-version
         run: |
