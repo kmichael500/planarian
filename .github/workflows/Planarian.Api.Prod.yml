@@ -1,0 +1,49 @@
+name: "Planarian API: Production"
+on:
+  push:
+    tags:
+      - "planarian-api-v*"
+    paths:
+      - "Planarian/Planarian/**"
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy_api:
+    runs-on: ubuntu-latest
+    name: Build and Deploy .NET Core API
+    environment:
+      name: Production
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Log Web App Name
+        run: |
+          echo "Web App Name: ${{ secrets.AZURE_WEBAPP_NAME }}"
+
+      - name: Extract .NET Version
+        id: get-dotnet-version
+        run: |
+          version=$(grep -oP '<TargetFramework>\K[^<]+' Planarian/Planarian/Planarian.csproj | sed 's/net//')
+          echo "::set-output name=dotnet-version::$version"
+
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ steps.get-dotnet-version.outputs.dotnet-version }}
+
+      - name: Restore Dependencies
+        run: dotnet restore Planarian/Planarian/Planarian.csproj
+
+      - name: Build .NET Core API
+        run: dotnet build Planarian/Planarian/Planarian.csproj --configuration Release
+
+      - name: Publish .NET Core API
+        run: dotnet publish Planarian/Planarian/Planarian.csproj --configuration Release --output ./publish
+
+      - name: Deploy to Azure Web App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
