@@ -32,6 +32,9 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Folder Include="Modules\FeatureSettings\Models\" />
+        <Folder Include="Modules\FeatureSettings\Repositories\" />
+        <Folder Include="Modules\FeatureSettings\Services\" />
         <Folder Include="Modules\Import\Controllers\"/>
         <Folder Include="Shared\Extensions\Queryable\"/>
     </ItemGroup>

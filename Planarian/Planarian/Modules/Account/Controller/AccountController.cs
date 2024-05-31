@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Extensions.String;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
@@ -23,6 +24,15 @@ public class AccountController : PlanarianControllerBase<AccountService>
         requestUser, tokenService, service)
     {
         _importService = importService;
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<string>> CreateAccount([FromBody] CreateAccountVm account,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.CreateAccount(account, cancellationToken);
+
+        return new JsonResult(result);
     }
 
     // dangerous
@@ -66,7 +76,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/caves/file")]
-    public async Task<IActionResult> ImportCavesFile(string? uuid, [FromForm] IFormFile file,
+    public async Task<IActionResult> ImportCavesFile(string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =
@@ -87,7 +97,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/entrances/file")]
-    public async Task<IActionResult> ImportEntrancesFile(string? uuid, [FromForm] IFormFile file,
+    public async Task<IActionResult> ImportEntrancesFile(string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =
@@ -99,7 +109,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/file")]
-    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string countyCodeRegex, [FromForm] IFormFile file,
+    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string countyCodeRegex, IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =
@@ -135,6 +145,22 @@ public class AccountController : PlanarianControllerBase<AccountService>
     {
         var result = await Service.GetCountiesForTable(stateId, cancellationToken);
         return Ok(result);
+    }
+    
+    [HttpGet("feature-settings")]
+    public async Task<ActionResult<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
+    {
+        var featureSettings = await Service.GetFeatureSettings(cancellationToken);
+
+        return new JsonResult(featureSettings);
+    }
+    
+    [HttpPost("feature-settings/{key}")]
+    public async Task<ActionResult<FeatureSettingVm>> UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)
+    {
+        await Service.UpdateFeatureSetting(key, isEnabled, cancellationToken);
+
+        return new OkResult();
     }
 
     [HttpGet("states")]

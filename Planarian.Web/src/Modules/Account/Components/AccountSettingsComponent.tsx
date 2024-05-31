@@ -11,6 +11,9 @@ import { toEnum } from "../../../Shared/Helpers/EnumHelpers";
 import CreateEditCountiesComponent from "./CreateEditCountiesComponent";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettings } from "./MiscAccountSettingsComponent";
+import { FeatureSettingsComponent } from "./EnabledFieldsComponent";
+import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
+import { AccountService } from "../Services/AccountService";
 
 const AccountSettingsComponent = () => {
   const includedTagTypes = [
@@ -30,6 +33,10 @@ const AccountSettingsComponent = () => {
   includedTagTypes.push(TagType.CaveOther);
 
   const [states, setStates] = useState<SelectListItem<string>[]>([]);
+
+  const [featureSettings, setFeatureSettings] = useState<FeatureSettingVm[]>(
+    []
+  );
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,6 +83,15 @@ const AccountSettingsComponent = () => {
     getStates();
   };
 
+  const getFeatureSettings = async () => {
+    const cavesResponse = await AccountService.GetFeatureSettings();
+    setFeatureSettings(cavesResponse);
+  };
+
+  useEffect(() => {
+    getFeatureSettings();
+  }, []);
+
   return (
     <>
       <Space direction="vertical">
@@ -92,6 +108,23 @@ const AccountSettingsComponent = () => {
                 <TagTypeEditComponent tagType={tagType} />
               </Tabs.TabPane>
             ))}
+          </Tabs>
+        </Card>
+
+        <Card title="Enabled Fields">
+          <Tabs type="card">
+            <Tabs.TabPane tab="Cave" key="1">
+              <FeatureSettingsComponent
+                featureSettings={featureSettings}
+                filterType={"cave"}
+              ></FeatureSettingsComponent>
+            </Tabs.TabPane>
+            <Tabs.TabPane tab="Entrance" key="2">
+              <FeatureSettingsComponent
+                featureSettings={featureSettings}
+                filterType={"entrance"}
+              ></FeatureSettingsComponent>{" "}
+            </Tabs.TabPane>
           </Tabs>
         </Card>
 

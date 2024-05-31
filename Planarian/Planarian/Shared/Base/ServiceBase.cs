@@ -12,7 +12,7 @@ public abstract class ServiceBase
     }
 }
 
-public abstract class ServiceBase<TRepository> : ServiceBase where TRepository : RepositoryBase
+public abstract class ServiceBase<TRepository> : ServiceBase
 {
     protected readonly TRepository Repository;
 

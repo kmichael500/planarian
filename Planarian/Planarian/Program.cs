@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Repositories;
@@ -66,7 +68,11 @@ builder.Configuration.AddJsonFile("appsettings.Development.json", false);
 #endif
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -172,6 +178,7 @@ builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
+builder.Services.AddScoped<FeatureSettingRepository>();
 
 #endregion
 

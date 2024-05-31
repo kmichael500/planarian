@@ -68,13 +68,11 @@ public enum FeatureKey
     #region Entrance Features
 
     EnabledFieldEntranceDescription,
-    EnabledFieldEntranceLocation,
     EnabledFieldEntranceStatusTags,
     EnabledFieldEntranceHydrologyTags,
     EnabledFieldEntranceFieldIndicationTags,
     EnabledFieldEntranceReportedByNameTags,
     EnabledFieldEntranceOtherTags,
-    EnabledFieldEntrancePrimary,
 
     #endregion
 }

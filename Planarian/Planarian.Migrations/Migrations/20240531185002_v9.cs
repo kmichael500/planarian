@@ -69,6 +69,42 @@ namespace Planarian.Migrations.Migrations
                 name: "IX_FeatureSettings_UserId",
                 table: "FeatureSettings",
                 column: "UserId");
+
+            // Add features for all accountIds in Accounts table
+            migrationBuilder.Sql(@"
+                INSERT INTO ""FeatureSettings"" (""Id"", ""AccountId"", ""Key"", ""IsEnabled"", ""CreatedOn"")
+                SELECT
+                    substr(md5(random()::text || clock_timestamp()::text), 1, 10),
+                    a.""Id"", 
+                    key.""Key"",
+                    true,
+                    NOW()
+                FROM
+                    ""Accounts"" a,
+                    (VALUES
+                        ('EnabledFieldCaveAlternateNames'),
+                        ('EnabledFieldCaveLengthFeet'),
+                        ('EnabledFieldCaveDepthFeet'),
+                        ('EnabledFieldCaveMaxPitDepthFeet'),
+                        ('EnabledFieldCaveNumberOfPits'),
+                        ('EnabledFieldCaveNarrative'),
+                        ('EnabledFieldCaveGeologyTags'),
+                        ('EnabledFieldCaveMapStatusTags'),
+                        ('EnabledFieldCaveGeologicAgeTags'),
+                        ('EnabledFieldCavePhysiographicProvinceTags'),
+                        ('EnabledFieldCaveBiologyTags'),
+                        ('EnabledFieldCaveArcheologyTags'),
+                        ('EnabledFieldCaveCartographerNameTags'),
+                        ('EnabledFieldCaveReportedByNameTags'),
+                        ('EnabledFieldCaveOtherTags'),
+                        ('EnabledFieldEntranceDescription'),
+                        ('EnabledFieldEntranceStatusTags'),
+                        ('EnabledFieldEntranceHydrologyTags'),
+                        ('EnabledFieldEntranceFieldIndicationTags'),
+                        ('EnabledFieldEntranceReportedByNameTags'),
+                        ('EnabledFieldEntranceOtherTags')
+                    ) AS key(""Key"")
+            ");
         }
 
         /// <inheritdoc />

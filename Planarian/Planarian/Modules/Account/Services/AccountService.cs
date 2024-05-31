@@ -3,8 +3,10 @@ using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
+using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
@@ -19,15 +21,51 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly FileRepository _fileRepository;
     private readonly NotificationService _notificationService;
     private readonly TagRepository _tagRepository;
+    private readonly FeatureSettingRepository _featureSettingRepository;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _notificationService = notificationService;
         _tagRepository = tagRepository;
+        _featureSettingRepository = featureSettingRepository;
+    }
+    public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
+    {
+        var entity = new Planarian.Model.Database.Entities.RidgeWalker.Account
+        {
+            Name = account.Name,
+        };
+        
+        foreach (var key in Enum.GetValues<FeatureKey>())
+        {
+            var isEnabled = key switch
+            {
+                FeatureKey.EnabledFieldCaveGeologicAgeTags => false,
+                _ => true
+            };
+
+            entity.FeatureSettings.Add(new FeatureSetting
+            {
+                AccountId = entity.Id,
+                Key = key,
+                IsEnabled = isEnabled
+            });
+        }
+
+        entity.AccountUsers.Add(new AccountUser
+        {
+            UserId = RequestUser.Id,
+        });
+        
+
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync(cancellationToken);
+
+        return entity.Id;
     }
 
     public async Task ResetAccount(CancellationToken cancellationToken)
@@ -100,6 +138,8 @@ public class AccountService : ServiceBase<AccountRepository>
         }
     }
 
+    #region Tags
+
     public async Task<IEnumerable<TagTypeTableVm>> GetTagsForTable(string tagTypeKey,
         CancellationToken cancellationToken)
     {
@@ -157,7 +197,11 @@ public class AccountService : ServiceBase<AccountRepository>
             await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId);
         }
     }
+    
 
+    #endregion
+
+    #region Counties
     public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
         CancellationToken cancellationToken)
     {
@@ -244,6 +288,36 @@ public class AccountService : ServiceBase<AccountRepository>
             await Repository.MergeCounties(countyIds, destinationCountyId);
         }
     }
+    
+    #endregion
+
+    #region Settings
+    
+    public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
+    {
+        return await _featureSettingRepository.GetFeatureSettings(cancellationToken);
+    }
+
+    public async Task UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)
+    {
+
+        var featureSetting = await _featureSettingRepository.GetFeatureSetting(key, cancellationToken);
+        var isNew = featureSetting == null;
+
+        featureSetting ??= new FeatureSetting
+        {
+            AccountId = RequestUser.AccountId,
+            Key = key
+        };
+        featureSetting.IsEnabled = isEnabled;
+
+        if (isNew)
+        {
+            _featureSettingRepository.Add(featureSetting);
+        }
+
+        await Repository.SaveChangesAsync(cancellationToken);
+    }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
     {
@@ -316,4 +390,6 @@ public class AccountService : ServiceBase<AccountRepository>
             throw;
         }
     }
+    
+    #endregion
 }

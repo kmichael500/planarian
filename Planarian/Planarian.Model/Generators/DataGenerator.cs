@@ -27,7 +27,6 @@ public class DataGenerator
             GenerateMapStatusTags(),
             GenerateLocationQualityTags(),
             GenerateFileTags(),
-            GeneratePhysiographicProvinces(),
         };
 
         var transaction = await _dbContext.Database.BeginTransactionAsync();
@@ -240,46 +239,7 @@ public class DataGenerator
             CreatedOn = Now
         });
     }
-
-    private static IEnumerable<TagType> GeneratePhysiographicProvinces()
-    {
-        return new List<TagType>
-        {
-            new() { Id = "HRRAwI4AP3", Name = "Superior Upland" },
-            new() { Id = "xnEl9tH82u", Name = "Continental Shelf" },
-            new() { Id = "kgQjcqhAqY", Name = "Coastal Plain" },
-            new() { Id = "cbjfbPgyjz", Name = "Piedmont" },
-            new() { Id = "2WbU6jxs5P", Name = "Blue Ridge" },
-            new() { Id = "Z2lFCY3WDx", Name = "Valley and Ridge" },
-            new() { Id = "qADNIXQBlR", Name = "St. Lawrence Valley" },
-            new() { Id = "0ogVeAAx8w", Name = "Appalachian Plateaus" },
-            new() { Id = "WmBKBtZ61n", Name = "New England Province" },
-            new() { Id = "R9FZEQD6PV", Name = "Adirondack" },
-            new() { Id = "XeLCBuc3BZ", Name = "Interior Low Plateaus" },
-            new() { Id = "uql4hG3AQn", Name = "Central Lowland" },
-            new() { Id = "yVAub95jUV", Name = "Great Plains" },
-            new() { Id = "VRZd3aXo39", Name = "Ozark Plateaus" },
-            new() { Id = "ZjAxzuu8K1", Name = "Ouachita province" },
-            new() { Id = "3NNnQUCZ02", Name = "Southern Rocky Mountains" },
-            new() { Id = "yPZVMSNnrG", Name = "Wyoming Basin" },
-            new() { Id = "2lfIV4tS4f", Name = "Middle Rocky Mountains" },
-            new() { Id = "qfEV1XEQcq", Name = "Northern Rocky Mountains" },
-            new() { Id = "DkienDJmf6", Name = "Columbia Plateau" },
-            new() { Id = "YZzOPN7HIT", Name = "Colorado Plateaus" },
-            new() { Id = "rRvA7dk0om", Name = "Basin and Range Province" },
-            new() { Id = "OfGoFXrvoh", Name = "Cascade-Sierra Mountains" },
-            new() { Id = "j2l65mQkgQ", Name = "Pacific Border province" },
-            new() { Id = "UKyNcEpNaT", Name = "Lower California province" },
-        }.Select(e => new TagType
-        {
-            Id = e.Id,
-            Name = e.Name,
-            Key = TagTypeKeyConstant.PhysiographicProvince,
-            IsDefault = true,
-            CreatedOn = Now
-        });
-    }
-
+    
     private static IEnumerable<State> GenerateStates()
     {
         var states = new List<State>
