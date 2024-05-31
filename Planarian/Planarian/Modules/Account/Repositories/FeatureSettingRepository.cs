@@ -17,7 +17,7 @@ public class FeatureSettingRepository : RepositoryBase
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
         return await DbContext.FeatureSettings
-            .Where(e => e.AccountId == RequestUser.AccountId || e.UserId == RequestUser.AccountId)
+            .Where(e => e.AccountId == RequestUser.AccountId)
             .Select(e => new FeatureSettingVm
             {
                 Id = e.Id,
@@ -30,7 +30,7 @@ public class FeatureSettingRepository : RepositoryBase
     public async Task<FeatureSetting?> GetFeatureSetting(FeatureKey key, CancellationToken cancellationToken)
     {
         var featureSetting = await DbContext.FeatureSettings
-            .Where(e => e.AccountId == RequestUser.AccountId || e.UserId == RequestUser.Id)
+            .Where(e => e.AccountId == RequestUser.AccountId)
             .FirstOrDefaultAsync(e => e.Key == key, cancellationToken);
 
         return featureSetting;

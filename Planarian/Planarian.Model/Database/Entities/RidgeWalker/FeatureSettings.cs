@@ -8,13 +8,10 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public class FeatureSetting : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string? UserId { get; set; } = null!;
-
     [MaxLength(PropertyLength.Key)] public FeatureKey Key { get; set; } = default;
     public bool IsEnabled { get; set; } = false;
     
     public virtual Account? Account { get; set; }
-    public virtual User? User { get; set; }
 
 }
 
@@ -27,10 +24,6 @@ public class FeatureSettingConfiguration : BaseEntityTypeConfiguration<FeatureSe
         builder.HasOne(e => e.Account)
             .WithMany(e=>e.FeatureSettings)
             .HasForeignKey(e => e.AccountId);
-
-        builder.HasOne(e => e.User)
-            .WithMany(e=>e.FeatureSettings)
-            .HasForeignKey(e => e.UserId);
 
         builder.Property(e => e.Key)
             .HasConversion<string>()

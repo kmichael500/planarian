@@ -17,7 +17,6 @@ namespace Planarian.Migrations.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     AccountId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    UserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
@@ -43,11 +42,6 @@ namespace Planarian.Migrations.Migrations
                         column: x => x.ModifiedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_FeatureSettings_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateIndex(
@@ -64,12 +58,7 @@ namespace Planarian.Migrations.Migrations
                 name: "IX_FeatureSettings_ModifiedByUserId",
                 table: "FeatureSettings",
                 column: "ModifiedByUserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_FeatureSettings_UserId",
-                table: "FeatureSettings",
-                column: "UserId");
-
+            
             // Add features for all accountIds in Accounts table
             migrationBuilder.Sql(@"
                 INSERT INTO ""FeatureSettings"" (""Id"", ""AccountId"", ""Key"", ""IsEnabled"", ""CreatedOn"")
@@ -106,6 +95,8 @@ namespace Planarian.Migrations.Migrations
                     ) AS key(""Key"")
             ");
         }
+        
+        
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)

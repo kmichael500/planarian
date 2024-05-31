@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20240531185002_v9")]
+    [Migration("20240531212200_v9")]
     partial class v9
     {
         /// <inheritdoc />
@@ -1073,10 +1073,6 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("UserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
@@ -1084,8 +1080,6 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("ModifiedByUserId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("FeatureSettings");
                 });
@@ -2135,17 +2129,11 @@ namespace Planarian.Migrations.Migrations
                         .WithMany()
                         .HasForeignKey("ModifiedByUserId");
 
-                    b.HasOne("Planarian.Model.Database.Entities.User", "User")
-                        .WithMany("FeatureSettings")
-                        .HasForeignKey("UserId");
-
                     b.Navigation("Account");
 
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("ModifiedByUser");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.FieldIndicationTag", b =>
@@ -2543,8 +2531,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("CavesReported");
 
                     b.Navigation("EntrancesReported");
-
-                    b.Navigation("FeatureSettings");
 
                     b.Navigation("Members");
                 });

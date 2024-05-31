@@ -64,7 +64,6 @@ public class User : EntityBase
     public ICollection<Cave> CavesReported { get; set; } = new HashSet<Cave>();
     public ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
     public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
-    public ICollection<FeatureSetting> FeatureSettings { get; set; } = new HashSet<FeatureSetting>();
 
     #region Helper Functions
 
