@@ -2,7 +2,7 @@ name: "Planarian API: Production"
 on:
   push:
     tags:
-      - "planarian-web-v*"
+      - "planarian-api-v*"
     paths:
       - "Planarian/Planarian/**"
   workflow_dispatch:
