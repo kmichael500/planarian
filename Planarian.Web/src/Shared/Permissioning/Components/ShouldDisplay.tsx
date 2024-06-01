@@ -1,9 +1,6 @@
-import React, { ReactNode, useCallback, useEffect, useState } from "react";
-import {
-  FeatureKey,
-  FeatureSettingVm,
-} from "../../../Modules/Account/Models/FeatureSettingVm";
-import { AccountService } from "../../../Modules/Account/Services/AccountService";
+import React, { ReactNode, useContext } from "react";
+import { FeatureKey } from "../../../Modules/Account/Models/FeatureSettingVm";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 interface ShouldDisplayProps {
   featureKey?: FeatureKey;
@@ -14,9 +11,9 @@ const ShouldDisplay: React.FC<ShouldDisplayProps> = ({
   featureKey,
   children,
 }) => {
-  const isEnabled = useFeatureEnabled().isFeatureEnabled(featureKey);
+  const { isFeatureEnabled } = useFeatureEnabled();
 
-  if (featureKey && isEnabled) {
+  if (featureKey && isFeatureEnabled(featureKey)) {
     return <>{children}</>;
   }
 
@@ -30,26 +27,15 @@ export interface UseFeatureEnabledProps {
 }
 
 export const useFeatureEnabled = () => {
-  const [features, setFeatures] = useState<FeatureSettingVm[]>([]);
-  const [isLoading, setLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    const fetchFeatureSettings = async () => {
-      const response = await AccountService.GetFeatureSettings();
-      setFeatures(response);
-      setLoading(false);
-    };
-
-    fetchFeatureSettings();
-  }, []);
+  const { permissions } = useContext(AppContext);
 
   const isFeatureEnabled = (
     featureKey?: FeatureKey | null | undefined
   ): boolean => {
     if (!featureKey) return false;
-    const feature = features.find((f) => f.key === featureKey);
+    const feature = permissions.visibleFields.find((f) => f.key === featureKey);
     return feature?.isEnabled || false;
   };
 
-  return { isFeatureEnabled, isLoading };
+  return { isFeatureEnabled };
 };

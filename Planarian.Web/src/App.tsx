@@ -1,5 +1,5 @@
 import { Col, Layout, Row, Spin } from "antd";
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import { AppRouting } from "./Configuration/Routing/App.routing";
 import Favicon from "react-favicon";
@@ -13,12 +13,13 @@ import { AppService } from "./Shared/Services/AppService";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
 import { ApiErrorResponse } from "./Shared/Models/ApiErrorResponse";
 
-const { Content, Footer, Sider } = Layout;
+const { Content } = Layout;
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [initializedError, setInitializedError] = useState<string | null>(null);
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -34,8 +35,6 @@ const App: React.FC = () => {
     initializeApp();
   }, []);
 
-  // const { hideBodyPadding } = useContext(AppContext);
-
   return (
     <>
       <Helmet>
@@ -44,30 +43,25 @@ const App: React.FC = () => {
       </Helmet>
       <Favicon url={logo} />
       <BrowserRouter>
-        {isInitialized && (
-          <>
-            <AppProvider>
-              <Layout style={{ minHeight: "100vh" }}>
-                <SideBarComponent />
-                <Layout className="site-layout">
-                  <HeaderComponent />
-                  <AppContext.Consumer>
-                    {({ hideBodyPadding }) => (
-                      <Content
-                        style={{ margin: hideBodyPadding ? "0px" : "16px" }}
-                      >
-                        <AppRouting />
-                      </Content>
-                    )}
-                  </AppContext.Consumer>
-                  {/* <Footer style={{ textAlign: "center" }}></Footer> */}
-                </Layout>
+        <AppProvider>
+          {isInitialized ? (
+            <Layout style={{ minHeight: "100vh" }}>
+              <SideBarComponent />
+              <Layout className="site-layout">
+                <HeaderComponent />
+                <AppContext.Consumer>
+                  {({ hideBodyPadding }) => (
+                    <Content
+                      style={{ margin: hideBodyPadding ? "0px" : "16px" }}
+                    >
+                      <AppRouting />
+                    </Content>
+                  )}
+                </AppContext.Consumer>
+                {/* <Footer style={{ textAlign: "center" }}></Footer> */}
               </Layout>
-            </AppProvider>
-          </>
-        )}
-        {!isInitialized && (
-          <>
+            </Layout>
+          ) : (
             <div
               style={{
                 display: "flex",
@@ -79,20 +73,15 @@ const App: React.FC = () => {
               <LogoIcon
                 style={{ padding: "10px", fontSize: "150px", opacity: "0.5" }}
               />
-
               <Row>
                 <Col span={24}>
-                  <Spin
-                    spinning={isLoading}
-                    size="large"
-                    tip="Planarian"
-                  ></Spin>
+                  <Spin spinning={isLoading} size="large" tip="Planarian" />
                 </Col>
                 <Col span={24}>{initializedError}</Col>
               </Row>
             </div>
-          </>
-        )}
+          )}
+        </AppProvider>
       </BrowserRouter>
     </>
   );

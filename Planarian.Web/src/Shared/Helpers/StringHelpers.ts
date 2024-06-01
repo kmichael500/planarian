@@ -111,7 +111,7 @@ export function splitCamelCase(input: string): string {
 
 export function defaultIfEmpty(value: string | null | undefined) {
   if (isNullOrWhiteSpace(value)) {
-    return "Not Provided";
+    return "-";
   } else return value;
 }
 

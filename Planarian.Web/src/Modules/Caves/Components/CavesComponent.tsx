@@ -158,7 +158,7 @@ const CavesComponent: React.FC = () => {
       data: { key: FeatureKey.EnabledFieldCaveOtherTags },
     },
   ];
-  const { isFeatureEnabled, isLoading: isFeatureLoading } = useFeatureEnabled();
+  const { isFeatureEnabled } = useFeatureEnabled();
   const [filteredFeatures, setFilteredFeatures] = useState<
     SelectListItemKey<CaveSearchVm>[]
   >([]);
@@ -183,7 +183,7 @@ const CavesComponent: React.FC = () => {
     console.log("filterFeatures", filterFeatures);
 
     filterFeatures();
-  }, [isFeatureLoading]);
+  }, []);
 
   const renderFeature = (
     cave: CaveSearchVm,

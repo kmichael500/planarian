@@ -1,5 +1,11 @@
-import React, { createContext, useState } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
+import { AccountService } from "../../Modules/Account/Services/AccountService";
+
+interface Permissions {
+  visibleFields: FeatureSettingVm[];
+}
 
 interface AppContextProps {
   isAuthenticated: boolean;
@@ -13,6 +19,8 @@ interface AppContextProps {
   setHeaderButtons: (buttons: React.ReactElement[]) => void;
   hideBodyPadding: boolean;
   setHideBodyPadding: (value: boolean) => void;
+  permissions: Permissions;
+  setPermissions: (permissions: Permissions) => void;
 }
 
 export const AppContext = createContext<AppContextProps>({
@@ -24,6 +32,8 @@ export const AppContext = createContext<AppContextProps>({
   setHeaderButtons: () => {},
   hideBodyPadding: false,
   setHideBodyPadding: () => {},
+  permissions: { visibleFields: [] },
+  setPermissions: () => {},
 });
 
 interface AppProviderProps {
@@ -41,6 +51,20 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [headerButtons, setHeaderButtons] = useState<React.ReactElement[]>([]);
 
   const [hideBodyPadding, setHideBodyPadding] = useState<boolean>(false);
+  const [permissions, setPermissions] = useState<Permissions>({
+    visibleFields: [],
+  });
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
+  useEffect(() => {
+    const init = async () => {
+      const response = await AccountService.GetFeatureSettings();
+      setPermissions({ visibleFields: response });
+      setIsInitialized(true);
+    };
+
+    init();
+  }, []);
 
   return (
     <AppContext.Provider
@@ -53,9 +77,11 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         setHeaderButtons: setHeaderButtons,
         hideBodyPadding: hideBodyPadding,
         setHideBodyPadding: setHideBodyPadding,
+        permissions: permissions,
+        setPermissions: setPermissions,
       }}
     >
-      {props.children}
+      {isInitialized ? props.children : null}
     </AppContext.Provider>
   );
 };

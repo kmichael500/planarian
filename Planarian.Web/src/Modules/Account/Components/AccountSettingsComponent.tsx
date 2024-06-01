@@ -1,6 +1,6 @@
 import { Card, Space, Tabs } from "antd";
 import { ResetAccountComponent } from "./ResetAccountComponent";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import TagTypeEditComponent from "./TagTypeEditComponent";
 import { TagType } from "../../Tag/Models/TagType";
@@ -13,6 +13,7 @@ import { MiscAccountSettings } from "./MiscAccountSettingsComponent";
 import { EnabledFieldsComponent } from "./EnabledFieldsComponent";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const AccountSettingsComponent = () => {
   const tagTypeFeatureMap: { [key in TagType]?: FeatureKey | null } = {
@@ -36,12 +37,15 @@ const AccountSettingsComponent = () => {
     [TagType.CaveOther]: FeatureKey.EnabledFieldCaveOtherTags,
   };
 
+  const { setPermissions, permissions } = useContext(AppContext);
+
   const includedTagTypes = Object.keys(tagTypeFeatureMap).sort() as TagType[];
 
   const [filteredTagTypes, setFilteredTagTypes] = useState<TagType[]>([]);
 
   const fetchFeatureSettings = async () => {
     const enabledFeatures = await AccountService.GetFeatureSettings(true);
+    setPermissions({ visibleFields: enabledFeatures });
     const enabledTagTypes = includedTagTypes.filter((tagType) => {
       const featureKey = tagTypeFeatureMap[tagType];
       if (!featureKey) return true;
