@@ -90,7 +90,6 @@ namespace Planarian.Migrations.Migrations
                         ('EnabledFieldCaveCartographerNameTags'),
                         ('EnabledFieldCaveOtherTags'),
                         ('EnabledFieldCaveNarrative'),
-                        ('EnabledFieldEntranceLocationQuality'),
                         ('EnabledFieldEntranceName'),
                         ('EnabledFieldEntranceReportedOn'),
                         ('EnabledFieldEntranceReportedByNameTags'),

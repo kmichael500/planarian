@@ -263,7 +263,7 @@ builder.Services.AddSession();
 var app = builder.Build();
 
 
-if (false)
+if (true)
 {
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
