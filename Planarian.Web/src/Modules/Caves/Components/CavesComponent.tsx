@@ -1,5 +1,5 @@
 import { Row, Col, Typography, Form, Checkbox, Space, Divider } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -38,6 +38,7 @@ import {
   useFeatureEnabled,
 } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -51,17 +52,6 @@ const CavesComponent: React.FC = () => {
   >([]);
 
   useEffect(() => {
-    const savedFeatures = localStorage.getItem("selectedFeatures");
-    if (savedFeatures) {
-      setSelectedFeatures(JSON.parse(savedFeatures));
-    } else {
-      setSelectedFeatures([
-        "countyId",
-        "lengthFeet",
-        "depthFeet",
-        "reportedOn",
-      ]);
-    }
     getCaves();
   }, []);
 
@@ -159,28 +149,37 @@ const CavesComponent: React.FC = () => {
     },
   ];
   const { isFeatureEnabled } = useFeatureEnabled();
+  const { permissions } = useContext(AppContext);
   const [filteredFeatures, setFilteredFeatures] = useState<
     SelectListItemKey<CaveSearchVm>[]
   >([]);
 
   useEffect(() => {
     const filterFeatures = () => {
+      const savedFeaturesJson = localStorage.getItem("selectedFeatures");
+      let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
+      if (savedFeaturesJson) {
+        savedFeatures = JSON.parse(savedFeaturesJson);
+
+        setSelectedFeatures(savedFeatures);
+      } else {
+        setSelectedFeatures([
+          "countyId",
+          "lengthFeet",
+          "depthFeet",
+          "reportedOn",
+        ]);
+      }
       const enabledFeatures = possibleFeaturesToRender.filter((feature) => {
         const isEnabled = isFeatureEnabled(feature.data.key);
-        selectedFeatures.includes(feature.value) &&
+        savedFeatures.includes(feature.value) &&
           !isEnabled &&
-          setSelectedFeatures(
-            selectedFeatures.filter((f) => f !== feature.value)
-          );
+          setSelectedFeatures(savedFeatures.filter((f) => f !== feature.value));
 
-        console.log("feature", feature, isFeatureEnabled(feature.data.key));
         return isEnabled;
       });
-      console.log("enabledFeatures", enabledFeatures);
       setFilteredFeatures(enabledFeatures);
     };
-
-    console.log("filterFeatures", filterFeatures);
 
     filterFeatures();
   }, []);
