@@ -10,6 +10,8 @@ import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { CacheService } from "../../../Shared/Services/CacheService";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -121,10 +123,20 @@ const AccountService = {
   },
   //#endregion
 
-  async GetFeatureSettings() {
+  async GetFeatureSettings(resetCache: boolean = false) {
+    const cacheKey = `${AuthenticationService.GetAccountId}-featureSettings`;
+
+    const cachedData = CacheService.get<FeatureSettingVm[]>(cacheKey);
+    if (!resetCache && cachedData) {
+      return cachedData;
+    }
+
     const response = await HttpClient.get<FeatureSettingVm[]>(
       `${baseUrl}/feature-settings`
     );
+
+    CacheService.set(cacheKey, response.data);
+
     return response.data;
   },
 

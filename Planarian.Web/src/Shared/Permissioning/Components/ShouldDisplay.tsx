@@ -43,14 +43,13 @@ export const useFeatureEnabled = () => {
     fetchFeatureSettings();
   }, []);
 
-  const isFeatureEnabled = useCallback(
-    (featureKey?: FeatureKey): boolean => {
-      if (!featureKey) return false;
-      const feature = features.find((f) => f.key === featureKey);
-      return feature?.isEnabled || false;
-    },
-    [features]
-  );
+  const isFeatureEnabled = (
+    featureKey?: FeatureKey | null | undefined
+  ): boolean => {
+    if (!featureKey) return false;
+    const feature = features.find((f) => f.key === featureKey);
+    return feature?.isEnabled || false;
+  };
 
   return { isFeatureEnabled, isLoading };
 };

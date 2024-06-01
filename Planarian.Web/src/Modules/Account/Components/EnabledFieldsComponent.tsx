@@ -39,12 +39,14 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldEntranceReportedByNameTags: "Reported By",
 };
 
-export const FeatureSettingsComponent = ({
+export const EnabledFieldsComponent = ({
   featureSettings,
   filterType,
+  onChange,
 }: {
   featureSettings: FeatureSettingVm[];
   filterType: "cave" | "entrance";
+  onChange?: (featureKey: FeatureKey, checked: boolean) => void;
 }) => {
   const [form] = Form.useForm<FeatureSettingVm>();
   const [initialSettings, setInitialSettings] = useState(new Map());
@@ -59,11 +61,12 @@ export const FeatureSettingsComponent = ({
         featureKey,
         checked
       );
-      // Assuming a successful response would confirm the setting was updated
+      if (onChange) {
+        onChange(featureKey, checked);
+      }
     } catch (e) {
       const error = e as PlanarianError;
       message.error(error.message);
-      // Revert the checkbox to the original value
       form.setFieldsValue({ [featureKey]: originalValue });
     }
   };
