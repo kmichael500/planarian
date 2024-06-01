@@ -39,6 +39,8 @@ import {
 } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { AccountService } from "../../Account/Services/AccountService";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -155,29 +157,28 @@ const CavesComponent: React.FC = () => {
 
   useEffect(() => {
     const filterFeatures = () => {
-      const savedFeaturesJson = localStorage.getItem("selectedFeatures");
+      const savedFeaturesJson = localStorage.getItem(
+        `${AuthenticationService.GetAccountId()}-selectedFeatures`
+      );
       let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
       if (savedFeaturesJson) {
         savedFeatures = JSON.parse(savedFeaturesJson);
-
-        setSelectedFeatures(savedFeatures);
       } else {
-        setSelectedFeatures([
-          "countyId",
-          "lengthFeet",
-          "depthFeet",
-          "reportedOn",
-        ]);
+        savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
       }
+
       const enabledFeatures = possibleFeaturesToRender.filter((feature) => {
         const isEnabled = isFeatureEnabled(feature.data.key);
-        savedFeatures.includes(feature.value) &&
-          !isEnabled &&
-          setSelectedFeatures(savedFeatures.filter((f) => f !== feature.value));
 
         return isEnabled;
       });
+
       setFilteredFeatures(enabledFeatures);
+      setSelectedFeatures(
+        savedFeatures.filter((feature) =>
+          enabledFeatures.map((f) => f.value).includes(feature)
+        )
+      );
     };
 
     filterFeatures();
@@ -496,7 +497,7 @@ const CavesComponent: React.FC = () => {
             onChange={(checkedValues) => {
               setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
               localStorage.setItem(
-                "selectedFeatures",
+                `${AuthenticationService.GetAccountId()}-selectedFeatures`,
                 JSON.stringify(checkedValues)
               );
             }}

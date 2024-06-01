@@ -87,8 +87,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, []);
 
   useEffect(() => {
-    setIsInitialized(false);
     if (isAuthenticated) {
+      setIsInitialized(false);
       initializeApp();
     }
   }, [isAuthenticated]);
