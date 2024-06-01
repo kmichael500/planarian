@@ -29,7 +29,7 @@ interface AppContextProps {
 }
 
 export const AppContext = createContext<AppContextProps>({
-  isAuthenticated: false,
+  isAuthenticated: AuthenticationService.IsAuthenticated(),
   setIsAuthenticated: () => {},
   setHeaderTitle: () => {},
   headerTitle: ["", ""],
