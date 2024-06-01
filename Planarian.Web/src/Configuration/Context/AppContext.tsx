@@ -65,7 +65,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [initializedError, setInitializedError] = useState<string | null>(null);
 
   const initializeApp = async () => {
-    console.log("Initializing app...");
     try {
       setIsLoading(true);
       await AppService.InitializeApp();

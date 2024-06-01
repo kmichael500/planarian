@@ -149,7 +149,6 @@ const CavesComponent: React.FC = () => {
     },
   ];
   const { isFeatureEnabled } = useFeatureEnabled();
-  const { permissions } = useContext(AppContext);
   const [filteredFeatures, setFilteredFeatures] = useState<
     SelectListItemKey<CaveSearchVm>[]
   >([]);
