@@ -46,14 +46,27 @@ const AccountSettingsComponent = () => {
   const fetchFeatureSettings = async () => {
     const enabledFeatures = await AccountService.GetFeatureSettings(true);
     setPermissions({ visibleFields: enabledFeatures });
+
+    // Check for People tag feature keys
+    const peopleFeatureKeys = [
+      FeatureKey.EnabledFieldCaveReportedByNameTags,
+      FeatureKey.EnabledFieldEntranceReportedByNameTags,
+      FeatureKey.EnabledFieldCaveCartographerNameTags,
+    ];
+
+    const isPeopleTagEnabled = peopleFeatureKeys.some((key) =>
+      enabledFeatures.some((f) => f.key === key && f.isEnabled)
+    );
+
     const enabledTagTypes = includedTagTypes.filter((tagType) => {
+      if (tagType === TagType.People) return isPeopleTagEnabled;
+
       const featureKey = tagTypeFeatureMap[tagType];
       if (!featureKey) return true;
       return enabledFeatures.some((f) => f.key === featureKey && f.isEnabled);
     });
 
     setFeatureSettings(enabledFeatures);
-
     setFilteredTagTypes(enabledTagTypes);
   };
 

@@ -479,7 +479,7 @@ const CavesComponent: React.FC = () => {
         />{" "}
       </AdvancedSearchDrawerComponent>
 
-      <Space direction="vertical">
+      <Space direction="vertical" style={{ width: "100%" }}>
         <div
           style={{
             borderRadius: "2px",
