@@ -1,5 +1,5 @@
 import { Col, Layout, Row, Spin } from "antd";
-import React, { useState, useEffect, useContext } from "react";
+import React from "react";
 import "./App.css";
 import { AppRouting } from "./Configuration/Routing/App.routing";
 import Favicon from "react-favicon";
@@ -9,90 +9,59 @@ import { BrowserRouter } from "react-router-dom";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
-import { AppService } from "./Shared/Services/AppService";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
-import { ApiErrorResponse } from "./Shared/Models/ApiErrorResponse";
 
-const { Content, Footer, Sider } = Layout;
+const { Content } = Layout;
 
 const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [initializedError, setInitializedError] = useState<string | null>(null);
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        await AppService.InitializeApp();
-        setIsInitialized(true);
-        setIsLoading(false);
-      } catch (e) {
-        const error = e as ApiErrorResponse;
-        setInitializedError(error.message);
-        setIsLoading(false);
-      }
-    };
-    initializeApp();
-  }, []);
-
-  // const { hideBodyPadding } = useContext(AppContext);
-
   return (
     <>
       <Helmet>
         <title>Planarian</title>
-        <meta name="description" content="Cave project managment" />
+        <meta name="description" content="Cave project management" />
       </Helmet>
       <Favicon url={logo} />
       <BrowserRouter>
-        {isInitialized && (
-          <>
-            <AppProvider>
-              <Layout style={{ minHeight: "100vh" }}>
-                <SideBarComponent />
-                <Layout className="site-layout">
-                  <HeaderComponent />
-                  <AppContext.Consumer>
-                    {({ hideBodyPadding }) => (
-                      <Content
-                        style={{ margin: hideBodyPadding ? "0px" : "16px" }}
-                      >
-                        <AppRouting />
-                      </Content>
-                    )}
-                  </AppContext.Consumer>
-                  {/* <Footer style={{ textAlign: "center" }}></Footer> */}
+        <AppProvider>
+          <AppContext.Consumer>
+            {({ isInitialized, isLoading, initializedError }) =>
+              isInitialized ? (
+                <Layout style={{ minHeight: "100vh" }}>
+                  <SideBarComponent />
+                  <Layout className="site-layout">
+                    <HeaderComponent />
+                    <Content style={{ margin: "16px" }}>
+                      <AppRouting />
+                    </Content>
+                  </Layout>
                 </Layout>
-              </Layout>
-            </AppProvider>
-          </>
-        )}
-        {!isInitialized && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                height: "100vh",
-              }}
-            >
-              <LogoIcon
-                style={{ padding: "10px", fontSize: "150px", opacity: "0.5" }}
-              />
-
-              <Row>
-                <Col span={24}>
-                  <Spin
-                    spinning={isLoading}
-                    size="large"
-                    tip="Planarian"
-                  ></Spin>
-                </Col>
-                <Col span={24}>{initializedError}</Col>
-              </Row>
-            </div>
-          </>
-        )}
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100vh",
+                  }}
+                >
+                  <LogoIcon
+                    style={{
+                      padding: "10px",
+                      fontSize: "150px",
+                      opacity: "0.5",
+                    }}
+                  />
+                  <Row>
+                    <Col span={24}>
+                      <Spin spinning={isLoading} size="large" tip="Planarian" />
+                    </Col>
+                    <Col span={24}>{initializedError}</Col>
+                  </Row>
+                </div>
+              )
+            }
+          </AppContext.Consumer>
+        </AppProvider>
       </BrowserRouter>
     </>
   );

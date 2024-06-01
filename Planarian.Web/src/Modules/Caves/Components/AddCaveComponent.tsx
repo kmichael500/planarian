@@ -31,6 +31,8 @@ import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputD
 import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
+import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -135,217 +137,262 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       <Form.Item name="id" noStyle>
         <Input type="hidden" />
       </Form.Item>
-      <Col span={12}>
-        <Form.Item
-          label="Name"
-          name={nameof<AddCaveVm>("name")}
-          rules={[{ required: true, message: "Please enter a name" }]}
-        >
-          <Input />
-        </Form.Item>
-      </Col>
-      <Col span={12}>
-        <Form.Item
-          label="Alternate Names"
-          name={nameof<AddCaveVm>("alternateNames")}
-        >
-          <Select
-            mode="tags"
-            style={{ width: "100%" }}
-            placeholder="Add alternate names"
-            allowClear
-          ></Select>
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="State"
-          name={nameof<AddCaveVm>("stateId")}
-          rules={[{ required: true, message: "Please select a state" }]}
-        >
-          <StateDropdown
-            autoSelectFirst={!isEditing}
-            onChange={(e) => {
-              setSelectedStateId(e.toString());
-              if (isInitialLoad) return setIsInitialLoad(false);
-              form.setFieldsValue({ countyId: undefined });
-            }}
-          />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="County"
-          name={nameof<AddCaveVm>("countyId")}
-          rules={[{ required: true, message: "Please select a county" }]}
-        >
-          {selectedStateId && (
-            <CountyDropdown selectedStateId={selectedStateId}></CountyDropdown>
-          )}
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="Map Status"
-          name={nameof<AddCaveVm>("mapStatusTagIds")}
-        >
-          <TagSelectComponent
-            tagType={TagType.MapStatus}
-            projectId={""}
-            mode="multiple"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="Cartographer Name"
-          name={nameof<AddCaveVm>("cartographerNameTagIds")}
-        >
-          <TagSelectComponent
-            tagType={TagType.People}
-            projectId={""}
-            mode="tags"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...threeColProps}>
-        <Form.Item label="Geology" name={nameof<AddCaveVm>("geologyTagIds")}>
-          <TagSelectComponent
-            tagType={TagType.Geology}
-            projectId={""}
-            mode="multiple"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...threeColProps}>
-        <Form.Item
-          label="Geologic Age"
-          name={nameof<AddCaveVm>("geologicAgeTagIds")}
-        >
-          <TagSelectComponent
-            tagType={TagType.GeologicAge}
-            projectId={""}
-            mode="multiple"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...threeColProps}>
-        <Form.Item
-          label="Physiographic Province"
-          name={nameof<AddCaveVm>("physiographicProvinceTagIds")}
-        >
-          <TagSelectComponent
-            tagType={TagType.PhysiographicProvince}
-            projectId={""}
-            mode="multiple"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...fourColProps}>
-        <Form.Item
-          label="Length"
-          name={nameof<AddCaveVm>("lengthFeet")}
-          rules={[
-            {
-              required: true,
-              message: "Please enter the length in feet",
-            },
-          ]}
-        >
-          <InputDistanceComponent />
-        </Form.Item>
-      </Col>
-      <Col {...fourColProps}>
-        <Form.Item
-          label="Depth"
-          name={nameof<AddCaveVm>("depthFeet")}
-          rules={[
-            { required: true, message: "Please enter the depth in feet" },
-          ]}
-        >
-          <InputDistanceComponent />
-        </Form.Item>
-      </Col>
-      <Col {...fourColProps}>
-        <Form.Item
-          label="Max Pit Depth"
-          name={nameof<AddCaveVm>("maxPitDepthFeet")}
-          rules={[
-            {
-              required: true,
-              message: "Please enter the max pit depth in feet",
-            },
-          ]}
-        >
-          <InputDistanceComponent />
-        </Form.Item>
-      </Col>
-      <Col {...fourColProps}>
-        <Form.Item
-          label="Number of Pits"
-          name={nameof<AddCaveVm>("numberOfPits")}
-          rules={[
-            {
-              required: true,
-              message: "Please enter the number of pits",
-            },
-          ]}
-        >
-          <InputNumber min={0} style={{ width: "100%" }} />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item label="Biology" name={nameof<AddCaveVm>("biologyTagIds")}>
-          <TagSelectComponent
-            allowCustomTags
-            tagType={TagType.Biology}
-            mode="tags"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="Archeology"
-          name={nameof<AddCaveVm>("archeologyTagIds")}
-        >
-          <TagSelectComponent
-            allowCustomTags
-            tagType={TagType.Archeology}
-            mode="tags"
-          />
-        </Form.Item>
-      </Col>
-      <Col span={24}>
-        <Form.Item label="Narrative" name={nameof<AddCaveVm>("narrative")}>
-          <Input.TextArea rows={15} />
-        </Form.Item>
-      </Col>{" "}
-      <Col {...oneColProps}>
-        <Form.Item label="Other Tags" name={nameof<AddCaveVm>("otherTagIds")}>
-          <TagSelectComponent
-            tagType={TagType.CaveOther}
-            projectId={""}
-            mode="multiple"
-          />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item label="Reported On" name={nameof<AddCaveVm>("reportedOn")}>
-          <Input type="date" />
-        </Form.Item>
-      </Col>
-      <Col {...twoColProps}>
-        <Form.Item
-          label="Reported By"
-          name={nameof<AddCaveVm>("reportedByNameTagIds")}
-        >
-          <TagSelectComponent
-            allowCustomTags
-            tagType={TagType.People}
-            mode="tags"
-          />
-        </Form.Item>
-      </Col>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveName}>
+        <Col span={12}>
+          <Form.Item
+            label="Name"
+            name={nameof<AddCaveVm>("name")}
+            rules={[{ required: true, message: "Please enter a name" }]}
+          >
+            <Input />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveAlternateNames}>
+        <Col span={12}>
+          <Form.Item
+            label="Alternate Names"
+            name={nameof<AddCaveVm>("alternateNames")}
+          >
+            <Select
+              mode="tags"
+              style={{ width: "100%" }}
+              placeholder="Add alternate names"
+              allowClear
+            ></Select>
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>
+        <Col {...twoColProps}>
+          <Form.Item
+            label="State"
+            name={nameof<AddCaveVm>("stateId")}
+            rules={[{ required: true, message: "Please select a state" }]}
+          >
+            <StateDropdown
+              autoSelectFirst={!isEditing}
+              onChange={(e) => {
+                setSelectedStateId(e.toString());
+                if (isInitialLoad) return setIsInitialLoad(false);
+                form.setFieldsValue({ countyId: undefined });
+              }}
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveCounty}>
+        <Col {...twoColProps}>
+          <Form.Item
+            label="County"
+            name={nameof<AddCaveVm>("countyId")}
+            rules={[{ required: true, message: "Please select a county" }]}
+          >
+            {selectedStateId && (
+              <CountyDropdown
+                selectedStateId={selectedStateId}
+              ></CountyDropdown>
+            )}
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
+        <Col {...twoColProps}>
+          <Form.Item
+            label="Map Status"
+            name={nameof<AddCaveVm>("mapStatusTagIds")}
+          >
+            <TagSelectComponent
+              tagType={TagType.MapStatus}
+              projectId={""}
+              mode="multiple"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay
+        featureKey={FeatureKey.EnabledFieldCaveCartographerNameTags}
+      >
+        <Col {...twoColProps}>
+          <Form.Item
+            label="Cartographer Name"
+            name={nameof<AddCaveVm>("cartographerNameTagIds")}
+          >
+            <TagSelectComponent
+              tagType={TagType.People}
+              projectId={""}
+              mode="tags"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologyTags}>
+        <Col {...threeColProps}>
+          <Form.Item label="Geology" name={nameof<AddCaveVm>("geologyTagIds")}>
+            <TagSelectComponent
+              tagType={TagType.Geology}
+              projectId={""}
+              mode="multiple"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologicAgeTags}>
+        <Col {...threeColProps}>
+          <Form.Item
+            label="Geologic Age"
+            name={nameof<AddCaveVm>("geologicAgeTagIds")}
+          >
+            <TagSelectComponent
+              tagType={TagType.GeologicAge}
+              projectId={""}
+              mode="multiple"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay
+        featureKey={FeatureKey.EnabledFieldCavePhysiographicProvinceTags}
+      >
+        <Col {...threeColProps}>
+          <Form.Item
+            label="Physiographic Province"
+            name={nameof<AddCaveVm>("physiographicProvinceTagIds")}
+          >
+            <TagSelectComponent
+              tagType={TagType.PhysiographicProvince}
+              projectId={""}
+              mode="multiple"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveLengthFeet}>
+        <Col {...fourColProps}>
+          <Form.Item
+            label="Length"
+            name={nameof<AddCaveVm>("lengthFeet")}
+            rules={[
+              {
+                required: true,
+                message: "Please enter the length in feet",
+              },
+            ]}
+          >
+            <InputDistanceComponent />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveDepthFeet}>
+        <Col {...fourColProps}>
+          <Form.Item
+            label="Depth"
+            name={nameof<AddCaveVm>("depthFeet")}
+            rules={[
+              { required: true, message: "Please enter the depth in feet" },
+            ]}
+          >
+            <InputDistanceComponent />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
+        <Col {...fourColProps}>
+          <Form.Item
+            label="Max Pit Depth"
+            name={nameof<AddCaveVm>("maxPitDepthFeet")}
+            rules={[
+              {
+                required: true,
+                message: "Please enter the max pit depth in feet",
+              },
+            ]}
+          >
+            <InputDistanceComponent />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNumberOfPits}>
+        <Col {...fourColProps}>
+          <Form.Item
+            label="Number of Pits"
+            name={nameof<AddCaveVm>("numberOfPits")}
+            rules={[
+              {
+                required: true,
+                message: "Please enter the number of pits",
+              },
+            ]}
+          >
+            <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveBiologyTags}>
+        <Col {...twoColProps}>
+          <Form.Item label="Biology" name={nameof<AddCaveVm>("biologyTagIds")}>
+            <TagSelectComponent
+              allowCustomTags
+              tagType={TagType.Biology}
+              mode="tags"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveArcheologyTags}>
+        <Col {...twoColProps}>
+          <Form.Item
+            label="Archeology"
+            name={nameof<AddCaveVm>("archeologyTagIds")}
+          >
+            <TagSelectComponent
+              allowCustomTags
+              tagType={TagType.Archeology}
+              mode="tags"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>
+        <Col span={24}>
+          <Form.Item label="Narrative" name={nameof<AddCaveVm>("narrative")}>
+            <Input.TextArea rows={15} />
+          </Form.Item>
+        </Col>{" "}
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveOtherTags}>
+        <Col {...oneColProps}>
+          <Form.Item label="Other Tags" name={nameof<AddCaveVm>("otherTagIds")}>
+            <TagSelectComponent
+              tagType={TagType.CaveOther}
+              projectId={""}
+              mode="multiple"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}>
+        <Col {...twoColProps}>
+          <Form.Item label="Reported On" name={nameof<AddCaveVm>("reportedOn")}>
+            <Input type="date" />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}>
+        <Col {...twoColProps}>
+          <Form.Item
+            label="Reported By"
+            name={nameof<AddCaveVm>("reportedByNameTagIds")}
+          >
+            <TagSelectComponent
+              allowCustomTags
+              tagType={TagType.People}
+              mode="tags"
+            />
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+
       <Col span={24}>
         <PlanarianDividerComponent title={"Entrances"} />
       </Col>
@@ -406,197 +453,262 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             </Radio.Group>
                           </Form.Item>
                         </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Name"
-                            name={[field.name, nameof<AddEntranceVm>("name")]}
-                          >
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Status"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("entranceStatusTagIds"),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              tagType={TagType.EntranceStatus}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Field Indication"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("fieldIndicationTagIds"),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              tagType={TagType.FieldIndication}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Hydrology"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("entranceHydrologyTagIds"),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              tagType={TagType.EntranceHydrology}
-                              mode="multiple"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col {...fourColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Latitude"
-                            help="WGS 84"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("latitude"),
-                            ]}
-                            rules={[
-                              {
-                                required: true,
-                                message: "Please enter the latitude",
-                              },
-                            ]}
-                          >
-                            <InputNumber
-                              min={-90}
-                              max={90}
-                              step={0.0000001}
-                              style={{ width: "100%" }}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col {...fourColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Longitude"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("longitude"),
-                            ]}
-                            rules={[
-                              {
-                                required: true,
-                                message: "Please enter the longitude",
-                              },
-                            ]}
-                          >
-                            <InputNumber
-                              style={{ width: "100%" }}
-                              min={-180}
-                              max={180}
-                              step={0.0000001}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col {...fourColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Elevation"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("elevationFeet"),
-                            ]}
-                            rules={[
-                              {
-                                required: true,
-                                message: "Please enter the elevation in feet",
-                              },
-                            ]}
-                          >
-                            <InputDistanceComponent />
-                          </Form.Item>
-                        </Col>
-                        <Col {...fourColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Location Quality"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("locationQualityTagId"),
-                            ]}
-                            rules={[
-                              {
-                                required: true,
-                                message: "Please select a location quality tag",
-                              },
-                            ]}
-                          >
-                            <TagSelectComponent
-                              mode={undefined}
-                              tagType={TagType.LocationQuality}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={24}>
-                          <Form.Item
-                            {...field}
-                            label="Pit Depth"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("pitFeet"),
-                            ]}
-                          >
-                            <InputDistanceComponent />
-                          </Form.Item>
-                        </Col>
-                        <Col span={24}>
-                          <Form.Item
-                            {...field}
-                            label="Description"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("description"),
-                            ]}
-                          >
-                            <Input.TextArea rows={6} />
-                          </Form.Item>
-                        </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            {...field}
-                            label="Reported On"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("reportedOn"),
-                            ]}
-                          >
-                            <Input type="date" />
-                          </Form.Item>
-                        </Col>
-                        <Col {...twoColProps}>
-                          <Form.Item
-                            label="Reported By"
-                            name={[
-                              field.name,
-                              nameof<AddEntranceVm>("reportedByNameTagIds"),
-                            ]}
-                          >
-                            <TagSelectComponent
-                              allowCustomTags
-                              tagType={TagType.People}
-                              mode="tags"
-                            />
-                          </Form.Item>
-                        </Col>
+                        <ShouldDisplay
+                          featureKey={FeatureKey.EnabledFieldEntranceName}
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Name"
+                              name={[field.name, nameof<AddEntranceVm>("name")]}
+                            >
+                              <Input />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={FeatureKey.EnabledFieldEntranceStatusTags}
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Status"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("entranceStatusTagIds"),
+                              ]}
+                            >
+                              <TagSelectComponent
+                                tagType={TagType.EntranceStatus}
+                                mode="multiple"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceFieldIndicationTags
+                          }
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Field Indication"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("fieldIndicationTagIds"),
+                              ]}
+                            >
+                              <TagSelectComponent
+                                tagType={TagType.FieldIndication}
+                                mode="multiple"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceHydrologyTags
+                          }
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Hydrology"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>(
+                                  "entranceHydrologyTagIds"
+                                ),
+                              ]}
+                            >
+                              <TagSelectComponent
+                                tagType={TagType.EntranceHydrology}
+                                mode="multiple"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceCoordinates
+                          }
+                        >
+                          <Col {...fourColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Latitude"
+                              help="WGS 84"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("latitude"),
+                              ]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Please enter the latitude",
+                                },
+                              ]}
+                            >
+                              <InputNumber
+                                min={-90}
+                                max={90}
+                                step={0.0000001}
+                                style={{ width: "100%" }}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceCoordinates
+                          }
+                        >
+                          <Col {...fourColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Longitude"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("longitude"),
+                              ]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Please enter the longitude",
+                                },
+                              ]}
+                            >
+                              <InputNumber
+                                style={{ width: "100%" }}
+                                min={-180}
+                                max={180}
+                                step={0.0000001}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={FeatureKey.EnabledFieldEntranceElevation}
+                        >
+                          <Col {...fourColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Elevation"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("elevationFeet"),
+                              ]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: "Please enter the elevation in feet",
+                                },
+                              ]}
+                            >
+                              <InputDistanceComponent />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceLocationQuality
+                          }
+                        >
+                          <Col {...fourColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Location Quality"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("locationQualityTagId"),
+                              ]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message:
+                                    "Please select a location quality tag",
+                                },
+                              ]}
+                            >
+                              <TagSelectComponent
+                                mode={undefined}
+                                tagType={TagType.LocationQuality}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={FeatureKey.EnabledFieldEntrancePitDepth}
+                        >
+                          <Col span={24}>
+                            <Form.Item
+                              {...field}
+                              label="Pit Depth"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("pitFeet"),
+                              ]}
+                            >
+                              <InputDistanceComponent />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceDescription
+                          }
+                        >
+                          <Col span={24}>
+                            <Form.Item
+                              {...field}
+                              label="Description"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("description"),
+                              ]}
+                            >
+                              <Input.TextArea rows={6} />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={FeatureKey.EnabledFieldEntranceReportedOn}
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Reported On"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("reportedOn"),
+                              ]}
+                            >
+                              <Input type="date" />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
+                        <ShouldDisplay
+                          featureKey={
+                            FeatureKey.EnabledFieldEntranceReportedByNameTags
+                          }
+                        >
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              label="Reported By"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("reportedByNameTagIds"),
+                              ]}
+                            >
+                              <TagSelectComponent
+                                allowCustomTags
+                                tagType={TagType.People}
+                                mode="tags"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </ShouldDisplay>
                       </Row>
                     </Card>
                   </Col>

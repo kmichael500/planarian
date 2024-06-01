@@ -9,6 +9,9 @@ import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
 import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
+import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { CacheService } from "../../../Shared/Services/CacheService";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -119,6 +122,31 @@ const AccountService = {
     return response.data;
   },
   //#endregion
+
+  async GetFeatureSettings(resetCache: boolean = false) {
+    const cacheKey = `${AuthenticationService.GetAccountId}-featureSettings`;
+
+    const cachedData = CacheService.get<FeatureSettingVm[]>(cacheKey);
+    if (!resetCache && cachedData) {
+      return cachedData;
+    }
+
+    const response = await HttpClient.get<FeatureSettingVm[]>(
+      `${baseUrl}/feature-settings`
+    );
+
+    CacheService.set(cacheKey, response.data);
+
+    return response.data;
+  },
+
+  async CreateOrUpdateFeatureSetting(key: FeatureKey, isEnabled: boolean) {
+    const response = await HttpClient.post<FeatureSettingVm[]>(
+      `${baseUrl}/feature-settings/${key}?isEnabled=${isEnabled}`,
+      {}
+    );
+    return response.data;
+  },
 
   //#region Tags
   async GetAllStates(): Promise<SelectListItem<string>[]> {

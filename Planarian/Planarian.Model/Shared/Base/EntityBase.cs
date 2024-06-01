@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities;
@@ -47,5 +48,13 @@ public abstract class BaseEntityTypeConfiguration<T> : IEntityTypeConfiguration<
         builder.HasOne(e => e.ModifiedByUser)
             .WithMany()
             .HasForeignKey(e => e.ModifiedByUserId);
+    }
+    
+    protected void ConfigureEnum<TEnum>(EntityTypeBuilder<T> builder, Expression<Func<T, TEnum>> propertyExpression)
+        where TEnum : struct, Enum
+    {
+        builder.Property(propertyExpression)
+            .HasConversion<string>()
+            .HasMaxLength(PropertyLength.Key);
     }
 }

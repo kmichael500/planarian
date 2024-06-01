@@ -161,7 +161,6 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             } catch (e) {
               const error = e as ImportApiErrorResponse<CaveCsvModel>;
 
-              console.log("Failed", params.file, error);
               // setUploadFailed(true);
 
               message.error(error.message);

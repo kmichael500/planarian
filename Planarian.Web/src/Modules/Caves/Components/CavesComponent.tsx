@@ -1,5 +1,5 @@
 import { Row, Col, Typography, Form, Checkbox, Space, Divider } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -33,6 +33,14 @@ import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
 import { TagType } from "../../Tag/Models/TagType";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
+import {
+  ShouldDisplay,
+  useFeatureEnabled,
+} from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { AppContext } from "../../../Configuration/Context/AppContext";
+import { AccountService } from "../../Account/Services/AccountService";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -46,17 +54,6 @@ const CavesComponent: React.FC = () => {
   >([]);
 
   useEffect(() => {
-    const savedFeatures = localStorage.getItem("selectedFeatures");
-    if (savedFeatures) {
-      setSelectedFeatures(JSON.parse(savedFeatures));
-    } else {
-      setSelectedFeatures([
-        "countyId",
-        "lengthFeet",
-        "depthFeet",
-        "reportedOn",
-      ]);
-    }
     getCaves();
   }, []);
 
@@ -72,26 +69,120 @@ const CavesComponent: React.FC = () => {
   };
 
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
-    { display: "ID", value: "displayId" },
-    { display: "County", value: "countyId" },
-    { display: "Length", value: "lengthFeet" },
-    { display: "Depth", value: "depthFeet" },
-    { display: "Reported On", value: "reportedOn" },
-    { display: "Max Pit Depth", value: "maxPitDepthFeet" },
-    { display: "Number of Pits", value: "numberOfPits" },
-    { display: "Map Status", value: "mapStatusTagIds" },
-    { display: "Geology", value: "geologyTagIds" },
-    { display: "Geologic Age", value: "geologicAgeTagIds" },
-    { display: "Archaeology", value: "archaeologyTagIds" },
-    { display: "Biology", value: "biologyTagIds" },
-    { display: "Cartographers", value: "cartographerNameTagIds" },
+    {
+      display: "ID",
+      value: "displayId",
+      data: { key: FeatureKey.EnabledFieldCaveId },
+    },
+    {
+      display: "County",
+      value: "countyId",
+      data: { key: FeatureKey.EnabledFieldCaveCounty },
+    },
+    {
+      display: "Length",
+      value: "lengthFeet",
+      data: { key: FeatureKey.EnabledFieldCaveLengthFeet },
+    },
+    {
+      display: "Depth",
+      value: "depthFeet",
+      data: { key: FeatureKey.EnabledFieldCaveDepthFeet },
+    },
+    {
+      display: "Reported On",
+      value: "reportedOn",
+      data: { key: FeatureKey.EnabledFieldCaveReportedOn },
+    },
+    {
+      display: "Max Pit Depth",
+      value: "maxPitDepthFeet",
+      data: { key: FeatureKey.EnabledFieldCaveMaxPitDepthFeet },
+    },
+    {
+      display: "Number of Pits",
+      value: "numberOfPits",
+      data: { key: FeatureKey.EnabledFieldCaveNumberOfPits },
+    },
+    {
+      display: "Map Status",
+      value: "mapStatusTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveMapStatusTags },
+    },
+    {
+      display: "Geology",
+      value: "geologyTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveGeologyTags },
+    },
+    {
+      display: "Geologic Age",
+      value: "geologicAgeTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveGeologicAgeTags },
+    },
+    {
+      display: "Archaeology",
+      value: "archaeologyTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveArcheologyTags },
+    },
+    {
+      display: "Biology",
+      value: "biologyTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveBiologyTags },
+    },
+    {
+      display: "Cartographers",
+      value: "cartographerNameTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveCartographerNameTags },
+    },
     {
       display: "Physiographic Province",
       value: "physiographicProvinceTagIds",
+      data: { key: FeatureKey.EnabledFieldCavePhysiographicProvinceTags },
     },
-    { display: "Reported By", value: "reportedByTagIds" },
-    { display: "Other Tags", value: "otherTagIds" },
+    {
+      display: "Reported By",
+      value: "reportedByTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveReportedByNameTags },
+    },
+    {
+      display: "Other Tags",
+      value: "otherTagIds",
+      data: { key: FeatureKey.EnabledFieldCaveOtherTags },
+    },
   ];
+  const { isFeatureEnabled } = useFeatureEnabled();
+  const [filteredFeatures, setFilteredFeatures] = useState<
+    SelectListItemKey<CaveSearchVm>[]
+  >([]);
+
+  useEffect(() => {
+    const filterFeatures = () => {
+      const savedFeaturesJson = localStorage.getItem(
+        `${AuthenticationService.GetAccountId()}-selectedFeatures`
+      );
+      let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
+      if (savedFeaturesJson) {
+        savedFeatures = JSON.parse(savedFeaturesJson);
+      } else {
+        savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
+      }
+
+      const enabledFeatures = possibleFeaturesToRender.filter((feature) => {
+        const isEnabled = isFeatureEnabled(feature.data.key);
+
+        return isEnabled;
+      });
+
+      setFilteredFeatures(enabledFeatures);
+      setSelectedFeatures(
+        savedFeatures.filter((feature) =>
+          enabledFeatures.map((f) => f.value).includes(feature)
+        )
+      );
+    };
+
+    filterFeatures();
+  }, []);
 
   const renderFeature = (
     cave: CaveSearchVm,
@@ -155,159 +246,223 @@ const CavesComponent: React.FC = () => {
         form={form}
       >
         <Divider>Cave</Divider>
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"narrative"}
-          label={"Narrative"}
-          queryOperator={QueryOperator.FreeText}
-        />
-        <StateCountyFilterFormItem
-          queryBuilder={queryBuilder}
-          autoSelectFirst={true}
-          stateField={"stateId"}
-          stateLabel={"State"}
-          countyField={"countyId"}
-          countyLabel={"County"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"lengthFeet"}
-          label={"Length (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"depthFeet"}
-          label={"Depth (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"elevationFeet"}
-          label={"Elevation (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"numberOfPits"}
-          label={"Number of Pits (Feet)"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"maxPitDepthFeet"}
-          label={"Max Pit Depth (Feet)"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.MapStatus}
-          queryBuilder={queryBuilder}
-          field={"mapStatusTagIds"}
-          label={"Map Status"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.People}
-          queryBuilder={queryBuilder}
-          field={"cartographerNamePeopleTagIds"}
-          label={"Cartographer Names"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.Geology}
-          queryBuilder={queryBuilder}
-          field={"geologyTagIds"}
-          label={"Geology"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.GeologicAge}
-          queryBuilder={queryBuilder}
-          field={"geologicAgeTagIds"}
-          label={"Geologic Age"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.PhysiographicProvince}
-          queryBuilder={queryBuilder}
-          field={"physiographicProvinceTagIds"}
-          label={"Physiographic Province"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.Biology}
-          queryBuilder={queryBuilder}
-          field={"biologyTagIds"}
-          label={"Biology"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.Archeology}
-          queryBuilder={queryBuilder}
-          field={"archaeologyTagIds" as any}
-          label={"Archeology"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.CaveOther}
-          queryBuilder={queryBuilder}
-          field={"caveOtherTagIds"}
-          label={"Other"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.People}
-          queryBuilder={queryBuilder}
-          field={"caveReportedByNameTagIds"}
-          label={"Reported By"}
-        />
-        <NumberComparisonFormItem
-          inputType={"date"}
-          queryBuilder={queryBuilder}
-          field={"caveReportedOnDate"}
-          label={"Reported On"}
-        />
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>
+          <TextFilterFormItem
+            queryBuilder={queryBuilder}
+            field={"narrative"}
+            label={"Narrative"}
+            queryOperator={QueryOperator.FreeText}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>
+          <StateCountyFilterFormItem
+            queryBuilder={queryBuilder}
+            autoSelectFirst={true}
+            stateField={"stateId"}
+            stateLabel={"State"}
+            countyField={"countyId"}
+            countyLabel={"County"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveLengthFeet}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"lengthFeet"}
+            label={"Length (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveDepthFeet}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"depthFeet"}
+            label={"Depth (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNumberOfPits}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"numberOfPits"}
+            label={"Number of Pits (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"maxPitDepthFeet"}
+            label={"Max Pit Depth (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
+          <TagFilterFormItem
+            tagType={TagType.MapStatus}
+            queryBuilder={queryBuilder}
+            field={"mapStatusTagIds"}
+            label={"Map Status"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldCaveCartographerNameTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.People}
+            queryBuilder={queryBuilder}
+            field={"cartographerNamePeopleTagIds"}
+            label={"Cartographer Names"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologyTags}>
+          <TagFilterFormItem
+            tagType={TagType.Geology}
+            queryBuilder={queryBuilder}
+            field={"geologyTagIds"}
+            label={"Geology"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologicAgeTags}>
+          <TagFilterFormItem
+            tagType={TagType.GeologicAge}
+            queryBuilder={queryBuilder}
+            field={"geologicAgeTagIds"}
+            label={"Geologic Age"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldCavePhysiographicProvinceTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.PhysiographicProvince}
+            queryBuilder={queryBuilder}
+            field={"physiographicProvinceTagIds"}
+            label={"Physiographic Province"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveBiologyTags}>
+          <TagFilterFormItem
+            tagType={TagType.Biology}
+            queryBuilder={queryBuilder}
+            field={"biologyTagIds"}
+            label={"Biology"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveArcheologyTags}>
+          <TagFilterFormItem
+            tagType={TagType.Archeology}
+            queryBuilder={queryBuilder}
+            field={"archaeologyTagIds" as any}
+            label={"Archeology"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveOtherTags}>
+          <TagFilterFormItem
+            tagType={TagType.CaveOther}
+            queryBuilder={queryBuilder}
+            field={"caveOtherTagIds"}
+            label={"Other"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.People}
+            queryBuilder={queryBuilder}
+            field={"caveReportedByNameTagIds"}
+            label={"Reported By"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedOn}>
+          <NumberComparisonFormItem
+            inputType={"date"}
+            queryBuilder={queryBuilder}
+            field={"caveReportedOnDate"}
+            label={"Reported On"}
+          />
+        </ShouldDisplay>
         <Divider>Entrance</Divider>
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"entranceDescription"}
-          label={"Entrance Description"}
-          queryOperator={QueryOperator.FreeText}
-        />
-        <TagFilterFormItem
-          tagType={TagType.EntranceStatus}
-          queryBuilder={queryBuilder}
-          field={"entranceStatusTagIds"}
-          label={"Entrance Status"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.FieldIndication}
-          queryBuilder={queryBuilder}
-          field={"entranceFieldIndicationTagIds"}
-          label={"Entrance Field Indication"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.LocationQuality}
-          queryBuilder={queryBuilder}
-          field={"locationQualityTagIds"}
-          label={"Entrance Location Quality"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.EntranceHydrology}
-          queryBuilder={queryBuilder}
-          field={"entranceHydrologyTagIds"}
-          label={"Entrance Hydrology"}
-        />
-        <NumberComparisonFormItem
-          inputType={"number"}
-          queryBuilder={queryBuilder}
-          field={"entrancePitDepthFeet"}
-          label={"Entrance Pit Depth (Feet)"}
-        />
-        <TagFilterFormItem
-          tagType={TagType.People}
-          queryBuilder={queryBuilder}
-          field={"entranceReportedByPeopleTagIds"}
-          label={"Entrance Reported By"}
-        />
-        <NumberComparisonFormItem
-          inputType={"date"}
-          queryBuilder={queryBuilder}
-          field={"entranceReportedOnDate"}
-          label={"Entrance Reported On"}
-        />
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceElevation}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"elevationFeet"}
+            label={"Elevation (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceDescription}>
+          <TextFilterFormItem
+            queryBuilder={queryBuilder}
+            field={"entranceDescription"}
+            label={"Entrance Description"}
+            queryOperator={QueryOperator.FreeText}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceStatusTags}>
+          <TagFilterFormItem
+            tagType={TagType.EntranceStatus}
+            queryBuilder={queryBuilder}
+            field={"entranceStatusTagIds"}
+            label={"Entrance Status"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldEntranceFieldIndicationTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.FieldIndication}
+            queryBuilder={queryBuilder}
+            field={"entranceFieldIndicationTagIds"}
+            label={"Entrance Field Indication"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldEntranceLocationQuality}
+        >
+          <TagFilterFormItem
+            tagType={TagType.LocationQuality}
+            queryBuilder={queryBuilder}
+            field={"locationQualityTagIds"}
+            label={"Entrance Location Quality"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldEntranceHydrologyTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.EntranceHydrology}
+            queryBuilder={queryBuilder}
+            field={"entranceHydrologyTagIds"}
+            label={"Entrance Hydrology"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
+          <NumberComparisonFormItem
+            inputType={"number"}
+            queryBuilder={queryBuilder}
+            field={"entrancePitDepthFeet"}
+            label={"Entrance Pit Depth (Feet)"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay
+          featureKey={FeatureKey.EnabledFieldEntranceReportedByNameTags}
+        >
+          <TagFilterFormItem
+            tagType={TagType.People}
+            queryBuilder={queryBuilder}
+            field={"entranceReportedByPeopleTagIds"}
+            label={"Entrance Reported By"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceReportedOn}>
+          <NumberComparisonFormItem
+            inputType={"date"}
+            queryBuilder={queryBuilder}
+            field={"entranceReportedOnDate"}
+            label={"Entrance Reported On"}
+          />
+        </ShouldDisplay>
         <Divider>Files</Divider>
         <TagFilterFormItem
           tagType={TagType.File}
@@ -323,7 +478,7 @@ const CavesComponent: React.FC = () => {
         />{" "}
       </AdvancedSearchDrawerComponent>
 
-      <Space direction="vertical">
+      <Space direction="vertical" style={{ width: "100%" }}>
         <div
           style={{
             borderRadius: "2px",
@@ -334,7 +489,7 @@ const CavesComponent: React.FC = () => {
         >
           <div style={{ fontWeight: 450 }}>Display</div>
           <Checkbox.Group
-            options={possibleFeaturesToRender.map((feature) => ({
+            options={filteredFeatures.map((feature) => ({
               label: feature.display,
               value: feature.value,
             }))}
@@ -342,7 +497,7 @@ const CavesComponent: React.FC = () => {
             onChange={(checkedValues) => {
               setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
               localStorage.setItem(
-                "selectedFeatures",
+                `${AuthenticationService.GetAccountId()}-selectedFeatures`,
                 JSON.stringify(checkedValues)
               );
             }}

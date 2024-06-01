@@ -66,6 +66,8 @@ public class PlanarianDbContext : DbContext
     public DbSet<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = null!;
     public DbSet<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } = null!;
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
+    
+    public DbSet<FeatureSetting> FeatureSettings { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
     public DbSet<GeologicAgeTag> GeologicAgeTags { get; set; } = null!;

@@ -361,7 +361,7 @@ public class CaveRepository : RepositoryBase
             Id = e.Id,
             CountyId = e.County.Id,
             DisplayId =
-                $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
+                $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
             PrimaryEntranceLatitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
                 .FirstOrDefault(),
             PrimaryEntranceLongitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)

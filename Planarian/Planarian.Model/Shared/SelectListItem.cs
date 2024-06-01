@@ -1,6 +1,6 @@
 namespace Planarian.Model.Shared;
 
-public class SelectListItem<TValue> where TValue : class
+public class SelectListItem<TValue>
 {
     public SelectListItem(string display, TValue value)
     {
@@ -13,5 +13,5 @@ public class SelectListItem<TValue> where TValue : class
     }
 
     public string Display { get; set; } = null!;
-    public TValue Value { get; set; } = null!;
+    public TValue Value { get; set; } = default!;
 }

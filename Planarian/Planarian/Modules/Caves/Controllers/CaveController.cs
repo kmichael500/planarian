@@ -58,7 +58,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]
-    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, [FromForm] IFormFile file,
+    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
         var result =

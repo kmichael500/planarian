@@ -16,6 +16,7 @@ public class Account : EntityBase
     public ICollection<AccountState> AccountStates { get; set; } = new HashSet<AccountState>();
     public ICollection<County> Counties { get; set; } = new HashSet<County>();
     public ICollection<TagType> Tags { get; set; } = new HashSet<TagType>();
+    public ICollection<FeatureSetting> FeatureSettings { get; set; } = new HashSet<FeatureSetting>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>
