@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20240531212200_v9")]
+    [Migration("20240601005735_\v9")]
     partial class v9
     {
         /// <inheritdoc />
@@ -1057,6 +1057,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");

@@ -304,6 +304,9 @@ public class AccountService : ServiceBase<AccountRepository>
         var featureSetting = await _featureSettingRepository.GetFeatureSetting(key, cancellationToken);
         var isNew = featureSetting == null;
 
+        if (!isNew && featureSetting!.IsDefault)
+            throw ApiExceptionDictionary.Unauthorized("Cannot modify default feature settings.");
+
         featureSetting ??= new FeatureSetting
         {
             AccountId = RequestUser.AccountId,

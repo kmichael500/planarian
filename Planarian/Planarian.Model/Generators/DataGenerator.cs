@@ -30,8 +30,24 @@ public class DataGenerator
         };
 
         var transaction = await _dbContext.Database.BeginTransactionAsync();
+
         try
         {
+            var defaultFeatureSettings = GenerateDefaultFeatureSettings();
+            foreach (var setting in defaultFeatureSettings)
+            {
+                var existingSetting = await _dbContext.FeatureSettings.FindAsync(setting.Id);
+                if (existingSetting != null)
+                {
+                    existingSetting.IsEnabled = setting.IsEnabled;
+                    existingSetting.IsDefault = setting.IsDefault;
+                }
+                else
+                {
+                    await _dbContext.FeatureSettings.AddAsync(setting);
+                }
+            }
+
             foreach (var tagGroup in allGeneratedTags)
             {
                 foreach (var tag in tagGroup)
@@ -239,7 +255,7 @@ public class DataGenerator
             CreatedOn = Now
         });
     }
-    
+
     private static IEnumerable<State> GenerateStates()
     {
         var states = new List<State>
@@ -303,5 +319,47 @@ public class DataGenerator
             Abbreviation = e.Abbreviation,
             CreatedOn = Now,
         }).ToList();
+    }
+
+    private List<FeatureSetting> GenerateDefaultFeatureSettings()
+    {
+        return new List<FeatureSetting>()
+        {
+            new()
+            {
+                Id = "pQokhzzUrp", Key = FeatureKey.EnabledFieldCaveId, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "XmyhgWyC1M", Key = FeatureKey.EnabledFieldCaveName, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "KFPVtOjitA", Key = FeatureKey.EnabledFieldCaveState, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "q5yTZXnt4v", Key = FeatureKey.EnabledFieldCaveCounty, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "GKq8oaxF8e", Key = FeatureKey.EnabledFieldEntranceCoordinates, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "uxvdNjxj27", Key = FeatureKey.EnabledFieldEntranceElevation, IsEnabled = true, IsDefault = true,
+                CreatedOn = Now
+            },
+            new()
+            {
+                Id = "Z5z5z5z5z5", Key = FeatureKey.EnabledFieldEntranceLocationQuality, IsEnabled = true,
+                IsDefault = true, CreatedOn = Now
+            },
+        };
     }
 }

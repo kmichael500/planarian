@@ -16,23 +16,28 @@ public class FeatureSettingRepository : RepositoryBase
 
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
-        return await DbContext.FeatureSettings
-            .Where(e => e.AccountId == RequestUser.AccountId)
+        return await GetFeatureSettingsQuery()
             .Select(e => new FeatureSettingVm
             {
                 Id = e.Id,
                 Key = e.Key,
                 IsEnabled = e.IsEnabled,
+                IsDefault = e.IsDefault
             })
             .ToListAsync(cancellationToken: cancellationToken);
     }
 
     public async Task<FeatureSetting?> GetFeatureSetting(FeatureKey key, CancellationToken cancellationToken)
     {
-        var featureSetting = await DbContext.FeatureSettings
-            .Where(e => e.AccountId == RequestUser.AccountId)
+        var featureSetting = await GetFeatureSettingsQuery()
             .FirstOrDefaultAsync(e => e.Key == key, cancellationToken);
 
         return featureSetting;
+    }
+    
+    private IQueryable<FeatureSetting> GetFeatureSettingsQuery()
+    {
+        return DbContext.FeatureSettings
+            .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault == true);
     }
 }

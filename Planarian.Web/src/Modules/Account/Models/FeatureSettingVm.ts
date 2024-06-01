@@ -2,28 +2,40 @@ export interface FeatureSettingVm {
   id: string;
   key: FeatureKey;
   isEnabled: boolean;
+  isDefault: boolean;
 }
 
 export enum FeatureKey {
+  EnabledFieldCaveId = "EnabledFieldCaveId",
+  EnabledFieldCaveName = "EnabledFieldCaveName",
   EnabledFieldCaveAlternateNames = "EnabledFieldCaveAlternateNames",
+  EnabledFieldCaveState = "EnabledFieldCaveState",
+  EnabledFieldCaveCounty = "EnabledFieldCaveCounty",
   EnabledFieldCaveLengthFeet = "EnabledFieldCaveLengthFeet",
   EnabledFieldCaveDepthFeet = "EnabledFieldCaveDepthFeet",
   EnabledFieldCaveMaxPitDepthFeet = "EnabledFieldCaveMaxPitDepthFeet",
   EnabledFieldCaveNumberOfPits = "EnabledFieldCaveNumberOfPits",
-  EnabledFieldCaveNarrative = "EnabledFieldCaveNarrative",
+  EnabledFieldCaveReportedOn = "EnabledFieldCaveReportedOn",
+  EnabledFieldCaveReportedByNameTags = "EnabledFieldCaveReportedByNameTags",
   EnabledFieldCaveGeologyTags = "EnabledFieldCaveGeologyTags",
-  EnabledFieldCaveMapStatusTags = "EnabledFieldCaveMapStatusTags",
   EnabledFieldCaveGeologicAgeTags = "EnabledFieldCaveGeologicAgeTags",
   EnabledFieldCavePhysiographicProvinceTags = "EnabledFieldCavePhysiographicProvinceTags",
   EnabledFieldCaveBiologyTags = "EnabledFieldCaveBiologyTags",
   EnabledFieldCaveArcheologyTags = "EnabledFieldCaveArcheologyTags",
+  EnabledFieldCaveMapStatusTags = "EnabledFieldCaveMapStatusTags",
   EnabledFieldCaveCartographerNameTags = "EnabledFieldCaveCartographerNameTags",
-  EnabledFieldCaveReportedByNameTags = "EnabledFieldCaveReportedByNameTags",
   EnabledFieldCaveOtherTags = "EnabledFieldCaveOtherTags",
-  EnabledFieldEntranceDescription = "EnabledFieldEntranceDescription",
-  EnabledFieldEntranceStatusTags = "EnabledFieldEntranceStatusTags",
-  EnabledFieldEntranceHydrologyTags = "EnabledFieldEntranceHydrologyTags",
-  EnabledFieldEntranceFieldIndicationTags = "EnabledFieldEntranceFieldIndicationTags",
+  EnabledFieldCaveNarrative = "EnabledFieldCaveNarrative",
+
+  EnabledFieldEntranceCoordinates = "EnabledFieldEntranceCoordinates",
+  EnabledFieldEntranceElevation = "EnabledFieldEntranceElevation",
+  EnabledFieldEntranceLocationQuality = "EnabledFieldEntranceLocationQuality",
+  EnabledFieldEntranceName = "EnabledFieldEntranceName",
+  EnabledFieldEntranceReportedOn = "EnabledFieldEntranceReportedOn",
   EnabledFieldEntranceReportedByNameTags = "EnabledFieldEntranceReportedByNameTags",
-  EnabledFieldEntranceOtherTags = "EnabledFieldEntranceOtherTags",
+  EnabledFieldEntrancePitDepth = "EnabledFieldEntrancePitDepth",
+  EnabledFieldEntranceStatusTags = "EnabledFieldEntranceStatusTags",
+  EnabledFieldEntranceFieldIndicationTags = "EnabledFieldEntranceFieldIndicationTags",
+  EnabledFieldEntranceHydrologyTags = "EnabledFieldEntranceHydrologyTags",
+  EnabledFieldEntranceDescription = "EnabledFieldEntranceDescription",
 }

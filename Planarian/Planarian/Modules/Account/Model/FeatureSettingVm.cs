@@ -9,4 +9,5 @@ public class FeatureSettingVm
     [MaxLength(PropertyLength.Id)] public string Id { get; set; }
     public FeatureKey Key { get; set; }
     public bool IsEnabled { get; set; }
+    public bool IsDefault { get; set; }
 }

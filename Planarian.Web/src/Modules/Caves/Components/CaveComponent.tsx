@@ -31,6 +31,9 @@ import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { FileService } from "../../Files/Services/FileService";
 import { CaveService } from "../Service/CaveService";
+import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { EntranceVm } from "../Models/EntranceVm";
 
 const { Panel } = Collapse;
 
@@ -64,6 +67,186 @@ const CaveComponent = ({
   updateCave,
 }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
+  const { isFeatureEnabled } = useFeatureEnabled();
+
+  // have to do this because of a weird bug with the Descriptions component where wrappers don't work (elements still get displayed)
+  const descriptionItems = [
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && (
+      <Descriptions.Item label="ID" key="id">
+        {cave?.displayId}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveAlternateNames) && (
+      <Descriptions.Item label="Alternative Names" key="alternative-names">
+        <Row>
+          {cave?.alternateNames.map((name) => (
+            <Col key={name}>
+              <Tag>{name}</Tag>
+            </Col>
+          ))}
+        </Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveState) && (
+      <Descriptions.Item label="State" key="state">
+        <StateTagComponent stateId={cave?.stateId} />
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveCounty) && (
+      <Descriptions.Item label="County" key="county">
+        <CountyTagComponent countyId={cave?.countyId} />
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && (
+      <Descriptions.Item label="Length" key="length">
+        {cave?.lengthFeet ? convertDistance(cave.lengthFeet) : "N/A"}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
+      <Descriptions.Item label="Depth" key="depth">
+        {cave?.depthFeet ? convertDistance(cave.depthFeet) : "N/A"}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
+      <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
+        {cave?.maxPitDepthFeet ? convertDistance(cave.maxPitDepthFeet) : "N/A"}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
+      <Descriptions.Item label="Number of Pits" key="number-of-pits">
+        {cave?.numberOfPits ? formatNumber(cave.numberOfPits) : "N/A"}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && (
+      <Descriptions.Item label="Reported On" key="reported-on">
+        {cave?.reportedOn ? formatDateTime(cave.reportedOn) : "N/A"}
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
+      <Descriptions.Item label="Reported By" key="reported-by">
+        <Row>{generateTags(cave?.reportedByNameTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologyTags) && (
+      <Descriptions.Item label="Geology" key="geology">
+        <Row>{generateTags(cave?.geologyTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologicAgeTags) && (
+      <Descriptions.Item label="Geologic Age" key="geologic-age">
+        <Row>{generateTags(cave?.geologicAgeTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCavePhysiographicProvinceTags) && (
+      <Descriptions.Item
+        label="Physiographic Province"
+        key="physiographic-province"
+      >
+        <Row>{generateTags(cave?.physiographicProvinceTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveBiologyTags) && (
+      <Descriptions.Item label="Biology" key="biology">
+        <Row>{generateTags(cave?.biologyTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && (
+      <Descriptions.Item label="Archeology" key="archeology">
+        <Row>{generateTags(cave?.archeologyTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveMapStatusTags) && (
+      <Descriptions.Item label="Map Status" key="map-status">
+        <Row>{generateTags(cave?.mapStatusTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveCartographerNameTags) && (
+      <Descriptions.Item label="Cartographers" key="cartographers">
+        <Row>{generateTags(cave?.cartographerNameTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveOtherTags) && (
+      <Descriptions.Item label="Other" key="other">
+        <Row>{generateTags(cave?.otherTagIds)}</Row>
+      </Descriptions.Item>
+    ),
+  ].filter(Boolean);
+
+  const entranceItems = (entrance: EntranceVm) =>
+    [
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && (
+        <Descriptions.Item
+          label={
+            <Space>
+              Coordinates
+              <a
+                href={getDirectionsUrl(entrance.latitude, entrance.longitude)}
+                target="_blank"
+              >
+                <Tooltip title="Directions">
+                  <CarOutlined />
+                </Tooltip>
+              </a>
+            </Space>
+          }
+          key="coordinates"
+        >
+          {entrance.latitude}, {entrance.longitude}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) && (
+        <Descriptions.Item label="Description" key="description">
+          {entrance.description}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
+        <Descriptions.Item label="Elevation" key="elevation">
+          {entrance.elevationFeet
+            ? convertDistance(entrance.elevationFeet)
+            : "N/A"}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
+        <Descriptions.Item label="Location Quality" key="location-quality">
+          <TagComponent tagId={entrance.locationQualityTagId} />
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceName) && (
+        <Descriptions.Item label="Name" key="name">
+          {entrance.name}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && (
+        <Descriptions.Item label="Reported On" key="reported-on">
+          {entrance.reportedOn ? formatDateTime(entrance.reportedOn) : "N/A"}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && (
+        <Descriptions.Item label="Reported By" key="reported-by">
+          <Row>{generateTags(entrance.reportedByNameTagIds)}</Row>
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
+        <Descriptions.Item label="Pit Depth" key="pit-depth">
+          {entrance.pitFeet ? convertDistance(entrance.pitFeet) : "N/A"}
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
+        <Descriptions.Item label="Status" key="status">
+          <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) && (
+        <Descriptions.Item label="Field Indication" key="field-indication">
+          <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>
+        </Descriptions.Item>
+      ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) && (
+        <Descriptions.Item label="Hydrology" key="hydrology">
+          <Row>{generateTags(entrance.entranceHydrologyTagIds)}</Row>
+        </Descriptions.Item>
+      ),
+    ].filter(Boolean);
 
   useEffect(() => {
     if (cave?.primaryEntrance) {
@@ -77,69 +260,7 @@ const CaveComponent = ({
         loading={isLoading}
       >
         <PlanarianDividerComponent title="Information" />
-        <Descriptions bordered>
-          <Descriptions.Item label="ID">
-            {defaultIfEmpty(cave?.displayId)}
-          </Descriptions.Item>
-          <Descriptions.Item label="Alternative Names">
-            <Row>
-              {cave?.alternateNames.map((name) => (
-                <Col key={name}>
-                  <Tag>{name}</Tag>
-                </Col>
-              ))}
-            </Row>
-          </Descriptions.Item>
-
-          <Descriptions.Item label="State">
-            <StateTagComponent stateId={cave?.stateId} />
-          </Descriptions.Item>
-          <Descriptions.Item label="County">
-            <CountyTagComponent countyId={cave?.countyId} />
-          </Descriptions.Item>
-          <Descriptions.Item label="Length">
-            {defaultIfEmpty(convertDistance(cave?.lengthFeet))}
-          </Descriptions.Item>
-          <Descriptions.Item label="Depth">
-            {defaultIfEmpty(convertDistance(cave?.depthFeet))}
-          </Descriptions.Item>
-          <Descriptions.Item label="Max Pit Depth">
-            {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
-          </Descriptions.Item>
-          <Descriptions.Item label="Number of Pits">
-            {defaultIfEmpty(formatNumber(cave?.numberOfPits)).toString()}
-          </Descriptions.Item>
-          <Descriptions.Item label="Reported On">
-            {defaultIfEmpty(formatDateTime(cave?.reportedOn))}
-          </Descriptions.Item>
-          <Descriptions.Item label="Reported By">
-            <Row>{generateTags(cave?.reportedByNameTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Geology">
-            <Row>{generateTags(cave?.geologyTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Geologic Age">
-            <Row>{generateTags(cave?.geologicAgeTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Physigraphic Province">
-            <Row>{generateTags(cave?.physiographicProvinceTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Biology">
-            <Row>{generateTags(cave?.biologyTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Archeology">
-            <Row>{generateTags(cave?.archeologyTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Map Status">
-            <Row>{generateTags(cave?.mapStatusTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Cartographers">
-            <Row>{generateTags(cave?.cartographerNameTagIds)}</Row>
-          </Descriptions.Item>
-          <Descriptions.Item label="Other">
-            <Row>{generateTags(cave?.otherTagIds)}</Row>
-          </Descriptions.Item>
-        </Descriptions>
+        <Descriptions bordered>{descriptionItems}</Descriptions>
         {cave?.entrances && cave?.entrances.length > 0 && (
           <>
             <PlanarianDividerComponent title="Entrances" />
@@ -166,69 +287,8 @@ const CaveComponent = ({
                   key={index}
                 >
                   <Descriptions bordered>
-                    <Descriptions.Item
-                      label={
-                        <Space>
-                          Coordinates
-                          <a
-                            href={getDirectionsUrl(
-                              entrance.latitude,
-                              entrance.longitude
-                            )}
-                            target="_blank"
-                          >
-                            <Tooltip title="Directions">
-                              <CarOutlined />
-                            </Tooltip>
-                          </a>
-                        </Space>
-                      }
-                    >
-                      {entrance.latitude}, {entrance.longitude}
-                    </Descriptions.Item>
-                    {cave.primaryEntrance && (
-                      <Descriptions.Item label="Elevation">
-                        {defaultIfEmpty(
-                          convertDistance(entrance.elevationFeet)
-                        )}
-                      </Descriptions.Item>
-                    )}
-                    <Descriptions.Item label="Location Quality">
-                      <TagComponent tagId={entrance.locationQualityTagId} />
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Name">
-                      {entrance.name}
-                    </Descriptions.Item>
-
-                    <Descriptions.Item label="Reported On">
-                      {defaultIfEmpty(formatDateTime(entrance.reportedOn))}
-                    </Descriptions.Item>
-
-                    <Descriptions.Item label="Reported By">
-                      <Row>{generateTags(entrance?.reportedByNameTagIds)}</Row>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Pit Depth">
-                      {defaultIfEmpty(convertDistance(entrance.pitFeet))}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Status">
-                      <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>
-                    </Descriptions.Item>
-
-                    <Descriptions.Item label="Field Indication">
-                      <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Hydrology">
-                      <Row>
-                        {generateTags(entrance.entranceHydrologyTagIds)}
-                      </Row>
-                    </Descriptions.Item>
+                    {entranceItems(entrance)}
                   </Descriptions>
-                  {!isNullOrWhiteSpace(entrance.description) && (
-                    <>
-                      <br />
-                      {entrance.description}
-                    </>
-                  )}
                 </Panel>
               ))}
             </Collapse>
