@@ -69,6 +69,8 @@ const CaveComponent = ({
   const [isUploading, setIsUploading] = useState(false);
   const { isFeatureEnabled } = useFeatureEnabled();
 
+  const [showMap, setShowMap] = useState(true);
+
   // have to do this because of a weird bug with the Descriptions component where wrappers don't work (elements still get displayed)
   const descriptionItems = [
     isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && (
@@ -249,7 +251,13 @@ const CaveComponent = ({
     ].filter(Boolean);
 
   useEffect(() => {
-    if (cave?.primaryEntrance) {
+    if (!cave?.primaryEntrance) {
+      if (
+        (cave?.entrances && cave?.entrances.length <= 0) ||
+        options?.showMap === false
+      ) {
+        setShowMap(false);
+      }
     }
   }, [cave, isLoading]);
 
@@ -346,7 +354,7 @@ const CaveComponent = ({
           />
         )}
 
-        {options?.showMap !== false && (
+        {showMap && (
           <>
             <PlanarianDividerComponent title="Map" />
             {cave?.primaryEntrance !== null && (

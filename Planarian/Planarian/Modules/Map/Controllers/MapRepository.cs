@@ -165,14 +165,24 @@ public class MapRepository : RepositoryBase
 
     public async Task<CoordinateDto> GetMapCenter()
     {
-        var averageLatitude = await DbContext.Entrances
+        double averageLatitude = 39.8333;
+        double averageLongitude = -98.5855;
+        try
+        {
+        averageLatitude = await DbContext.Entrances
             .Where(e => e.Cave.AccountId == RequestUser.AccountId)
             .AverageAsync(e => e.Location.Y);
 
-        var averageLongitude = await DbContext.Entrances
+        averageLongitude = await DbContext.Entrances
             .Where(e => e.Cave.AccountId == RequestUser.AccountId)
             .AverageAsync(e => e.Location.X);
-        
+        }
+        catch (Exception)
+        {
+            // ignored
+            // will fail if no entrances added
+        }
+
         return new CoordinateDto{Latitude = averageLatitude, Longitude = averageLongitude};
     }
 

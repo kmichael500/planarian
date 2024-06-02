@@ -13,7 +13,7 @@ public class Cave : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     [MaxLength(PropertyLength.Max)] public string AlternateNames { get; private set; } = "[]";

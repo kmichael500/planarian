@@ -4,6 +4,7 @@ import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
   RedoOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import Papa from "papaparse";
 
@@ -23,6 +24,7 @@ import { NotificationComponent } from "./NotificationComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
+import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -43,6 +45,8 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
   const [isLoading, setIsLoading] = useState(false);
+  const [dryRunData, setDryRunData] = useState<CaveDryRunRecord[]>([]);
+  const [isDryRunComplete, setIsDryRunComplete] = useState(false);
 
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
@@ -59,10 +63,35 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       }))
     );
 
+  const handleDryRunClick = async () => {
+    if (!uploadResult?.id) return message.error("File id not found");
+    setIsLoading(true);
+    setIsProcessing(true);
+    try {
+      const result = await AccountService.ImportCavesFileProcess(
+        uploadResult.id,
+        true
+      );
+      setDryRunData(result);
+      setIsDryRunComplete(true);
+    } catch (e) {
+      const error = e as ImportApiErrorResponse<CaveCsvModel>;
+
+      if (error.data) {
+        setErrorList(error.data);
+        setErrorList(error.data);
+      }
+      setProcessError(error.message);
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+    }
+  };
+
   const handleProcessClick = async () => {
     if (!uploadResult?.id) return message.error("File id not found");
     setIsLoading(true);
-    setIsProcessing(true); // Set processing state to true when starting to process
+    setIsProcessing(true);
     try {
       await AccountService.ImportCavesFileProcess(uploadResult.id);
       setIsProcessed(true);
@@ -88,6 +117,8 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setProcessError(null);
     setErrorList([]);
     setUploadResult(undefined);
+    setDryRunData([]);
+    setIsDryRunComplete(false);
   };
 
   return (
@@ -148,13 +179,43 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {isUploaded && !isProcessed && !isProcessing && processError === null && (
+      {isUploaded &&
+        !isProcessed &&
+        !isProcessing &&
+        processError === null &&
+        !isDryRunComplete && (
+          <Card style={{ width: "100%" }}>
+            <Result
+              icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+              title="Successfully Uploaded!"
+              subTitle="Click the dry run button below to preview the changes. If not, no caves will be imported."
+              extra={[
+                <PlanarianButton
+                  onClick={handleDryRunClick}
+                  icon={<EyeOutlined />}
+                  loading={isLoading}
+                  type="primary"
+                >
+                  Dry Run
+                </PlanarianButton>,
+                <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                  Reset
+                </Button>,
+              ]}
+            />
+          </Card>
+        )}
+
+      {isDryRunComplete && !isProcessing && !isProcessed && (
         <Card style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Successfully Uploaded!"
-            subTitle="Click the process button below to start processing. If not, no caves will be imported."
+            title="Dry Run Complete!"
+            subTitle="Review the changes below. If everything looks good, proceed with processing."
             extra={[
+              <Button onClick={showCSVModal} icon={<EyeOutlined />}>
+                View Dry Run Data
+              </Button>,
               <PlanarianButton
                 onClick={handleProcessClick}
                 icon={<DeliveredProcedureOutlined />}
@@ -186,7 +247,8 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
           />
         </Card>
       )}
-      {isProcessed && (
+
+      {isProcessed && !isProcessing && (
         <Card style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
@@ -227,7 +289,6 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
             />
           </Card>
           <FullScreenModal>
-            <div>test</div>
             <Modal
               title="Import Cave Errors"
               open={isModalOpen}
@@ -239,6 +300,20 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
             </Modal>
           </FullScreenModal>
         </>
+      )}
+
+      {dryRunData.length > 0 && (
+        <FullScreenModal>
+          <Modal
+            title="Dry Run Data"
+            open={isModalOpen}
+            onOk={handleOk}
+            onCancel={handleOk}
+            footer={null}
+          >
+            <CSVDisplay data={Papa.unparse(dryRunData)} />
+          </Modal>
+        </FullScreenModal>
       )}
     </>
   );

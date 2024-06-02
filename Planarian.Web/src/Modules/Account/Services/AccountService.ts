@@ -12,6 +12,7 @@ import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponen
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CacheService } from "../../../Shared/Services/CacheService";
+import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -58,9 +59,12 @@ const AccountService = {
     );
     return response.data;
   },
-  async ImportCavesFileProcess(fileId: string): Promise<void> {
-    const response = await HttpClient.post<void>(
-      `${baseUrl}/import/caves/process/${fileId}`
+  async ImportCavesFileProcess(
+    fileId: string,
+    isDryRun = false
+  ): Promise<CaveDryRunRecord[]> {
+    const response = await HttpClient.post<CaveDryRunRecord[]>(
+      `${baseUrl}/import/caves/process/${fileId}?isDryRun=${isDryRun}`
     );
     return response.data;
   },

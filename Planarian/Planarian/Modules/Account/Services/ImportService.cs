@@ -6,6 +6,7 @@ using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -81,7 +82,8 @@ public class ImportService : ServiceBase
 
     #region Cave Import
 
-    public async Task<FileVm> ImportCavesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
+    public async Task<List<CaveDryRunRecord>> ImportCavesFileProcess(string temporaryFileId, bool isDryRun,
+        CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
 
@@ -143,21 +145,25 @@ public class ImportService : ServiceBase
             var allGeologyTags = await CreateAndProcessCaveTags(caveRecords, await _tagRepository.GetGeologyTags(),
                 TagTypeKeyConstant.Geology, e => e.Geology?.SplitAndTrim(), signalRGroup, cancellationToken);
 
-            var allGeologicAgeTags = await CreateAndProcessCaveTags(caveRecords, await _tagRepository.GetTags (TagTypeKeyConstant.GeologicAge),
+            var allGeologicAgeTags = await CreateAndProcessCaveTags(caveRecords,
+                await _tagRepository.GetTags(TagTypeKeyConstant.GeologicAge),
                 TagTypeKeyConstant.GeologicAge, e => e.GeologicAges?.SplitAndTrim(), signalRGroup, cancellationToken);
 
-            var allMapStatusTags = await CreateAndProcessCaveTags(caveRecords, await _tagRepository.GetTags (TagTypeKeyConstant.MapStatus),
+            var allMapStatusTags = await CreateAndProcessCaveTags(caveRecords,
+                await _tagRepository.GetTags(TagTypeKeyConstant.MapStatus),
                 TagTypeKeyConstant.Geology, e => e.Geology?.SplitAndTrim(), signalRGroup, cancellationToken);
-            
+
             var allPhysiographicProvincesTags = await CreateAndProcessCaveTags(caveRecords,
                 await _tagRepository.GetTags(TagTypeKeyConstant.PhysiographicProvince),
                 TagTypeKeyConstant.PhysiographicProvince, e => e.PhysiographicProvinces?.SplitAndTrim(), signalRGroup,
                 cancellationToken);
-            
-            var allArcheologyTags = await CreateAndProcessCaveTags(caveRecords, await _tagRepository.GetTags (TagTypeKeyConstant.Archeology),
+
+            var allArcheologyTags = await CreateAndProcessCaveTags(caveRecords,
+                await _tagRepository.GetTags(TagTypeKeyConstant.Archeology),
                 TagTypeKeyConstant.Archeology, e => e.Archeology?.SplitAndTrim(), signalRGroup, cancellationToken);
 
-            var allBiologyTags = await CreateAndProcessCaveTags(caveRecords, await _tagRepository.GetTags (TagTypeKeyConstant.Biology),
+            var allBiologyTags = await CreateAndProcessCaveTags(caveRecords,
+                await _tagRepository.GetTags(TagTypeKeyConstant.Biology),
                 TagTypeKeyConstant.Biology, e => e.Biology?.SplitAndTrim(), signalRGroup, cancellationToken);
 
             var allOtherTags = await CreateAndProcessCaveTags(caveRecords,
@@ -168,13 +174,14 @@ public class ImportService : ServiceBase
                 await _tagRepository.GetTags(TagTypeKeyConstant.People),
                 TagTypeKeyConstant.People, e => e.CartographerNames?.SplitAndTrim(), signalRGroup,
                 cancellationToken);
-            
+
             var allCaveReportedByName = await CreateAndProcessCaveTags(caveRecords,
                 await _tagRepository.GetTags(TagTypeKeyConstant.People),
                 TagTypeKeyConstant.People, e => e.ReportedByNames?.SplitAndTrim(), signalRGroup,
                 cancellationToken);
 
             var allPeopleTags = allCartographerNames.Concat(allCaveReportedByName).DistinctBy(e => e.Id).ToList();
+
             #endregion
 
             #region Counties
@@ -212,13 +219,13 @@ public class ImportService : ServiceBase
                 .ToList();
 
             foreach (var record in caveRecordsToRemove) caveRecords.Remove(record);
-            
+
             async void OnBatchProcessed(int processed, int total)
             {
                 var message = $"Inserted {processed} out of {total} records.";
                 await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
             }
-            
+
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
             await _tagRepository.BulkInsertAsync(newCounties, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
@@ -296,6 +303,7 @@ public class ImportService : ServiceBase
                     }
 
                     var isValidReportedOn = DateTime.TryParse(caveRecord.ReportedOnDate, out var reportedOnDate);
+                    reportedOnDate = reportedOnDate.ToUtcKind();
                     var cave = new Cave
                     {
                         Id = IdGenerator.Generate(),
@@ -316,7 +324,7 @@ public class ImportService : ServiceBase
                     };
                     var alternateNames = caveRecord.AlternateNames.SplitAndTrim();
                     cave.SetAlternateNamesList(alternateNames);
-                    
+
                     if (caveRecord.Geology != null)
                     {
                         var geologyNames = caveRecord.Geology.SplitAndTrim()
@@ -397,7 +405,7 @@ public class ImportService : ServiceBase
                             cave.MapStatusTags.Add(mapStatusTag);
                         }
                     }
-                    
+
                     if (caveRecord.PhysiographicProvinces != null)
                     {
                         var physiographicProvinceNames = caveRecord.PhysiographicProvinces.SplitAndTrim()
@@ -424,7 +432,7 @@ public class ImportService : ServiceBase
                             cave.PhysiographicProvinceTags.Add(physiographicProvinceTag);
                         }
                     }
-                    
+
                     if (caveRecord.Archeology != null)
                     {
                         var archeologyNames = caveRecord.Archeology.SplitAndTrim()
@@ -451,7 +459,7 @@ public class ImportService : ServiceBase
                             cave.ArcheologyTags.Add(archeologyTag);
                         }
                     }
-                    
+
                     if (caveRecord.Biology != null)
                     {
                         var biologyNames = caveRecord.Biology.SplitAndTrim()
@@ -478,7 +486,7 @@ public class ImportService : ServiceBase
                             cave.BiologyTags.Add(biologyTag);
                         }
                     }
-                    
+
                     if (caveRecord.OtherTags != null)
                     {
                         var otherTagNames = caveRecord.OtherTags.SplitAndTrim()
@@ -592,56 +600,113 @@ public class ImportService : ServiceBase
             await _repository.BulkInsertAsync(geologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting geology tags.");
-            
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geologic age tags.");
             var geologicAgeTagsForInsert = caves.SelectMany(e => e.GeologicAgeTags).ToList();
             await _repository.BulkInsertAsync(geologicAgeTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting geologic age tags.");
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting geologic age tags.");
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting map status tags.");
             var mapStatusTagsForInsert = caves.SelectMany(e => e.MapStatusTags).ToList();
             await _repository.BulkInsertAsync(mapStatusTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting map status tags.");
-            
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting physiographic province tags.");
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting map status tags.");
+
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Inserting physiographic province tags.");
             var physiographicProvinceTagsForInsert = caves.SelectMany(e => e.PhysiographicProvinceTags).ToList();
             await _repository.BulkInsertAsync(physiographicProvinceTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting physiographic province tags.");
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting physiographic province tags.");
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting archeology tags.");
             var archeologyTagsForInsert = caves.SelectMany(e => e.ArcheologyTags).ToList();
             await _repository.BulkInsertAsync(archeologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting archeology tags.");
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting archeology tags.");
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting biology tags.");
             var biologyTagsForInsert = caves.SelectMany(e => e.BiologyTags).ToList();
             await _repository.BulkInsertAsync(biologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting biology tags.");
-            
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting other tags.");
             var otherTagsForInsert = caves.SelectMany(e => e.CaveOtherTags).ToList();
             await _repository.BulkInsertAsync(otherTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting other tags.");
-            
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting cartographer tags.");
             var cartographerTagsForInsert = caves.SelectMany(e => e.CartographerNameTags).ToList();
             await _repository.BulkInsertAsync(cartographerTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting cartographer tags.");
-            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting cartographer tags.");
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting reported by tags.");
             var reportedByTagsForInsert = caves.SelectMany(e => e.CaveReportedByNameTags).ToList();
             await _repository.BulkInsertAsync(reportedByTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting reported by tags.");
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                "Finished inserting reported by tags.");
 
-            await transaction.CommitAsync(cancellationToken);
+            var records = new List<CaveDryRunRecord>();
+
+            foreach (var cave in caves)
+            {
+                var record = new CaveDryRunRecord();
+                record.Id = cave.Id;
+                record.StateName = stateEntities.First(e => e.Id == cave.StateId).Abbreviation;
+                record.CountyName = allCounties.First(e => e.Id == cave.CountyId).Name;
+                record.CountyCode = allCounties.First(e => e.Id == cave.CountyId).DisplayId;
+                record.CountyNumber = cave.CountyNumber;
+                record.Name = cave.Name;
+                record.AlternateNames = cave.AlternateNamesList;
+                record.LengthFeet = cave.LengthFeet;
+                record.DepthFeet = cave.DepthFeet;
+                record.MaxPitDepthFeet = cave.MaxPitDepthFeet;
+                record.NumberOfPits = cave.NumberOfPits;
+                record.Narrative = cave.Narrative;
+                record.ReportedOn = cave.ReportedOn;
+                record.IsArchived = cave.IsArchived;
+                record.GeologyTagNames = cave.GeologyTags
+                    .Select(e => allGeologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.ReportedByNameTagNames = cave.CaveReportedByNameTags
+                    .Select(e => allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.BiologyTagNames = cave.BiologyTags
+                    .Select(e => allBiologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.ArcheologyTagNames = cave.ArcheologyTags
+                    .Select(e => allArcheologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.CartographerNameTagNames = cave.CartographerNameTags
+                    .Select(e => allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.GeologicAgeTagNames = cave.GeologicAgeTags
+                    .Select(e => allGeologicAgeTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.PhysiographicProvinceTagNames = cave.PhysiographicProvinceTags
+                    .Select(e => allPhysiographicProvincesTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.OtherTagNames = cave.CaveOtherTags
+                    .Select(e => allOtherTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.MapStatusTagNames = cave.MapStatusTags
+                    .Select(e => allMapStatusTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+
+                records.Add(record);
+            }
+
+            if (!isDryRun)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            
+            return records;
         }
         catch (Exception e)
         {
@@ -650,7 +715,6 @@ public class ImportService : ServiceBase
             throw;
         }
 
-        return new FileVm();
     }
 
     private async Task<List<CaveCsvModel>> ParseCaveCsv(Stream stream,
@@ -1499,3 +1563,35 @@ public class ImportService : ServiceBase
 
 }
 
+public class CaveDryRunRecord
+{
+    [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string StateName { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string CountyName { get; set; } = null!;
+
+    public string CountyCode { get; set; } = null!;
+    public int CountyNumber { get; set; }
+
+    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
+
+    public double? LengthFeet { get; set; }
+    public double? DepthFeet { get; set; }
+    public double? MaxPitDepthFeet { get; set; }
+    public int? NumberOfPits { get; set; } = 0;
+
+    public string? Narrative { get; set; }
+
+    public DateTime? ReportedOn { get; set; }
+
+    public bool IsArchived { get; set; } = false;
+    public IEnumerable<string> GeologyTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ReportedByNameTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> BiologyTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ArcheologyTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> CartographerNameTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> GeologicAgeTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> PhysiographicProvinceTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> OtherTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> MapStatusTagNames { get; set; } = new HashSet<string>();
+}
