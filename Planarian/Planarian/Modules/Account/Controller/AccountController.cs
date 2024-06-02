@@ -88,9 +88,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpPost("import/caves/process/{fileId:length(10)}")]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
+        bool isDryRun,
         CancellationToken cancellationToken)
     {
-        var result = await _importService.ImportCavesFileProcess(fileId, cancellationToken);
+        var result = await _importService.ImportCavesFileProcess(fileId, isDryRun, cancellationToken);
 
         return new JsonResult(result);
     }
