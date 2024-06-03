@@ -43,7 +43,7 @@ public abstract class RepositoryBase
         var processed = 0;
         foreach (var batch in entities.Chunk(batchSize))
         {
-            await DbContext.BulkInsertAsync(batch, bulkConfig, cancellationToken: cancellationToken);
+             await DbContext.BulkInsertAsync(batch, bulkConfig, cancellationToken: cancellationToken);
             processed += batch.Length;
             onBatchProcessed?.Invoke(processed, totalEntities);
         }
