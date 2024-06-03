@@ -28,6 +28,7 @@ import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { searchFilterSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
 import { TagTypeTableVm } from "../Models/TagTypeTableVm";
 import { MergeForm } from "../Models/MergeForm";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 
 interface TagTypeEditComponentProps {
   tagType: TagType;
@@ -291,13 +292,23 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
           <Space>
             {editedTagType && editedTagType.tagTypeId === record.tagTypeId ? (
               <>
-                <Button onClick={() => onSave(editedTagType)} type="primary">
+                <PlanarianButton
+                  onClick={() => onSave(editedTagType)}
+                  type="primary"
+                  icon={undefined}
+                >
                   Save
-                </Button>
-                <Button onClick={() => setEditedTagType(null)}>Cancel</Button>
+                </PlanarianButton>
+                <CancelButtonComponent onClick={() => setEditedTagType(null)} />
               </>
             ) : (
-              <Button onClick={() => setEditedTagType(record)}>Edit</Button>
+              <PlanarianButton
+                disabled={!record.isUserModifiable}
+                onClick={() => setEditedTagType(record)}
+                icon={undefined}
+              >
+                Edit
+              </PlanarianButton>
             )}
             {record.tagTypeId !== editedTagType?.tagTypeId && (
               <Button
