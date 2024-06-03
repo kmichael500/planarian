@@ -97,7 +97,7 @@ public class AccountRepository : RepositoryBase
                               e.CaveReportedByNameTags.Count +
                               e.CartographerNameTags.Count +
                               e.EntranceReportedByNameTags.Count +
-                              e.FileTypeTags.Count +
+                              e.FileTypeTags.Count(ee=>ee.ExpiresOn == null) + // temp files don't count
                               e.MapStatusTags.Count +
                               e.GeologicAgeTags.Count +
                               e.PhysiographicProvinceTags.Count +
