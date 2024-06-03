@@ -198,9 +198,9 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
                 >
                   Dry Run
                 </PlanarianButton>,
-                <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
                   Reset
-                </Button>,
+                </PlanarianButton>,
               ]}
             />
           </Card>

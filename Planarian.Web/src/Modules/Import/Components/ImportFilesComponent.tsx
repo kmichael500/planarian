@@ -186,6 +186,15 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               >
                 Try Again
               </PlanarianButton>,
+              <PlanarianButton
+                onClick={() => {
+                  resetStates();
+                  setInputsConfirmed(false);
+                }}
+                icon={<RedoOutlined />}
+              >
+                Reset
+              </PlanarianButton>,
             ]}
           />
         </Card>
