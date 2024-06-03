@@ -9,8 +9,8 @@ public class CaveVm
 {
     public CaveVm(string id, string stateId, string countyId, string displayId, string name,
         IEnumerable<string> alternateNames,
-        double lengthFeet,
-        double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
+        double? lengthFeet,
+        double? depthFeet, double? maxPitDepthFeet, int? numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
         IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files)
@@ -36,13 +36,14 @@ public class CaveVm
     public CaveVm(string id, string reportedByUserId, string narrative, DateTime? reportedOn,
         IEnumerable<string> reportedByNameTagIds, string stateId, string countyId, string displayId, string name,
         IEnumerable<string> alternateNames,
-        double lengthFeet,
-        double depthFeet, double maxPitDepthFeet, int numberOfPits, bool isArchived,
+        double? lengthFeet,
+        double? depthFeet, double? maxPitDepthFeet, int? numberOfPits, bool isArchived,
         EntranceVm primaryEntrance,
         IEnumerable<string> mapIds,
         IEnumerable<EntranceVm> entrances, IEnumerable<string> geologyTagIds, IEnumerable<FileVm> files) : this(id,
         stateId,
-        countyId, displayId, name, alternateNames, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived, primaryEntrance, mapIds, entrances, geologyTagIds, files)
+        countyId, displayId, name, alternateNames, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived,
+        primaryEntrance, mapIds, entrances, geologyTagIds, files)
     {
         ReportedByUserId = reportedByUserId;
         MaxPitDepthFeet = maxPitDepthFeet;
@@ -90,4 +91,3 @@ public class CaveVm
     public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
 }
-

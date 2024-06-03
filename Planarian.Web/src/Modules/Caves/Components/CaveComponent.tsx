@@ -101,27 +101,37 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && (
       <Descriptions.Item label="Length" key="length">
-        {cave?.lengthFeet ? convertDistance(cave.lengthFeet) : "N/A"}
+        {cave?.lengthFeet
+          ? convertDistance(cave.lengthFeet)
+          : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
       <Descriptions.Item label="Depth" key="depth">
-        {cave?.depthFeet ? convertDistance(cave.depthFeet) : "N/A"}
+        {cave?.depthFeet
+          ? convertDistance(cave.depthFeet)
+          : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
       <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
-        {cave?.maxPitDepthFeet ? convertDistance(cave.maxPitDepthFeet) : "N/A"}
+        {cave?.maxPitDepthFeet
+          ? convertDistance(cave.maxPitDepthFeet)
+          : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
       <Descriptions.Item label="Number of Pits" key="number-of-pits">
-        {cave?.numberOfPits ? formatNumber(cave.numberOfPits) : "N/A"}
+        {cave?.numberOfPits
+          ? formatNumber(cave.numberOfPits)
+          : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && (
       <Descriptions.Item label="Reported On" key="reported-on">
-        {cave?.reportedOn ? formatDateTime(cave.reportedOn) : "N/A"}
+        {cave?.reportedOn
+          ? formatDateTime(cave.reportedOn)
+          : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
@@ -205,7 +215,7 @@ const CaveComponent = ({
         <Descriptions.Item label="Elevation" key="elevation">
           {entrance.elevationFeet
             ? convertDistance(entrance.elevationFeet)
-            : "N/A"}
+            : defaultIfEmpty(null)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
@@ -220,7 +230,9 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && (
         <Descriptions.Item label="Reported On" key="reported-on">
-          {entrance.reportedOn ? formatDateTime(entrance.reportedOn) : "N/A"}
+          {entrance.reportedOn
+            ? formatDateTime(entrance.reportedOn)
+            : defaultIfEmpty(null)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && (
@@ -230,7 +242,9 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
         <Descriptions.Item label="Pit Depth" key="pit-depth">
-          {entrance.pitFeet ? convertDistance(entrance.pitFeet) : "N/A"}
+          {entrance.pitFeet
+            ? convertDistance(entrance.pitFeet)
+            : defaultIfEmpty(null)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
@@ -303,8 +317,16 @@ const CaveComponent = ({
           </>
         )}
 
-        <PlanarianDividerComponent title="Narrative" />
-        <ParagraphDisplayComponent text={cave?.narrative} />
+        {isFeatureEnabled(FeatureKey.EnabledFieldCaveNarrative) && (
+          <>
+            {isNullOrWhiteSpace(cave?.narrative) && (
+              <>
+                <PlanarianDividerComponent title="Narrative" />
+                <ParagraphDisplayComponent text={cave?.narrative} />
+              </>
+            )}
+          </>
+        )}
 
         <PlanarianDividerComponent
           title="Files"
