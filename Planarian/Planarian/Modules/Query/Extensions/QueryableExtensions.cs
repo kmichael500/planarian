@@ -239,7 +239,7 @@ public static class QueryableExtensions
         if (pageSize > QueryConstants.MaxPageSize) pageSize = QueryConstants.MaxPageSize;
 
 
-        query = query.OrderByDescending(orderingExpression);
+        query = query.OrderByDescendingNullLast(orderingExpression);
 
 
         var totalCount = await query.CountAsync();
@@ -255,5 +255,28 @@ public static class QueryableExtensions
             .ToListAsync();
 
         return new PagedResult<T>(pageNumber, pageSize, totalCount, results);
+    }
+    
+    private static IOrderedQueryable<T> OrderByDescendingNullLast<T, TKey>(
+        this IQueryable<T> source,
+        Expression<Func<T, TKey>> keySelector)
+    {
+        var param = keySelector.Parameters[0];
+        var body = keySelector.Body;
+
+        var isNull = Expression.Equal(body, Expression.Constant(null, typeof(TKey)));
+        var notNull = Expression.NotEqual(body, Expression.Constant(null, typeof(TKey)));
+
+        var nullValuesLast = Expression.Condition(
+            isNull,
+            Expression.Constant(int.MaxValue, typeof(int)),
+            Expression.Constant(0, typeof(int))
+        );
+
+        var selector = Expression.Lambda<Func<T, int>>(nullValuesLast, param);
+
+        return source
+            .OrderBy(selector)
+            .ThenByDescending(keySelector);
     }
 }

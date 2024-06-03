@@ -60,7 +60,7 @@ builder.Configuration.AddAzureAppConfiguration(options =>
     options.Connect(appConfigConnectionString)
         .Select(KeyFilter.Any, LabelFilter.Null)
         .Select(KeyFilter.Any,
-            isDevelopment ? "Development" : "Production");
+            false ? "Development" : "Production");
 });
 
 #if DEBUG
@@ -276,12 +276,9 @@ if (false)
 
 app.UseSession();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
