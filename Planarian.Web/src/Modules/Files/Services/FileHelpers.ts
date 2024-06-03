@@ -9,7 +9,7 @@ export function isPdfFileType(fileType: string | null | undefined): boolean {
   if (!fileType) {
     return false;
   }
-  return fileType === "pdf";
+  return fileType.toLowerCase() === "pdf";
 }
 
 export const isTextFileType = (fileType: string | null | undefined) => {
