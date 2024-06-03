@@ -84,25 +84,22 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           <Typography.Paragraph>
             A <strong>delimiter</strong> is a character that separates the
             county code and the county cave number in your file name. For
-            example, if your county code is "AB" and your cave number follows
-            it, using a delimiter like a dash would look like "AB-123". If you
-            don't specify a delimter, it will be assumed that there is no
-            delimter and that the county code and cave number are directly next
-            to each other.
+            example, if your county code is "1" and your cave number follows it,
+            using a delimiter like a dash would look like "1-3". If you don't
+            specify a delimiter, it will be assumed that there is no delimiter
+            and that the county code and cave number are directly next to each
+            other.
           </Typography.Paragraph>
           <Typography.Paragraph>
-            The <strong>county code regex</strong> is a pattern that matches the
-            format of your county codes. This is to tie the file with the
-            correct cave. For instance, For example, the regex pattern '
-            {`[A-Z]{2}`}' ensures each code is exactly two uppercase letters,
-            such as "AB", "DB", or "BU" but it would not match "A", "ABC", or
-            "Ab". You can use a site like{" "}
+            The <strong>ID regex</strong> is a pattern that matches the entire
+            ID format in your filenames. This includes both the county code and
+            the cave number. For instance, the regex pattern '{`\\d+-\\d+`}'
+            ensures it matches IDs like "1-3", "12-34", etc. You can use a site
+            like{" "}
             <a href="https://regexr.com" target="_blank">
               https://regexr.com
             </a>{" "}
-            to test your regex against your filenames to ensure it matches. The
-            first match of the county code regex combined with the delimiter and
-            followed by the cave number will be used to match the cave.
+            to test your regex against your filenames to ensure it matches.
           </Typography.Paragraph>
 
           <Form
@@ -120,17 +117,17 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               <Input placeholder="-" />
             </Form.Item>
             <Form.Item
-              label="County Code Regex"
-              name={nameof<DelimiterFormFields>("countyCodeRegex")}
+              label="ID Regex"
+              name={nameof<DelimiterFormFields>("idRegex")}
               rules={[
                 {
                   required: true,
-                  message: "Please input a county code regex!",
+                  message: "Please input an ID regex!",
                 },
               ]}
               initialValue=""
             >
-              <Input placeholder="[A-Z]{2}" />
+              <Input placeholder="\d+-\d+" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit">
@@ -141,37 +138,38 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {inputsConfirmed && !uploadFailed && errorList.length === 0 && (
-        <UploadComponent
-          draggerMessage="Drag any files you would like to upload."
-          draggerTitle="Import Cave Files"
-          hideCancelButton
-          style={{ display: "flex" }}
-          uploadFunction={async (params): Promise<FileVm> => {
-            try {
-              const result = await AccountService.ImportFile(
-                params.file,
-                params.uid,
-                form.getFieldValue("delimiter"),
-                form.getFieldValue("countyCodeRegex"),
-                params.onProgress
-              );
-              // setUploadResult(result);
-              // setIsUploaded(true);
-            } catch (e) {
-              const error = e as ImportApiErrorResponse<CaveCsvModel>;
-
-              // setUploadFailed(true);
-
-              message.error(error.message);
-            }
-            return {} as FileVm;
-          }}
-          updateFunction={() => {
-            throw new Error("Function not implemented intentionally.");
-          }}
-        />
-      )}
+      {!isUploaded &&
+        inputsConfirmed &&
+        !uploadFailed &&
+        errorList.length === 0 && (
+          <UploadComponent
+            draggerMessage="Drag any files you would like to upload."
+            draggerTitle="Import Cave Files"
+            hideCancelButton
+            style={{ display: "flex" }}
+            uploadFunction={async (params): Promise<FileVm> => {
+              try {
+                const result = await AccountService.ImportFile(
+                  params.file,
+                  params.uid,
+                  form.getFieldValue("delimiter"),
+                  form.getFieldValue("idRegex"),
+                  params.onProgress
+                );
+                setUploadResult(result);
+                setIsUploaded(true);
+              } catch (e) {
+                const error = e as ImportApiErrorResponse<CaveCsvModel>;
+                setUploadFailed(true);
+                message.error(error.message);
+              }
+              return {} as FileVm;
+            }}
+            updateFunction={() => {
+              throw new Error("Function not implemented intentionally.");
+            }}
+          />
+        )}
 
       {uploadFailed && (
         <Card style={{ width: "100%" }}>
@@ -188,6 +186,15 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               >
                 Try Again
               </PlanarianButton>,
+              <PlanarianButton
+                onClick={() => {
+                  resetStates();
+                  setInputsConfirmed(false);
+                }}
+                icon={<RedoOutlined />}
+              >
+                Reset
+              </PlanarianButton>,
             ]}
           />
         </Card>
@@ -198,7 +205,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Successfully Uploaded!"
-            subTitle="Click the process button below to start processing. If not, no caves will be imported."
+            subTitle="Your files have been successfully uploaded."
             extra={[
               <Button onClick={tryAgain} icon={<RedoOutlined />}>
                 Reset
@@ -250,5 +257,5 @@ export { ImportFilesComponent };
 
 interface DelimiterFormFields {
   delimiter: string;
-  countyCodeRegex: string;
+  idRegex: string;
 }

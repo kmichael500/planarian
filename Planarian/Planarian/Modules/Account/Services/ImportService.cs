@@ -705,7 +705,7 @@ public class ImportService : ServiceBase
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
-            
+
             return records;
         }
         catch (Exception e)
@@ -741,10 +741,10 @@ public class ImportService : ServiceBase
 
                 TryGetFieldValue(csv, nameof(record.CaveName), true, errors, out string? caveName);
                 if (!string.IsNullOrWhiteSpace(caveName)) record.CaveName = caveName;
-                
+
                 TryGetFieldValue(csv, nameof(record.AlternateNames), false, errors, out string? alternateName);
                 record.AlternateNames = alternateName;
-                
+
                 TryGetFieldValue(csv, nameof(record.State), true, errors, out string? state);
                 if (!string.IsNullOrWhiteSpace(state)) record.State = state;
 
@@ -756,10 +756,10 @@ public class ImportService : ServiceBase
 
                 TryGetFieldValue(csv, nameof(record.CountyCaveNumber), true, errors, out int countyCaveNumber);
                 record.CountyCaveNumber = countyCaveNumber;
-                
+
                 TryGetFieldValue(csv, nameof(record.MapStatuses), false, errors, out string? mapStatuses);
                 record.MapStatuses = mapStatuses;
-                
+
                 TryGetFieldValue(csv, nameof(record.CartographerNames), false, errors, out string? cartographerNames);
                 record.CartographerNames = cartographerNames;
 
@@ -773,29 +773,30 @@ public class ImportService : ServiceBase
                 record.MaxPitDepthFt = maxPitDepthFt;
 
                 TryGetFieldValue(csv, nameof(record.NumberOfPits), false, errors, out int? numberOfPits);
-                record.NumberOfPits = numberOfPits;                
-                
+                record.NumberOfPits = numberOfPits;
+
                 TryGetFieldValue(csv, nameof(record.Narrative), false, errors, out string? narrative);
                 record.Narrative = narrative;
-                
+
                 TryGetFieldValue(csv, nameof(record.Geology), false, errors, out string? geology);
                 record.Geology = geology;
-                
+
                 TryGetFieldValue(csv, nameof(record.GeologicAges), false, errors, out string? geologicAges);
                 record.GeologicAges = geologicAges;
-                
-                TryGetFieldValue(csv, nameof(record.PhysiographicProvinces), false, errors, out string? physiographicProvinces);
+
+                TryGetFieldValue(csv, nameof(record.PhysiographicProvinces), false, errors,
+                    out string? physiographicProvinces);
                 record.PhysiographicProvinces = physiographicProvinces;
-                
+
                 TryGetFieldValue(csv, nameof(record.Archeology), false, errors, out string? archeology);
                 record.Archeology = archeology;
-                
+
                 TryGetFieldValue(csv, nameof(record.Biology), false, errors, out string? biology);
                 record.Biology = biology;
-                
+
                 TryGetFieldValue(csv, nameof(record.IsArchived), false, errors, out bool isArchived);
                 record.IsArchived = isArchived;
-                
+
                 TryGetFieldValue(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOnDate);
                 record.ReportedOnDate = reportedOnDate;
 
@@ -804,7 +805,7 @@ public class ImportService : ServiceBase
 
                 TryGetFieldValue(csv, nameof(record.OtherTags), false, errors, out string? otherTags);
                 record.OtherTags = otherTags;
-                
+
                 if (errors.Any())
                     foreach (var error in errors)
                         failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(record, index, error));
@@ -869,21 +870,21 @@ public class ImportService : ServiceBase
                 $"Number of pits must be greater than or equal to 1!"));
             isValid = false;
         }
-        
+
         if (cave.LengthFeet is < 0)
         {
             failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
                 $"Length must be greater than or equal to 0!"));
             isValid = false;
         }
-        
+
         if (cave.DepthFeet is < 0)
         {
             failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
                 $"Depth must be greater than or equal to 0!"));
             isValid = false;
         }
-        
+
         if (cave.MaxPitDepthFeet is < 0)
         {
             failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
@@ -975,7 +976,8 @@ public class ImportService : ServiceBase
 
             var allEntranceStatusTags = await CreateAndProcessEntranceTags(entranceRecords,
                 (await _tagRepository.GetEntranceStatusTags()).ToList(),
-                TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatuses?.SplitAndTrim(), signalRGroup, cancellationToken);
+                TagTypeKeyConstant.EntranceStatus, e => e.EntranceStatuses?.SplitAndTrim(), signalRGroup,
+                cancellationToken);
             var allEntranceHydrologyTags = await CreateAndProcessEntranceTags(entranceRecords,
                 (await _tagRepository.GetEntranceHydrologyTags()).ToList(),
                 TagTypeKeyConstant.EntranceHydrology, e => e.EntranceHydrology?.SplitAndTrim(), signalRGroup,
@@ -984,7 +986,7 @@ public class ImportService : ServiceBase
                 (await _tagRepository.GetFieldIndicationTags()).ToList(),
                 TagTypeKeyConstant.FieldIndication, e => e.FieldIndication?.SplitAndTrim(), signalRGroup,
                 cancellationToken);
-            
+
             var allPeopleTags = await CreateAndProcessEntranceTags(entranceRecords,
                 (await _tagRepository.GetTags(TagTypeKeyConstant.People)).ToList(),
                 TagTypeKeyConstant.People, e => e.ReportedByNames?.SplitAndTrim(), signalRGroup,
@@ -1118,14 +1120,14 @@ public class ImportService : ServiceBase
                         entranceHydrologyTags,
                         e => e.EntranceHydrology,
                         allEntranceHydrologyTags);
-                    
+
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.FieldIndication),
                         entranceFieldIndicationTags,
                         e => e.FieldIndication,
                         allFieldIndicationTags);
-                    
+
                     //TODO: How does this work??? Untested
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
@@ -1238,7 +1240,7 @@ public class ImportService : ServiceBase
             await _repository.BulkInsertAsync(entranceReportedByNameTags, onBatchProcessed: OnBatchProcessed,
                 batchSize: batchSize,
                 cancellationToken: cancellationToken);
-            
+
 
             #endregion
 
@@ -1378,8 +1380,8 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
         }
     }
-    
- 
+
+
 
 
     private void CreateEntranceTags<TTag>(EntranceCsvModel entranceRecord,
@@ -1464,102 +1466,97 @@ public class ImportService : ServiceBase
 
     #endregion
 
-    public async Task<object?> AddFileForImport(Stream stream, string fileName, string countyCodeRegex,
+    
+    public async Task<object?> AddFileForImport(Stream stream, string fileName, string idRegex,
         string delimiterRegex, string? uuid, CancellationToken cancellationToken)
     {
-        // var delimiterRegex = @"";
-        // const string countyCodeRegex = @"[A-Z]{2}";
-    
-        var caveInfos = ExtractCountyInformation(fileName, delimiterRegex, countyCodeRegex, cancellationToken);
+        var caveInfo = ExtractCountyInformation(fileName, delimiterRegex, idRegex, cancellationToken);
         var validCaveIds = new Dictionary<string, string>();
 
-        foreach (var cave in caveInfos)
+        var caveId =
+            await _caveRepository.GetCaveIdByCountyCodeNumber(caveInfo.CountyCode, caveInfo.CountyCaveNumber,
+                cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(caveId))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var caveId =
-                await _caveRepository.GetCaveIdByCountyCodeNumber(cave.CountyCode, cave.CountyCaveNumber,
-                    cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(caveId))
-            {
-                throw ApiExceptionDictionary.BadRequest(
-                    $"Cave with county code {cave.CountyCode} and number {cave.CountyCaveNumber} does not exist for file '{fileName}'.");
-            }
-
-            validCaveIds.Add(fileName, caveId);
+            throw ApiExceptionDictionary.BadRequest(
+                $"Cave with county code {caveInfo.CountyCode} and number {caveInfo.CountyCaveNumber} does not exist for file '{fileName}'.");
         }
+
+        validCaveIds.Add(fileName, caveId);
 
         foreach (var (key, value) in validCaveIds)
         {
             await _fileService.UploadCaveFile(stream, value, key, cancellationToken, uuid);
         }
-    
-        return caveInfos;
+
+        return caveInfo;
     }
 
-    // public static List<CountyCaveInfo> ExtractCountyInformation(string fileName,
-    //     string delimiterRegex, string countyCodeRegex, CancellationToken cancellationToken)
-    // {
-    //     // Combining the county code, delimiter, and number patterns.
-    //     var combinedPattern = countyCodeRegex + delimiterRegex + "(\\d+)";
-    //
-    //     var matches = Regex.Matches(fileName, combinedPattern);
-    //     var resultList = new List<CountyCaveInfo>();
-    //
-    //     foreach (Match match in matches)
-    //     {
-    //         cancellationToken.ThrowIfCancellationRequested();
-    //         var countyCode = match.Groups[1].Value;
-    //         var countyNumber = int.Parse(match.Groups[2].Value); // Convert string to integer
-    //
-    //         resultList.Add(new CountyCaveInfo
-    //         {
-    //             CountyCode = countyCode,
-    //             CountyCaveNumber = countyNumber
-    //         });
-    //     }
-    //
-    //     return resultList;
-    // }
-
-    public static List<CountyCaveInfo> ExtractCountyInformation(string fileName,
-        string delimiterRegex, string countyCodeRegex, CancellationToken cancellationToken)
+    public static CountyCaveInfo ExtractCountyInformation(string fileName, string delimiterRegex,
+        string idRegex, CancellationToken cancellationToken)
     {
-        var countyCodeMatches = Regex.Matches(fileName, countyCodeRegex);
-        
         var resultList = new List<CountyCaveInfo>();
-        foreach (Match countyCodeMatch in countyCodeMatches)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            
-            var countyCodeValue = countyCodeMatch.Groups[0].Value;
-            var combinedPattern = $"({countyCodeValue})" + delimiterRegex + @"(\d+)";
-
-            var matches = Regex.Matches(fileName, combinedPattern);
-            foreach (Match match in matches)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var countyCode = match.Groups[1].Value;
-                var countyNumber = int.Parse(match.Groups[2].Value);
-
-                resultList.Add(new CountyCaveInfo
-                {
-                    CountyCode = countyCode,
-                    CountyCaveNumber = countyNumber
-                });
-            }
-            
-        }
+        var caveInfo = CountyCaveInfo.Parse(fileName, idRegex, delimiterRegex);
         
-        
-        return resultList;
+        return caveInfo;
     }
+
     public class CountyCaveInfo
     {
         public string CountyCode { get; set; }
         public int CountyCaveNumber { get; set; }
+        public static CountyCaveInfo Parse(string input, string idRegex, string delimiter)
+        {
+            var regex = new Regex(idRegex);
+            var match = regex.Match(input);
+
+            if (!match.Success)
+            {
+                throw ApiExceptionDictionary.BadRequest("The filename does not match the provided regex pattern.");
+            }
+
+            var id = match.Value;
+            string countyCode;
+            int countyCaveNumber;
+
+            if (string.IsNullOrWhiteSpace(delimiter))
+            {
+                // If no delimiter is provided, assume the format is CountyCodeCountyCaveNumber
+                var splitIndex = id.IndexOfAny("0123456789".ToCharArray());
+                if (splitIndex == -1)
+                {
+                    throw new ArgumentException("The ID does not contain a valid county cave number.");
+                }
+                countyCode = id.Substring(0, splitIndex);
+                if (!int.TryParse(id.Substring(splitIndex), out countyCaveNumber))
+                {
+                    throw new ArgumentException("The ID does not contain a valid county cave number.");
+                }
+            }
+            else
+            {
+                var parts = id.Split(new[] { delimiter }, StringSplitOptions.None);
+
+                if (parts.Length != 2 || !int.TryParse(parts[1], out var caveNumber))
+                {
+                    throw ApiExceptionDictionary.BadRequest(
+                        $"'{input}' does not contain a valid county cave number.'.");
+
+                }
+                
+                countyCaveNumber = caveNumber;
+                countyCode = parts[0];
+            }
+
+            return new CountyCaveInfo
+            {
+                CountyCode = countyCode,
+                CountyCaveNumber = countyCaveNumber
+            };
+        }
     }
-    
+
 
 }
 

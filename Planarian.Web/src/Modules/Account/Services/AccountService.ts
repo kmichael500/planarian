@@ -101,7 +101,7 @@ const AccountService = {
     file: string | Blob | RcFile,
     uuid: string,
     delmiterRegex: string,
-    countyCodeRegex: string,
+    idRegex: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileVm> {
     const formData = new FormData();
@@ -116,7 +116,7 @@ const AccountService = {
 
     const regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
       delmiterRegex
-    )}&countyCodeRegex=${countyCodeRegex}`;
+    )}&idRegex=${encodeURIComponent(idRegex)}`;
 
     const response = await HttpClient.post<FileVm>(
       `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,
