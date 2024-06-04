@@ -29,6 +29,17 @@ public class DataGenerator
             GenerateFileTags(),
         };
 
+        foreach (var tagGroup in allGeneratedTags)
+        {
+            foreach (var tag in tagGroup)
+            {
+                if (tag.Id.Length != PropertyLength.Id)
+                {
+                    throw new ArgumentException("Tag Id is not the correct length");
+                }
+            }
+        }
+
         var transaction = await _dbContext.Database.BeginTransactionAsync();
 
         try
@@ -220,7 +231,7 @@ public class DataGenerator
             new() { Id = "psv2C6Mh2k", Name = "Unverified" },
             new() { Id = "oF8MuzX7OI", Name = "Approximate" },
             new() { Id = "Tndm7SgjVg", Name = "GPS Point" },
-            new() { Id = "XY80k3iZ8", Name = "Lidar / GIS Assisted" },
+            new() { Id = "XY80k3iZ8a", Name = "Lidar / GIS Assisted" },
             new() { Id = "RaQvx9jOB8", Name = "Historic Topo Point" }
         };
 
@@ -238,14 +249,14 @@ public class DataGenerator
     {
         return new List<TagType>
         {
-            new() { Id = "2KL5bK2N5M", Name = "File" },
             new() { Id = "Y0BrXbVmkW", Name = "Map" },
             new() { Id = "6CeJboo99I", Name = "Trip Report" },
             new() { Id = "aaCmvn2MMG", Name = "Article" },
             new() { Id = "LONruyiR4F", Name = "Notes" },
             new() { Id = "jeGhtON7Gk", Name = "Data" },
             new() { Id = "1fhE7lSCI1", Name = "Shapefile/GIS" },
-            new() { Id = "FxaiqMZaYH", Name = "Photos" }
+            new() { Id = "FxaiqMZaYH", Name = "Photos" },
+            new() { Id = "OthEUrY4eF", Name = "Other" },
         }.Select(e => new TagType
         {
             Id = e.Id,

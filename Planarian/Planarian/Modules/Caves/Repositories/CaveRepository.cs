@@ -362,11 +362,11 @@ public class CaveRepository : RepositoryBase
             CountyId = e.County.Id,
             DisplayId =
                 $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
-            PrimaryEntranceLatitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
+            PrimaryEntranceLatitude = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
                 .FirstOrDefault(),
-            PrimaryEntranceLongitude = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
+            PrimaryEntranceLongitude = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
                 .FirstOrDefault(),
-            PrimaryEntranceElevationFeet = e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
+            PrimaryEntranceElevationFeet = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
                 .FirstOrDefault(),
             ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
             Name = e.Name,
@@ -518,11 +518,16 @@ public class CaveRepository : RepositoryBase
         return usedCountyNumbers.ToHashSet();
     }
 
-    public async Task<string?> GetCaveIdByCountyCodeNumber(string countyDisplayId, int countyNumber,
+    public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);
+
+    public async Task<GetCaveForFileImportByCountyCodeNumberResult?> GetCaveForFileImportByCountyCodeNumber(string countyDisplayId, int countyNumber,
         CancellationToken cancellationToken)
     {
-        var result = await DbContext.Caves.Where(e => e.County.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
-            .Select(e => e.Id).FirstOrDefaultAsync(cancellationToken: cancellationToken);
+        var result = await DbContext.Caves
+            .Where(e => e.County.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
+            .Select(e => new GetCaveForFileImportByCountyCodeNumberResult(e.Id,
+                $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber} {e.Name}"))
+            .FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
         return result;
     }

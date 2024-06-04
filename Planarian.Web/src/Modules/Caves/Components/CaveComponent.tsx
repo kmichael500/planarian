@@ -319,7 +319,7 @@ const CaveComponent = ({
 
         {isFeatureEnabled(FeatureKey.EnabledFieldCaveNarrative) && (
           <>
-            {isNullOrWhiteSpace(cave?.narrative) && (
+            {!isNullOrWhiteSpace(cave?.narrative) && (
               <>
                 <PlanarianDividerComponent title="Narrative" />
                 <ParagraphDisplayComponent text={cave?.narrative} />

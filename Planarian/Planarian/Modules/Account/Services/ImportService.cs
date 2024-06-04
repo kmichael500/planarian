@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
+using LinqToDB.Tools;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
@@ -661,37 +662,36 @@ public class ImportService : ServiceBase
             foreach (var cave in caves)
             {
                 var record = new CaveDryRunRecord();
-                record.Id = cave.Id;
-                record.StateName = stateEntities.First(e => e.Id == cave.StateId).Abbreviation;
+                record.State = stateEntities.First(e => e.Id == cave.StateId).Abbreviation;
                 record.CountyName = allCounties.First(e => e.Id == cave.CountyId).Name;
                 record.CountyCode = allCounties.First(e => e.Id == cave.CountyId).DisplayId;
-                record.CountyNumber = cave.CountyNumber;
-                record.Name = cave.Name;
+                record.CountyCaveNumber = cave.CountyNumber;
+                record.CaveName = cave.Name;
                 record.AlternateNames = cave.AlternateNamesList;
-                record.LengthFeet = cave.LengthFeet;
-                record.DepthFeet = cave.DepthFeet;
+                record.CaveLengthFeet = cave.LengthFeet;
+                record.CaveDepthFeet = cave.DepthFeet;
                 record.MaxPitDepthFeet = cave.MaxPitDepthFeet;
                 record.NumberOfPits = cave.NumberOfPits;
                 record.Narrative = cave.Narrative;
-                record.ReportedOn = cave.ReportedOn;
+                record.ReportedOnDate = cave.ReportedOn;
                 record.IsArchived = cave.IsArchived;
-                record.GeologyTagNames = cave.GeologyTags
+                record.Geology = cave.GeologyTags
                     .Select(e => allGeologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.ReportedByNameTagNames = cave.CaveReportedByNameTags
+                record.ReportedByNames = cave.CaveReportedByNameTags
                     .Select(e => allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.BiologyTagNames = cave.BiologyTags
+                record.Biology = cave.BiologyTags
                     .Select(e => allBiologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.ArcheologyTagNames = cave.ArcheologyTags
+                record.Archeology = cave.ArcheologyTags
                     .Select(e => allArcheologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.CartographerNameTagNames = cave.CartographerNameTags
+                record.CartographerNames = cave.CartographerNameTags
                     .Select(e => allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.GeologicAgeTagNames = cave.GeologicAgeTags
+                record.GeologicAges = cave.GeologicAgeTags
                     .Select(e => allGeologicAgeTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.PhysiographicProvinceTagNames = cave.PhysiographicProvinceTags
+                record.PhysiographicProvinces = cave.PhysiographicProvinceTags
                     .Select(e => allPhysiographicProvincesTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.OtherTagNames = cave.CaveOtherTags
+                record.OtherTags = cave.CaveOtherTags
                     .Select(e => allOtherTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
-                record.MapStatusTagNames = cave.MapStatusTags
+                record.MapStatuses = cave.MapStatusTags
                     .Select(e => allMapStatusTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
 
                 records.Add(record);
@@ -945,7 +945,8 @@ public class ImportService : ServiceBase
 
     #region Entrance Import
 
-    public async Task<FileVm> ImportEntrancesFileProcess(string temporaryFileId, CancellationToken cancellationToken)
+    public async Task<List<EntranceDryRun>> ImportEntrancesFileProcess(string temporaryFileId, bool isDryRun,
+        CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
 
@@ -1167,7 +1168,7 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting entrances!");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Associating entrances with caves");
-            var unassociatedEntranceIds = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
+            var (unassociatedEntranceIds, associatedEntrances) = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished associating entrances with caves");
             foreach (var unassociatedEntranceId in unassociatedEntranceIds)
@@ -1245,17 +1246,63 @@ public class ImportService : ServiceBase
             #endregion
 
             await _temporaryEntranceRepository.DropTable();
+            
+            var records = new List<EntranceDryRun>();
 
-            await transaction.CommitAsync(cancellationToken);
+            foreach (var entrance in entrances)
+            {
+                var associatedCave = associatedEntrances.FirstOrDefault(e => e.Id == entrance.Id);
+                var record = new EntranceDryRun
+                {
+                    AssociatedCave = $"{associatedCave?.DisplayId} {associatedCave?.CaveName}",
+                    
+                    LocationQuality = allLocationQualityTags.First(e => e.Id == entrance.LocationQualityTagId).Name,
+                    IsPrimaryEntrance = entrance.IsPrimary,
+                    EntranceName = entrance.Name,
+                    EntranceDescription = entrance.Description,
+                    DecimalLatitude = entrance.Latitude,
+                    DecimalLongitude = entrance.Longitude,
+                    EntranceElevationFt = entrance.Elevation,
+                    ReportedOnDate = entrance.ReportedOn,
+                    EntrancePitDepth = entrance.PitFeet,
+                    EntranceStatuses = allEntranceStatusTags
+                        .Where(e => entranceStatusTags.Any(et => et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
+                        .Select(e => e.Name).ToList(),
+                    FieldIndication = allFieldIndicationTags
+                        .Where(e => entranceFieldIndicationTags.Any(et =>
+                            et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
+                        .Select(e => e.Name).ToList(),
+                    EntranceHydrology = allEntranceHydrologyTags
+                        .Where(e => entranceHydrologyTags.Any(
+                            et => et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
+                        .Select(e => e.Name).ToList(),
+                    ReportedByNames = allPeopleTags
+                        .Where(e => entranceReportedByNameTags.Any(et =>
+                            et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
+                        .Select(e => e.Name).ToList(),
+                };
+               
+                records.Add(record);
+            }
+
+            if (!isDryRun)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished importing entrances!");
+
+            return records;
         }
         catch (Exception)
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
-
-        return new FileVm();
     }
 
     private async Task<List<EntranceCsvModel>> ParseEntranceCsv(Stream stream,
@@ -1308,7 +1355,7 @@ public class ImportService : ServiceBase
                     out string? entranceDescription);
                 record.EntranceDescription = entranceDescription;
 
-                TryGetFieldValue(csv, nameof(record.EntrancePitDepth), false, errors, out double entrancePitDepth);
+                TryGetFieldValue(csv, nameof(record.EntrancePitDepth), false, errors, out double? entrancePitDepth);
                 record.EntrancePitDepth = entrancePitDepth;
 
                 TryGetFieldValue(csv, nameof(record.EntranceStatuses), false, errors, out string? entranceStatus);
@@ -1466,40 +1513,44 @@ public class ImportService : ServiceBase
 
     #endregion
 
-    
-    public async Task<object?> AddFileForImport(Stream stream, string fileName, string idRegex,
+
+    public async Task<FileImportResult> AddFileForImport(Stream stream, string fileName, string idRegex,
         string delimiterRegex, string? uuid, CancellationToken cancellationToken)
     {
-        var caveInfo = ExtractCountyInformation(fileName, delimiterRegex, idRegex, cancellationToken);
-        var validCaveIds = new Dictionary<string, string>();
+        var result = new FileImportResult
+        {
+            FileName = fileName,
+            IsSuccessful = true,
+        };
+        
+        CountyCaveInfo caveInfo;
+        try
+        {
+            caveInfo = CountyCaveInfo.Parse(fileName, idRegex, delimiterRegex);
+        }
+        catch (ApiException e)
+        {
+            result.Message = e.Message;
+            result.IsSuccessful = false;
+            return result;
+        }
 
-        var caveId =
-            await _caveRepository.GetCaveIdByCountyCodeNumber(caveInfo.CountyCode, caveInfo.CountyCaveNumber,
+        var caveInformation =
+            await _caveRepository.GetCaveForFileImportByCountyCodeNumber(caveInfo.CountyCode, caveInfo.CountyCaveNumber,
                 cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(caveId))
+        if (caveInformation == null)
         {
-            throw ApiExceptionDictionary.BadRequest(
-                $"Cave with county code {caveInfo.CountyCode} and number {caveInfo.CountyCaveNumber} does not exist for file '{fileName}'.");
+            result.Message =
+                $"Cave with county code {caveInfo.CountyCode} and number {caveInfo.CountyCaveNumber} does not exist for file '{fileName}'.";
+            result.IsSuccessful = false;
+            return result;
         }
+        result.AssociatedCave = caveInformation.CaveName;
 
-        validCaveIds.Add(fileName, caveId);
+        await _fileService.UploadCaveFile(stream, caveInformation.CaveId, fileName, cancellationToken, uuid);
 
-        foreach (var (key, value) in validCaveIds)
-        {
-            await _fileService.UploadCaveFile(stream, value, key, cancellationToken, uuid);
-        }
-
-        return caveInfo;
-    }
-
-    public static CountyCaveInfo ExtractCountyInformation(string fileName, string delimiterRegex,
-        string idRegex, CancellationToken cancellationToken)
-    {
-        var resultList = new List<CountyCaveInfo>();
-        var caveInfo = CountyCaveInfo.Parse(fileName, idRegex, delimiterRegex);
-        
-        return caveInfo;
+        return result;
     }
 
     public class CountyCaveInfo
@@ -1541,7 +1592,7 @@ public class ImportService : ServiceBase
                 if (parts.Length != 2 || !int.TryParse(parts[1], out var caveNumber))
                 {
                     throw ApiExceptionDictionary.BadRequest(
-                        $"'{input}' does not contain a valid county cave number.'.");
+                        $"'{input}' does not contain a valid county cave number.");
 
                 }
                 
@@ -1562,33 +1613,56 @@ public class ImportService : ServiceBase
 
 public class CaveDryRunRecord
 {
-    [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string StateName { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string State { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyName { get; set; } = null!;
 
     public string CountyCode { get; set; } = null!;
-    public int CountyNumber { get; set; }
+    public int CountyCaveNumber { get; set; }
 
-    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    [MaxLength(PropertyLength.Name)] public string CaveName { get; set; } = null!;
     public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
 
-    public double? LengthFeet { get; set; }
-    public double? DepthFeet { get; set; }
+    public double? CaveLengthFeet { get; set; }
+    public double? CaveDepthFeet { get; set; }
     public double? MaxPitDepthFeet { get; set; }
     public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
 
-    public DateTime? ReportedOn { get; set; }
+    public DateTime? ReportedOnDate { get; set; }
 
     public bool IsArchived { get; set; } = false;
-    public IEnumerable<string> GeologyTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> ReportedByNameTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> BiologyTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> ArcheologyTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> CartographerNameTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> GeologicAgeTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> PhysiographicProvinceTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> OtherTagNames { get; set; } = new HashSet<string>();
-    public IEnumerable<string> MapStatusTagNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> Geology { get; set; } = new HashSet<string>();
+    public IEnumerable<string> ReportedByNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> Biology { get; set; } = new HashSet<string>();
+    public IEnumerable<string> Archeology { get; set; } = new HashSet<string>();
+    public IEnumerable<string> CartographerNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> GeologicAges { get; set; } = new HashSet<string>();
+    public IEnumerable<string> PhysiographicProvinces { get; set; } = new HashSet<string>();
+    public IEnumerable<string> OtherTags { get; set; } = new HashSet<string>();
+    public IEnumerable<string> MapStatuses { get; set; } = new HashSet<string>();
+}
+
+public class EntranceDryRun
+{
+    public string AssociatedCave { get; set; }
+    [MaxLength(PropertyLength.Id)] public string LocationQuality { get; set; } = null!;
+
+    public bool IsPrimaryEntrance { get; set; }
+    [MaxLength(PropertyLength.Name)] public string? EntranceName { get; set; }
+    public string? EntranceDescription { get; set; }
+
+    public double DecimalLatitude { get; set; }
+    public double DecimalLongitude { get; set; }
+    public double EntranceElevationFt { get; set; }
+
+    public DateTime? ReportedOnDate { get; set; }
+
+    public double? EntrancePitDepth { get; set; }
+
+    public IEnumerable<string> EntranceStatuses { get; set; } = new HashSet<string>();
+    public IEnumerable<string> FieldIndication { get; set; } = new HashSet<string>();
+    public IEnumerable<string> EntranceHydrology { get; set; } = new HashSet<string>();
+
+    public IEnumerable<string> ReportedByNames { get; set; } = new HashSet<string>();
 }

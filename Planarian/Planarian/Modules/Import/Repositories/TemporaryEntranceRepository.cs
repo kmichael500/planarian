@@ -7,6 +7,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Shared;
+using Planarian.Modules.Import.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Import.Repositories;
@@ -47,7 +48,7 @@ public class TemporaryEntranceRepository : RepositoryBase
         return await db.BulkCopyAsync(options, entrances);
     }
 
-    public async Task<IEnumerable<string>> UpdateTemporaryEntranceWithCaveId()
+    public async Task<(List<string> unassociatedEntrances, List<TemporaryEntranceResult> associatedEntrances)> UpdateTemporaryEntranceWithCaveId()
     {
         if (string.IsNullOrEmpty(_temporaryEntranceTableName))
             throw new InvalidOperationException("The temporary table has not been created.");
@@ -70,15 +71,33 @@ public class TemporaryEntranceRepository : RepositoryBase
 
 
         var unassociatedEntrances = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName) // Use dynamic table name
+            .TableName(_temporaryEntranceTableName)
             .Where(e => e.CaveId == null)
             .Select(e => e.Id).ToListAsyncLinqToDB();
+
+        var delimiter = "-";
+        
+        var associatedEntrances = await db.GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName) 
+            .Where(e => e.CaveId != null)
+            .Join(db.GetTable<Cave>(),
+                te => te.CaveId,
+                cave => cave.Id,
+                (te, cave) => new TemporaryEntranceResult
+                {
+                 Id = te.Id,
+                 CaveId = te.CaveId,
+                 CaveName = cave.Name,
+                 DisplayId = $"{te.CountyDisplayId}{delimiter}{te.CountyCaveNumber}",
+                })
+            .ToListAsyncLinqToDB();
+
 
         var deleteResult = await db.GetTable<TemporaryEntrance>()
             .TableName(_temporaryEntranceTableName) // Use dynamic table name
             .Where(e => e.CaveId == null).DeleteAsync();
 
-        return unassociatedEntrances;
+        return (unassociatedEntrances, associatedEntrances);
     }
 
     public async Task<List<string>> GetInvalidIsPrimaryRecords()

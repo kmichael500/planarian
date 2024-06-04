@@ -12,22 +12,22 @@ import {
 import { CheckCircleOutlined, RedoOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
 
-// Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
 
-// Importing models
-import { ImportApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import {
+  ApiErrorResponse,
+  ImportApiErrorResponse,
+} from "../../../Shared/Models/ApiErrorResponse";
 import { CaveCsvModel } from "../Models/CaveCsvModel";
 import { FileVm } from "../../Files/Models/FileVm";
 
-// Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
-import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { FileImportResult } from "../Models/FileUploadresult";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -36,45 +36,77 @@ interface ImportCaveComponentProps {
 const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   onUploaded,
 }) => {
-  // Initializing states
   const [isUploaded, setIsUploaded] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
-  const [errorList, setErrorList] = useState<FailedCsvRecord<CaveCsvModel>[]>(
-    []
-  );
+  const [partialUpload, setPartialUpload] = useState(false);
+
+  const [uploadResults, setUploadResults] = useState<FileImportResult[]>([]);
+  const [filesToUpload, setFilesToUpload] = useState(0);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
-  const [isLoading, setIsLoading] = useState(false);
 
   const [form] = Form.useForm<DelimiterFormFields>();
   const [inputsConfirmed, setInputsConfirmed] = useState(false);
 
-  // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
   const handleOk = () => setIsModalOpen(false);
   const tryAgain = () => resetStates();
-  const confirmInputs = () => {
-    form.submit();
+
+  const convertResultsListToCsv = (
+    uploadResults: FileImportResult[]
+  ): string => {
+    return Papa.unparse(uploadResults);
   };
-
-  const convertErrorListToCsv = (
-    errorList: FailedCsvRecord<CaveCsvModel>[]
-  ): string =>
-    Papa.unparse(
-      errorList.map((error) => ({
-        rowNumber: error.rowNumber,
-        reason: error.reason,
-        ...error.caveCsvModel,
-      }))
-    );
-
-  // Helper function to reset states
   const resetStates = () => {
     setIsUploaded(false);
     setUploadFailed(false);
-    setErrorList([]);
-    setUploadResult(undefined);
+    setUploadResults([]);
+    setPartialUpload(false);
   };
+
+  const determineUploadStatus = () => {
+    const successfulUploads = uploadResults.filter(
+      (result) => result.isSuccessful
+    );
+    const failedUploads = uploadResults.filter(
+      (result) => !result.isSuccessful
+    );
+
+    if (successfulUploads.length > 0 && failedUploads.length > 0) {
+      setPartialUpload(true);
+    } else if (failedUploads.length === uploadResults.length) {
+      setUploadFailed(true);
+    } else {
+      setIsUploaded(true);
+    }
+  };
+
+  const handleUpload = async (params: any) => {
+    try {
+      const result = await AccountService.ImportFile(
+        params.file,
+        params.uid,
+        form.getFieldValue("delimiter"),
+        form.getFieldValue("idRegex"),
+        params.onProgress
+      );
+
+      setUploadResults((prevResults) => [...prevResults, result]);
+
+      setFilesToUpload((prevCount) => prevCount - 1);
+    } catch (e) {
+      const error = e as ApiErrorResponse;
+      setUploadFailed(true);
+      message.error(error.message);
+      setFilesToUpload((prevCount) => prevCount - 1);
+    }
+  };
+
+  React.useEffect(() => {
+    if (filesToUpload === 0 && uploadResults.length > 0) {
+      determineUploadStatus();
+    }
+  }, [filesToUpload, uploadResults]);
 
   return (
     <>
@@ -138,46 +170,97 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {!isUploaded &&
-        inputsConfirmed &&
-        !uploadFailed &&
-        errorList.length === 0 && (
-          <UploadComponent
-            draggerMessage="Drag any files you would like to upload."
-            draggerTitle="Import Cave Files"
-            hideCancelButton
-            style={{ display: "flex" }}
-            uploadFunction={async (params): Promise<FileVm> => {
-              try {
-                const result = await AccountService.ImportFile(
-                  params.file,
-                  params.uid,
-                  form.getFieldValue("delimiter"),
-                  form.getFieldValue("idRegex"),
-                  params.onProgress
-                );
-                setUploadResult(result);
-                setIsUploaded(true);
-              } catch (e) {
-                const error = e as ImportApiErrorResponse<CaveCsvModel>;
-                setUploadFailed(true);
-                message.error(error.message);
-              }
-              return {} as FileVm;
-            }}
-            updateFunction={() => {
-              throw new Error("Function not implemented intentionally.");
-            }}
+      {!isUploaded && inputsConfirmed && !uploadFailed && !partialUpload && (
+        <UploadComponent
+          draggerMessage="Drag any files you would like to upload."
+          draggerTitle="Import Cave Files"
+          hideCancelButton
+          style={{ display: "flex" }}
+          uploadFunction={async (params): Promise<FileVm> => {
+            setFilesToUpload((prevCount) => prevCount + 1);
+            await handleUpload(params);
+            return {} as FileVm;
+          }}
+          updateFunction={() => {
+            throw new Error("Function not implemented intentionally.");
+          }}
+        />
+      )}
+
+      {isUploaded && (
+        <Card style={{ width: "100%" }}>
+          <Result
+            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+            title="Successfully Uploaded!"
+            subTitle="Your files have been successfully uploaded."
+            extra={[
+              <Button type="primary" onClick={showCSVModal}>
+                View Results
+              </Button>,
+              <PlanarianButton
+                type="primary"
+                danger
+                onClick={tryAgain}
+                icon={<RedoOutlined />}
+              >
+                Upload More
+              </PlanarianButton>,
+              <PlanarianButton
+                onClick={() => {
+                  resetStates();
+                  setInputsConfirmed(false);
+                }}
+                icon={<RedoOutlined />}
+              >
+                Reset
+              </PlanarianButton>,
+            ]}
           />
-        )}
+        </Card>
+      )}
+
+      {partialUpload && (
+        <Card style={{ width: "100%" }}>
+          <Result
+            icon={<CheckCircleOutlined style={{ color: "#FFA500" }} />}
+            title="Partially Uploaded!"
+            subTitle="Your files have been partially uploaded. However, there were some errors. Please review the results."
+            extra={[
+              <Button type="primary" onClick={showCSVModal}>
+                View Results
+              </Button>,
+              <PlanarianButton
+                type="primary"
+                danger
+                onClick={tryAgain}
+                icon={<RedoOutlined />}
+              >
+                Upload More
+              </PlanarianButton>,
+              <PlanarianButton
+                onClick={() => {
+                  resetStates();
+                  setInputsConfirmed(false);
+                }}
+                icon={<RedoOutlined />}
+              >
+                Reset
+              </PlanarianButton>,
+            ]}
+          />
+        </Card>
+      )}
 
       {uploadFailed && (
         <Card style={{ width: "100%" }}>
           <Result
             status="error"
             title="Upload Failed"
-            subTitle="Please try uploading the file again."
+            subTitle="Please try uploading the files again."
             extra={[
+              <Button type="primary" onClick={showCSVModal}>
+                View Results
+              </Button>,
               <PlanarianButton
                 type="primary"
                 danger
@@ -200,55 +283,17 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
 
-      {isUploaded && (
-        <Card style={{ width: "100%" }}>
-          <Result
-            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Successfully Uploaded!"
-            subTitle="Your files have been successfully uploaded."
-            extra={[
-              <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                Reset
-              </Button>,
-            ]}
-          />
-        </Card>
-      )}
-
-      {errorList.length > 0 && (
-        <>
-          <Card style={{ width: "100%" }}>
-            <Result
-              status="error"
-              title="There were errors."
-              subTitle={
-                "Please click the button below to view the upload errors."
-              }
-              extra={[
-                errorList.length > 0 && (
-                  <Button type="primary" onClick={showCSVModal}>
-                    View Errors
-                  </Button>
-                ),
-                <Button type="primary" danger onClick={tryAgain}>
-                  Try Again
-                </Button>,
-              ]}
-            />
-          </Card>
-          <FullScreenModal>
-            <Modal
-              title="Import Cave Files Errors"
-              open={isModalOpen}
-              onOk={handleOk}
-              onCancel={handleOk}
-              footer={null}
-            >
-              <CSVDisplay data={convertErrorListToCsv(errorList)} />
-            </Modal>
-          </FullScreenModal>
-        </>
-      )}
+      <FullScreenModal>
+        <Modal
+          title="File Import Results"
+          open={isModalOpen}
+          onOk={handleOk}
+          onCancel={handleOk}
+          footer={null}
+        >
+          <CSVDisplay data={convertResultsListToCsv(uploadResults)} />
+        </Modal>
+      </FullScreenModal>
     </>
   );
 };

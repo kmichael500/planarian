@@ -11,10 +11,10 @@ public sealed class EntranceCsvModelMap : ClassMap<EntranceCsvModel>
         Map(m => m.EntranceName);
         Map(m => m.DecimalLatitude);
         Map(m => m.DecimalLongitude);
-        Map(m => m.EntranceElevationFt).Default(0.0);
+        Map(m => m.EntranceElevationFt);
         Map(m => m.LocationQuality);
         Map(m => m.EntranceDescription);
-        Map(m => m.EntrancePitDepth).Default(0.0);
+        Map(m => m.EntrancePitDepth);
         Map(m => m.EntranceStatuses);
         Map(m => m.EntranceHydrology);
         Map(m => m.FieldIndication);

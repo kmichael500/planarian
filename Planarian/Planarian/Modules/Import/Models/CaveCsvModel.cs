@@ -7,8 +7,8 @@ public class CaveCsvModel
 
     public string State { get; set; }
     public string CountyCode { get; set; }
-    public string CountyName { get; set; }
     public int CountyCaveNumber { get; set; }
+    public string CountyName { get; set; }
     public string? MapStatuses { get; set; }
     public string? CartographerNames { get; set; }
 
