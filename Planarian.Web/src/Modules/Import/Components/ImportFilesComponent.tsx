@@ -198,8 +198,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                 View Results
               </Button>,
               <PlanarianButton
-                type="primary"
-                danger
+                type="dashed"
                 onClick={tryAgain}
                 icon={<RedoOutlined />}
               >
@@ -230,8 +229,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                 View Results
               </Button>,
               <PlanarianButton
-                type="primary"
-                danger
+                type="dashed"
                 onClick={tryAgain}
                 icon={<RedoOutlined />}
               >
