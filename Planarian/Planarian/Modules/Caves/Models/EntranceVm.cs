@@ -22,9 +22,9 @@ public class EntranceVm
 
     public EntranceVm(string id, string name, string description, double latitude, double longitude,
         double elevationFeet,
-        double pitFeet, string locationQualityTagId, string reportedByUserId, IEnumerable<string> reportedByNameTagIds,
+        double? pitFeet, string locationQualityTagId, string reportedByUserId, IEnumerable<string> reportedByNameTagIds,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds, IEnumerable<string> entranceTypeTagIds) : this(id, latitude, longitude, elevationFeet,
+        IEnumerable<string> entranceHydrologyTagIds) : this(id, latitude, longitude, elevationFeet,
         entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
@@ -34,7 +34,6 @@ public class EntranceVm
         ReportedByUserId = reportedByUserId;
         ReportedByNameTagIds = reportedByNameTagIds;
         ReportedOn = reportedOn;
-        EntranceTypeTagIds = entranceTypeTagIds;
     }
 
     public EntranceVm()
@@ -62,5 +61,4 @@ public class EntranceVm
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
 
     public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> EntranceTypeTagIds { get; set; } = new HashSet<string>();
 }

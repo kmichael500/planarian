@@ -13,6 +13,8 @@ import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
+import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
+import { FileImportResult } from "../../Import/Models/FileUploadresult";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -90,9 +92,12 @@ const AccountService = {
     );
     return response.data;
   },
-  async ImportEntrancesProcess(fileId: string): Promise<void> {
-    const response = await HttpClient.post<void>(
-      `${baseUrl}/import/entrances/process/${fileId}`
+  async ImportEntrancesProcess(
+    fileId: string,
+    isDryRun: boolean
+  ): Promise<EntranceDryRun[]> {
+    const response = await HttpClient.post<EntranceDryRun[]>(
+      `${baseUrl}/import/entrances/process/${fileId}?isDryRun=${isDryRun}`
     );
     return response.data;
   },
@@ -103,7 +108,7 @@ const AccountService = {
     delmiterRegex: string,
     idRegex: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<FileVm> {
+  ): Promise<FileImportResult> {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -118,7 +123,7 @@ const AccountService = {
       delmiterRegex
     )}&idRegex=${encodeURIComponent(idRegex)}`;
 
-    const response = await HttpClient.post<FileVm>(
+    const response = await HttpClient.post<FileImportResult>(
       `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,
       formData,
       config

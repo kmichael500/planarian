@@ -122,9 +122,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpPost("import/entrances/process/{fileId:length(10)}")]
     public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
+        bool isDryRun,
         CancellationToken cancellationToken)
     {
-        var result = await _importService.ImportEntrancesFileProcess(fileId, cancellationToken);
+        var result = await _importService.ImportEntrancesFileProcess(fileId, isDryRun, cancellationToken);
 
         return new JsonResult(result);
     }

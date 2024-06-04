@@ -21,7 +21,7 @@ public class AddEntranceVm
 
     public AddEntranceVm(string name, string description, double latitude, double longitude,
         double elevationFeet,
-        double pitFeet, string locationQualityTagId, string reportedByName,
+        double? pitFeet, string locationQualityTagId, string reportedByName,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {

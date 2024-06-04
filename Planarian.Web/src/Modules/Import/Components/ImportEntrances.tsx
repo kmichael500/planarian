@@ -4,6 +4,7 @@ import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
   RedoOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import Papa from "papaparse";
 
@@ -24,6 +25,7 @@ import { Link } from "react-router-dom";
 import { AccountService } from "../../Account/Services/AccountService";
 import { EntranceCsvModel } from "../Models/EntranceCsvModel";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
+import { EntranceDryRun } from "../Models/EntranceDryRun";
 
 interface ImportEntrancesComponentProps {
   onUploaded: () => void;
@@ -44,6 +46,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadResult, setUploadResult] = useState<FileVm | undefined>();
   const [isLoading, setIsLoading] = useState(false);
+  const [dryRunData, setDryRunData] = useState<EntranceDryRun[]>([]);
+  const [isDryRunComplete, setIsDryRunComplete] = useState(false);
 
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
@@ -60,12 +64,36 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
       }))
     );
 
+  const handleDryRunClick = async () => {
+    if (!uploadResult?.id) return message.error("File id not found");
+    setIsLoading(true);
+    setIsProcessing(true);
+    try {
+      const result = await AccountService.ImportEntrancesProcess(
+        uploadResult.id,
+        true
+      );
+      setDryRunData(result);
+      setIsDryRunComplete(true);
+    } catch (e) {
+      const error = e as ImportApiErrorResponse<EntranceCsvModel>;
+
+      if (error.data) {
+        setErrorList(error.data);
+      }
+      setProcessError(error.message);
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+    }
+  };
+
   const handleProcessClick = async () => {
     if (!uploadResult?.id) return message.error("File id not found");
     setIsLoading(true);
-    setIsProcessing(true); // Set processing state to true when starting to process
+    setIsProcessing(true);
     try {
-      await AccountService.ImportEntrancesProcess(uploadResult.id);
+      await AccountService.ImportEntrancesProcess(uploadResult.id, false);
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<EntranceCsvModel>;
@@ -88,6 +116,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     setProcessError(null);
     setErrorList([]);
     setUploadResult(undefined);
+    setDryRunData([]);
+    setIsDryRunComplete(false);
   };
 
   return (
@@ -148,13 +178,43 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
         </Card>
       )}
 
-      {isUploaded && !isProcessed && !isProcessing && processError === null && (
+      {isUploaded &&
+        !isProcessed &&
+        !isProcessing &&
+        processError === null &&
+        !isDryRunComplete && (
+          <Card style={{ width: "100%" }}>
+            <Result
+              icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+              title="Successfully Uploaded!"
+              subTitle="Click the dry run button below to preview the changes. If not, no entrances will be imported."
+              extra={[
+                <PlanarianButton
+                  onClick={handleDryRunClick}
+                  icon={<EyeOutlined />}
+                  loading={isLoading}
+                  type="primary"
+                >
+                  Dry Run
+                </PlanarianButton>,
+                <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                  Reset
+                </Button>,
+              ]}
+            />
+          </Card>
+        )}
+
+      {isDryRunComplete && !isProcessing && !isProcessed && (
         <Card style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Successfully Uploaded!"
-            subTitle="Click the process button below to start processing. If not, no entrances will be imported."
+            title="Dry Run Complete!"
+            subTitle="Review the changes below. If everything looks good, proceed with processing."
             extra={[
+              <Button onClick={showCSVModal} icon={<EyeOutlined />}>
+                View Dry Run Data
+              </Button>,
               <PlanarianButton
                 onClick={handleProcessClick}
                 icon={<DeliveredProcedureOutlined />}
@@ -186,7 +246,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
           />
         </Card>
       )}
-      {isProcessed && (
+
+      {isProcessed && !isProcessing && (
         <Card style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
@@ -240,6 +301,20 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             </Modal>
           </FullScreenModal>
         </>
+      )}
+
+      {dryRunData.length > 0 && (
+        <FullScreenModal>
+          <Modal
+            title="Dry Run Data"
+            open={isModalOpen}
+            onOk={handleOk}
+            onCancel={handleOk}
+            footer={null}
+          >
+            <CSVDisplay data={Papa.unparse(dryRunData)} />
+          </Modal>
+        </FullScreenModal>
       )}
     </>
   );
