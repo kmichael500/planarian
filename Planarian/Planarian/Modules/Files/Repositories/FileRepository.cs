@@ -70,4 +70,10 @@ public class FileRepository : RepositoryBase
         return await DbContext.Files.Where(e => e.ExpiresOn < DateTime.UtcNow && e.AccountId == RequestUser.AccountId)
             .ToListAsync();
     }
+
+    public async Task<bool> IsDuplicateFile(string caveId, string fileName)
+    {
+        return await DbContext.Files.AnyAsync(e =>
+            e.CaveId == caveId && e.FileName == fileName && e.AccountId == RequestUser.AccountId);
+    }
 }

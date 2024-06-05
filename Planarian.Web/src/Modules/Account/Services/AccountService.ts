@@ -107,6 +107,7 @@ const AccountService = {
     uuid: string,
     delmiterRegex: string,
     idRegex: string,
+    ignoreDuplicates: boolean = false,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileImportResult> {
     const formData = new FormData();
@@ -121,7 +122,9 @@ const AccountService = {
 
     const regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
       delmiterRegex
-    )}&idRegex=${encodeURIComponent(idRegex)}`;
+    )}&idRegex=${encodeURIComponent(
+      idRegex
+    )}&ignoreDuplicates=${ignoreDuplicates}`;
 
     const response = await HttpClient.post<FileImportResult>(
       `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,

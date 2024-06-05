@@ -17,9 +17,9 @@ export const StringHelpers = {
 
 export function convertDistance(
   distanceInFeet: number | undefined | null
-): string {
-  if (distanceInFeet === undefined || distanceInFeet === null) return "0 ft";
-  const milesThreshold = 2640; // Half a mile in feet (1 mile = 5280 feet)
+): string | null {
+  if (distanceInFeet === undefined || distanceInFeet === null) return null;
+  const milesThreshold = 2640;
 
   const formatOptions = {
     minimumFractionDigits: 2,
@@ -35,13 +35,6 @@ export function convertDistance(
   formatOptions.minimumFractionDigits = 0;
 
   return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`; // Add commas for thousands in feet
-}
-
-export function displayCountyId(
-  countyId: string,
-  countyNumber: string
-): string {
-  return `${countyId} - ${countyNumber}`;
 }
 
 export function isNullOrWhiteSpace(
@@ -114,8 +107,3 @@ export function defaultIfEmpty(value: string | null | undefined) {
     return "-";
   } else return value;
 }
-
-type AbbreviationOptions = {
-  delimiter?: string;
-  maxLength?: number;
-};
