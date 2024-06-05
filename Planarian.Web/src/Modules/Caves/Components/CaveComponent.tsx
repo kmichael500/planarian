@@ -101,30 +101,22 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && (
       <Descriptions.Item label="Length" key="length">
-        {cave?.lengthFeet
-          ? convertDistance(cave.lengthFeet)
-          : defaultIfEmpty(null)}
+        {defaultIfEmpty(convertDistance(cave?.lengthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
       <Descriptions.Item label="Depth" key="depth">
-        {cave?.depthFeet
-          ? convertDistance(cave.depthFeet)
-          : defaultIfEmpty(null)}
+        {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
       <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
-        {cave?.maxPitDepthFeet
-          ? convertDistance(cave.maxPitDepthFeet)
-          : defaultIfEmpty(null)}
+        {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
       <Descriptions.Item label="Number of Pits" key="number-of-pits">
-        {cave?.numberOfPits
-          ? formatNumber(cave.numberOfPits)
-          : defaultIfEmpty(null)}
+        {defaultIfEmpty(formatNumber(cave?.numberOfPits))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && (
@@ -213,9 +205,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
         <Descriptions.Item label="Elevation" key="elevation">
-          {entrance.elevationFeet
-            ? convertDistance(entrance.elevationFeet)
-            : defaultIfEmpty(null)}
+          {defaultIfEmpty(convertDistance(entrance.elevationFeet))}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
@@ -242,9 +232,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
         <Descriptions.Item label="Pit Depth" key="pit-depth">
-          {entrance.pitFeet
-            ? convertDistance(entrance.pitFeet)
-            : defaultIfEmpty(null)}
+          {defaultIfEmpty(convertDistance(entrance.pitFeet))}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (

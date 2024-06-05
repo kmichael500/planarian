@@ -8,6 +8,9 @@ import {
   Input,
   Form,
   Typography,
+  Col,
+  Row,
+  Checkbox,
 } from "antd";
 import { CheckCircleOutlined, RedoOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
@@ -88,6 +91,7 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         params.uid,
         form.getFieldValue("delimiter"),
         form.getFieldValue("idRegex"),
+        form.getFieldValue("ignoreDuplicates"),
         params.onProgress
       );
 
@@ -141,26 +145,38 @@ const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               setInputsConfirmed(true);
             }}
           >
-            <Form.Item
-              label="Delimiter"
-              name={nameof<DelimiterFormFields>("delimiter")}
-              initialValue=""
-            >
-              <Input placeholder="-" />
-            </Form.Item>
-            <Form.Item
-              label="ID Regex"
-              name={nameof<DelimiterFormFields>("idRegex")}
-              rules={[
-                {
-                  required: true,
-                  message: "Please input an ID regex!",
-                },
-              ]}
-              initialValue=""
-            >
-              <Input placeholder="\d+-\d+" />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item
+                  label="Delimiter"
+                  name={nameof<DelimiterFormFields>("delimiter")}
+                  initialValue=""
+                >
+                  <Input placeholder="-" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  label="ID Regex"
+                  name={nameof<DelimiterFormFields>("idRegex")}
+                  rules={[
+                    { required: true, message: "Please input an ID regex!" },
+                  ]}
+                >
+                  <Input placeholder="\d+-\d+" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name={nameof<DelimiterFormFields>("ignoreDuplicates")}
+                  label="Ignore Duplicates"
+                  valuePropName="checked"
+                >
+                  <Checkbox />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item>
               <Button type="primary" htmlType="submit">
                 Confirm Settings
@@ -301,4 +317,5 @@ export { ImportFilesComponent };
 interface DelimiterFormFields {
   delimiter: string;
   idRegex: string;
+  ignoreDuplicates: boolean;
 }

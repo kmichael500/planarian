@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Generators;
@@ -284,7 +285,8 @@ app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
 
-var corsOrigins = serverOptions.AllowedCorsOrigins.Append(serverOptions.ClientBaseUrl).ToArray();
+var corsOrigins = serverOptions.AllowedCorsOrigins.SplitAndTrim(',').Append(serverOptions.ClientBaseUrl).ToArray();
+
 app.UseCors(x =>
     x.WithOrigins(corsOrigins)
         .AllowAnyHeader()

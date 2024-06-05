@@ -17,6 +17,7 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
 using Planarian.Modules.Import.Repositories;
@@ -37,12 +38,14 @@ public class ImportService : ServiceBase
     private readonly CaveRepository _repository;
     private readonly AccountRepository _accountRepository;
     private readonly CaveRepository _caveRepository;
+    private readonly FileRepository _fileRepository;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository tagRepository, SettingsRepository settingsRepository,
         TemporaryEntranceRepository temporaryEntranceRepository,
         NotificationService notificationService, CaveRepository repository,
-        AccountRepository accountRepository, CaveRepository caveRepository) : base(requestUser)
+        AccountRepository accountRepository, CaveRepository caveRepository,
+        FileRepository fileRepository) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -52,6 +55,7 @@ public class ImportService : ServiceBase
         _repository = repository;
         _accountRepository = accountRepository;
         _caveRepository = caveRepository;
+        _fileRepository = fileRepository;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -1515,7 +1519,7 @@ public class ImportService : ServiceBase
 
 
     public async Task<FileImportResult> AddFileForImport(Stream stream, string fileName, string idRegex,
-        string delimiterRegex, string? uuid, CancellationToken cancellationToken)
+        string delimiterRegex, bool ignoreDuplicates, string? uuid, CancellationToken cancellationToken)
     {
         var result = new FileImportResult
         {
@@ -1523,10 +1527,10 @@ public class ImportService : ServiceBase
             IsSuccessful = true,
         };
         
-        CountyCaveInfo caveInfo;
+        CountyCaveInfo parsed;
         try
         {
-            caveInfo = CountyCaveInfo.Parse(fileName, idRegex, delimiterRegex);
+            parsed = CountyCaveInfo.Parse(fileName, idRegex, delimiterRegex);
         }
         catch (ApiException e)
         {
@@ -1536,17 +1540,28 @@ public class ImportService : ServiceBase
         }
 
         var caveInformation =
-            await _caveRepository.GetCaveForFileImportByCountyCodeNumber(caveInfo.CountyCode, caveInfo.CountyCaveNumber,
+            await _caveRepository.GetCaveForFileImportByCountyCodeNumber(parsed.CountyCode, parsed.CountyCaveNumber,
                 cancellationToken);
 
         if (caveInformation == null)
         {
             result.Message =
-                $"Cave with county code {caveInfo.CountyCode} and number {caveInfo.CountyCaveNumber} does not exist for file '{fileName}'.";
+                $"Cave with county code {parsed.CountyCode} and number {parsed.CountyCaveNumber} does not exist for file '{fileName}'.";
             result.IsSuccessful = false;
             return result;
         }
         result.AssociatedCave = caveInformation.CaveName;
+
+        if (!ignoreDuplicates)
+        {
+            var isDuplicate = await _fileRepository.IsDuplicateFile(caveInformation.CaveId, fileName);
+            if (isDuplicate)
+            {
+                result.Message = $"File already exists for cave '{caveInformation.CaveName}'.";
+                result.IsSuccessful = false;
+                return result;
+            }
+        }
 
         await _fileService.UploadCaveFile(stream, caveInformation.CaveId, fileName, cancellationToken, uuid);
 

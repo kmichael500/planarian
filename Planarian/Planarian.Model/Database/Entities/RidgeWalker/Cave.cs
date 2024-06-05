@@ -20,8 +20,8 @@ public class Cave : EntityBase
     public int CountyNumber { get; set; } // max of highest cave number in county + 1
     public double? LengthFeet { get; set; }
     public double? DepthFeet { get; set; }
-    public double? MaxPitDepthFeet { get; set; } = 0;
-    public int? NumberOfPits { get; set; } = 0;
+    public double? MaxPitDepthFeet { get; set; }
+    public int? NumberOfPits { get; set; }
 
     public string? Narrative { get; set; }
 
