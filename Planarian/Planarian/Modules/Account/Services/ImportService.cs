@@ -544,32 +544,32 @@ public class ImportService : ServiceBase
                             };
                             cave.CartographerNameTags.Add(cartographerTag);
                         }
-
-                        if (caveRecord.ReportedByNames != null)
+                    }
+                    
+                    if (caveRecord.ReportedByNames != null)
+                    {
+                        var reportedByNames = caveRecord.ReportedByNames.SplitAndTrim()
+                            .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
+                        foreach (var reportedByName in reportedByNames)
                         {
-                            var reportedByNames = caveRecord.ReportedByNames.SplitAndTrim()
-                                .Where(e => !string.IsNullOrWhiteSpace(e)).ToList();
-                            foreach (var reportedByName in reportedByNames)
+                            var tag = allPeopleTags.FirstOrDefault(e =>
+                                e.Name.Equals(reportedByName, StringComparison.InvariantCultureIgnoreCase));
+                            if (tag == null)
                             {
-                                var tag = allPeopleTags.FirstOrDefault(e =>
-                                    e.Name.Equals(reportedByName, StringComparison.InvariantCultureIgnoreCase));
-                                if (tag == null)
-                                {
-                                    failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
-                                        $"{nameof(caveRecord.ReportedByNames)} not found: '{reportedByName}'"));
-                                    continue;
-                                }
-
-                                var reportedByTag = new CaveReportedByNameTag()
-                                {
-                                    Id = IdGenerator.Generate(),
-                                    CaveId = cave.Id,
-                                    TagTypeId = tag.Id,
-                                    CreatedOn = DateTime.UtcNow,
-                                    CreatedByUserId = RequestUser.Id
-                                };
-                                cave.CaveReportedByNameTags.Add(reportedByTag);
+                                failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                                    $"{nameof(caveRecord.ReportedByNames)} not found: '{reportedByName}'"));
+                                continue;
                             }
+
+                            var reportedByTag = new CaveReportedByNameTag()
+                            {
+                                Id = IdGenerator.Generate(),
+                                CaveId = cave.Id,
+                                TagTypeId = tag.Id,
+                                CreatedOn = DateTime.UtcNow,
+                                CreatedByUserId = RequestUser.Id
+                            };
+                            cave.CaveReportedByNameTags.Add(reportedByTag);
                         }
                     }
 
@@ -591,7 +591,7 @@ public class ImportService : ServiceBase
             {
                 await transaction.RollbackAsync(cancellationToken);
                 failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Cave);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Cave);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -821,7 +821,7 @@ public class ImportService : ServiceBase
         if (!failedRecords.Any()) return caveRecords;
 
         failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-        throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Cave);
+        throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Cave);
     }
 
     private bool IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
@@ -927,6 +927,14 @@ public class ImportService : ServiceBase
 
         // Determine new tags that don't already exist in the system
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
+
+        foreach (var newTag in newTags)
+        {
+            if (newTag.Name.Length > PropertyLength.Name)
+            {
+                throw ApiExceptionDictionary.BadRequest($"Tag '{newTag.Name}' exceeds the maximum allowed length of {PropertyLength.Name}");
+            }
+        }
 
         async void OnBatchProcessed(int currentProcessedCount, int total)
         {
@@ -1156,7 +1164,7 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing entrances");
 
             if (failedRecords.Any())
-                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Entrance);
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrances. This may take a while...");
@@ -1189,7 +1197,7 @@ public class ImportService : ServiceBase
             if (failedRecords.Any())
             {
                 failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Entrance);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -1217,7 +1225,7 @@ public class ImportService : ServiceBase
             if (failedRecords.Any())
             {
                 failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-                throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+                throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Entrance);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Moving entrances to main table");
@@ -1253,14 +1261,43 @@ public class ImportService : ServiceBase
             
             var records = new List<EntranceDryRun>();
 
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing result!");
+            
+            var locationQualityDict = allLocationQualityTags.ToDictionary(e => e.Id, e => e.Name);
+            var entranceStatusDict = entranceStatusTags
+                .GroupBy(e => e.EntranceId)
+                .ToDictionary(g => g.Key, g => g.Select(et => allEntranceStatusTags.FirstOrDefault(tag => tag.Id == et.TagTypeId)?.Name)
+                    .Where(name => name != null)
+                    .Cast<string>()
+                    .ToList());
+            var fieldIndicationDict = entranceFieldIndicationTags
+                .GroupBy(e => e.EntranceId)
+                .ToDictionary(g => g.Key, g => g.Select(et => allFieldIndicationTags.FirstOrDefault(tag => tag.Id == et.TagTypeId)?.Name)
+                    .Where(name => name != null)
+                    .Cast<string>()
+                    .ToList());
+            var entranceHydrologyDict = entranceHydrologyTags
+                .GroupBy(e => e.EntranceId)
+                .ToDictionary(g => g.Key, g => g.Select(et => allEntranceHydrologyTags.FirstOrDefault(tag => tag.Id == et.TagTypeId)?.Name)
+                    .Where(name => name != null)
+                    .Cast<string>()
+                    .ToList());
+            var reportedByNameDict = entranceReportedByNameTags
+                .GroupBy(e => e.EntranceId)
+                .ToDictionary(g => g.Key, g => g.Select(et => allPeopleTags.FirstOrDefault(tag => tag.Id == et.TagTypeId)?.Name)
+                    .Where(name => name != null)
+                    .Cast<string>()
+                    .ToList());
+            var associatedEntrancesDict = associatedEntrances.ToDictionary(e => e.Id);
+
             foreach (var entrance in entrances)
             {
-                var associatedCave = associatedEntrances.FirstOrDefault(e => e.Id == entrance.Id);
+                associatedEntrancesDict.TryGetValue(entrance.Id, out var associatedCave);
+
                 var record = new EntranceDryRun
                 {
                     AssociatedCave = $"{associatedCave?.DisplayId} {associatedCave?.CaveName}",
-                    
-                    LocationQuality = allLocationQualityTags.First(e => e.Id == entrance.LocationQualityTagId).Name,
+                    LocationQuality = locationQualityDict[entrance.LocationQualityTagId],
                     IsPrimaryEntrance = entrance.IsPrimary,
                     EntranceName = entrance.Name,
                     EntranceDescription = entrance.Description,
@@ -1269,24 +1306,28 @@ public class ImportService : ServiceBase
                     EntranceElevationFt = entrance.Elevation,
                     ReportedOnDate = entrance.ReportedOn,
                     EntrancePitDepth = entrance.PitFeet,
-                    EntranceStatuses = allEntranceStatusTags
-                        .Where(e => entranceStatusTags.Any(et => et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
-                        .Select(e => e.Name).ToList(),
-                    FieldIndication = allFieldIndicationTags
-                        .Where(e => entranceFieldIndicationTags.Any(et =>
-                            et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
-                        .Select(e => e.Name).ToList(),
-                    EntranceHydrology = allEntranceHydrologyTags
-                        .Where(e => entranceHydrologyTags.Any(
-                            et => et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
-                        .Select(e => e.Name).ToList(),
-                    ReportedByNames = allPeopleTags
-                        .Where(e => entranceReportedByNameTags.Any(et =>
-                            et.TagTypeId == e.Id && et.EntranceId == entrance.Id))
-                        .Select(e => e.Name).ToList(),
+                    EntranceStatuses = entranceStatusDict.TryGetValue(entrance.Id, out var entranceStatuses)
+                        ? entranceStatuses
+                        : new List<string>(),
+                    FieldIndication = fieldIndicationDict.TryGetValue(entrance.Id, value: out var fieldIndication)
+                        ? fieldIndication
+                        : new List<string>(),
+                    EntranceHydrology = entranceHydrologyDict.TryGetValue(entrance.Id, out var entranceHydrology
+                    )
+                        ? entranceHydrology
+                        : new List<string>(),
+                    ReportedByNames = reportedByNameDict.TryGetValue(entrance.Id, out var reportedByNames)
+                        ? reportedByNames
+                        : new List<string>(),
                 };
-               
+
                 records.Add(record);
+                
+                if (records.Count % 100 == 0)
+                {
+                    await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Processing preview of {records.Count} entrances out of {entrances.Count}");
+                }
+                
             }
 
             if (!isDryRun)
@@ -1392,7 +1433,7 @@ public class ImportService : ServiceBase
         if (!failedRecords.Any()) return entranceRecords;
 
         failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
-        throw ApiExceptionDictionary.InvalidImport(failedRecords, ApiExceptionDictionary.ImportType.Entrance);
+        throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Entrance);
     }
 
     private async Task<List<TagType>> CreateAndProcessEntranceTags(IEnumerable<EntranceCsvModel> entranceRecords,

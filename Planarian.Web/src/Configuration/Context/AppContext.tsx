@@ -25,7 +25,7 @@ interface AppContextProps {
   setPermissions: (permissions: Permissions) => void;
   isInitialized: boolean;
   isLoading: boolean;
-  initializedError: string | null;
+  initializedError: ApiErrorResponse | null;
 }
 
 export const AppContext = createContext<AppContextProps>({
@@ -62,7 +62,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   });
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [initializedError, setInitializedError] = useState<string | null>(null);
+  const [initializedError, setInitializedError] =
+    useState<ApiErrorResponse | null>(null);
 
   const initializeApp = async () => {
     try {
@@ -76,7 +77,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setInitializedError(null);
     } catch (e) {
       const error = e as ApiErrorResponse;
-      setInitializedError(error.message);
+      setInitializedError(error);
     } finally {
       setIsLoading(false);
     }

@@ -138,6 +138,12 @@ const AuthenticationService = {
     sessionStorage.setItem(currentIdStorageKey(userId), accountId);
     localStorage.setItem(currentIdStorageKey(userId), accountId);
   },
+  ResetAccountId(): void {
+    const userId = this.GetUserId();
+    if (userId == null) throw new NotFoundError("user");
+    sessionStorage.removeItem(currentIdStorageKey(userId));
+    localStorage.removeItem(currentIdStorageKey(userId));
+  },
 };
 
 const currentIdStorageKey = (userId: string) => `currentAccountId-${userId}`;

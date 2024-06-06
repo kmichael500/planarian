@@ -87,23 +87,26 @@ public class AccountRepository : RepositoryBase
                 TagTypeId = e.Id,
                 Name = e.Name,
                 IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
-                Occurrences = e.TripTags.Count +
-                              e.LeadTags.Count +
-                              e.EntranceStatusTags.Count +
-                              e.EntranceHydrologyTags.Count +
-                              e.FieldIndicationTags.Count +
-                              e.EntranceLocationQualitiesTags.Count +
-                              e.GeologyTags.Count +
-                              e.CaveReportedByNameTags.Count +
-                              e.CartographerNameTags.Count +
-                              e.EntranceReportedByNameTags.Count +
-                              e.FileTypeTags.Count(ee=>ee.ExpiresOn == null) + // temp files don't count
-                              e.MapStatusTags.Count +
-                              e.GeologicAgeTags.Count +
-                              e.PhysiographicProvinceTags.Count +
-                              e.BiologyTags.Count +
-                              e.ArcheologyTags.Count +
-                              e.CaveOtherTags.Count
+                Occurrences = e.TripTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.LeadTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceStatusTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceHydrologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.FieldIndicationTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceLocationQualitiesTags.Count(ee =>
+                                  ee.LocationQualityTag.AccountId == RequestUser.AccountId) +
+                              e.GeologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.CaveReportedByNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.CartographerNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceReportedByNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.FileTypeTags.Count(ee =>
+                                  ee.ExpiresOn == null &&
+                                  ee.FileTypeTag.AccountId == RequestUser.AccountId) + // temp files don't count
+                              e.MapStatusTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.GeologicAgeTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.PhysiographicProvinceTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.BiologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.ArcheologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.CaveOtherTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId)
             })
             .OrderBy(e => e.Name), cancellationToken);
 
@@ -187,57 +190,57 @@ public class AccountRepository : RepositoryBase
             #endregion
 
             await DbContext.ArcheologyTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.BiologyTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.CaveOtherTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.EntranceHydrologyTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.EntranceStatusTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.FieldIndicationTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.Files
-                .Where(e => e.FileTypeTagId == tagTypeId)
+                .Where(e => e.FileTypeTagId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.GeologicAgeTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.GeologyTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.Entrances
-                .Where(e => e.LocationQualityTagId == tagTypeId)
+                .Where(e => e.LocationQualityTagId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.LocationQualityTagId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.MapStatusTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
@@ -245,23 +248,23 @@ public class AccountRepository : RepositoryBase
 
             // TODO: Error when merging someone who already has the same tag type for CartographerNameTag
             await DbContext.CartographerNameTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             await DbContext.EntranceReportedByNameTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
             await DbContext.CaveReportedByNameTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
 
             #endregion
 
             await DbContext.PhysiographicProvinceTags
-                .Where(e => e.TagTypeId == tagTypeId)
+                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
                 .Set(e => e.TagTypeId, destinationTagTypeId)
                 .UpdateAsync();
         }

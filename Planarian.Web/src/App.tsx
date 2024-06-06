@@ -5,11 +5,15 @@ import { AppRouting } from "./Configuration/Routing/App.routing";
 import Favicon from "react-favicon";
 import logo from "./logo.svg";
 import { Helmet } from "react-helmet";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, useNavigate } from "react-router-dom";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
+import { ApiExceptionType } from "./Shared/Models/ApiErrorResponse";
+import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
+import { RedoOutlined } from "@ant-design/icons";
+import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 
 const { Content } = Layout;
 
@@ -55,7 +59,22 @@ const App: React.FC = () => {
                     <Col span={24}>
                       <Spin spinning={isLoading} size="large" tip="Planarian" />
                     </Col>
-                    <Col span={24}>{initializedError}</Col>
+                    <Col span={24}>{initializedError?.message}</Col>
+                    {initializedError?.errorCode ===
+                      ApiExceptionType.Unauthorized && (
+                      <Col span={24}>
+                        <PlanarianButton
+                          icon={<RedoOutlined />}
+                          onClick={() => {
+                            AuthenticationService.ResetAccountId();
+                            AuthenticationService.Logout();
+                            window.location.reload();
+                          }}
+                        >
+                          Login
+                        </PlanarianButton>{" "}
+                      </Col>
+                    )}
                   </Row>
                 </div>
               )
