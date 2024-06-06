@@ -73,6 +73,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+
     });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -264,7 +265,7 @@ builder.Services.AddSession();
 var app = builder.Build();
 
 
-if (true)
+if (false)
 {
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;

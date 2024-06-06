@@ -19,7 +19,7 @@ public class File : EntityBase
     public DateTime? ExpiresOn { get; set; } = null!;
     public TagType FileTypeTag { get; set; } = null!;
 
-    public virtual Cave? Cave { get; set; } = null!;
+    public virtual Cave Cave { get; set; } = null!;
     public virtual Account? Account { get; set; } = null!;
 }
 
