@@ -554,10 +554,16 @@ public class ImportService : ServiceBase
                         {
                             var tag = allPeopleTags.FirstOrDefault(e =>
                                 e.Name.Equals(reportedByName, StringComparison.InvariantCultureIgnoreCase));
+                            
                             if (tag == null)
                             {
                                 failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
                                     $"{nameof(caveRecord.ReportedByNames)} not found: '{reportedByName}'"));
+                                continue;
+                            }
+
+                            if (cave.CaveReportedByNameTags.Any(e => e.TagTypeId == tag.Id))
+                            {
                                 continue;
                             }
 
@@ -569,6 +575,7 @@ public class ImportService : ServiceBase
                                 CreatedOn = DateTime.UtcNow,
                                 CreatedByUserId = RequestUser.Id
                             };
+                            
                             cave.CaveReportedByNameTags.Add(reportedByTag);
                         }
                     }
@@ -1141,7 +1148,6 @@ public class ImportService : ServiceBase
                         e => e.FieldIndication,
                         allFieldIndicationTags);
 
-                    //TODO: How does this work??? Untested
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.ReportedByNames),
