@@ -89,24 +89,23 @@ public class AccountRepository : RepositoryBase
                 IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
                 Occurrences = e.TripTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
                               e.LeadTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.EntranceStatusTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.EntranceHydrologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.FieldIndicationTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceStatusTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceHydrologyTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.FieldIndicationTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
                               e.EntranceLocationQualitiesTags.Count(ee =>
-                                  ee.LocationQualityTag.AccountId == RequestUser.AccountId) +
-                              e.GeologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.CaveReportedByNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.CartographerNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.EntranceReportedByNameTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                                  ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.GeologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CaveReportedByNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CartographerNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceReportedByNameTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
                               e.FileTypeTags.Count(ee =>
-                                  ee.ExpiresOn == null &&
-                                  ee.FileTypeTag.AccountId == RequestUser.AccountId) + // temp files don't count
-                              e.MapStatusTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.GeologicAgeTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.PhysiographicProvinceTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.BiologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.ArcheologyTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
-                              e.CaveOtherTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId)
+                                  ee.ExpiresOn == null && ee.Cave.AccountId == RequestUser.AccountId) + // temp files don't count
+                              e.MapStatusTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.GeologicAgeTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.PhysiographicProvinceTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.BiologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.ArcheologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CaveOtherTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId)
             })
             .OrderBy(e => e.Name), cancellationToken);
 
