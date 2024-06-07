@@ -134,6 +134,7 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = entity.FileTypeTagId,
             Uuid = uuid
         };
+        await stream.DisposeAsync();
         return fileInformation;
     }
 
