@@ -83,11 +83,10 @@ export function formatDateTime(
 
   const match = yearPattern.exec(date.toString());
   if (match) {
-    // Format only the year part if the pattern matches
-    return moment(match[1], "YYYY").format(formatString);
+    return moment.utc(match[1], "YYYY").format(formatString);
   }
 
-  return moment(date).format(formatString);
+  return moment.utc(date).format(formatString);
 }
 
 export function formatNumber(value: number | null | undefined): string | null {
