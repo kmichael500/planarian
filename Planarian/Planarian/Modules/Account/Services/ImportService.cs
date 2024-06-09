@@ -935,7 +935,6 @@ public class ImportService : ServiceBase
         
         // Determine new tags that don't already exist in the system
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
-        var newTagsNames = newTags.Select(e => e.Name).ToList();
         foreach (var newTag in newTags)
         {
             if (newTag.Name.Length > PropertyLength.Name)
