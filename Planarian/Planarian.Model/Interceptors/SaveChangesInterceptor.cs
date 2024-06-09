@@ -189,7 +189,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 break;
             case nameof(EntranceHydrologyTag):
                 var entranceHydrologyTag = (EntranceHydrologyTag)entity.Entity;
-                var entranceHydrologyTagAccountId = entranceHydrologyTag.Entrance.Cave?.AccountId ?? await context
+                var entranceHydrologyTagAccountId = entranceHydrologyTag.Entrance?.Cave?.AccountId ?? await context
                     .EntranceHydrologyTags
                     .Where(e => e.Id == entranceHydrologyTag.Id)
                     .Select(e => e.Entrance!.Cave!.AccountId)

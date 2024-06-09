@@ -175,13 +175,6 @@ public class AccountRepository : RepositoryBase
         {
             if (tagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
 
-            #region Project Tags
-
-            // await MergeTagsWithConflictHandling<LeadTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId);
-            // await MergeTagsWithConflictHandling<TripTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId);
-
-            #endregion
-
             #region Cave Tags
 
             await MergeTagsWithConflictHandling<ArcheologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
