@@ -11,7 +11,7 @@ public class Project : EntityBase
     [MaxLength(PropertyLength.Name)]
     public string Name { get; set; } = null!;
 
-    public virtual ICollection<Member> Members { get; set; } = null!;
+    public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
     public virtual ICollection<Trip> Trips { get; set; } = new HashSet<Trip>();
     public virtual ICollection<TagType> CustomTagTypes { get; set; } = new HashSet<TagType>();
 }

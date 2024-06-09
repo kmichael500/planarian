@@ -12,8 +12,8 @@ public class County : EntityBaseNameId
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.SmallText)] public string DisplayId { get; set; } = null!;
 
-    public virtual Account Account { get; set; } = null!;
-    public virtual State State { get; set; } = null!;
+    public virtual Account? Account { get; set; } = null!;
+    public virtual State? State { get; set; } = null!;
     public ICollection<Cave> Caves { get; set; } = null!;
 }
 

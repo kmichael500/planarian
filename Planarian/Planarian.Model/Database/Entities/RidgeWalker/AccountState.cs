@@ -11,8 +11,8 @@ public class AccountState : EntityBase
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
 
-    public virtual State State { get; set; } = null!;
-    public virtual Account Account { get; set; } = null!;
+    public virtual State? State { get; set; } = null!;
+    public virtual Account? Account { get; set; } = null!;
 }
 
 public class AccountStateConfiguration : IEntityTypeConfiguration<AccountState>

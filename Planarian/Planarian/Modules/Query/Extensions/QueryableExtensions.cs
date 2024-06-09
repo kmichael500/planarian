@@ -6,7 +6,7 @@ using Planarian.Modules.Query.Models;
 
 namespace Planarian.Modules.Query.Extensions;
 
-public static class QueryableExtensions
+public static class  QueryableExtensions
 {
     // public static IQueryable<T> QueryFilter<T>(this IQueryable<T> source, IEnumerable<QueryCondition> conditions)
     // {

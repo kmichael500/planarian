@@ -7,9 +7,10 @@ namespace Planarian.Model.Database.Entities;
 public class TripTag : EntityBase
 {
     public string TagTypeId { get; set; }
-    public TagType TagType { get; set; }
-    public Trip Trip { get; set; }
     public string TripId { get; set; }
+    
+    public TagType? TagType { get; set; }
+    public Trip? Trip { get; set; }
 }
 
 public class TripTagConfiguration : BaseEntityTypeConfiguration<TripTag>

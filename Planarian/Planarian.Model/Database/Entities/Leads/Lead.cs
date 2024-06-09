@@ -41,7 +41,7 @@ public class Lead : EntityBase
     [MaxLength(PropertyLength.Key)] public string Classification { get; set; }
     public DateTime? DateClosed { get; set; }
 
-    public virtual Trip Trip { get; set; } = null!;
+    public virtual Trip? Trip { get; set; } = null!;
     public virtual ICollection<LeadTag> LeadTags { get; set; } = new HashSet<LeadTag>();
 }
 

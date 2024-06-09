@@ -36,7 +36,7 @@ public class Photo : EntityBase
 
     [MaxLength(PropertyLength.BlobKey)] public string? BlobKey { get; set; } = null!;
 
-    public virtual Trip Trip { get; set; } = null!;
+    public virtual Trip? Trip { get; set; } = null!;
 }
 
 public class PhotoConfiguration : BaseEntityTypeConfiguration<Photo>

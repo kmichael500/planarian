@@ -9,8 +9,8 @@ public class LeadTag : EntityBase
     public string TagTypeId { get; set; }
     public string LeadId { get; set; }
 
-    public TagType TagType { get; set; }
-    public Lead Lead { get; set; }
+    public TagType? TagType { get; set; }
+    public Lead? Lead { get; set; }
 }
 
 public class LeadTagConfiguration : BaseEntityTypeConfiguration<LeadTag>
