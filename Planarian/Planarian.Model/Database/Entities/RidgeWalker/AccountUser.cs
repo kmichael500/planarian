@@ -11,8 +11,8 @@ public class AccountUser : EntityBase
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string UserId { get; set; } = null!;
 
-    public Account Account { get; set; } = null!;
-    public User User { get; set; } = null!;
+    public Account? Account { get; set; }
+    public User? User { get; set; }
 }
 
 public class AccountUserConfiguration : IEntityTypeConfiguration<AccountUser>

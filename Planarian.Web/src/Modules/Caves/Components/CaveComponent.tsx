@@ -81,6 +81,9 @@ const CaveComponent = ({
     isFeatureEnabled(FeatureKey.EnabledFieldCaveAlternateNames) && (
       <Descriptions.Item label="Alternative Names" key="alternative-names">
         <Row>
+          {cave?.alternateNames.length === 0 && (
+            <Col>{defaultIfEmpty(null)}</Col>
+          )}
           {cave?.alternateNames.map((name) => (
             <Col key={name}>
               <Tag>{name}</Tag>

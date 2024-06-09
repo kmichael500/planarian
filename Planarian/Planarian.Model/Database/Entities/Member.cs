@@ -18,7 +18,7 @@ public class Member : EntityBase
 
     public virtual Project? Project { get; set; } = null!;
     public virtual Trip? Trip { get; set; } = null!;
-    public virtual User User { get; set; } = null!;
+    public virtual User? User { get; set; } = null!;
 }
 
 public class ProjectMemberConfiguration : BaseEntityTypeConfiguration<Member>

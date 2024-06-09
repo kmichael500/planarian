@@ -11,8 +11,8 @@ public class ArcheologyTag : EntityBase
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
 
-    public TagType TagType { get; set; }
-    public Cave Cave { get; set; }
+    public TagType? TagType { get; set; }
+    public Cave? Cave { get; set; }
 }
 
 public class ArcheologyTagConfiguration : BaseEntityTypeConfiguration<ArcheologyTag>

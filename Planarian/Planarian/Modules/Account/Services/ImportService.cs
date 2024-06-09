@@ -156,7 +156,7 @@ public class ImportService : ServiceBase
 
             var allMapStatusTags = await CreateAndProcessCaveTags(caveRecords,
                 await _tagRepository.GetTags(TagTypeKeyConstant.MapStatus),
-                TagTypeKeyConstant.Geology, e => e.Geology?.SplitAndTrim(), signalRGroup, cancellationToken);
+                TagTypeKeyConstant.MapStatus, e => e.MapStatuses?.SplitAndTrim(), signalRGroup, cancellationToken);
 
             var allPhysiographicProvincesTags = await CreateAndProcessCaveTags(caveRecords,
                 await _tagRepository.GetTags(TagTypeKeyConstant.PhysiographicProvince),
@@ -930,11 +930,11 @@ public class ImportService : ServiceBase
                 Id = IdGenerator.Generate(),
                 Name = e ?? throw ApiExceptionDictionary.NullValue(nameof(TagType.Name))
             })
+            .OrderBy(e=>e.Name)
             .ToList();
-
+        
         // Determine new tags that don't already exist in the system
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
-
         foreach (var newTag in newTags)
         {
             if (newTag.Name.Length > PropertyLength.Name)

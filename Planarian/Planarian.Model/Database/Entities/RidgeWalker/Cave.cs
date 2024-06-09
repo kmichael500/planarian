@@ -29,10 +29,10 @@ public class Cave : EntityBase
     public bool IsArchived { get; set; } = false;
 
 
-    public virtual Account Account { get; set; } = null!;
-    public virtual User? ReportedByUser { get; set; } = null!;
-    public virtual County County { get; set; } = null!;
-    public virtual State State { get; set; } = null!;
+    public virtual Account? Account { get; set; } = null!;
+    public virtual User? ReportedByUser { get; set; }
+    public virtual County? County { get; set; } = null!;
+    public virtual State? State { get; set; } = null!;
     public virtual ICollection<File> Files { get; set; } = new HashSet<File>();
     public virtual ICollection<Entrance> Entrances { get; set; } = new HashSet<Entrance>();
     public virtual ICollection<GeologyTag> GeologyTags { get; set; } = new HashSet<GeologyTag>();

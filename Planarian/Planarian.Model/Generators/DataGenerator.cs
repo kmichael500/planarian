@@ -111,7 +111,6 @@ public class DataGenerator
         return new List<TagType>
         {
             new() { Id = "hM5WqDNpUZ", Name = "Yes" },
-            new() { Id = "CaHW7bd3yx", Name = "No" }
         }.Select(e => new TagType
         {
             Id = e.Id,

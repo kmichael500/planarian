@@ -30,8 +30,8 @@ public class MapRepository : RepositoryBase
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
 
             return await DbContext.Entrances
-                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-                .Select(e => new { e.Location, e.Cave.Name, e.Cave.Id })
+                .Where(e => e.Cave!.AccountId == RequestUser.AccountId)
+                .Select(e => new { e.Location, e.Cave!.Name, e.Cave.Id })
                 .ToListAsync(cancellationToken: cancellationToken);
         });
 

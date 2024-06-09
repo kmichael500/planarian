@@ -8,7 +8,9 @@ public static class StringExtensions
 {
     public static string[] SplitAndTrim(this string? input, char delimiter = ',')
     {
-        return input == null ? Array.Empty<string>() : input.Split(delimiter).Select(s => s.Trim()).ToArray();
+        return input == null
+            ? Array.Empty<string>()
+            : input.Split(delimiter).Where(e => !string.IsNullOrWhiteSpace(e)).Select(s => s.Trim()).ToArray();
     }
 
     public static string Quote(this string input)

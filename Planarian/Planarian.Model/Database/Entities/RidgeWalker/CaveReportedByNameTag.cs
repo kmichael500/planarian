@@ -11,8 +11,8 @@ public class CaveReportedByNameTag : EntityBase
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
 
-    public TagType TagType { get; set; }
-    public Cave Cave { get; set; }
+    public TagType? TagType { get; set; }
+    public Cave? Cave { get; set; }
 }
 
 public class ReportedByNameTagConfiguration : BaseEntityTypeConfiguration<CaveReportedByNameTag>

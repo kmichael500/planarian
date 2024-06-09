@@ -17,7 +17,7 @@ public class AuthenticationRepository : RepositoryBase
     {
         return await DbContext.AccountUsers
             .Where(e => e.UserId == userId)
-            .OrderByDescending(e => e.Account.Name)
+            .OrderByDescending(e => e.Account!.Name)
             .Select(e => e.AccountId)
             .ToListAsync();
     }

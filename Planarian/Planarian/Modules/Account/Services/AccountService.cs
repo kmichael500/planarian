@@ -220,7 +220,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         if (entity == null) throw ApiExceptionDictionary.NotFound("County Id");
 
-        var isDuplicateCountyCode =
+        var isDuplicateCountyCode = isNewCounty &&
             await Repository.IsDuplicateCountyCode(county.CountyDisplayId, stateId, cancellationToken);
 
         if (isDuplicateCountyCode)

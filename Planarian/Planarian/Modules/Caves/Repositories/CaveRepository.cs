@@ -483,7 +483,7 @@ public class CaveRepository : RepositoryBase
             .Include(e => e.EntranceOtherTags)
             .Include(e => e.EntranceHydrologyTags)
             .Include(e => e.EntranceReportedByNameTags)
-            .Where(e => e.Id == id && e.Cave.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
+            .Where(e => e.Id == id && e.Cave!.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
     }
 
     public async Task<Cave?> GetAsync(string? id)
@@ -524,9 +524,10 @@ public class CaveRepository : RepositoryBase
         CancellationToken cancellationToken)
     {
         var result = await DbContext.Caves
-            .Where(e => e.County.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
+            .Where(e=>e.AccountId == RequestUser.AccountId)
+            .Where(e => e.County!.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
             .Select(e => new GetCaveForFileImportByCountyCodeNumberResult(e.Id,
-                $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber} {e.Name}"))
+                $"{e.County!.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber} {e.Name}"))
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
         return result;

@@ -81,6 +81,6 @@ public class TagRepository : RepositoryBase
     {
         return DbContext.TagTypes
             .Where(e => e.Key == key &&
-                        (e.AccountId == RequestUser.AccountId || string.IsNullOrWhiteSpace(e.AccountId) && e.IsDefault));
+                        (e.AccountId == RequestUser.AccountId || e.IsDefault));
     }
 }

@@ -1,11 +1,14 @@
+using System.Linq.Expressions;
 using LinqToDB;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
+using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Account.Repositories;
 
@@ -172,103 +175,58 @@ public class AccountRepository : RepositoryBase
         {
             if (tagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
 
-            // Update the TagTypeId in each tag table
+            #region Cave Tags
 
-            #region Trip Data
-
-            await DbContext.TripTags
-                .Where(e => e.TagTypeId == tagTypeId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.LeadTags
-                .Where(e => e.TagTypeId == tagTypeId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
+            await MergeTagsWithConflictHandling<ArcheologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<BiologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<CartographerNameTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<CaveOtherTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<CaveReportedByNameTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<File>(tagTypeId, destinationTagTypeId, e => e.FileTypeTagId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<GeologicAgeTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<GeologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<MapStatusTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<PhysiographicProvinceTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
+            
             #endregion
 
-            await DbContext.ArcheologyTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
+            #region Entrance Tags
 
-            await DbContext.BiologyTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
 
-            await DbContext.CaveOtherTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.EntranceHydrologyTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.EntranceStatusTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.FieldIndicationTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.Files
-                .Where(e => e.FileTypeTagId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(ee => ee.FileTypeTagId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.GeologicAgeTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.GeologyTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.Entrances
-                .Where(e => e.LocationQualityTagId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.LocationQualityTagId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.MapStatusTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            #region People Tags
-
-            // TODO: Error when merging someone who already has the same tag type for CartographerNameTag
-            await DbContext.CartographerNameTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-
-            await DbContext.EntranceReportedByNameTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
-            await DbContext.CaveReportedByNameTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
+            await MergeTagsWithConflictHandling<Entrance>(tagTypeId, destinationTagTypeId, e => e.LocationQualityTagId, e => e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<EntranceHydrologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<EntranceReportedByNameTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<EntranceStatusTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<FieldIndicationTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId);
 
             #endregion
-
-            await DbContext.PhysiographicProvinceTags
-                .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
-                .Set(e => e.TagTypeId, destinationTagTypeId)
-                .UpdateAsync();
         }
 
         await DbContext.SaveChangesAsync();
+    }
+
+    private async Task MergeTagsWithConflictHandling<T>(
+        string sourceTagTypeId,
+        string destinationTagTypeId,
+        Expression<Func<T, string>> tagTypeSelector,
+        Expression<Func<T, string>> accountIdSelector) where T : class
+    {
+        // Remove any existing tags of the destination type for the same CaveId
+        var existingTags = DbContext.Set<T>()
+            .Where(tagTypeSelector.Compose(s => s == destinationTagTypeId))
+            .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
+
+        DbContext.Set<T>().RemoveRange(existingTags);
+        await DbContext.SaveChangesAsync();
+
+        var tags = DbContext.Set<T>()
+            .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
+            .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
+
+
+        await tags
+            .Set(tagTypeSelector, destinationTagTypeId)
+            .UpdateAsync();
     }
 
     private void UpdateTagTypeId<T>(ICollection<T> tags, string destinationTagTypeId) where T : class
@@ -379,5 +337,16 @@ public class AccountRepository : RepositoryBase
         return await DbContext.AccountStates
             .Where(e => e.AccountId == accountId && e.StateId == deletedStateId)
             .FirstOrDefaultAsyncEF();
+    }
+}
+
+public static class ExpressionExtensions
+{
+    public static Expression<Func<T, bool>> Compose<T>(this Expression<Func<T, string>> selector,
+        Expression<Func<string, bool>> condition)
+    {
+        var parameter = selector.Parameters[0];
+        var body = Expression.Invoke(condition, selector.Body);
+        return Expression.Lambda<Func<T, bool>>(body, parameter);
     }
 }
