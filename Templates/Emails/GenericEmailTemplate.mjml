@@ -1,35 +1,40 @@
 <mjml>
+  <mj-head>
+    <mj-style inline="inline">
+      .body-container {
+        background-color: #F7F7F7;
+        padding: 20px;
+      }
+    </mj-style>
+  </mj-head>
   <mj-body>
     <mj-section>
       <mj-column>
-
-        <mj-text font-size="24px" color="#F45E43" font-family="helvetica">
-          {{header}}
-        </mj-text>
-
-        <mj-raw>
-          {{#if messages}}
-            {{#each messages}}
-        </mj-raw>
-        <mj-text font-size="16px" color="#F45E43" font-family="helvetica">
-          {{this}}
-        </mj-text>
-        <mj-raw>
-
-          {{/each}}
-          {{/if}}
-        </mj-raw>
-        <mj-raw>
-          {{#if buttonText}}
-        </mj-raw>
-        <mj-button background-color="#F63A4D" href="{{buttonUrl}}">
-          {{buttonText}}
-        </mj-button>
-        <mj-raw>
-
-          {{/if}}
-        </mj-raw>
+        <mj-image width="150px" src="https://saplanarian.blob.core.windows.net/public/planarianLogo.png"></mj-image>
+        <mj-text align="center" font-size="20px">Planarian</mj-text>
       </mj-column>
     </mj-section>
+    <mj-section>
+      <mj-column>
+        <mj-text font-size="16px">{{header}}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section>
+      <mj-column>
+        <mj-raw>
+          {{#each messages}}
+        </mj-raw>
+        <mj-text>{{this}}</mj-text>
+        <mj-raw>{{/each}}</mj-raw>
+      </mj-column>
+    </mj-section>
+    <mj-raw>{{#if buttonText}}</mj-raw>
+    <mj-section>
+      <mj-column>
+        <mj-button background-color="#1990ff" color="#FFFFFF" padding="10px 25px" border-radius="5px" href="{{buttonUrl}}">{{buttonText}}</mj-button>
+
+      </mj-column>
+    </mj-section>
+    <mj-raw>{{/if}}</mj-raw>
   </mj-body>
 </mjml>

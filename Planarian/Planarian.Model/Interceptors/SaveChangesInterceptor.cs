@@ -110,7 +110,8 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 var inSameAccount = await context.AccountUsers.AnyAsync(e =>
                     e.UserId == user.Id && e.AccountId == requestUserAccountId);
 
-                var canModify = (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
+                var isResetPassword = string.IsNullOrWhiteSpace(requestUserAccountId); // should probably be more thorough in the future
+                var canModify = isResetPassword || (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
                                 inSameAccount;
                 if (!canModify)
                 {
