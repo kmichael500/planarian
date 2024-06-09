@@ -94,7 +94,7 @@ public class TemporaryEntranceRepository : RepositoryBase
 
 
         var deleteResult = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName) // Use dynamic table name
+            .TableName(_temporaryEntranceTableName)
             .Where(e => e.CaveId == null).DeleteAsync();
 
         return (unassociatedEntrances, associatedEntrances);
@@ -137,7 +137,6 @@ public class TemporaryEntranceRepository : RepositoryBase
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
-        // TODO Reported by name
         var command = $@"
         INSERT INTO {nameof(DbContext.Entrances).Quote()} (
             {nameof(Entrance.Id).Quote()},
@@ -175,8 +174,7 @@ public class TemporaryEntranceRepository : RepositoryBase
             {nameof(TemporaryEntrance.CreatedOn).Quote()},
             {nameof(TemporaryEntrance.ModifiedOn).Quote()}
         FROM {_temporaryEntranceTableName.Quote()}";
-
-
+        
         await DbContext.Database.ExecuteSqlRawAsync(command);
     }
 

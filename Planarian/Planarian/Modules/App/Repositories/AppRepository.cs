@@ -16,8 +16,8 @@ public class AppRepository : RepositoryBase
     {
         return await DbContext.AccountUsers
             .Where(e => e.UserId == RequestUser.Id)
-            .OrderByDescending(e => e.Account.Name)
-            .Select(e => new SelectListItem<string> { Display = e.Account.Name, Value = e.AccountId })
+            .OrderByDescending(e => e.Account!.Name)
+            .Select(e => new SelectListItem<string> { Display = e.Account!.Name, Value = e.AccountId })
             .ToListAsync();
     }
 }

@@ -15,7 +15,9 @@ public class SettingsRepository : RepositoryBase
 
     public async Task<string> GetTagTypeName(string tagTypeId)
     {
-        return await DbContext.TagTypes.Where(e => e.Id == tagTypeId).Select(e => e.Name).FirstAsync();
+        return await DbContext.TagTypes
+            .Where(e => e.Id == tagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault)).Select(e => e.Name)
+            .FirstAsync();
     }
 
     public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)

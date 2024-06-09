@@ -15,7 +15,7 @@ public class FileRepository : RepositoryBase
 
     public async Task<File?> GetCaveFileByBlobKey(string blobKey)
     {
-        return await DbContext.Files.Where(e => e.BlobKey == blobKey && e.Cave.AccountId == RequestUser.AccountId)
+        return await DbContext.Files.Where(e => e.BlobKey == blobKey && e.Cave!.AccountId == RequestUser.AccountId)
             .FirstOrDefaultAsync();
     }
 

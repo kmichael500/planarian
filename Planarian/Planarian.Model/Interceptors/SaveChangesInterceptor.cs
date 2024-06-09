@@ -229,7 +229,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 break;
             case nameof(File):
                 var file = (File)entity.Entity;
-                var fileAccountId = file.Cave?.AccountId ?? await context.Files
+                var fileAccountId = file.Cave?.AccountId ?? file.AccountId ?? await context.Files
                     .Where(e => e.Id == file.Id)
                     .Select(e => e.Cave!.AccountId)
                     .FirstOrDefaultAsync();
