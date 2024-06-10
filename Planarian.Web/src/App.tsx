@@ -28,13 +28,13 @@ const App: React.FC = () => {
       <BrowserRouter>
         <AppProvider>
           <AppContext.Consumer>
-            {({ isInitialized, isLoading, initializedError }) =>
+            {({ isInitialized, isLoading, initializedError, contentStyle }) =>
               isInitialized ? (
                 <Layout style={{ minHeight: "100vh" }}>
                   <SideBarComponent />
                   <Layout className="site-layout">
                     <HeaderComponent />
-                    <Content style={{ margin: "16px" }}>
+                    <Content style={contentStyle ?? {}}>
                       <AppRouting />
                     </Content>
                   </Layout>

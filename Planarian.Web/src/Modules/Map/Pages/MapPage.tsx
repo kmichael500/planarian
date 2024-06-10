@@ -3,11 +3,21 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 import { MapComponent } from "../Components/MapComponent";
 
 const MapPage = () => {
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const {
+    setHeaderTitle,
+    setHeaderButtons,
+    setContentStyle,
+    defaultContentStyle,
+  } = useContext(AppContext);
 
   useEffect(() => {
     setHeaderTitle([`Map`]);
     setHeaderButtons([]);
+    setContentStyle({});
+
+    return () => {
+      setContentStyle(defaultContentStyle);
+    };
   }, []);
 
   return (
