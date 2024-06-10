@@ -26,6 +26,9 @@ interface AppContextProps {
   isInitialized: boolean;
   isLoading: boolean;
   initializedError: ApiErrorResponse | null;
+  defaultContentStyle: React.CSSProperties;
+  contentStyle: React.CSSProperties | null;
+  setContentStyle: (style: React.CSSProperties) => void;
 }
 
 export const AppContext = createContext<AppContextProps>({
@@ -42,6 +45,11 @@ export const AppContext = createContext<AppContextProps>({
   isInitialized: false,
   isLoading: true,
   initializedError: null,
+  defaultContentStyle: {
+    margin: "16px",
+  },
+  contentStyle: null,
+  setContentStyle: () => {},
 });
 
 interface AppProviderProps {
@@ -64,6 +72,14 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
     useState<ApiErrorResponse | null>(null);
+
+  const defaultContentStyle = {
+    margin: "16px",
+  } as React.CSSProperties;
+
+  const [contentStyle, setContentStyle] = useState<React.CSSProperties | null>(
+    defaultContentStyle
+  );
 
   const initializeApp = async () => {
     try {
@@ -110,6 +126,9 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         isInitialized: isInitialized,
         isLoading: isLoading,
         initializedError: initializedError,
+        contentStyle: contentStyle,
+        setContentStyle: setContentStyle,
+        defaultContentStyle: defaultContentStyle,
       }}
     >
       {props.children}
