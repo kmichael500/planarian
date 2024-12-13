@@ -32,5 +32,6 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .WithOne(e => e.Account)
             .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.NoAction);
+
     }
 }

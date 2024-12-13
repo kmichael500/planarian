@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.Trips;
@@ -27,14 +28,20 @@ public class ProjectMemberConfiguration : BaseEntityTypeConfiguration<Member>
     {
         builder.HasOne(e => e.Project)
             .WithMany(e => e.Members)
-            .HasForeignKey(e => e.ProjectId);
+            .HasForeignKey(e => e.ProjectId)
+            .OnDelete(DeleteBehavior.NoAction);
+
 
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Members)
-            .HasForeignKey(e => e.TripId);
+            .HasForeignKey(e => e.TripId)
+            .OnDelete(DeleteBehavior.NoAction);
+
 
         builder.HasOne(e => e.User)
             .WithMany(e => e.Members)
-            .HasForeignKey(e => e.UserId);
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
     }
 }

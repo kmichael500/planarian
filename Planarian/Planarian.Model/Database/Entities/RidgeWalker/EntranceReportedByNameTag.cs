@@ -26,11 +26,11 @@ public class EntranceReportedByNameTagConfiguration : BaseEntityTypeConfiguratio
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceReportedByNameTags)
             .HasForeignKey(e => e.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Entrance)
             .WithMany(e => e.EntranceReportedByNameTags)
             .HasForeignKey(e => e.EntranceId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

@@ -26,11 +26,11 @@ public class MapStatusTagConfiguration : BaseEntityTypeConfiguration<MapStatusTa
             .HasOne(e => e.TagType)
             .WithMany(e => e.MapStatusTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.MapStatusTags)
             .HasForeignKey(e => e.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

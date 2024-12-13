@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Shared.Base;
@@ -23,10 +24,14 @@ public class LeadTagConfiguration : BaseEntityTypeConfiguration<LeadTag>
         builder
             .HasOne(e => e.TagType)
             .WithMany(e => e.LeadTags)
-            .HasForeignKey(bc => bc.TagTypeId);
+            .HasForeignKey(bc => bc.TagTypeId)
+            .OnDelete(DeleteBehavior.NoAction);
+
 
         builder.HasOne(e => e.Lead)
             .WithMany(e => e.LeadTags)
-            .HasForeignKey(e => e.LeadId);
+            .HasForeignKey(e => e.LeadId)
+            .OnDelete(DeleteBehavior.NoAction);
+
     }
 }

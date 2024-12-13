@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
@@ -46,6 +47,7 @@ public class PhotoConfiguration : BaseEntityTypeConfiguration<Photo>
         var photo = new Photo();
         builder.HasOne(e => e.Trip)
             .WithMany(e => e.Photos)
-            .HasForeignKey(e => e.TripId);
+            .HasForeignKey(e => e.TripId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

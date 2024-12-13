@@ -17,6 +17,7 @@ const ResetAccountComponent = () => {
         data. This action is irreversible.
       </Typography.Paragraph>
       <ConfirmationModalComponent
+        autoClose={false}
         title={`Reset Account`}
         modalMessage={
           <>
@@ -27,7 +28,6 @@ const ResetAccountComponent = () => {
         onConfirm={async () => {
           try {
             await AccountService.ResetAccount();
-            message.success("everything is gone (:");
           } catch (e) {
             const error = e as ApiErrorResponse;
             message.error(error.message);

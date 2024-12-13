@@ -61,7 +61,7 @@ public class FileService : ServiceBase<FileRepository>
         };
 
         Repository.Add(entity);
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
 
 
         var fileExtension = Path.GetExtension(fileName);
@@ -72,7 +72,7 @@ public class FileService : ServiceBase<FileRepository>
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm

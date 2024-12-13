@@ -18,40 +18,25 @@ public class AccountRepository : RepositoryBase
     {
     }
 
-    public async Task DeleteAllCaves(IProgress<string> progress, CancellationToken cancellationToken)
+    public async Task DeleteAllTagTypes(IProgress<string> progress, CancellationToken cancellationToken)
     {
         const int batchSize = 500; // Adjust based on your needs
-        var cavesCount = await AsyncExtensions.CountAsync(DbContext.Caves, e => e.AccountId == RequestUser.AccountId,
-            cancellationToken);
         // Batch delete for Caves
         int deletedCount;
         var totalDeleted = 0;
-        do
-        {
-            deletedCount = await DbContext.Caves
-                .Where(e => e.AccountId == RequestUser.AccountId)
-                .Where(c => DbContext.Caves
-                    .Where(e => e.AccountId == RequestUser.AccountId)
-                    .Take(batchSize)
-                    .Select(w => w.Id)
-                    .Contains(c.Id) && c.AccountId == RequestUser.AccountId)
-                .DeleteAsync(cancellationToken);
 
-            totalDeleted += deletedCount;
-            progress.Report($"Deleted {totalDeleted} of {cavesCount} caves.");
-        } while (deletedCount == batchSize); // Continue until fewer than batchSize rows are deleted
-
-        // Reset counter for TagTypes
-        totalDeleted = 0;
-
+        
         // Batch delete for TagTypes
         var tagTypesCount =
-            await AsyncExtensions.CountAsync(DbContext.TagTypes, e => e.AccountId == RequestUser.AccountId,
+            await AsyncExtensions.CountAsync(DbContext.TagTypes,
+                e => e.AccountId == RequestUser.AccountId && e.IsDefault == false &&
+                     !string.IsNullOrWhiteSpace(e.AccountId),
                 cancellationToken);
+        
         do
         {
             deletedCount = await DbContext.TagTypes
-                .Where(e => e.AccountId == RequestUser.AccountId)
+                .Where(e => e.AccountId == RequestUser.AccountId && e.IsDefault == false && !string.IsNullOrWhiteSpace(e.AccountId))
                 .Where(tt => DbContext.TagTypes
                     .Where(e => e.AccountId == RequestUser.AccountId)
                     .Take(batchSize)
@@ -337,6 +322,22 @@ public class AccountRepository : RepositoryBase
         return await DbContext.AccountStates
             .Where(e => e.AccountId == accountId && e.StateId == deletedStateId)
             .FirstOrDefaultAsyncEF();
+    }
+
+    public async Task<IEnumerable<string>> GetCavesBatch(int cavesBatchSize, CancellationToken cancellationToken)
+    {
+        return await DbContext.Caves
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Take(cavesBatchSize)
+            .Select(e=>e.Id)
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<int> GetCavesCount(CancellationToken cancellationToken)
+    {
+        return await DbContext.Caves
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .CountAsyncEF(cancellationToken);
     }
 }
 

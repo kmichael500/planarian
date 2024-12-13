@@ -48,6 +48,7 @@ public abstract class RepositoryBase
             onBatchProcessed?.Invoke(processed, totalEntities);
         }
     }
+    
 
     public async Task<int> ExecuteRawSql(string sql, CancellationToken cancellationToken = default)
     {

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -25,7 +26,8 @@ public class FeatureSettingConfiguration : BaseEntityTypeConfiguration<FeatureSe
 
         builder.HasOne(e => e.Account)
             .WithMany(e=>e.FeatureSettings)
-            .HasForeignKey(e => e.AccountId);
+            .HasForeignKey(e => e.AccountId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.Property(e => e.Key)
             .HasConversion<string>()

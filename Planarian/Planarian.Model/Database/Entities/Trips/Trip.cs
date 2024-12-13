@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Projects;
@@ -39,6 +40,7 @@ public class TripConfiguration : BaseEntityTypeConfiguration<Trip>
         base.Configure(builder);
         builder.HasOne(e => e.Project)
             .WithMany(e => e.Trips)
-            .HasForeignKey(e => e.ProjectId);
+            .HasForeignKey(e => e.ProjectId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

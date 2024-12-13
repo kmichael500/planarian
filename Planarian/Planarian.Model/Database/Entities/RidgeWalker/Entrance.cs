@@ -44,12 +44,12 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.Entrances)
             .HasForeignKey(e => e.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.ReportedByUser)
             .WithMany(e => e.EntrancesReported)
             .HasForeignKey(e => e.ReportedByUserId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
 
 
         builder.HasOne(e => e.LocationQualityTag)

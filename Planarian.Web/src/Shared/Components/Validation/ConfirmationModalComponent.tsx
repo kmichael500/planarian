@@ -20,6 +20,7 @@ interface ConfirmationModalComponentProps {
   modalMessage?: ReactNode;
   children?: ReactNode;
   onOkClickRender?: ReactNode;
+  autoClose?: boolean;
 }
 
 const ConfirmationModalComponent = ({
@@ -32,6 +33,7 @@ const ConfirmationModalComponent = ({
   cancelText = "Cancel",
   children,
   onOkClickRender,
+  autoClose = true,
   ...props
 }: ConfirmationModalComponentProps) => {
   const [inputValue, setInputValue] = useState("");
@@ -45,9 +47,11 @@ const ConfirmationModalComponent = ({
         await onConfirm();
       }
 
-      setInputValue("");
-      setVisible(false);
-      setIsLoading(false);
+      if (autoClose) {
+        setInputValue("");
+        setVisible(false);
+        setIsLoading(false);
+      }
     }
   };
 

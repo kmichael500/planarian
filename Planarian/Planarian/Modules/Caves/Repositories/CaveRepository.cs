@@ -475,17 +475,6 @@ public class CaveRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<Entrance?> GetEntrance(string? id)
-    {
-        return await DbContext.Entrances
-            .Include(e => e.EntranceStatusTags)
-            .Include(e => e.FieldIndicationTags)
-            .Include(e => e.EntranceOtherTags)
-            .Include(e => e.EntranceHydrologyTags)
-            .Include(e => e.EntranceReportedByNameTags)
-            .Where(e => e.Id == id && e.Cave!.AccountId == RequestUser.AccountId).FirstOrDefaultAsync();
-    }
-
     public async Task<Cave?> GetAsync(string? id)
     {
         return await DbContext.Caves.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
@@ -499,9 +488,17 @@ public class CaveRepository : RepositoryBase
             .Include(e => e.CaveOtherTags)    
             .Include(e => e.CaveReportedByNameTags)    
             .Include(e => e.Files)
-            .Include(e => e.Entrances)
-
             .Include(e => e.CaveReportedByNameTags)
+            .Include(e => e.Entrances)
+            .ThenInclude(entrance => entrance.EntranceStatusTags)
+            .Include(e => e.Entrances)
+            .ThenInclude(entrance => entrance.FieldIndicationTags)
+            .Include(e => e.Entrances)
+            .ThenInclude(entrance => entrance.EntranceOtherTags)
+            .Include(e => e.Entrances)
+            .ThenInclude(entrance => entrance.EntranceHydrologyTags)
+            .Include(e => e.Entrances)
+            .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
             .FirstOrDefaultAsync();
     }
 

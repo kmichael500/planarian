@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -16,6 +18,4 @@ public class Project : EntityBase
     public virtual ICollection<TagType> CustomTagTypes { get; set; } = new HashSet<TagType>();
 }
 
-public class ProjectConfiguration : BaseEntityTypeConfiguration<Project>
-{
-}
+public class ProjectConfiguration : BaseEntityTypeConfiguration<Project>;

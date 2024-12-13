@@ -26,11 +26,11 @@ public class ReportedByNameTagConfiguration : BaseEntityTypeConfiguration<CaveRe
             .HasOne(e => e.TagType)
             .WithMany(e => e.CaveReportedByNameTags)
             .HasForeignKey(e => e.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.CaveReportedByNameTags)
             .HasForeignKey(e => e.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }
