@@ -20,7 +20,16 @@ public partial class Program
         
         var planarianEntranceRecords = ExtractEntranceRecords(allEntranceRecords);
         
+        WriteCsvFile("/Users/michaelketzner/Downloads/planarianCaveRecords.csv", planarianCaveRecords);
+        WriteCsvFile("/Users/michaelketzner/Downloads/planarianEntranceRecords.csv", planarianEntranceRecords);
         
+    }
+    
+    private static void WriteCsvFile<T>(string filePath, IEnumerable<T> records)
+    {
+        using var writer = new StreamWriter(filePath);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        csv.WriteRecords(records);
     }
 
     private static IEnumerable<CaveCsvModel> ExtractCaveRecords(IEnumerable<CaveRecord> caveRecords)
@@ -136,7 +145,7 @@ public partial class Program
                 DecimalLongitude = entrance.Longitude,
                 EntranceElevationFt = entrance.ElevationFt,
                 LocationQuality = "TODO",
-                EntranceDescription = entrance.Narrative,
+                EntranceDescription = null,
                 EntrancePitDepth = !isPrimaryEntrance ? entrance.PitDepthFt : null,
                 EntranceStatuses = ownershipTags,
                 EntranceHydrology = null,
