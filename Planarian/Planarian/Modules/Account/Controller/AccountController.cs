@@ -39,12 +39,8 @@ public class AccountController : PlanarianControllerBase<AccountService>
     [HttpDelete("reset")]
     public async Task<ActionResult<string>> RestAccount(CancellationToken cancellationToken)
     {
-        _ = Task.Run(async () =>
-        {
-            await Service.ResetAccount(cancellationToken);
-        }, cancellationToken);
-
-        return Ok("Account reset is in progress.");
+        await Service.ResetAccount(cancellationToken);
+        return Ok("Account reset finished.");
     }
 
     #region Misc Settings

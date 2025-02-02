@@ -18,6 +18,253 @@ public class AccountRepository : RepositoryBase
     {
     }
 
+    public async Task DeleteCaveWithRelatedData(IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        const int batchSize = 500;
+
+        int deletedCount = 0;
+        int totalDeleted = 0;
+
+        // Step 1: Delete entrance-related tags
+        progress.Report("Deleting entrance-related tags...");
+
+        do
+        {
+            deletedCount = await DbContext.EntranceStatusTags
+                .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
+                 .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} entrance status tags.");
+        } while (deletedCount == batchSize);
+        
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.EntranceHydrologyTags
+                .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} entrance hydrology tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.FieldIndicationTags
+                .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} field indication tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.EntranceReportedByNameTags
+                .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} entrance reported by name tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.EntranceOtherTag
+                .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} entrance other tags.");
+        } while (deletedCount == batchSize);
+
+        // Step 2: Delete entrances
+        progress.Report("Deleting entrances...");
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.Entrances
+                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} entrances.");
+        } while (deletedCount == batchSize);
+
+        // Step 3: Delete cave-related tags
+        progress.Report("Deleting cave-related tags...");
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        totalDeleted = 0;
+        do
+        {
+            deletedCount = await DbContext.GeologyTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} geology tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+
+            // the tag.account.accountUsers is only needed to force linq2sql to generate a delete statement that works with take
+            deletedCount = await DbContext.Files
+                .Where(tag => tag.AccountId == RequestUser.AccountId && tag.Account.AccountUsers.Any())
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} files.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.MapStatusTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} map status tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.GeologicAgeTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} geologic age tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.PhysiographicProvinceTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} physiographic province tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.BiologyTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} biology tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.ArcheologyTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} archeology tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.CartographerNameTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} cartographer name tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.CaveReportedByNameTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} cave reported by name tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.CaveOtherTags
+                .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} cave other tags.");
+        } while (deletedCount == batchSize);
+
+        // Step 4: Delete the cave
+        progress.Report("Deleting the cave...");
+
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DbContext.Caves
+                .Where(c => c.AccountId == RequestUser.AccountId && c.Account.AccountUsers.Any())
+                .Take(batchSize)
+                .DeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} caves.");
+        } while (deletedCount == batchSize);
+
+        progress.Report("Deleted all caves.");
+    }
+
+
     public async Task DeleteAllTagTypes(IProgress<string> progress, CancellationToken cancellationToken)
     {
         const int batchSize = 500; // Adjust based on your needs

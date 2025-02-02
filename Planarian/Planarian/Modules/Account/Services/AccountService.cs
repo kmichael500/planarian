@@ -73,84 +73,47 @@ public class AccountService : ServiceBase<AccountRepository>
 
     public async Task ResetAccount(CancellationToken cancellationToken)
     {
-        var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Getting associated files.");
-        var blobProperties = (await _fileRepository.GetAllCavesBlobProperties()).ToList();
+        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        
+            var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Getting associated files.");
 
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Done getting associated files.");
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Deleted 0 of 0 caves.");
 
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Done getting associated files.");
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleted 0 of 0 caves.");
-
-        async void DeleteCavesProgressHandler(string message)
-        {
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
-        }
-            
-        var cavesBatchSize = 1000;
-        var caveCount = await Repository.GetCavesCount(cancellationToken);
-        var caveIdBatch = (await Repository.GetCavesBatch(cavesBatchSize, cancellationToken)).ToList();
-            
-        var totalCavesDeleted = 0;
-        var notifyInterval = caveCount > 0 ? (int)(caveCount * 0.001) : 0; // every 10% if totalRecords is greater than 0
-        notifyInterval = Math.Max(notifyInterval, 1);
-        while (caveIdBatch.Any())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            foreach (var caveId in caveIdBatch)
+            async void DeleteCavesProgressHandler(string message)
             {
-                await _caveService.DeleteCave(caveId, cancellationToken);
-                totalCavesDeleted++;
-                if (totalCavesDeleted % notifyInterval == 0 || totalCavesDeleted == 1 || totalCavesDeleted == caveCount)
-                {
-                    var message = $"Deleted {totalCavesDeleted} of {caveCount} caves.";
-                    await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
-                }
-            }
-
-            caveIdBatch = (await Repository.GetCavesBatch(cavesBatchSize, cancellationToken)).ToList();
-        }
-
-        await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated files.");
-        var totalDeleted = 0;
-        var totalFiles = blobProperties.Count();
-        notifyInterval = blobProperties.Count > 0 ? (int)(totalFiles * 0.1) : 0;
-        notifyInterval = Math.Max(notifyInterval, 1);
-        foreach (var blobProperty in blobProperties)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await _fileService.DeleteFile(blobProperty.BlobKey, blobProperty.ContainerName);
-
-            totalDeleted++;
-
-            if (totalDeleted % notifyInterval == 0 || totalDeleted == 1 || totalDeleted == totalFiles)
-            {
-                var message =
-                    $"Deleted {totalDeleted} out of {totalFiles} records.";
                 await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
             }
-        }
 
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Done deleting associated files.");
+            await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
+                cancellationToken);
 
+            await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
 
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated counties");
-        await Repository.DeleteAllCounties();
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Finished deleting associated counties");
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Deleting associated counties");
+            await Repository.DeleteAllCounties();
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Finished deleting associated counties");
 
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated states");
-        await Repository.DeleteAllAccountStates();
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Finished deleting associated states");
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Deleting associated states");
+            await Repository.DeleteAllAccountStates();
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Finished deleting associated states");
+
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Deleting associated files.");
+            await _fileService.DeleteContainer(RequestUser.AccountContainerName);
+
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+                "Done deleting associated files.");
+
+            await dbTransaction.CommitAsync(cancellationToken);
     }
 
     #region Tags
