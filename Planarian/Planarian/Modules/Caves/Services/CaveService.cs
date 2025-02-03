@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Geometries;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
@@ -234,7 +236,9 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 var isNewEntrance = string.IsNullOrWhiteSpace(entranceValue.Id);
 
-                var entrance = isNewEntrance ? new Entrance() : await Repository.GetEntrance(entranceValue.Id);
+                var entrance = isNewEntrance
+                    ? new Entrance()
+                    : entity.Entrances.FirstOrDefault(e => e.Id == entranceValue.Id);
 
                 if (entrance == null) throw ApiExceptionDictionary.NotFound(nameof(entranceValue.Id));
 
@@ -393,18 +397,153 @@ public class CaveService : ServiceBase<CaveRepository>
         return cave;
     }
 
-    public async Task DeleteCave(string caveId)
+    public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
+        IDbContextTransaction? transaction = null)
     {
-        var entity = await Repository.GetAsync(caveId);
+        var outsideTransaction = transaction != null;
+        transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
+        
+        var files = new List<File>();
+        var isSuccessful = false;
+        try
+        {
+            var entity = await Repository.GetAsync(caveId);
 
-        if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+            if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
-        var files = entity.Files.ToList();
+            foreach (var entrance in entity.Entrances)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var tag in entrance.EntranceStatusTags)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Repository.Delete(tag);
+                }
+                
+                await Repository.SaveChangesAsync(cancellationToken);
 
-        Repository.Delete(entity);
-        await Repository.SaveChangesAsync();
+                foreach (var tag in entrance.EntranceHydrologyTags)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Repository.Delete(tag);
+                }
+                await Repository.SaveChangesAsync(cancellationToken);
 
-        foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+                foreach (var tag in entrance.FieldIndicationTags)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Repository.Delete(tag);
+                }
+                await Repository.SaveChangesAsync(cancellationToken);
+
+                foreach (var tag in entrance.EntranceReportedByNameTags)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Repository.Delete(tag);
+                }
+                await Repository.SaveChangesAsync(cancellationToken);
+
+                foreach (var tag in entrance.EntranceOtherTags)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Repository.Delete(tag);
+                }
+
+                await Repository.SaveChangesAsync(cancellationToken);
+
+                Repository.Delete(entrance);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+
+            foreach (var tag in entity.GeologyTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.MapStatusTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.GeologicAgeTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.PhysiographicProvinceTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.BiologyTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.ArcheologyTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.CartographerNameTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.CaveReportedByNameTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            foreach (var tag in entity.CaveOtherTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(tag);
+            }
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            files = entity.Files.ToList();
+
+            Repository.Delete(entity);
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            if (!outsideTransaction)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            
+            isSuccessful = true;
+        }
+        catch (Exception)
+        {
+            if (!outsideTransaction)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            throw;
+        }
+        
+        if (isSuccessful)
+        {
+            foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+        }
     }
 
     public async Task ArchiveCave(string caveId)

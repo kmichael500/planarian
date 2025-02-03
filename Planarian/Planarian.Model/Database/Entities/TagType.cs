@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -69,10 +70,12 @@ public class TagTypeConfiguration : BaseEntityTypeConfiguration<TagType>
     {
         builder.HasOne(e => e.Project)
             .WithMany(e => e.CustomTagTypes)
-            .HasForeignKey(e => e.ProjectId);
+            .HasForeignKey(e => e.ProjectId)
+            .OnDelete(DeleteBehavior.NoAction);
         builder.HasOne<Account>(e => e.Account)
             .WithMany(e => e.Tags)
-            .HasForeignKey(e => e.AccountId);
+            .HasForeignKey(e => e.AccountId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasIndex(e => new { e.Key });
     }

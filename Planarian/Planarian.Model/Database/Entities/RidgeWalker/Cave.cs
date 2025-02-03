@@ -75,22 +75,22 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         builder.HasOne(e => e.County)
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.CountyId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.ReportedByUser)
             .WithMany(e => e.CavesReported)
             .HasForeignKey(e => e.ReportedByUserId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Account)
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.AccountId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.State)
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.StateId)
-            .OnDelete(DeleteBehavior.ClientNoAction);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasIndex(e => new { e.CountyNumber, e.CountyId }).IsUnique();
         builder.HasIndex(e => e.LengthFeet);

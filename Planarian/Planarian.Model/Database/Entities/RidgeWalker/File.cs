@@ -31,11 +31,11 @@ public class FileConfiguration : BaseEntityTypeConfiguration<File>
             .HasOne(e => e.Cave)
             .WithMany(e => e.Files)
             .HasForeignKey(bc => bc.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.FileTypeTag)
             .WithMany(e => e.FileTypeTags)
             .HasForeignKey(e => e.FileTypeTagId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

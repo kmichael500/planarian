@@ -26,11 +26,11 @@ public class ArcheologyTagConfiguration : BaseEntityTypeConfiguration<Archeology
             .HasOne(e => e.TagType)
             .WithMany(e => e.ArcheologyTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.ArcheologyTags)
             .HasForeignKey(e => e.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

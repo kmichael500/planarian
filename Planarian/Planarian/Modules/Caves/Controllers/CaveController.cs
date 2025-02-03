@@ -69,9 +69,9 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpDelete("{caveId:length(10)}")]
-    public async Task<ActionResult> DeleteCave(string caveId)
+    public async Task<ActionResult> DeleteCave(string caveId, CancellationToken cancellationToken)
     {
-        await Service.DeleteCave(caveId);
+        await Service.DeleteCave(caveId, cancellationToken);
 
         return new OkResult();
     }

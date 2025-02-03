@@ -27,11 +27,11 @@ public class EntranceHydrologyTagConfiguration : BaseEntityTypeConfiguration<Ent
             .HasOne(e => e.TagType)
             .WithMany(e => e.EntranceHydrologyTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Entrance)
             .WithMany(e => e.EntranceHydrologyTags)
             .HasForeignKey(e => e.EntranceId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

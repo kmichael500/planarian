@@ -40,7 +40,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     public async Task<ActionResult<string>> RestAccount(CancellationToken cancellationToken)
     {
         await Service.ResetAccount(cancellationToken);
-        return Ok();
+        return Ok("Account reset finished.");
     }
 
     #region Misc Settings

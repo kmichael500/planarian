@@ -61,7 +61,7 @@ public class FileService : ServiceBase<FileRepository>
         };
 
         Repository.Add(entity);
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
 
 
         var fileExtension = Path.GetExtension(fileName);
@@ -72,7 +72,7 @@ public class FileService : ServiceBase<FileRepository>
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm
@@ -284,6 +284,21 @@ public class FileService : ServiceBase<FileRepository>
         var blobClient = client.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
     }
+    
+    public async Task DeleteContainer(string containerName)
+    {
+        if (RequestUser.AccountId == null) 
+            throw ApiExceptionDictionary.BadRequest("Account Id is null");
+
+        // Create a container client using your configured connection string
+        var containerClient = new BlobContainerClient(
+            _fileOptions.ConnectionString, 
+            containerName.ToLowerInvariant());
+
+        // Attempt to delete the entire container
+        await containerClient.DeleteIfExistsAsync();
+    }
+
 
     public async Task<Stream> GetFileStream(string fileId)
     {

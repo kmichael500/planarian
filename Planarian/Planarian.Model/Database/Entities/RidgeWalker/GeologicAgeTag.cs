@@ -26,11 +26,11 @@ public class GeologicAgeTagConfiguration : BaseEntityTypeConfiguration<GeologicA
             .HasOne(e => e.TagType)
             .WithMany(e => e.GeologicAgeTags)
             .HasForeignKey(bc => bc.TagTypeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.GeologicAgeTags)
             .HasForeignKey(e => e.CaveId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }
