@@ -80,7 +80,8 @@ public class UserConfiguration : BaseEntityTypeConfiguration<User>
 {
     public override void Configure(EntityTypeBuilder<User> builder)
     {
-        builder.HasIndex(e => e.EmailAddress).IsUnique()
-            .HasFilter("IsTemporary = false");
+        builder.HasIndex(e => e.EmailAddress)
+            .IsUnique()
+            .HasFilter("\"IsTemporary\" = false");
     }
 }
