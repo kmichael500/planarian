@@ -6,6 +6,10 @@ namespace Planarian.Library.Extensions.String;
 
 public static class StringExtensions
 {
+    public static bool IsNullOrWhiteSpace(this string? input)
+    {
+        return string.IsNullOrWhiteSpace(input);
+    }
     public static string[] SplitAndTrim(this string? input, char delimiter = ',')
     {
         return input == null

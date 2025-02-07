@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
@@ -46,5 +47,13 @@ public class UserRepository : RepositoryBase
     public async Task<User?> GetUserByPasswordEmailConfirmationCode(string code)
     {
         return await DbContext.Users.FirstOrDefaultAsync(e => e.EmailConfirmationCode == code);
+    }
+
+    public async Task<List<AccountUserVm>> GetAccountUsers(string accountId)
+    {
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == accountId)
+            .Select(e => new AccountUserVm(e.UserId, e.User.EmailAddress, e.User.FullName, e.InvitationAcceptedOn))
+            .ToListAsync();
     }
 }

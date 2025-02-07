@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -57,6 +58,8 @@ public class User : EntityBase
 
     public DateTime? EmailConfirmedOn { get; set; }
 
+    public bool IsTemporary { get; set; } = false; // Used to invite users to Planarian. The entire user record will be deleted once the user accepts the invitation.
+
     public DateTime? PasswordResetCodeExpiration { get; set; }
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
 
@@ -77,6 +80,7 @@ public class UserConfiguration : BaseEntityTypeConfiguration<User>
 {
     public override void Configure(EntityTypeBuilder<User> builder)
     {
-        builder.HasIndex(e => e.EmailAddress).IsUnique();
+        builder.HasIndex(e => e.EmailAddress).IsUnique()
+            .HasFilter("IsTemporary = false");
     }
 }

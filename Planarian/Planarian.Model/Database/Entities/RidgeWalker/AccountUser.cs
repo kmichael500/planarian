@@ -11,6 +11,12 @@ public class AccountUser : EntityBase
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string UserId { get; set; } = null!;
 
+    [Required] public DateTime InvitationAcceptedOn { get; set; }
+
+    [MaxLength(PropertyLength.EmailConfirmationCode)]
+    public string? InvitationCode { get; set; }
+    public DateTime? InvitationSentOn { get; set; }
+
     public Account? Account { get; set; }
     public User? User { get; set; }
 }

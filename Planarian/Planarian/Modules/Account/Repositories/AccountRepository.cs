@@ -6,6 +6,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -585,6 +586,21 @@ public class AccountRepository : RepositoryBase
         return await DbContext.Caves
             .Where(e => e.AccountId == RequestUser.AccountId)
             .CountAsyncEF(cancellationToken);
+    }
+
+    public async Task<string?> GetAccountName(string accountId)
+    {
+        return await DbContext.Accounts
+            .Where(e => e.Id == accountId)
+            .Select(e => e.Name)
+            .FirstOrDefaultAsyncEF();
+    }
+
+    public async Task<AccountUser?> GetAccountUser(string userId, string accountId)
+    {
+        return await DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .FirstOrDefaultAsyncEF();
     }
 }
 
