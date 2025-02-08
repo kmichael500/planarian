@@ -4,6 +4,7 @@ using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
@@ -12,12 +13,12 @@ using Planarian.Shared.Email.Services;
 
 namespace Planarian.Modules.Users.Services;
 
-public class UserManagerService : ServiceBase<UserRepository>
+public class AccountUserManagerService : ServiceBase<UserRepository>
 {
     private readonly EmailService _emailService;
     private readonly AccountRepository _accountRepository;
 
-    public UserManagerService(
+    public AccountUserManagerService(
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
@@ -27,7 +28,7 @@ public class UserManagerService : ServiceBase<UserRepository>
         _accountRepository = accountRepository;
     }
 
-    public async Task<List<AccountUserVm>> GetAccountUsers()
+    public async Task<List<UserManagerGridVm>> GetAccountUsers()
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
@@ -46,12 +47,12 @@ public class UserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("Invalid email address.");
         }
 
-        if (!request.FirstName.IsNullOrWhiteSpace())
+        if (request.FirstName.IsNullOrWhiteSpace())
         {
             throw ApiExceptionDictionary.BadRequest("First name is required.");
         }
 
-        if (!request.LastName.IsNullOrWhiteSpace())
+        if (request.LastName.IsNullOrWhiteSpace())
         {
             throw ApiExceptionDictionary.BadRequest("Last name is required.");
         }
@@ -59,10 +60,10 @@ public class UserManagerService : ServiceBase<UserRepository>
         var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            var user = new User(request.FirstName, request.LastName, request.EmailAddress);
+            var user = new User(request.FirstName, request.LastName, request.EmailAddress) { IsTemporary = true };
             Repository.Add(user);
 
-            var invitationCode = Guid.NewGuid().ToString("N");
+            var invitationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode);
 
             var accountUser = new AccountUser
             {
@@ -80,6 +81,7 @@ public class UserManagerService : ServiceBase<UserRepository>
 
             await _emailService.SendAccountInvitationEmail(user, accountUser,
                 accountName);
+            await dbTransaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
         {

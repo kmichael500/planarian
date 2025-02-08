@@ -8,20 +8,20 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Users.Controllers;
 
-[Route("api/user-manager")]
+[Route("api/account/user-manager")]
 [Authorize]
-public class UserManagerController : PlanarianControllerBase<UserManagerService>
+public class AccountUserManagerController : PlanarianControllerBase<AccountUserManagerService>
 {
-    public UserManagerController(
+    public AccountUserManagerController(
         RequestUser requestUser, 
-        UserManagerService service, 
+        AccountUserManagerService service, 
         TokenService tokenService
     ) : base(requestUser, tokenService, service)
     {
     }
     
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AccountUserVm>>> Get()
+    public async Task<ActionResult<IEnumerable<UserManagerGridVm>>> Get()
     {
         var users = await Service.GetAccountUsers();
         return new JsonResult(users);

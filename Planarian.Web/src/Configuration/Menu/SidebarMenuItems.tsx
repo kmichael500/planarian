@@ -70,6 +70,16 @@ const SideBarMenuItems = () => {
           icon: <SettingOutlined />,
           label: "Settings",
         },
+        {
+          key: "/account/users",
+          icon: (
+            <Link to="/account/users">
+              <ImportOutlined />
+            </Link>
+          ),
+          label: "Users",
+        },
+
       ],
     },
     {

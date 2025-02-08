@@ -109,10 +109,12 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 var inSameAccount = await context.AccountUsers.AnyAsync(e =>
                     e.UserId == user.Id && e.AccountId == requestUserAccountId);
-
+            
                 var isResetPassword = string.IsNullOrWhiteSpace(requestUserAccountId); // should probably be more thorough in the future
-                var canModify = isResetPassword || (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
-                                inSameAccount;
+                var canModify = isResetPassword ||
+                                (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
+                                inSameAccount || user.IsTemporary;
+
                 if (!canModify)
                 {
                     throw ApiExceptionDictionary.Unauthorized(

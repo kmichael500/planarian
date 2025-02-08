@@ -49,11 +49,12 @@ public class UserRepository : RepositoryBase
         return await DbContext.Users.FirstOrDefaultAsync(e => e.EmailConfirmationCode == code);
     }
 
-    public async Task<List<AccountUserVm>> GetAccountUsers(string accountId)
+    public async Task<List<UserManagerGridVm>> GetAccountUsers(string accountId)
     {
         return await DbContext.AccountUsers
             .Where(e => e.AccountId == accountId)
-            .Select(e => new AccountUserVm(e.UserId, e.User.EmailAddress, e.User.FullName, e.InvitationAcceptedOn))
+            .Select(e => new UserManagerGridVm(e.UserId, e.User.EmailAddress, e.User.FullName, e.InvitationSentOn,
+                e.InvitationAcceptedOn))
             .ToListAsync();
     }
 }

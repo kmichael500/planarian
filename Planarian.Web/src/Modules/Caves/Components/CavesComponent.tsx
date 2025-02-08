@@ -17,7 +17,7 @@ import {
   nameof,
   convertDistance,
   getDirectionsUrl,
-  formatDateTime,
+  formatDate,
   defaultIfEmpty,
   formatNumber,
 } from "../../../Shared/Helpers/StringHelpers";
@@ -192,7 +192,7 @@ const CavesComponent: React.FC = () => {
       case nameof<CaveSearchVm>("name"):
         return defaultIfEmpty(cave.name);
       case nameof<CaveSearchVm>("reportedOn"):
-        return defaultIfEmpty(formatDateTime(cave.reportedOn));
+        return defaultIfEmpty(formatDate(cave.reportedOn));
       case nameof<CaveSearchVm>("isArchived"):
         return cave.isArchived;
       case nameof<CaveSearchVm>("depthFeet"):

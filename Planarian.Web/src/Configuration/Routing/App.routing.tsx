@@ -20,6 +20,7 @@ import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
 import { AppRederect } from "./App.routing.redirect";
 import { MapPage } from "../../Modules/Map/Pages/MapPage";
+import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -39,6 +40,7 @@ export const AppRouting: React.FC = () => {
         <Route path="/caves/add" element={<AddCavesPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/account/settings" element={<AccountSettingsPage />} />
+        <Route path="/account/users" element={<UserManagerPage />} />
         <Route path="/account/import" element={<ImportPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>

@@ -16,7 +16,7 @@ import { TagComponent } from "../../Tag/Components/TagComponent";
 import {
   convertDistance,
   defaultIfEmpty,
-  formatDateTime,
+  formatDate,
   formatNumber,
   getDirectionsUrl,
   isNullOrWhiteSpace,
@@ -124,9 +124,7 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && (
       <Descriptions.Item label="Reported On" key="reported-on">
-        {cave?.reportedOn
-          ? formatDateTime(cave.reportedOn)
-          : defaultIfEmpty(null)}
+        {cave?.reportedOn ? formatDate(cave.reportedOn) : defaultIfEmpty(null)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
@@ -224,7 +222,7 @@ const CaveComponent = ({
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && (
         <Descriptions.Item label="Reported On" key="reported-on">
           {entrance.reportedOn
-            ? formatDateTime(entrance.reportedOn)
+            ? formatDate(entrance.reportedOn)
             : defaultIfEmpty(null)}
         </Descriptions.Item>
       ),
