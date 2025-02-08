@@ -17,12 +17,13 @@ public enum ApiExceptionType
     InvalidPassword = 201,
     PasswordResetCodeExpired = 202,
     InvalidPasswordResetCode = 203,
+    UserAlreadyInAccount = 204,
     MessageTypeNotFound = 300,
     EmailFailedToSend = 301,
-    NoAccount,
+    NoAccount = 302,
     EntranceRequired = 303,
     InvalidImport = 400,
     NullValue = 401,
     QueryInvalidValue = 500,
-    UnexpectedIssue = -1
+    UnexpectedIssue = -1,
 }

@@ -81,17 +81,15 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     
     public async Task SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName)
     {
-        var link = $"{_serverOptions.ClientBaseUrl}/register?code={accountUser.InvitationCode}";
-        // we are inviting the user to a state survey to view cave location data
+        var link = $"{_serverOptions.ClientBaseUrl}/user/invitations/{accountUser.InvitationCode}";
         var paragraphs = new List<string>
         {
-            $"You have been invited by {accountName} to join Planarian!",
-            "Please click the link below to create your account and accept the invitation."
+            $"You have been invited by {accountName} to join Planarian! Please click the link below to create your account and accept the invitation.",
         };
 
-        await SendGenericEmail("Planarian Account Invitation", user.EmailAddress, user.FullName,
+        await SendGenericEmail($"Join {accountName} on Planarian!", user.EmailAddress, user.FullName,
             new GenericEmailSubstitutions(paragraphs,
-                "Planarian Account Invitation", "Create Account", link));
+                "Welcome!", "Create Account", link));
 
         accountUser.InvitationSentOn = DateTime.UtcNow;
     }

@@ -3,6 +3,7 @@ using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Authentication.Models;
@@ -66,7 +67,7 @@ public class UserService : ServiceBase<UserRepository>
         await Repository.SaveChangesAsync();
     }
 
-    public async Task RegisterUser(RegisterUserVm user)
+    public async Task RegisterUser(RegisterUserVm user, CancellationToken cancellationToken)
     {
         var exists = await Repository.EmailExists(user.EmailAddress);
 
@@ -78,18 +79,79 @@ public class UserService : ServiceBase<UserRepository>
 
         if (!user.Password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
-        var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
+        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            HashedPassword = PasswordService.Hash(user.Password),
-            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode)
+            var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
+            {
+                HashedPassword = PasswordService.Hash(user.Password),
+                EmailConfirmationCode = IdGenerator.Generate(PropertyLength.InvitationCode)
+            };
+
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync(cancellationToken);
+
+            if (!user.InvitationCode.IsNullOrWhiteSpace())
+            {
+                await ClaimInvitation(entity, user.InvitationCode, cancellationToken);
+            }
+
+            await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
+                entity.EmailConfirmationCode);
+
+            await dbTransaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task ClaimInvitation(string invitationCode, CancellationToken cancellationToken)
+    {
+        var user = await Repository.Get(RequestUser.Id);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+
+        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ClaimInvitation(user, invitationCode, cancellationToken);
+        }
+        catch (Exception)
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task ClaimInvitation(User existingUser, string? invitationCode, CancellationToken cancellationToken)
+    {
+        var invitation = await Repository.GetInvitationEntities(invitationCode);
+
+        if (invitation.AccountUser == null || invitation.User == null)
+            throw ApiExceptionDictionary.NotFound("Invitation");
+
+        var userAlreadyInAccount = await Repository.UserInAccount(existingUser.Id, invitation.AccountUser.AccountId);
+
+        if (userAlreadyInAccount) throw ApiExceptionDictionary.UserAlreadyInAccount;
+
+        var accountUser = new AccountUser
+        {
+            AccountId = invitation.AccountUser.AccountId,
+            UserId = existingUser.Id,
+            InvitationAcceptedOn = DateTime.UtcNow,
+            InvitationSentOn = invitation.AccountUser.InvitationSentOn,
+            CreatedByUserId = invitation.AccountUser.CreatedByUserId,
+            ModifiedByUserId = invitation.AccountUser.ModifiedByUserId
         };
+        Repository.Add(accountUser);
+        await Repository.SaveChangesAsync(cancellationToken);
 
-        Repository.Add(entity);
+        await DeleteInvitation(invitation.AccountUser, invitation.User);
 
-        await Repository.SaveChangesAsync();
-
-        await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
-            entity.EmailConfirmationCode);
+        await Repository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SendResetPasswordEmail(string email)
@@ -134,5 +196,47 @@ public class UserService : ServiceBase<UserRepository>
         user.EmailConfirmedOn = DateTime.UtcNow;
 
         await Repository.SaveChangesAsync();
+    }
+
+    public async Task<AcceptInvitationVm?> GetInvitation(string code)
+    {
+        var invitation = await Repository.GetInvitation(code);
+
+        if (invitation == null) throw ApiExceptionDictionary.NotFound("Invitation");
+
+        return invitation;
+    }
+
+    public async Task DeclineInvitation(string code)
+    {
+        var invitation = await Repository.GetInvitationEntities(code);
+
+        await DeleteInvitation(invitation.AccountUser, invitation.User);
+    }
+    
+    private async Task DeleteInvitation(AccountUser? accountUser, User? user)
+    {
+        if (accountUser == null || user == null) throw ApiExceptionDictionary.NotFound("Invitation");
+        Repository.Delete(accountUser);
+        Repository.Delete(user);
+        await Repository.SaveChangesAsync();
+    }
+
+    public async Task AcceptInvitation(string invitationCode, CancellationToken cancellationToken)
+    {
+        var user = await Repository.Get(RequestUser.Id);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+
+        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ClaimInvitation(user, invitationCode, cancellationToken);
+            await dbTransaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 }

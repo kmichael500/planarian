@@ -42,7 +42,7 @@ const SwitchAccountComponent = ({
     return () => {
       unsubscribe();
     };
-  }, []); // empty dependency array ensures this runs once on mount and once on unmount
+  }, []);
 
   const handleSwitch = async (accountId: string) => {
     try {

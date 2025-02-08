@@ -29,7 +29,10 @@ const AuthenticationService = {
   notifyAuthChange() {
     this.subscribers.forEach((callback) => callback());
   },
-  async Login(values: UserLoginVm): Promise<string> {
+  async Login(values: UserLoginVm, invitationCode: string | null = null): Promise<string> {
+    if (!isNullOrWhiteSpace(invitationCode)) {
+      values.invitationCode = invitationCode;
+    }
     const response = await HttpClient.post<string>(`${baseUrl}/login`, values);
     this.SetToken(response.data);
     const accountId = this.GetAccountId();

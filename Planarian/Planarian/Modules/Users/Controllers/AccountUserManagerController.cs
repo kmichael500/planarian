@@ -26,8 +26,15 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         var users = await Service.GetAccountUsers();
         return new JsonResult(users);
     }
-    
-    [HttpPost("invite")]
+
+    [HttpPost("{userId}/resend-invitation")]
+    public async Task<IActionResult> ResendInvitation(string userId)
+    {
+        await Service.ResendInvitation(userId);
+        return Ok();
+    }
+
+    [HttpPost("")]
     public async Task<ActionResult> Invite([FromBody] InviteUserRequest request, CancellationToken cancellationToken)
     {
         await Service.InviteUser(request, cancellationToken);

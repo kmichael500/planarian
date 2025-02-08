@@ -9,6 +9,7 @@ import {
   Card,
   Row,
   Col,
+  Space,
 } from "antd";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
@@ -61,8 +62,10 @@ const UserManagerComponent: React.FC = () => {
     }
   };
 
+  const [isRevoking, setIsRevoking] = useState<boolean>(false);
   const handleRevokeAccess = async (userId: string) => {
     try {
+      setIsRevoking(true);
       await AccountUserManagerService.RevokeAccess(userId);
       message.success("Access revoked.");
       fetchUsers();
@@ -70,6 +73,21 @@ const UserManagerComponent: React.FC = () => {
       const error = err as PlanarianError;
       message.error(error.message);
     }
+    setIsRevoking(false);
+  };
+
+  const [isResending, setIsResending] = useState<boolean>(false);
+  const handleResendInvitation = async (userId: string) => {
+    try {
+      setIsResending(true);
+      await AccountUserManagerService.ResendInvitation(userId);
+      message.success("Invitation resent.");
+      fetchUsers();
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+    }
+    setIsResending(false);
   };
 
   const columns: ColumnsType<UserManagerGridVm> = [
@@ -103,16 +121,29 @@ const UserManagerComponent: React.FC = () => {
     {
       title: "Action",
       render: (_: any, record: UserManagerGridVm) => (
-        <DeleteButtonComponent
-          title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
-          onConfirm={() => {
-            handleRevokeAccess(record.userId);
-          }}
-          okText="Yes"
-          cancelText="No"
-        >
-          Revoke
-        </DeleteButtonComponent>
+        <Space>
+          {" "}
+          <DeleteButtonComponent
+            loading={isRevoking}
+            title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
+            onConfirm={() => {
+              handleRevokeAccess(record.userId);
+            }}
+            okText="Yes"
+            cancelText="No"
+          >
+            Revoke
+          </DeleteButtonComponent>
+          {record.invitationSentOn && !record.invitationAcceptedOn && (
+            <Button
+              loading={isResending}
+              type="primary"
+              onClick={() => handleResendInvitation(record.userId)}
+            >
+              Resend Invitation
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];

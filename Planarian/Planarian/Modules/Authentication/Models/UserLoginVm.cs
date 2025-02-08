@@ -22,4 +22,7 @@ public class UserLoginVm
     [Required] public string Password { get; set; } = null!;
 
     public bool? Remember { get; set; }
+
+    [MaxLength(PropertyLength.InvitationCode)]
+    public string? InvitationCode { get; set; } = null!;
 }

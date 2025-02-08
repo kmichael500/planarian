@@ -34,7 +34,9 @@ public class RequestUser
         var isValidAccountId = user.AccountUsers.Select(e => e.AccountId).Contains(accountId);
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
+        {
             throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
+        }
 
         Id = user.Id;
         FirstName = user.FirstName;

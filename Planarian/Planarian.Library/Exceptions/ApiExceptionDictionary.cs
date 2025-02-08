@@ -70,6 +70,9 @@ public static class ApiExceptionDictionary
     public static ApiException InvalidPasswordResetCode =>
         new(StatusCodes.Status500InternalServerError, ApiExceptionType.InvalidPasswordResetCode, "The code does not exist");
 
+    public static ApiException UserAlreadyInAccount =>
+        new(StatusCodes.Status400BadRequest, ApiExceptionType.UserAlreadyInAccount, "You are already have access to this account");
+
     #endregion
 
     #region Email Issues 300-399
@@ -84,7 +87,6 @@ public static class ApiExceptionDictionary
 
     public static ApiException NoAccount =>
         new(StatusCodes.Status500InternalServerError, ApiExceptionType.NoAccount, "No account was found");
-
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired)
     {
         return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.EntranceRequired, atLeastEntranceIsRequired);

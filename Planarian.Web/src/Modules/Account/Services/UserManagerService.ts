@@ -11,11 +11,14 @@ const AccountUserManagerService = {
         return response.data;
     },
     async InviteUser(request: InviteUserRequest): Promise<void> {
-        await HttpClient.post(`${baseUrl}/invite`, request);
+        await HttpClient.post(`${baseUrl}`, request);
     }
     ,
     async RevokeAccess(userId: string): Promise<void> {
         await HttpClient.delete(`${baseUrl}/${userId}`);
+    },
+    async ResendInvitation(userId: string): Promise<void> {
+        await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {});
     }
 
 };

@@ -1,4 +1,5 @@
 import { HttpClient } from "../..";
+import { AcceptInvitationVm } from "./Models/AcceptInvitationVm";
 import { UserVm } from "./Models/UserVm";
 
 const baseUrl = "api/users";
@@ -41,6 +42,25 @@ const UserService = {
       {
         headers: { "Content-Type": "application/json" },
       }
+    );
+  },
+  async GetInvitation(invitationCode: string): Promise<AcceptInvitationVm> {
+    const response = await HttpClient.get<AcceptInvitationVm>(
+      `${baseUrl}/invitations/${invitationCode}`
+    );
+    return response.data;
+  },
+
+  async AcceptInvitation(invitationCode: string): Promise<void> {
+    const response = await HttpClient.post(
+      `${baseUrl}/invitations/${invitationCode}/accept`,
+      {}
+    );
+  },
+  async DeclineInvitation(invitationCode: string): Promise<void> {
+    const response = await HttpClient.post(
+      `${baseUrl}/invitations/${invitationCode}/decline`,
+      {}
     );
   },
 };

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Planarian.Library.Constants;
@@ -6,7 +7,7 @@ namespace Planarian.Library.Extensions.String;
 
 public static class StringExtensions
 {
-    public static bool IsNullOrWhiteSpace(this string? input)
+    public static bool IsNullOrWhiteSpace([NotNullWhen(false)] this string? input)
     {
         return string.IsNullOrWhiteSpace(input);
     }

@@ -41,10 +41,13 @@ const LoginPage: React.FC = () => {
 
   const navigate = useNavigate();
 
+  const queryParams = new URLSearchParams(location.search);
+  const invitationCode = queryParams.get("invitationCode") || undefined;
+
   const onSubmit = async (values: UserLoginVm) => {
     try {
       setIsLoading(true);
-      await AuthenticationService.Login(values);
+      await AuthenticationService.Login(values, invitationCode);
       setIsAuthenticated(true);
 
       navigate(redirectUrl);

@@ -14,7 +14,7 @@ public class AccountUser : EntityBase
     public DateTime? InvitationAcceptedOn { get; set; }
     public DateTime? InvitationSentOn { get; set; }
 
-    [MaxLength(PropertyLength.EmailConfirmationCode)]
+    [MaxLength(PropertyLength.InvitationCode)]
     public string? InvitationCode { get; set; }
 
     public Account? Account { get; set; }

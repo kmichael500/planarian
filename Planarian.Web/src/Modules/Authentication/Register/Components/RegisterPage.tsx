@@ -1,51 +1,83 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Card, Col, ColProps, Form, Input, message, Row } from "antd";
-import { nameof } from "../../../../Shared/Helpers/StringHelpers";
+import { CheckCircleOutlined } from "@ant-design/icons";
+import { useLocation, useNavigate } from "react-router-dom";
 import { MaskedInput } from "antd-mask-input";
+import { nameof } from "../../../../Shared/Helpers/StringHelpers";
 import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionConstants";
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
-import { useNavigate } from "react-router-dom";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../../Configuration/Context/AppContext";
 import { SubmitButtonComponent } from "../../../../Shared/Components/Buttons/SubmitButtonComponent";
 import { LoginButtonComponent } from "../../../../Shared/Components/Buttons/LoginButtonComponent";
+import { UserService } from "../../../User/UserService";
+import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
+import { AcceptInvitationVm } from "../../../User/Models/AcceptInvitationVm";
 
 const RegisterPage: React.FC = () => {
   const [form] = Form.useForm();
 
-  const [invitation, setUser] = useState<RegisterUserVm | undefined>(undefined);
+  const [invitation, setInvitation] = useState<AcceptInvitationVm | undefined>(
+    undefined
+  );
   const [isLoading, setIsLoading] = useState(false);
-
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
-
-  useEffect(() => {
-    setHeaderTitle(["Register"]);
-
-    setHeaderButtons([]);
-  }, []);
+  const [isSubmissionSuccsess, setIsSubmissionSuccsess] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const invitationCode = queryParams.get("invitationCode") || undefined;
 
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmissionSuccsess, setIsSubmissionSuccsess] = useState(false);
 
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
 
+  useEffect(() => {
+    setHeaderTitle(["Register"]);
+    setHeaderButtons([]);
+  }, [setHeaderTitle, setHeaderButtons]);
+
+  useEffect(() => {
+    const fetchInvitationDetails = async () => {
+      if (!invitationCode) return;
+
+      setIsLoading(true);
+      try {
+        const invitationDetails = await UserService.GetInvitation(
+          invitationCode
+        );
+        setInvitation(invitationDetails);
+        form.setFieldsValue({
+          [nameof<RegisterUserVm>("firstName")]: invitationDetails.firstName,
+          [nameof<RegisterUserVm>("lastName")]: invitationDetails.lastName,
+          [nameof<RegisterUserVm>("emailAddress")]: invitationDetails.email,
+        });
+      } catch (error) {
+        message.error("Invalid or expired invitation code.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInvitationDetails();
+  }, [invitationCode, form]);
+
   const onFinish = async (values: RegisterUserVm) => {
     setIsSubmitting(true);
     try {
-      await RegisterService.RegisterUser(values);
+      // Append invitationCode if it exists
+      const payload = { ...values, invitationCode };
 
+      await RegisterService.RegisterUser(payload);
       message.success(
         "Thanks! Please check your email to confirm your account!"
       );
-
       navigate("../login");
     } catch (e) {
       const error = e as ApiErrorResponse;
-
       message.error(error.message);
     }
     setIsLoading(false);
@@ -53,15 +85,27 @@ const RegisterPage: React.FC = () => {
   };
 
   const twoPerColProps = { xs: 24, sm: 24, md: 12, lg: 12, xl: 12 } as ColProps;
+
   return (
     <Card
       title="Register"
       actions={[
-        <SubmitButtonComponent
-          type="primary"
-          loading={isSubmitting}
-          onClick={() => form.submit()}
-        />,
+        invitationCode ? (
+          <PlanarianButton
+            type="primary"
+            loading={isSubmitting}
+            onClick={() => form.submit()}
+            icon={<CheckCircleOutlined />}
+          >
+            Accept Invitation
+          </PlanarianButton>
+        ) : (
+          <SubmitButtonComponent
+            type="primary"
+            loading={isSubmitting}
+            onClick={() => form.submit()}
+          />
+        ),
         <LoginButtonComponent />,
       ]}
     >
@@ -79,7 +123,7 @@ const RegisterPage: React.FC = () => {
               rules={[{ required: true }]}
               messageVariables={{ name: "First Name" }}
             >
-              <Input />
+              <Input disabled={isLoading} />
             </Form.Item>
           </Col>
           <Col {...twoPerColProps}>
@@ -117,7 +161,7 @@ const RegisterPage: React.FC = () => {
               <MaskedInput
                 name={nameof<RegisterUserVm>("phoneNumber")}
                 mask={"+1 (000) 000-0000"}
-              ></MaskedInput>
+              />
             </Form.Item>
           </Col>
           <Col span={24}>
@@ -133,14 +177,14 @@ const RegisterPage: React.FC = () => {
                 },
               ]}
             >
-              <Input.Password type="password"></Input.Password>
+              <Input.Password type="password" />
             </Form.Item>
           </Col>
           <Col span={24}>
             <Form.Item
               label="Confirm Password"
               name={"confirmPassword"}
-              dependencies={["password"]}
+              dependencies={[nameof<RegisterUserVm>("password")]}
               hasFeedback
               rules={[
                 {
@@ -165,7 +209,7 @@ const RegisterPage: React.FC = () => {
                 }),
               ]}
             >
-              <Input.Password type="password"></Input.Password>
+              <Input.Password type="password" />
             </Form.Item>
           </Col>
         </Row>

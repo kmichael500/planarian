@@ -3,77 +3,177 @@ import { Card, Typography, Button, Space, Tag, message } from "antd";
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  UserAddOutlined,
+  LoginOutlined,
   EnvironmentOutlined,
 } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom"; // Add this import for navigation
+import { AuthenticationService } from "../Services/AuthenticationService";
+import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { UserService } from "../../User/UserService";
+import { SwitchAccountComponent } from "./SwitchAccountComponent";
 
 const { Title, Text } = Typography;
 
-const mockInvitation = {
-  surveyName: "Southeastern Cave Survey",
-  states: ["Tennessee"],
-};
+const isLoggedIn = AuthenticationService.IsAuthenticated();
+interface InvitationComponentProps {
+  invitation?: AcceptInvitationVm;
+  invitationCode: string;
+  isLoading: boolean;
+  updateInvitation: () => Promise<void>;
+}
 
-const InvitationComponent: React.FC = () => {
+const InvitationComponent = ({
+  invitation,
+  isLoading,
+  updateInvitation,
+  invitationCode,
+}: InvitationComponentProps) => {
   const [status, setStatus] = useState<"pending" | "accepted" | "declined">(
     "pending"
   );
 
-  const handleAccept = () => {
-    setStatus("accepted");
-    message.success("You have accepted the invitation.");
+  const navigate = useNavigate();
+
+  const [isDeclining, setIsDeclining] = useState<boolean>(false);
+  const [isAccepting, setIsAccepting] = useState<boolean>(false);
+
+  const [showSwitchAccountModal, setShowSwitchAccountModal] = useState(false);
+
+  const handleAccept = async () => {
+    try {
+      setIsAccepting(true);
+      await UserService.AcceptInvitation(invitationCode);
+      setStatus("accepted");
+      message.success("You have accepted the invitation.");
+    } catch (error) {
+      const err = error as ApiErrorResponse;
+      message.error(err.message);
+    }
+    setIsAccepting(false);
   };
 
-  const handleDecline = () => {
-    setStatus("declined");
-    message.warning("You have declined the invitation.");
+  const handleDecline = async () => {
+    try {
+      setIsDeclining(true);
+      await UserService.DeclineInvitation(invitationCode);
+      setStatus("declined");
+      message.warning("You have declined the invitation.");
+    } catch (error) {
+      const err = error as ApiErrorResponse;
+      message.error(err.message);
+    }
+    setIsDeclining(false);
   };
+  const handleCreateAccount = () => {
+    navigate(`/register?invitationCode=${invitationCode}`);
+  };
+
+  const handleExistingAccount = () => {
+    navigate(`/login?invitationCode=${invitationCode}`);
+  };
+
+  let invitationMessage = `You’ve been invited to access ${invitation?.accountName} data on
+  Planarian.`;
+
+  if (isLoggedIn) {
+    invitationMessage += " Accept the invitation to continue!";
+  } else {
+    invitationMessage +=
+      " Create an account or login to accept the invitation.";
+  }
+
+  if (!isLoading && !invitation) {
+    return (
+      <div style={styles.container}>
+        <Card style={styles.card} bordered={false}>
+          <Title level={3} style={{ marginBottom: 10 }}>
+            Invitation Not Found
+          </Title>
+          <Text>
+            We could not find an invitation with the provided code. Please check
+            the code and try again.
+          </Text>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
       {status === "pending" ? (
-        <Card style={styles.card} bordered={false}>
+        <Card loading={isLoading} style={styles.card} bordered={false}>
           <Title level={3} style={{ marginBottom: 10 }}>
-            {mockInvitation.surveyName}
+            {invitation?.accountName}
           </Title>
-          <Text>
-            You’ve been invited to access {mockInvitation.surveyName} data on
-            Planarian. Accept the invitation to continue!
-          </Text>
+          <Text>{invitationMessage}</Text>
 
           <div style={styles.section}>
             <Text strong>Regions:</Text>
             <div style={styles.tags}>
-              {mockInvitation.states.map((state) => (
+              {invitation?.regions.map((region) => (
                 <Tag
-                  key={state}
+                  key={region}
                   color="blue"
                   icon={<EnvironmentOutlined />}
                   style={styles.tag}
                 >
-                  {state}
+                  {region}
                 </Tag>
               ))}
             </div>
           </div>
 
-          <Space style={{ marginTop: 20 }}>
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={handleAccept}
-              style={styles.acceptButton}
-            >
-              Accept
-            </Button>
-            <Button
-              type="default"
-              icon={<CloseCircleOutlined />}
-              danger
-              onClick={handleDecline}
-            >
-              Decline
-            </Button>
-          </Space>
+          {isLoggedIn ? (
+            <Space style={{ marginTop: 20 }}>
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={handleAccept}
+                loading={isAccepting}
+              >
+                Accept
+              </Button>
+              <Button
+                type="default"
+                icon={<CloseCircleOutlined />}
+                danger
+                onClick={handleDecline}
+                loading={isDeclining}
+              >
+                Decline
+              </Button>
+            </Space>
+          ) : (
+            <div style={styles.buttonStack}>
+              <Button
+                type="primary"
+                icon={<UserAddOutlined />}
+                block
+                onClick={handleCreateAccount}
+              >
+                Create a New Account
+              </Button>
+              <Button
+                type="default"
+                icon={<LoginOutlined />}
+                block
+                onClick={handleExistingAccount}
+              >
+                I Have an Account
+              </Button>
+              <Button
+                type="default"
+                icon={<CloseCircleOutlined />}
+                danger
+                block
+                onClick={handleDecline}
+              >
+                Decline
+              </Button>
+            </div>
+          )}
         </Card>
       ) : (
         <Card style={styles.card} bordered={false}>
@@ -85,6 +185,21 @@ const InvitationComponent: React.FC = () => {
               ? "You now have access to the cave location data."
               : "If you change your mind, contact the survey organization."}
           </Text>
+          {status === "accepted" && (
+            <Button
+              type="primary"
+              onClick={() => setShowSwitchAccountModal(true)}
+              style={{ marginTop: 20 }}
+            >
+              Switch Account
+            </Button>
+          )}
+          <SwitchAccountComponent
+            isVisible={showSwitchAccountModal}
+            handleCancel={function (): void {
+              setShowSwitchAccountModal(false);
+            }}
+          />
         </Card>
       )}
     </div>
@@ -122,9 +237,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "4px 10px",
     fontSize: "14px",
   },
-  acceptButton: {
-    backgroundColor: "#1890ff",
-    borderColor: "#1890ff",
+  buttonStack: {
+    marginTop: 20,
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
   },
 };
 

@@ -51,6 +51,6 @@ public static class PasswordService
 
     public static string GenerateResetCode()
     {
-        return IdGenerator.Generate(PropertyLength.PasswordResetCode);
+        return IdGenerator.Generate(PropertyLength.InvitationCode);
     }
 }

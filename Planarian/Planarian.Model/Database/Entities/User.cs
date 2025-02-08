@@ -50,10 +50,10 @@ public class User : EntityBase
     [MaxLength(PropertyLength.PasswordHash)]
     public string? HashedPassword { get; set; }
 
-    [MaxLength(PropertyLength.PasswordResetCode)]
+    [MaxLength(PropertyLength.InvitationCode)]
     public string? PasswordResetCode { get; set; }
 
-    [MaxLength(PropertyLength.EmailConfirmationCode)]
+    [MaxLength(PropertyLength.InvitationCode)]
     public string? EmailConfirmationCode { get; set; }
 
     public DateTime? EmailConfirmedOn { get; set; }

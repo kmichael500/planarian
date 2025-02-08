@@ -57,6 +57,33 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #endregion
 
+    #region Invitations
+
+    [HttpPost("invitations/{code:length(10)}/accept")]
+    public async Task<ActionResult> AcceptInvitation(string code, CancellationToken cancellationToken)
+    {
+        await Service.AcceptInvitation(code, cancellationToken);
+        return new OkResult();
+    }
+
+    [HttpPost("invitations/{code:length(10)}/decline")]
+    public async Task<ActionResult> DeclineInvitation(string code)
+    {
+        await Service.DeclineInvitation(code);
+
+        return new OkResult();
+    }
+    
+    [AllowAnonymous]
+    [HttpGet("invitations/{code:length(10)}")]
+    public async Task<ActionResult<AcceptInvitationVm>> GetInvitation(string code)
+    {
+        var result = await Service.GetInvitation(code);
+
+        return new JsonResult(result);
+    }
+    #endregion
+
     #region Password Reset
 
     [AllowAnonymous]

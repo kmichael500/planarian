@@ -40,8 +40,6 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-
-        // Validate email
         if (!request.EmailAddress.IsValidEmail())
         {
             throw ApiExceptionDictionary.BadRequest("Invalid email address.");
@@ -63,7 +61,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             var user = new User(request.FirstName, request.LastName, request.EmailAddress) { IsTemporary = true };
             Repository.Add(user);
 
-            var invitationCode = IdGenerator.Generate(PropertyLength.EmailConfirmationCode);
+            var invitationCode = IdGenerator.Generate(PropertyLength.InvitationCode);
 
             var accountUser = new AccountUser
             {
@@ -105,5 +103,43 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
         Repository.Delete(accountUser);
         await Repository.SaveChangesAsync();
+    }
+
+    public async Task ResendInvitation(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        if (accountUser.InvitationAcceptedOn.HasValue)
+        {
+            throw ApiExceptionDictionary.BadRequest("User has already accepted the invitation.");
+        }
+
+        if (!accountUser.InvitationSentOn.HasValue)
+        {
+            throw ApiExceptionDictionary.BadRequest("The user was not invited in the first place.");
+        }
+        
+        var user = await Repository.Get(userId);
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+        
+        accountUser.InvitationSentOn = DateTime.UtcNow;
+        await Repository.SaveChangesAsync();
+
+        var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
+
+        await _emailService.SendAccountInvitationEmail(user, accountUser,
+            accountName);
     }
 }
