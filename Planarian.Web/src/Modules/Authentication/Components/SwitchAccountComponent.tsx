@@ -1,5 +1,5 @@
 import { Modal, Button, Form, List, message, Divider } from "antd";
-import { AppOptions } from "../../../Shared/Services/AppService";
+import { AppOptions, AppService } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
 import React, { useEffect, useState } from "react";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -26,12 +26,18 @@ const SwitchAccountComponent = ({
   const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
 
   useEffect(() => {
-    if (!accountList) {
-      const result = AppOptions.accountIds.filter(
-        (item) => item.value !== currentAccountId
-      );
-      setAccountList(result);
+    async function initialize() {
+      await AppService.InitializeApp();
+      if (!accountList) {
+        const result = AppOptions.accountIds.filter(
+          (item) => item.value !== currentAccountId
+        );
+        setAccountList(result);
+      }
     }
+
+    initialize();
+
     const unsubscribe = AuthenticationService.onAuthChange(() => {
       const result = AppOptions.accountIds.filter(
         (item) => item.value !== currentAccountId
@@ -42,26 +48,10 @@ const SwitchAccountComponent = ({
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [isOpen]);
 
   const handleSwitch = async (accountId: string) => {
-    try {
-      AuthenticationService.SwitchAccount(accountId);
-      const accountName = accountList?.find(
-        (item) => item.value === accountId
-      )?.display;
-      message.success(`Switched to account ${accountName}`);
-      if (location.pathname.startsWith("/caves")) {
-        if (location.pathname === "/caves") {
-          navigate("/caves", { replace: true, state: {} });
-        } else {
-          navigate("/caves", { replace: true });
-        }
-      }
-      window.location.reload();
-    } catch (error) {
-      message.error("Failed to switch account");
-    }
+    AuthenticationService.SwitchAccountFull(accountId, navigate);
   };
 
   return (

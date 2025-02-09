@@ -17,7 +17,7 @@ public class UserRepository : RepositoryBase
 
     public async Task<User?> GetUserByEmail(string email)
     {
-        return await DbContext.Users.Where(e => e.EmailAddress == email).FirstOrDefaultAsync();
+        return await DbContext.Users.Where(e => e.EmailAddress == email && !e.IsTemporary).FirstOrDefaultAsync();
     }
 
     public async Task<User?> Get(string id)

@@ -108,16 +108,18 @@ public class UserService : ServiceBase<UserRepository>
             throw;
         }
     }
-
-    public async Task ClaimInvitation(string invitationCode, CancellationToken cancellationToken)
+    
+    
+    public async Task ClaimInvitation(string invitationCode, string userEmail, CancellationToken cancellationToken)
     {
-        var user = await Repository.Get(RequestUser.Id);
+        var user = await Repository.GetUserByEmail(userEmail);
         if (user == null) throw ApiExceptionDictionary.NotFound("User");
 
         var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             await ClaimInvitation(user, invitationCode, cancellationToken);
+            await dbTransaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
         {

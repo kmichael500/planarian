@@ -51,6 +51,7 @@ const UserManagerComponent: React.FC = () => {
 
   const handleInviteUser = async (values: InviteUserRequest) => {
     try {
+      setLoading(true);
       await AccountUserManagerService.InviteUser(values);
       message.success("Invitation sent successfully.");
       setInviteModalVisible(false);
@@ -60,6 +61,7 @@ const UserManagerComponent: React.FC = () => {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     }
+    setLoading(false);
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);

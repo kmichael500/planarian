@@ -5,6 +5,8 @@ import jwt_decode from "jwt-decode";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { AppOptions, AppService } from "../../../Shared/Services/AppService";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
+import { message } from "antd";
+import { NavigateFunction } from "react-router-dom";
 const NAME_CLAIM_KEY =
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
@@ -29,7 +31,10 @@ const AuthenticationService = {
   notifyAuthChange() {
     this.subscribers.forEach((callback) => callback());
   },
-  async Login(values: UserLoginVm, invitationCode: string | null = null): Promise<string> {
+  async Login(
+    values: UserLoginVm,
+    invitationCode: string | null = null
+  ): Promise<string> {
     if (!isNullOrWhiteSpace(invitationCode)) {
       values.invitationCode = invitationCode;
     }
@@ -140,6 +145,34 @@ const AuthenticationService = {
     if (userId == null) throw new NotFoundError("user");
     sessionStorage.setItem(currentIdStorageKey(userId), accountId);
     localStorage.setItem(currentIdStorageKey(userId), accountId);
+  },
+  SwitchAccountFull(
+    accountId: string,
+    navigate: NavigateFunction,
+    path: string | null = null
+  ): void {
+    try {
+      this.SwitchAccount(accountId);
+      const accountName = AppOptions.accountIds?.find(
+        (item) => item.value === accountId
+      )?.display;
+      message.success(`Switched to account ${accountName}`);
+
+      if (!isNullOrWhiteSpace(path)) {
+        navigate(path);
+      }
+
+      if (window.location.pathname.startsWith("/caves")) {
+        if (window.location.pathname === "/caves") {
+          navigate("/caves", { replace: true, state: {} });
+        } else {
+          navigate("/caves", { replace: true });
+        }
+      }
+      window.location.reload();
+    } catch (error) {
+      message.error("Failed to switch account");
+    }
   },
   ResetAccountId(): void {
     const userId = this.GetUserId();

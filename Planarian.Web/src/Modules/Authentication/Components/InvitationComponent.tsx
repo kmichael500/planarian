@@ -13,6 +13,9 @@ import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserService } from "../../User/UserService";
 import { SwitchAccountComponent } from "./SwitchAccountComponent";
+import { AppService } from "../../../Shared/Services/AppService";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
 const { Title, Text } = Typography;
 
@@ -43,10 +46,18 @@ const InvitationComponent = ({
 
   const handleAccept = async () => {
     try {
+      if (invitation === undefined) return;
       setIsAccepting(true);
       await UserService.AcceptInvitation(invitationCode);
       setStatus("accepted");
       message.success("You have accepted the invitation.");
+
+      await AppService.InitializeApp();
+      AuthenticationService.SwitchAccountFull(
+        invitation?.accountId,
+        navigate,
+        "/caves"
+      );
     } catch (error) {
       const err = error as ApiErrorResponse;
       message.error(err.message);
@@ -135,43 +146,48 @@ const InvitationComponent = ({
               >
                 Accept
               </Button>
-              <Button
-                type="default"
-                icon={<CloseCircleOutlined />}
-                danger
-                onClick={handleDecline}
+              <DeleteButtonComponent
                 loading={isDeclining}
+                title={`Are you sure you want to decline the invitation?`}
+                onConfirm={() => {
+                  handleDecline();
+                }}
+                okText="Yes"
+                cancelText="No"
               >
                 Decline
-              </Button>
+              </DeleteButtonComponent>
             </Space>
           ) : (
             <div style={styles.buttonStack}>
-              <Button
+              <PlanarianButton
                 type="primary"
                 icon={<UserAddOutlined />}
                 block
                 onClick={handleCreateAccount}
               >
                 Create a New Account
-              </Button>
-              <Button
+              </PlanarianButton>
+              <PlanarianButton
                 type="default"
                 icon={<LoginOutlined />}
                 block
                 onClick={handleExistingAccount}
               >
                 I Have an Account
-              </Button>
-              <Button
-                type="default"
-                icon={<CloseCircleOutlined />}
-                danger
-                block
-                onClick={handleDecline}
+              </PlanarianButton>
+
+              <DeleteButtonComponent
+                loading={isDeclining}
+                title={`Are you sure you want to decline the invitation?`}
+                onConfirm={() => {
+                  handleDecline();
+                }}
+                okText="Yes"
+                cancelText="No"
               >
                 Decline
-              </Button>
+              </DeleteButtonComponent>
             </div>
           )}
         </Card>
