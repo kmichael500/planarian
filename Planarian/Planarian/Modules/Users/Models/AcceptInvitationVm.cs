@@ -7,4 +7,5 @@ public class AcceptInvitationVm
     public string Email { get; set; } = null!;
     public IEnumerable<string> Regions { get; set; }
     public string AccountName { get; set; }
+    public string AccountId { get; set; }
 }

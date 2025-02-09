@@ -19,7 +19,6 @@ import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/Delete
 
 const { Title, Text } = Typography;
 
-const isLoggedIn = AuthenticationService.IsAuthenticated();
 interface InvitationComponentProps {
   invitation?: AcceptInvitationVm;
   invitationCode: string;
@@ -36,6 +35,7 @@ const InvitationComponent = ({
   const [status, setStatus] = useState<"pending" | "accepted" | "declined">(
     "pending"
   );
+  const isLoggedIn = AuthenticationService.IsAuthenticated();
 
   const navigate = useNavigate();
 

@@ -25,18 +25,6 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
     public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values, CancellationToken cancellationToken)
     {
         var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password);
-        if (!values.InvitationCode.IsNullOrWhiteSpace())
-        {
-            // should still be able to login if code is wrong
-            try
-            {
-                await _userService.ClaimInvitation(values.InvitationCode, values.EmailAddress, cancellationToken);
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
-        }
 
         return new JsonResult(token);
     }

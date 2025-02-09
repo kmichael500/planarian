@@ -70,6 +70,7 @@ public class UserRepository : RepositoryBase
                 Email = e.User.EmailAddress,
                 Regions = e.Account.AccountStates.OrderByDescending(ee => ee.State.Name).Select(ee => ee.State.Name),
                 AccountName = e.Account.Name,
+                AccountId = e.Account.Id
             })
             .FirstOrDefaultAsync();
     }

@@ -33,28 +33,23 @@ const InvitationMessageCard: React.FC<{
   // Customize your message here. You can use invitation.accountName if available.
   const invitationMessage =
     invitation && invitation.accountName
-      ? `You've been invited to access ${invitation.accountName} data on Planarian. Create an account to accept the invitation.`
+      ? `You've been invited to access ${invitation.accountName} on Planarian. Create an account to accept the invitation.`
       : "You've been invited to access data on Planarian.";
 
   return (
-    <>
-      {invitation && (
-        <Card loading={isLoading} bordered={false} style={{ marginBottom: 16 }}>
-          <Text>{invitationMessage}</Text>
-        </Card>
-      )}
-    </>
+    <Card loading={isLoading} bordered={false} style={{ marginBottom: 16 }}>
+      <Text>{invitationMessage}</Text>
+    </Card>
   );
 };
 
 const RegisterPage: React.FC = () => {
   const [form] = Form.useForm();
-
   const [invitation, setInvitation] = useState<AcceptInvitationVm | undefined>(
     undefined
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmissionSuccsess, setIsSubmissionSuccsess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -62,7 +57,6 @@ const RegisterPage: React.FC = () => {
   const invitationCode = queryParams.get("invitationCode") || undefined;
 
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
@@ -100,9 +94,7 @@ const RegisterPage: React.FC = () => {
   const onFinish = async (values: RegisterUserVm) => {
     setIsSubmitting(true);
     try {
-      // Append invitationCode if it exists
       const payload = { ...values, invitationCode };
-
       await RegisterService.RegisterUser(payload);
       message.success(
         "Thanks! Please check your email to confirm your account!"
@@ -112,15 +104,18 @@ const RegisterPage: React.FC = () => {
       const error = e as ApiErrorResponse;
       message.error(error.message);
     }
-    setIsLoading(false);
     setIsSubmitting(false);
   };
 
   const twoPerColProps = { xs: 24, sm: 24, md: 12, lg: 12, xl: 12 } as ColProps;
 
   return (
-    <>
-      <InvitationMessageCard invitation={invitation} isLoading={isLoading} />
+    <div style={{ maxWidth: 600, margin: "0 auto", padding: "16px" }}>
+      {/* Only show the invitation card if an invitation code exists */}
+      {invitationCode && (
+        <InvitationMessageCard invitation={invitation} isLoading={isLoading} />
+      )}
+
       <Card
         title="Register"
         actions={[
@@ -140,7 +135,7 @@ const RegisterPage: React.FC = () => {
               onClick={() => form.submit()}
             />
           ),
-          <LoginButtonComponent invitationCode={invitationCode} />,
+          <LoginButtonComponent key="login" />,
         ]}
       >
         <Form
@@ -164,8 +159,8 @@ const RegisterPage: React.FC = () => {
               <Form.Item
                 label="Last Name"
                 name={nameof<RegisterUserVm>("lastName")}
-                messageVariables={{ name: "Last Name" }}
                 rules={[{ required: true }]}
+                messageVariables={{ name: "Last Name" }}
               >
                 <Input />
               </Form.Item>
@@ -202,7 +197,6 @@ const RegisterPage: React.FC = () => {
               <Form.Item
                 label="Password"
                 name={nameof<RegisterUserVm>("password")}
-                messageVariables={{ name: "Password" }}
                 rules={[
                   {
                     required: true,
@@ -210,6 +204,7 @@ const RegisterPage: React.FC = () => {
                     message: passwordMessage,
                   },
                 ]}
+                messageVariables={{ name: "Password" }}
               >
                 <Input.Password type="password" />
               </Form.Item>
@@ -249,7 +244,7 @@ const RegisterPage: React.FC = () => {
           </Row>
         </Form>
       </Card>
-    </>
+    </div>
   );
 };
 

@@ -50,7 +50,11 @@ const LoginPage: React.FC = () => {
       await AuthenticationService.Login(values, invitationCode);
       setIsAuthenticated(true);
 
-      navigate(redirectUrl);
+      if (!isNullOrWhiteSpace(invitationCode)) {
+        navigate(`/user/invitations/${invitationCode}`);
+      } else {
+        navigate(redirectUrl);
+      }
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
@@ -72,7 +76,13 @@ const LoginPage: React.FC = () => {
           Login
         </PlanarianButton>,
 
-        <Link to={"../register"}>
+        <Link
+          to={
+            !isNullOrWhiteSpace(invitationCode)
+              ? `../register?invitationCode=${invitationCode}`
+              : "../register"
+          }
+        >
           <PlanarianButton alwaysShowChildren icon={<UserAddOutlined />}>
             Register
           </PlanarianButton>
