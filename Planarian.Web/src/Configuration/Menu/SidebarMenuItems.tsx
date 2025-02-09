@@ -8,6 +8,7 @@ import {
   SettingOutlined,
   ImportOutlined,
   CompassOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
@@ -64,6 +65,15 @@ const SideBarMenuItems = () => {
             </Link>
           ),
           label: "Import",
+        },
+        {
+          key: "/account/users",
+          icon: (
+            <Link to="/account/users">
+              <UserOutlined />
+            </Link>
+          ),
+          label: "Users",
         },
         {
           key: "/account/settings",

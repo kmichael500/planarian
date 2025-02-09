@@ -30,7 +30,7 @@ function ProfileMenu() {
 
   const menuItems = [
     {
-      key: "/profile",
+      key: "/user/profile",
       icon: <UserOutlined />,
       label: "Profile",
       requiresAuthentication: true,

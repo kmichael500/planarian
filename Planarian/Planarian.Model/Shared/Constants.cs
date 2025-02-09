@@ -14,8 +14,7 @@ public static class PropertyLength
     public const int FileType = 10;
     public const int StationName = 100;
     public const int PasswordHash = 100;
-    public const int PasswordResetCode = 20;
-    public const int EmailConfirmationCode = 20;
+    public const int InvitationCode = 10;
     public const int FileName = 1000;
     public const int Delimiter = 10;
 }

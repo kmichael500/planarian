@@ -20,11 +20,17 @@ import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
 import { AppRederect } from "./App.routing.redirect";
 import { MapPage } from "../../Modules/Map/Pages/MapPage";
+import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
+import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptInvitationPage";
 
 export const AppRouting: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />}></Route>
+      <Route
+        path="/user/invitations/:invitationCode"
+        element={<AcceptInvitationPage />}
+      ></Route>
       <Route path="/register" element={<RegisterPage />}></Route>
       <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
       <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
@@ -39,6 +45,7 @@ export const AppRouting: React.FC = () => {
         <Route path="/caves/add" element={<AddCavesPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/account/settings" element={<AccountSettingsPage />} />
+        <Route path="/account/users" element={<UserManagerPage />} />
         <Route path="/account/import" element={<ImportPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
@@ -54,7 +61,7 @@ export const AppRouting: React.FC = () => {
           path="/projects/:projectId/trip/:tripId/addLeads"
           element={<LeadAddPage />}
         ></Route>
-        <Route path="/profile" element={<ProfilePage />}></Route>
+        <Route path="/user/profile" element={<ProfilePage />}></Route>
         <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/not-found" replace />} />

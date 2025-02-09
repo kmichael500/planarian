@@ -19,9 +19,10 @@ public class RegisterController : PlanarianControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<string>> Register([FromBody] RegisterUserVm user)
+    public async Task<ActionResult<string>> Register([FromBody] RegisterUserVm user,
+        CancellationToken cancellationToken)
     {
-        await _userService.RegisterUser(user);
+        await _userService.RegisterUser(user, cancellationToken);
         return Ok();
     }
 }

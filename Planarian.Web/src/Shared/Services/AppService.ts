@@ -9,6 +9,7 @@ const AppService = {
       `${baseUrl}/initialize`
     );
     AppOptions = response.data;
+    console.log("init");
   },
 };
 export { AppService, AppOptions };

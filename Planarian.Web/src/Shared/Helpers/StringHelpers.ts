@@ -71,7 +71,7 @@ export function formatPhoneNumber(phoneNumber?: string): string {
   return formattedPhoneNumber ?? "";
 }
 
-export function formatDateTime(
+export function formatDate(
   date: Date | string | null | undefined,
   formatString: string = "YYYY MMM-DD"
 ): string | null {
@@ -87,6 +87,16 @@ export function formatDateTime(
   }
 
   return moment.utc(date).format(formatString);
+}
+
+export function formatDateTime(
+  date: Date | string | null | undefined,
+  formatString: string = "YYYY MMM-D h:mm A"
+): string | null {
+  if (typeof date === "string" && isNullOrWhiteSpace(date)) return null;
+  if (date === null || date === undefined) return null;
+
+  return moment(date).format(formatString);
 }
 
 export function formatNumber(value: number | null | undefined): string | null {

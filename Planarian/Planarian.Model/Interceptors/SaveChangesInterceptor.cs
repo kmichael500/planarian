@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -109,10 +110,12 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 var inSameAccount = await context.AccountUsers.AnyAsync(e =>
                     e.UserId == user.Id && e.AccountId == requestUserAccountId);
-
+            
                 var isResetPassword = string.IsNullOrWhiteSpace(requestUserAccountId); // should probably be more thorough in the future
-                var canModify = isResetPassword || (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
-                                inSameAccount;
+                var canModify = isResetPassword ||
+                                (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
+                                inSameAccount || user.IsTemporary;
+
                 if (!canModify)
                 {
                     throw ApiExceptionDictionary.Unauthorized(
@@ -121,9 +124,14 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 break;
             case nameof(AccountUser):
-                var accountUser = (AccountUser)entity.Entity;
-                ValidateAccount(accountUser.AccountId, requestUserAccountId);
-                break;
+                 var accountUser = (AccountUser)entity.Entity;
+                 var isInvitation = !accountUser.InvitationCode.IsNullOrWhiteSpace();
+                 if (!isInvitation && entityState != EntityState.Added)
+                 {
+                     ValidateAccount(accountUser.AccountId, requestUserAccountId);
+                 }
+
+                 break;
             case nameof(TagType):
                 var tagType = (TagType)entity.Entity;
                 ValidateAccount(tagType.AccountId, requestUserAccountId);

@@ -4,7 +4,7 @@ import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroup
 import { TripVm } from "../Models/TripVm";
 import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import moment from "moment";
-import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
+import { formatDate } from "../../../Shared/Helpers/StringHelpers";
 const { Text } = Typography;
 
 export interface TripCardProps {
@@ -69,7 +69,7 @@ const TripCardComponent: React.FC<TripCardProps> = ({ trip }) => {
           <Col>
             <Text>
               Modified On:{" "}
-              {trip.modifiedOn ? formatDateTime(trip.modifiedOn) : "Never"}
+              {trip.modifiedOn ? formatDate(trip.modifiedOn) : "Never"}
             </Text>
           </Col>
         </Row>

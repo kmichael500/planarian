@@ -5,12 +5,21 @@ import {
   PlanarianButtonTypeWithoutIcon,
 } from "./PlanarianButtton";
 
-const LoginButtonComponent: React.FC<PlanarianButtonTypeWithoutIcon> = (
-  props
-) => {
+interface LoginButtonComponentProps extends PlanarianButtonTypeWithoutIcon {
+  invitationCode?: string;
+}
+
+const LoginButtonComponent: React.FC<LoginButtonComponentProps> = (props) => {
+  const { invitationCode, ...restProps } = props;
+  const linkTo = invitationCode
+    ? `/login?invitationCode=${invitationCode}`
+    : "/login";
+
+  console.log("LoginButtonComponent -> linkTo", linkTo);
+
   return (
-    <Link to={"./login"}>
-      <PlanarianButton {...props} icon={<LoginOutlined />}>
+    <Link to={linkTo}>
+      <PlanarianButton {...restProps} icon={<LoginOutlined />}>
         Login
       </PlanarianButton>
     </Link>

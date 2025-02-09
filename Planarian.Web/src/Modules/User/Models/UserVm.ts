@@ -4,3 +4,4 @@ export interface UserVm {
   emailAddress?: string;
   phoneNumber?: string;
 }
+

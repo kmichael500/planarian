@@ -8,7 +8,7 @@ import { CaveService } from "../Service/CaveService";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
-import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
+import { formatDate } from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
 const EditCavePage: React.FC = () => {
@@ -48,12 +48,12 @@ const EditCavePage: React.FC = () => {
       const caveResponse = await CaveService.GetCave(caveId);
 
       // antd input requires date to be in format yyyy-MM-DD otherwise it will not be displayed
-      caveResponse.reportedOn = formatDateTime(
+      caveResponse.reportedOn = formatDate(
         caveResponse.reportedOn,
         "yyyy-MM-DD"
       );
       caveResponse.entrances.forEach((entrance) => {
-        entrance.reportedOn = formatDateTime(entrance.reportedOn, "yyyy-MM-DD");
+        entrance.reportedOn = formatDate(entrance.reportedOn, "yyyy-MM-DD");
       });
       setCave(caveResponse);
 

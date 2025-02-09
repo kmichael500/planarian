@@ -4,6 +4,7 @@ using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Models;
@@ -76,6 +77,21 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         await SendGenericEmail("Confirm your email address", emailAddress, fullName,
             new GenericEmailSubstitutions(paragraphs,
                 "Confirm your email address", "Confirm Email", link));
+    }
+    
+    public async Task SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName)
+    {
+        var link = $"{_serverOptions.ClientBaseUrl}/user/invitations/{accountUser.InvitationCode}";
+        var paragraphs = new List<string>
+        {
+            $"You have been invited by {accountName} to join Planarian! Please click the link below to create your account and accept the invitation.",
+        };
+
+        await SendGenericEmail($"Join {accountName} on Planarian!", user.EmailAddress, user.FullName,
+            new GenericEmailSubstitutions(paragraphs,
+                "Welcome!", "Create Account", link));
+
+        accountUser.InvitationSentOn = DateTime.UtcNow;
     }
 
     public async Task SendPasswordChangedEmail(string emailAddress, string fullName)

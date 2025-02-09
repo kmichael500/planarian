@@ -41,13 +41,20 @@ const LoginPage: React.FC = () => {
 
   const navigate = useNavigate();
 
+  const queryParams = new URLSearchParams(location.search);
+  const invitationCode = queryParams.get("invitationCode") || undefined;
+
   const onSubmit = async (values: UserLoginVm) => {
     try {
       setIsLoading(true);
-      await AuthenticationService.Login(values);
+      await AuthenticationService.Login(values, invitationCode);
       setIsAuthenticated(true);
 
-      navigate(redirectUrl);
+      if (!isNullOrWhiteSpace(invitationCode)) {
+        navigate(`/user/invitations/${invitationCode}`);
+      } else {
+        navigate(redirectUrl);
+      }
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
@@ -69,7 +76,13 @@ const LoginPage: React.FC = () => {
           Login
         </PlanarianButton>,
 
-        <Link to={"../register"}>
+        <Link
+          to={
+            !isNullOrWhiteSpace(invitationCode)
+              ? `../register?invitationCode=${invitationCode}`
+              : "../register"
+          }
+        >
           <PlanarianButton alwaysShowChildren icon={<UserAddOutlined />}>
             Register
           </PlanarianButton>
