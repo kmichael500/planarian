@@ -63,9 +63,11 @@ public class Cave : EntityBase
     public IEnumerable<string> AlternateNamesList =>
         JsonSerializer.Deserialize<List<string>>(AlternateNames) ?? new List<string>();
 
+    public IEnumerable<CavePermission> CavePermissions { get; set; }
+
+
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>
         AlternateNames = JsonSerializer.Serialize(alternateNames);
-
 }
 
 public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>

@@ -1,7 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Geometries;
-using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Model.Database.Entities;
@@ -14,7 +12,6 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Modules.Tags.Repositories;
-using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
