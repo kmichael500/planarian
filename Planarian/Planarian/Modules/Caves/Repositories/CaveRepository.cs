@@ -30,11 +30,16 @@ public class CaveRepository : RepositoryBase
                     case nameof(CaveSearchParamsVm.Name):
                         query = queryCondition.Operator switch
                         {
-                            QueryOperator.Contains => query.Where(e =>
-                                EF.Functions.ToTsVector(e.Name).Matches(queryCondition.Value) ||
-                                EF.Functions.ToTsVector(e.AlternateNames).Matches(queryCondition.Value) ||
-                                (queryCondition.Value.Contains(e.County.DisplayId) &&
-                                 queryCondition.Value.Contains(e.CountyNumber.ToString()))),
+                            QueryOperator.Contains => query
+                                .Where(e =>
+                                    e.Name.ToLower().Contains(queryCondition.Value.ToLower())
+                                    // || EF.Functions.ToTsVector(e.Name).Matches(EF.Functions.PlainToTsQuery(queryCondition.Value + ":*"))
+                                    || EF.Functions.ToTsVector(e.AlternateNames).Matches(queryCondition.Value)
+                                    || (
+                                        queryCondition.Value.Contains(e.County.DisplayId)
+                                        && queryCondition.Value.Contains(e.CountyNumber.ToString())
+                                    )
+                                ),
                             _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                         };
                         break;

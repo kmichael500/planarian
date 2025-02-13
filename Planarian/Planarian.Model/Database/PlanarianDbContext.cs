@@ -86,6 +86,18 @@ public class PlanarianDbContext : DbContext
     {
         modelBuilder.HasPostgresExtension("postgis");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContext).Assembly);
+        
+        // modelBuilder.Entity<Cave>().HasQueryFilter(c =>
+        //     c.AccountId == RequestUser.AccountId &&
+        //     CavePermissions.Any(cavePermission =>
+        //         cavePermission.UserId == RequestUser.Id &&
+        //         cavePermission.AccountId == RequestUser.AccountId &&
+        //         (
+        //             (cavePermission.CountyId != null && cavePermission.CountyId == c.CountyId) ||
+        //             (cavePermission.CaveId != null && cavePermission.CaveId == c.Id)
+        //         )
+        //     )
+        // );
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

@@ -1,7 +1,10 @@
 import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
 import { PagedResult } from "../../Search/Models/PagedResult";
-import { QueryBuilder } from "../../Search/Services/QueryBuilder";
+import {
+  QueryBuilder,
+  QueryOperator,
+} from "../../Search/Services/QueryBuilder";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
@@ -68,6 +71,28 @@ const CaveService = {
       config
     );
     return response.data;
+  },
+
+  async SearchCavesPaged(
+    name: string,
+    pageNumber: number = 1,
+    pageSize: number = 10
+  ): Promise<PagedResult<CaveSearchVm>> {
+    if (!name) {
+      return {
+        results: [],
+        pageNumber: 1,
+        pageSize: pageSize,
+        totalCount: 0,
+        totalPages: 0,
+      };
+    }
+
+    const qb = new QueryBuilder<CaveSearchParamsVm>("", false);
+    qb.filterBy("name", QueryOperator.Contains, name as any);
+    qb.changePage(pageNumber, pageSize);
+
+    return await CaveService.GetCaves(qb);
   },
 };
 export { CaveService };
