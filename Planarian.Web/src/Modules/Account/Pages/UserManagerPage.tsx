@@ -19,7 +19,6 @@ const UserManagerPage: React.FC = () => {
       <LocationPermissionManagement
         userId="someUserId"
         maxCaveSelectCount={5} // or null if no limit
-        counties={[]}
       />
     </>
   );

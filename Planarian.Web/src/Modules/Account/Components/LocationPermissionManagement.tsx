@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Card,
   Switch,
-  Select,
   Button,
   List,
   Modal,
@@ -16,36 +15,48 @@ import {
   LeftOutlined,
   RightOutlined,
 } from "@ant-design/icons";
+
 import {
   UserLocationPermissionCaveVm,
   UserLocationPermissionsVm,
 } from "../Models/UserLocationPermissionsVm";
+
 import { CaveService } from "../../Caves/Service/CaveService";
 import { CaveSearchVm } from "../../Caves/Models/CaveSearchVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { UserLocationPermissionService } from "../Services/PermissionService";
 import { PagedResult } from "../../Search/Models/PagedResult";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
+import {
+  StateCountySelect,
+  StateCountyValue,
+} from "../../Tag/Components/StateCountySelect";
 
 const { Text } = Typography;
 
 interface LocationPermissionManagementProps {
   userId: string;
   maxCaveSelectCount?: number | null;
-  counties: SelectListItem<UserLocationPermissionCaveVm>[];
 }
 
+/**
+ * Manages user location permissions: states/counties & individual caves.
+ */
 export const LocationPermissionManagement: React.FC<
   LocationPermissionManagementProps
-> = ({ userId, maxCaveSelectCount = null, counties }) => {
+> = ({ userId, maxCaveSelectCount = null }) => {
   const [permissions, setPermissions] = useState<UserLocationPermissionsVm>({
     hasAllLocations: false,
     countyIds: [],
     caveIds: [],
   });
+
   const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
+
+  // -------------
+  // Caves searching
+  // -------------
   const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchResults, setSearchResults] = useState<CaveSearchVm[]>([]);
@@ -54,6 +65,15 @@ export const LocationPermissionManagement: React.FC<
   const [totalPages, setTotalPages] = useState<number>(1);
   const pageSize = 10;
 
+  // -------------
+  // State + County selections
+  // -------------
+  const [stateCountyValue, setStateCountyValue] = useState<StateCountyValue>({
+    states: [],
+    countiesByState: {},
+  });
+
+  // Load existing permissions on mount
   useEffect(() => {
     const loadPermissions = async () => {
       setLoading(true);
@@ -62,6 +82,16 @@ export const LocationPermissionManagement: React.FC<
           userId
         );
         setPermissions(data);
+
+        // If you want to also reflect existing countyIds
+        // back into StateCountySelect, we can't do that
+        // unless we also have stored states. So for now,
+        // we only set the counties. If needed, you'd have to
+        // figure out which states those counties belong to
+        // and populate `states` + `countiesByState`.
+        //
+        // For demonstration, we won't try to 'reverse engineer'
+        // which states the user had. We'll keep the input empty.
       } catch (error) {
         message.error("Failed to load user location permissions.");
         console.error(error);
@@ -72,6 +102,22 @@ export const LocationPermissionManagement: React.FC<
     void loadPermissions();
   }, [userId]);
 
+  /**
+   * Called when the user changes states/counties in StateCountySelect.
+   * We flatten all selected counties into a single array for permissions.countyIds.
+   */
+  const handleStateCountyChange = (newValue: StateCountyValue) => {
+    setStateCountyValue(newValue);
+    const allSelectedCountyIds = Object.values(newValue.countiesByState).flat();
+    setPermissions((prev) => ({
+      ...prev,
+      countyIds: allSelectedCountyIds,
+    }));
+  };
+
+  // -------------
+  // Cave Searching
+  // -------------
   const handleSearchCaves = async (pageNumber: number = 1) => {
     if (!searchTerm) {
       setSearchResults([]);
@@ -93,6 +139,9 @@ export const LocationPermissionManagement: React.FC<
     }
   };
 
+  /**
+   * User adds a cave from the search modal
+   */
   const handleAddCave = (cave: CaveSearchVm) => {
     if (
       maxCaveSelectCount !== null &&
@@ -110,7 +159,10 @@ export const LocationPermissionManagement: React.FC<
       display: cave.name,
     };
 
-    if (!permissions.caveIds.some((c) => c.value === newCave.value)) {
+    // Add if not already present
+    if (
+      !permissions.caveIds.some((c) => c.value.caveId === newCave.value.caveId)
+    ) {
       setPermissions((prev) => ({
         ...prev,
         caveIds: [...prev.caveIds, newCave],
@@ -118,6 +170,9 @@ export const LocationPermissionManagement: React.FC<
     }
   };
 
+  /**
+   * Remove a cave from the existing list
+   */
   const handleRemoveCave = (caveId: string) => {
     setPermissions((prev) => ({
       ...prev,
@@ -125,6 +180,9 @@ export const LocationPermissionManagement: React.FC<
     }));
   };
 
+  /**
+   * Save permissions to server
+   */
   const handleSave = async () => {
     setSaveLoading(true);
     try {
@@ -143,6 +201,7 @@ export const LocationPermissionManagement: React.FC<
 
   return (
     <Card title="Manage Location Permissions" loading={loading}>
+      {/* Has ALL Locations */}
       <div style={{ marginBottom: 16 }}>
         <Text strong>Has access to ALL locations: </Text>
         <Switch
@@ -151,31 +210,26 @@ export const LocationPermissionManagement: React.FC<
             setPermissions((prev) => ({
               ...prev,
               hasAllLocations: checked,
+              // If user toggles ON "All Locations", clear counties + caves
+              ...(checked ? { countyIds: [], caveIds: [] } : {}),
             }))
           }
         />
       </div>
 
+      {/* State/County Access using StateCountySelect */}
       <div style={{ marginBottom: 16 }}>
-        <Text strong>County Access:</Text>
-        <Select
-          style={{ width: "100%", marginTop: 8 }}
-          mode="multiple"
-          placeholder="Select counties"
-          disabled={permissions.hasAllLocations}
-          value={permissions.countyIds}
-          onChange={(values: string[]) =>
-            setPermissions((prev) => ({ ...prev, countyIds: values }))
-          }
-        >
-          {counties.map((c) => (
-            <Select.Option key={c.value.caveId} value={c.value.caveId}>
-              {c.display}
-            </Select.Option>
-          ))}
-        </Select>
+        <Text strong>County Access (by State):</Text>
+        <div style={{ marginTop: 8 }}>
+          <StateCountySelect
+            disabled={permissions.hasAllLocations}
+            value={stateCountyValue}
+            onChange={handleStateCountyChange}
+          />
+        </div>
       </div>
 
+      {/* Individual Caves */}
       <div style={{ marginBottom: 16 }}>
         <Text strong>Individual Caves:</Text>
         <div style={{ marginTop: 8 }}>
@@ -213,12 +267,14 @@ export const LocationPermissionManagement: React.FC<
         )}
       </div>
 
+      {/* Save button */}
       <div style={{ textAlign: "right" }}>
         <Button type="primary" onClick={handleSave} loading={saveLoading}>
           Save Changes
         </Button>
       </div>
 
+      {/* Modal for searching caves */}
       <Modal
         title="Search for Caves"
         open={isSearchModalOpen}
@@ -239,38 +295,32 @@ export const LocationPermissionManagement: React.FC<
           loading={searching}
           dataSource={searchResults}
           locale={{ emptyText: "No caves found" }}
-          renderItem={(cave) => (
-            <List.Item
-              actions={[
-                <AddButtonComponent
-                  disabled={permissions.caveIds.some(
-                    (c) => c.value.caveId === cave.id
-                  )}
-                  type="link"
-                  onClick={() => handleAddCave(cave)}
-                />,
-              ]}
-              style={{
-                opacity: permissions.caveIds.some(
-                  (c) => c.value.caveId === cave.id
-                )
-                  ? 0.5
-                  : 1,
-                pointerEvents: permissions.caveIds.some(
-                  (c) => c.value.caveId === cave.id
-                )
-                  ? "none"
-                  : "auto",
-              }}
-            >
-              <List.Item.Meta
-                title={cave.name}
-                description={`County: ${cave.countyId}`}
+          renderItem={(cave) => {
+            const alreadySelected = permissions.caveIds.some(
+              (c) => c.value.caveId === cave.id
+            );
+
+            return (
+              <List.Item
+                actions={[
+                  <AddButtonComponent
+                    disabled={alreadySelected}
+                    type="link"
+                    onClick={() => handleAddCave(cave)}
+                  />,
+                ]}
+                style={{
+                  opacity: alreadySelected ? 0.5 : 1,
+                  pointerEvents: alreadySelected ? "none" : "auto",
+                }}
               >
-                Test?
-              </List.Item.Meta>
-            </List.Item>
-          )}
+                <List.Item.Meta
+                  title={cave.name}
+                  description={`County: ${cave.countyId}`}
+                />
+              </List.Item>
+            );
+          }}
         />
 
         <div
