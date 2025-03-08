@@ -1,12 +1,26 @@
-import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { SelectListItemWithData } from "../../../Shared/Models/SelectListItem";
 
-export interface UserLocationPermissionsVm {
+export interface CavePermissionManagementVm {
   hasAllLocations: boolean;
-  countyIds: string[];
-  caveIds: SelectListItem<UserLocationPermissionCaveVm>[];
+  stateCountyValues: StateCountyValue;
+  cavePermissions: SelectListItemWithData<
+    string,
+    CavePermissionManagementData
+  >[];
 }
 
-export interface UserLocationPermissionCaveVm {
-  caveId: string;
+export interface CavePermissionManagementData {
   countyId: string;
+}
+
+export interface StateCountyValue {
+  states: string[];
+
+  countiesByState: Record<string, string[]>;
+}
+
+export interface CreateUserCavePermissionsVm {
+  hasAllLocations: boolean;
+  countyIds: string[];
+  caveIds: string[];
 }

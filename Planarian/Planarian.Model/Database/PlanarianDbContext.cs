@@ -62,7 +62,6 @@ public class PlanarianDbContext : DbContext
     
     public DbSet<CavePermission> CavePermissions { get; set; } = null!;
     
-    public DbSet<CavePermissionPermission> CavePermissionPermissions { get; set; } = null!;
     public DbSet<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;

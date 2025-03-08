@@ -69,6 +69,11 @@ public abstract class RepositoryBase
     {
         DbContext.Remove(entity);
     }
+    
+    public void DeleteRange(IEnumerable<EntityBase> entities)
+    {
+        DbContext.RemoveRange(entities);
+    }
 
     protected string GetTableName<TEntity>()
     {

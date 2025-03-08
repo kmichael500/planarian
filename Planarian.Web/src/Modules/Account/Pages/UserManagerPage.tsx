@@ -3,7 +3,8 @@ import { Row } from "antd";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { AccountSettingsComponent } from "../Components/AccountSettingsComponent";
 import { UserManagerComponent } from "../Components/UserManagerComponent";
-import { LocationPermissionManagement } from "../Components/LocationPermissionManagement";
+import { CavePermissionManagement } from "../Components/CavePermissionManagementProps";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const UserManagerPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -15,10 +16,10 @@ const UserManagerPage: React.FC = () => {
 
   return (
     <>
-      {/* <UserManagerComponent /> */}
-      <LocationPermissionManagement
-        userId="someUserId"
-        maxCaveSelectCount={5} // or null if no limit
+      <CavePermissionManagement
+        userId="1mlAiqjdEE"
+        permissionKey={PermissionKey.View}
+        maxCaveSelectCount={5}
       />
     </>
   );

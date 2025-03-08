@@ -2,13 +2,12 @@ import { Select, Spin } from "antd";
 import { useState, useEffect } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
+import { StateCountyValue } from "../../Account/Models/UserLocationPermissionsVm";
 
 const { Option } = Select;
 
 interface StateCountySelectProps {
-  /** Current value, for controlled usage (Ant Form integration) */
   value?: StateCountyValue;
-  /** Fires whenever the user updates state or county selections */
   onChange?: (value: StateCountyValue) => void;
 
   /** Optional placeholders/labels/etc. */
@@ -17,21 +16,6 @@ interface StateCountySelectProps {
   disabled?: boolean;
 }
 
-// StateCountyValue.ts
-export interface StateCountyValue {
-  /** List of state IDs the user selected */
-  states: string[];
-  /**
-   * For each state ID, an array of county IDs
-   * the user selected
-   */
-  countiesByState: Record<string, string[]>;
-}
-
-/**
- * Allows multiple selection of States,
- * and for each selected State, multiple Counties.
- */
 export const StateCountySelect: React.FC<StateCountySelectProps> = ({
   value,
   onChange,
@@ -39,35 +23,38 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
   labelCounties = "Select Counties",
   disabled = false,
 }) => {
-  // Keep an internal state, which can be either
-  // controlled or uncontrolled depending on the props.
   const [internalValue, setInternalValue] = useState<StateCountyValue>({
     states: [],
     countiesByState: {},
   });
 
-  // Merge in the "value" prop if using as a controlled component.
   useEffect(() => {
     if (value) {
       setInternalValue(value);
     }
   }, [value]);
 
-  // All states for the top-level Select
+  useEffect(() => {
+    if (value?.states) {
+      value.states.forEach((stateId) => {
+        if (!countiesByStateData[stateId]) {
+          loadCountiesForState(stateId);
+        }
+      });
+    }
+  }, [value]);
+
   const [allStates, setAllStates] = useState<SelectListItem<string>[]>([]);
   const [statesLoading, setStatesLoading] = useState<boolean>(false);
 
-  // A dictionary of stateId -> array of counties
   const [countiesByStateData, setCountiesByStateData] = useState<
     Record<string, SelectListItem<string>[]>
   >({});
 
-  // Loading flags for counties
   const [countiesLoading, setCountiesLoading] = useState<
     Record<string, boolean>
   >({});
 
-  /** Fetch states on mount */
   useEffect(() => {
     (async () => {
       setStatesLoading(true);
@@ -80,11 +67,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     })();
   }, []);
 
-  /**
-   * Called when user changes the states selection.
-   * We fetch county data for any newly added states,
-   * and remove county data for any unselected states.
-   */
   const handleStatesChange = async (selectedStateIds: string[]) => {
     const oldValue = { ...internalValue };
     const newValue: StateCountyValue = {
@@ -92,20 +74,16 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
       countiesByState: { ...oldValue.countiesByState },
     };
 
-    // Remove county selections for states no longer selected
     for (const oldStateId of Object.keys(newValue.countiesByState)) {
       if (!selectedStateIds.includes(oldStateId)) {
         delete newValue.countiesByState[oldStateId];
       }
     }
 
-    // For newly selected states that we haven't fetched yet, fetch counties
     for (const newStateId of selectedStateIds) {
       if (!countiesByStateData[newStateId]) {
-        // fetch once
         await loadCountiesForState(newStateId);
       }
-      // Make sure we have a record for this state in countiesByState
       if (!newValue.countiesByState[newStateId]) {
         newValue.countiesByState[newStateId] = [];
       }
@@ -115,10 +93,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     onChange?.(newValue);
   };
 
-  /**
-   * Called when user changes the counties for a specific state.
-   * We just update that one state's counties in the overall data.
-   */
   const handleCountiesChange = (
     stateId: string,
     selectedCountyIds: string[]
@@ -133,9 +107,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
     onChange?.(newValue);
   };
 
-  /**
-   * Helper to fetch counties for a single state, store in state
-   */
   const loadCountiesForState = async (stateId: string) => {
     setCountiesLoading((prev) => ({ ...prev, [stateId]: true }));
     try {
@@ -151,7 +122,6 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
 
   return (
     <div>
-      {/* States Select */}
       <div style={{ marginBottom: 8 }}>
         <label style={{ display: "block", fontWeight: 500 }}>
           {labelStates}
@@ -195,7 +165,7 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
                 mode="multiple"
                 style={{ width: "100%" }}
                 disabled={disabled}
-                placeholder="Choose County(ies)"
+                placeholder="Choose Counties"
                 value={internalValue.countiesByState[stateId] || []}
                 onChange={(countyIds) =>
                   handleCountiesChange(stateId, countyIds)

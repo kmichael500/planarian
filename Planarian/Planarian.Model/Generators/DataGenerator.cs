@@ -44,6 +44,24 @@ public class DataGenerator
 
         try
         {
+            var permissions = GeneratePermissions();
+            foreach (var permission in permissions)
+            {
+                var existingPermission = await _dbContext.Permissions.FindAsync(permission.Id);
+
+                if (existingPermission != null)
+                {
+                    existingPermission.Name = permission.Name;
+                    existingPermission.Description = permission.Description;
+                    existingPermission.IsHidden = permission.IsHidden;
+                    existingPermission.Key = permission.Key;
+                }
+                else
+                {
+                    await _dbContext.Permissions.AddAsync(permission);
+                }
+            }
+
             var defaultFeatureSettings = GenerateDefaultFeatureSettings();
             foreach (var setting in defaultFeatureSettings)
             {
@@ -371,5 +389,28 @@ public class DataGenerator
                 IsDefault = true, CreatedOn = Now
             },
         };
+    }
+
+    private IEnumerable<Permission> GeneratePermissions()
+    {
+        var managePermission = new Permission
+        {
+            Id = "vIeWPz9a00",
+            Name = "View",
+            Description = "Allows the user to view caves.",
+            IsHidden = false,
+            Key = PermissionKey.View,
+        };
+
+        var viewPermission = new Permission
+        {
+            Id = "MaNagEz9a0",
+            Name = "Manage",
+            Description = "Allows the user to manage caves.",
+            IsHidden = false,
+            Key = PermissionKey.Manage,
+        };
+
+        return [viewPermission, managePermission];
     }
 }

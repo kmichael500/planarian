@@ -93,6 +93,12 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
     private async Task Validate(PlanarianDbContext context, EntityEntry entity, EntityState entityState)
     {
         var name = entity.Entity.GetType().Name;
+        switch (name)
+        {
+            case nameof(Permission):
+                return;
+        }
+        
         var requestUserAccountId = context.RequestUser.AccountId;
         switch (name)
         {

@@ -15,21 +15,20 @@ public class CavePermission : EntityBase
     [Required]
     [MaxLength(PropertyLength.Id)]
     public string AccountId { get; set; } = null!;
+    
+    [Required] [MaxLength(PropertyLength.Id)] public string PermissionId { get; set; } = null!;
 
     // Either a CountyId OR a CaveId (or neither) may be provided.
     [MaxLength(PropertyLength.Id)] public string? CountyId { get; set; } // Applies to all caves in the county.
 
-    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; } // Applies to a specific cave.
+    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
 
     public virtual User? User { get; set; }
     public virtual Account? Account { get; set; }
     public virtual County? County { get; set; }
     public virtual Cave? Cave { get; set; }
+    public virtual Permission? Permission { get; set; }
 
-    public virtual ICollection<Permission> Permissions { get; set; } = new List<Permission>();
-
-    public virtual ICollection<CavePermissionPermission> CavePermissionPermissions { get; set; } =
-        new HashSet<CavePermissionPermission>();
 }
 
 
@@ -38,9 +37,7 @@ public class CavePermissionConfiguration : BaseEntityTypeConfiguration<CavePermi
     public override void Configure(EntityTypeBuilder<CavePermission> builder)
     {
         base.Configure(builder);
-
-        base.Configure(builder);
-
+        
         builder.HasOne(e => e.User)
             .WithMany(e => e.CavePermissions)
             .HasForeignKey(e => e.UserId)
@@ -60,6 +57,11 @@ public class CavePermissionConfiguration : BaseEntityTypeConfiguration<CavePermi
             .WithMany(e => e.CavePermissions)
             .HasForeignKey(e => e.CaveId)
             .OnDelete(DeleteBehavior.NoAction);
+        
+        builder.HasOne(e => e.Permission)
+            .WithMany(e => e.CavePermission)
+            .HasForeignKey(e => e.PermissionId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // Enforce that at most one of CountyId and CaveId is provided.
         builder.ToTable(nameof(CavePermission), tb =>
@@ -68,17 +70,17 @@ public class CavePermissionConfiguration : BaseEntityTypeConfiguration<CavePermi
         });
 
         // Unique index for records with a CountyId (and CaveId is null).
-        builder.HasIndex(e => new { e.UserId, e.AccountId, e.CountyId })
+        builder.HasIndex(e => new { e.UserId, e.AccountId, e.CountyId, e.PermissionId })
             .IsUnique()
             .HasFilter("\"CountyId\" IS NOT NULL");
 
         // Unique index for records with a CaveId (and CountyId is null).
-        builder.HasIndex(e => new { e.UserId, e.AccountId, e.CaveId })
+        builder.HasIndex(e => new { e.UserId, e.AccountId, e.CaveId, e.PermissionId })
             .IsUnique()
             .HasFilter("\"CaveId\" IS NOT NULL");
 
         // Unique index for records with neither location specified.
-        builder.HasIndex(e => new { e.UserId, e.AccountId })
+        builder.HasIndex(e => new { e.UserId, e.AccountId, e.PermissionId })
             .IsUnique()
             .HasFilter("\"CountyId\" IS NULL AND \"CaveId\" IS NULL");
     }

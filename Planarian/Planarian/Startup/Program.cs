@@ -176,6 +176,7 @@ builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<AccountRepository>();
+builder.Services.AddScoped<PermissionRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped<MapService>();

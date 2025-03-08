@@ -22,7 +22,7 @@ public class Permission : EntityBase
     [MaxLength(PropertyLength.Key)]
     public string Key { get; set; } = null!;
 
-    public IEnumerable<CavePermissionPermission> CavePermissionPermissions { get; set; }
+    public ICollection<CavePermission> CavePermission { get; set; } = new HashSet<CavePermission>();
 }
 
 public class PermissionConfiguration : BaseEntityTypeConfiguration<Permission>
