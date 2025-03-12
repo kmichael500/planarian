@@ -78,16 +78,6 @@ const CaveService = {
     pageNumber: number = 1,
     pageSize: number = 10
   ): Promise<PagedResult<CaveSearchVm>> {
-    if (!name) {
-      return {
-        results: [],
-        pageNumber: 1,
-        pageSize: pageSize,
-        totalCount: 0,
-        totalPages: 0,
-      };
-    }
-
     const qb = new QueryBuilder<CaveSearchParamsVm>("", false);
     qb.filterBy("name", QueryOperator.Contains, name as any);
     qb.changePage(pageNumber, pageSize);
@@ -95,4 +85,5 @@ const CaveService = {
     return await CaveService.GetCaves(qb);
   },
 };
+
 export { CaveService };

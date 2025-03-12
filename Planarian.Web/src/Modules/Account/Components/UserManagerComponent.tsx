@@ -23,6 +23,8 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import { Link } from "react-router-dom";
+import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
@@ -145,6 +147,9 @@ const UserManagerComponent: React.FC = () => {
               Resend Invitation
             </Button>
           )}
+          <Link to={record.userId}>
+            <EditButtonComponentt />
+          </Link>
         </Space>
       ),
     },

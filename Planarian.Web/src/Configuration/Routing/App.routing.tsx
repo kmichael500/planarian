@@ -22,6 +22,8 @@ import { AppRederect } from "./App.routing.redirect";
 import { MapPage } from "../../Modules/Map/Pages/MapPage";
 import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
 import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptInvitationPage";
+import { UserPage } from "../../Modules/Account/Pages/UserPage";
+import { UserPermissionManagementPage } from "../../Modules/Account/Pages/UserPermissionManagementPage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -46,6 +48,11 @@ export const AppRouting: React.FC = () => {
         <Route path="/map" element={<MapPage />} />
         <Route path="/account/settings" element={<AccountSettingsPage />} />
         <Route path="/account/users" element={<UserManagerPage />} />
+        <Route path="/account/users/:userId" element={<UserPage />} />
+        <Route
+          path="/account/users/:userId/permissions/:permissionKey"
+          element={<UserPermissionManagementPage />}
+        />
         <Route path="/account/import" element={<ImportPage />} />
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>

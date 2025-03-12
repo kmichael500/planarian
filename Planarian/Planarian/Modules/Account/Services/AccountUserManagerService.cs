@@ -25,7 +25,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
-        ServerOptions serverOptions, AccountRepository accountRepository, PermissionRepository permissionRepository) : base(repository, requestUser)
+        ServerOptions serverOptions, AccountRepository accountRepository,
+        PermissionRepository permissionRepository) : base(repository, requestUser)
     {
         _emailService = emailService;
         _accountRepository = accountRepository;
@@ -183,21 +184,22 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         {
             throw ApiExceptionDictionary.NoAccount;
         }
-        
-        
+
+
         var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
         if (accountUser == null)
         {
             throw ApiExceptionDictionary.NotFound("User");
         }
-        
+
         var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
         if (permission == null)
         {
             throw ApiExceptionDictionary.NotFound("Permission");
         }
 
-        var existingPermissions = (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
+        var existingPermissions =
+            (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
         Repository.DeleteRange(existingPermissions);
 
         if (vm.HasAllLocations)
@@ -217,7 +219,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             await Repository.SaveChangesAsync();
             return;
         }
-        
+
         foreach (var countyId in vm.CountyIds.Distinct())
         {
             var row = new CavePermission
@@ -249,4 +251,31 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
 
     #endregion
+
+    public async Task<UserManagerGridVm> GetUserById(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var user = await Repository.GetUserById(userId, RequestUser.AccountId);
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        return user;
+    }
+
+    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>> GetPermissionSelectList()
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var permissions = await _permissionRepository.GetPermissionSelectList();
+        return permissions;
+    }
 }

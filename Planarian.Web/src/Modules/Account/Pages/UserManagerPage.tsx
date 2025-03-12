@@ -1,10 +1,6 @@
 import React, { useContext, useEffect } from "react";
-import { Row } from "antd";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { AccountSettingsComponent } from "../Components/AccountSettingsComponent";
 import { UserManagerComponent } from "../Components/UserManagerComponent";
-import { CavePermissionManagement } from "../Components/CavePermissionManagementProps";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const UserManagerPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -16,11 +12,7 @@ const UserManagerPage: React.FC = () => {
 
   return (
     <>
-      <CavePermissionManagement
-        userId="1mlAiqjdEE"
-        permissionKey={PermissionKey.View}
-        maxCaveSelectCount={5}
-      />
+      <UserManagerComponent />
     </>
   );
 };

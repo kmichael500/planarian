@@ -34,30 +34,24 @@ import { AccountUserManagerService } from "../Services/UserManagerService";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 const { Text } = Typography;
 
-interface CavePermissionManagementProps {
+interface UserPermissionManagementProps {
   userId: string;
   permissionKey: PermissionKey;
   maxCaveSelectCount?: number | null;
 }
 
-/**
- * Manages user location permissions: states/counties & individual caves, using a typed Ant Design Form.
- */
-export const CavePermissionManagement: React.FC<
-  CavePermissionManagementProps
+export const UserPermissionManagement: React.FC<
+  UserPermissionManagementProps
 > = ({ userId, maxCaveSelectCount = null, permissionKey }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
 
-  // Typed Ant Design Form instance
   const [form] = Form.useForm<CavePermissionManagementVm>();
 
-  // -------------
-  // Cave searching (local state)
-  // -------------
   const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchResults, setSearchResults] = useState<CaveSearchVm[]>([]);
@@ -66,7 +60,6 @@ export const CavePermissionManagement: React.FC<
   const [totalPages, setTotalPages] = useState<number>(1);
   const pageSize = 10;
 
-  // Load existing permissions from server on mount
   useEffect(() => {
     const loadPermissions = async () => {
       setLoading(true);
@@ -77,10 +70,8 @@ export const CavePermissionManagement: React.FC<
             permissionKey
           );
 
-        console.log(data);
+        await handleSearchCaves(1);
 
-        // Populate form fields. If we want to "reverse-engineer" states from countyIds,
-        // we'd do that here. For now, we just set it empty so the user can re‐select.
         form.setFieldsValue({
           hasAllLocations: data.hasAllLocations,
           stateCountyValues: data.stateCountyValues ?? {
@@ -99,9 +90,6 @@ export const CavePermissionManagement: React.FC<
     loadPermissions();
   }, [userId, form]);
 
-  /**
-   * Form submit handler (called by onFinish).
-   */
   const handleFormSubmit = async (values: CavePermissionManagementVm) => {
     const newPermissions: CreateUserCavePermissionsVm = {
       hasAllLocations: values.hasAllLocations,
@@ -139,10 +127,6 @@ export const CavePermissionManagement: React.FC<
     ) || [];
 
   const handleSearchCaves = async (pageNumber: number = 1) => {
-    if (!searchTerm) {
-      setSearchResults([]);
-      return;
-    }
     setSearching(true);
     try {
       const pagedResult: PagedResult<CaveSearchVm> =
@@ -192,13 +176,12 @@ export const CavePermissionManagement: React.FC<
   };
 
   return (
-    <Card title="Manage Location Permissions" loading={loading}>
+    <Card title={`${permissionKey} Permission`} loading={loading}>
       <Form<CavePermissionManagementVm>
         form={form}
         layout="vertical"
         onFinish={handleFormSubmit}
       >
-        {/* Has ALL Locations */}
         <Form.Item
           label={<Text strong>Has access to ALL locations:</Text>}
           name={nameof<CavePermissionManagementVm>("hasAllLocations")}

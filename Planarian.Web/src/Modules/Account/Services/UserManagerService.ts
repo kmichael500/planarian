@@ -1,6 +1,8 @@
 import { HttpClient } from "../../..";
+import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
+import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import {
   CavePermissionManagementVm,
   CreateUserCavePermissionsVm,
@@ -11,6 +13,12 @@ const baseUrl = "api/account/user-manager";
 const AccountUserManagerService = {
   async GetAccountUsers(): Promise<UserManagerGridVm[]> {
     const response = await HttpClient.get<UserManagerGridVm[]>(`${baseUrl}`);
+    return response.data;
+  },
+  async GetUserById(userId: string): Promise<UserManagerGridVm> {
+    const response = await HttpClient.get<UserManagerGridVm>(
+      `${baseUrl}/${userId}`
+    );
     return response.data;
   },
   async InviteUser(request: InviteUserRequest): Promise<void> {
@@ -47,5 +55,16 @@ const AccountUserManagerService = {
   },
 
   //#endregion
+
+  //#region Select
+
+  async GetPermissionSelectList(): Promise<
+    SelectListItemDescriptionData<string, PermissionSelectListData>[]
+  > {
+    const response = await HttpClient.get<
+      SelectListItemDescriptionData<string, PermissionSelectListData>[]
+    >(`${baseUrl}/select/permissions`);
+    return response.data;
+  },
 };
 export { AccountUserManagerService };

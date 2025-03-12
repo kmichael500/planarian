@@ -29,3 +29,18 @@ public class SelectListItem<TValue, TData> : SelectListItem<TValue>
 
     public TData Data { get; set; } = default!;
 }
+
+public class SelectListItemDescriptionData<TValue, TData> : SelectListItem<TValue, TData>
+{
+    public SelectListItemDescriptionData(string display, TValue value, string description, TData data) : base(display,
+        value, data)
+    {
+        Description = description;
+    }
+
+    public SelectListItemDescriptionData()
+    {
+    }
+
+    public string Description { get; set; } = null!;
+}

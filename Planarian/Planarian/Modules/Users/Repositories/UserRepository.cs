@@ -53,10 +53,10 @@ public class UserRepository : RepositoryBase
 
     public async Task<List<UserManagerGridVm>> GetAccountUsers(string accountId)
     {
-        return await DbContext.AccountUsers
-            .Where(e => e.AccountId == accountId)
-            .Select(e => new UserManagerGridVm(e.UserId, e.User.EmailAddress, e.User.FullName, e.InvitationSentOn,
-                e.InvitationAcceptedOn))
+        return await ToUserGridVmQuery(DbContext.AccountUsers
+                .Where(e => e.AccountId == accountId)
+                .Select(e => e)
+            )
             .ToListAsync();
     }
 
@@ -66,10 +66,10 @@ public class UserRepository : RepositoryBase
             .Where(e => e.InvitationCode == code && e.User != null && e.User.IsTemporary)
             .Select(e => new AcceptInvitationVm
             {
-                FirstName = e.User.FirstName,
+                FirstName = e.User!.FirstName,
                 LastName = e.User.LastName,
                 Email = e.User.EmailAddress,
-                Regions = e.Account.AccountStates.OrderByDescending(ee => ee.State.Name).Select(ee => ee.State.Name),
+                Regions = e.Account!.AccountStates.OrderByDescending(ee => ee.State.Name).Select(ee => ee.State.Name),
                 AccountName = e.Account.Name,
                 AccountId = e.Account.Id
             })
@@ -100,13 +100,7 @@ public class UserRepository : RepositoryBase
         string permissionKey)
     {
         var permissions = GetCavePermissionQuery(userId, accountId, permissionKey);
-
-        var permissionsEntities = (await permissions
-                .Include(e=>e.County)
-                .Include(e=>e.Cave)
-                .GroupBy(e => e.UserId)
-                .ToListAsync());
-
+        
         var data = await permissions.Select(e=> new
         {
             CaveName = e.Cave!.Name,
@@ -115,7 +109,6 @@ public class UserRepository : RepositoryBase
             e.CountyId,
             StateId = e.County!.StateId
         }).ToListAsync();
-
         
         var hasAllLocations = data.Any(permission => permission.CountyId == null && permission.CaveId == null);
 
@@ -138,7 +131,6 @@ public class UserRepository : RepositoryBase
                     CountyId = e.CaveCountyId!
                 }
             }).ToList();
-                    
         
         var result = new CavePermissionManagementVm
         {
@@ -148,7 +140,6 @@ public class UserRepository : RepositoryBase
         };
 
         return result;
-
     }
 
     public async Task<IEnumerable<CavePermission>> GetCavePermissions(string userId,
@@ -164,4 +155,20 @@ public class UserRepository : RepositoryBase
     }
 
     #endregion
+
+    public async Task<UserManagerGridVm?> GetUserById(string userId, string requestUserAccountId)
+    {
+        var user = await ToUserGridVmQuery(DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == requestUserAccountId)
+            .Select(e => (e))
+        ).FirstOrDefaultAsync();
+
+        return user;
+    }
+    
+    private static IQueryable<UserManagerGridVm> ToUserGridVmQuery(IQueryable<AccountUser> query)
+    {
+        return query.Select(e => new UserManagerGridVm(e.UserId, e.User!.EmailAddress, e.User.FullName, e.InvitationSentOn,
+            e.InvitationAcceptedOn));
+    }
 }

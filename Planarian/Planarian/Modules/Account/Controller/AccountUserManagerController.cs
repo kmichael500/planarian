@@ -14,8 +14,8 @@ namespace Planarian.Modules.Account.Controller;
 public class AccountUserManagerController : PlanarianControllerBase<AccountUserManagerService>
 {
     public AccountUserManagerController(
-        RequestUser requestUser, 
-        AccountUserManagerService service, 
+        RequestUser requestUser,
+        AccountUserManagerService service,
         TokenService tokenService
     ) : base(requestUser, tokenService, service)
     {
@@ -24,10 +24,17 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     #region User Manage
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UserManagerGridVm>>> Get()
+    public async Task<ActionResult<IEnumerable<UserManagerGridVm>>> GetAccountUsers()
     {
         var users = await Service.GetAccountUsers();
         return new JsonResult(users);
+    }
+
+    [HttpGet("{userId:length(10)}")]
+    public async Task<ActionResult<UserManagerGridVm>> GetUserById(string userId)
+    {
+        var user = await Service.GetUserById(userId);
+        return new JsonResult(user);
     }
 
     [HttpPost("{userId:length(10)}/resend-invitation")]
@@ -43,7 +50,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         await Service.InviteUser(request, cancellationToken);
         return Ok();
     }
-    
+
     [HttpDelete("{userId:length(10)}")]
     public async Task<ActionResult> Revoke(string userId)
     {
@@ -56,7 +63,8 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     #region Permission Management
 
     [HttpGet("{userId:length(10)}/location-permissions/{permissionKey}")]
-    public async Task<ActionResult<CavePermissionManagementVm>> GetLocationPermissions(string userId, string permissionKey)
+    public async Task<ActionResult<CavePermissionManagementVm>> GetLocationPermissions(string userId,
+        string permissionKey)
     {
         var permissions = await Service.GetLocationPermissions(userId, permissionKey);
         return new JsonResult(permissions);
@@ -72,6 +80,14 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return Ok();
     }
 
+    [HttpGet("select/permissions")]
+
+    public async Task<ActionResult<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>> GetPermissionSelectList()
+    {
+        var results = await Service.GetPermissionSelectList();
+        return new JsonResult(results);
+    }
+
     #endregion
-    
+
 }

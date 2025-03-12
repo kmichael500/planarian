@@ -15,3 +15,8 @@ export interface SelectListItemKey<TValue extends object> {
   value: NestedKeyOf<TValue>;
   data?: any;
 }
+
+export interface SelectListItemDescriptionData<TValue, TData>
+  extends SelectListItemWithData<TValue, TData> {
+  description: string;
+}
