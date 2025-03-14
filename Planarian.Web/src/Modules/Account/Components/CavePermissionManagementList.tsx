@@ -2,14 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Card, List, Typography, message } from "antd";
 import { Link } from "react-router-dom";
 
-// Adjust these imports to match your project’s file structure
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
-// or wherever your HttpClient is located
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
-import { HttpClient } from "@microsoft/signalr";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import { AccountUserManagerService } from "../Services/UserManagerService";
+import { PermissionType } from "../../Authentication/Models/PermissionType";
 
 const { Text } = Typography;
 
@@ -17,7 +15,7 @@ interface PermissionManagementListProps {
   userId: string;
 }
 
-export const PermissionManagementList: React.FC<
+export const CavePermissionManagementList: React.FC<
   PermissionManagementListProps
 > = ({ userId }) => {
   const [permissions, setPermissions] = useState<
@@ -29,7 +27,9 @@ export const PermissionManagementList: React.FC<
     const loadPermissions = async () => {
       setLoading(true);
       try {
-        const data = await AccountUserManagerService.GetPermissionSelectList();
+        const data = await AccountUserManagerService.GetPermissionSelectList(
+          PermissionType.Cave
+        );
         setPermissions(data);
       } catch (err) {
         console.error(err);
@@ -44,10 +44,12 @@ export const PermissionManagementList: React.FC<
   }, []);
 
   return (
-    <Card title="Manage Permissions">
+    <Card title="Cave Permissions">
       <List
         loading={loading}
-        dataSource={permissions}
+        dataSource={permissions.sort(
+          (a, b) => a.data.sortOrder - b.data.sortOrder
+        )}
         renderItem={(permission) => (
           <List.Item
             actions={[

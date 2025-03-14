@@ -18,6 +18,7 @@ public class Account : EntityBase
     public ICollection<TagType> Tags { get; set; } = new HashSet<TagType>();
     public ICollection<FeatureSetting> FeatureSettings { get; set; } = new HashSet<FeatureSetting>();
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
+    public ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>

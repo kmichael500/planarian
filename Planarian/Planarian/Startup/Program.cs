@@ -198,6 +198,11 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
     options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 });
 
+builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
+{
+    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+});
+
 LinqToDBForEFTools.Initialize();
 //
 // // Convert NetTopologySuite Point to SqlGeometry

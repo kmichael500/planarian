@@ -10,7 +10,6 @@ interface StateCountySelectProps {
   value?: StateCountyValue;
   onChange?: (value: StateCountyValue) => void;
 
-  /** Optional placeholders/labels/etc. */
   labelStates?: string;
   labelCounties?: string;
   disabled?: boolean;
@@ -135,6 +134,12 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
             disabled={disabled}
             placeholder="Choose State(s)"
             value={internalValue.states}
+            showSearch
+            filterOption={(input, option) => {
+              return option?.props.children
+                .toLowerCase()
+                .includes(input.toLowerCase());
+            }}
             onChange={handleStatesChange}
             allowClear
           >
@@ -171,6 +176,12 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
                   handleCountiesChange(stateId, countyIds)
                 }
                 allowClear
+                showSearch
+                filterOption={(input, option) => {
+                  return option?.props.children
+                    .toLowerCase()
+                    .includes(input.toLowerCase());
+                }}
               >
                 {counties.map((cty) => (
                   <Option key={cty.value} value={cty.value}>

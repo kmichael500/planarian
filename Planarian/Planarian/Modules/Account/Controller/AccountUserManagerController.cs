@@ -62,32 +62,58 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
     #region Permission Management
 
-    [HttpGet("{userId:length(10)}/location-permissions/{permissionKey}")]
-    public async Task<ActionResult<CavePermissionManagementVm>> GetLocationPermissions(string userId,
+    [HttpGet("{userId:length(10)}/cave-permissions/{permissionKey}")]
+    public async Task<ActionResult<CavePermissionManagementVm>> GetCavePermissions(string userId,
         string permissionKey)
     {
-        var permissions = await Service.GetLocationPermissions(userId, permissionKey);
+        var permissions = await Service.GetcavePermissions(userId, permissionKey);
         return new JsonResult(permissions);
     }
 
-    [HttpPut("{userId:length(10)}/location-permissions/{permissionKey}")]
-    public async Task<IActionResult> UpdateLocationPermissions(
+    [HttpPut("{userId:length(10)}/cave-permissions/{permissionKey}")]
+    public async Task<IActionResult> UpdateCavePermissions(
         string userId,
         string permissionKey,
         [FromBody] CreateUserCavePermissionsVm model)
     {
-        await Service.UpdateLocationPermissions(userId, permissionKey, model);
+        await Service.UpdateCavePermissions(userId, permissionKey, model);
         return Ok();
     }
 
     [HttpGet("select/permissions")]
-
-    public async Task<ActionResult<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>> GetPermissionSelectList()
+    public async Task<ActionResult<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>>
+        GetPermissionSelectList([FromQuery] string permissionType)
     {
-        var results = await Service.GetPermissionSelectList();
+        var results = await Service.GetPermissionSelectList(permissionType);
         return new JsonResult(results);
     }
 
+
+    [HttpGet("{userId:length(10)}/user-permissions")]
+    public async Task<ActionResult<IEnumerable<UserPermissionVm>>>
+        GetUserPermissions(string userId)
+    {
+        var perms = await Service.GetUserPermissions(userId);
+        return new JsonResult(perms);
+    }
+
+    [HttpPost("{userId:length(10)}/user-permissions/{permissionKey}")]
+    public async Task<IActionResult> AddUserPermission(string userId, string permissionKey)
+    {
+        await Service.AddUserPermission(userId, permissionKey);
+        return Ok();
+    }
+
+    [HttpDelete("{userId:length(10)}/user-permissions/{permissionKey}")]
+    public async Task<IActionResult> RemoveUserPermission(
+        string userId,
+        string permissionKey)
+    {
+        await Service.RemoveUserPermission(userId, permissionKey);
+        return Ok();
+    }
+
     #endregion
+
 
 }

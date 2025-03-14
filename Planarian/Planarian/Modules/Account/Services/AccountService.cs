@@ -84,6 +84,9 @@ public class AccountService : ServiceBase<AccountRepository>
             await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
                 "Deleted 0 of 0 caves.");
 
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
+            await Repository.DeleteAllCavePermissions();
+            
             async void DeleteCavesProgressHandler(string message)
             {
                 await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);

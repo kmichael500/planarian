@@ -16,15 +16,13 @@ import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import {
-  formatDate,
-  formatDateTime,
-  nameof,
-} from "../../../Shared/Helpers/StringHelpers";
+import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { Link } from "react-router-dom";
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { UserAddOutlined } from "@ant-design/icons";
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
@@ -173,9 +171,13 @@ const UserManagerComponent: React.FC = () => {
             alignItems: "center",
           }}
         >
-          <Button type="primary" onClick={() => setInviteModalVisible(true)}>
+          <PlanarianButton
+            icon={<UserAddOutlined />}
+            type="primary"
+            onClick={() => setInviteModalVisible(true)}
+          >
             Invite User
-          </Button>
+          </PlanarianButton>
           <Input.Search
             placeholder="Search users"
             onSearch={(value) => setSearchText(value)}

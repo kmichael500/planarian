@@ -127,7 +127,7 @@ const AccountSettingsComponent = () => {
 
   return (
     <>
-      <Space direction="vertical">
+      <Space direction="vertical" style={{ width: "100%" }}>
         <MiscAccountSettings onStatesChange={onStatesChange} />
         <Card title="Manage Tags">
           <Tabs

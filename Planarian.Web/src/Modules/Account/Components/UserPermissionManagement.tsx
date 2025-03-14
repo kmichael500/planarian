@@ -31,7 +31,10 @@ import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButton
 
 import { StateCountySelect } from "../../Tag/Components/StateCountySelect";
 import { AccountUserManagerService } from "../Services/UserManagerService";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import {
+  GetPermissionKeyDisplay,
+  PermissionKey,
+} from "../../Authentication/Models/PermissionKey";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
@@ -65,7 +68,7 @@ export const UserPermissionManagement: React.FC<
       setLoading(true);
       try {
         const data: CavePermissionManagementVm =
-          await AccountUserManagerService.GetLocationPermissions(
+          await AccountUserManagerService.GetCavePermissions(
             userId,
             permissionKey
           );
@@ -99,7 +102,7 @@ export const UserPermissionManagement: React.FC<
 
     setSaveLoading(true);
     try {
-      await AccountUserManagerService.UpdateLocationPermissions(
+      await AccountUserManagerService.UpdateCavePermissions(
         userId,
         permissionKey,
         newPermissions
@@ -176,7 +179,10 @@ export const UserPermissionManagement: React.FC<
   };
 
   return (
-    <Card title={`${permissionKey} Permission`} loading={loading}>
+    <Card
+      title={`${GetPermissionKeyDisplay(permissionKey)} Permission`}
+      loading={loading}
+    >
       <Form<CavePermissionManagementVm>
         form={form}
         layout="vertical"

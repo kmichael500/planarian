@@ -21,8 +21,11 @@ public class Permission : EntityBase
     [Required]
     [MaxLength(PropertyLength.Key)]
     public string Key { get; set; } = null!;
+    public int SortOrder { get; set; }
+    [Required] [MaxLength(PropertyLength.Key)] public string PermissionType { get; set; } = null!;
 
     public ICollection<CavePermission> CavePermission { get; set; } = new HashSet<CavePermission>();
+    public ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
 }
 
 public class PermissionConfiguration : BaseEntityTypeConfiguration<Permission>

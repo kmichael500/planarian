@@ -1,8 +1,10 @@
 import { HttpClient } from "../../..";
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { PermissionType } from "../../Authentication/Models/PermissionType";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
+import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
 import {
   CavePermissionManagementVm,
   CreateUserCavePermissionsVm,
@@ -33,24 +35,49 @@ const AccountUserManagerService = {
 
   //#region Manage Permissions
 
-  async GetLocationPermissions(
+  async GetCavePermissions(
     userId: string,
     permissionKey: PermissionKey
   ): Promise<CavePermissionManagementVm> {
     const response = await HttpClient.get<CavePermissionManagementVm>(
-      `${baseUrl}/${userId}/location-permissions/${permissionKey}`
+      `${baseUrl}/${userId}/cave-permissions/${permissionKey}`
     );
     return response.data;
   },
 
-  async UpdateLocationPermissions(
+  async UpdateCavePermissions(
     userId: string,
     permissionKey: PermissionKey,
     newPermissions: CreateUserCavePermissionsVm
   ): Promise<void> {
     await HttpClient.put<void>(
-      `${baseUrl}/${userId}/location-permissions/${permissionKey}`,
+      `${baseUrl}/${userId}/cave-permissions/${permissionKey}`,
       newPermissions
+    );
+  },
+
+  async GetUserPermissions(userId: string): Promise<UserPermissionVm[]> {
+    const response = await HttpClient.get<UserPermissionVm[]>(
+      `${baseUrl}/${userId}/user-permissions`
+    );
+    return response.data;
+  },
+
+  async AddUserPermission(
+    userId: string,
+    permissionKey: string
+  ): Promise<void> {
+    await HttpClient.post<void>(
+      `${baseUrl}/${userId}/user-permissions/${permissionKey}`
+    );
+  },
+
+  async RemoveUserPermission(
+    userId: string,
+    permissionKey: string
+  ): Promise<void> {
+    await HttpClient.delete<void>(
+      `${baseUrl}/${userId}/user-permissions/${permissionKey}`
     );
   },
 
@@ -58,12 +85,15 @@ const AccountUserManagerService = {
 
   //#region Select
 
-  async GetPermissionSelectList(): Promise<
+  async GetPermissionSelectList(
+    permissionType: PermissionType
+  ): Promise<
     SelectListItemDescriptionData<string, PermissionSelectListData>[]
   > {
+    const queryString = `permissionType=${permissionType}`;
     const response = await HttpClient.get<
       SelectListItemDescriptionData<string, PermissionSelectListData>[]
-    >(`${baseUrl}/select/permissions`);
+    >(`${baseUrl}/select/permissions?${queryString}`);
     return response.data;
   },
 };

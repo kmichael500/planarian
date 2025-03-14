@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250312070443_v14")]
+    partial class v14
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1521,55 +1524,6 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("States");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.UserPermission", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("AccountId")
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PermissionId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ModifiedByUserId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.HasIndex("UserId", "PermissionId", "AccountId")
-                        .IsUnique();
-
-                    b.ToTable("UserPermissions");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
                     b.Property<string>("Id")
@@ -2594,44 +2548,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("ModifiedByUser");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.UserPermission", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
-                        .WithMany("UserPermissions")
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
-                        .WithMany()
-                        .HasForeignKey("ModifiedByUserId");
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Permission", "Permission")
-                        .WithMany("UserPermissions")
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "User")
-                        .WithMany("UserPermissions")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Account");
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("ModifiedByUser");
-
-                    b.Navigation("Permission");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
@@ -2724,8 +2640,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("FeatureSettings");
 
                     b.Navigation("Tags");
-
-                    b.Navigation("UserPermissions");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>
@@ -2778,8 +2692,6 @@ namespace Planarian.Migrations.Migrations
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Permission", b =>
                 {
                     b.Navigation("CavePermission");
-
-                    b.Navigation("UserPermissions");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
@@ -2854,8 +2766,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("EntrancesReported");
 
                     b.Navigation("Members");
-
-                    b.Navigation("UserPermissions");
                 });
 #pragma warning restore 612, 618
         }

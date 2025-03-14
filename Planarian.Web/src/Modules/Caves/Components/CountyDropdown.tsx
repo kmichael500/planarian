@@ -7,7 +7,6 @@ const { Option } = Select;
 export interface CountyDropdownProps extends SelectProps<string> {
   selectedStateId: string;
 }
-// Generic County Dropdown Component
 const CountyDropdown = ({
   selectedStateId,
   defaultValue,

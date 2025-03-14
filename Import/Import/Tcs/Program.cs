@@ -144,7 +144,7 @@ public partial class Program
                 DecimalLatitude = entrance.Latitude,
                 DecimalLongitude = entrance.Longitude,
                 EntranceElevationFt = entrance.ElevationFt,
-                LocationQuality = "TODO",
+                LocationQuality = "Unverified",
                 EntranceDescription = null,
                 EntrancePitDepth = !isPrimaryEntrance ? entrance.PitDepthFt : null,
                 EntranceStatuses = ownershipTags,

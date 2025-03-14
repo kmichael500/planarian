@@ -34,6 +34,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.EntranceStatusTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
                  .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -48,6 +49,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.EntranceHydrologyTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -61,6 +63,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.FieldIndicationTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -74,6 +77,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.EntranceReportedByNameTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -87,6 +91,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.EntranceOtherTag
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -103,6 +108,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.Entrances
                 .Where(e => e.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -120,6 +126,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.GeologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -135,6 +142,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.Files
                 .Where(tag => tag.AccountId == RequestUser.AccountId && tag.Account.AccountUsers.Any())
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -148,6 +156,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.MapStatusTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -161,6 +170,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.GeologicAgeTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -174,6 +184,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.PhysiographicProvinceTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -187,6 +198,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.BiologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -200,6 +212,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.ArcheologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -213,6 +226,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.CartographerNameTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -226,6 +240,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.CaveReportedByNameTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -239,6 +254,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.CaveOtherTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -256,6 +272,7 @@ public class AccountRepository : RepositoryBase
             deletedCount = await DbContext.Caves
                 .Where(c => c.AccountId == RequestUser.AccountId && c.Account.AccountUsers.Any())
                 .Take(batchSize)
+                .IgnoreQueryFilters()
                 .DeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
@@ -300,6 +317,14 @@ public class AccountRepository : RepositoryBase
     public async Task DeleteAllCounties()
     {
         await DbContext.Counties.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
+    }
+    
+    // deletes all cave permissions except view all
+    public async Task DeleteAllCavePermissions()
+    {
+        await DbContext.CavePermissions.Where(c =>
+            c.AccountId == RequestUser.AccountId &&
+            !(string.IsNullOrWhiteSpace(c.CaveId) && string.IsNullOrWhiteSpace(c.CountyId))).DeleteAsync();
     }
 
     public async Task DeleteAllAccountStates()

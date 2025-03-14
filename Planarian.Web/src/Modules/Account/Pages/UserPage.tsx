@@ -7,11 +7,12 @@ import { useParams } from "react-router-dom";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { AccountUserManagerService } from "../Services/UserManagerService";
-import { message } from "antd";
+import { message, Space } from "antd";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
-import { PermissionManagementList } from "../Components/PermissionManagementList";
+import { CavePermissionManagementList } from "../Components/CavePermissionManagementList";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { UserPermissionManagementList } from "../Components/UserPermissionManagementList";
 
 const UserPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -43,7 +44,10 @@ const UserPage: React.FC = () => {
 
   return (
     <>
-      <PermissionManagementList userId={userId} />
+      <Space direction="vertical" style={{ width: "100%" }}>
+        <UserPermissionManagementList userId={userId} />
+        <CavePermissionManagementList userId={userId} />
+      </Space>
     </>
   );
 };

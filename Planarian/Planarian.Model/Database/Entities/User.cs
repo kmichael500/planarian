@@ -68,7 +68,8 @@ public class User : EntityBase
     public virtual ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
     public virtual ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
 
-    public virtual ICollection<CavePermission> CavePermissions { get; set; }
+    public virtual ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
+    public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
 
     #region Helper Functions
 

@@ -18,17 +18,23 @@ public class PermissionRepository : RepositoryBase
         return await DbContext.Permissions.FirstOrDefaultAsync(e => e.Key.Equals(permissionKey));
     }
 
-    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>
-        GetPermissionSelectList()
+    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>> 
+        GetPermissionSelectList(string permissionType)
     {
         return await DbContext.Permissions
-            .Select(e => new SelectListItemDescriptionData<string, PermissionSelectListData>(e.Name, e.Id,
-                e.Description, new PermissionSelectListData
+            .Where(e => !e.IsHidden && e.PermissionType == permissionType)
+            .Select(e => new SelectListItemDescriptionData<string, PermissionSelectListData>(
+                e.Name,
+                e.Id,
+                e.Description,
+                new PermissionSelectListData
                 {
                     Name = e.Name,
                     Description = e.Description,
-                    Key = e.Key
+                    Key = e.Key,
+                    SortOrder = e.SortOrder
                 }))
             .ToListAsync();
     }
+
 }

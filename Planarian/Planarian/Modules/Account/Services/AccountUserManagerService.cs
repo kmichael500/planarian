@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
@@ -20,17 +21,19 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     private readonly EmailService _emailService;
     private readonly AccountRepository _accountRepository;
     private readonly PermissionRepository _permissionRepository;
+    private readonly UserRepository _userRepository;
 
     public AccountUserManagerService(
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
         ServerOptions serverOptions, AccountRepository accountRepository,
-        PermissionRepository permissionRepository) : base(repository, requestUser)
+        PermissionRepository permissionRepository, UserRepository userRepository) : base(repository, requestUser)
     {
         _emailService = emailService;
         _accountRepository = accountRepository;
         _permissionRepository = permissionRepository;
+        _userRepository = userRepository;
     }
 
     #region User Manager
@@ -154,7 +157,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
     #region Permissions
 
-    public async Task<CavePermissionManagementVm> GetLocationPermissions(string userId, string permissionKey)
+    public async Task<CavePermissionManagementVm> GetcavePermissions(string userId, string permissionKey)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -173,12 +176,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return cavePermissions;
     }
 
-    /// <summary>
-    /// Updates the user's location permissions by creating/removing CavePermission rows.
-    /// If HasAllLocations is true, we store a single row with no CountyId or CaveId.
-    /// Otherwise we store rows for each county/cave in the request. 
-    /// </summary>
-    public async Task UpdateLocationPermissions(string userId, string permissionKey, CreateUserCavePermissionsVm vm)
+    public async Task UpdateCavePermissions(string userId, string permissionKey, CreateUserCavePermissionsVm vm)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -198,13 +196,17 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("Permission");
         }
 
+        if (permission.PermissionType != PermissionType.Cave)
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
+        }
+
         var existingPermissions =
             (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
         Repository.DeleteRange(existingPermissions);
 
         if (vm.HasAllLocations)
         {
-
             // create a single row that indicates "all"
             var row = new CavePermission
             {
@@ -268,14 +270,74 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return user;
     }
 
-    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>> GetPermissionSelectList()
+    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>> 
+        GetPermissionSelectList(string permissionType)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var permissions = await _permissionRepository.GetPermissionSelectList();
+        var permissions = await _permissionRepository.GetPermissionSelectList(permissionType);
         return permissions;
     }
+    
+      public async Task<IEnumerable<UserPermissionVm>> GetUserPermissions(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            {
+                throw ApiExceptionDictionary.NoAccount;
+            }
+
+            var permissions = await Repository.GetUserPermissions(userId);
+            return permissions;
+        }
+
+        public async Task AddUserPermission(string userId, string permissionKey)
+        {
+            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            {
+                throw ApiExceptionDictionary.NoAccount;
+            }
+
+            var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+            if (userHasPermission != null)
+            {
+                throw ApiExceptionDictionary.BadRequest("User already has this permission.");
+            }
+
+            var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
+            if (permission == null)
+            {
+                throw ApiExceptionDictionary.NotFound("Permission");
+            }
+
+            var entity = new UserPermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                Permission = permission
+            };
+
+            _userRepository.Add(entity);
+            await _userRepository.SaveChangesAsync();
+        }
+
+        public async Task RemoveUserPermission(string userId, string permissionKey)
+        {
+            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            {
+                throw ApiExceptionDictionary.NoAccount;
+            }
+
+            var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+            if (userPermission == null)
+            {
+                throw ApiExceptionDictionary.NotFound("User Permission");
+            }
+
+            _userRepository.Delete(userPermission);
+            await _userRepository.SaveChangesAsync();
+        }
+    
 }

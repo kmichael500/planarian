@@ -147,11 +147,12 @@ public class UserRepository : RepositoryBase
     {
         return await GetCavePermissionQuery(userId, accountId, permissionKey).ToListAsync();
     }
-    
+
     private IQueryable<CavePermission> GetCavePermissionQuery(string userId, string accountId, string permissionKey)
     {
         return DbContext.CavePermissions
-            .Where(cp => cp.UserId == userId && cp.AccountId == accountId && cp.Permission.Key == permissionKey);
+            .Where(e => e.UserId == userId && e.AccountId == accountId && e.Permission.Key == permissionKey &&
+                        e.Permission.PermissionType == PermissionType.Cave);
     }
 
     #endregion
@@ -171,4 +172,24 @@ public class UserRepository : RepositoryBase
         return query.Select(e => new UserManagerGridVm(e.UserId, e.User!.EmailAddress, e.User.FullName, e.InvitationSentOn,
             e.InvitationAcceptedOn));
     }
+
+    /// <summary>
+    /// Return all Access Permissions the user currently has.
+    /// </summary>
+    public async Task<List<UserPermissionVm>> GetUserPermissions(
+        string userId)
+    {
+        return await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.AccountId == RequestUser.AccountId &&
+                        e.Permission!.PermissionType == PermissionType.User)
+            .Select(e => new UserPermissionVm(e.Id, e.Permission!.Key, e.Permission.Name, e.Permission!.Description))
+            .ToListAsync();
+    }
+
+    public async Task<UserPermission?> GetUserPermission(string userId, string permissionKey)
+        {
+            return await DbContext.UserPermissions
+                .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey && e.AccountId == RequestUser.AccountId)
+                .FirstOrDefaultAsync();
+        }
 }
