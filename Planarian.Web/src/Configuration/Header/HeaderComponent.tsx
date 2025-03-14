@@ -60,7 +60,7 @@ const HeaderComponent = () => {
           paddingTop:
             hasHeaderButons || (!hasHeaderButons && !isLargeScreenSize)
               ? "4px"
-              : "16px",
+              : "4px", // this used to be 16px but caused a bug in the header with the position of the icons
           paddingBottom: "4px",
           paddingRight: "16px",
           paddingLeft: "16px",

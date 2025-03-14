@@ -1599,7 +1599,7 @@ public class ImportService : ServiceBase
         }
         result.AssociatedCave = caveInformation.CaveName;
 
-        if (!ignoreDuplicates)
+        if (ignoreDuplicates)
         {
             var isDuplicate = await _fileRepository.IsDuplicateFile(caveInformation.CaveId, fileName);
             if (isDuplicate)
