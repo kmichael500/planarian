@@ -415,7 +415,7 @@ public class AccountRepository : RepositoryBase
             await MergeTagsWithConflictHandling<CartographerNameTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
             await MergeTagsWithConflictHandling<CaveOtherTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
             await MergeTagsWithConflictHandling<CaveReportedByNameTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
-            await MergeTagsWithConflictHandling<File>(tagTypeId, destinationTagTypeId, e => e.FileTypeTagId, e=>e.Cave!.AccountId);
+            await MergeTagsWithConflictHandling<File>(tagTypeId, destinationTagTypeId, e => e.FileTypeTagId, e=>e.Cave!.AccountId, false);
             await MergeTagsWithConflictHandling<GeologicAgeTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
             await MergeTagsWithConflictHandling<GeologyTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
             await MergeTagsWithConflictHandling<MapStatusTag>(tagTypeId, destinationTagTypeId, e => e.TagTypeId, e=>e.Cave!.AccountId);
@@ -438,29 +438,33 @@ public class AccountRepository : RepositoryBase
         await DbContext.SaveChangesAsync();
     }
 
+    // Modify the merge method signature to include an optional parameter.
     private async Task MergeTagsWithConflictHandling<T>(
         string sourceTagTypeId,
         string destinationTagTypeId,
         Expression<Func<T, string>> tagTypeSelector,
-        Expression<Func<T, string>> accountIdSelector) where T : class
+        Expression<Func<T, string>> accountIdSelector,
+        bool removeDuplicates = true) where T : class
     {
-        // Remove any existing tags of the destination type for the same CaveId
-        var existingTags = DbContext.Set<T>()
-            .Where(tagTypeSelector.Compose(s => s == destinationTagTypeId))
-            .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
+        if (removeDuplicates)
+        {
+            // Remove any existing tags with the destination type.
+            var existingTags = DbContext.Set<T>()
+                .Where(tagTypeSelector.Compose(s => s == destinationTagTypeId))
+                .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
 
-        DbContext.Set<T>().RemoveRange(existingTags);
-        await DbContext.SaveChangesAsync();
+            DbContext.Set<T>().RemoveRange(existingTags);
+            await DbContext.SaveChangesAsync();
+        }
 
+        // Update the source tags to the destination type.
         var tags = DbContext.Set<T>()
             .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
             .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
 
-
-        await tags
-            .Set(tagTypeSelector, destinationTagTypeId)
-            .UpdateAsync();
+        await tags.Set(tagTypeSelector, destinationTagTypeId).UpdateAsync();
     }
+
 
     private void UpdateTagTypeId<T>(ICollection<T> tags, string destinationTagTypeId) where T : class
     {

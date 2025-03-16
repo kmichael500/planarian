@@ -5,45 +5,31 @@ import {
   Button,
   Card,
   Typography,
+  Checkbox,
+  Col,
   Form,
   Input,
-  Row,
-  Col,
-  Checkbox,
   Modal,
   Result,
+  Row,
 } from "antd";
-import Papa from "papaparse";
-import { useState, useEffect } from "react";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { FileVm } from "../../Files/Models/FileVm";
+import { getFileType } from "../../Files/Services/FileHelpers";
+import {
+  CheckCircleOutlined,
+  InboxOutlined,
+  RedoOutlined,
+} from "@ant-design/icons";
+import { useState, useEffect, useRef } from "react";
+import Papa from "papaparse";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { nameof } from "../../../Shared/Helpers/StringHelpers";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AccountService } from "../../Account/Services/AccountService";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
 import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
-import { FileVm } from "../../Files/Models/FileVm";
-import { getFileType } from "../../Files/Services/FileHelpers";
 import { FileImportResult } from "../Models/FileUploadresult";
-import {
-  CheckCircleOutlined,
-  RedoOutlined,
-  InboxOutlined,
-} from "@ant-design/icons";
-import { FileTypeKey } from "../../Files/Models/FileTypeKey";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { nameof } from "../../../Shared/Helpers/StringHelpers";
-
-const convertFileImportResultToFileVm = (result: FileImportResult): FileVm => {
-  return {
-    fileName: result.fileName,
-    displayName: result.fileName,
-    id: "",
-    uuid: undefined,
-    fileTypeTagId: "",
-    fileTypeKey: "unknown" as FileTypeKey,
-    embedUrl: "",
-    downloadUrl: "",
-  };
-};
 
 export interface UploadParams {
   file: any;
@@ -68,6 +54,7 @@ interface QueuedFile {
   file: File;
   uid: string;
   progress: number;
+  active: boolean;
 }
 
 export const UploadComponent: React.FC<UploadComponentProps> = ({
@@ -103,7 +90,7 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
       return false;
     }
     const fileSizeInMB = file.size / 1024 / 1024;
-    const maxSizeInMB = 50;
+    const maxSizeInMB = 500;
     if (fileSizeInMB > maxSizeInMB) {
       message.error(`File size should not exceed ${maxSizeInMB} MB.`);
       return false;
@@ -111,7 +98,7 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
     return true;
   };
 
-  // Process files from drag or file input
+  // Process files from drag/drop or file input
   const processFiles = (fileList: FileList) => {
     const newFiles: QueuedFile[] = [];
     Array.from(fileList).forEach((file, index) => {
@@ -120,6 +107,7 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
           file,
           uid: `${file.name}-${Date.now()}-${index}`,
           progress: 0,
+          active: false,
         });
       }
     });
@@ -176,7 +164,12 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
       return;
     }
     setUploading(true);
+
     const tasks = queuedFiles.map((queued) => async () => {
+      // Mark the file as active once its upload starts
+      setQueuedFiles((prev) =>
+        prev.map((f) => (f.uid === queued.uid ? { ...f, active: true } : f))
+      );
       try {
         await uploadFunction({
           file: queued.file,
@@ -201,6 +194,14 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
     setUploaded(true);
     setUploading(false);
   };
+
+  // Determine which files to show: before upload, show all queued;
+  // once uploading, show only files that have been marked as active and are not yet complete.
+  const filesToShow = queuedFiles;
+
+  // Compute remaining files count from the displayed files
+  const remainingFiles = filesToShow.filter((f) => f.progress < 100).length;
+  const totalFiles = filesToShow.length;
 
   return (
     <>
@@ -240,21 +241,35 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
             style={{ display: "none" }}
             onChange={handleFileSelect}
           />
-          {queuedFiles.length > 0 && (
-            <div
-              style={{
-                maxHeight: "200px",
-                overflowY: "scroll",
-                marginBottom: "20px",
-              }}
-            >
-              {queuedFiles.map((f) => (
-                <div key={f.uid} style={{ marginBottom: "10px" }}>
-                  <div>{f.file.name}</div>
-                  <Progress percent={f.progress} size="small" />
-                </div>
-              ))}
-            </div>
+          {filesToShow.length > 0 && (
+            <>
+              {/* Display remaining files indicator */}
+              <div
+                style={{
+                  width: "100%",
+                  textAlign: "right",
+                  marginBottom: "5px",
+                  fontSize: "12px",
+                  color: "#888",
+                }}
+              >
+                {remainingFiles} of {totalFiles} actively uploading
+              </div>
+              <div
+                style={{
+                  maxHeight: "200px",
+                  overflowY: "scroll",
+                  marginBottom: "20px",
+                }}
+              >
+                {filesToShow.map((f) => (
+                  <div key={f.uid} style={{ marginBottom: "10px" }}>
+                    <div>{f.file.name}</div>
+                    <Progress percent={f.progress} size="small" />
+                  </div>
+                ))}
+              </div>
+            </>
           )}
           <Space>
             <Button
@@ -353,8 +368,18 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       setUploadResults((prevResults) => [...prevResults, result]);
     } catch (e) {
       const error = e as ApiErrorResponse;
-      setUploadFailed(true);
-      message.error(error.message);
+
+      // add result to list of results
+      setUploadResults((prevResults) => [
+        ...prevResults,
+        {
+          fileName: params.file.name,
+          isSuccessful: false,
+          error: error.message,
+          associatedCave: "",
+          message: error.message,
+        },
+      ]);
     } finally {
       setFilesToUpload((prev) => prev - 1);
     }

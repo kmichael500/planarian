@@ -15,6 +15,7 @@ import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -110,6 +111,7 @@ const AccountService = {
     ignoreDuplicates: boolean = false,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileImportResult> {
+    console.log("IDregex", idRegex);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -120,14 +122,18 @@ const AccountService = {
       onUploadProgress: onProgress, // Set the onUploadProgress callback
     };
 
-    const regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
+    let regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
       delmiterRegex
     )}&idRegex=${encodeURIComponent(
       idRegex
     )}&ignoreDuplicates=${ignoreDuplicates}`;
 
+    if (!isNullOrWhiteSpace(uuid)) {
+      regexQueryStringUrlSafe += `&uuid=${encodeURIComponent(uuid)}`;
+    }
+
     const response = await HttpClient.post<FileImportResult>(
-      `${baseUrl}/import/file?uuid=${uuid}&${regexQueryStringUrlSafe}`,
+      `${baseUrl}/import/file?${regexQueryStringUrlSafe}`,
       formData,
       config
     );
