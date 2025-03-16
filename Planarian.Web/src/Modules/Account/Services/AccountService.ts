@@ -111,7 +111,6 @@ const AccountService = {
     ignoreDuplicates: boolean = false,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileImportResult> {
-    console.log("IDregex", idRegex);
     const formData = new FormData();
     formData.append("file", file);
 
