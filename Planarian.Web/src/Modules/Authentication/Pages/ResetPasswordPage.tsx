@@ -14,6 +14,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
+import { SubmitButtonComponent } from "../../../Shared/Components/Buttons/SubmitButtonComponent";
 
 const ResetPasswordPage: React.FC = () => {
   const [passwordForm] = Form.useForm();
@@ -156,7 +157,7 @@ const ResetPasswordPage: React.FC = () => {
           loading={isLoading}
           title="Reset Password"
           actions={[
-            <SaveButtonComponent
+            <SubmitButtonComponent
               loading={isSubmitting}
               type="primary"
               onClick={(e) => emailForm.submit()}

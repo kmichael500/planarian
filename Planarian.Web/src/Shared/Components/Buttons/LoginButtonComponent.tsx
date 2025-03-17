@@ -15,8 +15,6 @@ const LoginButtonComponent: React.FC<LoginButtonComponentProps> = (props) => {
     ? `/login?invitationCode=${invitationCode}`
     : "/login";
 
-  console.log("LoginButtonComponent -> linkTo", linkTo);
-
   return (
     <Link to={linkTo}>
       <PlanarianButton {...restProps} icon={<LoginOutlined />}>

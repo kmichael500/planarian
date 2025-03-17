@@ -99,7 +99,18 @@ const MiscAccountSettings = ({
           ]}
           help="These are states available for data entry in the state survey. You can only remove states that have no caves associated with them."
         >
-          <Select mode="multiple" placeholder="Please select">
+          <Select
+            mode="multiple"
+            placeholder="Please select"
+            filterOption={(input, option) =>
+              option && option.children
+                ? option.children
+                    .toString()
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                : false
+            }
+          >
             {states.map((state) => (
               <Option key={state.value} value={state.value}>
                 {state.display}

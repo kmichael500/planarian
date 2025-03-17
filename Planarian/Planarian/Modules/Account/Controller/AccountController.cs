@@ -113,8 +113,9 @@ public class AccountController : PlanarianControllerBase<AccountService>
     public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string idRegex, IFormFile file,
         CancellationToken cancellationToken, bool ignoreDuplicates)
     {
+        await using var stream = file.OpenReadStream();
         var result =
-            await _importService.AddFileForImport(file.OpenReadStream(), file.FileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
+            await _importService.AddFileForImport(stream, file.FileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
                 cancellationToken);
 
         return new JsonResult(result);
