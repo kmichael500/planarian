@@ -231,6 +231,10 @@ public class AccountService : ServiceBase<AccountRepository>
 
     public async Task DeleteCounties(IEnumerable<string> countyIds, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
         countyIds = countyIds.ToList();
         var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
@@ -244,12 +248,13 @@ public class AccountService : ServiceBase<AccountRepository>
                     throw ApiExceptionDictionary.BadRequest("Cannot delete county because it is in use.");
                 }
 
-                Repository.Delete(new County { Id = countyId });
+                Repository.Delete(new County { Id = countyId, AccountId = RequestUser.AccountId});
             }
 
-            await Repository.SaveChangesAsync();
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-        catch (Exception)
+        catch (Exception e)
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;

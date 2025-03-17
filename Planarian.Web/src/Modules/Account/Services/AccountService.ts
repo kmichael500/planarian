@@ -205,6 +205,16 @@ const AccountService = {
     );
     return response.data;
   },
+  async DeleteCounties(countyIds: string[], stateId: string): Promise<void> {
+    const parameter = "countyIds";
+    let queryString = `${parameter}=${countyIds.join(",")}`;
+
+    const response = await HttpClient.delete<void>(
+      `${baseUrl}/states/${stateId}/counties?${queryString}`
+    );
+    return response.data;
+  },
+
   async AddTagType(tag: CreateEditTagTypeVm): Promise<TagTypeTableVm> {
     const response = await HttpClient.post<TagTypeTableVm>(
       `${baseUrl}/tags/`,

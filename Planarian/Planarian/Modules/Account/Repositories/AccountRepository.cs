@@ -389,7 +389,8 @@ public class AccountRepository : RepositoryBase
                     .Where(e => batch.Contains(e.Id))
                     .DeleteAsync(cancellationToken);
 
-            // commit transaction
+            await SaveChangesAsync(cancellationToken);
+            
             await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception)

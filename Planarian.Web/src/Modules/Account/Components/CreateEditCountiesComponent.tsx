@@ -131,7 +131,7 @@ const CreateEditCountiesComponent = (
   const onMassDeleteConfirm = async () => {
     try {
       setIsLoading(true);
-      await AccountService.DeleteTagTypes(selectedRowKeys);
+      await AccountService.DeleteCounties(selectedRowKeys, props.stateId);
       setLocalTagTypes((prev) =>
         prev.filter((t) => !selectedRowKeys.includes(t.tagTypeId))
       );
@@ -188,7 +188,7 @@ const CreateEditCountiesComponent = (
   const onDelete = async (tagTypeId: string) => {
     try {
       setIsLoading(true);
-      await AccountService.DeleteTagTypes([tagTypeId]);
+      await AccountService.DeleteCounties([tagTypeId], props.stateId);
       setLocalTagTypes((prev) => prev.filter((t) => t.tagTypeId !== tagTypeId));
       message.success("Tag Type deleted successfully!");
     } catch (error) {
