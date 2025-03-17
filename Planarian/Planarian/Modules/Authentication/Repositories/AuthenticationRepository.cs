@@ -3,6 +3,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Shared.Base;
+using Planarian.Shared.Email.Models;
 
 namespace Planarian.Modules.Authentication.Repositories;
 
