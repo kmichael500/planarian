@@ -3,6 +3,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Entities.RidgeWalker.Views;
 using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
@@ -51,6 +52,12 @@ public class PlanarianDbContextBase : DbContext
     #endregion
 
     #region Cave
+
+    #region Views
+
+    public DbSet<UserCavePermissionsView> UserCavePermissionView { get; set; } = null!;
+
+    #endregion
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<AccountState> AccountStates { get; set; } = null!;
     public DbSet<AccountUser> AccountUsers { get; set; } = null!;
@@ -128,31 +135,11 @@ public class PlanarianDbContext : PlanarianDbContextBase
 
         modelBuilder.Entity<Cave>().HasQueryFilter(c =>
             c.AccountId == RequestUser.AccountId &&
-            (
-                CavePermissions.Any(cavePermission =>
-                    cavePermission.Permission!.PermissionType == PermissionType.Cave
-                    && cavePermission.AccountId == RequestUser.AccountId
-                    && cavePermission.UserId == RequestUser.Id
-                    && (
-                        cavePermission.Permission!.Key == PermissionKey.View
-                        || cavePermission.Permission!.Key == PermissionKey.CountyCoordinator
-                    )
-                    && (
-                        (cavePermission.CountyId == null && cavePermission.CaveId == null) || // access to all
-                        (cavePermission.CountyId != null &&
-                         cavePermission.CountyId == c.CountyId) || // access to a county
-                        (cavePermission.CaveId != null && cavePermission.CaveId == c.Id) // access to a cave
-                    )
-                )
-                || UserPermissions.Any(userPermission =>
-                    userPermission.AccountId == RequestUser.AccountId
-                    && userPermission.UserId == RequestUser.Id
-                    && (
-                        userPermission.Permission!.Key == PermissionKey.Admin
-                        || userPermission.Permission!.Key == PermissionKey.PlanarianAdmin
-                    )
-                )
-            )
+            UserCavePermissionView.Any(ucp =>
+                ucp.AccountId == RequestUser.AccountId &&
+                ucp.UserId == RequestUser.Id &&
+                ucp.CaveId == c.Id)
         );
+
     }
 }
