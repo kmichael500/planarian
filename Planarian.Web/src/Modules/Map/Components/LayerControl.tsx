@@ -118,6 +118,21 @@ const LAYERS = [
     opacity: 1,
     attribution: "© USGS",
   },
+  {
+    id: "usgs-drainage-basins-16digit",
+    displayName: "Subwatershed Boundary",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://hydro.nationalmap.gov/arcgis/services/wbd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=8&styles=",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    attribution: "© USGS Watershed Boundary Dataset",
+  },
 ] as PlanarianMapLayer[];
 
 const LayerControl: React.FC = () => {
