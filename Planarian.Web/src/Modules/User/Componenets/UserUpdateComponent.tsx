@@ -83,6 +83,7 @@ const UserUpdateComponent: React.FC = () => {
           <>
             {!isChangingPassword && (
               <PlanarianButton
+                alwaysShowChildren
                 onClick={() => {
                   passwordForm.resetFields();
                   setIsChangingPassword(true);
@@ -96,6 +97,7 @@ const UserUpdateComponent: React.FC = () => {
           <>
             {isChangingPassword && (
               <PlanarianButton
+                alwaysShowChildren
                 onClick={() => {
                   setIsChangingPassword(false);
                   passwordForm.resetFields();

@@ -78,7 +78,11 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
       <Tag
         key={props.tagId}
         // color={backgroundColor}
-        // style={{ color: textColor }}
+        style={{
+          color: textColor,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
       >
         {defaultIfEmpty(tagName)}
       </Tag>
