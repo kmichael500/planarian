@@ -19,7 +19,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UserAddOutlined } from "@ant-design/icons";
@@ -30,6 +30,8 @@ const UserManagerComponent: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>("");
+
+  const navigate = useNavigate();
 
   const [form] = Form.useForm();
 
@@ -53,10 +55,13 @@ const UserManagerComponent: React.FC = () => {
   const handleInviteUser = async (values: InviteUserRequest) => {
     try {
       setLoading(true);
-      await AccountUserManagerService.InviteUser(values);
+      const userId = await AccountUserManagerService.InviteUser(values);
       message.success("Invitation sent successfully.");
       setInviteModalVisible(false);
       form.resetFields();
+
+      // naviagte to userId/permissions/View relative to this page
+      navigate(`${userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {
       const error = err as ApiErrorResponse;

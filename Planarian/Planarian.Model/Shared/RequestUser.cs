@@ -67,9 +67,45 @@ public class RequestUser
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
             return false;
 
-        var hasUserPermission = await _dbContext.UserPermissions
-            .AnyAsync(e =>
-                e.UserId == Id && e.AccountId == AccountId && permissionKey == e.Permission!.Key);
+        var userPermissions = await _dbContext.UserPermissions
+            .Where(e =>
+                e.UserId == Id
+                && e.AccountId == AccountId || e.AccountId == null
+            )
+            .Select(e => e.Permission!.Key).ToListAsync();
+    
+        var hasUserPermission = permissionKey switch
+        {
+            PermissionKey.View => userPermissions.Contains(PermissionPolicyKey.View) ||
+                                  userPermissions.Contains(PermissionPolicyKey.Manager) ||
+                                  userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                                  userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
+            PermissionKey.Manager => userPermissions.Contains(PermissionPolicyKey.Manager) ||
+                                     userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                                     userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
+            PermissionKey.Admin => userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                                   userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
+            PermissionKey.PlanarianAdmin => userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
+            _ => false
+        };
+    
+        if (permissionKey == PermissionPolicyKey.AdminManager)
+        {
+            hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                                userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
+            
+         
+            if (!hasUserPermission)
+            {
+                hasUserPermission = await _dbContext.CavePermissions
+                    .AnyAsync(e =>
+                        string.IsNullOrWhiteSpace(e.CaveId) 
+                        && string.IsNullOrWhiteSpace(e.CountyId)
+                        && e.UserId == Id
+                        && e.AccountId == AccountId
+                        && e.Permission!.Key == permissionKey
+                    );            }
+        }
 
         if (hasUserPermission)
             return true;
@@ -129,49 +165,5 @@ public class RequestUser
 
         return hasPermission;
     }
-
-    // public async Task<bool> HasPermission(string permissionKey, bool @throw = true)
-    // {
-    //     var userPermissions = await _dbContext.UserPermissions
-    //         .Where(e =>
-    //             e.UserId == Id
-    //             && e.AccountId == AccountId
-    //             && permissionKey == e.Permission!.Key
-    //         )
-    //         .Select(e => e.Permission!.Key).ToListAsync();
-    //
-    //     var hasUserPermission = permissionKey switch
-    //     {
-    //         PermissionKey.View => userPermissions.Contains(PermissionPolicyKey.View) ||
-    //                               userPermissions.Contains(PermissionPolicyKey.Manager) ||
-    //                               userPermissions.Contains(PermissionPolicyKey.Admin) ||
-    //                               userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-    //         PermissionKey.Manager => userPermissions.Contains(PermissionPolicyKey.Manager) ||
-    //                                  userPermissions.Contains(PermissionPolicyKey.Admin) ||
-    //                                  userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-    //         PermissionKey.Admin => userPermissions.Contains(PermissionPolicyKey.Admin) ||
-    //                                userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-    //         PermissionKey.PlanarianAdmin => userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-    //         _ => false
-    //     };
-    //
-    //     if (permissionKey == PermissionPolicyKey.AdminManager)
-    //     {
-    //         hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
-    //                             userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
-    //         
-    //      
-    //         if (!hasUserPermission)
-    //         {
-    //             hasUserPermission = await _dbContext.CavePermissions
-    //                 .AnyAsync(e =>
-    //                     string.IsNullOrWhiteSpace(e.CaveId) 
-    //                     && string.IsNullOrWhiteSpace(e.CountyId)
-    //                     && e.UserId == Id
-    //                     && e.AccountId == AccountId
-    //                     && e.Permission!.Key == permissionKey
-    //                 );            }
-    //     }
-    //     
-    // }
+    
 }

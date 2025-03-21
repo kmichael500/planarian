@@ -52,8 +52,8 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> Invite([FromBody] InviteUserRequest request, CancellationToken cancellationToken)
     {
-        await Service.InviteUser(request, cancellationToken);
-        return Ok();
+        var userId = await Service.InviteUser(request, cancellationToken);
+        return new JsonResult(userId);
     }
 
     [HttpDelete("{userId:length(10)}")]

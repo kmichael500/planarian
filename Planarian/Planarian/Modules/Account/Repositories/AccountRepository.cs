@@ -632,6 +632,13 @@ public class AccountRepository : RepositoryBase
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .FirstOrDefaultAsyncEF();
     }
+
+    public async Task<bool> GetDefaultViewAccess()
+    {
+        return await DbContext.Accounts.Where(e=>e.Id == RequestUser.AccountId)
+            .Select(e => e.DefaultViewAccessAllCaves)
+            .FirstOrDefaultAsyncEF();
+    }
 }
 
 public static class ExpressionExtensions

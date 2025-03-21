@@ -23,8 +23,8 @@ const AccountUserManagerService = {
     );
     return response.data;
   },
-  async InviteUser(request: InviteUserRequest): Promise<void> {
-    await HttpClient.post(`${baseUrl}`, request);
+  async InviteUser(request: InviteUserRequest): Promise<string> {
+    return (await HttpClient.post<string>(`${baseUrl}`, request)).data;
   },
   async RevokeAccess(userId: string): Promise<void> {
     await HttpClient.delete(`${baseUrl}/${userId}`);

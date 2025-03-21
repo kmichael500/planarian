@@ -45,5 +45,6 @@ public class UserPermissionConfiguration : BaseEntityTypeConfiguration<UserPermi
 
         builder.HasIndex(e => new { e.UserId, e.PermissionId, e.AccountId })
             .IsUnique();
+        builder.HasIndex(e => new { e.UserId, e.PermissionId });
     }
 }

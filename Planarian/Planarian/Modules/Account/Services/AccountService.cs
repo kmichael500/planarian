@@ -332,6 +332,8 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             account.Name = values.AccountName;
             account.CountyIdDelimiter = values.CountyIdDelimiter;
+            
+            account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
 
             // check which states are missing
             var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();

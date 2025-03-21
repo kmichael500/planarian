@@ -396,7 +396,8 @@ public class CaveRepository : RepositoryBase
             GeologicAgeTagIds = e.GeologicAgeTags.Select(ee => ee.TagTypeId),
             PhysiographicProvinceTagIds = e.PhysiographicProvinceTags.Select(ee => ee.TagTypeId),
             OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
-        }).AsSplitQuery().ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet);
+        })
+            .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet);
 
         return result;
     }

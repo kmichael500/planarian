@@ -190,21 +190,23 @@ public class MapRepository : RepositoryBase
     {
         var query = @"
 WITH tile AS (
-    SELECT ST_TileEnvelope({0}, {1}, {2}) AS bbox
+    SELECT 
+         ST_TileEnvelope({0}, {1}, {2}) AS bbox_3857,
+         ST_Transform(ST_TileEnvelope({0}, {1}, {2}), 4326) AS bbox_native
 )
 SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
 FROM (
     SELECT 
         ""Entrances"".""ReportedByUserId"",
         ""Entrances"".""CaveId"",
-        ""Caves"".""Name"" as CaveName,  -- Grabbing the name from Cave table
+        ""Caves"".""Name"" as CaveName,
         ""Entrances"".""LocationQualityTagId"",
         ""Entrances"".""Name"",
         ""Entrances"".""IsPrimary"",
         ""Entrances"".""Description"",
         ST_AsMVTGeom(
             ST_Transform(""Entrances"".""Location"", 3857),
-            tile.bbox,
+            tile.bbox_3857,
             4096,
             0,
             true
@@ -216,9 +218,9 @@ FROM (
     JOIN 
         ""UserCavePermissions"" ucp ON ""Caves"".""Id"" = ucp.""CaveId""
                                       AND ""Caves"".""AccountId"" = ucp.""AccountId""
-    ,   tile
+    , tile
     WHERE 
-        ST_Intersects(ST_Transform(""Entrances"".""Location"", 3857), tile.bbox)
+        ST_Intersects(""Entrances"".""Location"", tile.bbox_native)
         AND ""Caves"".""AccountId"" = '{3}'
         AND ucp.""UserId"" = '{4}'
 ) AS tile_geom";
@@ -237,6 +239,7 @@ FROM (
 
         return null;
     }
+
 
 
 

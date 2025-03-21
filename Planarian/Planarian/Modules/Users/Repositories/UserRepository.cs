@@ -76,14 +76,19 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<(AccountUser? AccountUser, User? User)> GetInvitationEntities(string? invitationCode)
+    public async
+        Task<(AccountUser? AccountUser, User? User, IEnumerable<CavePermission>? CavePermissions, IEnumerable<UserPermission>? UserPermissions)>
+        GetInvitationEntities(string? invitationCode)
     {
         var accountUser = await DbContext.AccountUsers
             .Include(e => e.User)
+            .ThenInclude(e => e!.UserPermissions)
+            .Include(e => e.User)
+            .ThenInclude(e => e!.CavePermissions)
             .Where(e => e.InvitationCode == invitationCode && e.User != null && e.User.IsTemporary)
             .FirstOrDefaultAsync();
 
-        return (accountUser, accountUser?.User);
+        return (accountUser, accountUser?.User, accountUser?.User?.CavePermissions, accountUser?.User?.UserPermissions);
     }
 
     public async Task<bool> UserInAccount(string existingUserId, string accountId)
@@ -165,7 +170,7 @@ public class UserRepository : RepositoryBase
     public async Task<IEnumerable<string>> GetPermissions(string userId, string accountId)
     {
         var userPermissions = await DbContext.UserPermissions
-            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .Where(e => e.UserId == userId && (e.AccountId == accountId || string.IsNullOrWhiteSpace(e.AccountId)))
             .Select(e => e.Permission!.Key)
             .ToListAsync();
         

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Form, Input, Select, message } from "antd";
+import { Card, Checkbox, Form, Input, Select, message } from "antd";
 import { AccountService } from "../Services/AccountService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
@@ -13,6 +13,7 @@ export interface MiscAccountSettingsVm {
   accountName: string;
   countyIdDelimiter: string;
   stateIds: string[];
+  defaultViewAccessAllCaves: boolean;
 }
 
 export interface MiscAccountSettingsProps {
@@ -69,7 +70,7 @@ const MiscAccountSettings = ({
   };
 
   return (
-    <Card title="Misc Account Settings" loading={isLoading}>
+    <Card title="Account Settings" loading={isLoading}>
       <Form
         form={form}
         onFinish={onFinish}
@@ -118,6 +119,15 @@ const MiscAccountSettings = ({
             ))}
           </Select>
         </Form.Item>
+
+        <Form.Item
+          name={nameof<MiscAccountSettingsVm>("defaultViewAccessAllCaves")}
+          valuePropName="checked"
+          help="If enabled, all new users will automatically be granted view access to every cave location upon invitation."
+        >
+          <Checkbox>Default Cave Visibility: All</Checkbox>
+        </Form.Item>
+
         <Form.Item>
           <SaveButtonComponent type="primary" htmlType="submit">
             Save

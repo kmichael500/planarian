@@ -1,4 +1,6 @@
+using System.Data;
 using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
@@ -46,7 +48,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return await Repository.GetAccountUsers(RequestUser.AccountId);
     }
 
-    public async Task InviteUser(InviteUserRequest request, CancellationToken cancellationToken)
+    public async Task<string> InviteUser(InviteUserRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
@@ -84,12 +86,23 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             Repository.Add(accountUser);
 
             await Repository.SaveChangesAsync(cancellationToken);
+            
+            var defaultAccessViewAll = await _accountRepository.GetDefaultViewAccess();
+            if (defaultAccessViewAll)
+            {
+                await UpdateCavePermissions(user.Id, PermissionKey.View, new CreateUserCavePermissionsVm
+                {
+                    HasAllLocations = true
+                }, cancellationToken, dbTransaction: dbTransaction);
+            }
 
             var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
 
             await _emailService.SendAccountInvitationEmail(user, accountUser,
                 accountName);
             await dbTransaction.CommitAsync(cancellationToken);
+            
+            return user.Id;
         }
         catch (Exception)
         {
@@ -177,7 +190,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     }
 
     public async Task UpdateCavePermissions(string userId, string permissionKey, CreateUserCavePermissionsVm vm,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IDbContextTransaction? dbTransaction = null)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -210,7 +223,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         var existingPermissions =
             (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
 
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        var isExistingTransaction = dbTransaction != null;
+        dbTransaction ??= await Repository.BeginTransactionAsync(cancellationToken);
 
         try
         {
@@ -239,7 +253,12 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                     Repository.DeleteRange(others);
 
                     await Repository.SaveChangesAsync(cancellationToken);
-                    await dbTransaction.CommitAsync(cancellationToken);
+
+                    if (!isExistingTransaction)
+                    {
+                        await dbTransaction.CommitAsync(cancellationToken);
+                    }
+
                     return;
                 }
             }
@@ -326,11 +345,18 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
-            await dbTransaction.CommitAsync(cancellationToken);
+            if (!isExistingTransaction)
+            {
+                await dbTransaction.CommitAsync(cancellationToken);
+            }
         }
         catch (Exception)
         {
-            await dbTransaction.RollbackAsync(cancellationToken);
+            if (!isExistingTransaction)
+            {
+                await dbTransaction.RollbackAsync(cancellationToken);
+            }
+
             throw;
         }
     }
