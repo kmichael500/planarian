@@ -27,6 +27,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost]
+    [Authorize(Policy = PermissionPolicyKey.PlanarianAdmin)]
     public async Task<ActionResult<string>> CreateAccount([FromBody] CreateAccountVm account,
         CancellationToken cancellationToken)
     {
@@ -37,6 +38,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     // dangerous
     [HttpDelete("reset")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<string>> RestAccount(CancellationToken cancellationToken)
     {
         await Service.ResetAccount(cancellationToken);
@@ -53,6 +55,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
     
     [HttpPut("settings")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<MiscAccountSettingsVm>> UpdateSettings([FromBody] MiscAccountSettingsVm settings,
         CancellationToken cancellationToken)
     {
@@ -76,6 +79,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/caves/file")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportCavesFile(string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -87,6 +91,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost("import/caves/process/{fileId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
         bool isDryRun,
         CancellationToken cancellationToken)
@@ -98,6 +103,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/entrances/file")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportEntrancesFile(string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -110,6 +116,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("import/file")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string idRegex, IFormFile file,
         CancellationToken cancellationToken, bool ignoreDuplicates)
     {
@@ -122,6 +129,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost("import/entrances/process/{fileId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
         bool isDryRun,
         CancellationToken cancellationToken)
@@ -136,6 +144,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     #region Tags
 
     [HttpGet("tags-table/{key}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<IEnumerable<TagTypeTableVm>>> GetTags(string key,
         CancellationToken cancellationToken)
     {
@@ -144,6 +153,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
     
     [HttpGet("counties-table/{stateId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<IEnumerable<TagTypeTableCountyVm>>> GetCountiesForTable(string stateId, CancellationToken cancellationToken)
     {
         var result = await Service.GetCountiesForTable(stateId, cancellationToken);
@@ -159,6 +169,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
     
     [HttpPost("feature-settings/{key}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<FeatureSettingVm>> UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)
     {
         await Service.UpdateFeatureSetting(key, isEnabled, cancellationToken);
@@ -175,6 +186,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
 
     [HttpPost("states/{stateId:length(10)}/counties")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<TagTypeTableCountyVm>> AddCounty(string stateId,
         [FromBody] CreateCountyVm county, CancellationToken cancellationToken)
     {
@@ -183,6 +195,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPut("states/{stateId:length(10)}/counties/{countyId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<TagTypeTableCountyVm>> AddCounty(string stateId, string countyId,
         [FromBody] CreateCountyVm county, CancellationToken cancellationToken)
     {
@@ -191,6 +204,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost("states/{stateId:length(10)}/counties/merge/{destinationCountyId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> MergeCounties([FromQuery] string sourceCountyIds, string destinationCountyId,
         CancellationToken cancellationToken)
     {
@@ -200,6 +214,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpDelete("states/{stateId:length(10)}/counties")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> DeleteCounties([FromQuery] string countyIds,
         CancellationToken cancellationToken)
     {
@@ -207,10 +222,9 @@ public class AccountController : PlanarianControllerBase<AccountService>
         await Service.DeleteCounties(ids, cancellationToken);
         return Ok();
     }
-    
-    
 
     [HttpPut("tags/{tagTypeId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<TagTypeTableVm>> UpdateTagTypeName(string tagTypeId,
         [FromBody] CreateEditTagTypeVm tag)
     {
@@ -220,6 +234,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost("tags")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<TagTypeTableVm>> CreateTagType(string tagTypeId, [FromBody] CreateEditTagTypeVm tag)
     {
         var result = await Service.CreateOrUpdateTagType(tag, tagTypeId);
@@ -228,6 +243,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpDelete("tags")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> DeleteTagType([FromQuery] string tagTypeIds)
     {
         var ids = tagTypeIds.SplitAndTrim();
@@ -236,6 +252,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     }
 
     [HttpPost("tags/merge/{destinationTagTypeId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> MergeTagTypes([FromQuery] string sourceTagTypeIds, string destinationTagTypeId)
     {
         var ids = sourceTagTypeIds.SplitAndTrim();

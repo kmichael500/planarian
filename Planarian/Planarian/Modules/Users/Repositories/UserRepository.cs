@@ -121,17 +121,24 @@ public class UserRepository : RepositoryBase
                 .ToDictionary(group => group.Key, e => e.Select(ee => ee.CountyId!).ToList())
         };
 
-        var cavePermissions = data.Where(e => !string.IsNullOrWhiteSpace(e.CaveId)).Select(e =>
-            new SelectListItem<string, CavePermissionManagementData>
-            {
-                Display = e.CaveName,
-                Value = e.CaveId!,
-                Data = new CavePermissionManagementData
+        var cavePermissions = new List<SelectListItem<string, CavePermissionManagementData>>();
+        foreach (var cave in data.Where(e => !string.IsNullOrWhiteSpace(e.CaveId)))
+        {
+            cavePermissions.Add(
+                new SelectListItem<string, CavePermissionManagementData>
                 {
-                    CountyId = e.CaveCountyId!
+                    Display = cave.CaveName,
+                    Value = cave.CaveId!,
+                    Data = new CavePermissionManagementData
+                    {
+                        CountyId = cave.CaveCountyId,
+                        RequestUserHasAccess =
+                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, false)
+                    }
                 }
-            }).ToList();
-        
+            );
+        }
+
         var result = new CavePermissionManagementVm
         {
             HasAllLocations = hasAllLocations,
@@ -153,6 +160,50 @@ public class UserRepository : RepositoryBase
         return DbContext.CavePermissions
             .Where(e => e.UserId == userId && e.AccountId == accountId && e.Permission.Key == permissionKey &&
                         e.Permission.PermissionType == PermissionType.Cave);
+    }
+    
+    public async Task<IEnumerable<string>> GetPermissions(string userId, string accountId)
+    {
+        var userPermissions = await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .Select(e => e.Permission!.Key)
+            .ToListAsync();
+        
+        var cavePermissions = await DbContext.CavePermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .Select(e => e.Permission!.Key)
+            .Distinct()
+            .ToListAsync();
+
+        var isAdminManger = await DbContext.CavePermissions
+            .Where(e =>
+                e.UserId == userId
+                && e.AccountId == accountId
+                && string.IsNullOrWhiteSpace(e.CaveId)
+                && string.IsNullOrWhiteSpace(e.CountyId)
+                && e.Permission!.Key == PermissionPolicyKey.Manager
+            )
+            .AnyAsync();
+        if (isAdminManger == false)
+        {
+            isAdminManger = await DbContext.UserPermissions
+                .AnyAsync(e =>
+                    e.UserId == userId
+                    && e.AccountId == accountId
+                    && (
+                        PermissionKey.Admin == e.Permission!.Key
+                        || PermissionKey.PlanarianAdmin == e.Permission!.Key
+                    )
+                );
+        }        
+        if(isAdminManger)
+        {
+            cavePermissions.Add(PermissionPolicyKey.AdminManager);
+        }
+
+        userPermissions.AddRange(cavePermissions);
+        
+        return userPermissions.Distinct();
     }
 
     #endregion

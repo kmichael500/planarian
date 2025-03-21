@@ -10,6 +10,7 @@ import {
   CountyDropdownProps,
   CountyDropdown,
 } from "../../Caves/Components/CountyDropdown";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 interface StateCountyFilterFormItem<T extends object>
   extends StateDropdownProps {
@@ -75,6 +76,7 @@ const StateCountyFilterFormItem = <T extends object>({
       <Form.Item label={countyLabel} name={countyField}>
         {selectedState && (
           <CountyDropdown
+            permissionKey={PermissionKey.View}
             selectedStateId={selectedState}
             allowClear={true}
             onClear={() => {

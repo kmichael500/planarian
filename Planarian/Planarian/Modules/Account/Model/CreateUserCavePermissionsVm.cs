@@ -30,4 +30,5 @@ public class StateCountyValue
 public class CavePermissionManagementData
 {
     public string CountyId { get; set; } = null!;
+    public bool RequestUserHasAccess { get; set; }
 }

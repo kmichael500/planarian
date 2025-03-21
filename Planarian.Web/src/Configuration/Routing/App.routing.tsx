@@ -24,6 +24,7 @@ import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
 import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptInvitationPage";
 import { UserPage } from "../../Modules/Account/Pages/UserPage";
 import { UserPermissionManagementPage } from "../../Modules/Account/Pages/UserPermissionManagementPage";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -41,19 +42,32 @@ export const AppRouting: React.FC = () => {
 
       <Route element={<ProtectedRoutesComponent />}>
         <Route path="/" element={<AppRederect />} />
+        <Route path="/map" element={<MapPage />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
-        <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
-        <Route path="/caves/add" element={<AddCavesPage />} />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/account/settings" element={<AccountSettingsPage />} />
-        <Route path="/account/users" element={<UserManagerPage />} />
-        <Route path="/account/users/:userId" element={<UserPage />} />
         <Route
-          path="/account/users/:userId/permissions/:permissionKey"
-          element={<UserPermissionManagementPage />}
-        />
-        <Route path="/account/import" element={<ImportPage />} />
+          element={
+            <ProtectedRoutesComponent permissionKey={PermissionKey.Manager} />
+          }
+        >
+          <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
+          <Route path="/caves/add" element={<AddCavesPage />} />
+          <Route path="/account/users" element={<UserManagerPage />} />
+          <Route path="/account/users/:userId" element={<UserPage />} />
+          <Route
+            path="/account/users/:userId/permissions/:permissionKey"
+            element={<UserPermissionManagementPage />}
+          />
+        </Route>
+        <Route
+          element={
+            <ProtectedRoutesComponent permissionKey={PermissionKey.Admin} />
+          }
+        >
+          <Route path="/account/settings" element={<AccountSettingsPage />} />
+          <Route path="/account/import" element={<ImportPage />} />
+        </Route>
+
         <Route path="/projects" element={<ProjectsPage />}></Route>
         <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
         <Route

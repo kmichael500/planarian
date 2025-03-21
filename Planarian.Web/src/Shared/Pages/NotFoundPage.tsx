@@ -14,8 +14,8 @@ const NotFoundPage = () => {
 
   return (
     <Result
-      status="404"
-      title="404"
+      status="error"
+      title="Not Found"
       subTitle="Sorry, the page you are trying to visit does not exist."
       extra={<BackButtonComponent to={"/caves"}>Back Home</BackButtonComponent>}
     />

@@ -37,7 +37,8 @@ import {
 } from "../../Authentication/Models/PermissionKey";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { AppService } from "../../../Shared/Services/AppService";
 
 const { Text } = Typography;
 
@@ -52,6 +53,10 @@ export const UserPermissionManagement: React.FC<
 > = ({ userId, maxCaveSelectCount = null, permissionKey }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
+
+  const [everythingDisabled, setEverythingDisabled] = useState<boolean>(true);
+
+  const isAdminManager = AppService.HasPermission(PermissionKey.AdminManager);
 
   const [form] = Form.useForm<CavePermissionManagementVm>();
 
@@ -83,6 +88,15 @@ export const UserPermissionManagement: React.FC<
           },
           cavePermissions: data.cavePermissions ?? [],
         });
+
+        if (
+          data.hasAllLocations &&
+          AppService.HasPermission(PermissionKey.Admin)
+        ) {
+          setEverythingDisabled(false);
+        } else {
+          setEverythingDisabled(false);
+        }
       } catch (error) {
         message.error("Failed to load user location permissions.");
         console.error(error);
@@ -109,8 +123,8 @@ export const UserPermissionManagement: React.FC<
       );
       message.success("Permissions updated!");
     } catch (err) {
-      message.error("Failed to save permissions.");
-      console.error(err);
+      const error = err as ApiErrorResponse;
+      message.error(error.message);
     } finally {
       setSaveLoading(false);
     }
@@ -133,7 +147,12 @@ export const UserPermissionManagement: React.FC<
     setSearching(true);
     try {
       const pagedResult: PagedResult<CaveSearchVm> =
-        await CaveService.SearchCavesPaged(searchTerm, pageNumber, pageSize);
+        await CaveService.SearchCavesPaged(
+          searchTerm,
+          pageNumber,
+          pageSize,
+          PermissionKey.Manager
+        );
 
       setSearchResults(pagedResult.results);
       setCurrentPage(pagedResult.pageNumber);
@@ -168,6 +187,7 @@ export const UserPermissionManagement: React.FC<
       display: cave.name,
       data: {
         countyId: cave.countyId,
+        requestUserHasAccess: true,
       },
     };
 
@@ -187,20 +207,24 @@ export const UserPermissionManagement: React.FC<
         form={form}
         layout="vertical"
         onFinish={handleFormSubmit}
+        disabled={everythingDisabled}
       >
         <Form.Item
           label={<Text strong>Has access to ALL locations:</Text>}
           name={nameof<CavePermissionManagementVm>("hasAllLocations")}
           valuePropName="checked"
         >
-          <Switch />
+          <Switch disabled={!isAdminManager} />
         </Form.Item>
 
         <Form.Item
           label={<Text strong>County Access (by State):</Text>}
           name={nameof<CavePermissionManagementVm>("stateCountyValues")}
         >
-          <StateCountySelect disabled={hasAllLocations} />
+          <StateCountySelect
+            permissionKey={PermissionKey.Manager}
+            disabled={hasAllLocations}
+          />
         </Form.Item>
 
         <Form.Item
@@ -222,8 +246,12 @@ export const UserPermissionManagement: React.FC<
                   bordered
                   dataSource={fields}
                   renderItem={(field) => {
-                    const cave =
-                      form.getFieldValue("cavePermissions")[field.name];
+                    const cave = form.getFieldValue("cavePermissions")[
+                      field.name
+                    ] as SelectListItemWithData<
+                      string,
+                      CavePermissionManagementData
+                    >;
                     return (
                       <List.Item
                         actions={[
@@ -231,7 +259,9 @@ export const UserPermissionManagement: React.FC<
                             danger
                             size="small"
                             icon={<DeleteOutlined />}
-                            disabled={hasAllLocations}
+                            disabled={
+                              hasAllLocations || !cave.data.requestUserHasAccess
+                            }
                             onClick={() => remove(field.name)}
                           />,
                         ]}

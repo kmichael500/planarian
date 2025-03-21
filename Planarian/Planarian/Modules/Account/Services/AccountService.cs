@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
@@ -16,6 +17,7 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Account.Services;
 
+[Authorize(Policy = PermissionPolicyKey.Admin)]
 public class AccountService : ServiceBase<AccountRepository>
 {
     private readonly FileService _fileService;

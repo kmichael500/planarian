@@ -39,57 +39,66 @@ public class CaveService : ServiceBase<CaveRepository>
         return await Repository.GetCaves(query);
     }
 
+    public async Task<PagedResult<CaveSearchVm>> GetCavesSearch(FilterQuery query, string? permissionKey = null)
+    {
+        return await Repository.GetCavesSearch(query, permissionKey);
+    }
+
+
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+        
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+        var isNew = string.IsNullOrWhiteSpace(values.Id);
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+
+        
+        #region Data Validation
+
+        // must be at least one entrance
+        if (values.Entrances == null || !values.Entrances.Any())
+            throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
+
+        if (values.NumberOfPits < 0)
+            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
+
+        if (values.LengthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
+
+        if (values.DepthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
+
+        if (values.MaxPitDepthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
+
+        if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
+            throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
+
+        if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
+            throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
+
+        if (values.Entrances.Any(e => e.ElevationFeet < 0))
+            throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
+
+        if (values.Entrances.Any(e => e.PitFeet < 0))
+            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
+
+        var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
+
+        if (numberOfPrimaryEntrances == 0)
+            throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
+
+        if (numberOfPrimaryEntrances != 1)
+            throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
+
+        #endregion
+
+
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-
-            #region Data Validation
-
-            // must be at least one entrance
-            if (values.Entrances == null || !values.Entrances.Any())
-                throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
-
-            if (values.NumberOfPits < 0)
-                throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
-
-            if (values.LengthFeet < 0)
-                throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
-
-            if (values.DepthFeet < 0)
-                throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
-
-            if (values.MaxPitDepthFeet < 0)
-                throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
-
-            if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
-                throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
-
-            if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
-                throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
-
-            if (values.Entrances.Any(e => e.ElevationFeet < 0))
-                throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
-
-            if (values.Entrances.Any(e => e.PitFeet < 0))
-                throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
-
-            var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
-
-            if (numberOfPrimaryEntrances == 0)
-                throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
-
-            if (numberOfPrimaryEntrances != 1)
-                throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
-
-            #endregion
-
-
-            var isNew = string.IsNullOrWhiteSpace(values.Id);
-
-
             var entity = isNew ? new Cave() : await Repository.GetAsync(values.Id);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
@@ -98,7 +107,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
             entity.Name = values.Name.Trim();
             entity.SetAlternateNamesList(values.AlternateNames.Select(e => e.Trim()));
-            
+
             entity.CountyId = values.CountyId.Trim();
             entity.StateId = values.StateId.Trim();
             entity.LengthFeet = values.LengthFeet;
@@ -118,7 +127,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.GeologyTags.Add(tag);
             }
-            
+
             entity.ArcheologyTags.Clear();
             foreach (var tagId in values.ArcheologyTagIds)
             {
@@ -128,7 +137,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.ArcheologyTags.Add(tag);
             }
-            
+
             entity.BiologyTags.Clear();
             foreach (var tagId in values.BiologyTagIds)
             {
@@ -138,11 +147,11 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.BiologyTags.Add(tag);
             }
-            
+
             entity.CartographerNameTags.Clear();
             foreach (var personTagTypeId in values.CartographerNameTagIds)
             {
-                
+
                 var tagType = await _tagRepository.GetTag(personTagTypeId);
                 tagType ??= new TagType
                 {
@@ -154,10 +163,10 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     TagType = tagType
                 };
-                
+
                 entity.CartographerNameTags.Add(tag);
             }
-            
+
             entity.MapStatusTags.Clear();
             foreach (var tagId in values.MapStatusTagIds)
             {
@@ -167,7 +176,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.MapStatusTags.Add(tag);
             }
-            
+
             entity.GeologicAgeTags.Clear();
             foreach (var tagId in values.GeologicAgeTagIds)
             {
@@ -177,7 +186,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.GeologicAgeTags.Add(tag);
             }
-            
+
             entity.PhysiographicProvinceTags.Clear();
             foreach (var tagId in values.PhysiographicProvinceTagIds)
             {
@@ -187,7 +196,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.PhysiographicProvinceTags.Add(tag);
             }
-            
+
             entity.CaveOtherTags.Clear();
             foreach (var tagId in values.OtherTagIds)
             {
@@ -197,7 +206,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
                 entity.CaveOtherTags.Add(tag);
             }
-            
+
             entity.CaveReportedByNameTags.Clear();
             foreach (var personTagTypeId in values.ReportedByNameTagIds)
             {
@@ -212,7 +221,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     TagType = tagType
                 };
-                
+
                 entity.CaveReportedByNameTags.Add(tag);
             }
 
@@ -260,7 +269,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     };
                     entrance.EntranceStatusTags.Add(tag);
                 }
-                
+
                 entrance.FieldIndicationTags.Clear();
                 foreach (var tagId in entranceValue.FieldIndicationTagIds)
                 {
@@ -270,7 +279,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     };
                     entrance.FieldIndicationTags.Add(tag);
                 }
-                
+
                 entrance.EntranceOtherTags.Clear();
                 foreach (var tagId in entranceValue.EntranceOtherTagIds)
                 {
@@ -315,55 +324,55 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             var blobsToDelete = new List<File>();
-                if (values.Files != null)
+            if (values.Files != null)
+            {
+                foreach (var file in values.Files)
                 {
-                    foreach (var file in values.Files)
+                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
+
+                    if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
+
+                    if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
+                        !string.Equals(file.DisplayName, fileEntity.DisplayName))
                     {
-                        var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
-
-                        if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
-
-                        if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
-                            !string.Equals(file.DisplayName, fileEntity.DisplayName))
-                        {
-                            fileEntity.DisplayName = file.DisplayName;
-                            fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
-                            !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
-                        {
-                            var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
-                            if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag");
-
-                            fileEntity.FileTypeTagId = tagType.Id;
-                        }
+                        fileEntity.DisplayName = file.DisplayName;
+                        fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
                     }
 
-                    // check if any ids are missing from the request compared to the db and delete the ones that are missing
-                    var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
-                    foreach (var missingId in missingIds)
+                    if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
+                        !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
                     {
-                        var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
-                        if (fileEntity == null) continue;
+                        var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
+                        if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag");
 
-                        blobsToDelete.Add(fileEntity);
-                        Repository.Delete(fileEntity);
+                        fileEntity.FileTypeTagId = tagType.Id;
                     }
                 }
 
-                if (isNew) Repository.Add(entity);
+                // check if any ids are missing from the request compared to the db and delete the ones that are missing
+                var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
+                foreach (var missingId in missingIds)
+                {
+                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
+                    if (fileEntity == null) continue;
 
-                await Repository.SaveChangesAsync();
+                    blobsToDelete.Add(fileEntity);
+                    Repository.Delete(fileEntity);
+                }
+            }
 
-                await transaction.CommitAsync(cancellationToken);
+            if (isNew) Repository.Add(entity);
 
-                foreach (var blobProperties in blobsToDelete)
-                    await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
+            await Repository.SaveChangesAsync(cancellationToken);
 
-                return entity.Id;
+            await transaction.CommitAsync(cancellationToken);
 
-            
+            foreach (var blobProperties in blobsToDelete)
+                await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
+
+            return entity.Id;
+
+
         }
         catch (Exception e)
         {
@@ -399,7 +408,7 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         var outsideTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
-        
+
         var files = new List<File>();
         var isSuccessful = false;
         try
@@ -407,6 +416,7 @@ public class CaveService : ServiceBase<CaveRepository>
             var entity = await Repository.GetAsync(caveId);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
 
             foreach (var entrance in entity.Entrances)
             {
@@ -416,7 +426,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken.ThrowIfCancellationRequested();
                     Repository.Delete(tag);
                 }
-                
+
                 await Repository.SaveChangesAsync(cancellationToken);
 
                 foreach (var tag in entrance.EntranceHydrologyTags)
@@ -424,6 +434,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken.ThrowIfCancellationRequested();
                     Repository.Delete(tag);
                 }
+
                 await Repository.SaveChangesAsync(cancellationToken);
 
                 foreach (var tag in entrance.FieldIndicationTags)
@@ -431,6 +442,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken.ThrowIfCancellationRequested();
                     Repository.Delete(tag);
                 }
+
                 await Repository.SaveChangesAsync(cancellationToken);
 
                 foreach (var tag in entrance.EntranceReportedByNameTags)
@@ -438,6 +450,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken.ThrowIfCancellationRequested();
                     Repository.Delete(tag);
                 }
+
                 await Repository.SaveChangesAsync(cancellationToken);
 
                 foreach (var tag in entrance.EntranceOtherTags)
@@ -450,6 +463,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
                 Repository.Delete(entrance);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
 
@@ -458,6 +472,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.MapStatusTags)
@@ -465,6 +480,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.GeologicAgeTags)
@@ -472,6 +488,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.PhysiographicProvinceTags)
@@ -479,6 +496,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.BiologyTags)
@@ -486,6 +504,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.ArcheologyTags)
@@ -493,6 +512,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.CartographerNameTags)
@@ -500,6 +520,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.CaveReportedByNameTags)
@@ -507,6 +528,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var tag in entity.CaveOtherTags)
@@ -514,6 +536,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 cancellationToken.ThrowIfCancellationRequested();
                 Repository.Delete(tag);
             }
+
             await Repository.SaveChangesAsync(cancellationToken);
 
             files = entity.Files.ToList();
@@ -525,7 +548,7 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.CommitAsync(cancellationToken);
             }
-            
+
             isSuccessful = true;
         }
         catch (Exception)
@@ -534,9 +557,10 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
+
             throw;
         }
-        
+
         if (isSuccessful)
         {
             foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
@@ -545,9 +569,12 @@ public class CaveService : ServiceBase<CaveRepository>
 
     public async Task ArchiveCave(string caveId)
     {
-        var entity = await Repository.GetAsync(caveId);
 
+        var entity = await Repository.GetAsync(caveId);
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
+
 
         entity.IsArchived = true;
         await Repository.SaveChangesAsync();
@@ -558,10 +585,13 @@ public class CaveService : ServiceBase<CaveRepository>
         var entity = await Repository.GetAsync(caveId);
 
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
 
         entity.IsArchived = false;
         await Repository.SaveChangesAsync();
     }
 
     #endregion
+
+
 }

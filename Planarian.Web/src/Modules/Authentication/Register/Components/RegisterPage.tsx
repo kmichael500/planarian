@@ -130,6 +130,7 @@ const RegisterPage: React.FC = () => {
               loading={isSubmitting}
               onClick={() => form.submit()}
               icon={<CheckCircleOutlined />}
+              alwaysShowChildren
             >
               Accept Invitation
             </PlanarianButton>
@@ -138,9 +139,13 @@ const RegisterPage: React.FC = () => {
               type="primary"
               loading={isSubmitting}
               onClick={() => form.submit()}
+              alwaysShowChildren
             />
           ),
-          <LoginButtonComponent invitationCode={invitationCode} />,
+          <LoginButtonComponent
+            alwaysShowChildren
+            invitationCode={invitationCode}
+          />,
         ]}
       >
         <Form

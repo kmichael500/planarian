@@ -1,6 +1,7 @@
 export enum PermissionKey {
   View = "View",
-  CountyCoordinator = "CountyCoordinator",
+  Manager = "Manager",
+  AdminManager = "AdminManager",
   Admin = "Admin",
   PlanarianAdmin = "PlanarianAdmin",
 }
@@ -9,8 +10,8 @@ export const GetPermissionKeyDisplay = (key: PermissionKey): string => {
   switch (key) {
     case PermissionKey.View:
       return "View";
-    case PermissionKey.CountyCoordinator:
-      return "County Coordinator";
+    case PermissionKey.Manager:
+      return "Manager";
     case PermissionKey.Admin:
       return "Admin";
     case PermissionKey.PlanarianAdmin:

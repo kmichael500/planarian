@@ -19,10 +19,17 @@ public class CaveRepository : RepositoryBase
     {
     }
 
-    public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery)
+    public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
-        var query = DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId!).AsQueryable();
-
+        var query = DbContext.Caves
+            .IgnoreQueryFilters() // ignoring because it makes the query too slow, we are applying the same filter to it here so we can include a permission type
+            .Where(cave =>
+            DbContext.UserCavePermissionView.Any(ucp =>
+                ucp.AccountId == RequestUser.AccountId
+                && ucp.UserId == RequestUser.Id &&
+                (string.IsNullOrWhiteSpace(permissionKey) || ucp.PermissionKey == permissionKey)
+                && ucp.CaveId == cave.Id)).AsQueryable();
+   
         if (filterQuery.Conditions.Any())
             foreach (var queryCondition in filterQuery.Conditions)
                 switch (queryCondition.Field)
@@ -397,6 +404,7 @@ public class CaveRepository : RepositoryBase
     public async Task<int> GetNewDisplayId(string countyId)
     {
         var maxCaveNumber = await DbContext.Caves
+            .IgnoreQueryFilters() // need to ignore filter to calculate county number for all caves, not just ones the user has access too
             .Where(e => e.AccountId == RequestUser.AccountId && e.CountyId == countyId)
             .MaxAsync(e => (int?)e.CountyNumber);
 
@@ -532,6 +540,13 @@ public class CaveRepository : RepositoryBase
                 $"{e.County!.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber} {e.Name}"))
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
+        return result;
+    }
+
+    public async Task<PagedResult<CaveSearchVm>> GetCavesSearch(FilterQuery filterQuery, string? permissionKey = null)
+    {
+        var result = await GetCaves(filterQuery, permissionKey);
+        
         return result;
     }
 }

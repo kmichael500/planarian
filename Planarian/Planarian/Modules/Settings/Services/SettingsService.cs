@@ -49,14 +49,15 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetUsers();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
         return await Repository.GetStates();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId,
+        string? permissionKey = null)
     {
-        return await Repository.GetStateCounties(stateId);
+        return await Repository.GetStateCounties(stateId, permissionKey);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTags(string key, string? projectId = null)

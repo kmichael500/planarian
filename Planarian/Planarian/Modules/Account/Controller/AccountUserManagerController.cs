@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
@@ -21,9 +22,10 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     {
     }
 
-    #region User Manage
+    #region User Manager
 
     [HttpGet]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<IEnumerable<UserManagerGridVm>>> GetAccountUsers()
     {
         var users = await Service.GetAccountUsers();
@@ -31,6 +33,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpGet("{userId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<UserManagerGridVm>> GetUserById(string userId)
     {
         var user = await Service.GetUserById(userId);
@@ -38,6 +41,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpPost("{userId:length(10)}/resend-invitation")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ResendInvitation(string userId)
     {
         await Service.ResendInvitation(userId);
@@ -45,6 +49,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpPost("")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> Invite([FromBody] InviteUserRequest request, CancellationToken cancellationToken)
     {
         await Service.InviteUser(request, cancellationToken);
@@ -52,6 +57,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpDelete("{userId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult> Revoke(string userId)
     {
         await Service.RevokeAccess(userId);
@@ -63,6 +69,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     #region Permission Management
 
     [HttpGet("{userId:length(10)}/cave-permissions/{permissionKey}")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<CavePermissionManagementVm>> GetCavePermissions(string userId,
         string permissionKey)
     {
@@ -71,16 +78,17 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpPut("{userId:length(10)}/cave-permissions/{permissionKey}")]
-    public async Task<IActionResult> UpdateCavePermissions(
-        string userId,
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    public async Task<IActionResult> UpdateCavePermissions(string userId,
         string permissionKey,
-        [FromBody] CreateUserCavePermissionsVm model)
+        [FromBody] CreateUserCavePermissionsVm model, CancellationToken cancellationToken)
     {
-        await Service.UpdateCavePermissions(userId, permissionKey, model);
+        await Service.UpdateCavePermissions(userId, permissionKey, model, cancellationToken);
         return Ok();
     }
 
     [HttpGet("select/permissions")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>>
         GetPermissionSelectList([FromQuery] string permissionType)
     {
@@ -90,6 +98,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
 
     [HttpGet("{userId:length(10)}/user-permissions")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<IEnumerable<UserPermissionVm>>>
         GetUserPermissions(string userId)
     {
@@ -98,6 +107,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpPost("{userId:length(10)}/user-permissions/{permissionKey}")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<IActionResult> AddUserPermission(string userId, string permissionKey)
     {
         await Service.AddUserPermission(userId, permissionKey);
@@ -105,6 +115,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpDelete("{userId:length(10)}/user-permissions/{permissionKey}")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<IActionResult> RemoveUserPermission(
         string userId,
         string permissionKey)
@@ -114,6 +125,5 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     #endregion
-
 
 }

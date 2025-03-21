@@ -8,7 +8,12 @@ const SubmitButtonComponent: React.FC<PlanarianButtonTypeWithoutIcon> = (
   props
 ) => {
   return (
-    <PlanarianButton type="primary" {...props} icon={<CheckCircleOutlined />}>
+    <PlanarianButton
+      alwaysShowChildren
+      type="primary"
+      {...props}
+      icon={<CheckCircleOutlined />}
+    >
       Submit
     </PlanarianButton>
   );

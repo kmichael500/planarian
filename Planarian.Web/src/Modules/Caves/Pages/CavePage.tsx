@@ -10,6 +10,8 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { EditOutlined } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { Grid, Typography } from "antd";
+import { AppService } from "../../../Shared/Services/AppService";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const CavePage = () => {
   const [cave, setCave] = useState<CaveVm>();
@@ -19,6 +21,8 @@ const CavePage = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const { caveId } = useParams();
 
+  const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
+
   const screens = Grid.useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
@@ -27,11 +31,13 @@ const CavePage = () => {
   useEffect(() => {
     setHeaderButtons([
       <Link to={`/caves/${caveId}/edit`}>
-        <PlanarianButton icon={<EditOutlined />}>Edit</PlanarianButton>{" "}
+        <PlanarianButton disabled={!hasEditPermission} icon={<EditOutlined />}>
+          Edit
+        </PlanarianButton>{" "}
       </Link>,
       <BackButtonComponent to={"./.."} />,
     ]);
-  }, [cave]);
+  }, [cave, hasEditPermission]);
 
   if (caveId === undefined) {
     throw new NotFoundError("caveid");
@@ -59,6 +65,11 @@ const CavePage = () => {
     const getCave = async () => {
       const caveResponse = await CaveService.GetCave(caveId);
       setCave(caveResponse);
+      const hasEditPermission = await AppService.HasCavePermission(
+        PermissionKey.Manager,
+        caveId
+      );
+      setHasEditPermission(hasEditPermission);
       setIsLoading(false);
     };
     getCave();

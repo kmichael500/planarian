@@ -25,4 +25,11 @@ public class AppController : PlanarianControllerBase<AppService>
         var result = await Service.Initialize(serverBaseUrl);
         return new JsonResult(result);
     }
+    
+    [HttpGet("permissions/caves")]
+    public async Task<ActionResult<string>> HasCavePermission([FromQuery] string? caveId, [FromQuery] string? countyId, [FromQuery] string permissionKey)
+    {
+        var result = await Service.HasCavePermission(permissionKey, caveId, countyId);
+        return new JsonResult(result);
+    }
 }

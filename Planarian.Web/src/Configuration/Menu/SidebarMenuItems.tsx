@@ -13,6 +13,7 @@ import {
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { useState, useEffect } from "react";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 
 const SideBarMenuItems = () => {
   const [hasAccount, setHasAccount] = useState(
@@ -56,6 +57,7 @@ const SideBarMenuItems = () => {
       icon: <SettingOutlined />,
       label: "Account",
       isVisible: hasAccount,
+      permissionKey: PermissionKey.Manager,
       children: [
         {
           key: "/account/import",
@@ -65,6 +67,7 @@ const SideBarMenuItems = () => {
             </Link>
           ),
           label: "Import",
+          permissionKey: PermissionKey.Admin,
         },
         {
           key: "/account/users",
@@ -74,19 +77,22 @@ const SideBarMenuItems = () => {
             </Link>
           ),
           label: "Users",
+          permissionKey: PermissionKey.Manager,
         },
         {
           key: "/account/settings",
           icon: <SettingOutlined />,
           label: "Settings",
+          permissionKey: PermissionKey.Admin,
         },
       ],
     },
     {
       icon: <Divider />,
-      isVisible: hasAccount,
+      isVisible: false,
     },
     {
+      isVisible: false,
       key: "/projects",
       icon: (
         <Link to="/projects">
@@ -124,6 +130,14 @@ const SideBarMenuItems = () => {
 
   authenticatedMenuItems.forEach((element) => {
     element.requiresAuthentication = true;
+
+    if (element.children) {
+      element.children.forEach((child) => {
+        child.requiresAuthentication = true;
+      });
+    }
+
+    // do permissions
   });
 
   return [...authenticatedMenuItems, ...unauthenticatedMenuItems];

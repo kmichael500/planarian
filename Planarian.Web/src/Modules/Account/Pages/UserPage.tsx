@@ -13,6 +13,7 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { CavePermissionManagementList } from "../Components/CavePermissionManagementList";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { UserPermissionManagementList } from "../Components/UserPermissionManagementList";
+import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 
 const UserPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -45,7 +46,9 @@ const UserPage: React.FC = () => {
   return (
     <>
       <Space direction="vertical" style={{ width: "100%" }}>
-        <UserPermissionManagementList userId={userId} />
+        <ShouldDisplay permissionKey={PermissionKey.Admin}>
+          <UserPermissionManagementList userId={userId} />
+        </ShouldDisplay>
         <CavePermissionManagementList userId={userId} />
       </Space>
     </>

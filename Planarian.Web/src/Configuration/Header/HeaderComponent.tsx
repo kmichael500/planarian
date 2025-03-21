@@ -117,7 +117,7 @@ const HeaderComponent = () => {
             {/* take up rest of space to push others to right and left side */}
             <Col flex="auto"></Col>
             {hasAccount && (
-              <Col>
+              <Col style={{ flexShrink: 0 }}>
                 <AccountNameTag />
               </Col>
             )}
@@ -137,14 +137,26 @@ const AccountNameTag = () => {
   let accountNameAbbreviation = "";
 
   const screens = useBreakpoint();
-
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
   );
+
+  const isNotXs = Object.entries(screens).some(
+    ([key, value]) => value && key !== "xs"
+  );
+
   accountName = AuthenticationService.GetAccountName();
   accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
 
-  return <Tag>{isLargeScreenSize ? accountName : accountNameAbbreviation}</Tag>;
+  return (
+    <>
+      {isNotXs && (
+        <Tag style={{ whiteSpace: "nowrap" }}>
+          {isLargeScreenSize ? accountName : accountNameAbbreviation}
+        </Tag>
+      )}
+    </>
+  );
 };
 
 export { HeaderComponent };

@@ -11,6 +11,8 @@ import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { FileVm } from "../../Files/Models/FileVm";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -76,13 +78,21 @@ const CaveService = {
   async SearchCavesPaged(
     name: string,
     pageNumber: number = 1,
-    pageSize: number = 10
+    pageSize: number = 10,
+    permissionKey: PermissionKey | null = null
   ): Promise<PagedResult<CaveSearchVm>> {
     const qb = new QueryBuilder<CaveSearchParamsVm>("", false);
     qb.filterBy("name", QueryOperator.Contains, name as any);
     qb.changePage(pageNumber, pageSize);
 
-    return await CaveService.GetCaves(qb);
+    const queryString = !isNullOrWhiteSpace(permissionKey)
+      ? `&permissionKey=${permissionKey}`
+      : "";
+
+    const response = await HttpClient.get<PagedResult<CaveSearchVm>>(
+      `${baseUrl}/search?${qb.buildAsQueryString()}${queryString}`
+    );
+    return response.data;
   },
 };
 

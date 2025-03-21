@@ -23,6 +23,7 @@ import { Link } from "react-router-dom";
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UserAddOutlined } from "@ant-design/icons";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
@@ -126,6 +127,7 @@ const UserManagerComponent: React.FC = () => {
         <Space>
           {" "}
           <DeleteButtonComponent
+            permissionKey={PermissionKey.Admin}
             loading={isRevoking}
             title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
             onConfirm={() => {
@@ -172,6 +174,7 @@ const UserManagerComponent: React.FC = () => {
           }}
         >
           <PlanarianButton
+            permissionKey={PermissionKey.Admin}
             icon={<UserAddOutlined />}
             type="primary"
             onClick={() => setInviteModalVisible(true)}

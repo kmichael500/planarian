@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Planarian.Model.Database.Entities.RidgeWalker.Views;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -63,7 +64,7 @@ public class Cave : EntityBase
     public IEnumerable<string> AlternateNamesList =>
         JsonSerializer.Deserialize<List<string>>(AlternateNames) ?? new List<string>();
 
-    public IEnumerable<CavePermission> CavePermissions { get; set; }
+    public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
 
 
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>

@@ -11,6 +11,7 @@ export interface CavePermissionManagementVm {
 
 export interface CavePermissionManagementData {
   countyId: string;
+  requestUserHasAccess: boolean;
 }
 
 export interface StateCountyValue {

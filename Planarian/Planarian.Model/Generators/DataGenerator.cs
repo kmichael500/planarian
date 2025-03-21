@@ -410,11 +410,11 @@ public class DataGenerator
         var managePermission = new Permission
         {
             Id = "MaNagEz9a0",
-            Name = "County Coordinator",
+            Name = "Manager",
             Description =
-                "County Coordinators are responsible for reviewing and approving changes. They can also invite other members within the state survey to view the data that they manage.",
+                "Managers are responsible for reviewing and approving changes. They can also invite other members within the state survey to view the data that they manage.",
             IsHidden = false,
-            Key = PermissionKey.CountyCoordinator,
+            Key = PermissionKey.Manager,
             PermissionType = PermissionType.Cave,
             SortOrder = 1
         };
