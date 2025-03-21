@@ -8,7 +8,13 @@ const CancelButtonComponent: React.FC<PlanarianButtonTypeWithoutIcon> = (
   props
 ) => {
   return (
-    <PlanarianButton danger type="primary" {...props} icon={<UndoOutlined />}>
+    <PlanarianButton
+      alwaysShowChildren
+      danger
+      type="primary"
+      {...props}
+      icon={<UndoOutlined />}
+    >
       Cancel
     </PlanarianButton>
   );

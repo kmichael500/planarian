@@ -1,13 +1,18 @@
 import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
 import { PagedResult } from "../../Search/Models/PagedResult";
-import { QueryBuilder } from "../../Search/Services/QueryBuilder";
+import {
+  QueryBuilder,
+  QueryOperator,
+} from "../../Search/Services/QueryBuilder";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { FileVm } from "../../Files/Models/FileVm";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -69,5 +74,26 @@ const CaveService = {
     );
     return response.data;
   },
+
+  async SearchCavesPaged(
+    name: string,
+    pageNumber: number = 1,
+    pageSize: number = 10,
+    permissionKey: PermissionKey | null = null
+  ): Promise<PagedResult<CaveSearchVm>> {
+    const qb = new QueryBuilder<CaveSearchParamsVm>("", false);
+    qb.filterBy("name", QueryOperator.Contains, name as any);
+    qb.changePage(pageNumber, pageSize);
+
+    const queryString = !isNullOrWhiteSpace(permissionKey)
+      ? `&permissionKey=${permissionKey}`
+      : "";
+
+    const response = await HttpClient.get<PagedResult<CaveSearchVm>>(
+      `${baseUrl}/search?${qb.buildAsQueryString()}${queryString}`
+    );
+    return response.data;
+  },
 };
+
 export { CaveService };

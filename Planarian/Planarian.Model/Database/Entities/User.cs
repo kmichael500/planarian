@@ -64,9 +64,12 @@ public class User : EntityBase
     [MaxLength(PropertyLength.BlobKey)] public string? ProfilePhotoBlobKey { get; set; }
 
     public virtual ICollection<Member> Members { get; set; } = new HashSet<Member>();
-    public ICollection<Cave> CavesReported { get; set; } = new HashSet<Cave>();
-    public ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
-    public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
+    public virtual ICollection<Cave> CavesReported { get; set; } = new HashSet<Cave>();
+    public virtual ICollection<Entrance> EntrancesReported { get; set; } = new HashSet<Entrance>();
+    public virtual ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
+
+    public virtual ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
+    public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
 
     #region Helper Functions
 

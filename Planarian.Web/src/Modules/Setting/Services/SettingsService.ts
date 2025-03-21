@@ -2,14 +2,21 @@ import { HttpClient } from "../../..";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { CacheService } from "../../../Shared/Services/CacheService";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { TagType } from "../../Tag/Models/TagType";
 import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
 
 const baseUrl = "api/settings";
 const SettingsService = {
-  async GetStates(): Promise<SelectListItem<string>[]> {
+  async GetStates(
+    permissionKey: PermissionKey | null = null
+  ): Promise<SelectListItem<string>[]> {
+    const queryString = !isNullOrWhiteSpace(permissionKey)
+      ? `?permissionKey=${permissionKey}`
+      : "";
+
     const response = await HttpClient.get<SelectListItem<string>[]>(
-      `${baseUrl}/tags/states`
+      `${baseUrl}/tags/states${queryString}`
     );
     return response.data;
   },
@@ -26,9 +33,15 @@ const SettingsService = {
     CacheService.set(cacheKey, response.data);
     return response.data;
   },
-  async GetCounties(stateId: string): Promise<SelectListItem<string>[]> {
+  async GetCounties(
+    stateId: string,
+    permissionKey: PermissionKey | null = null
+  ): Promise<SelectListItem<string>[]> {
+    const queryString = !isNullOrWhiteSpace(permissionKey)
+      ? `?permissionKey=${permissionKey}`
+      : "";
     const response = await HttpClient.get<SelectListItem<string>[]>(
-      `${baseUrl}/tags/states/${stateId}/counties/`
+      `${baseUrl}/tags/states/${stateId}/counties${queryString}`
     );
     return response.data;
   },

@@ -41,6 +41,7 @@ export const FileListComponent = ({
                 noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
                 noDataCreateButton={
                   <PlanarianButton
+                    alwaysShowChildren
                     icon={<CloudUploadOutlined />}
                     onClick={() => {
                       if (setIsUploading) {
@@ -68,6 +69,7 @@ export const FileListComponent = ({
           noDataCreateButton={
             <PlanarianButton
               icon={<CloudUploadOutlined />}
+              alwaysShowChildren
               onClick={() => {
                 if (setIsUploading) {
                   setIsUploading(true);

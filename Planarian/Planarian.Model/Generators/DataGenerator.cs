@@ -44,6 +44,26 @@ public class DataGenerator
 
         try
         {
+            var permissions = GeneratePermissions();
+            foreach (var permission in permissions)
+            {
+                var existingPermission = await _dbContext.Permissions.FindAsync(permission.Id);
+
+                if (existingPermission != null)
+                {
+                    existingPermission.Name = permission.Name;
+                    existingPermission.Description = permission.Description;
+                    existingPermission.IsHidden = permission.IsHidden;
+                    existingPermission.Key = permission.Key;
+                    existingPermission.PermissionType = permission.PermissionType;
+                    existingPermission.SortOrder = permission.SortOrder;
+                }
+                else
+                {
+                    await _dbContext.Permissions.AddAsync(permission);
+                }
+            }
+
             var defaultFeatureSettings = GenerateDefaultFeatureSettings();
             foreach (var setting in defaultFeatureSettings)
             {
@@ -371,5 +391,57 @@ public class DataGenerator
                 IsDefault = true, CreatedOn = Now
             },
         };
+    }
+
+    private IEnumerable<Permission> GeneratePermissions()
+    {
+        var viewPermission = new Permission
+        {
+            Id = "vIeWPz9a00",
+            Name = "View",
+            Description =
+                "Users with view access can view the cave data and suggest updates. Their changes will need a to be approved by a county coordinator or an admin before any changes are applied.",
+            IsHidden = false,
+            Key = PermissionKey.View,
+            PermissionType = PermissionType.Cave,
+            SortOrder = 0
+        };
+
+        var managePermission = new Permission
+        {
+            Id = "MaNagEz9a0",
+            Name = "Manager",
+            Description =
+                "Managers are responsible for reviewing and approving changes. They can also invite other members within the state survey to view the data that they manage.",
+            IsHidden = false,
+            Key = PermissionKey.Manager,
+            PermissionType = PermissionType.Cave,
+            SortOrder = 1
+        };
+
+        var adminPermission = new Permission
+        {
+            Id = "AdMiNz9a00",
+            Name = "Admin",
+            Description = "Admins have full access to the system and can manage all data, permissions, users, and account settings.",
+            IsHidden = false,
+            Key = PermissionKey.Admin,
+            PermissionType = PermissionType.User,
+            SortOrder = 2
+        };
+
+        var planarianAdmin = new Permission
+        {
+            Id = "PlAnArIaNz",
+            Name = "Planarian Admin",
+            Description = "Planarian Admins have access to super secret settings.",
+            IsHidden = true,
+            Key = PermissionKey.PlanarianAdmin,
+            PermissionType = PermissionType.User,
+            SortOrder = 3
+        };
+        
+
+        return [managePermission, viewPermission, adminPermission, planarianAdmin];
     }
 }

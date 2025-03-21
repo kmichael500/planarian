@@ -149,6 +149,23 @@ public class UserService : ServiceBase<UserRepository>
             ModifiedByUserId = invitation.AccountUser.ModifiedByUserId
         };
         Repository.Add(accountUser);
+
+        if (invitation.CavePermissions != null)
+        {
+            foreach (var cavePermission in invitation.CavePermissions)
+            {
+                cavePermission.User = existingUser;
+            }
+        }
+        
+        if (invitation.UserPermissions != null)
+        {
+            foreach (var userPermission in invitation.UserPermissions)
+            {
+                userPermission.User = existingUser;
+            }
+        }
+        
         await Repository.SaveChangesAsync(cancellationToken);
 
         await DeleteInvitation(invitation.AccountUser, invitation.User);

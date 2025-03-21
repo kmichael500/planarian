@@ -522,7 +522,11 @@ const CavesComponent: React.FC = () => {
                 title={`${cave.displayId} ${cave.name}`}
                 actions={[
                   <Link to={`/caves/${cave.id}`}>
-                    <PlanarianButton type="primary" icon={<EyeOutlined />}>
+                    <PlanarianButton
+                      alwaysShowChildren
+                      type="primary"
+                      icon={<EyeOutlined />}
+                    >
                       More Info
                     </PlanarianButton>
                   </Link>,
@@ -535,7 +539,10 @@ const CavesComponent: React.FC = () => {
                         )}
                         target="_blank"
                       >
-                        <PlanarianButton icon={<CarOutlined />}>
+                        <PlanarianButton
+                          alwaysShowChildren
+                          icon={<CarOutlined />}
+                        >
                           Directions
                         </PlanarianButton>
                       </a>

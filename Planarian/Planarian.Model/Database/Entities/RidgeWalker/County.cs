@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Database.Entities.RidgeWalker.Views;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 
@@ -14,7 +15,8 @@ public class County : EntityBaseNameId
 
     public virtual Account? Account { get; set; } = null!;
     public virtual State? State { get; set; } = null!;
-    public ICollection<Cave> Caves { get; set; } = null!;
+    public ICollection<Cave> Caves { get; set; } = new HashSet<Cave>();
+    public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
 }
 
 public class CountyConfiguration : BaseEntityTypeConfiguration<County>

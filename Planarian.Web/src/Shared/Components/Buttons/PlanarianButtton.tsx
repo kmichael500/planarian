@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Button, ButtonProps, Grid } from "antd";
+import { Button, ButtonProps, Grid, Tooltip } from "antd";
+import { AppService } from "../../Services/AppService";
+import { PermissionKey } from "../../../Modules/Authentication/Models/PermissionKey";
 
 interface PlanarianButtonProps {
   icon: React.ReactNode;
@@ -7,6 +9,8 @@ interface PlanarianButtonProps {
   neverShowChildren?: boolean;
   // Optional debounce time in milliseconds (default: 500ms)
   debounceTime?: number;
+  permissionKey?: PermissionKey;
+  tooltip?: React.ReactNode;
 }
 
 const { useBreakpoint } = Grid;
@@ -21,6 +25,8 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     onConfirm,
     debounceTime = 500,
     onClick,
+    permissionKey,
+    tooltip,
     ...newProps
   } = props as any;
   props = newProps as any;
@@ -31,6 +37,12 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
   );
+
+  const permissionDisabled =
+    permissionKey && !AppService.HasPermission(permissionKey);
+
+  // Merge with any existing disabled prop
+  const disabled = props.disabled || permissionDisabled;
 
   const [debouncing, setDebouncing] = useState(false);
 
@@ -47,12 +59,27 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     }, debounceTime);
   };
 
-  return (
-    <Button {...props} icon={props.icon} onClick={handleClick}>
-      {!neverShowChildren &&
-        (isLargeScreenSize || alwaysShowChildren) &&
-        props.children}
-    </Button>
+  const getButton = () => {
+    return (
+      <Button
+        {...props}
+        icon={props.icon}
+        onClick={handleClick}
+        disabled={disabled}
+      >
+        {!neverShowChildren &&
+          (isLargeScreenSize || alwaysShowChildren) &&
+          props.children}
+      </Button>
+    );
+  };
+
+  return tooltip ? (
+    <Tooltip title={tooltip}>
+      <>{getButton()}</>
+    </Tooltip>
+  ) : (
+    getButton()
   );
 };
 

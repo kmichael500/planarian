@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Models;
@@ -31,6 +32,15 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new JsonResult(caves);
     }
+    
+    
+    [HttpGet("search")]
+    public async Task<ActionResult<PagedResult<CaveVm>>> GetCavesSearch([FromQuery] FilterQuery query, [FromQuery] string? permissionKey = null)
+    {
+        var caves = await Service.GetCavesSearch(query, permissionKey);
+
+        return new JsonResult(caves);
+    }
 
     [HttpGet("{caveId:length(10)}")]
     public async Task<ActionResult<CaveVm>> GetCave(string caveId)
@@ -41,6 +51,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
         var result = await Service.AddCave(cave, cancellationToken);
@@ -49,6 +60,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPut]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
         var result = await Service.AddCave(cave, cancellationToken);
@@ -58,6 +70,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -69,6 +82,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpDelete("{caveId:length(10)}")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult> DeleteCave(string caveId, CancellationToken cancellationToken)
     {
         await Service.DeleteCave(caveId, cancellationToken);
@@ -77,6 +91,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost("{caveId:length(10)}/archive")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult> ArchiveCave(string caveId)
     {
         await Service.ArchiveCave(caveId);
@@ -85,6 +100,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost("{caveId:length(10)}/unarchive")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult> UnarchiveCave(string caveId)
     {
         await Service.UnarchiveCave(caveId);

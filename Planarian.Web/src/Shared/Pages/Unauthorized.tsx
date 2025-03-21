@@ -8,14 +8,27 @@ const UnauthorizedPage = () => {
 
   useEffect(() => {
     setHeaderButtons([]);
-    setHeaderTitle(["Unauthorizedd"]);
+    setHeaderTitle(["Unauthorized"]);
   }, []);
 
   return (
     <Result
-      status="403"
-      title="403"
+      title="Unauthorized"
       subTitle="Sorry, you are not authorized to view this page."
+      icon={
+        <img
+          src="https://saplanarian.blob.core.windows.net/public/unauthorized.png"
+          alt="Unauthorized"
+          style={{
+            height: "350px",
+            width: "350px",
+            borderRadius: "10%",
+            border: "5px solid white",
+            boxShadow: "0 0 10px rgba(0, 0, 0, 0.1)",
+            objectFit: "cover",
+          }}
+        />
+      }
       extra={<BackButtonComponent to={"/caves"}>Back Home</BackButtonComponent>}
     />
   );

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -11,12 +12,14 @@ using Microsoft.OpenApi.Models;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
 using Planarian.Modules.App.Services;
+using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
@@ -176,6 +179,7 @@ builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<AccountRepository>();
+builder.Services.AddScoped<PermissionRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped<MapService>();
@@ -193,6 +197,11 @@ builder.Services.AddSignalR();
 #region Database
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
+{
+    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+});
+
+builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
 {
     options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 });
@@ -263,6 +272,38 @@ builder.Services.AddSession();
 
 #endregion
 
+#region Authorization
+
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(PermissionPolicyKey.Admin, policy =>
+    {
+        policy.Requirements.Add(new PermissionRequirement([PermissionKey.PlanarianAdmin, PermissionKey.Admin]));
+    });
+    options.AddPolicy(PermissionPolicyKey.PlanarianAdmin, policy =>
+    {
+        policy.Requirements.Add(new PermissionRequirement([PermissionKey.PlanarianAdmin]));
+    });
+    options.AddPolicy(PermissionPolicyKey.Manager, policy =>
+    {
+        policy.Requirements.Add(new PermissionRequirement([
+            PermissionKey.PlanarianAdmin, PermissionKey.Admin, PermissionKey.Manager
+        ]));
+    });
+    options.AddPolicy(PermissionPolicyKey.View, policy =>
+    {
+        policy.Requirements.Add(new PermissionRequirement([
+            PermissionKey.PlanarianAdmin, PermissionKey.Admin, PermissionKey.Manager, PermissionKey.View
+        ]));
+    });
+});
+
+
+
+#endregion
+
 var app = builder.Build();
 
 
@@ -297,6 +338,7 @@ app.UseCors(x =>
 );
 
 app.UseAuthentication();
+app.UseMiddleware<RequestUserMiddleware>();
 app.UseAuthorization();
 
 

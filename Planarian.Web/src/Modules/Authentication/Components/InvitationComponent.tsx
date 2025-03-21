@@ -165,6 +165,7 @@ const InvitationComponent = ({
                 icon={<UserAddOutlined />}
                 block
                 onClick={handleCreateAccount}
+                alwaysShowChildren
               >
                 Create a New Account
               </PlanarianButton>
@@ -173,6 +174,7 @@ const InvitationComponent = ({
                 icon={<LoginOutlined />}
                 block
                 onClick={handleExistingAccount}
+                alwaysShowChildren
               >
                 I Have an Account
               </PlanarianButton>
@@ -185,6 +187,7 @@ const InvitationComponent = ({
                 }}
                 okText="Yes"
                 cancelText="No"
+                alwaysShowChildren
               >
                 Decline
               </DeleteButtonComponent>

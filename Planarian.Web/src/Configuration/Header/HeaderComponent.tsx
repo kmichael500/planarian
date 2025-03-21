@@ -28,6 +28,8 @@ const HeaderComponent = () => {
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
 
+  const isXsScreen = screens.xs === true && !screens.sm;
+
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);
@@ -106,18 +108,26 @@ const HeaderComponent = () => {
                 />
               </Drawer>
             </Col>
-            <Col>
-              <>
-                {typeof headerTitle[0] == "string" && (
-                  <Typography.Title level={4}>{headerTitle}</Typography.Title>
+            <Col flex="1 1 0" style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {typeof headerTitle[0] === "string" ? (
+                  <Typography.Title level={4} style={{ margin: 0 }}>
+                    {headerTitle}
+                  </Typography.Title>
+                ) : (
+                  headerTitle[0]
                 )}
-                {typeof headerTitle[0] != "string" && headerTitle[0]}
-              </>
+              </div>
             </Col>
-            {/* take up rest of space to push others to right and left side */}
-            <Col flex="auto"></Col>
+
             {hasAccount && (
-              <Col>
+              <Col style={{ flexShrink: 0 }}>
                 <AccountNameTag />
               </Col>
             )}
@@ -137,14 +147,26 @@ const AccountNameTag = () => {
   let accountNameAbbreviation = "";
 
   const screens = useBreakpoint();
-
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
   );
+
+  const isNotXs = Object.entries(screens).some(
+    ([key, value]) => value && key !== "xs"
+  );
+
   accountName = AuthenticationService.GetAccountName();
   accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
 
-  return <Tag>{isLargeScreenSize ? accountName : accountNameAbbreviation}</Tag>;
+  return (
+    <>
+      {isNotXs && (
+        <Tag style={{ whiteSpace: "nowrap" }}>
+          {isLargeScreenSize ? accountName : accountNameAbbreviation}
+        </Tag>
+      )}
+    </>
+  );
 };
 
 export { HeaderComponent };

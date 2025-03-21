@@ -12,13 +12,15 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Import.Repositories;
 
-public class TemporaryEntranceRepository : RepositoryBase
+public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase>
 {
     private readonly string _temporaryEntranceTableName;
+    private readonly RequestUser RequestUser;
 
-    public TemporaryEntranceRepository(PlanarianDbContext dbContext, RequestUser requestUser)
-        : base(dbContext, requestUser)
+    public TemporaryEntranceRepository(PlanarianDbContextBase dbContext, RequestUser requestUser)
+        : base(dbContext)
     {
+        RequestUser = requestUser;
         _temporaryEntranceTableName = "TemporaryEntrance" + Guid.NewGuid().ToString().Replace("-", "");
     }
 
@@ -73,7 +75,8 @@ public class TemporaryEntranceRepository : RepositoryBase
         var unassociatedEntrances = await db.GetTable<TemporaryEntrance>()
             .TableName(_temporaryEntranceTableName)
             .Where(e => e.CaveId == null)
-            .Select(e => e.Id).ToListAsyncLinqToDB();
+            .Select(e => e.Id)
+            .ToListAsyncLinqToDB();
 
         var delimiter = "-";
         
@@ -90,11 +93,13 @@ public class TemporaryEntranceRepository : RepositoryBase
                  CaveName = cave.Name,
                  DisplayId = $"{te.CountyDisplayId}{delimiter}{te.CountyCaveNumber}",
                 })
+            .IgnoreQueryFilters()
             .ToListAsyncLinqToDB();
 
 
         var deleteResult = await db.GetTable<TemporaryEntrance>()
             .TableName(_temporaryEntranceTableName)
+            .IgnoreQueryFilters()
             .Where(e => e.CaveId == null).DeleteAsync();
 
         return (unassociatedEntrances, associatedEntrances);

@@ -16,19 +16,22 @@ import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import {
-  formatDate,
-  formatDateTime,
-  nameof,
-} from "../../../Shared/Helpers/StringHelpers";
+import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import { Link, useNavigate } from "react-router-dom";
+import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { UserAddOutlined } from "@ant-design/icons";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>("");
+
+  const navigate = useNavigate();
 
   const [form] = Form.useForm();
 
@@ -52,10 +55,13 @@ const UserManagerComponent: React.FC = () => {
   const handleInviteUser = async (values: InviteUserRequest) => {
     try {
       setLoading(true);
-      await AccountUserManagerService.InviteUser(values);
+      const userId = await AccountUserManagerService.InviteUser(values);
       message.success("Invitation sent successfully.");
       setInviteModalVisible(false);
       form.resetFields();
+
+      // naviagte to userId/permissions/View relative to this page
+      navigate(`${userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {
       const error = err as ApiErrorResponse;
@@ -126,6 +132,7 @@ const UserManagerComponent: React.FC = () => {
         <Space>
           {" "}
           <DeleteButtonComponent
+            permissionKey={PermissionKey.Admin}
             loading={isRevoking}
             title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
             onConfirm={() => {
@@ -145,6 +152,9 @@ const UserManagerComponent: React.FC = () => {
               Resend Invitation
             </Button>
           )}
+          <Link to={record.userId}>
+            <EditButtonComponentt />
+          </Link>
         </Space>
       ),
     },
@@ -168,9 +178,14 @@ const UserManagerComponent: React.FC = () => {
             alignItems: "center",
           }}
         >
-          <Button type="primary" onClick={() => setInviteModalVisible(true)}>
+          <PlanarianButton
+            permissionKey={PermissionKey.Admin}
+            icon={<UserAddOutlined />}
+            type="primary"
+            onClick={() => setInviteModalVisible(true)}
+          >
             Invite User
-          </Button>
+          </PlanarianButton>
           <Input.Search
             placeholder="Search users"
             onSearch={(value) => setSearchText(value)}

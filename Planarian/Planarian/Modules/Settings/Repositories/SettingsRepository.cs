@@ -31,17 +31,43 @@ public class SettingsRepository : RepositoryBase
         return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetStates()
+    public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
-        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
-            .Select(e => e.State)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+        return await DbContext.AccountStates.Where(e=>e.AccountId == RequestUser.AccountId)
+            .Select(accountState => new SelectListItem<string>(accountState.State!.Name, accountState.State.Id))
+            .ToListAsync();
     }
 
-    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId)
+    public async Task<IEnumerable<SelectListItem<string>>> GetStateCounties(string stateId,
+        string? permissionKey = null)
     {
-        return await DbContext.Counties.Where(e => e.StateId == stateId && e.AccountId == RequestUser.AccountId)
-            .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
+        var query =
+            DbContext.UserCavePermissionView.Where(e =>
+                e.AccountId == RequestUser.AccountId
+                && e.UserId == RequestUser.Id
+            );
+
+        IQueryable<County> countyQuery;
+        if (permissionKey == PermissionKey.Manager)
+        {
+            countyQuery = query.Where(e => e.Permission.Key == PermissionKey.Manager)
+                .Select(e => e.County!);
+        }
+        else if (permissionKey == PermissionKey.View)
+        {
+            countyQuery = query
+                .Select(e => e.Cave!.County!);
+        }
+        else
+        {
+            countyQuery = DbContext.Counties.Where(e => e.AccountId == RequestUser.AccountId);
+        }
+
+        return await countyQuery
+            .Where(e => e.StateId == stateId)
+            .Distinct()
+            .Select(e => new SelectListItem<string>(e.Name, e.Id))
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTags(string key, string? projectId = null)

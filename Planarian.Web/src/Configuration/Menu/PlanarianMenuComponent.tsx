@@ -4,6 +4,8 @@ import { useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AppContext } from "../Context/AppContext";
 import { MenuInfo, MenuMode } from "rc-menu/lib/interface";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
+import { AppService } from "../../Shared/Services/AppService";
 
 const { SubMenu } = Menu;
 
@@ -12,6 +14,7 @@ export interface PlanarianMenuItem extends MenuItemType {
   requiresAuthentication: boolean;
   action?: () => void; // Action to be executed when item is clicked
   isVisible?: boolean;
+  permissionKey?: PermissionKey;
 }
 
 interface MenuComponentProps {
@@ -33,6 +36,13 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
 
   const renderMenuItem = (item: PlanarianMenuItem) => {
     if (item.isVisible === false) return null;
+
+    if (item.permissionKey) {
+      if (!AppService.HasPermission(item.permissionKey)) {
+        return null;
+      }
+    }
+
     if (item.children && item.children.length > 0) {
       return (
         <SubMenu key={item.key} title={item.label} icon={item.icon}>
@@ -101,17 +111,20 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
     if (selectedItem?.key && typeof selectedItem.key === "string") {
       setSelectedKey(selectedItem.key);
 
-      const openKeys: string[] = [];
-      let parent = (items as PlanarianMenuItem[]).find((item) =>
-        item.children?.includes(selectedItem)
-      );
-      while (parent && typeof parent.key === "string") {
-        openKeys.push(parent.key);
-        parent = (items as PlanarianMenuItem[]).find((item) =>
-          item.children?.includes(parent!)
-        );
-      }
-      setOpenedKeys(openKeys);
+      // Not sure if this is needed. It's purpose was to open the children of the selected item when refreshing the page
+      // However, it causes a bug that always opens the children of the selected item before clicking the menu open/closed
+
+      // const openKeys: string[] = [];
+      // let parent = (items as PlanarianMenuItem[]).find((item) =>
+      //   item.children?.includes(selectedItem)
+      // );
+      // while (parent && typeof parent.key === "string") {
+      //   openKeys.push(parent.key);
+      //   parent = (items as PlanarianMenuItem[]).find((item) =>
+      //     item.children?.includes(parent!)
+      //   );
+      // }
+      // setOpenedKeys(openKeys);
     }
   }, [location, props.menuItems]);
 

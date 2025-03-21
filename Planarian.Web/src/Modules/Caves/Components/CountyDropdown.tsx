@@ -3,13 +3,15 @@ import { useState, useEffect } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { sortSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 const { Option } = Select;
 export interface CountyDropdownProps extends SelectProps<string> {
   selectedStateId: string;
+  permissionKey?: PermissionKey;
 }
-// Generic County Dropdown Component
 const CountyDropdown = ({
   selectedStateId,
+  permissionKey,
   defaultValue,
   onSelect,
   ...rest
@@ -18,7 +20,7 @@ const CountyDropdown = ({
 
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
-    SettingsService.GetCounties(selectedStateId).then((data) => {
+    SettingsService.GetCounties(selectedStateId, permissionKey).then((data) => {
       setCounties(data);
       setIsLoading(false);
     });

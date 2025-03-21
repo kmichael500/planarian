@@ -88,7 +88,10 @@ const LoginPage: React.FC = () => {
           </PlanarianButton>
         </Link>,
         <Link to={"../reset-password"}>
-          <PlanarianButton icon={<QuestionCircleOutlined />}>
+          <PlanarianButton
+            tooltip="Forgot Password"
+            icon={<QuestionCircleOutlined />}
+          >
             Forgot Password?
           </PlanarianButton>
         </Link>,

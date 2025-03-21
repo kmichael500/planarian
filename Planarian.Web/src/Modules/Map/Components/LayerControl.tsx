@@ -120,7 +120,7 @@ const LAYERS = [
   },
   {
     id: "usgs-drainage-basins-16digit",
-    displayName: "Subwatershed Boundary",
+    displayName: "Watershed Boundary",
     type: "raster",
     source: {
       type: "raster",

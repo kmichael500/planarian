@@ -87,6 +87,10 @@ public static class ApiExceptionDictionary
 
     public static ApiException NoAccount =>
         new(StatusCodes.Status500InternalServerError, ApiExceptionType.NoAccount, "No account was found");
+
+    public static Exception InvalidPermission =>
+        new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.BadRequest, "Invalid permission key");
+
     public static ApiException EntranceRequired(string atLeastEntranceIsRequired)
     {
         return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.EntranceRequired, atLeastEntranceIsRequired);

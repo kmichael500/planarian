@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
@@ -16,6 +17,7 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Account.Services;
 
+[Authorize(Policy = PermissionPolicyKey.Admin)]
 public class AccountService : ServiceBase<AccountRepository>
 {
     private readonly FileService _fileService;
@@ -84,6 +86,9 @@ public class AccountService : ServiceBase<AccountRepository>
             await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
                 "Deleted 0 of 0 caves.");
 
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
+            await Repository.DeleteAllCavePermissions();
+            
             async void DeleteCavesProgressHandler(string message)
             {
                 await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
@@ -327,6 +332,8 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             account.Name = values.AccountName;
             account.CountyIdDelimiter = values.CountyIdDelimiter;
+            
+            account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
 
             // check which states are missing
             var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();

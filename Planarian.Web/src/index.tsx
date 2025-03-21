@@ -7,6 +7,10 @@ import axios, { AxiosRequestTransformer } from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 import { AppService } from "./Shared/Services/AppService";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "./Shared/Models/ApiErrorResponse";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement
@@ -68,7 +72,19 @@ HttpClient.interceptors.response.use(
   },
   function (error) {
     if (error.response) {
-      return Promise.reject(error.response.data);
+      if (error.response.data) {
+        return Promise.reject(error.response.data);
+      }
+
+      if (error.response.status === 401 || error.response.status === 403) {
+        // Create a custom unauthorized error object
+        const unauthorizedError: ApiErrorResponse = {
+          message: "Unauthorized",
+          errorCode: ApiExceptionType.Unauthorized,
+          data: null,
+        };
+        return Promise.reject(unauthorizedError);
+      }
     }
     return Promise.reject(error);
   }

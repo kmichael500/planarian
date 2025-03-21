@@ -18,9 +18,9 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
     #region Tags
 
     [HttpGet("tags/states/{stateId:length(10)}/counties")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateCounties(string stateId)
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStateCounties(string stateId, [FromQuery] string? permissionKey)
     {
-        var counties = await Service.GetStateCounties(stateId);
+        var counties = await Service.GetStateCounties(stateId, permissionKey);
 
         return new JsonResult(counties);
     }
@@ -34,9 +34,9 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
     }
 
     [HttpGet("tags/states/")]
-    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStates()
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStates([FromQuery] string? permissionKey)
     {
-        var states = await Service.GetStates();
+        var states = await Service.GetStates(permissionKey);
 
         return new JsonResult(states);
     }
