@@ -11,6 +11,8 @@ import {
   Col,
   Space,
 } from "antd";
+import { RedoOutlined } from "@ant-design/icons";
+
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
@@ -144,13 +146,15 @@ const UserManagerComponent: React.FC = () => {
             Revoke
           </DeleteButtonComponent>
           {record.invitationSentOn && !record.invitationAcceptedOn && (
-            <Button
+            <PlanarianButton
               loading={isResending}
+              permissionKey={PermissionKey.Admin}
               type="primary"
               onClick={() => handleResendInvitation(record.userId)}
+              icon={<RedoOutlined />}
             >
               Resend Invitation
-            </Button>
+            </PlanarianButton>
           )}
           <Link to={record.userId}>
             <EditButtonComponentt />

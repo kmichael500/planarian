@@ -34,6 +34,7 @@ import { CaveService } from "../Service/CaveService";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const { Panel } = Collapse;
 
@@ -44,6 +45,7 @@ export interface CaveComponentProps {
   cave?: CaveVm;
   isLoading: boolean;
   options?: CaveComponentOptions;
+  hasEditPermission?: boolean;
   updateCave?: () => void;
 }
 
@@ -65,6 +67,7 @@ const CaveComponent = ({
   isLoading,
   options,
   updateCave,
+  hasEditPermission,
 }: CaveComponentProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const { isFeatureEnabled } = useFeatureEnabled();
@@ -323,6 +326,8 @@ const CaveComponent = ({
             <>
               {!isUploading && (
                 <PlanarianButton
+                  permissionKey={PermissionKey.Manager}
+                  disabled={!hasEditPermission}
                   icon={<CloudUploadOutlined />}
                   onClick={() => {
                     setIsUploading(true);
@@ -342,6 +347,7 @@ const CaveComponent = ({
               isUploading={isUploading}
               setIsUploading={(value) => setIsUploading(value)}
               customOrder={["Map"]}
+              hasEditPermission={hasEditPermission}
             />
           </>
         )}

@@ -31,7 +31,11 @@ const CavePage = () => {
   useEffect(() => {
     setHeaderButtons([
       <Link to={`/caves/${caveId}/edit`}>
-        <PlanarianButton disabled={!hasEditPermission} icon={<EditOutlined />}>
+        <PlanarianButton
+          permissionKey={PermissionKey.Manager}
+          disabled={!hasEditPermission}
+          icon={<EditOutlined />}
+        >
           Edit
         </PlanarianButton>{" "}
       </Link>,
@@ -80,6 +84,7 @@ const CavePage = () => {
       <CaveComponent
         cave={cave}
         isLoading={isLoading}
+        hasEditPermission={hasEditPermission}
         updateCave={async () => {
           setIsLoading(true);
           const updatedCave = await CaveService.GetCave(caveId);

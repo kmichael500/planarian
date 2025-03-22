@@ -1,8 +1,6 @@
 import React, { useContext, useEffect } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { UserPermissionManagement } from "../Components/UserPermissionManagement";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { useParams } from "react-router-dom";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";

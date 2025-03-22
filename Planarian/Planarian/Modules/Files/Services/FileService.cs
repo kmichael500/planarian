@@ -3,7 +3,9 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
@@ -20,13 +22,16 @@ public class FileService : ServiceBase<FileRepository>
     private readonly TagRepository _tagRepository;
     private readonly FileOptions _fileOptions;
     private readonly SettingsRepository _settingsRepository;
+    private readonly CaveRepository _caveRepository;
 
     public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
-        FileOptions fileOptions, SettingsRepository settingsRepository) : base(repository, requestUser)
+        FileOptions fileOptions, SettingsRepository settingsRepository, CaveRepository caveRepository) : base(
+        repository, requestUser)
     {
         _tagRepository = tagRepository;
         _fileOptions = fileOptions;
         _settingsRepository = settingsRepository;
+        _caveRepository = caveRepository;
     }
 
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
@@ -35,6 +40,13 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
 
+        var caveEntity = await _caveRepository.GetCave(caveId);
+        if (caveEntity == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Cave");
+        }
+        
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         // check if tag type name exists in the file name
@@ -62,8 +74,7 @@ public class FileService : ServiceBase<FileRepository>
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync(cancellationToken);
-
-
+        
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
