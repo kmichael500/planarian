@@ -412,7 +412,7 @@ public class DataGenerator
             Id = "MaNagEz9a0",
             Name = "Manager",
             Description =
-                "Managers are responsible for reviewing and approving changes. They can also invite other members within the state survey to view the data that they manage.",
+                "Managers are responsible for reviewing and approving changes. They can also invite other members within the state survey to view or manage the data that they control.",
             IsHidden = false,
             Key = PermissionKey.Manager,
             PermissionType = PermissionType.Cave,

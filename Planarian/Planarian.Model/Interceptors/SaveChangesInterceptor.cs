@@ -99,7 +99,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 return;
         }
         
-        var requestUserAccountId = context.RequestUser.AccountId;
+        var requestUserAccountId = context?.RequestUser?.AccountId;
         switch (name)
         {
             case nameof(Account):
@@ -140,7 +140,10 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                  break;
             case nameof(TagType):
                 var tagType = (TagType)entity.Entity;
-                ValidateAccount(tagType.AccountId, requestUserAccountId);
+                if (!tagType.IsDefault || !string.IsNullOrWhiteSpace(tagType.AccountId))
+                {
+                    ValidateAccount(tagType.AccountId, requestUserAccountId);
+                }
                 break;
             case nameof(ArcheologyTag):
                 var archeologyTag = (ArcheologyTag)entity.Entity;
