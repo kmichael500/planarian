@@ -8,6 +8,7 @@ namespace Planarian.Migrations.Migrations
     public partial class v20 : Migration
     {
         /// <inheritdoc />
+        /// this does not apply automatically because there will be no permisions in the db
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Create a new CavePermission for each User with the 'View' Permission

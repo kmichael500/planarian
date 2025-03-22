@@ -10,7 +10,7 @@ namespace Planarian.Migrations.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(@"
-            CREATE OR REPLACE VIEW "" UserCavePermissions "" AS 
+            CREATE OR REPLACE VIEW ""UserCavePermissions "" AS 
             SELECT cp.""AccountId"",
        cp.""UserId"",
        c.""Id""                  AS ""CaveId"",
