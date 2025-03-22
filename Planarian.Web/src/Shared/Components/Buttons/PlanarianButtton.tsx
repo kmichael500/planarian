@@ -42,7 +42,7 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     permissionKey && !AppService.HasPermission(permissionKey);
 
   // Merge with any existing disabled prop
-  const disabled = props.disabled || permissionDisabled;
+  const disabled = props.disabled;
 
   const [debouncing, setDebouncing] = useState(false);
 
@@ -74,12 +74,17 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     );
   };
 
-  return tooltip ? (
-    <Tooltip title={tooltip}>
-      <>{getButton()}</>
-    </Tooltip>
-  ) : (
-    getButton()
+  return (
+    <>
+      {!permissionDisabled &&
+        (tooltip ? (
+          <Tooltip title={tooltip}>
+            <>{getButton()}</>
+          </Tooltip>
+        ) : (
+          getButton()
+        ))}
+    </>
   );
 };
 

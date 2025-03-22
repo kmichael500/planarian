@@ -6,6 +6,7 @@ import { FileListItemComponent } from "./FileListItemComponent";
 import { customSort, groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { CloudUploadOutlined } from "@ant-design/icons";
 import { ReactNode } from "react";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 const { Panel } = Collapse;
 
 export interface FileListComponentProps {
@@ -13,6 +14,7 @@ export interface FileListComponentProps {
   customOrder?: string[];
   isUploading: boolean;
   setIsUploading?: (value: boolean) => void;
+  hasEditPermission?: boolean;
 }
 
 export const FileListComponent = ({
@@ -20,6 +22,7 @@ export const FileListComponent = ({
   isUploading,
   setIsUploading,
   customOrder,
+  hasEditPermission = true,
 }: FileListComponentProps) => {
   if (!files) {
     files = [];
@@ -70,6 +73,8 @@ export const FileListComponent = ({
             <PlanarianButton
               icon={<CloudUploadOutlined />}
               alwaysShowChildren
+              permissionKey={PermissionKey.Manager}
+              disabled={!hasEditPermission}
               onClick={() => {
                 if (setIsUploading) {
                   setIsUploading(true);
