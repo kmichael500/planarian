@@ -7,8 +7,8 @@ interface PlanarianButtonProps {
   icon: React.ReactNode;
   alwaysShowChildren?: boolean;
   neverShowChildren?: boolean;
-  // Optional debounce time in milliseconds (default: 500ms)
-  debounceTime?: number;
+  collapseOnScreenSize?: "xl" | "lg" | "md" | "sm" | "xs";
+  debounceTime?: number; // Optional debounce time in milliseconds (default: 500ms)
   permissionKey?: PermissionKey;
   tooltip?: React.ReactNode;
 }
@@ -20,59 +20,77 @@ export type PlanarianButtonTypeWithoutIcon = Omit<PlanarianButtonType, "icon">;
 
 const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
   const {
-    cancelText,
-    okText,
-    onConfirm,
     debounceTime = 500,
     onClick,
     permissionKey,
     tooltip,
-    ...newProps
-  } = props as any;
-  props = newProps as any;
+    collapseOnScreenSize,
+    alwaysShowChildren = false,
+    neverShowChildren = false,
+    ...rest
+  } = props;
 
   const screens = useBreakpoint();
-  const { alwaysShowChildren = false, neverShowChildren = false } = props;
-
-  const isLargeScreenSize = Object.entries(screens).some(
-    ([key, value]) => value && key === "xl"
-  );
-
   const permissionDisabled =
     permissionKey && !AppService.HasPermission(permissionKey);
 
-  // Merge with any existing disabled prop
-  const disabled = props.disabled;
+  const disabled = rest.disabled;
 
   const [debouncing, setDebouncing] = useState(false);
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (debouncing) return;
-
     if (onClick) {
       onClick(e);
     }
-
     setDebouncing(true);
     setTimeout(() => {
       setDebouncing(false);
     }, debounceTime);
   };
 
-  const getButton = () => {
-    return (
-      <Button
-        {...props}
-        icon={props.icon}
-        onClick={handleClick}
-        disabled={disabled}
-      >
-        {!neverShowChildren &&
-          (isLargeScreenSize || alwaysShowChildren) &&
-          props.children}
-      </Button>
-    );
-  };
+  // Define breakpoints order (from smallest to largest)
+  const breakpointsOrder: Array<"xs" | "sm" | "md" | "lg" | "xl"> = [
+    "xs",
+    "sm",
+    "md",
+    "lg",
+    "xl",
+  ];
+
+  const activeBreakpoint =
+    breakpointsOrder
+      .slice()
+      .reverse()
+      .find((bp) => screens[bp as keyof typeof screens]) || "xs";
+
+  let showChildren = true;
+  if (neverShowChildren) {
+    showChildren = false;
+  } else if (alwaysShowChildren) {
+    showChildren = true;
+  } else if (collapseOnScreenSize) {
+    const activeIndex = breakpointsOrder.indexOf(activeBreakpoint);
+    const collapseIndex = breakpointsOrder.indexOf(collapseOnScreenSize);
+
+    if (collapseOnScreenSize === "sm") {
+      console.log(activeIndex, collapseIndex);
+    }
+    showChildren = activeIndex > collapseIndex;
+  } else {
+    showChildren = !!screens.xl;
+  }
+
+  const getButton = () => (
+    <Button
+      {...rest}
+      icon={rest.icon}
+      onClick={handleClick}
+      disabled={disabled}
+    >
+      {showChildren && rest.children}
+    </Button>
+  );
 
   return (
     <>
