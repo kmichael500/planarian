@@ -6,7 +6,9 @@ import {
   FormInstance,
   Input,
   Row,
+  Select,
   Space,
+  Typography,
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -14,6 +16,8 @@ import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";
 import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
+import { CaveSearchSortByConstants } from "../../Caves/Models/CaveSearchVm";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 export interface AdvancedSearchDrawerComponentProps<T extends object>
   extends FilterFormProps<T> {
@@ -22,6 +26,7 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   mainSearchField: NestedKeyOf<T>;
   mainSearchFieldLabel: string;
   form?: FormInstance<T>;
+  sortOptions?: SelectListItem<string>[];
 }
 
 const AdvancedSearchDrawerComponent = <T extends object>({
@@ -31,6 +36,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   mainSearchField,
   mainSearchFieldLabel,
   form,
+  sortOptions,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
@@ -45,7 +51,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   };
 
   return (
-    <Row style={{ marginBottom: 10 }} gutter={5}>
+    <Row gutter={[16, 16]} align="middle" style={{ marginBottom: 10 }}>
       <Col>
         <Input.Search
           placeholder={mainSearchFieldLabel}
@@ -62,23 +68,51 @@ const AdvancedSearchDrawerComponent = <T extends object>({
       </Col>
       <Col>
         <Space>
+          {sortOptions && (
+            <>
+              <Select
+                style={{ width: "139px" }}
+                value={queryBuilder.getSortBy()}
+                onChange={(value) => {
+                  queryBuilder.setSort(value);
+                  onSearch();
+                }}
+              >
+                {sortOptions.map((option) => (
+                  <Select.Option key={option.value} value={option.value}>
+                    {option.display}
+                  </Select.Option>
+                ))}
+              </Select>
+              <Select
+                value={queryBuilder.getSortDescending() ? "desc" : "asc"}
+                onChange={(value) => {
+                  queryBuilder.setSortDescending(value === "desc");
+                  onSearch();
+                }}
+                options={[
+                  { label: "Descending", value: "desc" },
+                  { label: "Ascending", value: "asc" },
+                ]}
+              />
+            </>
+          )}
           <PlanarianButton
             icon={<SlidersOutlined />}
-            onClick={(e) => setIsAdvancedSearchOpen(true)}
+            onClick={() => setIsAdvancedSearchOpen(true)}
+            alwaysShowChildren
           >
             Advanced
           </PlanarianButton>
-          <PlanarianButton
-            icon={<ClearOutlined />}
-            onClick={(e) => onClearSearch()}
-          >
+          <PlanarianButton icon={<ClearOutlined />} onClick={onClearSearch}>
             Clear
           </PlanarianButton>
         </Space>
+
         <Drawer
           title="Advanced Search"
           open={isAdvancedSearchOpen}
-          onClose={(e) => setIsAdvancedSearchOpen(false)}
+          onClose={() => setIsAdvancedSearchOpen(false)}
         >
           <Form
             onKeyDown={(e) => {
@@ -92,13 +126,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
           >
             {children}
           </Form>
-          <Button
-            onClick={() => {
-              onClickSearch();
-            }}
-          >
-            Search
-          </Button>
+          <Button onClick={onClickSearch}>Search</Button>
         </Drawer>
       </Col>
     </Row>

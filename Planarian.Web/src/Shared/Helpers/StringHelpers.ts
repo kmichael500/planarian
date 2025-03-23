@@ -116,3 +116,10 @@ export function defaultIfEmpty(value: string | null | undefined) {
     return "-";
   } else return value;
 }
+
+export function capitalizeFirstLetter(
+  input: string | null | undefined
+): string {
+  if (isNullOrWhiteSpace(input)) return "";
+  return input.charAt(0).toUpperCase() + input.slice(1);
+}

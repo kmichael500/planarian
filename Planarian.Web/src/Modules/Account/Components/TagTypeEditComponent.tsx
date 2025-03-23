@@ -508,7 +508,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
             <Select
               showSearch
               filterOption={searchFilterSelectListItems}
-              placeholder="Select Destination Tag "
+              placeholder="Select Destination Tag"
             >
               {sortedAndFilteredTagTypes.map((tagType) => (
                 <Select.Option
