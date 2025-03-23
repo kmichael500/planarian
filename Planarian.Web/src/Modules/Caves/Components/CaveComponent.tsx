@@ -388,6 +388,7 @@ const CaveComponent = ({
                     cave?.primaryEntrance?.longitude as number,
                   ]}
                   initialZoom={15}
+                  showFullScreenControl
                 />
               </div>
             )}

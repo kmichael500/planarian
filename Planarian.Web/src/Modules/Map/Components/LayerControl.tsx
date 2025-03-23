@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { BuildOutlined } from "@ant-design/icons";
+import { BuildOutlined, FullscreenOutlined } from "@ant-design/icons";
 
 interface PlanarianMapLayer {
   displayName: string;

@@ -8,6 +8,7 @@ import {
   NavigationControl,
   MapLayerMouseEvent,
   MapProvider,
+  ViewStateChangeEvent,
 } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { Spin } from "antd";
@@ -16,11 +17,18 @@ import { AuthenticationService } from "../../Authentication/Services/Authenticat
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { LayerControl } from "./LayerControl";
 import { CaveSearchMapControl } from "./CaveSearchMapControl";
+import { FullscreenOutlined } from "@ant-design/icons";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { FullScreenControl } from "./FullScreenControl";
+import { useNavigate } from "react-router-dom";
+import { NavigationService } from "../../../Shared/Services/NavigationService";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   onCaveClicked: (caveId: string) => void;
+  onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
+  showFullScreenControl?: boolean;
 }
 
 // MUST be defined outside the function or in useMemo (still bugs with this tho on mobile?) otherwise the map re-renders every time the you click on it
@@ -37,6 +45,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
   initialZoom,
   onCaveClicked,
+  onMoveEnd,
+  showFullScreenControl = false,
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
@@ -50,6 +60,16 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     initialCenter || [0, 0]
   );
   const [zoom, setZoom] = useState(initialZoom || 7);
+  const handleMoveEnd = (e: ViewStateChangeEvent) => {
+    const { latitude, longitude, zoom: currentZoom } = e.viewState;
+    setMapCenter([latitude, longitude]);
+    setZoom(currentZoom);
+    if (onMoveEnd) {
+      onMoveEnd(e);
+    }
+  };
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!initialCenter) {
@@ -101,6 +121,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 }}
                 onClick={handleMapClick}
                 mapStyle={mapStyle}
+                onMoveEnd={handleMoveEnd}
               >
                 <LayerControl />
                 <CaveSearchMapControl />
@@ -221,6 +242,22 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
                 <NavigationControl position={zoomControlPosition} />
                 <GeolocateControl position={zoomControlPosition} />
+
+                {showFullScreenControl && (
+                  <FullScreenControl
+                    handleClick={() => {
+                      const latitude = mapCenter[0];
+                      const longitude = mapCenter[1];
+
+                      NavigationService.NavigateToMap(
+                        latitude,
+                        longitude,
+                        zoom,
+                        navigate
+                      );
+                    }}
+                  />
+                )}
               </Map>
             </MapProvider>
           </>

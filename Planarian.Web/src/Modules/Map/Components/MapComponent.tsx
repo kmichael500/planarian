@@ -3,13 +3,20 @@ import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveService } from "../../Caves/Service/CaveService";
 import { MapBaseComponent } from "./MapBaseComponent";
 import { MapClickModal } from "./MapClickModal";
-
+import { ViewStateChangeEvent } from "react-map-gl/maplibre";
 interface MapComponentProps {
   initialCenter?: [number, number];
   initialZoom?: number;
+  onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
+  showFullScreenControl?: boolean;
 }
 
-const MapComponent = ({ initialCenter, initialZoom }: MapComponentProps) => {
+const MapComponent = ({
+  initialCenter,
+  initialZoom,
+  onMoveEnd,
+  showFullScreenControl = false,
+}: MapComponentProps) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [cave, setCave] = useState<CaveVm | undefined>(undefined);
@@ -37,6 +44,8 @@ const MapComponent = ({ initialCenter, initialZoom }: MapComponentProps) => {
         initialCenter={initialCenter}
         initialZoom={initialZoom}
         onCaveClicked={handleCaveClick}
+        onMoveEnd={onMoveEnd}
+        showFullScreenControl={showFullScreenControl}
       />
       <MapClickModal
         isModalVisible={isModalVisible}

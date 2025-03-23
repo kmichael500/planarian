@@ -1,4 +1,4 @@
-import { Typography, Form, Checkbox, Space, Divider, Select } from "antd";
+import { Typography, Form, Checkbox, Space, Divider } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -16,14 +16,13 @@ import {
   NestedKeyOf,
   nameof,
   convertDistance,
-  getDirectionsUrl,
   formatDate,
   defaultIfEmpty,
   formatNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CarOutlined } from "@ant-design/icons";
+import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -45,6 +44,7 @@ import {
 } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { NavigationService } from "../../../Shared/Services/NavigationService";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -548,20 +548,20 @@ const CavesComponent: React.FC = () => {
                   </Link>,
                   cave.primaryEntranceLatitude &&
                     cave.primaryEntranceLongitude && (
-                      <a
-                        href={getDirectionsUrl(
+                      <Link
+                        to={NavigationService.GenerateMapUrl(
                           cave.primaryEntranceLatitude,
-                          cave.primaryEntranceLongitude
+                          cave.primaryEntranceLongitude,
+                          15
                         )}
-                        target="_blank"
                       >
                         <PlanarianButton
                           alwaysShowChildren
-                          icon={<CarOutlined />}
+                          icon={<CompassOutlined />}
                         >
-                          Directions
+                          Map
                         </PlanarianButton>
-                      </a>
+                      </Link>
                     ),
                 ]}
               >
