@@ -54,7 +54,7 @@ class QueryBuilder<T extends object> {
     this.conditions = filerQuery.conditions ?? [];
 
     this.currentPage = filerQuery.pageNumber ?? 1;
-    this.pageSize = filerQuery.pageSize ?? 8;
+    this.pageSize = filerQuery.pageSize ?? 16;
   }
 
   changeOperators(
