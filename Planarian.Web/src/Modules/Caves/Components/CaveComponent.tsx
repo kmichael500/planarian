@@ -7,6 +7,7 @@ import {
   Col,
   Collapse,
   Descriptions,
+  Grid,
   Row,
   Space,
   Tag,
@@ -73,6 +74,9 @@ const CaveComponent = ({
   const { isFeatureEnabled } = useFeatureEnabled();
 
   const [showMap, setShowMap] = useState(true);
+
+  const screens = Grid.useBreakpoint();
+  const descriptionLayout = screens.md ? "horizontal" : "vertical";
 
   // have to do this because of a weird bug with the Descriptions component where wrappers don't work (elements still get displayed)
   const descriptionItems = [
@@ -274,7 +278,9 @@ const CaveComponent = ({
         loading={isLoading}
       >
         <PlanarianDividerComponent title="Information" />
-        <Descriptions bordered>{descriptionItems}</Descriptions>
+        <Descriptions layout={descriptionLayout} bordered>
+          {descriptionItems}
+        </Descriptions>
         {cave?.entrances && cave?.entrances.length > 0 && (
           <>
             <PlanarianDividerComponent title="Entrances" />
@@ -300,7 +306,7 @@ const CaveComponent = ({
                   }
                   key={index}
                 >
-                  <Descriptions bordered>
+                  <Descriptions bordered layout={descriptionLayout}>
                     {entranceItems(entrance)}
                   </Descriptions>
                 </Panel>

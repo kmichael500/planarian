@@ -18,7 +18,12 @@ const CavePage = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const {
+    setHeaderTitle,
+    setHeaderButtons,
+    defaultContentStyle,
+    setContentStyle,
+  } = useContext(AppContext);
   const { caveId } = useParams();
 
   const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
@@ -77,6 +82,12 @@ const CavePage = () => {
       setIsLoading(false);
     };
     getCave();
+
+    setContentStyle({});
+
+    return () => {
+      setContentStyle(defaultContentStyle);
+    };
   }, []);
 
   return (
