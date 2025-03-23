@@ -57,7 +57,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
-var isDevelopment = builder.Environment.IsDevelopment();
+var isDevelopment = false;
 
 builder.Configuration.AddAzureAppConfiguration(options =>
 {
@@ -307,7 +307,7 @@ builder.Services.AddAuthorization(options =>
 var app = builder.Build();
 
 
-if (false)
+if (true)
 {
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
