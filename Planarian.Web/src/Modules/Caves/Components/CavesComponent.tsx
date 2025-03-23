@@ -1,5 +1,5 @@
-import { Row, Col, Typography, Form, Checkbox, Space, Divider } from "antd";
-import { useState, useEffect, useContext } from "react";
+import { Typography, Form, Checkbox, Space, Divider, Select } from "antd";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -25,8 +25,14 @@ import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { EyeOutlined, CarOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
-import { SelectListItemKey } from "../../../Shared/Models/SelectListItem";
-import { CaveSearchVm } from "../Models/CaveSearchVm";
+import {
+  SelectListItem,
+  SelectListItemKey,
+} from "../../../Shared/Models/SelectListItem";
+import {
+  CaveSearchSortByConstants,
+  CaveSearchVm,
+} from "../Models/CaveSearchVm";
 import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
 import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
 import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
@@ -38,12 +44,21 @@ import {
   useFeatureEnabled,
 } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
-import { AppContext } from "../../../Configuration/Context/AppContext";
-import { AccountService } from "../../Account/Services/AccountService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
+const sortOptions = [
+  { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
+  { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
+  {
+    display: "Max Pit Depth",
+    value: CaveSearchSortByConstants.MaxPitDepthFeet,
+  },
+  { display: "Number of Pits", value: CaveSearchSortByConstants.NumberOfPits },
+  { display: "Reported On", value: CaveSearchSortByConstants.ReportedOn },
+  { display: "Name", value: CaveSearchSortByConstants.Name },
+] as SelectListItem<string>[];
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -244,6 +259,7 @@ const CavesComponent: React.FC = () => {
         onSearch={onSearch}
         queryBuilder={queryBuilder}
         form={form}
+        sortOptions={sortOptions}
       >
         <Divider>Cave</Divider>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>

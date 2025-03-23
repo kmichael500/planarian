@@ -1,3 +1,8 @@
+import {
+  capitalizeFirstLetter,
+  nameof,
+} from "../../../Shared/Helpers/StringHelpers";
+
 export interface CaveSearchVm {
   id: string;
   name: string;
@@ -21,4 +26,26 @@ export interface CaveSearchVm {
   otherTagIds: string[];
   physiographicProvinceTagIds: string[];
   reportedByTagIds: string[];
+}
+
+export class CaveSearchSortByConstants {
+  static readonly Name = capitalizeFirstLetter(nameof<CaveSearchVm>("name"));
+  static readonly ReportedOn = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("reportedOn")
+  );
+  static readonly DepthFeet = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("depthFeet")
+  );
+  static readonly MaxPitDepthFeet = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("maxPitDepthFeet")
+  );
+  static readonly NumberOfPits = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("numberOfPits")
+  );
+  static readonly CountyId = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("countyId")
+  );
+  static readonly LengthFeet = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("lengthFeet")
+  );
 }

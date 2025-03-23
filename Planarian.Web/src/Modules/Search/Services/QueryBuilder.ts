@@ -1,7 +1,9 @@
 import {
   NestedKeyOf,
+  capitalizeFirstLetter,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
+import { CaveSearchSortByConstants } from "../../Caves/Models/CaveSearchVm";
 import { QueryStringParser } from "./QueryStringParser";
 
 export enum QueryOperator {
@@ -41,6 +43,8 @@ class QueryBuilder<T extends object> {
   private conditions: QueryCondition<T>[];
   private currentPage: number;
   private pageSize: number;
+  private sortBy?: string;
+  private sortDescending?: boolean;
 
   constructor(queryString: string, private pushToBrowser: boolean = true) {
     const filerQuery =
@@ -55,6 +59,18 @@ class QueryBuilder<T extends object> {
 
     this.currentPage = filerQuery.pageNumber ?? 1;
     this.pageSize = filerQuery.pageSize ?? 16;
+    this.sortBy = filerQuery.sortBy ?? CaveSearchSortByConstants.LengthFeet;
+    this.sortDescending = filerQuery.sortDescending ?? true;
+  }
+
+  public setSort(sortBy: string) {
+    this.sortBy = capitalizeFirstLetter(sortBy);
+    return this;
+  }
+
+  public setSortDescending(sortDescending: boolean) {
+    this.sortDescending = sortDescending;
+    return this;
   }
 
   changeOperators(
@@ -77,6 +93,14 @@ class QueryBuilder<T extends object> {
       defaultValues[condition.key] = condition.value;
     });
     return defaultValues;
+  }
+
+  public getSortBy(): string | undefined {
+    return this.sortBy;
+  }
+
+  public getSortDescending(): boolean | undefined {
+    return this.sortDescending;
   }
 
   public getFieldValue(key: keyof T | string): T[keyof T] | undefined | null {
@@ -121,6 +145,9 @@ class QueryBuilder<T extends object> {
   }
   public clear() {
     this.conditions = [];
+    this.sortBy = CaveSearchSortByConstants.LengthFeet;
+    this.sortDescending = true;
+
     return this;
   }
 
@@ -172,6 +199,8 @@ class QueryBuilder<T extends object> {
     const pageQueryString = this.convertToQueryParams({
       pageNumber: this.currentPage,
       pageSize: this.pageSize,
+      sortBy: this.sortBy,
+      sortDescending: this.sortDescending,
     });
 
     const conditionsQueryString = this.convertArrayToQueryParams(conditions);
@@ -230,6 +259,8 @@ export interface FilterQuery {
   conditions?: QueryCondition<any>[];
   pageSize?: number;
   pageNumber?: number;
+  sortBy?: string;
+  sortDescending?: boolean;
 }
 
 export { QueryBuilder };

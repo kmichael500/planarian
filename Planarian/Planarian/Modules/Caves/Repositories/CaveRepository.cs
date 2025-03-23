@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -24,12 +25,12 @@ public class CaveRepository : RepositoryBase
         var query = DbContext.Caves
             .IgnoreQueryFilters() // ignoring because it makes the query too slow, we are applying the same filter to it here so we can include a permission type
             .Where(cave =>
-            DbContext.UserCavePermissionView.Any(ucp =>
-                ucp.AccountId == RequestUser.AccountId
-                && ucp.UserId == RequestUser.Id &&
-                (string.IsNullOrWhiteSpace(permissionKey) || ucp.PermissionKey == permissionKey)
-                && ucp.CaveId == cave.Id)).AsQueryable();
-   
+                DbContext.UserCavePermissionView.Any(ucp =>
+                    ucp.AccountId == RequestUser.AccountId
+                    && ucp.UserId == RequestUser.Id &&
+                    (string.IsNullOrWhiteSpace(permissionKey) || ucp.PermissionKey == permissionKey)
+                    && ucp.CaveId == cave.Id)).AsQueryable();
+
         if (filterQuery.Conditions.Any())
             foreach (var queryCondition in filterQuery.Conditions)
                 switch (queryCondition.Field)
@@ -367,19 +368,26 @@ public class CaveRepository : RepositoryBase
                     default:
                         throw new ArgumentOutOfRangeException(nameof(queryCondition.Field));
                 }
-        
-        var result = await query.Select(e => new CaveSearchVm
+
+
+        var caveSearchQuery = query.Select(e => new CaveSearchVm
         {
             Id = e.Id,
-            CountyId = e.County.Id,
+            CountyId = e.County!.Id,
             DisplayId =
-                $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
-            PrimaryEntranceLatitude = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
-                .FirstOrDefault(),
-            PrimaryEntranceLongitude = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
-                .FirstOrDefault(),
-            PrimaryEntranceElevationFeet = e.Entrances.Count == 0 ? null : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
-                .FirstOrDefault(),
+                $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
+            PrimaryEntranceLatitude = e.Entrances.Count == 0
+                ? null
+                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
+                    .FirstOrDefault(),
+            PrimaryEntranceLongitude = e.Entrances.Count == 0
+                ? null
+                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
+                    .FirstOrDefault(),
+            PrimaryEntranceElevationFeet = e.Entrances.Count == 0
+                ? null
+                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
+                    .FirstOrDefault(),
             ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
             Name = e.Name,
             LengthFeet = e.LengthFeet,
@@ -396,8 +404,25 @@ public class CaveRepository : RepositoryBase
             GeologicAgeTagIds = e.GeologicAgeTags.Select(ee => ee.TagTypeId),
             PhysiographicProvinceTagIds = e.PhysiographicProvinceTags.Select(ee => ee.TagTypeId),
             OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
-        })
-            .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet);
+        });
+
+        var result = filterQuery.SortBy switch
+        {
+            nameof(CaveSearchVm.Name) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize,
+                e => e.Name, filterQuery.SortDescending),
+            nameof(CaveSearchVm.ReportedOn) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize, e => e.ReportedOn, filterQuery.SortDescending),
+            nameof(CaveSearchVm.DepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize, e => e.DepthFeet, filterQuery.SortDescending),
+            nameof(CaveSearchVm.LengthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
+            nameof(CaveSearchVm.MaxPitDepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
+            nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            _ => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet,
+                filterQuery.SortDescending)
+        };
 
         return result;
     }

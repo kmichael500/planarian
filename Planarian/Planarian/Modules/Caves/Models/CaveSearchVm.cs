@@ -27,6 +27,4 @@ public class CaveSearchVm
     public IEnumerable<string> OtherTagIds { get; set; }
     public IEnumerable<string> PhysiographicProvinceTagIds { get; set; }
     public IEnumerable<string> ReportedByTagIds { get; set; }
-
-    
 }
