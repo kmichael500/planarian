@@ -36,16 +36,13 @@ export class CaveSearchSortByConstants {
   static readonly DepthFeet = capitalizeFirstLetter(
     nameof<CaveSearchVm>("depthFeet")
   );
+  static readonly LengthFeet = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("lengthFeet")
+  );
   static readonly MaxPitDepthFeet = capitalizeFirstLetter(
     nameof<CaveSearchVm>("maxPitDepthFeet")
   );
   static readonly NumberOfPits = capitalizeFirstLetter(
     nameof<CaveSearchVm>("numberOfPits")
-  );
-  static readonly CountyId = capitalizeFirstLetter(
-    nameof<CaveSearchVm>("countyId")
-  );
-  static readonly LengthFeet = capitalizeFirstLetter(
-    nameof<CaveSearchVm>("lengthFeet")
   );
 }

@@ -7,8 +7,6 @@ import {
   Input,
   Row,
   Select,
-  Space,
-  Typography,
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -16,7 +14,6 @@ import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";
 import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
-import { CaveSearchSortByConstants } from "../../Caves/Models/CaveSearchVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 export interface AdvancedSearchDrawerComponentProps<T extends object>
@@ -51,7 +48,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   };
 
   return (
-    <Row gutter={[16, 16]} align="middle" style={{ marginBottom: 10 }}>
+    <Row align="middle" gutter={[16, 10]} style={{ marginBottom: 10 }}>
       <Col>
         <Input.Search
           placeholder={mainSearchFieldLabel}
@@ -67,67 +64,78 @@ const AdvancedSearchDrawerComponent = <T extends object>({
         />
       </Col>
       <Col>
-        <Space>
+        <Row gutter={[8, 8]} align="middle" style={{ flexWrap: "wrap" }}>
           {sortOptions && (
             <>
-              <Select
-                style={{ width: "139px" }}
-                value={queryBuilder.getSortBy()}
-                onChange={(value) => {
-                  queryBuilder.setSort(value);
-                  onSearch();
-                }}
-              >
-                {sortOptions.map((option) => (
-                  <Select.Option key={option.value} value={option.value}>
-                    {option.display}
-                  </Select.Option>
-                ))}
-              </Select>
-              <Select
-                value={queryBuilder.getSortDescending() ? "desc" : "asc"}
-                onChange={(value) => {
-                  queryBuilder.setSortDescending(value === "desc");
-                  onSearch();
-                }}
-                options={[
-                  { label: "Descending", value: "desc" },
-                  { label: "Ascending", value: "asc" },
-                ]}
-              />
+              <Col style={{ flex: "0 0 auto" }}>
+                <Select
+                  style={{ width: "139px" }}
+                  value={queryBuilder.getSortBy()}
+                  onChange={(value) => {
+                    queryBuilder.setSort(value);
+                    onSearch();
+                  }}
+                >
+                  {sortOptions.map((option) => (
+                    <Select.Option key={option.value} value={option.value}>
+                      {option.display}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col style={{ flex: "0 0 auto" }}>
+                <Select
+                  value={queryBuilder.getSortDescending() ? "desc" : "asc"}
+                  onChange={(value) => {
+                    queryBuilder.setSortDescending(value === "desc");
+                    onSearch();
+                  }}
+                  options={[
+                    { label: "Desc", value: "desc" },
+                    { label: "Asc", value: "asc" },
+                  ]}
+                />
+              </Col>
             </>
           )}
-          <PlanarianButton
-            icon={<SlidersOutlined />}
-            onClick={() => setIsAdvancedSearchOpen(true)}
-            alwaysShowChildren
+          <Col style={{ flex: "0 0 auto" }}>
+            <PlanarianButton
+              icon={<SlidersOutlined />}
+              onClick={() => setIsAdvancedSearchOpen(true)}
+              collapseOnScreenSize="xs"
+            >
+              Advanced
+            </PlanarianButton>
+          </Col>
+          <Col style={{ flex: "0 0 auto" }}>
+            <PlanarianButton
+              collapseOnScreenSize="sm"
+              icon={<ClearOutlined />}
+              onClick={onClearSearch}
+            >
+              Clear
+            </PlanarianButton>
+          </Col>
+          <Drawer
+            title="Advanced Search"
+            open={isAdvancedSearchOpen}
+            onClose={() => setIsAdvancedSearchOpen(false)}
           >
-            Advanced
-          </PlanarianButton>
-          <PlanarianButton icon={<ClearOutlined />} onClick={onClearSearch}>
-            Clear
-          </PlanarianButton>
-        </Space>
-
-        <Drawer
-          title="Advanced Search"
-          open={isAdvancedSearchOpen}
-          onClose={() => setIsAdvancedSearchOpen(false)}
-        >
-          <Form
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                onClickSearch();
-              }
-            }}
-            layout="vertical"
-            initialValues={queryBuilder.getDefaultValues()}
-            form={form}
-          >
-            {children}
-          </Form>
-          <Button onClick={onClickSearch}>Search</Button>
-        </Drawer>
+            <Form
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onClickSearch();
+                }
+              }}
+              layout="vertical"
+              initialValues={queryBuilder.getDefaultValues()}
+              form={form}
+            >
+              {children}
+            </Form>
+            <Button onClick={onClickSearch}>Search</Button>
+          </Drawer>
+        </Row>
       </Col>
     </Row>
   );
