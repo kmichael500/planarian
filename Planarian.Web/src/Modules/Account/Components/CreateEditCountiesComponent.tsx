@@ -472,10 +472,7 @@ const CreateEditCountiesComponent = (
 
   return (
     <div>
-      <Space
-        direction="vertical"
-        // style={{ width: "100%" }}
-      >
+      <Space direction="vertical" style={{ width: "100%" }}>
         {!hasSelected && (
           <Row>
             {" "}
@@ -549,7 +546,7 @@ const CreateEditCountiesComponent = (
           dataSource={localTagTypes}
           rowKey="tagTypeId"
           loading={isLoading}
-          scroll={{ y: 400 }}
+          scroll={{ x: "max-content" }}
           rowSelection={rowSelection}
           pagination={{
             current: currentPage,
