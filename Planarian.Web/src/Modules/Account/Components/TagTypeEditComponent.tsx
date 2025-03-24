@@ -18,7 +18,7 @@ import {
   FilterDropdownProps,
   TableRowSelection,
 } from "antd/lib/table/interface";
-import { SearchOutlined } from "@ant-design/icons";
+import { LinkOutlined, SearchOutlined } from "@ant-design/icons";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { TagType } from "../../Tag/Models/TagType";
@@ -29,6 +29,8 @@ import { searchFilterSelectListItems } from "../../../Shared/Helpers/ArrayHelper
 import { TagTypeTableVm } from "../Models/TagTypeTableVm";
 import { MergeForm } from "../Models/MergeForm";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
+import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 
 interface TagTypeEditComponentProps {
   tagType: TagType;
@@ -292,23 +294,17 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
           <Space>
             {editedTagType && editedTagType.tagTypeId === record.tagTypeId ? (
               <>
-                <PlanarianButton
+                <SaveButtonComponent
                   onClick={() => onSave(editedTagType)}
                   type="primary"
-                  icon={undefined}
-                >
-                  Save
-                </PlanarianButton>
+                />
                 <CancelButtonComponent onClick={() => setEditedTagType(null)} />
               </>
             ) : (
-              <PlanarianButton
+              <EditButtonComponentt
                 disabled={!record.isUserModifiable}
                 onClick={() => setEditedTagType(record)}
-                icon={undefined}
-              >
-                Edit
-              </PlanarianButton>
+              />
             )}
             {record.tagTypeId !== editedTagType?.tagTypeId && (
               <Button
@@ -316,6 +312,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
                   setSingleMergeTagTypeId(record.tagTypeId);
                   setIsMergeModalOpen(true);
                 }}
+                icon={<LinkOutlined />}
               >
                 Merge
               </Button>
