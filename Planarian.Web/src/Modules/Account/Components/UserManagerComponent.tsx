@@ -176,12 +176,11 @@ const UserManagerComponent: React.FC = () => {
     <>
       <Card>
         <Row
-          gutter={[16, 16]}
           align="middle"
           justify="space-between"
           style={{ flexWrap: "wrap", marginBottom: 16 }}
         >
-          <Col xs={24} sm={12}>
+          <Col>
             <PlanarianButton
               permissionKey={PermissionKey.Admin}
               icon={<UserAddOutlined />}
@@ -191,7 +190,7 @@ const UserManagerComponent: React.FC = () => {
               Invite User
             </PlanarianButton>
           </Col>
-          <Col xs={24} sm={12}>
+          <Col>
             <Input.Search
               placeholder="Search users"
               onSearch={(value) => setSearchText(value)}
