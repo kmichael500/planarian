@@ -543,7 +543,7 @@ const CavesComponent: React.FC = () => {
                       type="primary"
                       icon={<EyeOutlined />}
                     >
-                      More Info
+                      View
                     </PlanarianButton>
                   </Link>,
                   cave.primaryEntranceLatitude &&
