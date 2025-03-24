@@ -1,4 +1,4 @@
-import { Card, Space, Tabs } from "antd";
+import { Card, Space, Tabs, Grid } from "antd";
 import { ResetAccountComponent } from "./ResetAccountComponent";
 import { useContext, useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
@@ -16,6 +16,10 @@ import { AccountService } from "../Services/AccountService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const AccountSettingsComponent = () => {
+  const { useBreakpoint } = Grid;
+  const screens = useBreakpoint();
+  const tagTabPosition = screens.md ? "left" : "top";
+
   const tagTypeFeatureMap: { [key in TagType]?: FeatureKey | null } = {
     [TagType.EntranceHydrology]: FeatureKey.EnabledFieldEntranceHydrologyTags,
     [TagType.People]:
@@ -75,11 +79,9 @@ const AccountSettingsComponent = () => {
   }, []);
 
   const [states, setStates] = useState<SelectListItem<string>[]>([]);
-
   const [featureSettings, setFeatureSettings] = useState<FeatureSettingVm[]>(
     []
   );
-
   const navigate = useNavigate();
   const location = useLocation();
   const [tagsActiveKey, setTagsActiveKey] = useState("");
@@ -132,7 +134,7 @@ const AccountSettingsComponent = () => {
         <Card title="Manage Tags">
           <Tabs
             type="card"
-            tabPosition="left"
+            tabPosition={tagTabPosition}
             activeKey={tagsActiveKey}
             onChange={onTagTypeTabChange}
           >
@@ -151,14 +153,14 @@ const AccountSettingsComponent = () => {
                 featureSettings={featureSettings}
                 filterType={"cave"}
                 onChange={fetchFeatureSettings}
-              ></EnabledFieldsComponent>
+              />
             </Tabs.TabPane>
             <Tabs.TabPane tab="Entrance" key="2">
               <EnabledFieldsComponent
                 featureSettings={featureSettings}
                 onChange={fetchFeatureSettings}
                 filterType={"entrance"}
-              ></EnabledFieldsComponent>{" "}
+              />
             </Tabs.TabPane>
           </Tabs>
         </Card>

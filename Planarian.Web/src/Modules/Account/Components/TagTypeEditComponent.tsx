@@ -410,11 +410,8 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
   }, [localTagTypes, selectedRowKeys, singleMergeTagTypeId]);
 
   return (
-    <div>
-      <Space
-        direction="vertical"
-        // style={{ width: "100%" }}
-      >
+    <div style={{ flexWrap: "wrap", width: "100%" }}>
+      <Space style={{ width: "100%" }} direction="vertical">
         {!hasSelected && (
           <Row>
             {" "}
@@ -472,11 +469,12 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
           </Space>
         )}
         <Table
+          style={{ width: "100%" }}
+          scroll={{ x: "max-content" }}
           columns={columns}
           dataSource={localTagTypes}
           rowKey="tagTypeId"
           loading={isLoading}
-          scroll={{ y: 400 }}
           rowSelection={rowSelection}
           pagination={{
             current: currentPage,

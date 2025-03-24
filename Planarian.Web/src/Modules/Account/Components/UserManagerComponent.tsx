@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   Table,
-  Button,
   Modal,
   Form,
   Input,
@@ -10,8 +9,10 @@ import {
   Row,
   Col,
   Space,
+  Grid,
 } from "antd";
-import { RedoOutlined } from "@ant-design/icons";
+import { RedoOutlined, UserAddOutlined } from "@ant-design/icons";
+import { Link, useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
@@ -21,21 +22,20 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { Link, useNavigate } from "react-router-dom";
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { UserAddOutlined } from "@ant-design/icons";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+
+const { useBreakpoint } = Grid;
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>("");
-
-  const navigate = useNavigate();
-
   const [form] = Form.useForm();
+  const navigate = useNavigate();
+  const screens = useBreakpoint();
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -61,8 +61,7 @@ const UserManagerComponent: React.FC = () => {
       message.success("Invitation sent successfully.");
       setInviteModalVisible(false);
       form.resetFields();
-
-      // naviagte to userId/permissions/View relative to this page
+      // Navigate to userId/permissions/View relative to this page
       navigate(`${userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {
@@ -105,11 +104,13 @@ const UserManagerComponent: React.FC = () => {
       title: "Name",
       dataIndex: nameof<UserManagerGridVm>("fullName"),
       sorter: (a, b) => a.fullName.localeCompare(b.fullName),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Email",
       dataIndex: nameof<UserManagerGridVm>("emailAddress"),
       sorter: (a, b) => a.emailAddress.localeCompare(b.emailAddress),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Invitation Sent On",
@@ -119,6 +120,7 @@ const UserManagerComponent: React.FC = () => {
         new Date(b.invitationSentOn ?? 0).getTime(),
       defaultSortOrder: "descend",
       render: (text: string) => (text ? formatDateTime(text) : ""),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Invitation Accepted On",
@@ -127,24 +129,12 @@ const UserManagerComponent: React.FC = () => {
         new Date(a.invitationAcceptedOn ?? 0).getTime() -
         new Date(b.invitationAcceptedOn ?? 0).getTime(),
       render: (text: string) => (text ? formatDateTime(text) : ""),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
       title: "Action",
       render: (_: any, record: UserManagerGridVm) => (
-        <Space>
-          {" "}
-          <DeleteButtonComponent
-            permissionKey={PermissionKey.Admin}
-            loading={isRevoking}
-            title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
-            onConfirm={() => {
-              handleRevokeAccess(record.userId);
-            }}
-            okText="Yes"
-            cancelText="No"
-          >
-            Revoke
-          </DeleteButtonComponent>
+        <Space direction={screens.xs ? "vertical" : "horizontal"}>
           {record.invitationSentOn && !record.invitationAcceptedOn && (
             <PlanarianButton
               loading={isResending}
@@ -159,8 +149,19 @@ const UserManagerComponent: React.FC = () => {
           <Link to={record.userId}>
             <EditButtonComponentt />
           </Link>
+          <DeleteButtonComponent
+            permissionKey={PermissionKey.Admin}
+            loading={isRevoking}
+            title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
+            onConfirm={() => handleRevokeAccess(record.userId)}
+            okText="Yes"
+            cancelText="No"
+          >
+            Remove
+          </DeleteButtonComponent>
         </Space>
       ),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
     },
   ];
 
@@ -174,35 +175,37 @@ const UserManagerComponent: React.FC = () => {
   return (
     <>
       <Card>
-        <div
-          style={{
-            marginBottom: 16,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
+        <Row
+          gutter={[16, 16]}
+          align="middle"
+          justify="space-between"
+          style={{ flexWrap: "wrap", marginBottom: 16 }}
         >
-          <PlanarianButton
-            permissionKey={PermissionKey.Admin}
-            icon={<UserAddOutlined />}
-            type="primary"
-            onClick={() => setInviteModalVisible(true)}
-          >
-            Invite User
-          </PlanarianButton>
-          <Input.Search
-            placeholder="Search users"
-            onSearch={(value) => setSearchText(value)}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 200 }}
-            allowClear
-          />
-        </div>
+          <Col xs={24} sm={12}>
+            <PlanarianButton
+              permissionKey={PermissionKey.Admin}
+              icon={<UserAddOutlined />}
+              type="primary"
+              onClick={() => setInviteModalVisible(true)}
+            >
+              Invite User
+            </PlanarianButton>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Input.Search
+              placeholder="Search users"
+              onSearch={(value) => setSearchText(value)}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+          </Col>
+        </Row>
         <Table
           columns={columns}
           dataSource={filteredUsers}
           rowKey="userId"
           loading={loading}
+          scroll={{ x: "max-content" }}
         />
       </Card>
 
@@ -224,7 +227,7 @@ const UserManagerComponent: React.FC = () => {
       >
         <Form layout="vertical" form={form}>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 label="First Name"
                 name={nameof<InviteUserRequest>("firstName")}
@@ -232,7 +235,7 @@ const UserManagerComponent: React.FC = () => {
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 label="Last Name"
                 name={nameof<InviteUserRequest>("lastName")}
