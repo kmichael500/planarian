@@ -10,22 +10,25 @@ const { Sider } = Layout;
 const { useBreakpoint } = Grid;
 
 const SideBarComponent: React.FC = () => {
-  const [collapsed, setCollapsed] = useState(true);
-
+  const [userCollapsed, setUserCollapsed] = useState(false);
   const screens = useBreakpoint();
-  const isLargeScreenSize = Object.entries(screens).some(
-    ([key, value]) => value && (key === "lg" || key === "xl")
-  );
+  const isLargeScreen = !!screens.lg;
+  const collapsed = isLargeScreen ? userCollapsed : true;
 
   return (
     <Sider
       className="sidebar"
-      breakpoint={"lg"}
-      collapsedWidth={isLargeScreenSize ? 100 : 0}
+      breakpoint="lg"
+      collapsedWidth={isLargeScreen ? 100 : 0}
       collapsible
       theme="light"
       collapsed={collapsed}
-      onCollapse={(value) => setCollapsed(value)}
+      onCollapse={(value, type) => {
+        // Only update the user's setting if the collapse was triggered by a click.
+        if (type === "clickTrigger") {
+          setUserCollapsed(value);
+        }
+      }}
       style={{
         position: "sticky",
         top: 0,
