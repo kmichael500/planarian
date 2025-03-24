@@ -30,10 +30,6 @@ const MapComponent = ({
     setIsModalLoading(false);
   };
 
-  const handleOk = () => {
-    setIsModalVisible(false);
-  };
-
   const handleCancel = () => {
     setIsModalVisible(false);
   };
@@ -51,7 +47,6 @@ const MapComponent = ({
         isModalVisible={isModalVisible}
         isModalLoading={isModalLoading}
         cave={cave}
-        handleOk={handleOk}
         handleCancel={handleCancel}
       />
     </>

@@ -25,5 +25,12 @@ const NavigationService = {
     const queryString = searchParams.toString();
     return `/map${!isNullOrWhiteSpace(queryString) ? `?${queryString}` : ""}`;
   },
+  GenerateCaveUrl(caveId: string) {
+    return `/caves/${caveId}`;
+  },
+  NavigateToCave(caveId: string, navigate: NavigateFunction) {
+    const url = NavigationService.GenerateCaveUrl(caveId);
+    navigate(url);
+  },
 };
 export { NavigationService };
