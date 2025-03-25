@@ -253,10 +253,11 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpPost("tags/merge/{destinationTagTypeId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> MergeTagTypes([FromQuery] string sourceTagTypeIds, string destinationTagTypeId)
+    public async Task<ActionResult> MergeTagTypes([FromQuery] string sourceTagTypeIds, string destinationTagTypeId,
+        CancellationToken cancellationToken)
     {
         var ids = sourceTagTypeIds.SplitAndTrim();
-        await Service.MergeTagTypes(ids, destinationTagTypeId);
+        await Service.MergeTagTypes(ids, destinationTagTypeId, cancellationToken);
         return Ok();
     }
 
