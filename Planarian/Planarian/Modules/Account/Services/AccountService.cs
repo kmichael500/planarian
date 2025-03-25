@@ -173,12 +173,10 @@ public class AccountService : ServiceBase<AccountRepository>
         return result;
     }
 
-    public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId)
+    public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,
+        CancellationToken cancellationToken)
     {
-        foreach (var id in tagTypeIds)
-        {
-            await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId);
-        }
+        await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId, cancellationToken);
     }
     
 
