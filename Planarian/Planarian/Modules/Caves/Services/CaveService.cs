@@ -259,6 +259,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 entrance.Location =
                     new Point(entranceValue.Longitude, entranceValue.Latitude, entranceValue.ElevationFeet)
                         { SRID = 4326 };
+                // if the z value was not provided during import, ef core doesn't realize that the z value was added later.
+                Repository.SetPropertiesModified(entrance, e=> e.Location);
 
                 entrance.EntranceStatusTags.Clear();
                 foreach (var tagId in entranceValue.EntranceStatusTagIds)

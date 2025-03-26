@@ -204,5 +204,16 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : DbContext
 
         return columnName.Quote();
     }
+    
+    public void SetPropertiesModified<TEntity>(TEntity entity, params Expression<Func<TEntity, object>>[] properties)
+        where TEntity : class
+    {
+        var entry = DbContext.Entry(entity);
+        foreach (var property in properties)
+        {
+            entry.Property(property).IsModified = true;
+        }
+    }
+
 
 }

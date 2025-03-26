@@ -713,7 +713,8 @@ public class AccountRepository : RepositoryBase
             {
                 AccountName = e.Name,
                 CountyIdDelimiter = e.CountyIdDelimiter,
-                StateIds = e.AccountStates.Select(ee => ee.StateId)
+                StateIds = e.AccountStates.Select(ee => ee.StateId),
+                DefaultViewAccessAllCaves = e.DefaultViewAccessAllCaves
             })
             .FirstOrDefaultAsyncEF(cancellationToken);
 

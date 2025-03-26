@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { MapService } from "../Services/MapService";
 import {
   Map,
@@ -17,8 +17,6 @@ import { AuthenticationService } from "../../Authentication/Services/Authenticat
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { LayerControl } from "./LayerControl";
 import { CaveSearchMapControl } from "./CaveSearchMapControl";
-import { FullscreenOutlined } from "@ant-design/icons";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { FullScreenControl } from "./FullScreenControl";
 import { useNavigate } from "react-router-dom";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
@@ -27,6 +25,7 @@ interface MapBaseComponentProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   onCaveClicked: (caveId: string) => void;
+  onNonCaveClicked?: (lat: number, lng: number) => void;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
   showFullScreenControl?: boolean;
 }
@@ -45,6 +44,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
   initialZoom,
   onCaveClicked,
+  onNonCaveClicked,
   onMoveEnd,
   showFullScreenControl = false,
 }) => {
@@ -97,6 +97,11 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     if (clickedEntrance) {
       if (clickedEntrance.properties?.CaveId) {
         onCaveClicked(clickedEntrance.properties?.CaveId);
+      }
+    } else {
+      if (onNonCaveClicked) {
+        const { lat, lng } = event.lngLat;
+        onNonCaveClicked(lat, lng);
       }
     }
   };
@@ -195,19 +200,19 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                       "text-font": ["Open Sans Regular"],
                       "text-field": [
                         "concat",
-                        ["get", "cavename"], // Always display 'cavename'
+                        ["get", "cavename"],
                         [
                           "case",
-                          ["all", ["has", "Name"], ["!=", ["get", "Name"], ""]],
-                          ["concat", " (", ["get", "Name"], ")"], // Only add ' (Name)' if 'Name' property exists and is not an empty string
+                          [
+                            "all",
+                            ["has", "Name"],
+                            ["!=", ["get", "Name"], ""],
+                            ["!=", ["get", "Name"], ["get", "cavename"]],
+                          ],
+                          ["concat", " (", ["get", "Name"], ")"],
                           "",
                         ],
-                        [
-                          "case",
-                          ["get", "IsPrimary"],
-                          "*", // Add a star symbol if 'IsPrimary' is true
-                          "", // Do nothing if 'IsPrimary' is false
-                        ],
+                        ["case", ["get", "IsPrimary"], " *", ""],
                       ],
 
                       "text-size": [

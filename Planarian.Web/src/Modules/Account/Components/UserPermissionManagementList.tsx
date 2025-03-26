@@ -121,6 +121,9 @@ export const UserPermissionManagementList: React.FC<
     >
       <List
         dataSource={permissions}
+        locale={{
+          emptyText: "This user does not have any special permissions.",
+        }}
         renderItem={(item) => (
           <List.Item
             actions={[

@@ -1,24 +1,20 @@
-import React, { FC } from "react";
+import { FC } from "react";
 import { Modal, Spin } from "antd";
-import {
-  CloseOutlined,
-  EyeOutlined,
-  FullscreenOutlined,
-} from "@ant-design/icons";
+import { CloseOutlined, EyeOutlined } from "@ant-design/icons";
 import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import { useNavigate } from "react-router-dom";
 
-interface MapClickModalProps {
+interface MapClickCaveModal {
   isModalVisible: boolean;
   isModalLoading: boolean;
   cave: CaveVm | undefined;
   handleCancel: () => void;
 }
 
-const MapClickModal: FC<MapClickModalProps> = ({
+const MapClickCaveModal: FC<MapClickCaveModal> = ({
   isModalVisible,
   isModalLoading,
   cave,
@@ -69,4 +65,4 @@ const MapClickModal: FC<MapClickModalProps> = ({
   );
 };
 
-export { MapClickModal };
+export { MapClickCaveModal };
