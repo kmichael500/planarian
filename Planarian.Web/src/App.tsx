@@ -2,8 +2,6 @@ import { Col, Layout, Row, Spin } from "antd";
 import React from "react";
 import "./App.css";
 import { AppRouting } from "./Configuration/Routing/App.routing";
-import Favicon from "react-favicon";
-import logo from "./logo.svg";
 import { Helmet } from "react-helmet";
 import { BrowserRouter, useNavigate } from "react-router-dom";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
@@ -24,7 +22,6 @@ const App: React.FC = () => {
         <title>Planarian</title>
         <meta name="description" content="Cave project management" />
       </Helmet>
-      <Favicon url={logo} />
       <BrowserRouter>
         <AppProvider>
           <AppContext.Consumer>
