@@ -15,7 +15,7 @@ import { CaveCreateButtonComponent } from "./CaveCreateButtonComponent";
 import {
   NestedKeyOf,
   nameof,
-  convertDistance,
+  formatDistance,
   formatDate,
   defaultIfEmpty,
   formatNumber,
@@ -211,11 +211,11 @@ const CavesComponent: React.FC = () => {
       case nameof<CaveSearchVm>("isArchived"):
         return cave.isArchived;
       case nameof<CaveSearchVm>("depthFeet"):
-        return defaultIfEmpty(convertDistance(cave.depthFeet));
+        return defaultIfEmpty(formatDistance(cave.depthFeet));
       case nameof<CaveSearchVm>("lengthFeet"):
-        return defaultIfEmpty(convertDistance(cave.lengthFeet));
+        return defaultIfEmpty(formatDistance(cave.lengthFeet));
       case nameof<CaveSearchVm>("maxPitDepthFeet"):
-        return defaultIfEmpty(convertDistance(cave.maxPitDepthFeet));
+        return defaultIfEmpty(formatDistance(cave.maxPitDepthFeet));
       case nameof<CaveSearchVm>("numberOfPits"):
         return defaultIfEmpty(cave.numberOfPits?.toString());
       case nameof<CaveSearchVm>("countyId"):

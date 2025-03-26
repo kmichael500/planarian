@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
-
 import {
   Card,
   Col,
@@ -12,11 +11,13 @@ import {
   Space,
   Tag,
   Tooltip,
+  Select,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import {
-  convertDistance,
+  formatDistance,
   defaultIfEmpty,
+  formatCoordinates,
   formatDate,
   formatNumber,
   getDirectionsUrl,
@@ -36,8 +37,10 @@ import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/Shou
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { Macrostrat } from "../../Map/Components/Macrostrat";
 
 const { Panel } = Collapse;
+const { Option } = Select;
 
 export interface CaveComponentOptions {
   showMap?: boolean;
@@ -52,11 +55,11 @@ export interface CaveComponentProps {
 
 // Common function to generate tags
 const generateTags = (tagIds: string[] | undefined) => {
-  if (!tagIds || tagIds?.length === 0) {
+  if (!tagIds || tagIds.length === 0) {
     return defaultIfEmpty(null);
   }
 
-  return tagIds?.map((tagId) => (
+  return tagIds.map((tagId) => (
     <Col key={tagId}>
       <TagComponent tagId={tagId} />
     </Col>
@@ -74,6 +77,10 @@ const CaveComponent = ({
   const { isFeatureEnabled } = useFeatureEnabled();
 
   const [showMap, setShowMap] = useState(true);
+
+  const [selectedEntrance, setSelectedEntrance] = useState<EntranceVm | null>(
+    null
+  );
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
@@ -111,17 +118,17 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && (
       <Descriptions.Item label="Length" key="length">
-        {defaultIfEmpty(convertDistance(cave?.lengthFeet))}
+        {defaultIfEmpty(formatDistance(cave?.lengthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
       <Descriptions.Item label="Depth" key="depth">
-        {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
+        {defaultIfEmpty(formatDistance(cave?.maxPitDepthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
       <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
-        {defaultIfEmpty(convertDistance(cave?.maxPitDepthFeet))}
+        {defaultIfEmpty(formatDistance(cave?.maxPitDepthFeet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
@@ -203,7 +210,7 @@ const CaveComponent = ({
           }
           key="coordinates"
         >
-          {entrance.latitude}, {entrance.longitude}
+          {formatCoordinates(entrance.latitude, entrance.longitude)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) && (
@@ -213,7 +220,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
         <Descriptions.Item label="Elevation" key="elevation">
-          {defaultIfEmpty(convertDistance(entrance.elevationFeet))}
+          {defaultIfEmpty(formatDistance(entrance.elevationFeet))}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
@@ -240,7 +247,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
         <Descriptions.Item label="Pit Depth" key="pit-depth">
-          {defaultIfEmpty(convertDistance(entrance.pitFeet))}
+          {defaultIfEmpty(formatDistance(entrance.pitFeet))}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
@@ -271,6 +278,16 @@ const CaveComponent = ({
     }
   }, [cave, isLoading]);
 
+  // Set the default selected entrance to the primary (or first available) entrance when the cave data updates.
+  useEffect(() => {
+    if (cave?.entrances && cave.entrances.length > 0) {
+      const primaryEntrance = cave.entrances.find(
+        (entrance) => entrance.isPrimary
+      );
+      setSelectedEntrance(primaryEntrance || cave.entrances[0]);
+    }
+  }, [cave]);
+
   return (
     <>
       <Card
@@ -281,12 +298,12 @@ const CaveComponent = ({
         <Descriptions layout={descriptionLayout} bordered>
           {descriptionItems}
         </Descriptions>
+
         {cave?.entrances && cave?.entrances.length > 0 && (
           <>
             <PlanarianDividerComponent title="Entrances" />
-
             <Collapse bordered defaultActiveKey={["0"]}>
-              {cave?.entrances.map((entrance, index) => (
+              {cave.entrances.map((entrance, index) => (
                 <Panel
                   header={
                     <>
@@ -325,7 +342,6 @@ const CaveComponent = ({
             )}
           </>
         )}
-
         <PlanarianDividerComponent
           title="Files"
           element={
@@ -375,6 +391,45 @@ const CaveComponent = ({
             }
             updateFunction={FileService.UpdateFilesMetadata}
           />
+        )}
+
+        {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
+          <>
+            <PlanarianDividerComponent
+              title="Geology"
+              secondaryTitle="from Macrostrat"
+              element={
+                <Select
+                  value={selectedEntrance.id}
+                  style={{ width: 200 }}
+                  onChange={(value) => {
+                    const newEntrance = cave.entrances.find(
+                      (entrance) => entrance.id === value
+                    );
+                    if (newEntrance) {
+                      setSelectedEntrance(newEntrance);
+                    }
+                  }}
+                >
+                  {cave.entrances.map((entrance, index) => (
+                    <Option
+                      key={entrance.id || index}
+                      value={entrance.id || index}
+                    >
+                      {entrance.name ? entrance.name : `Entrance ${index + 1}`}
+                    </Option>
+                  ))}
+                </Select>
+              }
+            ></PlanarianDividerComponent>
+
+            {selectedEntrance.latitude && selectedEntrance.longitude && (
+              <Macrostrat
+                lat={selectedEntrance.latitude}
+                lng={selectedEntrance.longitude}
+              />
+            )}
+          </>
         )}
 
         {showMap && (

@@ -15,7 +15,7 @@ export const StringHelpers = {
   },
 };
 
-export function convertDistance(
+export function formatDistance(
   distanceInFeet: number | undefined | null
 ): string | null {
   if (distanceInFeet === undefined || distanceInFeet === null) return null;
@@ -97,6 +97,29 @@ export function formatDateTime(
   if (date === null || date === undefined) return null;
 
   return moment(date).format(formatString);
+}
+
+export function formatCoordinates(
+  latitude: number | null | undefined | string,
+  longitude: number | null | undefined | string
+): string | null {
+  if (
+    latitude === null ||
+    latitude === undefined ||
+    longitude === null ||
+    longitude === undefined
+  ) {
+    return null;
+  }
+
+  const lat = typeof latitude === "string" ? parseFloat(latitude) : latitude;
+  const lon = typeof longitude === "string" ? parseFloat(longitude) : longitude;
+
+  if (isNaN(lat) || isNaN(lon)) {
+    return null;
+  }
+
+  return `${lat}, ${lon}`;
 }
 
 export function formatNumber(value: number | null | undefined): string | null {
