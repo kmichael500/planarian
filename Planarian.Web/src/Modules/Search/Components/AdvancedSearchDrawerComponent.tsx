@@ -7,14 +7,22 @@ import {
   Input,
   Row,
   Select,
+  Space,
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { useState } from "react";
-import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
+import {
+  SlidersOutlined,
+  ClearOutlined,
+  DownloadOutlined,
+} from "@ant-design/icons";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { CaveService } from "../../Caves/Service/CaveService";
+import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 export interface AdvancedSearchDrawerComponentProps<T extends object>
   extends FilterFormProps<T> {
@@ -24,6 +32,7 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   mainSearchFieldLabel: string;
   form?: FormInstance<T>;
   sortOptions?: SelectListItem<string>[];
+  onExportGpx?: () => Promise<void>;
 }
 
 const AdvancedSearchDrawerComponent = <T extends object>({
@@ -34,6 +43,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   mainSearchFieldLabel,
   form,
   sortOptions,
+  onExportGpx,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
@@ -120,6 +130,30 @@ const AdvancedSearchDrawerComponent = <T extends object>({
             title="Advanced Search"
             open={isAdvancedSearchOpen}
             onClose={() => setIsAdvancedSearchOpen(false)}
+            footer={
+              <div
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Button type="primary" onClick={onClickSearch}>
+                  Search
+                </Button>
+                {onExportGpx && (
+                  <ShouldDisplay permissionKey={PermissionKey.Export}>
+                    <Button
+                      onClick={async () => {
+                        await onExportGpx();
+                      }}
+                    >
+                      Export GPX
+                    </Button>
+                  </ShouldDisplay>
+                )}
+              </div>
+            }
           >
             <Form
               onKeyDown={(e) => {
@@ -133,7 +167,6 @@ const AdvancedSearchDrawerComponent = <T extends object>({
             >
               {children}
             </Form>
-            <Button onClick={onClickSearch}>Search</Button>
           </Drawer>
         </Row>
       </Col>

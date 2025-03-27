@@ -1,12 +1,16 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Geometries;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
+using Planarian.Library.Extensions.String;
+using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
@@ -22,14 +26,19 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
+    private readonly FeatureSettingRepository _featureSettingRepository;
+    private readonly ServerOptions _serverOptions;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository) : base(
+        FileRepository fileRepository, TagRepository tagRepository,
+        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _fileRepository = fileRepository;
         _tagRepository = tagRepository;
+        _featureSettingRepository = featureSettingRepository;
+        _serverOptions = serverOptions;
     }
 
     #region Caves
@@ -44,6 +53,348 @@ public class CaveService : ServiceBase<CaveRepository>
         return await Repository.GetCavesSearch(query, permissionKey);
     }
 
+    public async Task<byte[]> ExportCavesGpx(FilterQuery filterQuery, string? permissionKey,
+        CancellationToken cancellationToken = default)
+    {
+        var featureSettings = await _featureSettingRepository.GetFeatureSettings(cancellationToken);
+        var featureDict = featureSettings.ToDictionary(fs => fs.Key, fs => fs.IsEnabled);
+
+        var exportData = await Repository.GetCavesForExport(filterQuery, permissionKey);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        sb.AppendLine("<gpx version=\"1.1\" creator=\"Planarian\" xmlns=\"http://www.topografix.com/GPX/1/1\">");
+
+        foreach (var cave in exportData)
+        {
+            foreach (var entrance in cave.Entrances)
+            {
+                // Build the waypoint name.
+                var caveName = featureDict.TryGetValue(FeatureKey.EnabledFieldCaveName, out var caveNameEnabled) &&
+                               caveNameEnabled
+                    ? cave.Name
+                    : string.Empty;
+                var entranceName =
+                    featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceName, out var entranceNameEnabled) &&
+                    entranceNameEnabled
+                        ? entrance.Name
+                        : string.Empty;
+                
+                var caveCountyId = featureDict.TryGetValue(FeatureKey.EnabledFieldCaveId, out var showCaveId) && showCaveId
+                    ? $"{cave.CountyDisplayId}{cave.CountyIdDelimiter}{cave.CountyNumber}"
+                    : string.Empty;
+                var waypointName = string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(caveCountyId))
+                {
+                    waypointName = $"{caveCountyId}";
+                }
+
+                if (!string.IsNullOrWhiteSpace(caveName))
+                {
+                    waypointName = $"{waypointName} {caveName}";
+                }
+                
+                if (!string.IsNullOrWhiteSpace(entranceName) && !string.Equals(entranceName, caveName, StringComparison.CurrentCultureIgnoreCase))
+                {
+                    waypointName = $"{waypointName} ({entranceName})";
+                }
+                
+                if (entrance.IsPrimary) // Append asterisk if this is the primary entrance.
+                {
+                    waypointName = $"{waypointName} *";
+                }
+                
+
+                var latitude = entrance.Latitude;
+                var longitude = entrance.Longitude;
+                var elevation = entrance.Elevation;
+
+                var descriptionStringBuilder = new StringBuilder();
+
+                var caveInfoLines = new List<string>();
+                
+                if (showCaveId)
+                {
+                    if (!string.IsNullOrWhiteSpace(caveCountyId))
+                        caveInfoLines.Add($"ID: {caveCountyId}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveName, out var showCaveName) && showCaveName)
+                {
+                    var name = cave.Name;
+                    if (!string.IsNullOrWhiteSpace(name))
+                        caveInfoLines.Add($"Name: {name}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveAlternateNames, out var showCaveAltNames) &&
+                    showCaveAltNames)
+                {
+                    var altNames = cave.AlternateNames.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(altNames))
+                        caveInfoLines.Add($"Alternate Names: {altNames}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveCounty, out var showCaveCounty) &&
+                    showCaveCounty)
+                {
+                    var county = cave.CountyName;
+                    if (!string.IsNullOrWhiteSpace(county))
+                        caveInfoLines.Add($"County: {county}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveState, out var showCaveState) && showCaveState)
+                {
+                    var state = cave.StateName;
+                    if (!string.IsNullOrWhiteSpace(state))
+                        caveInfoLines.Add($"State: {state}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveLengthFeet, out var showCaveLength) &&
+                    showCaveLength)
+                {
+                    if (cave.LengthFeet.HasValue && cave.LengthFeet != 0)
+                        caveInfoLines.Add($"Length (ft): {cave.LengthFeet}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveDepthFeet, out var showCaveDepth) &&
+                    showCaveDepth)
+                {
+                    if (cave.DepthFeet.HasValue && cave.DepthFeet != 0)
+                        caveInfoLines.Add($"Depth (ft): {cave.DepthFeet}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveMaxPitDepthFeet, out var showCaveMaxPit) &&
+                    showCaveMaxPit)
+                {
+                    if (cave.MaxPitDepthFeet.HasValue && cave.MaxPitDepthFeet != 0)
+                        caveInfoLines.Add($"Max Pit Depth (ft): {cave.MaxPitDepthFeet}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveNumberOfPits, out var showCaveNumPits) &&
+                    showCaveNumPits)
+                {
+                    if (cave.NumberOfPits.HasValue && cave.NumberOfPits != 0)
+                        caveInfoLines.Add($"Number Of Pits: {cave.NumberOfPits}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveReportedOn, out var showCaveReportedOn) &&
+                    showCaveReportedOn)
+                {
+                    var reportedOn = cave.ReportedOn.HasValue ? cave.ReportedOn.Value.ToShortDateString() : string.Empty;
+                    if (!string.IsNullOrWhiteSpace(reportedOn))
+                        caveInfoLines.Add($"Reported On: {reportedOn}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveGeologyTags, out var showCaveGeology) &&
+                    showCaveGeology)
+                {
+                    var geology = cave.GeologyTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(geology))
+                        caveInfoLines.Add($"Geology: {geology}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveGeologicAgeTags, out var showCaveGeoAge) &&
+                    showCaveGeoAge)
+                {
+                    var geoAge = cave.GeologicAgeTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(geoAge))
+                        caveInfoLines.Add($"Geologic Age: {geoAge}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCavePhysiographicProvinceTags,
+                        out var showCavePhysio) && showCavePhysio)
+                {
+                    var physio = cave.PhysiographicProvinceTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(physio))
+                        caveInfoLines.Add($"Physiographic Province: {physio}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveBiologyTags, out var showCaveBiology) &&
+                    showCaveBiology)
+                {
+                    var biology = cave.BiologyTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(biology))
+                        caveInfoLines.Add($"Biology: {biology}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveArcheologyTags, out var showCaveArcheology) &&
+                    showCaveArcheology)
+                {
+                    var archeology = cave.ArcheologyTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(archeology))
+                        caveInfoLines.Add($"Archeology: {archeology}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveMapStatusTags, out var showCaveMapStatus) &&
+                    showCaveMapStatus)
+                {
+                    var mapStatus = cave.MapStatusTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(mapStatus))
+                        caveInfoLines.Add($"Map Status: {mapStatus}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveCartographerNameTags,
+                        out var showCaveCartographer) && showCaveCartographer)
+                {
+                    var cartographer = cave.CartographerNameTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(cartographer))
+                        caveInfoLines.Add($"Cartographer Name: {cartographer}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveReportedByNameTags,
+                        out var showCaveReportedBy) && showCaveReportedBy)
+                {
+                    var reportedBy = cave.CaveReportedByTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(reportedBy))
+                        caveInfoLines.Add($"Cave Reported By: {reportedBy}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveOtherTags, out var showCaveOther) &&
+                    showCaveOther)
+                {
+                    var otherTags = cave.CaveOtherTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(otherTags))
+                        caveInfoLines.Add($"Other: {otherTags}");
+                }
+
+                if (caveInfoLines.Count > 0)
+                {
+                    descriptionStringBuilder.AppendLine("Cave Information:");
+                    foreach (var line in caveInfoLines)
+                    {
+                        descriptionStringBuilder.AppendLine(line);
+                    }
+                }
+                else
+                {
+                    descriptionStringBuilder.AppendLine($"Cave Information: {"".DefaultIfNullOrWhiteSpace()}");
+                }
+
+                // Build Entrance Information only for non-null fields.
+                var entranceInfoSb = new StringBuilder();
+                
+                descriptionStringBuilder.AppendLine();
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceName, out var showEntranceName) &&
+                    showEntranceName)
+                {
+                    var name = entrance.Name;
+                    if (!string.IsNullOrWhiteSpace(name) && !string.Equals(name, cave.Name, StringComparison.CurrentCultureIgnoreCase))
+                        entranceInfoSb.AppendLine($"Name: {name}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceReportedOn,
+                        out var showEntranceReportedOn) && showEntranceReportedOn)
+                {
+                    var reportedOn = entrance.ReportedOn.HasValue
+                        ? entrance.ReportedOn.Value.ToShortDateString()
+                        : string.Empty;
+                    if (!string.IsNullOrWhiteSpace(reportedOn))
+                        entranceInfoSb.AppendLine($"Reported On: {reportedOn}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntrancePitDepth, out var showEntrancePitDepth) &&
+                    showEntrancePitDepth)
+                {
+                    // Assuming a numeric value.
+                    if (entrance.PitDepthFeet.HasValue && entrance.PitDepthFeet != 0)
+                        entranceInfoSb.AppendLine($"Pit Depth (ft): {entrance.PitDepthFeet}");
+                }
+                
+                entranceInfoSb.AppendLine("Primary Entrance: " + (entrance.IsPrimary ? "Yes" : "No"));
+
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceLocationQuality,
+                        out var showEntranceLocQual) && showEntranceLocQual)
+                {
+                    var locQual = entrance.LocationQuality;
+                    if (!string.IsNullOrWhiteSpace(locQual))
+                        entranceInfoSb.AppendLine($"Location Quality: {locQual}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceStatusTags, out var showEntranceStatus) &&
+                    showEntranceStatus)
+                {
+                    var statusTags = entrance.EntranceStatusTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(statusTags))
+                        entranceInfoSb.AppendLine($"Entrance Status: {statusTags}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceFieldIndicationTags,
+                        out var showEntranceFieldInd) && showEntranceFieldInd)
+                {
+                    var fieldIndTags = entrance.FieldIndicationTags.ToCommaSeparatedString()
+                        ;
+                    if (!string.IsNullOrWhiteSpace(fieldIndTags))
+                        entranceInfoSb.AppendLine($"Field Indication: {fieldIndTags}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceHydrologyTags, out var showEntranceHydro) &&
+                    showEntranceHydro)
+                {
+                    var hydroTags = entrance.EntranceHydrologyTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(hydroTags))
+                        entranceInfoSb.AppendLine($"Entrance Hydrology: {hydroTags}");
+                }
+
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceReportedByNameTags,
+                        out var showEntranceReportedBy) && showEntranceReportedBy)
+                {
+                    var reportedByTags = entrance.EntranceReportedByTags.ToCommaSeparatedString();
+                    if (!string.IsNullOrWhiteSpace(reportedByTags))
+                        entranceInfoSb.AppendLine($"Entrance Reported By: {reportedByTags}");
+                }
+                
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceDescription, out var showEntranceDesc) &&
+                    showEntranceDesc)
+                {
+                    var description = entrance.Description;
+                    if (!string.IsNullOrWhiteSpace(description))
+                        entranceInfoSb.AppendLine($"Description: {description}");
+                }
+                
+                if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveNarrative, out var showCaveNarrative) &&
+                    showCaveNarrative)
+                {
+                    var narrative = cave.Narrative;
+                    if (!string.IsNullOrWhiteSpace(narrative))
+                    {
+                        entranceInfoSb.AppendLine($"");
+                        entranceInfoSb.AppendLine($"Narrative:");
+                        entranceInfoSb.AppendLine($"{narrative}");
+                    }
+                }
+                
+                if (entranceInfoSb.Length > 0)
+                {
+                    descriptionStringBuilder.AppendLine("Entrance Information:");
+                    descriptionStringBuilder.Append(entranceInfoSb.ToString());
+                }
+                else
+                {
+                    descriptionStringBuilder.AppendLine($"Entrance Information: {"".DefaultIfNullOrWhiteSpace()}");
+                }
+                
+                descriptionStringBuilder.AppendLine();
+                descriptionStringBuilder.AppendLine($"{_serverOptions.ClientBaseUrl}/caves/{cave.Id}");
+
+                // Build the GPX waypoint.
+                sb.AppendLine($"  <wpt lat=\"{latitude}\" lon=\"{longitude}\">");
+                if (elevation > 0)
+                {
+                    sb.AppendLine($"    <ele>{elevation}</ele>");
+                }
+
+                sb.AppendLine($"    <name>{waypointName}</name>");
+                sb.AppendLine($"    <cmt><![CDATA[{descriptionStringBuilder.ToString()}]]></cmt>");
+                sb.AppendLine("  </wpt>");
+            }
+        }
+
+        sb.AppendLine("</gpx>");
+        var gpx = sb.ToString();
+        return Encoding.UTF8.GetBytes(gpx);
+    }
 
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {

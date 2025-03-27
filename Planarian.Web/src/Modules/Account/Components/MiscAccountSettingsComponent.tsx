@@ -14,6 +14,7 @@ export interface MiscAccountSettingsVm {
   countyIdDelimiter: string;
   stateIds: string[];
   defaultViewAccessAllCaves: boolean;
+  exportEnabled: boolean;
 }
 
 export interface MiscAccountSettingsProps {
@@ -126,6 +127,14 @@ const MiscAccountSettings = ({
           help="If enabled, all new users will automatically be granted view access to every cave location upon invitation."
         >
           <Checkbox>Default Cave Visibility: All</Checkbox>
+        </Form.Item>
+
+        <Form.Item
+          name={nameof<MiscAccountSettingsVm>("exportEnabled")}
+          valuePropName="checked"
+          help="This allows any user to export data that they have access to. Otherwise, only admins can export data."
+        >
+          <Checkbox>Export Enabled</Checkbox>
         </Form.Item>
 
         <Form.Item>

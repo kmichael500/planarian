@@ -11,6 +11,7 @@ public static class StringExtensions
     {
         return string.IsNullOrWhiteSpace(input);
     }
+
     public static string[] SplitAndTrim(this string? input, char delimiter = ',')
     {
         return input == null
@@ -112,5 +113,40 @@ public static class StringExtensions
             return input;
 
         return char.ToLowerInvariant(input[0]) + input.Substring(1);
+    }
+
+    /// <summary>
+    /// Converts an enumerable of strings into a comma-separated string with "and" before the last element.
+    /// For example, { "apple", "banana", "cherry" } becomes "apple, banana, and cherry".
+    /// </summary>
+    public static string ToCommaSeparatedString(this IEnumerable<string>? items)
+    {
+        if (items == null)
+            return string.Empty;
+
+        var list = items.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+        switch (list.Count)
+        {
+            case 0:
+                return string.Empty;
+            case 1:
+                return list[0];
+            case 2:
+                return $"{list[0]} and {list[1]}";
+        }
+
+        var allButLast = string.Join(", ", list.Take(list.Count - 1));
+        var last = list.Last();
+        return $"{allButLast}, and {last}";
+    }
+
+    /// <summary>
+    /// Returns the specified default value if the string is null or consists only of whitespace;
+    /// otherwise returns the original string.
+    /// Default value is "-" unless specified otherwise.
+    /// </summary>
+    public static string DefaultIfNullOrWhiteSpace(this string? input, string defaultValue = "-")
+    {
+        return string.IsNullOrWhiteSpace(input) ? defaultValue : input;
     }
 }

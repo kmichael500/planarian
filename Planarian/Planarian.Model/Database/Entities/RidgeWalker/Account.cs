@@ -12,7 +12,7 @@ public class Account : EntityBase
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     [MaxLength(PropertyLength.Delimiter)] public string? CountyIdDelimiter { get; set; } = null!;
     public bool DefaultViewAccessAllCaves { get; set; }
-
+    public bool ExportEnabled { get; set; }
     public ICollection<AccountUser> AccountUsers { get; set; } = new HashSet<AccountUser>();
     public ICollection<Cave> Caves { get; set; } = new HashSet<Cave>();
     public ICollection<AccountState> AccountStates { get; set; } = new HashSet<AccountState>();

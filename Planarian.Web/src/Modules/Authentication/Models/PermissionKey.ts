@@ -4,6 +4,7 @@ export enum PermissionKey {
   AdminManager = "AdminManager",
   Admin = "Admin",
   PlanarianAdmin = "PlanarianAdmin",
+  Export = "Export",
 }
 
 export const GetPermissionKeyDisplay = (key: PermissionKey): string => {

@@ -73,9 +73,6 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     const activeIndex = breakpointsOrder.indexOf(activeBreakpoint);
     const collapseIndex = breakpointsOrder.indexOf(collapseOnScreenSize);
 
-    if (collapseOnScreenSize === "sm") {
-      console.log(activeIndex, collapseIndex);
-    }
     showChildren = activeIndex > collapseIndex;
   } else {
     showChildren = !!screens.xl;

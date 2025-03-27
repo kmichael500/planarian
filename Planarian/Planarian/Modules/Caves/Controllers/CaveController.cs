@@ -41,6 +41,17 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new JsonResult(caves);
     }
+    
+    [HttpGet("export/gpx")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [Authorize(Policy = PermissionPolicyKey.Export)]
+    public async Task<ActionResult> ExportCavesGpx([FromQuery] FilterQuery query, [FromQuery] string? permissionKey = null)
+    {
+        var fileBytes = await Service.ExportCavesGpx(query, permissionKey);
+        
+        var fileName = $"Caves {DateTime.UtcNow.Ticks}";
+            return File(fileBytes, "application/gpx+xml", fileName);
+    }
 
     [HttpGet("{caveId:length(10)}")]
     public async Task<ActionResult<CaveVm>> GetCave(string caveId)

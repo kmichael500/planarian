@@ -9,4 +9,5 @@ public class MiscAccountSettingsVm
     [MaxLength(PropertyLength.Delimiter)] public string? CountyIdDelimiter { get; set; } = null!;
     [Required] public IEnumerable<string> StateIds { get; set; } = new List<string>();
     public bool DefaultViewAccessAllCaves { get; set; }
+    public bool ExportEnabled { get; set; }
 }

@@ -1,4 +1,4 @@
-import { Typography, Form, Checkbox, Space, Divider } from "antd";
+import { Typography, Form, Checkbox, Space, Divider, message } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -22,7 +22,11 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
+import {
+  EyeOutlined,
+  CompassOutlined,
+  DownloadOutlined,
+} from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -45,6 +49,10 @@ import {
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { saveAs } from "file-saver";
+import { AccountService } from "../../Account/Services/AccountService";
+import { AppService } from "../../../Shared/Services/AppService";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -81,6 +89,25 @@ const CavesComponent: React.FC = () => {
 
   const onSearch = async () => {
     await getCaves();
+  };
+
+  const onExportGpx = async () => {
+    const hide = message.loading("Exporting GPX...", 0);
+    try {
+      const response = await CaveService.ExportCavesGpx(queryBuilder);
+
+      const accountName = AuthenticationService.GetAccountName();
+      const localDateTime = new Date().toISOString();
+
+      const fileName = `${accountName} ${localDateTime}.gpx`;
+
+      saveAs(response, fileName);
+    } catch (err) {
+      const error = err as ApiErrorResponse;
+      message.error(error.message);
+    } finally {
+      hide(); // Remove the loading message
+    }
   };
 
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
@@ -260,6 +287,7 @@ const CavesComponent: React.FC = () => {
         queryBuilder={queryBuilder}
         form={form}
         sortOptions={sortOptions}
+        onExportGpx={onExportGpx}
       >
         <Divider>Cave</Divider>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>

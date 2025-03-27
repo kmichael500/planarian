@@ -83,4 +83,7 @@ public enum FeatureKey
     EnabledFieldEntranceDescription
 
     #endregion
+
+    ,
+    ExportEnabled
 }

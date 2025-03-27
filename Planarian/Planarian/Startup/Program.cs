@@ -298,6 +298,12 @@ builder.Services.AddAuthorization(options =>
             PermissionKey.PlanarianAdmin, PermissionKey.Admin, PermissionKey.Manager, PermissionKey.View
         ]));
     });
+    options.AddPolicy(PermissionPolicyKey.Export, policy =>
+    {
+        policy.Requirements.Add(new PermissionRequirement([
+            PermissionPolicyKey.Export
+        ]));
+    });
 });
 
 
