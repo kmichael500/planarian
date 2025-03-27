@@ -11,8 +11,8 @@ public class PhysiographicProvinceTag : EntityBase
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
 
-    public TagType? TagType { get; set; }
-    public Cave? Cave { get; set; }
+    public TagType TagType { get; set; } = null!;
+    public Cave Cave { get; set; } = null!;
 }
 
 public class PhysiographicProvinceTagConfiguration : BaseEntityTypeConfiguration<PhysiographicProvinceTag>

@@ -436,7 +436,7 @@ const CaveComponent = ({
           <>
             <PlanarianDividerComponent title="Map" />
             {cave?.primaryEntrance !== null && (
-              <div style={{ height: "400px" }}>
+              <div style={{ height: "590px" }}>
                 <MapComponent
                   initialCenter={[
                     cave?.primaryEntrance?.latitude as number,

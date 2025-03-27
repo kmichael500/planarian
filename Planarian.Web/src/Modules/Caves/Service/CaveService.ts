@@ -24,6 +24,15 @@ const CaveService = {
     );
     return response.data;
   },
+  async ExportCavesGpx(
+    queryBuilder: QueryBuilder<CaveSearchParamsVm>
+  ): Promise<Blob> {
+    const response = await HttpClient.get(
+      `${baseUrl}/export/gpx?${queryBuilder.buildAsQueryString()}`,
+      { responseType: "blob" }
+    );
+    return response.data;
+  },
   async AddCave(values: AddCaveVm): Promise<string> {
     const response = await HttpClient.post<string>(`${baseUrl}`, values);
     return response.data;

@@ -398,15 +398,23 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           <Typography.Title level={4}>File Import Settings</Typography.Title>
           <Typography.Paragraph>
             A <strong>delimiter</strong> is a character that separates the
-            county code and the cave number in your file name. For example, if
-            your county code is "1" and your cave number follows it, using a
-            delimiter like a dash would look like "1-3". If you don't specify a
-            delimiter, it will be assumed that there is no delimiter.
+            county code and the county cave number in your file name. For
+            example, if your county code is "1" and your cave number follows it,
+            using a delimiter like a dash would look like "1-3". If you don't
+            specify a delimiter, it will be assumed that there is no delimiter
+            and that the county code and cave number are directly next to each
+            other.
           </Typography.Paragraph>
           <Typography.Paragraph>
             The <strong>ID regex</strong> is a pattern that matches the entire
-            ID format in your filenames. For instance, the regex pattern{" "}
-            {"{\\d+-\\d+}"} ensures it matches IDs like "1-3", "12-34", etc.
+            ID format in your filenames. This includes both the county code and
+            the cave number. For instance, the regex pattern '{`\\d+-\\d+`}'
+            ensures it matches IDs like "1-3", "12-34", etc. You can use a site
+            like{" "}
+            <a href="https://regexr.com" target="_blank">
+              https://regexr.com
+            </a>{" "}
+            to test your regex against your filenames to ensure it matches.
           </Typography.Paragraph>
           <Form
             form={form}

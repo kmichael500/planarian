@@ -11,8 +11,8 @@ public class EntranceStatusTag : EntityBase, IEntranceTag
     [MaxLength(PropertyLength.Id)] public string TagTypeId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string EntranceId { get; set; } = null!;
 
-    public TagType? TagType { get; set; }
-    public Entrance? Entrance { get; set; }
+    public TagType TagType { get; set; } = null!;
+    public Entrance Entrance { get; set; } = null!;
 }
 
 public class EntranceStatusTagConfiguration : BaseEntityTypeConfiguration<EntranceStatusTag>

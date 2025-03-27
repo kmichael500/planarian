@@ -453,6 +453,16 @@ public class AccountRepository : RepositoryBase
             foreach (var sourceTagTypeId in tagTypeIds)
             {
                 if (sourceTagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
+                
+                var sourceTagType = await DbContext.TagTypes
+                    .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
+                    .FirstOrDefaultAsyncEF(cancellationToken);
+                
+                if (sourceTagType == null)
+                {
+                    throw ApiExceptionDictionary.NotFound("Source tag type");
+                }
+                
                 cancellationToken.ThrowIfCancellationRequested();
 
                 #region Cave Tags
@@ -714,7 +724,8 @@ public class AccountRepository : RepositoryBase
                 AccountName = e.Name,
                 CountyIdDelimiter = e.CountyIdDelimiter,
                 StateIds = e.AccountStates.Select(ee => ee.StateId),
-                DefaultViewAccessAllCaves = e.DefaultViewAccessAllCaves
+                DefaultViewAccessAllCaves = e.DefaultViewAccessAllCaves,
+                ExportEnabled = e.ExportEnabled
             })
             .FirstOrDefaultAsyncEF(cancellationToken);
 

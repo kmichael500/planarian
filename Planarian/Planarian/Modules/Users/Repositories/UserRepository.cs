@@ -205,6 +205,12 @@ public class UserRepository : RepositoryBase
         {
             cavePermissions.Add(PermissionPolicyKey.AdminManager);
         }
+        
+        var exportEnabled = await RequestUser.HasCavePermission(PermissionPolicyKey.Export, false);
+        if (exportEnabled)
+        {
+            cavePermissions.Add(PermissionPolicyKey.Export);
+        }
 
         userPermissions.AddRange(cavePermissions);
         

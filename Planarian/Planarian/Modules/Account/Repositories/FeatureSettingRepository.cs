@@ -22,7 +22,8 @@ public class FeatureSettingRepository : RepositoryBase
                 Id = e.Id,
                 Key = e.Key,
                 IsEnabled = e.IsEnabled,
-                IsDefault = e.IsDefault
+                IsDefault = e.IsDefault,
+                
             })
             .ToListAsync(cancellationToken: cancellationToken);
     }

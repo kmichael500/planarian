@@ -70,7 +70,7 @@ public class RequestUser
         var userPermissions = await _dbContext.UserPermissions
             .Where(e =>
                 e.UserId == Id
-                && e.AccountId == AccountId || e.AccountId == null
+                && (e.AccountId == AccountId || e.AccountId == null)
             )
             .Select(e => e.Permission!.Key).ToListAsync();
     
@@ -104,7 +104,20 @@ public class RequestUser
                         && e.UserId == Id
                         && e.AccountId == AccountId
                         && e.Permission!.Key == permissionKey
-                    );            }
+                    );            
+            }
+        }
+
+        if (permissionKey == PermissionPolicyKey.Export)
+        {
+            hasUserPermission = _dbContext.Accounts.Where(e => e.Id == AccountId).Select(e => e.ExportEnabled)
+                .FirstOrDefault();
+
+            if (!hasUserPermission)
+            {
+                hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                                    userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
+            }
         }
 
         if (hasUserPermission)

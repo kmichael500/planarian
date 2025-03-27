@@ -61,27 +61,35 @@ export const AppRouting: React.FC = () => {
         </Route>
         <Route
           element={
-            <ProtectedRoutesComponent permissionKey={PermissionKey.Admin} />
+            <ProtectedRoutesComponent permissionKey={PermissionKey.View} />
           }
         >
           <Route path="/account/settings" element={<AccountSettingsPage />} />
           <Route path="/account/import" element={<ImportPage />} />
         </Route>
+        <Route
+          element={
+            <ProtectedRoutesComponent
+              permissionKey={PermissionKey.PlanarianAdmin}
+            />
+          }
+        >
+          <Route path="/projects" element={<ProjectsPage />}></Route>
+          <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
+          <Route
+            path="/projects/:projectId/trip/:tripId"
+            element={<TripPage />}
+          ></Route>
+          <Route
+            path="/projects/:projectId/trip/:tripId/uploadPhotos"
+            element={<TripPhotoUploadPage />}
+          ></Route>
+          <Route
+            path="/projects/:projectId/trip/:tripId/addLeads"
+            element={<LeadAddPage />}
+          ></Route>
+        </Route>
 
-        <Route path="/projects" element={<ProjectsPage />}></Route>
-        <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
-        <Route
-          path="/projects/:projectId/trip/:tripId"
-          element={<TripPage />}
-        ></Route>
-        <Route
-          path="/projects/:projectId/trip/:tripId/uploadPhotos"
-          element={<TripPhotoUploadPage />}
-        ></Route>
-        <Route
-          path="/projects/:projectId/trip/:tripId/addLeads"
-          element={<LeadAddPage />}
-        ></Route>
         <Route path="/user/profile" element={<ProfilePage />}></Route>
         <Route path="*" element={<Navigate to="/not-found" replace />} />
       </Route>

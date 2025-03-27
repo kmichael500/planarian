@@ -46,6 +46,8 @@ export const useFeatureEnabled = () => {
     }
 
     if (permissionKey && permissionKey.length > 0) {
+      if (permissionKey === PermissionKey.Export) {
+      }
       return AppService.HasPermission(permissionKey);
     }
 

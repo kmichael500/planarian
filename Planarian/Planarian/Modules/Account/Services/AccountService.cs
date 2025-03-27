@@ -281,7 +281,9 @@ public class AccountService : ServiceBase<AccountRepository>
     
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
-        return await _featureSettingRepository.GetFeatureSettings(cancellationToken);
+        var featureSettings = (await _featureSettingRepository.GetFeatureSettings(cancellationToken)).ToList();
+        
+        return featureSettings;
     }
 
     public async Task UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)
@@ -332,6 +334,7 @@ public class AccountService : ServiceBase<AccountRepository>
             account.CountyIdDelimiter = values.CountyIdDelimiter;
             
             account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
+            account.ExportEnabled = values.ExportEnabled;
 
             // check which states are missing
             var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
