@@ -14,6 +14,9 @@ const AppService = {
     console.log("init");
   },
   HasPermission(permission: PermissionKey): boolean {
+    if (!AppOptions.permissions) {
+      return false;
+    }
     if (permission === PermissionKey.View) {
       return (
         AppOptions.permissions.includes(PermissionKey.View) ||
