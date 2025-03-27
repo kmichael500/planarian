@@ -56,11 +56,9 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<byte[]> ExportCavesGpx(FilterQuery filterQuery, string? permissionKey,
         CancellationToken cancellationToken = default)
     {
-        // Load feature settings from the feature repository.
         var featureSettings = await _featureSettingRepository.GetFeatureSettings(cancellationToken);
         var featureDict = featureSettings.ToDictionary(fs => fs.Key, fs => fs.IsEnabled);
 
-        // Get only the fields needed for export.
         var exportData = await Repository.GetCavesForExport(filterQuery, permissionKey);
 
         var sb = new StringBuilder();

@@ -61,7 +61,7 @@ export const AppRouting: React.FC = () => {
         </Route>
         <Route
           element={
-            <ProtectedRoutesComponent permissionKey={PermissionKey.View} />
+            <ProtectedRoutesComponent permissionKey={PermissionKey.Admin} />
           }
         >
           <Route path="/account/settings" element={<AccountSettingsPage />} />
