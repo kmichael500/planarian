@@ -12,19 +12,20 @@ import {
   Tag,
   Tooltip,
   Select,
+  DatePicker,
+  InputNumber,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import {
-  formatDistance,
   defaultIfEmpty,
+  DistanceFormat,
   formatCoordinates,
   formatDate,
+  formatDistance,
   formatNumber,
   getDirectionsUrl,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
-import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
-import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
@@ -38,9 +39,15 @@ import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
+import moment from "moment";
+import { RangeValue } from "rc-picker/lib/interface";
+import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
+import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
+import { GageList } from "../../Map/Components/GaugeList";
 
 const { Panel } = Collapse;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 export interface CaveComponentOptions {
   showMap?: boolean;
@@ -58,7 +65,6 @@ const generateTags = (tagIds: string[] | undefined) => {
   if (!tagIds || tagIds.length === 0) {
     return defaultIfEmpty(null);
   }
-
   return tagIds.map((tagId) => (
     <Col key={tagId}>
       <TagComponent tagId={tagId} />
@@ -81,6 +87,13 @@ const CaveComponent = ({
   const [selectedEntrance, setSelectedEntrance] = useState<EntranceVm | null>(
     null
   );
+  const [selectedGageEntrance, setSelectedGageEntrance] =
+    useState<EntranceVm | null>(null);
+  const [gageDateRange, setGageDateRange] = useState<RangeValue<moment.Moment>>(
+    [moment().subtract(1, "month"), moment()]
+  );
+
+  const [gageDistance, setGageDistance] = useState<number>(20);
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
@@ -123,12 +136,16 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
       <Descriptions.Item label="Depth" key="depth">
-        {defaultIfEmpty(formatDistance(cave?.maxPitDepthFeet))}
+        {defaultIfEmpty(
+          formatDistance(cave?.maxPitDepthFeet, DistanceFormat.feet)
+        )}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
       <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
-        {defaultIfEmpty(formatDistance(cave?.maxPitDepthFeet))}
+        {defaultIfEmpty(
+          formatDistance(cave?.maxPitDepthFeet, DistanceFormat.feet)
+        )}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
@@ -191,6 +208,7 @@ const CaveComponent = ({
     ),
   ].filter(Boolean);
 
+  // Entrance details for each entrance panel
   const entranceItems = (entrance: EntranceVm) =>
     [
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && (
@@ -220,7 +238,9 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
         <Descriptions.Item label="Elevation" key="elevation">
-          {defaultIfEmpty(formatDistance(entrance.elevationFeet))}
+          {defaultIfEmpty(
+            formatDistance(entrance.elevationFeet, DistanceFormat.feet)
+          )}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
@@ -278,13 +298,13 @@ const CaveComponent = ({
     }
   }, [cave, isLoading]);
 
-  // Set the default selected entrance to the primary (or first available) entrance when the cave data updates.
   useEffect(() => {
     if (cave?.entrances && cave.entrances.length > 0) {
       const primaryEntrance = cave.entrances.find(
         (entrance) => entrance.isPrimary
       );
       setSelectedEntrance(primaryEntrance || cave.entrances[0]);
+      setSelectedGageEntrance(primaryEntrance || cave.entrances[0]);
     }
   }, [cave]);
 
@@ -342,6 +362,7 @@ const CaveComponent = ({
             )}
           </>
         )}
+
         <PlanarianDividerComponent
           title="Files"
           element={
@@ -421,14 +442,73 @@ const CaveComponent = ({
                   ))}
                 </Select>
               }
-            ></PlanarianDividerComponent>
-
+            />
             {selectedEntrance.latitude && selectedEntrance.longitude && (
               <Macrostrat
                 lat={selectedEntrance.latitude}
                 lng={selectedEntrance.longitude}
               />
             )}
+
+            <PlanarianDividerComponent
+              title="Stream Gages"
+              secondaryTitle="from USGS"
+              element={
+                <Row gutter={10}>
+                  <Col>
+                    <Select
+                      value={selectedGageEntrance?.id}
+                      style={{ width: 200 }}
+                      onChange={(value) => {
+                        const newEntrance = cave.entrances.find(
+                          (entrance) => entrance.id === value
+                        );
+                        if (newEntrance) {
+                          setSelectedGageEntrance(newEntrance);
+                        }
+                      }}
+                    >
+                      {cave.entrances.map((entrance, index) => (
+                        <Option
+                          key={entrance.id || index}
+                          value={entrance.id || index}
+                        >
+                          {entrance.name
+                            ? entrance.name
+                            : `Entrance ${index + 1}`}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col>
+                    <InputNumber
+                      value={gageDistance}
+                      addonAfter="Miles"
+                      min={1}
+                      max={50}
+                      onChange={(value) => setGageDistance(value as number)}
+                    />
+                  </Col>
+                  <Col>
+                    <RangePicker
+                      value={gageDateRange}
+                      onChange={(range) => setGageDateRange(range)}
+                      style={{ width: 250 }}
+                    />
+                  </Col>
+                </Row>
+              }
+            />
+            {selectedGageEntrance &&
+              selectedGageEntrance.latitude &&
+              selectedGageEntrance.longitude && (
+                <GageList
+                  lat={selectedGageEntrance.latitude}
+                  lng={selectedGageEntrance.longitude}
+                  distanceMiles={gageDistance}
+                  dateRange={gageDateRange}
+                />
+              )}
           </>
         )}
 

@@ -288,7 +288,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({ lat, lng }) => {
                 <Descriptions.Item label="Stratigraphic Name(s)">
                   {strat_name}
                 </Descriptions.Item>
-                <Descriptions.Item label="Lith">{lith}</Descriptions.Item>
+                <Descriptions.Item label="Lithology">{lith}</Descriptions.Item>
                 <Descriptions.Item label="Lithology Details">
                   {mainLiths.length > 0
                     ? mainLiths.map((l: any, idx: number) => (
@@ -331,7 +331,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({ lat, lng }) => {
                 <Descriptions.Item label="Matched Stratigraphic Unit">
                   {strat_names.map((sn: any) => sn.rank_name).join(", ")}
                 </Descriptions.Item>
-                <Descriptions.Item label="Age (Macrostrat)">
+                <Descriptions.Item label="Age">
                   <Tag
                     color={(b_int && b_int.color) || "default"}
                     style={getTagStyle(b_int && b_int.color)}
