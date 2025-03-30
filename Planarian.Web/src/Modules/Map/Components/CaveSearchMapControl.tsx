@@ -11,18 +11,52 @@ import { CaveSearchParamsVm } from "../../Caves/Models/CaveSearchParamsVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveSearchVm } from "../../Caves/Models/CaveSearchVm";
 
-var queryBuilder = new QueryBuilder<CaveSearchParamsVm>("", false);
+let queryBuilder = new QueryBuilder<CaveSearchParamsVm>("", false);
+
 export const CaveSearchMapControl = () => {
   const [options, setOptions] = useState<
     { value: string; label: string; cave: CaveSearchVm | null }[]
   >([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  // State to store the candidate coordinate (if any)
+  const [coordinateCandidate, setCoordinateCandidate] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
   const map = useMap();
 
-  const [isLoading, setIsLoading] = useState(false);
-
   const handleSearch = useCallback(async (value: string) => {
+    setInputValue(value);
+
+    // Check if input is in the format "lat, lon"
+    if (value.includes(",")) {
+      const parts = value.split(",");
+      if (parts.length === 2) {
+        const lat = parseFloat(parts[0].trim());
+        const lon = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lon)) {
+          // Store the coordinate candidate and update options
+          setCoordinateCandidate({ lat, lon });
+          setOptions([
+            {
+              value: `coordinate:${lat},${lon}`,
+              label: `Go to [${lat}, ${lon}]`,
+              cave: null,
+            },
+          ]);
+          return;
+        }
+      }
+    }
+
+    // Clear any coordinate candidate if the input isn't a valid coordinate
+    setCoordinateCandidate(null);
+
     if (value) {
       try {
+        // Reset the query builder to avoid stacking filters
+        queryBuilder = new QueryBuilder<CaveSearchParamsVm>("", false);
         queryBuilder = queryBuilder.filterBy(
           "name",
           QueryOperator.Contains,
@@ -37,7 +71,6 @@ export const CaveSearchMapControl = () => {
         }));
         setIsLoading(false);
 
-        // Check if there are results, if not, set a "No results" option
         if (formattedOptions.length === 0) {
           setOptions([
             { value: "no_results", label: "No results", cave: null },
@@ -58,15 +91,45 @@ export const CaveSearchMapControl = () => {
     value: string,
     option: { value: string; label: string; cave: CaveSearchVm | null }
   ) => {
-    if (option.cave) {
+    // Check if the selected option is the coordinate candidate
+    if (value.startsWith("coordinate:")) {
+      const coords = value.split(":")[1];
+      const [lat, lon] = coords.split(",").map((v) => parseFloat(v.trim()));
+      if (!isNaN(lat) && !isNaN(lon)) {
+        map.current?.flyTo({
+          center: [lon, lat],
+          zoom: 16,
+        });
+        message.success(`Navigating to [${lat}, ${lon}]`);
+      }
+    } else if (option.cave) {
       const { cave } = option;
-      const entrance = cave.primaryEntranceLatitude;
       if (cave.primaryEntranceLatitude && cave.primaryEntranceLongitude) {
         map.current?.flyTo({
           center: [cave.primaryEntranceLongitude, cave.primaryEntranceLatitude],
           zoom: 16,
         });
       }
+    }
+    // Clear the search input and drop-down options after selection
+    setInputValue("");
+    setOptions([]);
+    setCoordinateCandidate(null);
+  };
+
+  // Handler for when the user presses Enter
+  const handlePressEnter = () => {
+    if (coordinateCandidate) {
+      map.current?.flyTo({
+        center: [coordinateCandidate.lon, coordinateCandidate.lat],
+        zoom: 16,
+      });
+      message.success(
+        `Navigating to [${coordinateCandidate.lat}, ${coordinateCandidate.lon}]`
+      );
+      setInputValue("");
+      setOptions([]);
+      setCoordinateCandidate(null);
     }
   };
 
@@ -76,11 +139,14 @@ export const CaveSearchMapControl = () => {
         options={options}
         onSelect={handleSelect}
         onSearch={handleSearch}
+        value={inputValue}
+        onChange={setInputValue}
       >
         <Input.Search
           loading={isLoading}
           size="large"
-          placeholder="Search for a cave"
+          placeholder="Search for a cave or enter coordinates (lat, lon)"
+          onPressEnter={handlePressEnter}
         />
       </AutoComplete>
     </ControlPanel>

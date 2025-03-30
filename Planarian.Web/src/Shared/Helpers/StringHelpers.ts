@@ -15,26 +15,67 @@ export const StringHelpers = {
   },
 };
 
+export enum DistanceFormat {
+  feet = "feet",
+  miles = "miles",
+  meters = "meters",
+  kilometers = "kilometers",
+}
+
 export function formatDistance(
-  distanceInFeet: number | undefined | null
+  distanceInFeet: number | undefined | null,
+  distanceFormat?: DistanceFormat
 ): string | null {
   if (distanceInFeet === undefined || distanceInFeet === null) return null;
-  const milesThreshold = 2640;
 
+  const milesThreshold = 2640;
   const formatOptions = {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   } as Intl.NumberFormatOptions;
 
+  if (distanceFormat) {
+    let convertedValue: number;
+    let unitLabel: string;
+    switch (distanceFormat) {
+      case DistanceFormat.feet:
+        convertedValue = distanceInFeet;
+        unitLabel = "ft";
+        formatOptions.minimumFractionDigits = 0;
+        break;
+      case DistanceFormat.miles:
+        convertedValue = distanceInFeet / 5280;
+        unitLabel = "mi";
+        break;
+      case DistanceFormat.kilometers:
+        convertedValue = distanceInFeet * 0.0003048;
+        unitLabel = "km";
+        break;
+      case DistanceFormat.meters:
+        convertedValue = distanceInFeet * 0.3048;
+        unitLabel = "m";
+        formatOptions.minimumFractionDigits = 0;
+        break;
+      default:
+        convertedValue = distanceInFeet;
+        unitLabel = "ft";
+        formatOptions.minimumFractionDigits = 0;
+    }
+    return `${convertedValue.toLocaleString(
+      undefined,
+      formatOptions
+    )} ${unitLabel}`;
+  }
+
+  // Otherwise do the current default logic
   if (distanceInFeet >= milesThreshold) {
     const miles = distanceInFeet / 5280;
     const formattedMiles = miles.toLocaleString(undefined, formatOptions);
-    return `${formattedMiles} mi`; // Display miles with 2 decimal places and commas for thousands
+    return `${formattedMiles} mi`;
   }
 
   formatOptions.minimumFractionDigits = 0;
-
-  return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`; // Add commas for thousands in feet
+  return `${distanceInFeet.toLocaleString(undefined, formatOptions)} ft`;
 }
 
 export function isNullOrWhiteSpace(

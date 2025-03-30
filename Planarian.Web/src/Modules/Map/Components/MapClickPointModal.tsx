@@ -1,15 +1,36 @@
 import React, { FC, useEffect, useState } from "react";
-import { Modal, Button, Descriptions, Grid } from "antd";
+import {
+  Modal,
+  Button,
+  Descriptions,
+  Grid,
+  Collapse,
+  InputNumber,
+  DatePicker,
+} from "antd";
+import { RangeValue } from "rc-picker/lib/interface";
+import moment from "moment";
 import { CopyOutlined } from "@ant-design/icons";
 import { Macrostrat } from "./Macrostrat";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import {
   defaultIfEmpty,
+  DistanceFormat,
   formatCoordinates,
   formatDistance,
 } from "../../../Shared/Helpers/StringHelpers";
+import { GageList } from "./GaugeList";
 
+const { RangePicker } = DatePicker;
+
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return date.toLocaleString();
+}
+
+/** MapClickPointModal Props */
 interface MapClickPointModalProps {
   isModalVisible: boolean;
   lat: number;
@@ -17,12 +38,13 @@ interface MapClickPointModalProps {
   handleCancel: () => void;
 }
 
-const MapClickPointModal: FC<MapClickPointModalProps> = ({
+export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   isModalVisible,
   lat,
   lng,
   handleCancel,
 }) => {
+  // Elevation
   const [elevation, setElevation] = useState<number | null>(null);
   const [loadingElevation, setLoadingElevation] = useState(false);
   const [errorElevation, setErrorElevation] = useState<string | null>(null);
@@ -31,64 +53,73 @@ const MapClickPointModal: FC<MapClickPointModalProps> = ({
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
 
+  const [pendingDistanceMiles, setPendingDistanceMiles] = useState(20);
+  const [distanceMiles, setDistanceMiles] = useState(25);
+  const [dateRange, setDateRange] = useState<RangeValue<moment.Moment>>([
+    moment().subtract(1, "month"),
+    moment(),
+  ]);
+
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.sm ? "horizontal" : "vertical";
 
   const copyCoordinates = () => {
-    const coordinates = `${lat}, ${lng}`;
-    navigator.clipboard.writeText(coordinates);
+    navigator.clipboard.writeText(`${lat}, ${lng}`);
   };
 
-  // Fetch elevation data
+  // Debounce the distance input
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDistanceMiles(pendingDistanceMiles);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [pendingDistanceMiles]);
+
+  // --- Fetch Elevation ---
+  useEffect(() => {
+    if (!lat || !lng) return;
     const fetchElevation = async () => {
       setLoadingElevation(true);
       setErrorElevation(null);
       try {
-        const response = await fetch(
+        const resp = await fetch(
           `https://epqs.nationalmap.gov/v1/json?x=${lng}&y=${lat}&units=Feet&wkid=4326&includeDate=False`
         );
-        const data = await response.json();
+        const data = await resp.json();
         if (data && data.value) {
           setElevation(data.value);
         } else {
           setErrorElevation("No elevation data found.");
         }
-      } catch (error) {
+      } catch (err) {
         setErrorElevation("Error fetching elevation data.");
       }
       setLoadingElevation(false);
     };
-
-    if (lat && lng) {
-      fetchElevation();
-    }
+    fetchElevation();
   }, [lat, lng]);
 
-  // Fetch reverse geocoded address data
   useEffect(() => {
+    if (!lat || !lng) return;
     const fetchAddress = async () => {
       setLoadingAddress(true);
       setErrorAddress(null);
       try {
-        const response = await fetch(
+        const resp = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
         );
-        const data = await response.json();
+        const data = await resp.json();
         if (data && data.address) {
           setAddress(data.address);
         } else {
           setErrorAddress("No address data found.");
         }
-      } catch (error) {
+      } catch (err) {
         setErrorAddress("Error fetching address data.");
       }
       setLoadingAddress(false);
     };
-
-    if (lat && lng) {
-      fetchAddress();
-    }
+    fetchAddress();
   }, [lat, lng]);
 
   return (
@@ -98,7 +129,7 @@ const MapClickPointModal: FC<MapClickPointModalProps> = ({
       width="80vw"
       bodyStyle={{
         height: "65vh",
-        overflow: "scroll",
+        overflow: "auto",
         padding: "16px",
       }}
       footer={[
@@ -112,7 +143,6 @@ const MapClickPointModal: FC<MapClickPointModalProps> = ({
         layout={descriptionLayout}
         bordered
         title="Location Information"
-        // column={3}
       >
         <Descriptions.Item
           label={
@@ -128,15 +158,17 @@ const MapClickPointModal: FC<MapClickPointModalProps> = ({
         >
           {formatCoordinates(lat, lng)}
         </Descriptions.Item>
+
         <Descriptions.Item label="Elevation">
           {loadingElevation
             ? "Loading..."
             : errorElevation
             ? errorElevation
             : elevation
-            ? formatDistance(elevation)
+            ? formatDistance(elevation, DistanceFormat.feet)
             : defaultIfEmpty("")}
         </Descriptions.Item>
+
         <Descriptions.Item label="Address">
           {loadingAddress ? (
             "Loading..."
@@ -155,13 +187,43 @@ const MapClickPointModal: FC<MapClickPointModalProps> = ({
           )}
         </Descriptions.Item>
       </Descriptions>
+
       <PlanarianDividerComponent
-        title={"Geology"}
+        title="Geology"
         secondaryTitle="from Macrostrat"
       />
       <Macrostrat lat={lat} lng={lng} />
+
+      <PlanarianDividerComponent
+        title="Water Gages"
+        secondaryTitle="from USGS NWIS"
+        element={
+          <div style={{ display: "flex", gap: 8 }}>
+            <InputNumber
+              addonAfter="Miles"
+              min={1}
+              max={50}
+              value={pendingDistanceMiles}
+              onChange={(val) => {
+                if (typeof val === "number") {
+                  setPendingDistanceMiles(val);
+                }
+              }}
+            />
+            <RangePicker
+              value={dateRange}
+              onChange={(vals) => setDateRange(vals)}
+            />
+          </div>
+        }
+      />
+
+      <GageList
+        lat={lat}
+        lng={lng}
+        distanceMiles={distanceMiles}
+        dateRange={dateRange}
+      />
     </Modal>
   );
 };
-
-export { MapClickPointModal };

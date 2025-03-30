@@ -41,7 +41,13 @@ const CSVDisplay: React.FC<CSVDisplayProps> = ({ data }) => {
       : [];
 
   return (
-    <Table dataSource={parsedData} scroll={{ x: 1500 }} columns={columns} />
+    <div style={{ flexWrap: "wrap", width: "100%" }}>
+      <Table
+        dataSource={parsedData}
+        scroll={{ x: "max-content" }}
+        columns={columns}
+      />
+    </div>
   );
 };
 

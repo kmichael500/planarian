@@ -79,8 +79,10 @@ public class CaveService : ServiceBase<CaveRepository>
                     entranceNameEnabled
                         ? entrance.Name
                         : string.Empty;
-                
-                var caveCountyId = featureDict.TryGetValue(FeatureKey.EnabledFieldCaveId, out var showCaveId) && showCaveId
+                entranceName = System.Security.SecurityElement.Escape(entranceName);
+
+                var caveCountyId = featureDict.TryGetValue(FeatureKey.EnabledFieldCaveId, out var showCaveId) &&
+                                   showCaveId
                     ? $"{cave.CountyDisplayId}{cave.CountyIdDelimiter}{cave.CountyNumber}"
                     : string.Empty;
                 var waypointName = string.Empty;
@@ -94,17 +96,17 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     waypointName = $"{waypointName} {caveName}";
                 }
-                
-                if (!string.IsNullOrWhiteSpace(entranceName) && !string.Equals(entranceName, caveName, StringComparison.CurrentCultureIgnoreCase))
+
+                if (!string.IsNullOrWhiteSpace(entranceName) && !string.Equals(entranceName, caveName,
+                        StringComparison.CurrentCultureIgnoreCase))
                 {
                     waypointName = $"{waypointName} ({entranceName})";
                 }
-                
+
                 if (entrance.IsPrimary) // Append asterisk if this is the primary entrance.
                 {
                     waypointName = $"{waypointName} *";
                 }
-                
 
                 var latitude = entrance.Latitude;
                 var longitude = entrance.Longitude;
@@ -113,7 +115,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 var descriptionStringBuilder = new StringBuilder();
 
                 var caveInfoLines = new List<string>();
-                
+
                 if (showCaveId)
                 {
                     if (!string.IsNullOrWhiteSpace(caveCountyId))
@@ -181,7 +183,9 @@ public class CaveService : ServiceBase<CaveRepository>
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveReportedOn, out var showCaveReportedOn) &&
                     showCaveReportedOn)
                 {
-                    var reportedOn = cave.ReportedOn.HasValue ? cave.ReportedOn.Value.ToShortDateString() : string.Empty;
+                    var reportedOn = cave.ReportedOn.HasValue
+                        ? cave.ReportedOn.Value.ToShortDateString()
+                        : string.Empty;
                     if (!string.IsNullOrWhiteSpace(reportedOn))
                         caveInfoLines.Add($"Reported On: {reportedOn}");
                 }
@@ -273,13 +277,14 @@ public class CaveService : ServiceBase<CaveRepository>
 
                 // Build Entrance Information only for non-null fields.
                 var entranceInfoSb = new StringBuilder();
-                
+
                 descriptionStringBuilder.AppendLine();
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceName, out var showEntranceName) &&
                     showEntranceName)
                 {
                     var name = entrance.Name;
-                    if (!string.IsNullOrWhiteSpace(name) && !string.Equals(name, cave.Name, StringComparison.CurrentCultureIgnoreCase))
+                    if (!string.IsNullOrWhiteSpace(name) &&
+                        !string.Equals(name, cave.Name, StringComparison.CurrentCultureIgnoreCase))
                         entranceInfoSb.AppendLine($"Name: {name}");
                 }
 
@@ -300,9 +305,8 @@ public class CaveService : ServiceBase<CaveRepository>
                     if (entrance.PitDepthFeet.HasValue && entrance.PitDepthFeet != 0)
                         entranceInfoSb.AppendLine($"Pit Depth (ft): {entrance.PitDepthFeet}");
                 }
-                
-                entranceInfoSb.AppendLine("Primary Entrance: " + (entrance.IsPrimary ? "Yes" : "No"));
 
+                entranceInfoSb.AppendLine("Primary Entrance: " + (entrance.IsPrimary ? "Yes" : "No"));
 
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceLocationQuality,
                         out var showEntranceLocQual) && showEntranceLocQual)
@@ -323,8 +327,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceFieldIndicationTags,
                         out var showEntranceFieldInd) && showEntranceFieldInd)
                 {
-                    var fieldIndTags = entrance.FieldIndicationTags.ToCommaSeparatedString()
-                        ;
+                    var fieldIndTags = entrance.FieldIndicationTags.ToCommaSeparatedString();
                     if (!string.IsNullOrWhiteSpace(fieldIndTags))
                         entranceInfoSb.AppendLine($"Field Indication: {fieldIndTags}");
                 }
@@ -344,27 +347,30 @@ public class CaveService : ServiceBase<CaveRepository>
                     if (!string.IsNullOrWhiteSpace(reportedByTags))
                         entranceInfoSb.AppendLine($"Entrance Reported By: {reportedByTags}");
                 }
-                
+
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldEntranceDescription, out var showEntranceDesc) &&
                     showEntranceDesc)
                 {
                     var description = entrance.Description;
                     if (!string.IsNullOrWhiteSpace(description))
-                        entranceInfoSb.AppendLine($"Description: {description}");
+                    {
+                        var safeDescription = System.Security.SecurityElement.Escape(description);
+                        entranceInfoSb.AppendLine($"Description: {safeDescription}");
+                    }
                 }
-                
+
                 if (featureDict.TryGetValue(FeatureKey.EnabledFieldCaveNarrative, out var showCaveNarrative) &&
                     showCaveNarrative)
                 {
                     var narrative = cave.Narrative;
                     if (!string.IsNullOrWhiteSpace(narrative))
                     {
-                        entranceInfoSb.AppendLine($"");
-                        entranceInfoSb.AppendLine($"Narrative:");
-                        entranceInfoSb.AppendLine($"{narrative}");
+                        entranceInfoSb.AppendLine();
+                        entranceInfoSb.AppendLine("Narrative:");
+                        entranceInfoSb.AppendLine(narrative);
                     }
                 }
-                
+
                 if (entranceInfoSb.Length > 0)
                 {
                     descriptionStringBuilder.AppendLine("Entrance Information:");
@@ -374,7 +380,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 {
                     descriptionStringBuilder.AppendLine($"Entrance Information: {"".DefaultIfNullOrWhiteSpace()}");
                 }
-                
+
                 descriptionStringBuilder.AppendLine();
                 descriptionStringBuilder.AppendLine($"{_serverOptions.ClientBaseUrl}/caves/{cave.Id}");
 
@@ -385,8 +391,11 @@ public class CaveService : ServiceBase<CaveRepository>
                     sb.AppendLine($"    <ele>{elevation}</ele>");
                 }
 
-                sb.AppendLine($"    <name>{waypointName}</name>");
-                sb.AppendLine($"    <cmt><![CDATA[{descriptionStringBuilder.ToString()}]]></cmt>");
+                var safeWaypointName = System.Security.SecurityElement.Escape(waypointName);
+                sb.AppendLine($"    <name>{safeWaypointName}</name>");
+
+                var safeCmt = System.Security.SecurityElement.Escape(descriptionStringBuilder.ToString());
+                sb.AppendLine($"    <cmt><![CDATA[{safeCmt}]]></cmt>");
                 sb.AppendLine("  </wpt>");
             }
         }

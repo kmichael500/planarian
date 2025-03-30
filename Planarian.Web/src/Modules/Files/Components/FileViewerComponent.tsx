@@ -1,6 +1,6 @@
-import { Modal, Tag, Table, Spin, Result, Drawer, Button } from "antd";
+import { Tag, Spin, Result, Drawer } from "antd";
 import Papa from "papaparse";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { CloudDownloadOutlined } from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import "./FileViewerComponent.scss";
@@ -59,6 +59,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
           if (isTextFileType(fileType)) {
             setFileContent(data);
           } else if (isCsvFileType(fileType)) {
+            setFileContent(data);
             const parsedData = Papa.parse<TableRow>(data, {
               header: true,
             }).data;
@@ -74,7 +75,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     <>
       <Drawer
         width="100VW"
-        height="100VH"
+        height="100vh"
         open={open}
         autoFocus={true} // add autoFocus prop
         extra={[<>{downloadButton}</>]}
