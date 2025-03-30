@@ -93,7 +93,7 @@ const CaveComponent = ({
     [moment().subtract(1, "month"), moment()]
   );
 
-  const [gageDistance, setGageDistance] = useState<number>(20);
+  const [gageDistance, setGageDistance] = useState<number>(25);
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";

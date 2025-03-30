@@ -54,7 +54,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
 
   const [pendingDistanceMiles, setPendingDistanceMiles] = useState(20);
-  const [distanceMiles, setDistanceMiles] = useState(10);
+  const [distanceMiles, setDistanceMiles] = useState(25);
   const [dateRange, setDateRange] = useState<RangeValue<moment.Moment>>([
     moment().subtract(1, "month"),
     moment(),
