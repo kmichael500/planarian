@@ -1,12 +1,12 @@
 import React, { FC, useEffect, useState } from "react";
 import {
-  Modal,
   Button,
   Descriptions,
   Grid,
   Collapse,
   InputNumber,
   DatePicker,
+  Modal,
 } from "antd";
 import { RangeValue } from "rc-picker/lib/interface";
 import moment from "moment";
@@ -21,6 +21,7 @@ import {
   formatDistance,
 } from "../../../Shared/Helpers/StringHelpers";
 import { GageList } from "./GaugeList";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 const { RangePicker } = DatePicker;
 
@@ -123,15 +124,10 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   }, [lat, lng]);
 
   return (
-    <Modal
+    <PlanarianModal
       open={isModalVisible}
       onCancel={handleCancel}
       width="80vw"
-      bodyStyle={{
-        height: "65vh",
-        overflow: "auto",
-        padding: "16px",
-      }}
       footer={[
         <Button key="close" onClick={handleCancel}>
           Close
@@ -224,6 +220,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
         distanceMiles={distanceMiles}
         dateRange={dateRange}
       />
-    </Modal>
+    </PlanarianModal>
   );
 };

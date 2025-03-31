@@ -12,6 +12,7 @@ import {
   isCsvFileType,
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface FileViewerProps {
   embedUrl: string | null | undefined;
@@ -19,9 +20,7 @@ interface FileViewerProps {
   displayName?: string | null;
   fileType?: string | null;
   open: boolean;
-  onCancel?:
-    | ((e: React.MouseEvent<HTMLElement, MouseEvent>) => void)
-    | undefined;
+  onCancel?: (() => void) | undefined;
 }
 
 type TableRow = {
@@ -73,21 +72,18 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
   return (
     <>
-      <Drawer
-        width="100VW"
-        height="100vh"
+      <PlanarianModal
         open={open}
-        autoFocus={true} // add autoFocus prop
-        extra={[<>{downloadButton}</>]}
         title={
           <>
             {displayName} <Tag>{fileType}</Tag>
+            {downloadButton}
           </>
         }
-        onClose={(e) => {
+        onCancel={() => {
           {
             if (onCancel) {
-              onCancel(e as any);
+              onCancel();
             }
           }
         }}
@@ -142,7 +138,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
             extra={downloadButton}
           />
         )}
-      </Drawer>
+      </PlanarianModal>
     </>
   );
 };
