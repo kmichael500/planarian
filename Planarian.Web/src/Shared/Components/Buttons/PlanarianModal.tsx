@@ -98,22 +98,31 @@ const PlanarianModal: FC<PlanarianModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [animationClass, setAnimationClass] = useState("");
+  // Save scroll position when modal opens
+  const scrollPosition = useRef(0);
 
   // Get antd breakpoints
   const screens = useBreakpoint();
   // If the screen is smaller than md, force fullScreen
   const computedFullScreen = !screens.md ? true : fullScreen;
 
-  // Effect to manage opening and closing animations
+  // Effect to manage modal animations and body scroll locking
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
     if (isOpen) {
+      // Save current scroll position
+      scrollPosition.current = window.pageYOffset;
+      // Lock the body scroll by setting a fixed position
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollPosition.current}px`;
+      document.body.style.width = "100%";
+
       if (!dialog.open) {
         dialog.showModal();
       }
-      // Trigger opening animation after initial render
+      // Trigger opening animation
       setTimeout(() => {
         setAnimationClass("open");
       }, 0);
@@ -124,22 +133,16 @@ const PlanarianModal: FC<PlanarianModalProps> = ({
         const timer = setTimeout(() => {
           dialog.close();
           setAnimationClass("");
+          // Restore body scroll and reset styles
+          document.body.style.position = "";
+          document.body.style.top = "";
+          document.body.style.width = "";
+          // Restore the previous scroll position
+          window.scrollTo(0, scrollPosition.current);
         }, ANIMATION_DURATION);
         return () => clearTimeout(timer);
       }
     }
-  }, [isOpen]);
-
-  // Effect to disable body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [isOpen]);
 
   // Prevent the default cancel behavior (like ESC key) and trigger onClose
