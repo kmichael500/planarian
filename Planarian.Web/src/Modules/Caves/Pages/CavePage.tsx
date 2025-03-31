@@ -96,6 +96,9 @@ const CavePage = () => {
         cave={cave}
         isLoading={isLoading}
         hasEditPermission={hasEditPermission}
+        options={{
+          showMap: true,
+        }}
         updateCave={async () => {
           setIsLoading(true);
           const updatedCave = await CaveService.GetCave(caveId);
