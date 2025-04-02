@@ -1,9 +1,22 @@
-import { Table } from "antd";
+import React, { useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
-import React from "react";
+import {
+  GridComponent,
+  ColumnsDirective,
+  ColumnDirective,
+  Inject,
+  Toolbar,
+  Page,
+  Sort,
+  Filter,
+  Search,
+  VirtualScroll,
+  Resize,
+  FilterSettingsModel,
+} from "@syncfusion/ej2-react-grids";
 
 interface CSVDisplayProps {
-  data: string;
+  data?: string | null;
 }
 
 type TableRow = {
@@ -11,43 +24,75 @@ type TableRow = {
 };
 
 const CSVDisplay: React.FC<CSVDisplayProps> = ({ data }) => {
-  const parsedData = Papa.parse<TableRow>(data, { header: true }).data;
+  const gridRef = useRef<GridComponent>(null);
+  const [parsedData, setParsedData] = useState<TableRow[]>([]);
+  const [columnKeys, setColumnKeys] = useState<string[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const columns =
-    parsedData.length > 0
-      ? Object.keys(parsedData[0]).map((key) => {
-          const uniqueValues = Array.from(
-            new Set(parsedData.map((row) => row[key]))
-          ).filter((val) => val !== undefined && val !== null);
-          const filters = uniqueValues.map((value) => ({
-            text: value,
-            value: value,
-          }));
+  // Set filter settings (using Excel type for enhanced filtering UI)
+  const filterSettings: FilterSettingsModel = { type: "Excel" };
 
-          return {
-            title: key,
-            dataIndex: key,
-            className: "truncate",
-            sorter: (a: TableRow, b: TableRow) => {
-              if (a[key] < b[key]) return -1;
-              if (a[key] > b[key]) return 1;
-              return 0;
-            },
-            filters: filters,
-            onFilter: (value: string | number | boolean, record: TableRow) =>
-              record[key]?.toString().includes(value.toString()),
-          };
-        })
-      : [];
+  useEffect(() => {
+    // Parse CSV data after component mount
+    if (data) {
+      const result = Papa.parse<TableRow>(data, { header: true });
+      const parsed = result.data;
+      setParsedData(parsed);
+
+      // Extract column keys from the first row
+      const keys = parsed && parsed.length > 0 ? Object.keys(parsed[0]) : [];
+      setColumnKeys(keys);
+
+      // Set component as loaded
+      setIsLoaded(true);
+    }
+  }, [data]);
 
   return (
-    <div style={{ flexWrap: "wrap", width: "100%" }}>
-      <Table
-        dataSource={parsedData}
-        scroll={{ x: "max-content" }}
-        columns={columns}
-      />
-    </div>
+    <>
+      {isLoaded && (
+        <GridComponent
+          ref={gridRef}
+          height="100%"
+          dataSource={parsedData}
+          allowSorting={true}
+          allowFiltering={true}
+          filterSettings={filterSettings}
+          allowPaging={true}
+          toolbar={["Search"]}
+          pageSettings={{ pageSize: 100 }}
+          allowResizing={true}
+          dataBound={() => {
+            if (gridRef.current) {
+              gridRef.current.autoFitColumns();
+            }
+          }}
+        >
+          <ColumnsDirective>
+            {columnKeys.map((key) => (
+              <ColumnDirective
+                key={key}
+                field={key}
+                headerText={key}
+                allowSorting={true}
+                allowFiltering={true}
+              />
+            ))}
+          </ColumnsDirective>
+          <Inject
+            services={[
+              Toolbar,
+              Page,
+              Sort,
+              Filter,
+              Search,
+              VirtualScroll,
+              Resize,
+            ]}
+          />
+        </GridComponent>
+      )}
+    </>
   );
 };
 

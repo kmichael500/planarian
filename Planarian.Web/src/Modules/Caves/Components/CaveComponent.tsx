@@ -512,7 +512,7 @@ const CaveComponent = ({
           </>
         )}
 
-        {showMap && (
+        {showMap && options && options.showMap == true && (
           <>
             <PlanarianDividerComponent title="Map" />
             {cave?.primaryEntrance !== null && (

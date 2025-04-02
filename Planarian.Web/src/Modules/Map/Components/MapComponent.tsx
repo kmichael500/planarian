@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveService } from "../../Caves/Service/CaveService";
 import { MapBaseComponent } from "./MapBaseComponent";

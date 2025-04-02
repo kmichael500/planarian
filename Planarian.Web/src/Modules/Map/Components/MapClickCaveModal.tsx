@@ -1,11 +1,12 @@
 import { FC } from "react";
-import { Modal, Spin } from "antd";
+import { Spin } from "antd";
 import { CloseOutlined, EyeOutlined } from "@ant-design/icons";
 import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import { useNavigate } from "react-router-dom";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface MapClickCaveModal {
   isModalVisible: boolean;
@@ -18,24 +19,18 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
   isModalVisible,
   isModalLoading,
   cave,
-  handleCancel,
+  handleCancel: handleClose,
 }) => {
   const navigate = useNavigate();
   return (
-    <Modal
-      title={cave?.name || "Cave"}
-      visible={isModalVisible}
-      onCancel={handleCancel}
-      width="80vw"
-      bodyStyle={{
-        height: "65vh",
-        overflow: "scroll",
-        padding: "0px",
-      }}
+    <PlanarianModal
+      header={cave?.name || "Cave"}
+      open={isModalVisible}
+      onClose={handleClose}
       footer={[
-        ,
         <PlanarianButton
           key="view"
+          alwaysShowChildren
           onClick={() => {
             if (cave) {
               NavigationService.NavigateToCave(cave.id, navigate);
@@ -44,13 +39,6 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
           icon={<EyeOutlined />}
         >
           View
-        </PlanarianButton>,
-        <PlanarianButton
-          key="close"
-          onClick={handleCancel}
-          icon={<CloseOutlined />}
-        >
-          Close
         </PlanarianButton>,
       ]}
     >
@@ -61,7 +49,7 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
           isLoading={isModalLoading}
         />
       </Spin>
-    </Modal>
+    </PlanarianModal>
   );
 };
 
