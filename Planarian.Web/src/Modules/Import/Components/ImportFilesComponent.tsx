@@ -9,7 +9,6 @@ import {
   Col,
   Form,
   Input,
-  Modal,
   Result,
   Row,
 } from "antd";
@@ -21,15 +20,15 @@ import {
   InboxOutlined,
   RedoOutlined,
 } from "@ant-design/icons";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AccountService } from "../../Account/Services/AccountService";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
-import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { FileImportResult } from "../Models/FileUploadresult";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 export interface UploadParams {
   file: any;
@@ -569,17 +568,15 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           />
         </Card>
       )}
-      <FullScreenModal>
-        <Modal
-          title="File Import Results"
-          open={isModalOpen}
-          onOk={handleOk}
-          onCancel={handleOk}
-          footer={null}
-        >
-          <CSVDisplay data={convertResultsListToCsv(uploadResults)} />
-        </Modal>
-      </FullScreenModal>
+      <PlanarianModal
+        fullScreen
+        header="File Import Results"
+        open={isModalOpen}
+        onClose={handleOk}
+        footer={null}
+      >
+        <CSVDisplay data={convertResultsListToCsv(uploadResults)} />
+      </PlanarianModal>
     </>
   );
 };

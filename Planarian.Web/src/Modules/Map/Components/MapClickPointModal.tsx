@@ -1,13 +1,5 @@
-import React, { FC, useEffect, useState } from "react";
-import {
-  Button,
-  Descriptions,
-  Grid,
-  Collapse,
-  InputNumber,
-  DatePicker,
-  Modal,
-} from "antd";
+import { FC, useEffect, useState } from "react";
+import { Descriptions, Grid, InputNumber, DatePicker } from "antd";
 import { RangeValue } from "rc-picker/lib/interface";
 import moment from "moment";
 import { CopyOutlined } from "@ant-design/icons";
@@ -126,14 +118,10 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   return (
     <PlanarianModal
       open={isModalVisible}
-      onCancel={handleCancel}
-      width="80vw"
-      footer={[
-        <Button key="close" onClick={handleCancel}>
-          Close
-        </Button>,
-      ]}
-      title={`${address?.county || ""}, ${address?.state || ""} `}
+      // fullScreen
+      onClose={handleCancel}
+      footer={[]}
+      header={`${address?.county || ""}, ${address?.state || ""} `}
     >
       <Descriptions
         layout={descriptionLayout}

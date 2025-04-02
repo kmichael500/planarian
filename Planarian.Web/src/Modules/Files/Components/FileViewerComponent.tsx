@@ -32,7 +32,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
   displayName,
   fileType,
   open,
-  onCancel,
+  onCancel: onClose,
 }) => {
   const isImage = isImageFileType(fileType);
   const isPdf = isPdfFileType(fileType);
@@ -47,10 +47,12 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [tableData, setTableData] = useState<TableRow[]>([]);
-
   useEffect(() => {
-    if ((isTextFileType(fileType) || isCsvFileType(fileType)) && embedUrl) {
+    if (
+      open &&
+      (isTextFileType(fileType) || isCsvFileType(fileType)) &&
+      embedUrl
+    ) {
       setIsLoading(true);
       fetch(embedUrl)
         .then((response) => response.text())
@@ -59,85 +61,84 @@ const FileViewer: React.FC<FileViewerProps> = ({
             setFileContent(data);
           } else if (isCsvFileType(fileType)) {
             setFileContent(data);
-            const parsedData = Papa.parse<TableRow>(data, {
-              header: true,
-            }).data;
-            setTableData(parsedData);
           }
           setIsLoading(false);
         })
         .catch(() => setIsLoading(false));
     }
-  }, [embedUrl, fileType]);
+  }, [open]);
 
   return (
     <>
       <PlanarianModal
+        // fullScreen
         open={open}
-        title={
+        fullScreen
+        header={[
           <>
             {displayName} <Tag>{fileType}</Tag>
-            {downloadButton}
-          </>
-        }
-        onCancel={() => {
+          </>,
+          downloadButton,
+        ]}
+        onClose={() => {
           {
-            if (onCancel) {
-              onCancel();
+            if (onClose) {
+              onClose();
             }
           }
         }}
-        footer={null}
       >
-        {isSupported && (
-          <>
-            {isImage && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  height: "100%",
-                }}
-              >
-                <img
-                  src={embedUrl || ""}
-                  alt="file"
-                  style={{ maxHeight: "100%" }}
+        <Spin spinning={isLoading}>
+          {isSupported && (
+            <>
+              {isImage && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100%",
+                  }}
+                >
+                  <img
+                    src={embedUrl || ""}
+                    alt="file"
+                    style={{ maxHeight: "100%" }}
+                  />
+                </div>
+              )}
+              {isPdf && (
+                <embed
+                  src={`${embedUrl ?? undefined}#toolbar=0`}
+                  type="application/pdf"
+                  width="100%"
+                  height="100%"
                 />
-              </div>
-            )}
-            {isPdf && (
-              <embed
-                src={`${embedUrl ?? undefined}#toolbar=0`}
-                type="application/pdf"
-                width="100%"
-                height="100%"
-              />
-            )}
-            {isCsvFileType(fileType) && <CSVDisplay data={fileContent || ""} />}
-            {isTextFileType(fileType) && (
-              <pre
-                style={{
-                  overflow: "auto",
-                  height: "50%",
-                  padding: "1rem",
-                  border: "1px solid rgb(240, 240, 240)",
-                }}
-              >
-                {isLoading ? <Spin /> : fileContent}
-              </pre>
-            )}{" "}
-          </>
-        )}
+              )}
+              {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
+              {isTextFileType(fileType) && (
+                <pre
+                  style={{
+                    overflow: "auto",
+                    height: "50%",
+                    padding: "1rem",
+                    border: "1px solid rgb(240, 240, 240)",
+                  }}
+                >
+                  {isLoading ? <Spin /> : fileContent}
+                </pre>
+              )}{" "}
+            </>
+          )}
 
-        {!isSupported && (
-          <Result
-            status="warning"
-            title={`The filetype '${fileType}' is not currently supported.`}
-            extra={downloadButton}
-          />
-        )}
+          {!isSupported && (
+            <Result
+              status="warning"
+              title={`The filetype '${fileType}' is not currently supported.`}
+              extra={downloadButton}
+            />
+          )}
+        </Spin>
       </PlanarianModal>
     </>
   );

@@ -26,6 +26,7 @@ import { AccountService } from "../../Account/Services/AccountService";
 import { EntranceCsvModel } from "../Models/EntranceCsvModel";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { EntranceDryRun } from "../Models/EntranceDryRun";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface ImportEntrancesComponentProps {
   onUploaded: () => void;
@@ -212,10 +213,15 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             title="Dry Run Complete!"
             subTitle="Review the changes below. If everything looks good, proceed with processing."
             extra={[
-              <Button onClick={showCSVModal} icon={<EyeOutlined />}>
-                View Dry Run Data
-              </Button>,
               <PlanarianButton
+                alwaysShowChildren
+                onClick={showCSVModal}
+                icon={<EyeOutlined />}
+              >
+                View Dry Run Data
+              </PlanarianButton>,
+              <PlanarianButton
+                alwaysShowChildren
                 onClick={handleProcessClick}
                 icon={<DeliveredProcedureOutlined />}
                 loading={isLoading}
@@ -223,9 +229,13 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
               >
                 Process
               </PlanarianButton>,
-              <Button onClick={tryAgain} icon={<RedoOutlined />}>
+              <PlanarianButton
+                alwaysShowChildren
+                onClick={tryAgain}
+                icon={<RedoOutlined />}
+              >
                 Reset
-              </Button>,
+              </PlanarianButton>,
             ]}
           />
         </Card>
@@ -289,32 +299,28 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
               ]}
             />
           </Card>
-          <FullScreenModal>
-            <Modal
-              title="Import Entrance Errors"
-              open={isModalOpen}
-              onOk={handleOk}
-              onCancel={handleOk}
-              footer={null}
-            >
-              <CSVDisplay data={convertErrorListToCsv(errorList)} />
-            </Modal>
-          </FullScreenModal>
+          <PlanarianModal
+            fullScreen
+            header="Import Entrance Errors"
+            open={isModalOpen}
+            onClose={handleOk}
+            footer={null}
+          >
+            <CSVDisplay data={convertErrorListToCsv(errorList)} />
+          </PlanarianModal>
         </>
       )}
 
       {dryRunData.length > 0 && (
-        <FullScreenModal>
-          <Modal
-            title="Dry Run Data"
-            open={isModalOpen}
-            onOk={handleOk}
-            onCancel={handleOk}
-            footer={null}
-          >
-            <CSVDisplay data={Papa.unparse(dryRunData)} />
-          </Modal>
-        </FullScreenModal>
+        <PlanarianModal
+          fullScreen
+          header="Dry Run Data"
+          open={isModalOpen}
+          onClose={handleOk}
+          footer={null}
+        >
+          <CSVDisplay data={Papa.unparse(dryRunData)} />
+        </PlanarianModal>
       )}
     </>
   );

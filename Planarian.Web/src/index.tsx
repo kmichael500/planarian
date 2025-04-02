@@ -6,11 +6,16 @@ import reportWebVitals from "./reportWebVitals";
 import axios, { AxiosRequestTransformer } from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
-import { AppService } from "./Shared/Services/AppService";
 import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
+
+import { registerLicense } from "@syncfusion/ej2-base";
+
+registerLicense(
+  "Ngo9BigBOggjHTQxAR8/V1NNaF5cXmBCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdmWXxdcXVWR2VYU01wXkpWYUA="
+);
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement

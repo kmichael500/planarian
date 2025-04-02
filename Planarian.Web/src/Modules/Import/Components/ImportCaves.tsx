@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Modal, message } from "antd";
+import { Card, Result, Button, Modal, message, Spin } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -25,6 +25,7 @@ import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -288,32 +289,30 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
               ]}
             />
           </Card>
-          <FullScreenModal>
-            <Modal
-              title="Import Cave Errors"
-              open={isModalOpen}
-              onOk={handleOk}
-              onCancel={handleOk}
-              footer={null}
-            >
+          <PlanarianModal
+            fullScreen
+            header="Import Cave Errors"
+            open={isModalOpen}
+            onClose={handleOk}
+            footer={null}
+          >
+            <Spin spinning={errorList.length === 0}>
               <CSVDisplay data={convertErrorListToCsv(errorList)} />
-            </Modal>
-          </FullScreenModal>
+            </Spin>
+          </PlanarianModal>
         </>
       )}
 
       {dryRunData.length > 0 && (
-        <FullScreenModal>
-          <Modal
-            title="Dry Run Data"
-            open={isModalOpen}
-            onOk={handleOk}
-            onCancel={handleOk}
-            footer={null}
-          >
-            <CSVDisplay data={Papa.unparse(dryRunData)} />
-          </Modal>
-        </FullScreenModal>
+        <PlanarianModal
+          fullScreen
+          header="Dry Run Data"
+          open={isModalOpen}
+          onClose={handleOk}
+          footer={null}
+        >
+          <CSVDisplay data={Papa.unparse(dryRunData)} />
+        </PlanarianModal>
       )}
     </>
   );

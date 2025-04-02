@@ -19,18 +19,18 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
   isModalVisible,
   isModalLoading,
   cave,
-  handleCancel,
+  handleCancel: handleClose,
 }) => {
   const navigate = useNavigate();
   return (
     <PlanarianModal
-      title={cave?.name || "Cave"}
+      header={cave?.name || "Cave"}
       open={isModalVisible}
-      onCancel={handleCancel}
+      onClose={handleClose}
       footer={[
-        ,
         <PlanarianButton
           key="view"
+          alwaysShowChildren
           onClick={() => {
             if (cave) {
               NavigationService.NavigateToCave(cave.id, navigate);
@@ -39,13 +39,6 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
           icon={<EyeOutlined />}
         >
           View
-        </PlanarianButton>,
-        <PlanarianButton
-          key="close"
-          onClick={handleCancel}
-          icon={<CloseOutlined />}
-        >
-          Close
         </PlanarianButton>,
       ]}
     >
