@@ -5,20 +5,6 @@ import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
 
 const { Text } = Typography;
 
-const LegendContainer = styled.div`
-  background: white;
-  border: 1px solid #ddd;
-  padding: 8px;
-  font-size: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  border-radius: 6px;
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 10;
-  max-width: 220px;
-`;
-
 const LegendContent = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -28,7 +14,7 @@ const LegendContent = styled.div`
 
 export const PublicAccessLegend: FC = () => {
   return (
-    <LegendContainer>
+    <>
       <Text strong style={{ fontSize: "12px" }}>
         Access
       </Text>
@@ -49,6 +35,6 @@ export const PublicAccessLegend: FC = () => {
       >
         *Not indicative of caving permissions
       </Text>
-    </LegendContainer>
+    </>
   );
 };

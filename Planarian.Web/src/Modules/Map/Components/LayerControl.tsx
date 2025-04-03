@@ -8,7 +8,7 @@ import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
 
-// Extend the interface so it can optionally include fill and text sublayer configurations.
+// Extend the interface to include an optional legend property.
 interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
@@ -47,7 +47,6 @@ interface PlanarianMapLayer {
     id: string;
     minzoom?: number;
     maxzoom?: number;
-
     source: {
       id: string;
       type: string;
@@ -58,6 +57,7 @@ interface PlanarianMapLayer {
     layout: (isActive: boolean) => { [key: string]: any };
     paint: (opacity: number) => { [key: string]: any };
   };
+  legend?: React.ReactNode;
 }
 
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
@@ -235,9 +235,9 @@ const LAYERS: PlanarianMapLayer[] = [
         ],
         "text-anchor": "center",
         "text-offset": [0, 0],
-        "text-allow-overlap": false, // Prevent overlapping labels.
-        "symbol-placement": "point", // Places the label at the polygon's center.
-        "text-optional": true, // Allows dropping labels if collisions occur.
+        "text-allow-overlap": false,
+        "symbol-placement": "point",
+        "text-optional": true,
       }),
       type: "symbol",
       paint: (opacity: number) => ({
@@ -255,6 +255,7 @@ const LAYERS: PlanarianMapLayer[] = [
         ],
       }),
     },
+    legend: <PublicAccessLegend />,
   },
 ];
 
@@ -321,9 +322,8 @@ const LayerControl: React.FC = () => {
           );
         } else if (layer.type === "vector") {
           return (
-            <>
+            <React.Fragment key={layer.id}>
               <Source
-                key={layer.id}
                 id={layer.id}
                 type="vector"
                 tiles={layer.source.tiles}
@@ -344,7 +344,6 @@ const LayerControl: React.FC = () => {
                     }}
                     paint={{
                       ...layer.fillLayer.paint,
-                      // Override the fill-opacity with the current layer opacity.
                       "fill-opacity": layer.opacity,
                     }}
                   />
@@ -372,7 +371,7 @@ const LayerControl: React.FC = () => {
                   />
                 </Source>
               )}
-            </>
+            </React.Fragment>
           );
         }
         return null;
@@ -391,14 +390,14 @@ const LayerControl: React.FC = () => {
           Layers
           <div
             style={{
-              maxHeight: "60vh",
+              maxHeight: "55vh",
               overflowY: "auto",
               overflowX: "hidden",
               marginBottom: "10px",
             }}
           >
             {mapLayers.map((layer) => (
-              <div key={layer.id}>
+              <div key={layer.id} style={{ marginBottom: "15px" }}>
                 <Checkbox
                   onChange={() => onLayerChecked(layer)}
                   checked={layer.isActive}
@@ -449,8 +448,23 @@ const LayerControl: React.FC = () => {
         </ContentWrapper>
       </ControlPanel>
 
-      <div style={{ zIndex: 1 }}>
-        <PublicAccessLegend />
+      <div>
+        {mapLayers
+          .filter((layer) => layer.isActive)
+          .map((layer) =>
+            layer.legend ? (
+              <LegendPanel>
+                <HoverIcon style={{ zIndex: 300 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
+                  </svg>
+                </HoverIcon>
+                <ContentWrapper>
+                  <div key={`legend-${layer.id}`}>{layer.legend}</div>
+                </ContentWrapper>
+              </LegendPanel>
+            ) : null
+          )}
       </div>
     </>
   );
@@ -462,12 +476,32 @@ const ControlPanel = styled.div`
   right: 0;
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  padding: 8px 8px;
+  padding: 8px;
   margin: 20px;
   font-size: 13px;
   line-height: 2;
   color: #6b6b76;
+  border-radius: 8px;
   outline: none;
+  transition: all 0.3s ease;
+  &:hover {
+    max-width: none;
+  }
+`;
+
+const LegendPanel = styled.div`
+  position: absolute;
+  bottom: -10px;
+  left: -10px;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  margin: 20px;
+  font-size: 13px;
+  line-height: 2;
+  color: #6b6b76;
+  z-index: 12;
   transition: all 0.3s ease;
   &:hover {
     max-width: none;
@@ -479,14 +513,16 @@ const HoverIcon = styled.div`
   width: 28px;
   height: 24px;
   cursor: pointer;
-  ${ControlPanel}:hover & {
+  ${ControlPanel}:hover &,
+  ${LegendPanel}:hover & {
     display: none;
   }
 `;
 
 const ContentWrapper = styled.div`
   display: none;
-  ${ControlPanel}:hover & {
+  ${ControlPanel}:hover &,
+  ${LegendPanel}:hover & {
     display: block;
   }
 `;
