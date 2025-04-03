@@ -1,5 +1,6 @@
 import { FC, useEffect, useState } from "react";
 import { Spin, Tag, Typography } from "antd";
+import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
 
 const { Text } = Typography;
 
@@ -122,13 +123,11 @@ export const IUCN_CATEGORY_INFO: Record<
   },
 };
 
-export const ProtectedAreaDetails: FC<ProtectedAreaDetailsProps> = ({
-  lat,
-  lng,
-}) => {
+const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
   const [protectedArea, setProtectedArea] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     if (!lat || !lng) return;
@@ -149,7 +148,14 @@ export const ProtectedAreaDetails: FC<ProtectedAreaDetailsProps> = ({
         const resp = await fetch(url);
         const data = await resp.json();
         if (data.features?.length) {
-          setProtectedArea(data.features[0].attributes);
+          const attributes = data.features[0].attributes;
+          // If Unit_Nm is "Non-PAD-US Area", treat it as no protected area
+          if (attributes.Unit_Nm === "Non-PAD-US Area") {
+            setProtectedArea(null);
+          } else {
+            setProtectedArea(attributes);
+            console.log(attributes);
+          }
         } else {
           setProtectedArea(null);
         }
@@ -165,7 +171,7 @@ export const ProtectedAreaDetails: FC<ProtectedAreaDetailsProps> = ({
 
   if (loading) return <Spin size="small" />;
   if (error) return <Text type="danger">{error}</Text>;
-  if (!protectedArea) return <Text type="secondary">None</Text>;
+  if (!protectedArea) return <Text type="secondary">{defaultIfEmpty("")}</Text>;
 
   const gap = GAP_STATUS_INFO[protectedArea.GAP_Sts];
   const iucn =
@@ -176,70 +182,83 @@ export const ProtectedAreaDetails: FC<ProtectedAreaDetailsProps> = ({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div>
-        <Text strong>Unit Name:</Text>{" "}
-        <Text>{protectedArea.Unit_Nm || "Unknown"}</Text>
+        <Text>Unit:</Text> <Text>{protectedArea.Unit_Nm || "Unknown"}</Text>
       </div>
 
       <div>
-        <Text strong>GAP Status:</Text>{" "}
-        {gap && <Tag color={gap.color}>{gap.label}</Tag>}{" "}
-        <Text type="secondary">{gap?.description || "No description"}</Text>
+        <Text>Manager:</Text>{" "}
+        <Text>
+          {protectedArea.MngNm_Desc || "Unknown"}
+          {protectedArea.MngTp_Desc && ` (${protectedArea.MngTp_Desc})`}
+        </Text>
       </div>
 
       <div>
-        <Text strong>IUCN Category:</Text>{" "}
-        {iucn && <Tag color={iucn.color}>{iucn.label}</Tag>}{" "}
-        <Text type="secondary">{iucn?.description || "No description"}</Text>
-      </div>
-
-      <div>
-        <Text strong>Public Access:</Text>{" "}
         {access && <Tag color={access.color}>{access.label}</Tag>}{" "}
         <Text type="secondary">{access?.description || "No description"}</Text>
       </div>
 
-      <div>
-        <Text strong>Manager Type:</Text>{" "}
-        <Text>{protectedArea.MngTp_Desc || "Unknown"}</Text>
-      </div>
+      {showMore && (
+        <>
+          <div>
+            <Text>GAP Status:</Text>{" "}
+            {gap && <Tag color={gap.color}>{gap.label}</Tag>}{" "}
+            <Text type="secondary">{gap?.description || "No description"}</Text>
+          </div>
 
-      <div>
-        <Text strong>Manager Name:</Text>{" "}
-        <Text>{protectedArea.MngNm_Desc || "Unknown"}</Text>
-      </div>
+          <div>
+            <Text>IUCN Category:</Text>{" "}
+            {iucn && <Tag color={iucn.color}>{iucn.label}</Tag>}{" "}
+            <Text type="secondary">
+              {iucn?.description || "No description"}
+            </Text>
+          </div>
 
-      <div>
-        <Text strong>Designation Type:</Text>{" "}
-        <Text>{protectedArea.DesTp_Desc || "Unknown"}</Text>
-      </div>
+          <div>
+            <Text>Designation Type:</Text>{" "}
+            <Text>{protectedArea.DesTp_Desc || "Unknown"}</Text>
+          </div>
 
-      <div>
-        <Text strong>Total Acres:</Text>{" "}
-        <Text>
-          {Math.round(
-            protectedArea.GIS_AcrsDb || protectedArea.GIS_Acres || 0
-          ).toLocaleString()}
-        </Text>
-      </div>
+          <div>
+            <Text>Total Acres:</Text>{" "}
+            <Text>
+              {Math.round(
+                protectedArea.GIS_AcrsDb || protectedArea.GIS_Acres || 0
+              ).toLocaleString()}
+            </Text>
+          </div>
+
+          <div style={{ marginTop: 4 }}>
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(
+                protectedArea.Unit_Nm
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Search on Google
+            </a>
+          </div>
+        </>
+      )}
 
       <div style={{ marginTop: 4 }}>
-        <a
-          href={`https://www.google.com/search?q=${encodeURIComponent(
-            protectedArea.Unit_Nm
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Text
+          type="secondary"
+          style={{ cursor: "pointer" }}
+          onClick={() => setShowMore(!showMore)}
         >
-          Search on Google
-        </a>
+          {showMore ? "Show less..." : "Show more..."}
+        </Text>
       </div>
 
       <div style={{ marginTop: 12 }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Note: This information is not an indication of whether caving is or
-          isn’t permitted on this land.
+          *Not indicative of caving permissions.
         </Text>
       </div>
     </div>
   );
 };
+
+export { PublicAccessDetails };

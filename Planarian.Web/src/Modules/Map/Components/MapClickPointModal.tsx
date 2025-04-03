@@ -14,7 +14,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { GageList } from "./GaugeList";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
-import { ProtectedAreaDetails } from "./ProtectedAreaDetails";
+import { PublicAccessDetails } from "./PublicAccesDetails";
 
 const { RangePicker } = DatePicker;
 
@@ -169,8 +169,8 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
             defaultIfEmpty("")
           )}
         </Descriptions.Item>
-        <Descriptions.Item label="Protected Area Details" span={3}>
-          <ProtectedAreaDetails lat={lat} lng={lng} />
+        <Descriptions.Item label="Land Access" span={3}>
+          <PublicAccessDetails lat={lat} lng={lng} />
         </Descriptions.Item>
       </Descriptions>
 

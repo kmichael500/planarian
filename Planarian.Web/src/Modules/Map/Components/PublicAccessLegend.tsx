@@ -1,7 +1,7 @@
 import { FC } from "react";
 import { Tag, Typography } from "antd";
 import styled from "styled-components";
-import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
+import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 
 const { Text } = Typography;
 
@@ -33,7 +33,7 @@ export const PublicAccessLegend: FC = () => {
         type="secondary"
         style={{ fontSize: "10px", display: "block", marginTop: 4 }}
       >
-        *Not indicative of caving permissions
+        *Not indicative of caving permissions.
       </Text>
     </>
   );

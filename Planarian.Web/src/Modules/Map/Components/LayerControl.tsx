@@ -6,7 +6,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { BuildOutlined } from "@ant-design/icons";
 import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
-import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
+import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 
 const MAPBOX_ACCESS_TOKEN =
   "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
@@ -101,6 +101,7 @@ const LAYERS: PlanarianMapLayer[] = [
     opacity: 1,
     attribution: "© OpenStreetMap contributors",
   },
+
   {
     id: "mapbox-satellite",
     displayName: "Satellite",
@@ -115,64 +116,6 @@ const LAYERS: PlanarianMapLayer[] = [
     isActive: false,
     opacity: 1,
     attribution: "© Mapbox",
-  },
-  {
-    id: "3-dep-hillshade-usgs",
-    displayName: "Hillshade",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
-      ],
-    },
-    isActive: false,
-    opacity: 1,
-    attribution: "USGS 3DEP Elevation Program",
-  },
-  {
-    id: "macrostrat",
-    displayName: "Geology",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    attribution: "Macrostrat",
-  },
-  {
-    id: "usgs-hydro",
-    displayName: "Hydrology",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=0,1,2,3,4,5,6,7,8,9,10,11,12&styles=",
-      ],
-      tileSize: 256,
-    },
-    paint: { "raster-opacity": 1 },
-    isActive: false,
-    opacity: 1,
-    attribution: "USGS",
-  },
-  {
-    id: "usgs-drainage-basins-16digit",
-    displayName: "Watershed Boundary",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://hydro.nationalmap.gov/arcgis/services/wbd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=8&styles=",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    attribution: "USGS Watershed Boundary Dataset",
   },
   {
     id: "arcgis-public-access",
@@ -255,6 +198,64 @@ const LAYERS: PlanarianMapLayer[] = [
       }),
     },
     legend: <PublicAccessLegend />,
+  },
+  {
+    id: "3-dep-hillshade-usgs",
+    displayName: "Hillshade",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
+      ],
+    },
+    isActive: false,
+    opacity: 1,
+    attribution: "USGS 3DEP Elevation Program",
+  },
+  {
+    id: "macrostrat",
+    displayName: "Geology",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    attribution: "Macrostrat",
+  },
+  {
+    id: "usgs-hydro",
+    displayName: "Hydrology",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=0,1,2,3,4,5,6,7,8,9,10,11,12&styles=",
+      ],
+      tileSize: 256,
+    },
+    paint: { "raster-opacity": 1 },
+    isActive: false,
+    opacity: 1,
+    attribution: "USGS",
+  },
+  {
+    id: "usgs-drainage-basins-16digit",
+    displayName: "Watershed Boundary",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://hydro.nationalmap.gov/arcgis/services/wbd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=8&styles=",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    attribution: "USGS Watershed Boundary Dataset",
   },
 ];
 
@@ -375,7 +376,7 @@ const LayerControl: React.FC = () => {
         }
         return null;
       })}
-      <ControlPanel style={{ zIndex: 11 }}>
+      <ControlPanel style={{ zIndex: 200 }}>
         <HoverIcon style={{ zIndex: 200 }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -453,7 +454,7 @@ const LayerControl: React.FC = () => {
           .map((layer) =>
             layer.legend ? (
               <LegendPanel>
-                <HoverIcon style={{ zIndex: 300 }}>
+                <HoverIcon style={{ zIndex: 0 }}>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                     <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
                   </svg>
@@ -490,8 +491,8 @@ const ControlPanel = styled.div`
 
 const LegendPanel = styled.div`
   position: absolute;
-  bottom: -10px;
-  left: -10px;
+  top: 100px;
+  right: 0;
   border-radius: 8px;
   background: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
