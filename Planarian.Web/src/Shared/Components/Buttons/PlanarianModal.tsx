@@ -57,6 +57,18 @@ export function PlanarianModal({
   const leftHeaderItem = headerContent[0];
   const rightHeaderItems = headerContent.slice(1);
 
+  const handleClose = () => {
+    // Restore scroll
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
+    window.scrollTo(0, scrollPositionRef.current);
+
+    setShouldRenderChildren(false);
+
+    onClose?.();
+  };
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -88,20 +100,16 @@ export function PlanarianModal({
   }, [open]);
 
   useEffect(() => {
+    return () => {
+      // this runs on unmount / route change
+      // restore scroll when the modal is closed
+      handleClose();
+    };
+  }, []);
+
+  useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-
-    const handleClose = () => {
-      // Restore scroll
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.width = "";
-      window.scrollTo(0, scrollPositionRef.current);
-
-      setShouldRenderChildren(false);
-
-      onClose?.();
-    };
 
     dialog.addEventListener("close", handleClose);
     return () => {
