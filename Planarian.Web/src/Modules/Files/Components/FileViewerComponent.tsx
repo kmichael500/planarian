@@ -108,12 +108,29 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 </div>
               )}
               {isPdf && (
-                <embed
-                  src={`${embedUrl ?? undefined}#toolbar=0`}
-                  type="application/pdf"
-                  width="100%"
-                  height="100%"
-                />
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    overflow: "hidden",
+                    position: "relative",
+                    WebkitOverflowScrolling: "touch", // Enables momentum scrolling on iOS
+                  }}
+                >
+                  <iframe
+                    src={`${embedUrl ?? undefined}#toolbar=0`}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      overflow: "auto",
+                    }}
+                    title="PDF Viewer"
+                  />
+                </div>
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
               {isTextFileType(fileType) && (
