@@ -465,7 +465,7 @@ const CaveComponent = ({
             }
           />
           {!showGeology && (
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "8px" }}>
               <p>
                 Access geological data through Macrostrat's comprehensive
                 database. View information about local geological formations and
@@ -477,7 +477,7 @@ const CaveComponent = ({
           {showGeology &&
             selectedEntrance.latitude &&
             selectedEntrance.longitude && (
-              <div style={{ marginTop: "16px" }}>
+              <div>
                 <h4>Geology Information</h4>
                 <Macrostrat
                   lat={selectedEntrance.latitude}
@@ -498,7 +498,7 @@ const CaveComponent = ({
             }
           />
           {!showGages && (
-            <div style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "8px" }}>
               <p>
                 View real-time water data from USGS's network of over 11,800
                 streamgages across the United States. These monitoring stations
@@ -556,12 +556,11 @@ const CaveComponent = ({
                     <RangePicker
                       value={gageDateRange}
                       onChange={(range) => setGageDateRange(range)}
-                      style={{ width: "100%" }}
+                      style={{ width: "100%", marginBottom: "16px" }}
                     />
                   </Col>
                 </Row>
 
-                <h4>Stream Gage Information</h4>
                 <GageList
                   lat={selectedGageEntrance.latitude}
                   lng={selectedGageEntrance.longitude}
