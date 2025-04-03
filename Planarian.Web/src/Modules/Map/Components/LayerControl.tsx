@@ -8,7 +8,9 @@ import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
 
-// Extend the interface to include an optional legend property.
+const MAPBOX_ACCESS_TOKEN =
+  "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
+
 interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
@@ -17,7 +19,7 @@ interface PlanarianMapLayer {
   type: string;
   attribution?: string;
   source: {
-    layerName?: string; // For vector layers, specify the source-layer name.
+    layerName?: string;
     type: string;
     tiles: string[];
     tileSize?: number;
@@ -25,14 +27,12 @@ interface PlanarianMapLayer {
   paint?: {
     "raster-opacity"?: number;
   };
-  // Optional configuration for a fill layer in vector sources.
   fillLayer?: {
     id: string;
     sourceLayer: string;
     layout: { [key: string]: any };
     paint: { [key: string]: any };
   };
-  // Optional configuration for a text-only sublayer.
   secondaryLayer?: {
     type:
       | "symbol"
@@ -73,22 +73,21 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
 
 const LAYERS: PlanarianMapLayer[] = [
   {
-    id: "open street map",
+    id: "mapbox-street",
     displayName: "Street",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/512/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
       ],
-      tileSize: 256,
+      tileSize: 512,
     },
     isActive: true,
     opacity: 1,
-    attribution: "© OpenStreetMap contributors",
+    attribution: "© Mapbox",
   },
+
   {
     id: "open-topo",
     displayName: "Topo",
@@ -103,19 +102,19 @@ const LAYERS: PlanarianMapLayer[] = [
     attribution: "© OpenStreetMap contributors",
   },
   {
-    id: "esri-world-imagery",
-    displayName: "Satellite (ESRI)",
+    id: "mapbox-satellite",
+    displayName: "Satellite",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
       ],
       tileSize: 256,
     },
     isActive: false,
     opacity: 1,
-    attribution: "© ESRI",
+    attribution: "© Mapbox",
   },
   {
     id: "3-dep-hillshade-usgs",
