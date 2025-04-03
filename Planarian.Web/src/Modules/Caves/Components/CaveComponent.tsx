@@ -428,40 +428,11 @@ const CaveComponent = ({
             title="Geology"
             secondaryTitle="from Macrostrat"
             element={
-              <Row gutter={10}>
-                <Col>
-                  <a onClick={() => setShowGeology(!showGeology)}>
-                    {showGeology ? "Show less" : "Show more"}
-                  </a>
-                </Col>
-                {cave.entrances.length > 1 && (
-                  <Col>
-                    <Select
-                      value={selectedEntrance.id}
-                      style={{ width: 200 }}
-                      onChange={(value) => {
-                        const newEntrance = cave.entrances.find(
-                          (entrance) => entrance.id === value
-                        );
-                        if (newEntrance) {
-                          setSelectedEntrance(newEntrance);
-                        }
-                      }}
-                    >
-                      {cave.entrances.map((entrance, index) => (
-                        <Option
-                          key={entrance.id || index}
-                          value={entrance.id || index}
-                        >
-                          {entrance.name
-                            ? entrance.name
-                            : `Entrance ${index + 1}`}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Col>
-                )}
-              </Row>
+              <div style={{ textAlign: "right" }}>
+                <a onClick={() => setShowGeology(!showGeology)}>
+                  {showGeology ? "Show less" : "Show more"}
+                </a>
+              </div>
             }
           />
           {!showGeology && (
@@ -478,6 +449,35 @@ const CaveComponent = ({
             selectedEntrance.latitude &&
             selectedEntrance.longitude && (
               <div>
+                {cave.entrances.length > 1 && (
+                  <Row style={{ marginBottom: "16px" }}>
+                    <Col>
+                      <Select
+                        value={selectedEntrance.id}
+                        style={{ width: 200 }}
+                        onChange={(value) => {
+                          const newEntrance = cave.entrances.find(
+                            (entrance) => entrance.id === value
+                          );
+                          if (newEntrance) {
+                            setSelectedEntrance(newEntrance);
+                          }
+                        }}
+                      >
+                        {cave.entrances.map((entrance, index) => (
+                          <Option
+                            key={entrance.id || index}
+                            value={entrance.id || index}
+                          >
+                            {entrance.name
+                              ? entrance.name
+                              : `Entrance ${index + 1}`}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Col>
+                  </Row>
+                )}
                 <h4>Geology Information</h4>
                 <Macrostrat
                   lat={selectedEntrance.latitude}
