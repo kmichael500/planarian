@@ -14,6 +14,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { GageList } from "./GaugeList";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { PublicAccessDetails } from "./PublicAccesDetails";
 
 const { RangePicker } = DatePicker;
 
@@ -142,7 +143,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
         >
           {formatCoordinates(lat, lng)}
         </Descriptions.Item>
-
         <Descriptions.Item label="Elevation">
           {loadingElevation
             ? "Loading..."
@@ -152,7 +152,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
             ? formatDistance(elevation, DistanceFormat.feet)
             : defaultIfEmpty("")}
         </Descriptions.Item>
-
         <Descriptions.Item label="Address">
           {loadingAddress ? (
             "Loading..."
@@ -169,6 +168,9 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
           ) : (
             defaultIfEmpty("")
           )}
+        </Descriptions.Item>
+        <Descriptions.Item label="Land Access" span={3}>
+          <PublicAccessDetails lat={lat} lng={lng} />
         </Descriptions.Item>
       </Descriptions>
 

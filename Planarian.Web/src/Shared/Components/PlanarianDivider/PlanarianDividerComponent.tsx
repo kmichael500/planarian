@@ -4,7 +4,7 @@ import { Row, Col, Typography } from "antd";
 interface DividerProps {
   title: string | React.ReactElement;
   secondaryTitle?: string;
-  element?: React.ReactElement;
+  element?: React.ReactElement | null;
 }
 
 const PlanarianDividerComponent = ({

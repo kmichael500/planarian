@@ -44,6 +44,7 @@ import { RangeValue } from "rc-picker/lib/interface";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { GageList } from "../../Map/Components/GaugeList";
+import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -285,6 +286,9 @@ const CaveComponent = ({
           <Row>{generateTags(entrance.entranceHydrologyTagIds)}</Row>
         </Descriptions.Item>
       ),
+      <Descriptions.Item label="Land Access" span={3}>
+        <PublicAccessDetails lat={entrance.latitude} lng={entrance.longitude} />
+      </Descriptions.Item>,
     ].filter(Boolean);
 
   useEffect(() => {
@@ -420,34 +424,43 @@ const CaveComponent = ({
               title="Geology"
               secondaryTitle="from Macrostrat"
               element={
-                <Select
-                  value={selectedEntrance.id}
-                  style={{ width: 200 }}
-                  onChange={(value) => {
-                    const newEntrance = cave.entrances.find(
-                      (entrance) => entrance.id === value
-                    );
-                    if (newEntrance) {
-                      setSelectedEntrance(newEntrance);
-                    }
-                  }}
-                >
-                  {cave.entrances.map((entrance, index) => (
-                    <Option
-                      key={entrance.id || index}
-                      value={entrance.id || index}
-                    >
-                      {entrance.name ? entrance.name : `Entrance ${index + 1}`}
-                    </Option>
-                  ))}
-                </Select>
+                cave.entrances.length > 1 ? (
+                  <Select
+                    value={selectedEntrance.id}
+                    style={{ width: 200 }}
+                    onChange={(value) => {
+                      const newEntrance = cave.entrances.find(
+                        (entrance) => entrance.id === value
+                      );
+                      if (newEntrance) {
+                        setSelectedEntrance(newEntrance);
+                      }
+                    }}
+                  >
+                    {cave.entrances.map((entrance, index) => (
+                      <Option
+                        key={entrance.id || index}
+                        value={entrance.id || index}
+                      >
+                        {entrance.name
+                          ? entrance.name
+                          : `Entrance ${index + 1}`}
+                      </Option>
+                    ))}
+                  </Select>
+                ) : null
               }
             />
             {selectedEntrance.latitude && selectedEntrance.longitude && (
-              <Macrostrat
-                lat={selectedEntrance.latitude}
-                lng={selectedEntrance.longitude}
-              />
+              <Collapse bordered defaultActiveKey={[]}>
+                <Panel header="Geology Information" key="geology">
+                  <Macrostrat
+                    lat={selectedEntrance.latitude}
+                    lng={selectedEntrance.longitude}
+                    openByDefault={false}
+                  />
+                </Panel>
+              </Collapse>
             )}
 
             <PlanarianDividerComponent
@@ -455,31 +468,33 @@ const CaveComponent = ({
               secondaryTitle="from USGS"
               element={
                 <Row gutter={10}>
-                  <Col>
-                    <Select
-                      value={selectedGageEntrance?.id}
-                      style={{ width: 200 }}
-                      onChange={(value) => {
-                        const newEntrance = cave.entrances.find(
-                          (entrance) => entrance.id === value
-                        );
-                        if (newEntrance) {
-                          setSelectedGageEntrance(newEntrance);
-                        }
-                      }}
-                    >
-                      {cave.entrances.map((entrance, index) => (
-                        <Option
-                          key={entrance.id || index}
-                          value={entrance.id || index}
-                        >
-                          {entrance.name
-                            ? entrance.name
-                            : `Entrance ${index + 1}`}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Col>
+                  {cave.entrances.length > 1 && (
+                    <Col>
+                      <Select
+                        value={selectedGageEntrance?.id}
+                        style={{ width: 200 }}
+                        onChange={(value) => {
+                          const newEntrance = cave.entrances.find(
+                            (entrance) => entrance.id === value
+                          );
+                          if (newEntrance) {
+                            setSelectedGageEntrance(newEntrance);
+                          }
+                        }}
+                      >
+                        {cave.entrances.map((entrance, index) => (
+                          <Option
+                            key={entrance.id || index}
+                            value={entrance.id || index}
+                          >
+                            {entrance.name
+                              ? entrance.name
+                              : `Entrance ${index + 1}`}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Col>
+                  )}
                   <Col>
                     <InputNumber
                       value={gageDistance}
@@ -502,12 +517,16 @@ const CaveComponent = ({
             {selectedGageEntrance &&
               selectedGageEntrance.latitude &&
               selectedGageEntrance.longitude && (
-                <GageList
-                  lat={selectedGageEntrance.latitude}
-                  lng={selectedGageEntrance.longitude}
-                  distanceMiles={gageDistance}
-                  dateRange={gageDateRange}
-                />
+                <Collapse bordered defaultActiveKey={[]}>
+                  <Panel header="Stream Gage Information" key="gages">
+                    <GageList
+                      lat={selectedGageEntrance.latitude}
+                      lng={selectedGageEntrance.longitude}
+                      distanceMiles={gageDistance}
+                      dateRange={gageDateRange}
+                    />
+                  </Panel>
+                </Collapse>
               )}
           </>
         )}

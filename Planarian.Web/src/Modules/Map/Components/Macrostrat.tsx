@@ -37,6 +37,7 @@ interface XDDResponse {
 interface MacrostratProps {
   lat: number;
   lng: number;
+  openByDefault?: boolean;
 }
 
 interface ExpandableTextProps {
@@ -107,7 +108,11 @@ const ExpandableText: React.FC<ExpandableTextProps> = ({
   );
 };
 
-const Macrostrat: React.FC<MacrostratProps> = ({ lat, lng }) => {
+const Macrostrat: React.FC<MacrostratProps> = ({
+  lat,
+  lng,
+  openByDefault = true,
+}) => {
   const screens = useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
 
@@ -261,7 +266,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({ lat, lng }) => {
       <style>{highlightCSS}</style>
       <Row gutter={[16, 16]}>
         <Col span={24}>
-          <Collapse defaultActiveKey={["1"]}>
+          <Collapse defaultActiveKey={openByDefault ? ["1"] : []}>
             {/* Geologic map panel */}
             <Panel header="Geologic map" key="1">
               <Descriptions
