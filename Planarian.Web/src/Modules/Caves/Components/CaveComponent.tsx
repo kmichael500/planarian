@@ -428,40 +428,11 @@ const CaveComponent = ({
             title="Geology"
             secondaryTitle="from Macrostrat"
             element={
-              <Row gutter={10}>
-                <Col>
-                  <a onClick={() => setShowGeology(!showGeology)}>
-                    {showGeology ? "Show less" : "Show more"}
-                  </a>
-                </Col>
-                {cave.entrances.length > 1 && (
-                  <Col>
-                    <Select
-                      value={selectedEntrance.id}
-                      style={{ width: 200 }}
-                      onChange={(value) => {
-                        const newEntrance = cave.entrances.find(
-                          (entrance) => entrance.id === value
-                        );
-                        if (newEntrance) {
-                          setSelectedEntrance(newEntrance);
-                        }
-                      }}
-                    >
-                      {cave.entrances.map((entrance, index) => (
-                        <Option
-                          key={entrance.id || index}
-                          value={entrance.id || index}
-                        >
-                          {entrance.name
-                            ? entrance.name
-                            : `Entrance ${index + 1}`}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Col>
-                )}
-              </Row>
+              <div style={{ textAlign: "right" }}>
+                <a onClick={() => setShowGeology(!showGeology)}>
+                  {showGeology ? "Show less" : "Show more"}
+                </a>
+              </div>
             }
           />
           {!showGeology && (
@@ -469,8 +440,7 @@ const CaveComponent = ({
               <p>
                 Access geological data through Macrostrat's comprehensive
                 database. View information about local geological formations and
-                rock types including limestone. Explore the geological context
-                at cave entrances.
+                rock type at cave entrances.
               </p>
             </div>
           )}
@@ -478,7 +448,31 @@ const CaveComponent = ({
             selectedEntrance.latitude &&
             selectedEntrance.longitude && (
               <div>
-                <h4>Geology Information</h4>
+                {cave.entrances.length > 1 && (
+                  <Select
+                    value={selectedEntrance.id}
+                    style={{ width: 200, marginBottom: "16px" }}
+                    onChange={(value) => {
+                      const newEntrance = cave.entrances.find(
+                        (entrance) => entrance.id === value
+                      );
+                      if (newEntrance) {
+                        setSelectedEntrance(newEntrance);
+                      }
+                    }}
+                  >
+                    {cave.entrances.map((entrance, index) => (
+                      <Option
+                        key={entrance.id || index}
+                        value={entrance.id || index}
+                      >
+                        {entrance.name
+                          ? entrance.name
+                          : `Entrance ${index + 1}`}
+                      </Option>
+                    ))}
+                  </Select>
+                )}
                 <Macrostrat
                   lat={selectedEntrance.latitude}
                   lng={selectedEntrance.longitude}
@@ -514,7 +508,7 @@ const CaveComponent = ({
             selectedGageEntrance.latitude &&
             selectedGageEntrance.longitude && (
               <div style={{}}>
-                <Row gutter={[16, 16]}>
+                <Row gutter={[8, 8]}>
                   {cave.entrances.length > 1 && (
                     <Col xs={24} sm={24} md={8} lg={8}>
                       <Select
