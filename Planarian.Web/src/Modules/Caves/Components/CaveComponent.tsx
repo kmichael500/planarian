@@ -52,7 +52,9 @@ const { RangePicker } = DatePicker;
 
 export interface CaveComponentOptions {
   showMap?: boolean;
+  inCardContainer?: boolean;
 }
+
 export interface CaveComponentProps {
   cave?: CaveVm;
   isLoading: boolean;
@@ -76,10 +78,13 @@ const generateTags = (tagIds: string[] | undefined) => {
 const CaveComponent = ({
   cave,
   isLoading,
-  options,
+  options = {}, // Default to empty object
   updateCave,
   hasEditPermission,
 }: CaveComponentProps) => {
+  // Set default for inCardContainer within options
+  const inCardContainer = options.inCardContainer !== false; // Default to true unless explicitly set to false
+
   const [isUploading, setIsUploading] = useState(false);
   const { isFeatureEnabled } = useFeatureEnabled();
 
@@ -95,6 +100,9 @@ const CaveComponent = ({
   );
 
   const [gageDistance, setGageDistance] = useState<number>(25);
+
+  const [showGeology, setShowGeology] = useState(false);
+  const [showGages, setShowGages] = useState(false);
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
@@ -312,167 +320,206 @@ const CaveComponent = ({
     }
   }, [cave]);
 
-  return (
+  const content = (
     <>
-      <Card
-        bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
-        loading={isLoading}
-      >
-        <PlanarianDividerComponent title="Information" />
-        <Descriptions layout={descriptionLayout} bordered>
-          {descriptionItems}
-        </Descriptions>
+      <PlanarianDividerComponent title="Information" />
+      <Descriptions layout={descriptionLayout} bordered>
+        {descriptionItems}
+      </Descriptions>
 
-        {cave?.entrances && cave?.entrances.length > 0 && (
-          <>
-            <PlanarianDividerComponent title="Entrances" />
-            <Collapse bordered defaultActiveKey={["0"]}>
-              {cave.entrances.map((entrance, index) => (
-                <Panel
-                  header={
-                    <>
-                      <Row>
-                        Entrance {index + 1}
-                        {!isNullOrWhiteSpace(entrance.name)
-                          ? " - " + entrance.name
-                          : ""}
-                        {entrance.isPrimary && (
-                          <>
-                            <Col flex="auto"></Col>
-                            <Tag>Primary</Tag>
-                          </>
-                        )}
-                      </Row>
-                    </>
-                  }
-                  key={index}
-                >
-                  <Descriptions bordered layout={descriptionLayout}>
-                    {entranceItems(entrance)}
-                  </Descriptions>
-                </Panel>
-              ))}
-            </Collapse>
-          </>
-        )}
+      {cave?.entrances && cave?.entrances.length > 0 && (
+        <>
+          <PlanarianDividerComponent title="Entrances" />
+          <Collapse bordered defaultActiveKey={["0"]}>
+            {cave.entrances.map((entrance, index) => (
+              <Panel
+                header={
+                  <>
+                    <Row>
+                      Entrance {index + 1}
+                      {!isNullOrWhiteSpace(entrance.name)
+                        ? " - " + entrance.name
+                        : ""}
+                      {entrance.isPrimary && (
+                        <>
+                          <Col flex="auto"></Col>
+                          <Tag>Primary</Tag>
+                        </>
+                      )}
+                    </Row>
+                  </>
+                }
+                key={index}
+              >
+                <Descriptions bordered layout={descriptionLayout}>
+                  {entranceItems(entrance)}
+                </Descriptions>
+              </Panel>
+            ))}
+          </Collapse>
+        </>
+      )}
 
-        {isFeatureEnabled(FeatureKey.EnabledFieldCaveNarrative) && (
-          <>
-            {!isNullOrWhiteSpace(cave?.narrative) && (
-              <>
-                <PlanarianDividerComponent title="Narrative" />
-                <ParagraphDisplayComponent text={cave?.narrative} />
-              </>
-            )}
-          </>
-        )}
-
-        <PlanarianDividerComponent
-          title="Files"
-          element={
+      {isFeatureEnabled(FeatureKey.EnabledFieldCaveNarrative) && (
+        <>
+          {!isNullOrWhiteSpace(cave?.narrative) && (
             <>
-              {!isUploading && (
-                <PlanarianButton
-                  permissionKey={PermissionKey.Manager}
-                  disabled={!hasEditPermission}
-                  icon={<CloudUploadOutlined />}
-                  onClick={() => {
-                    setIsUploading(true);
-                  }}
-                >
-                  Upload
-                </PlanarianButton>
-              )}
+              <PlanarianDividerComponent title="Narrative" />
+              <ParagraphDisplayComponent text={cave?.narrative} />
             </>
-          }
-        />
+          )}
+        </>
+      )}
 
-        {!isUploading && (
+      <PlanarianDividerComponent
+        title="Files"
+        element={
           <>
-            <FileListComponent
-              files={cave?.files}
-              isUploading={isUploading}
-              setIsUploading={(value) => setIsUploading(value)}
-              customOrder={["Map"]}
-              hasEditPermission={hasEditPermission}
-            />
+            {!isUploading && (
+              <PlanarianButton
+                permissionKey={PermissionKey.Manager}
+                disabled={!hasEditPermission}
+                icon={<CloudUploadOutlined />}
+                onClick={() => {
+                  setIsUploading(true);
+                }}
+              >
+                Upload
+              </PlanarianButton>
+            )}
           </>
-        )}
-        {isUploading && (
-          <UploadComponent
-            onClose={() => {
-              if (updateCave) {
-                updateCave();
-              }
-              setIsUploading(false);
-            }}
-            uploadFunction={(params) =>
-              CaveService.AddCaveFile(
-                params.file,
-                cave?.id as string,
-                params.uid,
-                params.onProgress
-              )
-            }
-            updateFunction={FileService.UpdateFilesMetadata}
-          />
-        )}
+        }
+      />
 
-        {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
-          <>
-            <PlanarianDividerComponent
-              title="Geology"
-              secondaryTitle="from Macrostrat"
-              element={
-                cave.entrances.length > 1 ? (
-                  <Select
-                    value={selectedEntrance.id}
-                    style={{ width: 200 }}
-                    onChange={(value) => {
-                      const newEntrance = cave.entrances.find(
-                        (entrance) => entrance.id === value
-                      );
-                      if (newEntrance) {
-                        setSelectedEntrance(newEntrance);
-                      }
-                    }}
-                  >
-                    {cave.entrances.map((entrance, index) => (
-                      <Option
-                        key={entrance.id || index}
-                        value={entrance.id || index}
-                      >
-                        {entrance.name
-                          ? entrance.name
-                          : `Entrance ${index + 1}`}
-                      </Option>
-                    ))}
-                  </Select>
-                ) : null
-              }
-            />
-            {selectedEntrance.latitude && selectedEntrance.longitude && (
-              <Collapse bordered defaultActiveKey={[]}>
-                <Panel header="Geology Information" key="geology">
-                  <Macrostrat
-                    lat={selectedEntrance.latitude}
-                    lng={selectedEntrance.longitude}
-                    openByDefault={false}
-                  />
-                </Panel>
-              </Collapse>
+      {!isUploading && (
+        <>
+          <FileListComponent
+            files={cave?.files}
+            isUploading={isUploading}
+            setIsUploading={(value) => setIsUploading(value)}
+            customOrder={["Map"]}
+            hasEditPermission={hasEditPermission}
+          />
+        </>
+      )}
+      {isUploading && (
+        <UploadComponent
+          onClose={() => {
+            if (updateCave) {
+              updateCave();
+            }
+            setIsUploading(false);
+          }}
+          uploadFunction={(params) =>
+            CaveService.AddCaveFile(
+              params.file,
+              cave?.id as string,
+              params.uid,
+              params.onProgress
+            )
+          }
+          updateFunction={FileService.UpdateFilesMetadata}
+        />
+      )}
+
+      {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
+        <>
+          <PlanarianDividerComponent
+            title="Geology"
+            secondaryTitle="from Macrostrat"
+            element={
+              <Row gutter={10}>
+                <Col>
+                  <a onClick={() => setShowGeology(!showGeology)}>
+                    {showGeology ? "Show less" : "Show more"}
+                  </a>
+                </Col>
+                {cave.entrances.length > 1 && (
+                  <Col>
+                    <Select
+                      value={selectedEntrance.id}
+                      style={{ width: 200 }}
+                      onChange={(value) => {
+                        const newEntrance = cave.entrances.find(
+                          (entrance) => entrance.id === value
+                        );
+                        if (newEntrance) {
+                          setSelectedEntrance(newEntrance);
+                        }
+                      }}
+                    >
+                      {cave.entrances.map((entrance, index) => (
+                        <Option
+                          key={entrance.id || index}
+                          value={entrance.id || index}
+                        >
+                          {entrance.name
+                            ? entrance.name
+                            : `Entrance ${index + 1}`}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Col>
+                )}
+              </Row>
+            }
+          />
+          {!showGeology && (
+            <div style={{ marginBottom: "8px" }}>
+              <p>
+                Access geological data through Macrostrat's comprehensive
+                database. View information about local geological formations and
+                rock types including limestone. Explore the geological context
+                at cave entrances.
+              </p>
+            </div>
+          )}
+          {showGeology &&
+            selectedEntrance.latitude &&
+            selectedEntrance.longitude && (
+              <div>
+                <h4>Geology Information</h4>
+                <Macrostrat
+                  lat={selectedEntrance.latitude}
+                  lng={selectedEntrance.longitude}
+                />
+              </div>
             )}
 
-            <PlanarianDividerComponent
-              title="Stream Gages"
-              secondaryTitle="from USGS"
-              element={
-                <Row gutter={10}>
+          <PlanarianDividerComponent
+            title="Stream Gages"
+            secondaryTitle="from USGS"
+            element={
+              <div style={{ textAlign: "right" }}>
+                <a onClick={() => setShowGages(!showGages)}>
+                  {showGages ? "Show less" : "Show more"}
+                </a>
+              </div>
+            }
+          />
+          {!showGages && (
+            <div style={{ marginBottom: "8px" }}>
+              <p>
+                View real-time water data from USGS's network of over 11,800
+                streamgages across the United States. These monitoring stations
+                measure and transmit water levels and flow rates, providing
+                valuable information about local water conditions. Search for
+                nearby streamgages and view historical data from selected time
+                periods.
+              </p>
+            </div>
+          )}
+          {showGages &&
+            selectedGageEntrance &&
+            selectedGageEntrance.latitude &&
+            selectedGageEntrance.longitude && (
+              <div style={{}}>
+                <Row gutter={[16, 16]}>
                   {cave.entrances.length > 1 && (
-                    <Col>
+                    <Col xs={24} sm={24} md={8} lg={8}>
                       <Select
                         value={selectedGageEntrance?.id}
-                        style={{ width: 200 }}
+                        style={{ width: "100%" }}
                         onChange={(value) => {
                           const newEntrance = cave.entrances.find(
                             (entrance) => entrance.id === value
@@ -495,60 +542,68 @@ const CaveComponent = ({
                       </Select>
                     </Col>
                   )}
-                  <Col>
+                  <Col xs={24} sm={12} md={6} lg={6}>
                     <InputNumber
                       value={gageDistance}
                       addonAfter="Miles"
                       min={1}
                       max={50}
                       onChange={(value) => setGageDistance(value as number)}
+                      style={{ width: "100%" }}
                     />
                   </Col>
-                  <Col>
+                  <Col xs={24} sm={12} md={10} lg={10}>
                     <RangePicker
                       value={gageDateRange}
                       onChange={(range) => setGageDateRange(range)}
-                      style={{ width: 250 }}
+                      style={{ width: "100%", marginBottom: "16px" }}
                     />
                   </Col>
                 </Row>
-              }
-            />
-            {selectedGageEntrance &&
-              selectedGageEntrance.latitude &&
-              selectedGageEntrance.longitude && (
-                <Collapse bordered defaultActiveKey={[]}>
-                  <Panel header="Stream Gage Information" key="gages">
-                    <GageList
-                      lat={selectedGageEntrance.latitude}
-                      lng={selectedGageEntrance.longitude}
-                      distanceMiles={gageDistance}
-                      dateRange={gageDateRange}
-                    />
-                  </Panel>
-                </Collapse>
-              )}
-          </>
-        )}
 
-        {showMap && options && options.showMap == true && (
-          <>
-            <PlanarianDividerComponent title="Map" />
-            {cave?.primaryEntrance !== null && (
-              <div style={{ height: "590px" }}>
-                <MapComponent
-                  initialCenter={[
-                    cave?.primaryEntrance?.latitude as number,
-                    cave?.primaryEntrance?.longitude as number,
-                  ]}
-                  initialZoom={15}
-                  showFullScreenControl
+                <GageList
+                  lat={selectedGageEntrance.latitude}
+                  lng={selectedGageEntrance.longitude}
+                  distanceMiles={gageDistance}
+                  dateRange={gageDateRange}
                 />
               </div>
             )}
-          </>
-        )}
-      </Card>
+        </>
+      )}
+
+      {showMap && options && options.showMap == true && (
+        <>
+          <PlanarianDividerComponent title="Map" />
+          {cave?.primaryEntrance !== null && (
+            <div style={{ height: "590px" }}>
+              <MapComponent
+                initialCenter={[
+                  cave?.primaryEntrance?.latitude as number,
+                  cave?.primaryEntrance?.longitude as number,
+                ]}
+                initialZoom={15}
+                showFullScreenControl
+              />
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      {inCardContainer ? (
+        <Card
+          bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
+          loading={isLoading}
+        >
+          {content}
+        </Card>
+      ) : (
+        content
+      )}
     </>
   );
 };

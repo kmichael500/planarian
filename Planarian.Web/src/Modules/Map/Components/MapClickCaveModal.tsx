@@ -44,7 +44,7 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
     >
       <Spin spinning={isModalLoading}>
         <CaveComponent
-          options={{ showMap: false }}
+          options={{ showMap: false, inCardContainer: false }}
           cave={cave}
           isLoading={isModalLoading}
         />

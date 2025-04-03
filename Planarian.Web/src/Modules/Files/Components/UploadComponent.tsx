@@ -313,6 +313,7 @@ const UploadComponent = ({
         {!uploadsInProgress() && (
           <>
             <PlanarianButton
+              alwaysShowChildren
               icon={undefined}
               onClick={() => {
                 if (onClose) {
@@ -323,6 +324,7 @@ const UploadComponent = ({
               Back
             </PlanarianButton>
             <PlanarianButton
+              alwaysShowChildren
               icon={undefined}
               onClick={() => {
                 form.submit();
