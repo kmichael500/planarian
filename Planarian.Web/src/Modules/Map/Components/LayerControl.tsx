@@ -1,11 +1,14 @@
-import { Button, Checkbox, InputNumber, Slider, Space } from "antd";
-import React from "react";
-import { useState } from "react";
+import { Checkbox, InputNumber, Slider, Space } from "antd";
+import React, { useState } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { BuildOutlined, FullscreenOutlined } from "@ant-design/icons";
+import { BuildOutlined } from "@ant-design/icons";
+import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
+import { PublicAccessLegend } from "./PublicAccessLegend";
+import { PUBLIC_ACCESS_INFO } from "./ProtectedAreaDetails";
 
+// Extend the interface so it can optionally include fill and text sublayer configurations.
 interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
@@ -14,16 +17,61 @@ interface PlanarianMapLayer {
   type: string;
   attribution?: string;
   source: {
+    layerName?: string; // For vector layers, specify the source-layer name.
     type: string;
     tiles: string[];
-    tileSize: number;
-  }; // Added
+    tileSize?: number;
+  };
   paint?: {
     "raster-opacity"?: number;
   };
+  // Optional configuration for a fill layer in vector sources.
+  fillLayer?: {
+    id: string;
+    sourceLayer: string;
+    layout: { [key: string]: any };
+    paint: { [key: string]: any };
+  };
+  // Optional configuration for a text-only sublayer.
+  secondaryLayer?: {
+    type:
+      | "symbol"
+      | "raster"
+      | "circle"
+      | "line"
+      | "background"
+      | "fill"
+      | "fill-extrusion"
+      | "heatmap"
+      | "hillshade";
+    id: string;
+    minzoom?: number;
+    maxzoom?: number;
+
+    source: {
+      id: string;
+      type: string;
+      layerName: string;
+      tiles: string[];
+      tileSize?: number;
+    };
+    layout: (isActive: boolean) => { [key: string]: any };
+    paint: (opacity: number) => { [key: string]: any };
+  };
 }
 
-const LAYERS = [
+const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
+  [
+    "match",
+    ["get", "Pub_Access"],
+    ...Object.entries(PUBLIC_ACCESS_INFO).flatMap(([code, info]) => [
+      code,
+      info.color,
+    ]),
+    "#cccccc", // fallback
+  ] as unknown as DataDrivenPropertyValueSpecification<string>;
+
+const LAYERS: PlanarianMapLayer[] = [
   {
     id: "open street map",
     displayName: "Street",
@@ -54,22 +102,20 @@ const LAYERS = [
     opacity: 1,
     attribution: "© OpenStreetMap contributors",
   },
-
   {
-    id: "usgs-imagery",
-    displayName: "Satellite",
+    id: "esri-world-imagery",
+    displayName: "Satellite (ESRI)",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/WMTS/tile/1.0.0/USGSImageryOnly/default/GoogleMapsCompatible/{z}/{y}/{x}.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
     isActive: false,
-    // maxzoom: 16,
     opacity: 1,
-    attribution: "© USGS",
+    attribution: "© ESRI",
   },
   {
     id: "3-dep-hillshade-usgs",
@@ -81,12 +127,10 @@ const LAYERS = [
         "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
       ],
     },
-
     isActive: false,
     opacity: 1,
     attribution: "USGS 3DEP Elevation Program",
   },
-
   {
     id: "macrostrat",
     displayName: "Geology",
@@ -98,7 +142,7 @@ const LAYERS = [
     },
     isActive: false,
     opacity: 1,
-    attribution: "© Macrostrat",
+    attribution: "Macrostrat",
   },
   {
     id: "usgs-hydro",
@@ -111,12 +155,10 @@ const LAYERS = [
       ],
       tileSize: 256,
     },
-    paint: {
-      "raster-opacity": 1,
-    },
+    paint: { "raster-opacity": 1 },
     isActive: false,
     opacity: 1,
-    attribution: "© USGS",
+    attribution: "USGS",
   },
   {
     id: "usgs-drainage-basins-16digit",
@@ -131,46 +173,113 @@ const LAYERS = [
     },
     isActive: false,
     opacity: 1,
-    attribution: "© USGS Watershed Boundary Dataset",
+    attribution: "USGS Watershed Boundary Dataset",
   },
-] as PlanarianMapLayer[];
+  {
+    id: "arcgis-public-access",
+    displayName: "Public Land",
+    type: "vector",
+    source: {
+      type: "vector",
+      // Define the source-layer name here (used as a default if not overridden)
+      layerName: "PADUS",
+      tiles: [
+        "https://tiles.arcgis.com/tiles/v01gqwM5QqNysAAi/arcgis/rest/services/PADUS4_0VectorAnalysis_National_WebMerc_PA/VectorTileServer/tile/{z}/{y}/{x}.pbf",
+      ],
+      tileSize: 512,
+    },
+    isActive: false,
+    opacity: 0.8,
+    attribution: "PADUS 4.0",
+    // Fill layer configuration defined in the layer.
+    fillLayer: {
+      id: "arcgis-public-access-fill",
+      sourceLayer: "PADUS",
+      layout: {},
+      paint: {
+        "fill-color": publicAccessColorExpression,
+        "fill-outline-color": "#000000",
+        // This value will be overridden by the layer's opacity state.
+        "fill-opacity": 0.8,
+      },
+    },
+    // Text layer configuration defined in the layer.
+    secondaryLayer: {
+      id: "arcgis-public-access-text",
+      minzoom: 8, // Layer appears from zoom level 8 onward.
+      maxzoom: 15, // Layer is hidden past zoom level 15.
+      source: {
+        id: "management-owner",
+        layerName: "PADUS",
+        type: "vector",
+        tiles: [
+          "https://tiles.arcgis.com/tiles/v01gqwM5QqNysAAi/arcgis/rest/services/PADUS_Management_Areas_Manager_Type/VectorTileServer/tile/{z}/{y}/{x}.pbf",
+        ],
+        tileSize: 512,
+      },
+      layout: (isActive: boolean) => ({
+        "text-field": ["get", "MngTp_Desc"],
+        visibility: isActive ? "visible" : "none",
+        "text-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          0, // At zoom 8, text is hidden.
+          10,
+          8, // At zoom 10, text size is 8.
+          13,
+          12, // At zoom 13, text size grows to 12.
+          15,
+          16, // Past zoom 13, text size increases to 16 by zoom 15.
+        ],
+        "text-anchor": "center",
+        "text-offset": [0, 0],
+        "text-allow-overlap": false, // Prevent overlapping labels.
+        "symbol-placement": "point", // Places the label at the polygon's center.
+        "text-optional": true, // Allows dropping labels if collisions occur.
+      }),
+      type: "symbol",
+      paint: (opacity: number) => ({
+        "text-color": "#000000",
+        "text-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          8,
+          0.5 * opacity,
+          13,
+          0.7 * opacity,
+          15,
+          0.9 * opacity,
+        ],
+      }),
+    },
+  },
+];
 
 const LayerControl: React.FC = () => {
   const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
   const [isTerrainActive, setIsTerrainActive] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
-
   const { current: map } = useMap();
 
   const onLayerChecked = (layer: PlanarianMapLayer) => {
-    const newLayers = mapLayers.map((l) => {
-      if (l.id === layer.id) {
-        return {
-          ...l,
-          isActive: !l.isActive,
-        };
-      }
-      return l;
-    });
+    const newLayers = mapLayers.map((l) =>
+      l.id === layer.id ? { ...l, isActive: !l.isActive } : l
+    );
     setMapLayers(newLayers);
   };
 
   const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
-    const newLayers = mapLayers.map((l) => {
-      if (l.id === layer.id) {
-        return {
-          ...l,
-          opacity,
-        };
-      }
-      return l;
-    });
+    const newLayers = mapLayers.map((l) =>
+      l.id === layer.id ? { ...l, opacity } : l
+    );
     setMapLayers(newLayers);
   };
 
   const onTerrainToggle = () => {
     setIsTerrainActive((prevState) => !prevState);
-
     if (isTerrainActive) {
       map?.getMap().setTerrain(null);
     } else {
@@ -190,29 +299,86 @@ const LayerControl: React.FC = () => {
           "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=G0kZR1vCDJukD1MigCcI",
         ]}
         tileSize={256}
-      ></Source>
-
-      {mapLayers.map((layer) => (
-        <Source
-          key={layer.id}
-          id={layer.id}
-          type={"raster"}
-          tiles={layer.source.tiles}
-          attribution={layer.attribution}
-        >
-          <Layer
-            key={layer.id}
-            source={layer.id}
-            paint={{ "raster-opacity": layer.opacity }}
-            type="raster"
-            layout={{ visibility: layer.isActive ? "visible" : "none" }}
-          ></Layer>
-        </Source>
-      ))}
-
-      <ControlPanel>
-        <HoverIcon>
-          {/* You can replace this with your desired icon */}
+      />
+      {mapLayers.map((layer) => {
+        if (layer.type === "raster") {
+          return (
+            <Source
+              key={layer.id}
+              id={layer.id}
+              type="raster"
+              tiles={layer.source.tiles}
+              attribution={layer.attribution}
+            >
+              <Layer
+                key={layer.id}
+                source={layer.id}
+                paint={{ "raster-opacity": layer.opacity }}
+                type="raster"
+                layout={{ visibility: layer.isActive ? "visible" : "none" }}
+              />
+            </Source>
+          );
+        } else if (layer.type === "vector") {
+          return (
+            <>
+              <Source
+                key={layer.id}
+                id={layer.id}
+                type="vector"
+                tiles={layer.source.tiles}
+                attribution={layer.attribution}
+              >
+                {layer.fillLayer && (
+                  <Layer
+                    id={layer.fillLayer.id}
+                    source={layer.id}
+                    // Use the fill layer sourceLayer defined in the configuration.
+                    source-layer={
+                      layer.fillLayer.sourceLayer || layer.source.layerName
+                    }
+                    type="fill"
+                    layout={{
+                      ...layer.fillLayer.layout,
+                      visibility: layer.isActive ? "visible" : "none",
+                    }}
+                    paint={{
+                      ...layer.fillLayer.paint,
+                      // Override the fill-opacity with the current layer opacity.
+                      "fill-opacity": layer.opacity,
+                    }}
+                  />
+                )}
+              </Source>
+              {layer.secondaryLayer && (
+                <Source
+                  id={layer.secondaryLayer.id}
+                  type="vector"
+                  tiles={layer.secondaryLayer.source.tiles}
+                >
+                  <Layer
+                    id={layer.secondaryLayer.id}
+                    source={layer.secondaryLayer.id}
+                    source-layer={layer.secondaryLayer.source.layerName}
+                    type={layer.secondaryLayer.type}
+                    layout={layer.secondaryLayer.layout(layer.isActive)}
+                    paint={layer.secondaryLayer.paint(layer.opacity)}
+                    {...(layer.secondaryLayer.minzoom !== undefined && {
+                      minzoom: layer.secondaryLayer.minzoom,
+                    })}
+                    {...(layer.secondaryLayer.maxzoom !== undefined && {
+                      maxzoom: layer.secondaryLayer.maxzoom,
+                    })}
+                  />
+                </Source>
+              )}
+            </>
+          );
+        }
+        return null;
+      })}
+      <ControlPanel style={{ zIndex: 11 }}>
+        <HoverIcon style={{ zIndex: 200 }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             height="24px"
@@ -223,27 +389,34 @@ const LayerControl: React.FC = () => {
         </HoverIcon>
         <ContentWrapper>
           Layers
-          {mapLayers.map((layer) => (
-            <div key={layer.id}>
-              <Checkbox
-                onChange={() => {
-                  onLayerChecked(layer);
-                }}
-                checked={layer.isActive}
-              >
-                {layer.displayName}
-              </Checkbox>
-              <Slider
-                min={0}
-                max={1}
-                step={0.1}
-                value={layer.opacity}
-                onChange={(value: number) =>
-                  onLayerOpacityChanged(layer, value)
-                }
-              />
-            </div>
-          ))}
+          <div
+            style={{
+              maxHeight: "60vh",
+              overflowY: "auto",
+              overflowX: "hidden",
+              marginBottom: "10px",
+            }}
+          >
+            {mapLayers.map((layer) => (
+              <div key={layer.id}>
+                <Checkbox
+                  onChange={() => onLayerChecked(layer)}
+                  checked={layer.isActive}
+                >
+                  {layer.displayName}
+                </Checkbox>
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={layer.opacity}
+                  onChange={(value: number) =>
+                    onLayerOpacityChanged(layer, value)
+                  }
+                />
+              </div>
+            ))}
+          </div>
           <Space direction="vertical">
             <PlanarianButton
               alwaysShowChildren
@@ -275,6 +448,10 @@ const LayerControl: React.FC = () => {
           </Space>
         </ContentWrapper>
       </ControlPanel>
+
+      <div style={{ zIndex: 1 }}>
+        <PublicAccessLegend />
+      </div>
     </>
   );
 };

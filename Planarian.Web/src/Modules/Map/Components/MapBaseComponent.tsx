@@ -60,6 +60,26 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     initialCenter || [0, 0]
   );
   const [zoom, setZoom] = useState(initialZoom || 7);
+  const [isOverControl, setIsOverControl] = useState(false);
+  const mapRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await MapService.getMapCenter();
+        setMapCenter([data.latitude, data.longitude]);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("An error occurred while fetching data", error);
+      }
+    };
+    if (!initialCenter) {
+      fetchData();
+    } else {
+      setIsLoading(false);
+    }
+  }, [initialCenter]);
+
   const handleMoveEnd = (e: ViewStateChangeEvent) => {
     const { latitude, longitude, zoom: currentZoom } = e.viewState;
     setMapCenter([latitude, longitude]);
@@ -71,25 +91,21 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!initialCenter) {
-      const fetchData = async () => {
-        try {
-          const data = await MapService.getMapCenter();
-          setMapCenter([data.latitude, data.longitude]);
-          setIsLoading(false);
-        } catch (error) {
-          console.error("An error occurred while fetching data", error);
-        } finally {
-        }
-      };
-      fetchData();
-    } else {
-      setIsLoading(false);
-    }
-  }, [initialCenter]);
+  const handleControlMouseEnter = () => {
+    console.log("Mouse entered control");
+    setIsOverControl(true);
+  };
+
+  const handleControlMouseLeave = () => {
+    console.log("Mouse left control");
+    setIsOverControl(false);
+  };
 
   const handleMapClick = async (event: MapLayerMouseEvent) => {
+    if (isOverControl) {
+      return;
+    }
+
     const clickedFeatures = event.features;
     const clickedEntrance = clickedFeatures?.find(
       (feature: any) => feature.layer.id === "entrances"
@@ -115,6 +131,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
           <>
             <MapProvider>
               <Map
+                ref={mapRef}
                 maxPitch={85}
                 reuseMaps
                 antialias
@@ -127,9 +144,24 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 onClick={handleMapClick}
                 mapStyle={mapStyle}
                 onMoveEnd={handleMoveEnd}
+                id="map-container"
               >
-                <LayerControl />
-                <CaveSearchMapControl />
+                <div
+                  id="layer-control-container"
+                  onMouseEnter={handleControlMouseEnter}
+                  onMouseLeave={handleControlMouseLeave}
+                >
+                  <LayerControl />
+                </div>
+
+                <div
+                  id="cave-search-container"
+                  onMouseEnter={handleControlMouseEnter}
+                  onMouseLeave={handleControlMouseLeave}
+                >
+                  <CaveSearchMapControl />
+                </div>
+
                 <Source
                   id="entrances"
                   type="vector"
@@ -163,8 +195,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                         9,
                         0.6, // visible at zoom levels >= 13
                       ],
-
-                      // "circle-color": "#161616",
                     }}
                   ></Layer>
 
@@ -245,23 +275,35 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   />
                 </Source>
 
-                <NavigationControl position={zoomControlPosition} />
-                <GeolocateControl position={zoomControlPosition} />
+                <div
+                  id="navigation-controls"
+                  onMouseEnter={handleControlMouseEnter}
+                  onMouseLeave={handleControlMouseLeave}
+                >
+                  <NavigationControl position={zoomControlPosition} />
+                  <GeolocateControl position={zoomControlPosition} />
+                </div>
 
                 {showFullScreenControl && (
-                  <FullScreenControl
-                    handleClick={() => {
-                      const latitude = mapCenter[0];
-                      const longitude = mapCenter[1];
+                  <div
+                    id="fullscreen-control"
+                    onMouseEnter={handleControlMouseEnter}
+                    onMouseLeave={handleControlMouseLeave}
+                  >
+                    <FullScreenControl
+                      handleClick={() => {
+                        const latitude = mapCenter[0];
+                        const longitude = mapCenter[1];
 
-                      NavigationService.NavigateToMap(
-                        latitude,
-                        longitude,
-                        zoom,
-                        navigate
-                      );
-                    }}
-                  />
+                        NavigationService.NavigateToMap(
+                          latitude,
+                          longitude,
+                          zoom,
+                          navigate
+                        );
+                      }}
+                    />
+                  </div>
                 )}
               </Map>
             </MapProvider>
