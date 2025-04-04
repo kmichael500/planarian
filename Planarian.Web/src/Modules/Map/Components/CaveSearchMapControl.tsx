@@ -145,7 +145,7 @@ export const CaveSearchMapControl = () => {
         <Input.Search
           loading={isLoading}
           size="large"
-          placeholder="Search for a cave or enter coordinates (lat, lon)"
+          placeholder="e.g. Helms Deep"
           onPressEnter={handlePressEnter}
         />
       </AutoComplete>
@@ -155,7 +155,8 @@ export const CaveSearchMapControl = () => {
 
 const ControlPanel = styled.div`
   position: absolute;
-  top: 20px;
-  right: 10px;
-  width: 250px;
+  top: 0px;
+  right: 0;
+  margin: 20px;
+  transition: all 0.3s ease;
 `;
