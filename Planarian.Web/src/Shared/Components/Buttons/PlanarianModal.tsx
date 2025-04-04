@@ -40,7 +40,9 @@ export function PlanarianModal({
   const finalFullScreen = !screens.md || fullScreen;
 
   const computedWidth = finalFullScreen ? "100vw" : width || "80%";
-  const computedHeight = finalFullScreen ? "100vh" : height || "80%";
+  const computedHeight = finalFullScreen
+    ? "calc(var(--vh, 1vh) * 100)"
+    : height || "80%";
 
   const headerContent = Array.isArray(headerItems)
     ? headerItems

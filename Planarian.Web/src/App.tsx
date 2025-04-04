@@ -27,7 +27,7 @@ const App: React.FC = () => {
           <AppContext.Consumer>
             {({ isInitialized, isLoading, initializedError, contentStyle }) =>
               isInitialized ? (
-                <Layout style={{ minHeight: "100vh" }}>
+                <Layout style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}>
                   <SideBarComponent />
                   <Layout className="site-layout">
                     <HeaderComponent />
@@ -42,7 +42,7 @@ const App: React.FC = () => {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    height: "100vh",
+                    height: "calc(var(--vh, 1vh) * 100)",
                   }}
                 >
                   <LogoIcon
