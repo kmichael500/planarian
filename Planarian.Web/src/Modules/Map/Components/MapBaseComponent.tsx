@@ -150,8 +150,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   id="layer-control-container"
                   onMouseEnter={handleControlMouseEnter}
                   onMouseLeave={handleControlMouseLeave}
-                  onTouchStart={handleControlMouseEnter}
-                  onTouchEnd={handleControlMouseLeave}
                 >
                   <LayerControl />
                 </div>
@@ -160,8 +158,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   id="cave-search-container"
                   onMouseEnter={handleControlMouseEnter}
                   onMouseLeave={handleControlMouseLeave}
-                  onTouchStart={handleControlMouseEnter}
-                  onTouchEnd={handleControlMouseLeave}
                 >
                   <CaveSearchMapControl />
                 </div>
@@ -283,8 +279,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   id="navigation-controls"
                   onMouseEnter={handleControlMouseEnter}
                   onMouseLeave={handleControlMouseLeave}
-                  onTouchStart={handleControlMouseEnter}
-                  onTouchEnd={handleControlMouseLeave}
                 >
                   <NavigationControl position={zoomControlPosition} />
                   <GeolocateControl position={zoomControlPosition} />
