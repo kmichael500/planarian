@@ -147,19 +147,19 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 id="map-container"
               >
                 <div
-                  id="layer-control-container"
-                  onMouseEnter={handleControlMouseEnter}
-                  onMouseLeave={handleControlMouseLeave}
-                >
-                  <LayerControl />
-                </div>
-
-                <div
                   id="cave-search-container"
                   onMouseEnter={handleControlMouseEnter}
                   onMouseLeave={handleControlMouseLeave}
                 >
                   <CaveSearchMapControl />
+                </div>
+
+                <div
+                  id="layer-control-container"
+                  onMouseEnter={handleControlMouseEnter}
+                  onMouseLeave={handleControlMouseLeave}
+                >
+                  <LayerControl />
                 </div>
 
                 <Source
