@@ -13,6 +13,20 @@ import {
 
 import { registerLicense } from "@syncfusion/ej2-base";
 
+if (typeof window !== "undefined") {
+  const hostname = window.location.hostname;
+  if (hostname === "app.planarian.xyz" || hostname === "app.planarian.org") {
+    const script = document.createElement("script");
+    script.src = "https://cloud.umami.is/script.js";
+    script.defer = true;
+    script.setAttribute(
+      "data-website-id",
+      "bf1b5632-1b4f-417d-875a-df5ab6593653"
+    );
+    document.body.appendChild(script);
+  }
+}
+
 registerLicense(
   "Ngo9BigBOggjHTQxAR8/V1NNaF5cXmBCf1FpRmJGdld5fUVHYVZUTXxaS00DNHVRdkdmWXxdcXVWR2VYU01wXkpWYUA="
 );
