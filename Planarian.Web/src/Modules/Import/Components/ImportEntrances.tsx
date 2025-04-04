@@ -20,7 +20,6 @@ import { FileVm } from "../../Files/Models/FileVm";
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NotificationComponent } from "./NotificationComponent";
-import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { Link } from "react-router-dom";
 import { AccountService } from "../../Account/Services/AccountService";
 import { EntranceCsvModel } from "../Models/EntranceCsvModel";

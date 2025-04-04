@@ -21,7 +21,6 @@ import { FileVm } from "../../Files/Models/FileVm";
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { NotificationComponent } from "./NotificationComponent";
-import { FullScreenModal } from "../../Files/Components/FileListItemComponent";
 import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";

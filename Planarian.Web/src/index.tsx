@@ -13,6 +13,16 @@ import {
 
 import { registerLicense } from "@syncfusion/ej2-base";
 
+// Set CSS variable for dynamic viewport height
+if (typeof window !== "undefined") {
+  const setVh = () => {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty("--vh", `${vh}px`);
+  };
+  setVh();
+  window.addEventListener("resize", setVh);
+}
+
 if (typeof window !== "undefined") {
   const hostname = window.location.hostname;
   if (hostname === "app.planarian.xyz" || hostname === "app.planarian.org") {

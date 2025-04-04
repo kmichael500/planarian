@@ -230,7 +230,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    height: "100vh",
+    height: "calc(var(--vh, 1vh) * 100)",
     background: "linear-gradient(135deg, #f0f2f5, #e6f7ff)",
     padding: 20,
   },

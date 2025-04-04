@@ -1,40 +1,8 @@
-import styled from "styled-components";
 import { List, Tag, Typography } from "antd";
 import { FileVm } from "../Models/FileVm";
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import { getFileType } from "../Services/FileHelpers";
 import { FileViewer } from "./FileViewerComponent";
-import { createGlobalStyle } from "styled-components";
-import React from "react";
-
-const GlobalStyles = createGlobalStyle`
-  .ant-list-item {
-    padding: 10px;
-  }
-
-  .ant-modal,
-  .ant-modal-content {
-    height: 100vh;
-    width: 100vw;
-    margin: 0;
-    top: 0;
-  }
-
-  .ant-modal-body {
-    height: calc(100vh - 110px);
-  }
-`;
-
-const FullScreenModal = ({ children }: { children: ReactNode }) => {
-  return (
-    <div>
-      <React.Fragment>
-        <GlobalStyles />
-        {children}
-      </React.Fragment>
-    </div>
-  );
-};
 
 const FileListItemComponent = ({ file }: { file: FileVm }) => {
   const [open, setOpen] = useState(false);
@@ -66,4 +34,4 @@ const FileListItemComponent = ({ file }: { file: FileVm }) => {
   );
 };
 
-export { FileListItemComponent, FullScreenModal };
+export { FileListItemComponent };
