@@ -13,6 +13,7 @@ import {
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 interface FileViewerProps {
   embedUrl: string | null | undefined;
@@ -48,6 +49,8 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    console.log(embedUrl);
+
     if (
       open &&
       (isTextFileType(fileType) || isCsvFileType(fileType)) &&
@@ -107,7 +110,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   />
                 </div>
               )}
-              {isPdf && (
+              {isPdf && !isNullOrWhiteSpace(embedUrl) && (
                 <div
                   style={{
                     width: "100%",
@@ -118,7 +121,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   }}
                 >
                   <iframe
-                    src={`${embedUrl ?? undefined}#toolbar=0`}
+                    src={`https://docs.google.com/gview?url=${encodeURIComponent(
+                      embedUrl
+                    )}&embedded=true`}
                     style={{
                       width: "100%",
                       height: "100%",
