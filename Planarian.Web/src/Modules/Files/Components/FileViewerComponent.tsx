@@ -49,8 +49,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    console.log(embedUrl);
-
     if (
       open &&
       (isTextFileType(fileType) || isCsvFileType(fileType)) &&

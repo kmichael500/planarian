@@ -124,7 +124,7 @@ export const IUCN_CATEGORY_INFO: Record<
 };
 
 const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
-  const [protectedArea, setProtectedArea] = useState<any>(null);
+  const [publicArea, setPublicArea] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
@@ -135,7 +135,7 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
     const fetchProtectedArea = async () => {
       setLoading(true);
       setError(null);
-      setProtectedArea(null);
+      setPublicArea(null);
 
       const x = (lng * 20037508.34) / 180;
       const y =
@@ -151,13 +151,12 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
           const attributes = data.features[0].attributes;
           // If Unit_Nm is "Non-PAD-US Area", treat it as no protected area
           if (attributes.Unit_Nm === "Non-PAD-US Area") {
-            setProtectedArea(null);
+            setPublicArea(null);
           } else {
-            setProtectedArea(attributes);
-            console.log(attributes);
+            setPublicArea(attributes);
           }
         } else {
-          setProtectedArea(null);
+          setPublicArea(null);
         }
       } catch (err) {
         setError("Error fetching protected area data.");
@@ -171,25 +170,25 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
 
   if (loading) return <Spin size="small" />;
   if (error) return <Text type="danger">{error}</Text>;
-  if (!protectedArea) return <Text type="secondary">{defaultIfEmpty("")}</Text>;
+  if (!publicArea) return <Text type="secondary">{defaultIfEmpty("")}</Text>;
 
-  const gap = GAP_STATUS_INFO[protectedArea.GAP_Sts];
+  const gap = GAP_STATUS_INFO[publicArea.GAP_Sts];
   const iucn =
-    IUCN_CATEGORY_INFO[protectedArea.IUCN_Cat] ||
-    IUCN_CATEGORY_INFO[protectedArea.IUCN_Cat_Reclass];
-  const access = PUBLIC_ACCESS_INFO[protectedArea.Pub_Access];
+    IUCN_CATEGORY_INFO[publicArea.IUCN_Cat] ||
+    IUCN_CATEGORY_INFO[publicArea.IUCN_Cat_Reclass];
+  const access = PUBLIC_ACCESS_INFO[publicArea.Pub_Access];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div>
-        <Text>Unit:</Text> <Text>{protectedArea.Unit_Nm || "Unknown"}</Text>
+        <Text>Unit:</Text> <Text>{publicArea.Unit_Nm || "Unknown"}</Text>
       </div>
 
       <div>
         <Text>Manager:</Text>{" "}
         <Text>
-          {protectedArea.MngNm_Desc || "Unknown"}
-          {protectedArea.MngTp_Desc && ` (${protectedArea.MngTp_Desc})`}
+          {publicArea.MngNm_Desc || "Unknown"}
+          {publicArea.MngTp_Desc && ` (${publicArea.MngTp_Desc})`}
         </Text>
       </div>
 
@@ -216,14 +215,14 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
 
           <div>
             <Text>Designation Type:</Text>{" "}
-            <Text>{protectedArea.DesTp_Desc || "Unknown"}</Text>
+            <Text>{publicArea.DesTp_Desc || "Unknown"}</Text>
           </div>
 
           <div>
             <Text>Total Acres:</Text>{" "}
             <Text>
               {Math.round(
-                protectedArea.GIS_AcrsDb || protectedArea.GIS_Acres || 0
+                publicArea.GIS_AcrsDb || publicArea.GIS_Acres || 0
               ).toLocaleString()}
             </Text>
           </div>
@@ -231,7 +230,7 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
           <div style={{ marginTop: 4 }}>
             <a
               href={`https://www.google.com/search?q=${encodeURIComponent(
-                protectedArea.Unit_Nm
+                publicArea.Unit_Nm
               )}`}
               target="_blank"
               rel="noopener noreferrer"
