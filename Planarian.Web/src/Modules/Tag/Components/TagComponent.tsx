@@ -7,12 +7,12 @@ import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
 
 export interface TripTagComponentProps {
   tagId: string;
-  color?: LiteralUnion<PresetColorType | PresetStatusColorType, string>;
+  color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 
 export interface TripTagComponentProps {
   tagId: string;
-  color?: LiteralUnion<PresetColorType | PresetStatusColorType, string>;
+  color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 function stringToColor(str: string): string {
   const hash = stringToHash(str);

@@ -1,6 +1,6 @@
 import { Avatar, Typography } from "antd";
-import { AvatarSize } from "antd/lib/avatar/SizeContext";
 import { UserAvatarComponent } from "./UserAvatarComponent";
+import { AvatarSize } from "antd/lib/avatar/AvatarContext";
 
 const { Text } = Typography;
 

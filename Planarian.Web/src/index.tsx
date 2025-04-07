@@ -11,7 +11,14 @@ import {
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
 
+import utc from "dayjs/plugin/utc";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
 import { registerLicense } from "@syncfusion/ej2-base";
+import dayjs from "dayjs";
+
+dayjs.extend(utc);
+dayjs.extend(customParseFormat);
 
 // Set CSS variable for dynamic viewport height
 if (typeof window !== "undefined") {

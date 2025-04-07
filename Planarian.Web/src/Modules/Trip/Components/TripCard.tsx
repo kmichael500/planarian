@@ -3,7 +3,6 @@ import { TagComponent } from "../../Tag/Components/TagComponent";
 import { UserAvatarGroupComponent } from "../../User/Componenets/UserAvatarGroupComponent";
 import { TripVm } from "../Models/TripVm";
 import { CheckCircleOutlined, CloseCircleOutlined } from "@ant-design/icons";
-import moment from "moment";
 import { formatDate } from "../../../Shared/Helpers/StringHelpers";
 const { Text } = Typography;
 
@@ -63,7 +62,7 @@ const TripCardComponent: React.FC<TripCardProps> = ({ trip }) => {
           </Col>
         </Row>
         <Row>
-          <Col>Created On: {moment(trip.createdOn).format("YYYY MMM-DD")}</Col>
+          <Col>Created On: {formatDate(trip.createdOn)}</Col>
         </Row>
         <Row>
           <Col>

@@ -166,10 +166,7 @@ export const UserPermissionManagement: React.FC<
   };
 
   const handleAddCave = async (cave: CaveSearchVm) => {
-    const existingCaveIds =
-      form.getFieldValue(
-        nameof<CavePermissionManagementVm>("cavePermissions")
-      ) || [];
+    const existingCaveIds = form.getFieldValue("cavePermissions") || [];
 
     if (
       maxCaveSelectCount !== null &&

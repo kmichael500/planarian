@@ -6,7 +6,7 @@ import { SettingsService } from "../../../Modules/Setting/Services/SettingsServi
 
 export interface CountyTagComponentProps {
   countyId?: string;
-  color?: LiteralUnion<PresetColorType | PresetStatusColorType, string>;
+  color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 
 const CountyTagComponent: React.FC<CountyTagComponentProps> = (props) => {

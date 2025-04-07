@@ -1,7 +1,7 @@
 import { FC, useEffect, useState } from "react";
 import { Descriptions, Grid, InputNumber, DatePicker } from "antd";
-import { RangeValue } from "rc-picker/lib/interface";
-import moment from "moment";
+
+import dayjs, { Dayjs } from "dayjs";
 import { CopyOutlined } from "@ant-design/icons";
 import { Macrostrat } from "./Macrostrat";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
@@ -49,9 +49,10 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
 
   const [pendingDistanceMiles, setPendingDistanceMiles] = useState(20);
   const [distanceMiles, setDistanceMiles] = useState(25);
-  const [dateRange, setDateRange] = useState<RangeValue<moment.Moment>>([
-    moment().subtract(1, "month"),
-    moment(),
+
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([
+    dayjs().subtract(1, "month"),
+    dayjs(),
   ]);
 
   const screens = Grid.useBreakpoint();
@@ -93,6 +94,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
     fetchElevation();
   }, [lat, lng]);
 
+  // --- Fetch Address ---
   useEffect(() => {
     if (!lat || !lng) return;
     const fetchAddress = async () => {
@@ -119,7 +121,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   return (
     <PlanarianModal
       open={isModalVisible}
-      // fullScreen
       onClose={handleCancel}
       footer={[]}
       header={`${address?.county || ""}, ${address?.state || ""} `}
@@ -198,7 +199,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
             />
             <RangePicker
               value={dateRange}
-              onChange={(vals) => setDateRange(vals)}
+              onChange={(vals) => setDateRange(vals || [null, null])}
             />
           </div>
         }

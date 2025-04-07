@@ -4,6 +4,10 @@ import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 
+type FeatureFormValues = {
+  [key in FeatureKey]?: boolean;
+};
+
 const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldCaveId: "ID",
   EnabledFieldCaveName: "Name",
@@ -48,8 +52,7 @@ export const EnabledFieldsComponent = ({
   filterType: "cave" | "entrance";
   onChange?: (featureKey: FeatureKey, checked: boolean) => void;
 }) => {
-  const [form] = Form.useForm<FeatureSettingVm>();
-  const [initialSettings, setInitialSettings] = useState(new Map());
+  const [form] = Form.useForm<FeatureFormValues>();
 
   const handleCheckboxChange = async (
     featureKey: FeatureKey,
@@ -57,10 +60,7 @@ export const EnabledFieldsComponent = ({
   ) => {
     const originalValue = form.getFieldValue(featureKey);
     try {
-      const response = await AccountService.CreateOrUpdateFeatureSetting(
-        featureKey,
-        checked
-      );
+      await AccountService.CreateOrUpdateFeatureSetting(featureKey, checked);
       if (onChange) {
         onChange(featureKey, checked);
       }
@@ -82,7 +82,7 @@ export const EnabledFieldsComponent = ({
   return (
     <Form
       form={form}
-      initialValues={featureSettings.reduce<{ [key in FeatureKey]?: boolean }>(
+      initialValues={featureSettings.reduce<FeatureFormValues>(
         (acc, feature) => {
           acc[feature.key] = feature.isEnabled;
           return acc;

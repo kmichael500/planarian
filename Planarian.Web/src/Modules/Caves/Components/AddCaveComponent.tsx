@@ -50,7 +50,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
       entrances: form
-        .getFieldValue(nameof<AddCaveVm>("entrances"))
+        .getFieldValue("entrances")
         .map((entrance: AddEntranceVm, i: number) => ({
           ...entrance,
           isPrimary: i === index,
@@ -60,7 +60,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
 
   useEffect(() => {
     // if stateId has a value in the form, set the selectedStateId to that value
-    const initialStateValue = form.getFieldValue(nameof<AddCaveVm>("stateId"));
+    const initialStateValue = form.getFieldValue("stateId");
     if (!isNullOrWhiteSpace(initialStateValue)) {
       setSelectedStateId(initialStateValue);
     }

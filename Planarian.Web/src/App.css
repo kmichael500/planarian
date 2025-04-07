@@ -1,4 +1,4 @@
-@import "~antd/dist/antd.css";
+@import "antd/dist/reset.css";
 
 @import '../node_modules/@syncfusion/ej2-base/styles/material.css';  
 @import '../node_modules/@syncfusion/ej2-buttons/styles/material.css';  

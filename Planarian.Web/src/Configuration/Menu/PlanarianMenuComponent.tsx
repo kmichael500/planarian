@@ -1,11 +1,11 @@
 import { Menu } from "antd";
-import { MenuItemType } from "antd/lib/menu/hooks/useItems";
 import { useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AppContext } from "../Context/AppContext";
 import { MenuInfo, MenuMode } from "rc-menu/lib/interface";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { AppService } from "../../Shared/Services/AppService";
+import { MenuItemType } from "antd/lib/menu/interface";
 
 const { SubMenu } = Menu;
 
