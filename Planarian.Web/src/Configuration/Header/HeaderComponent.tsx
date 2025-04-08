@@ -28,8 +28,6 @@ const HeaderComponent = () => {
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
 
-  const isXsScreen = screens.xs === true && !screens.sm;
-
   useEffect(() => {
     if (headerButtons.length === 0) {
       setHasHeaderButons(false);
@@ -101,7 +99,7 @@ const HeaderComponent = () => {
                 open={visible}
               >
                 <PlanarianMenuComponent
-                  onMenuItemClick={(key) => {
+                  onMenuItemClick={() => {
                     setVisible(false);
                   }}
                   menuItems={[...SideBarMenuItems()]}
@@ -121,7 +119,9 @@ const HeaderComponent = () => {
                     {headerTitle}
                   </Typography.Title>
                 ) : (
-                  headerTitle[0]
+                  <Typography.Title level={4}>
+                    {headerTitle[0]}
+                  </Typography.Title>
                 )}
               </div>
             </Col>
