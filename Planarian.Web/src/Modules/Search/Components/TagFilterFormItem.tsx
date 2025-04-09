@@ -19,7 +19,7 @@ const TagFilterFormItem = <T extends object>({
   label,
 }: TagFilterFormItemProps<T>) => {
   return (
-    <Form.Item name={field} label={label}>
+    <Form.Item name={field.toString()} label={label}>
       <TagSelectComponent
         projectId={projectId}
         tagType={tagType}

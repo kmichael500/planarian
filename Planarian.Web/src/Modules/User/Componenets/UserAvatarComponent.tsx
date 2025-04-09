@@ -1,9 +1,9 @@
 import { Avatar, Spin, Tooltip, Typography } from "antd";
-import { AvatarSize } from "antd/lib/avatar/SizeContext";
 import { useEffect, useState } from "react";
 import { StringHelpers } from "../../../Shared/Helpers/StringHelpers";
 import { NameProfilePhotoVm } from "../Models/NameProfilePhotoVm";
 import { SettingsService } from "../../Setting/Services/SettingsService";
+import { AvatarSize } from "antd/lib/avatar/AvatarContext";
 
 const { Text } = Typography;
 

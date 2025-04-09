@@ -6,7 +6,7 @@ import { SettingsService } from "../../../Modules/Setting/Services/SettingsServi
 
 export interface StateTagComponentProps {
   stateId?: string;
-  color?: LiteralUnion<PresetColorType | PresetStatusColorType, string>;
+  color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 
 const StateTagComponent: React.FC<StateTagComponentProps> = (props) => {

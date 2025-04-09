@@ -11,6 +11,8 @@ interface MapComponentProps {
   initialZoom?: number;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
   showFullScreenControl?: boolean;
+  showGeolocateControl?: boolean;
+  showSearchBar?: boolean;
 }
 
 const MapComponent = ({
@@ -18,6 +20,8 @@ const MapComponent = ({
   initialZoom,
   onMoveEnd,
   showFullScreenControl = false,
+  showGeolocateControl = true,
+  showSearchBar = true,
 }: MapComponentProps) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
@@ -57,6 +61,8 @@ const MapComponent = ({
         onNonCaveClicked={handleNonCaveClick}
         onMoveEnd={onMoveEnd}
         showFullScreenControl={showFullScreenControl}
+        showGeolocateControl={showGeolocateControl}
+        showSearchBar={showSearchBar}
       />
       <MapClickCaveModal
         isModalVisible={isModalVisible}

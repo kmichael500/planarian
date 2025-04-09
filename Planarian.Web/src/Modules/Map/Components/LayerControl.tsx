@@ -60,6 +60,15 @@ interface PlanarianMapLayer {
   legend?: React.ReactNode;
 }
 
+interface LayerControlProps {
+  position?: {
+    top?: string;
+    right?: string;
+    left?: string;
+    bottom?: string;
+  };
+}
+
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
   [
     "match",
@@ -260,7 +269,7 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 ];
 
-const LayerControl: React.FC = () => {
+const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
   const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
   const [isTerrainActive, setIsTerrainActive] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
@@ -290,6 +299,15 @@ const LayerControl: React.FC = () => {
         exaggeration: terrainExaggeration,
       });
     }
+  };
+
+  // Calculate legend position based on layer control position
+  const legendPosition = {
+    top:
+      position && position.top ? `${parseInt(position.top) + 50}px` : "100px",
+    right: position?.right || "0",
+    left: position?.left || "auto",
+    bottom: position?.bottom || "auto",
   };
 
   return (
@@ -377,7 +395,19 @@ const LayerControl: React.FC = () => {
         }
         return null;
       })}
-      <ControlPanel style={{ zIndex: 200 }}>
+      <ControlPanel
+        style={{
+          zIndex: 200,
+          ...(position
+            ? {
+                top: position.top || "50px",
+                right: position.right || "0",
+                left: position.left || "auto",
+                bottom: position.bottom || "auto",
+              }
+            : {}),
+        }}
+      >
         <HoverIcon style={{ zIndex: 200 }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -454,7 +484,7 @@ const LayerControl: React.FC = () => {
           .filter((layer) => layer.isActive)
           .map((layer) =>
             layer.legend ? (
-              <LegendPanel>
+              <LegendPanel style={legendPosition}>
                 <HoverIcon style={{ zIndex: 0 }}>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                     <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
@@ -492,7 +522,7 @@ const ControlPanel = styled.div`
 
 const LegendPanel = styled.div`
   position: absolute;
-  top: 100px;
+  top: 100px; // Default position
   right: 0;
   border-radius: 8px;
   background: white;

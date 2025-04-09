@@ -82,71 +82,69 @@ const ConfirmationModalComponent = ({
     });
   };
 
-  return (
-    <>
-      <PlanarianButton
-        danger
-        onClick={() => setVisible(true)}
-        icon={<DeleteOutlined />}
-        type="primary"
-      >
-        {children}
-      </PlanarianButton>
-      <Modal
-        width={700}
-        visible={open}
-        title={title}
-        onOk={handleOk}
-        onCancel={handleCancel}
-        {...props}
-        footer={[
-          <PlanarianButton
-            key="cancel"
-            onClick={handleCancel}
-            icon={<UndoOutlined />}
-          >
-            {cancelText}
-          </PlanarianButton>,
-          <PlanarianButton
-            key="confirm"
-            danger
-            onClick={handleOk}
-            disabled={!isConfirmed}
-            loading={isLoading}
-            icon={<CheckCircleOutlined />}
-          >
-            {okText}
-          </PlanarianButton>,
-        ]}
-      >
-        {isLoading && onOkClickRender}
-        {(!isLoading || (isLoading && !onOkClickRender)) && (
-          <>
-            <Paragraph>{modalMessage}</Paragraph>
-            <Paragraph>Please type the word below to confirm:</Paragraph>
-            <div style={{ textAlign: "center" }}>
-              <Paragraph
-                strong
-                style={{ fontSize: "20px", textAlign: "center" }}
-              >
-                {renderConfirmationWord()}
-              </Paragraph>
-            </div>
-            <Input
-              style={{ fontSize: "20px" }}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onPressEnter={(e) => {
-                if (isConfirmed) {
-                  handleOk();
-                }
-              }}
-            />
-          </>
-        )}
-      </Modal>
-    </>
-  );
+  return (<>
+    <PlanarianButton
+      danger
+      onClick={() => setVisible(true)}
+      icon={<DeleteOutlined />}
+      type="primary"
+    >
+      {children}
+    </PlanarianButton>
+    <Modal
+      width={700}
+      open={open}
+      title={title}
+      onOk={handleOk}
+      onCancel={handleCancel}
+      {...props}
+      footer={[
+        <PlanarianButton
+          key="cancel"
+          onClick={handleCancel}
+          icon={<UndoOutlined />}
+        >
+          {cancelText}
+        </PlanarianButton>,
+        <PlanarianButton
+          key="confirm"
+          danger
+          onClick={handleOk}
+          disabled={!isConfirmed}
+          loading={isLoading}
+          icon={<CheckCircleOutlined />}
+        >
+          {okText}
+        </PlanarianButton>,
+      ]}
+    >
+      {isLoading && onOkClickRender}
+      {(!isLoading || (isLoading && !onOkClickRender)) && (
+        <>
+          <Paragraph>{modalMessage}</Paragraph>
+          <Paragraph>Please type the word below to confirm:</Paragraph>
+          <div style={{ textAlign: "center" }}>
+            <Paragraph
+              strong
+              style={{ fontSize: "20px", textAlign: "center" }}
+            >
+              {renderConfirmationWord()}
+            </Paragraph>
+          </div>
+          <Input
+            style={{ fontSize: "20px" }}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onPressEnter={(e) => {
+              if (isConfirmed) {
+                handleOk();
+              }
+            }}
+          />
+        </>
+      )}
+    </Modal>
+  </>);
 };
 
 export { ConfirmationModalComponent };

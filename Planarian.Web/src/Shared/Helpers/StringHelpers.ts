@@ -1,5 +1,5 @@
-import moment from "moment";
 import { CaveVm } from "../../Modules/Caves/Models/CaveVm";
+import dayjs from "dayjs";
 
 export const StringHelpers = {
   GenerateAbbreviation(name: string | undefined): string {
@@ -116,18 +116,18 @@ export function formatDate(
   date: Date | string | null | undefined,
   formatString: string = "YYYY MMM-DD"
 ): string | null {
-  if (typeof date === "string" && isNullOrWhiteSpace(date)) return null;
+  // Check for null, undefined, or whitespace-only strings.
+  if (typeof date === "string" && date.trim() === "") return null;
   if (date === null || date === undefined) return null;
 
   // Check if the date follows the pattern "YYYY-01-01 00:00:00+00:00"
   const yearPattern = /(\d{4})-01-01 00:00:00\+00:00/;
-
   const match = yearPattern.exec(date.toString());
   if (match) {
-    return moment.utc(match[1], "YYYY").format(formatString);
+    return dayjs.utc(match[1], "YYYY").format(formatString);
   }
 
-  return moment.utc(date).format(formatString);
+  return dayjs.utc(date).format(formatString);
 }
 
 export function formatDateTime(
@@ -137,7 +137,7 @@ export function formatDateTime(
   if (typeof date === "string" && isNullOrWhiteSpace(date)) return null;
   if (date === null || date === undefined) return null;
 
-  return moment(date).format(formatString);
+  return dayjs(date).format(formatString);
 }
 
 export function formatCoordinates(

@@ -39,6 +39,7 @@ import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTag
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppService } from "../../../Shared/Services/AppService";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 const { Text } = Typography;
 
@@ -166,10 +167,7 @@ export const UserPermissionManagement: React.FC<
   };
 
   const handleAddCave = async (cave: CaveSearchVm) => {
-    const existingCaveIds =
-      form.getFieldValue(
-        nameof<CavePermissionManagementVm>("cavePermissions")
-      ) || [];
+    const existingCaveIds = form.getFieldValue("cavePermissions") || [];
 
     if (
       maxCaveSelectCount !== null &&
@@ -305,12 +303,41 @@ export const UserPermissionManagement: React.FC<
         </Form.Item>
       </Form>
 
-      <Modal
-        title="Search for Caves"
+      <PlanarianModal
+        header={["Search for Caves"]}
         open={isSearchModalOpen}
-        onCancel={() => setIsSearchModalOpen(false)}
-        footer={null}
-        destroyOnClose
+        onClose={() => setIsSearchModalOpen(false)}
+        footer={[
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              width: "100%",
+              marginTop: 16,
+            }}
+          >
+            <Button
+              icon={<LeftOutlined />}
+              disabled={currentPage <= 1}
+              onClick={() => handleSearchCaves(currentPage - 1)}
+            >
+              Previous
+            </Button>
+            <Text>
+              Page {currentPage} of {totalPages}
+            </Text>
+            <Button
+              icon={<RightOutlined />}
+              disabled={currentPage >= totalPages}
+              onClick={() => handleSearchCaves(currentPage + 1)}
+            >
+              Next
+            </Button>
+          </div>,
+        ]}
+        footerStyle={{
+          width: "100%",
+        }}
       >
         <Input.Search
           placeholder="Enter cave name..."
@@ -361,33 +388,7 @@ export const UserPermissionManagement: React.FC<
             );
           }}
         />
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 16,
-          }}
-        >
-          <Button
-            icon={<LeftOutlined />}
-            disabled={currentPage <= 1}
-            onClick={() => handleSearchCaves(currentPage - 1)}
-          >
-            Previous
-          </Button>
-          <Text>
-            Page {currentPage} of {totalPages}
-          </Text>
-          <Button
-            icon={<RightOutlined />}
-            disabled={currentPage >= totalPages}
-            onClick={() => handleSearchCaves(currentPage + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </Modal>
+      </PlanarianModal>
     </Card>
   );
 };

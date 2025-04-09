@@ -73,7 +73,7 @@ const StateCountyFilterFormItem = <T extends object>({
       <Form.Item label={stateLabel} fieldId={stateField}>
         <StateDropdown {...stateDropDownProps} />
       </Form.Item>
-      <Form.Item label={countyLabel} name={countyField}>
+      <Form.Item label={countyLabel} name={countyField.toString()}>
         {selectedState && (
           <CountyDropdown
             permissionKey={PermissionKey.View}

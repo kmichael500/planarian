@@ -1,7 +1,6 @@
 import React, { FC, useEffect, useState } from "react";
 import { Collapse, Grid, Spin } from "antd";
-import moment from "moment";
-import { RangeValue } from "rc-picker/lib/interface";
+import dayjs, { Dayjs } from "dayjs"; // use dayjs instead of moment
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -63,12 +62,10 @@ function getDistanceMiles(
   const dLat = toRadians(lat2 - lat1);
   const dLon = toRadians(lon2 - lon1);
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) ** 2 +
     Math.cos(toRadians(lat1)) *
       Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
+      Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -81,18 +78,14 @@ function getBoundingBox(
 ) {
   const latMilesPerDegree = 69;
   const halfSide = distanceMiles;
-
   const deltaLat = halfSide / latMilesPerDegree;
-
   const cosLat = Math.cos((centerLat * Math.PI) / 180);
   const lonMilesPerDegree = cosLat === 0 ? 999999 : 69 * cosLat;
   const deltaLon = halfSide / lonMilesPerDegree;
-
   const minLat = centerLat - deltaLat;
   const maxLat = centerLat + deltaLat;
   const minLon = centerLon - deltaLon;
   const maxLon = centerLon + deltaLon;
-
   const round7 = (val: number) => parseFloat(val.toFixed(7));
   return [round7(minLon), round7(minLat), round7(maxLon), round7(maxLat)];
 }
@@ -138,7 +131,7 @@ function ParameterChart({
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: screens.sm ? true : false,
+        display: screens.sm,
         position: "top" as const,
         labels: {
           boxWidth: screens.sm ? 40 : 20,
@@ -201,7 +194,7 @@ interface GageListProps {
   lat: number;
   lng: number;
   distanceMiles: number;
-  dateRange: RangeValue<moment.Moment>;
+  dateRange: [Dayjs | null, Dayjs | null];
 }
 
 export const GageList: FC<GageListProps> = ({
@@ -213,7 +206,6 @@ export const GageList: FC<GageListProps> = ({
   const [gages, setGages] = useState<StationGroup[]>([]);
   const [loadingGages, setLoadingGages] = useState(false);
   const [errorGages, setErrorGages] = useState<string | null>(null);
-
   const screens = Grid.useBreakpoint();
 
   // Helper for extracting latest value of a parameter from station data
@@ -224,11 +216,9 @@ export const GageList: FC<GageListProps> = ({
     if (!param || param.points.length === 0)
       return { value: "No data", unit: "" };
     const lastVal = param.points[param.points.length - 1].value;
-
     // Extract unit from variable name (e.g., "Streamflow, ft³/s" -> "ft³/s")
     const unitMatch = param.variableName.match(/,\s*([^,]+)$/);
     const unit = unitMatch ? unitMatch[1].trim() : "";
-
     return { value: lastVal || "No data", unit };
   }
 
@@ -280,11 +270,9 @@ export const GageList: FC<GageListProps> = ({
         const timeSeriesWithDistance = data.value.timeSeries.map((ts: any) => {
           // Convert "ft&#179;" => "ft³"
           const fixedVarName = ts.variable.variableName.replace(/&#179;/g, "³");
-
           const stationLat = ts.sourceInfo.geoLocation.geogLocation.latitude;
           const stationLon = ts.sourceInfo.geoLocation.geogLocation.longitude;
           const dist = getDistanceMiles(lat, lng, stationLat, stationLon);
-
           return {
             ...ts,
             distanceMiles: dist,
@@ -323,13 +311,11 @@ export const GageList: FC<GageListProps> = ({
         // Sort by nearest first
         const stationGroups = Object.values(stationMap);
         stationGroups.sort((a, b) => a.distanceMiles - b.distanceMiles);
-
         setGages(stationGroups);
       } catch (err) {
         console.error(err);
         setErrorGages("Error fetching USGS gage data.");
       }
-
       setLoadingGages(false);
     };
 
@@ -366,7 +352,6 @@ export const GageList: FC<GageListProps> = ({
                 View station details on USGS site
               </a>
             </div>
-
             <div
               style={{
                 display: "flex",

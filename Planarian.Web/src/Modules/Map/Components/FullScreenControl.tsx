@@ -3,16 +3,23 @@ import { FullscreenOutlined } from "@ant-design/icons";
 
 interface FullScreenControlProps {
   handleClick: () => any;
+  position?: {
+    top?: string;
+    left?: string;
+    right?: string;
+    bottom?: string;
+  };
 }
 
-const FullScreenControl = ({ handleClick }: FullScreenControlProps) => {
+const FullScreenControl = ({
+  handleClick,
+  position = { top: "150px", left: "10px" },
+}: FullScreenControlProps) => {
   return (
     <div
       style={{
         position: "absolute",
-        top: "150px",
-        left: "10px",
-        zIndex: 1,
+        ...position,
       }}
     >
       <PlanarianButton icon={<FullscreenOutlined />} onClick={handleClick} />

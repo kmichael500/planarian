@@ -10,6 +10,7 @@ interface DialogModalProps {
   onClose?: () => void;
   header?: string | React.ReactNode | (string | React.ReactNode)[];
   footer?: string | React.ReactNode | (string | React.ReactNode)[];
+  footerStyle?: React.CSSProperties; // New prop for footer style override
   children?: React.ReactNode;
 
   width?: string | number;
@@ -24,6 +25,7 @@ export function PlanarianModal({
   onClose,
   header: headerItems,
   footer: footerItems,
+  footerStyle,
   children,
   width,
   height,
@@ -211,20 +213,29 @@ export function PlanarianModal({
             padding: "1rem",
             borderTop: "1px solid #ddd",
             flexShrink: 0,
+            width: "100%",
           }}
         >
-          <Space
-            style={{
-              display: "flex",
-              width: "100%",
-              justifyContent: "flex-end",
-              alignItems: "center",
-            }}
-          >
-            {footerContent.map((item, index) => (
-              <div key={index}>{item}</div>
-            ))}
-          </Space>
+          {footerStyle ? (
+            <div style={footerStyle}>
+              {footerContent.map((item, index) => (
+                <div key={index}>{item}</div>
+              ))}
+            </div>
+          ) : (
+            <Space
+              style={{
+                display: "flex",
+                width: "100%",
+                justifyContent: "flex-end",
+                alignItems: "center",
+              }}
+            >
+              {footerContent.map((item, index) => (
+                <div key={index}>{item}</div>
+              ))}
+            </Space>
+          )}
         </footer>
       )}
     </dialog>

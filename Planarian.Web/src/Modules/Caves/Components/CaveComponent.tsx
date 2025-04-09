@@ -39,12 +39,12 @@ import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
-import moment from "moment";
-import { RangeValue } from "rc-picker/lib/interface";
+import dayjs, { Dayjs } from "dayjs";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
+import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -95,9 +95,10 @@ const CaveComponent = ({
   );
   const [selectedGageEntrance, setSelectedGageEntrance] =
     useState<EntranceVm | null>(null);
-  const [gageDateRange, setGageDateRange] = useState<RangeValue<moment.Moment>>(
-    [moment().subtract(1, "month"), moment()]
-  );
+
+  const [gageDateRange, setGageDateRange] = useState<
+    [Dayjs | null, Dayjs | null]
+  >([dayjs().subtract(1, "month"), dayjs()]);
 
   const [gageDistance, setGageDistance] = useState<number>(25);
 
@@ -440,8 +441,7 @@ const CaveComponent = ({
               <p>
                 Access geological data through Macrostrat's comprehensive
                 database. View information about local geological formations and
-                rock types including limestone. Explore the geological context
-                at cave entrances.
+                rock types at cave entrances.
               </p>
             </div>
           )}
@@ -503,9 +503,7 @@ const CaveComponent = ({
                 View real-time water data from USGS's network of over 11,800
                 streamgages across the United States. These monitoring stations
                 measure and transmit water levels and flow rates, providing
-                valuable information about local water conditions. Search for
-                nearby streamgages and view historical data from selected time
-                periods.
+                valuable information about local water conditions.
               </p>
             </div>
           )}
@@ -552,11 +550,18 @@ const CaveComponent = ({
                       style={{ width: "100%" }}
                     />
                   </Col>
-                  <Col xs={24} sm={12} md={10} lg={10}>
-                    <RangePicker
+                  <Col
+                    style={{ marginBottom: "16px" }}
+                    xs={24}
+                    sm={12}
+                    md={10}
+                    lg={10}
+                  >
+                    <PlanarianDateRange
                       value={gageDateRange}
-                      onChange={(range) => setGageDateRange(range)}
-                      style={{ width: "100%", marginBottom: "16px" }}
+                      onChange={(range, dateStrings) =>
+                        setGageDateRange(range || [null, null])
+                      }
                     />
                   </Col>
                 </Row>
@@ -584,6 +589,8 @@ const CaveComponent = ({
                 ]}
                 initialZoom={15}
                 showFullScreenControl
+                showSearchBar={false}
+                showGeolocateControl={false}
               />
             </div>
           )}
