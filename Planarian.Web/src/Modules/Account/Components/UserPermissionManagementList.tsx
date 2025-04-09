@@ -1,6 +1,5 @@
-import { Form, message, Button, List, Popconfirm, Modal, Select } from "antd";
+import { Form, message, List, Modal, Select } from "antd";
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
@@ -9,7 +8,7 @@ import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PermissionType } from "../../Authentication/Models/PermissionType";
-import { Card, Spin } from "antd";
+import { Card } from "antd";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { AddButtonComponent } from "../../../Shared/Components/Buttons/AddButtonComponent";
 

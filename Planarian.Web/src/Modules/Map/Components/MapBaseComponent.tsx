@@ -28,6 +28,8 @@ interface MapBaseComponentProps {
   onNonCaveClicked?: (lat: number, lng: number) => void;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
   showFullScreenControl?: boolean;
+  showGeolocateControl?: boolean;
+  showSearchBar?: boolean;
 }
 
 // MUST be defined outside the function or in useMemo (still bugs with this tho on mobile?) otherwise the map re-renders every time the you click on it
@@ -47,6 +49,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   onNonCaveClicked,
   onMoveEnd,
   showFullScreenControl = false,
+  showGeolocateControl = true,
+  showSearchBar = true,
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
@@ -124,6 +128,18 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const zoomControlPosition = "top-left";
   const accountName = AuthenticationService.GetAccountName();
+
+  // Calculate positions based on which controls are visible
+  const fullScreenControlPosition = {
+    top: "110px",
+    left: "10px",
+  };
+
+  const layerControlPosition = {
+    top: showSearchBar ? "50px" : "0px",
+    right: "0",
+  };
+
   return (
     <>
       <Spin spinning={isLoading}>
@@ -146,20 +162,22 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 onMoveEnd={handleMoveEnd}
                 id="map-container"
               >
-                <div
-                  id="cave-search-container"
-                  onMouseEnter={handleControlMouseEnter}
-                  onMouseLeave={handleControlMouseLeave}
-                >
-                  <CaveSearchMapControl />
-                </div>
+                {showSearchBar && (
+                  <div
+                    id="cave-search-container"
+                    onMouseEnter={handleControlMouseEnter}
+                    onMouseLeave={handleControlMouseLeave}
+                  >
+                    <CaveSearchMapControl />
+                  </div>
+                )}
 
                 <div
                   id="layer-control-container"
                   onMouseEnter={handleControlMouseEnter}
                   onMouseLeave={handleControlMouseLeave}
                 >
-                  <LayerControl />
+                  <LayerControl position={layerControlPosition} />
                 </div>
 
                 <Source
@@ -281,7 +299,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   onMouseLeave={handleControlMouseLeave}
                 >
                   <NavigationControl position={zoomControlPosition} />
-                  <GeolocateControl position={zoomControlPosition} />
+                  {showGeolocateControl && (
+                    <GeolocateControl
+                      position={zoomControlPosition}
+                      positionOptions={{ enableHighAccuracy: true }}
+                      trackUserLocation={true}
+                    />
+                  )}
                 </div>
 
                 {showFullScreenControl && (
@@ -291,6 +315,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     onMouseLeave={handleControlMouseLeave}
                   >
                     <FullScreenControl
+                      position={fullScreenControlPosition}
                       handleClick={() => {
                         const latitude = mapCenter[0];
                         const longitude = mapCenter[1];

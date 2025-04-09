@@ -421,18 +421,16 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                         background: "#FCF5C7",
                       }}
                       extra={
-                        <Form.Item>
-                          <DeleteButtonComponent
-                            title={`Are you sure you want to delete entrance ${(
-                              field.name + 1
-                            ).toString()}?`}
-                            onConfirm={() => {
-                              remove(field.name);
-                            }}
-                            okText="Yes"
-                            cancelText="No"
-                          ></DeleteButtonComponent>
-                        </Form.Item>
+                        <DeleteButtonComponent
+                          title={`Are you sure you want to delete entrance ${(
+                            field.name + 1
+                          ).toString()}?`}
+                          onConfirm={() => {
+                            remove(field.name);
+                          }}
+                          okText="Yes"
+                          cancelText="No"
+                        />
                       }
                     >
                       <Row gutter={16}>

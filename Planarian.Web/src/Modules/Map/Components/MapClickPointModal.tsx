@@ -15,6 +15,7 @@ import {
 import { GageList } from "./GaugeList";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { PublicAccessDetails } from "./PublicAccesDetails";
+import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 
 const { RangePicker } = DatePicker;
 
@@ -197,9 +198,12 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
                 }
               }}
             />
-            <RangePicker
+
+            <PlanarianDateRange
               value={dateRange}
-              onChange={(vals) => setDateRange(vals || [null, null])}
+              onChange={(range, dateStrings) =>
+                setDateRange(range || [null, null])
+              }
             />
           </div>
         }

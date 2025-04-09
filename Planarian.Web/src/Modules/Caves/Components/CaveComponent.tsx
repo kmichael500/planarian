@@ -44,6 +44,7 @@ import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTag
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
+import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -549,13 +550,18 @@ const CaveComponent = ({
                       style={{ width: "100%" }}
                     />
                   </Col>
-                  <Col xs={24} sm={12} md={10} lg={10}>
-                    <RangePicker
+                  <Col
+                    style={{ marginBottom: "16px" }}
+                    xs={24}
+                    sm={12}
+                    md={10}
+                    lg={10}
+                  >
+                    <PlanarianDateRange
                       value={gageDateRange}
-                      onChange={(range) =>
+                      onChange={(range, dateStrings) =>
                         setGageDateRange(range || [null, null])
                       }
-                      style={{ width: "100%", marginBottom: "16px" }}
                     />
                   </Col>
                 </Row>
@@ -583,6 +589,8 @@ const CaveComponent = ({
                 ]}
                 initialZoom={15}
                 showFullScreenControl
+                showSearchBar={false}
+                showGeolocateControl={false}
               />
             </div>
           )}
