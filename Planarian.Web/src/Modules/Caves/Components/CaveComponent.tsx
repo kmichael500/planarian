@@ -146,9 +146,7 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
       <Descriptions.Item label="Depth" key="depth">
-        {defaultIfEmpty(
-          formatDistance(cave?.maxPitDepthFeet, DistanceFormat.feet)
-        )}
+        {defaultIfEmpty(formatDistance(cave?.depthFeet, DistanceFormat.feet))}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (

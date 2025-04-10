@@ -9,8 +9,8 @@ import {
   Radio,
   ColProps,
   Collapse,
-  Space,
   Select,
+  DatePicker,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
@@ -374,7 +374,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}>
         <Col {...twoColProps}>
           <Form.Item label="Reported On" name={nameof<AddCaveVm>("reportedOn")}>
-            <Input type="date" />
+            <DatePicker style={{ width: "100%" }} />
           </Form.Item>
         </Col>
       </ShouldDisplay>
@@ -682,7 +682,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                 nameof<AddEntranceVm>("reportedOn"),
                               ]}
                             >
-                              <Input type="date" />
+                              <DatePicker style={{ width: "100%" }} />
                             </Form.Item>
                           </Col>
                         </ShouldDisplay>
