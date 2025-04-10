@@ -622,7 +622,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
                 // this can only be called if the entrance already exists otherwise SaveChanges throws a
                 // Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException because it's expecting to update something
-                if (!isNew)
+                if (!isNewEntrance)
                 {
                     // if the z value was not provided during import, ef core doesn't realize that the z value was added later.
                     Repository.SetPropertiesModified(entrance, e=> e.Location);

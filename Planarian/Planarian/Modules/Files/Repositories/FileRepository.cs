@@ -7,9 +7,9 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Files.Repositories;
 
-public class FileRepository : RepositoryBase
+public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    public FileRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public FileRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -75,5 +75,12 @@ public class FileRepository : RepositoryBase
     {
         return await DbContext.Files.AnyAsync(e =>
             e.CaveId == caveId && e.FileName == fileName && e.AccountId == RequestUser.AccountId);
+    }
+}
+
+public class FileRepository : FileRepository<PlanarianDbContext>
+{
+    public FileRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    {
     }
 }
