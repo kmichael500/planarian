@@ -8,9 +8,9 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Tags.Repositories;
 
-public class TagRepository : RepositoryBase
+public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    public TagRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public TagRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -82,5 +82,12 @@ public class TagRepository : RepositoryBase
         return DbContext.TagTypes
             .Where(e => e.Key == key &&
                         (e.AccountId == RequestUser.AccountId || e.IsDefault));
+    }
+}
+
+public class TagRepository : TagRepository<PlanarianDbContext>
+{
+    public TagRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    {
     }
 }

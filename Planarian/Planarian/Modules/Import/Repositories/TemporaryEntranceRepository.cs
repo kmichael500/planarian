@@ -15,12 +15,10 @@ namespace Planarian.Modules.Import.Repositories;
 public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase>
 {
     private readonly string _temporaryEntranceTableName;
-    private readonly RequestUser RequestUser;
 
     public TemporaryEntranceRepository(PlanarianDbContextBase dbContext, RequestUser requestUser)
-        : base(dbContext)
+        : base(dbContext, requestUser)
     {
-        RequestUser = requestUser;
         _temporaryEntranceTableName = "TemporaryEntrance" + Guid.NewGuid().ToString().Replace("-", "");
     }
 

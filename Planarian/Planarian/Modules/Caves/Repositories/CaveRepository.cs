@@ -14,9 +14,9 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Caves.Repositories;
 
-public class CaveRepository : RepositoryBase
+public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    public CaveRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public CaveRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -612,10 +612,6 @@ public class CaveRepository : RepositoryBase
             .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
             .FirstOrDefaultAsync();
     }
-
-
-    public record UsedCountyNumber(string CountyId, int CountyNumber);
-
     public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
     {
         var usedCountyNumbers = await DbContext.Caves
@@ -648,3 +644,12 @@ public class CaveRepository : RepositoryBase
         return result;
     }
 }
+
+public class CaveRepository : CaveRepository<PlanarianDbContext>
+{
+    public CaveRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    {
+    }
+}
+
+public record UsedCountyNumber(string CountyId, int CountyNumber);

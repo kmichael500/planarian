@@ -7,9 +7,9 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Settings.Repositories;
 
-public class SettingsRepository : RepositoryBase
+public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    public SettingsRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public SettingsRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -109,5 +109,12 @@ public class SettingsRepository : RepositoryBase
             .Where(e => e.DisplayId == displayId && e.StateId == stateId).FirstOrDefaultAsync();
 
         return county;
+    }
+}
+
+public class SettingsRepository : SettingsRepository<PlanarianDbContext>
+{
+    public SettingsRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    {
     }
 }
