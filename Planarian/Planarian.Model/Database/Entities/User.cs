@@ -70,6 +70,8 @@ public class User : EntityBase
 
     public virtual ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
+    public virtual ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
+
 
     #region Helper Functions
 

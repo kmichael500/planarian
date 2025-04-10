@@ -21,6 +21,7 @@ public class Account : EntityBase
     public ICollection<FeatureSetting> FeatureSettings { get; set; } = new HashSet<FeatureSetting>();
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
+    public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>

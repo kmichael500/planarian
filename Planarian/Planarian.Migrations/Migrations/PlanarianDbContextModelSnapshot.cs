@@ -1129,6 +1129,47 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("EntranceStatusTags");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Favorite", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CaveId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2147483647)
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("CaveId");
+
+                    b.ToTable("Favorites");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.FeatureSetting", b =>
                 {
                     b.Property<string>("Id")
@@ -2422,6 +2463,41 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("TagType");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Favorite", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
+                        .WithMany("Favorites")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
+                        .WithMany("Favorites")
+                        .HasForeignKey("CaveId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.OwnsOne("System.Collections.Generic.HashSet<string>", "Tags", b1 =>
+                        {
+                            b1.Property<string>("FavoriteId")
+                                .HasColumnType("character varying(10)");
+
+                            b1.HasKey("FavoriteId");
+
+                            b1.ToTable("Favorites");
+
+                            b1.ToJson("Tags");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FavoriteId");
+                        });
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Cave");
+
+                    b.Navigation("Tags")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.FeatureSetting", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
@@ -2823,6 +2899,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("Counties");
 
+                    b.Navigation("Favorites");
+
                     b.Navigation("FeatureSettings");
 
                     b.Navigation("Tags");
@@ -2845,6 +2923,8 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("CaveReportedByNameTags");
 
                     b.Navigation("Entrances");
+
+                    b.Navigation("Favorites");
 
                     b.Navigation("Files");
 

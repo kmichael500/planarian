@@ -962,4 +962,45 @@ public class CaveService : ServiceBase<CaveRepository>
     #endregion
 
 
+    #region Favorite Cave
+    
+    public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
+    {
+        var caves = await Repository.GetFavoriteCaves(query);
+        return caves;
+    }
+    public async Task FavoriteCave(string caveId, CreateFavoriteVm values)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
+        var entity = await Repository.GetAsync(caveId);
+        if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+
+        var favorite = new Favorite()
+        {
+            CaveId = caveId,
+            UserId = RequestUser.Id,
+            Notes = values.Notes,
+            Tags = values.Tags,
+            AccountId = RequestUser.AccountId
+        };
+        Repository.Add(favorite);
+        await Repository.SaveChangesAsync();
+    }
+    
+    public async Task UnfavoriteCave(string caveId)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
+        var entity = await Repository.GetAsync(caveId);
+        if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
+
+        var favorite = await Repository.GetFavoriteCave(caveId, RequestUser.Id);
+        if (favorite == null) throw ApiExceptionDictionary.NotFound(nameof(favorite.Id));
+
+        Repository.Delete(favorite);
+        await Repository.SaveChangesAsync();
+    }
+    
+    #endregion
 }

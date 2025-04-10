@@ -76,6 +76,7 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<EntranceOtherTag> EntranceOtherTag { get; set; } = null!;
     public DbSet<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } = null!;
     public DbSet<EntranceStatusTag> EntranceStatusTags { get; set; } = null!;
+    public DbSet<Favorite> Favorites { get; set; } = null!;
     public DbSet<FeatureSetting> FeatureSettings { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
