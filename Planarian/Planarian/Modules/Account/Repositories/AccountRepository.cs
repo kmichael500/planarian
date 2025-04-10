@@ -15,9 +15,9 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Account.Repositories;
 
-public class AccountRepository : RepositoryBase
+public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
-    public AccountRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    public AccountRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
 
@@ -801,5 +801,12 @@ public static class ExpressionExtensions
         var parameter = selector.Parameters[0];
         var body = Expression.Invoke(condition, selector.Body);
         return Expression.Lambda<Func<T, bool>>(body, parameter);
+    }
+}
+
+public class AccountRepository : AccountRepository<PlanarianDbContext>
+{
+    public AccountRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
+    {
     }
 }

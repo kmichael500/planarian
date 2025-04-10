@@ -9,6 +9,7 @@ using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
+using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
@@ -31,30 +32,30 @@ namespace Planarian.Modules.Account.Services;
 public class ImportService : ServiceBase
 {
     private readonly FileService _fileService;
-    private readonly TagRepository _tagRepository;
-    private readonly SettingsRepository _settingsRepository;
+    private readonly TagRepository<PlanarianDbContextBase> _tagRepository;
+    private readonly SettingsRepository<PlanarianDbContextBase> _settingsRepository;
     private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
     private readonly NotificationService _notificationService;
-    private readonly CaveRepository _repository;
-    private readonly AccountRepository _accountRepository;
-    private readonly CaveRepository _caveRepository;
-    private readonly FileRepository _fileRepository;
+    private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
+    private readonly CaveRepository<PlanarianDbContextBase> _repository;
+    private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
 
     public ImportService(RequestUser requestUser, FileService fileService,
-        TagRepository tagRepository, SettingsRepository settingsRepository,
+        TagRepository<PlanarianDbContextBase> tagRepository,
+        SettingsRepository<PlanarianDbContextBase> settingsRepository,
         TemporaryEntranceRepository temporaryEntranceRepository,
-        NotificationService notificationService, CaveRepository repository,
-        AccountRepository accountRepository, CaveRepository caveRepository,
-        FileRepository fileRepository) : base(requestUser)
+        NotificationService notificationService,
+        AccountRepository<PlanarianDbContextBase> accountRepository,
+        CaveRepository<PlanarianDbContextBase> caveRepository,
+        FileRepository<PlanarianDbContextBase> fileRepository) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
         _temporaryEntranceRepository = temporaryEntranceRepository;
         _notificationService = notificationService;
-        _repository = repository;
         _accountRepository = accountRepository;
-        _caveRepository = caveRepository;
+        _repository = caveRepository;
         _fileRepository = fileRepository;
     }
 
@@ -831,7 +832,7 @@ public class ImportService : ServiceBase
         throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Cave);
     }
 
-    private bool IsValidCave(Cave cave, HashSet<CaveRepository.UsedCountyNumber> usedCountyNumbers,
+    private bool IsValidCave(Cave cave, HashSet<UsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord,
         int currentRowNumber,
         List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
@@ -865,7 +866,7 @@ public class ImportService : ServiceBase
         }
         else
         {
-            usedCountyNumbers.Add(new CaveRepository.UsedCountyNumber(cave.CountyId, cave.CountyNumber));
+            usedCountyNumbers.Add(new UsedCountyNumber(cave.CountyId, cave.CountyNumber));
         }
 
         if (cave.CountyId == null)
@@ -1587,7 +1588,7 @@ public class ImportService : ServiceBase
         }
 
         var caveInformation =
-            await _caveRepository.GetCaveForFileImportByCountyCodeNumber(parsed.CountyCode, parsed.CountyCaveNumber,
+            await _repository.GetCaveForFileImportByCountyCodeNumber(parsed.CountyCode, parsed.CountyCaveNumber,
                 cancellationToken);
 
         if (caveInformation == null)
