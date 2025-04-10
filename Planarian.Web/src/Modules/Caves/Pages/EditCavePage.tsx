@@ -5,11 +5,12 @@ import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButt
 import { Card, Form, message } from "antd";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
 import { formatDate } from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import dayjs from "dayjs";
 
 const EditCavePage: React.FC = () => {
   const { caveId } = useParams();
@@ -47,13 +48,10 @@ const EditCavePage: React.FC = () => {
     const getCave = async () => {
       const caveResponse = await CaveService.GetCave(caveId);
 
-      // antd input requires date to be in format yyyy-MM-DD otherwise it will not be displayed
-      caveResponse.reportedOn = formatDate(
-        caveResponse.reportedOn,
-        "yyyy-MM-DD"
-      );
+      // date picker requires it to be a dayjs object
+      caveResponse.reportedOn = dayjs.utc(caveResponse.reportedOn) as any;
       caveResponse.entrances.forEach((entrance) => {
-        entrance.reportedOn = formatDate(entrance.reportedOn, "yyyy-MM-DD");
+        entrance.reportedOn = dayjs.utc(entrance.reportedOn) as any;
       });
       setCave(caveResponse);
 
