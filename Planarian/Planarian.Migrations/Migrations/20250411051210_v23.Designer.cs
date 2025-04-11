@@ -13,7 +13,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20250410201423_v23")]
+    [Migration("20250411051210_v23")]
     partial class v23
     {
         /// <inheritdoc />
@@ -1171,7 +1171,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("CaveId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CaveId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Favorite_UserId_CaveId_AccountId");
 
                     b.ToTable("Favorites");
                 });

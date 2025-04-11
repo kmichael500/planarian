@@ -36,5 +36,9 @@ public class FavoriteConfiguration : BaseEntityTypeConfiguration<Favorite>
             .WithMany(e => e.Favorites)
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.NoAction);
+        
+        builder.HasIndex(e => new { e.UserId, e.CaveId, e.AccountId })
+            .IsUnique()
+            .HasDatabaseName("IX_Favorite_UserId_CaveId_AccountId");
     }
 }

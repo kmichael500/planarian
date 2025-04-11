@@ -45,6 +45,12 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Favorite_UserId_CaveId_AccountId",
+                table: "Favorites",
+                columns: new[] { "UserId", "CaveId", "AccountId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Favorites_AccountId",
                 table: "Favorites",
                 column: "AccountId");
@@ -53,11 +59,6 @@ namespace Planarian.Migrations.Migrations
                 name: "IX_Favorites_CaveId",
                 table: "Favorites",
                 column: "CaveId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Favorites_UserId",
-                table: "Favorites",
-                column: "UserId");
         }
 
         /// <inheritdoc />

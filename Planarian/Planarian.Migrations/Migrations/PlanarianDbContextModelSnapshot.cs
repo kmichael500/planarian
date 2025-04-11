@@ -1168,7 +1168,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("CaveId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CaveId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Favorite_UserId_CaveId_AccountId");
 
                     b.ToTable("Favorites");
                 });

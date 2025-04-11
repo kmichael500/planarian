@@ -12,9 +12,6 @@
 @import "../node_modules/@syncfusion/ej2-react-grids/styles/material.css";
 
 
-.ant-message {
-  z-index: 1200 !important;
-}
 
 
 .App {
