@@ -50,8 +50,7 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
             .WithMany(e => e.EntrancesReported)
             .HasForeignKey(e => e.ReportedByUserId)
             .OnDelete(DeleteBehavior.NoAction);
-
-
+        
         builder.HasOne(e => e.LocationQualityTag)
             .WithMany(e => e.EntranceLocationQualitiesTags)
             .HasForeignKey(e => e.LocationQualityTagId)

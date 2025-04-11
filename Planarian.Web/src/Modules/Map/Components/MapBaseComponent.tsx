@@ -213,6 +213,27 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                         9,
                         0.6, // visible at zoom levels >= 13
                       ],
+                      "circle-color": [
+                        "case",
+                        // If IsFavorite is true, return gold, else blue
+                        ["boolean", ["get", "IsFavorite"], false],
+                        "#FFC107", // Gold for favorites
+                        "#00008B", // Default color for non-favorites
+                      ],
+                      "circle-stroke-color": [
+                        "step",
+                        ["zoom"],
+                        "rgba(0, 0, 0, 0)", // Transparent at zoom levels below 9
+                        9,
+                        "#000", // Black stroke for zoom levels 9 and above
+                      ],
+                      "circle-stroke-width": [
+                        "step",
+                        ["zoom"],
+                        0, // Stroke width 0 below zoom level 9
+                        9,
+                        1, // Stroke width 1 at zoom level 9 and above
+                      ],
                     }}
                   ></Layer>
 

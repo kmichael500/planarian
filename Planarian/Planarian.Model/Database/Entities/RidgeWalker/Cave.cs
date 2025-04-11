@@ -65,6 +65,7 @@ public class Cave : EntityBase
         JsonSerializer.Deserialize<List<string>>(AlternateNames) ?? new List<string>();
 
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
+    public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
 
 
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>

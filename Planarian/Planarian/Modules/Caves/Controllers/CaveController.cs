@@ -26,31 +26,33 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetCaves([FromQuery] FilterQuery query)
+    public async Task<ActionResult<PagedResult<CaveSearchVm>>> GetCaves([FromQuery] FilterQuery query)
     {
         var caves = await Service.GetCaves(query);
 
         return new JsonResult(caves);
     }
-    
-    
+
+
     [HttpGet("search")]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetCavesSearch([FromQuery] FilterQuery query, [FromQuery] string? permissionKey = null)
+    public async Task<ActionResult<PagedResult<CaveSearchVm>>> GetCavesSearch([FromQuery] FilterQuery query,
+        [FromQuery] string? permissionKey = null)
     {
         var caves = await Service.GetCavesSearch(query, permissionKey);
 
         return new JsonResult(caves);
     }
-    
+
     [HttpGet("export/gpx")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize(Policy = PermissionPolicyKey.Export)]
-    public async Task<ActionResult> ExportCavesGpx([FromQuery] FilterQuery query, [FromQuery] string? permissionKey = null)
+    public async Task<ActionResult> ExportCavesGpx([FromQuery] FilterQuery query,
+        [FromQuery] string? permissionKey = null)
     {
         var fileBytes = await Service.ExportCavesGpx(query, permissionKey);
-        
+
         var fileName = $"Caves {DateTime.UtcNow.Ticks}";
-            return File(fileBytes, "application/gpx+xml", fileName);
+        return File(fileBytes, "application/gpx+xml", fileName);
     }
 
     [HttpGet("{caveId:length(10)}")]
@@ -118,4 +120,32 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new OkResult();
     }
+
+    #region Favorites
+    
+    [HttpGet("{caveId:length(10)}/favorite")]
+    public async Task<ActionResult<FavoriteVm>> GetFavoriteCaves(string caveId)
+    {
+        var caves = await Service.GetFavoriteCave(caveId);
+
+        return new JsonResult(caves);
+    }
+
+    [HttpPost("{caveId:length(10)}/favorite")]
+    public async Task<ActionResult> FavoriteCave(string caveId)
+    {
+        await Service.FavoriteCave(caveId);
+
+        return new OkResult();
+    }
+
+    [HttpDelete("{caveId:length(10)}/favorite")]
+    public async Task<ActionResult> UnfavoriteCave(string caveId)
+    {
+        await Service.UnfavoriteCave(caveId);
+
+        return new OkResult();
+    }
+
+    #endregion
 }

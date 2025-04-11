@@ -6,6 +6,7 @@ using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
@@ -31,16 +32,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
             PrimaryEntranceLatitude = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.Y)
                     .FirstOrDefault(),
             PrimaryEntranceLongitude = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.X)
                     .FirstOrDefault(),
             PrimaryEntranceElevationFeet = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.Z)
                     .FirstOrDefault(),
+            IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
             ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
             Name = e.Name,
             LengthFeet = e.LengthFeet,
@@ -61,7 +66,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
         var result = filterQuery.SortBy switch
         {
-            nameof(CaveSearchVm.Name) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize,
+            nameof(CaveSearchVm.Name) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                filterQuery.PageSize,
                 e => e.Name, filterQuery.SortDescending),
             nameof(CaveSearchVm.ReportedOn) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                 filterQuery.PageSize, e => e.ReportedOn, filterQuery.SortDescending),
@@ -155,14 +161,28 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 DbContext.UserCavePermissionView.Any(ucp =>
                     ucp.AccountId == RequestUser.AccountId
                     && ucp.UserId == RequestUser.Id &&
-                    (string.IsNullOrWhiteSpace(permissionKey) || ucp.PermissionKey == permissionKey) // gets caves that the user has access at a specific permission level for (i.e. manager)
+                    (string.IsNullOrWhiteSpace(permissionKey) ||
+                     ucp.PermissionKey ==
+                     permissionKey) // gets caves that the user has access at a specific permission level for (i.e. manager)
                     && ucp.CaveId == cave.Id)).AsQueryable();
 
         if (!filterQuery.Conditions.Any()) return query;
-        
+
         foreach (var queryCondition in filterQuery.Conditions)
             switch (queryCondition.Field)
             {
+                case nameof(CaveSearchParamsVm.IsFavorite):
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Equal => query.Where(e =>
+                            e.Favorites.Any(ee =>
+                                ee.UserId == RequestUser.Id && ee.AccountId == RequestUser.AccountId)),
+                        QueryOperator.NotEqual => query.Where(e =>
+                            !e.Favorites.Any(ee =>
+                                ee.UserId == RequestUser.Id && ee.AccountId == RequestUser.AccountId)),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
                 case nameof(CaveSearchParamsVm.Name):
                     query = queryCondition.Operator switch
                     {
@@ -499,6 +519,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
         return query;
     }
+
     public async Task<int> GetNewDisplayId(string countyId)
     {
         var maxCaveNumber = await DbContext.Caves
@@ -517,6 +538,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new CaveVm
             {
                 Id = e.Id,
+                IsFavorite = e.Favorites.Any(favorite=>favorite.UserId == RequestUser.Id),
                 ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
                 CountyId = e.CountyId,
@@ -590,14 +612,14 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
         return await DbContext.Caves.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
             .Include(e => e.GeologyTags)
-            .Include(e => e.ArcheologyTags)    
-            .Include(e => e.BiologyTags)    
-            .Include(e => e.CartographerNameTags)    
-            .Include(e => e.MapStatusTags)    
-            .Include(e => e.GeologicAgeTags)    
-            .Include(e => e.PhysiographicProvinceTags)    
-            .Include(e => e.CaveOtherTags)    
-            .Include(e => e.CaveReportedByNameTags)    
+            .Include(e => e.ArcheologyTags)
+            .Include(e => e.BiologyTags)
+            .Include(e => e.CartographerNameTags)
+            .Include(e => e.MapStatusTags)
+            .Include(e => e.GeologicAgeTags)
+            .Include(e => e.PhysiographicProvinceTags)
+            .Include(e => e.CaveOtherTags)
+            .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Files)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)
@@ -612,6 +634,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
             .FirstOrDefaultAsync();
     }
+
     public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
     {
         var usedCountyNumbers = await DbContext.Caves
@@ -624,11 +647,12 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);
 
-    public async Task<GetCaveForFileImportByCountyCodeNumberResult?> GetCaveForFileImportByCountyCodeNumber(string countyDisplayId, int countyNumber,
+    public async Task<GetCaveForFileImportByCountyCodeNumberResult?> GetCaveForFileImportByCountyCodeNumber(
+        string countyDisplayId, int countyNumber,
         CancellationToken cancellationToken)
     {
         var result = await DbContext.Caves
-            .Where(e=>e.AccountId == RequestUser.AccountId)
+            .Where(e => e.AccountId == RequestUser.AccountId)
             .Where(e => e.County!.DisplayId == countyDisplayId && e.CountyNumber == countyNumber)
             .Select(e => new GetCaveForFileImportByCountyCodeNumberResult(e.Id,
                 $"{e.County!.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber} {e.Name}"))
@@ -640,9 +664,53 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public async Task<PagedResult<CaveSearchVm>> GetCavesSearch(FilterQuery filterQuery, string? permissionKey = null)
     {
         var result = await GetCaves(filterQuery, permissionKey);
-        
+
         return result;
     }
+
+    #region Favorites
+
+    public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
+    {
+        var favoriteCaves = await DbContext.Favorites
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == RequestUser.Id)
+            .OrderByDescending(e => e.CreatedOn)
+            .Select(e => new FavoriteVm
+            {
+                CaveId = e.CaveId,
+            })
+            .ApplyPagingAsync(query.PageNumber, query.PageSize);
+
+        return favoriteCaves;
+    }
+
+    public async Task<Favorite?> GetFavoriteCave(string caveId)
+    {
+        var favoriteCave = await GetFavoriteCaveQuery(caveId)
+            .FirstOrDefaultAsync();
+        
+        return favoriteCave;
+    }
+
+    public async Task<FavoriteVm?> GetFavoriteCaveVm(string caveId)
+    {
+        var favoriteCave = await GetFavoriteCaveQuery(caveId)
+            .Select(e => new FavoriteVm
+            {
+                CaveId = e.CaveId,
+            })
+            .FirstOrDefaultAsync();
+
+        return favoriteCave;
+    }
+
+    private IQueryable<Favorite> GetFavoriteCaveQuery(string caveId)
+    {
+        return DbContext.Favorites
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == RequestUser.Id && e.CaveId == caveId);
+    }
+
+    #endregion
 }
 
 public class CaveRepository : CaveRepository<PlanarianDbContext>

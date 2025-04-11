@@ -18,7 +18,7 @@ public abstract class EntityBase
 {
     protected EntityBase()
     {
-        // Temporary Id for EF Core change tracking
+        // Temporary ID for EF Core change tracking
         Id = Guid.NewGuid().ToString();
     }
 

@@ -204,6 +204,14 @@ FROM (
         ""Entrances"".""Name"",
         ""Entrances"".""IsPrimary"",
         ""Entrances"".""Description"",
+        (SELECT EXISTS(
+            SELECT 1 
+            FROM ""Favorites""
+            WHERE 
+                ""Favorites"".""UserId"" = '{4}'
+                AND ""Favorites"".""AccountId"" = '{3}'
+                AND ""Favorites"".""CaveId"" = ""Entrances"".""CaveId""
+        )) AS ""IsFavorite"",
         ST_AsMVTGeom(
             ST_Transform(""Entrances"".""Location"", 3857),
             tile.bbox_3857,
