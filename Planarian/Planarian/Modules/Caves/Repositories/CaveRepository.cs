@@ -32,16 +32,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
             PrimaryEntranceLatitude = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Y)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.Y)
                     .FirstOrDefault(),
             PrimaryEntranceLongitude = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.X)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.X)
                     .FirstOrDefault(),
             PrimaryEntranceElevationFeet = e.Entrances.Count == 0
                 ? null
-                : e.Entrances.Where(ee => ee.IsPrimary == true).Select(ee => ee.Location.Z)
+                : e.Entrances.Where(ee => ee.IsPrimary == true)
+                    .Select(ee => ee.Location.Z)
                     .FirstOrDefault(),
+            IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
             ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
             Name = e.Name,
             LengthFeet = e.LengthFeet,
@@ -167,6 +171,18 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         foreach (var queryCondition in filterQuery.Conditions)
             switch (queryCondition.Field)
             {
+                case nameof(CaveSearchParamsVm.IsFavorite):
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Equal => query.Where(e =>
+                            e.Favorites.Any(ee =>
+                                ee.UserId == RequestUser.Id && ee.AccountId == RequestUser.AccountId)),
+                        QueryOperator.NotEqual => query.Where(e =>
+                            !e.Favorites.Any(ee =>
+                                ee.UserId == RequestUser.Id && ee.AccountId == RequestUser.AccountId)),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
                 case nameof(CaveSearchParamsVm.Name):
                     query = queryCondition.Operator switch
                     {
@@ -522,6 +538,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new CaveVm
             {
                 Id = e.Id,
+                IsFavorite = e.Favorites.Any(favorite=>favorite.UserId == RequestUser.Id),
                 ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
                 CountyId = e.CountyId,
@@ -661,21 +678,36 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new FavoriteVm
             {
                 CaveId = e.CaveId,
-                Notes = e.Notes,
-                Tags = e.Tags.ToList()
             })
             .ApplyPagingAsync(query.PageNumber, query.PageSize);
 
         return favoriteCaves;
     }
 
-    public async Task<Favorite?> GetFavoriteCave(string caveId, string requestUserId)
+    public async Task<Favorite?> GetFavoriteCave(string caveId)
     {
-        var favoriteCave = await DbContext.Favorites
-            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == requestUserId && e.CaveId == caveId)
+        var favoriteCave = await GetFavoriteCaveQuery(caveId)
             .FirstOrDefaultAsync();
         
         return favoriteCave;
+    }
+
+    public async Task<FavoriteVm?> GetFavoriteCaveVm(string caveId)
+    {
+        var favoriteCave = await GetFavoriteCaveQuery(caveId)
+            .Select(e => new FavoriteVm
+            {
+                CaveId = e.CaveId,
+            })
+            .FirstOrDefaultAsync();
+
+        return favoriteCave;
+    }
+
+    private IQueryable<Favorite> GetFavoriteCaveQuery(string caveId)
+    {
+        return DbContext.Favorites
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == RequestUser.Id && e.CaveId == caveId);
     }
 
     #endregion

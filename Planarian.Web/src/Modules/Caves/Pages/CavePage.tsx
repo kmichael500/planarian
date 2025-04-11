@@ -12,6 +12,7 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { Grid, Typography } from "antd";
 import { AppService } from "../../../Shared/Services/AppService";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import FavoriteCave from "../Components/FavoriteCave";
 
 const CavePage = () => {
   const [cave, setCave] = useState<CaveVm>();
@@ -26,6 +27,10 @@ const CavePage = () => {
   } = useContext(AppContext);
   const { caveId } = useParams();
 
+  if (isNullOrWhiteSpace(caveId)) {
+    throw new NotFoundError("caveid");
+  }
+
   const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
 
   const screens = Grid.useBreakpoint();
@@ -35,6 +40,8 @@ const CavePage = () => {
 
   useEffect(() => {
     setHeaderButtons([
+      <FavoriteCave caveId={caveId} />,
+
       <Link to={`/caves/${caveId}/edit`}>
         <PlanarianButton
           permissionKey={PermissionKey.Manager}
@@ -42,7 +49,7 @@ const CavePage = () => {
           icon={<EditOutlined />}
         >
           Edit
-        </PlanarianButton>{" "}
+        </PlanarianButton>
       </Link>,
       <BackButtonComponent to={"./.."} />,
     ]);

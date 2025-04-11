@@ -72,6 +72,8 @@ public class CaveVm
     public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
+    
+    public bool IsFavorite { get; set; }
 
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; } = false;

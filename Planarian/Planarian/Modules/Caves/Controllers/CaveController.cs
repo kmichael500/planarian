@@ -26,7 +26,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetCaves([FromQuery] FilterQuery query)
+    public async Task<ActionResult<PagedResult<CaveSearchVm>>> GetCaves([FromQuery] FilterQuery query)
     {
         var caves = await Service.GetCaves(query);
 
@@ -35,7 +35,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
 
     [HttpGet("search")]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetCavesSearch([FromQuery] FilterQuery query,
+    public async Task<ActionResult<PagedResult<CaveSearchVm>>> GetCavesSearch([FromQuery] FilterQuery query,
         [FromQuery] string? permissionKey = null)
     {
         var caves = await Service.GetCavesSearch(query, permissionKey);
@@ -122,19 +122,19 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     #region Favorites
-
-    [HttpGet("favorites")]
-    public async Task<ActionResult<PagedResult<CaveVm>>> GetFavoriteCaves([FromQuery] FilterQuery query)
+    
+    [HttpGet("{caveId:length(10)}/favorite")]
+    public async Task<ActionResult<FavoriteVm>> GetFavoriteCaves(string caveId)
     {
-        var caves = await Service.GetFavoriteCaves(query);
+        var caves = await Service.GetFavoriteCave(caveId);
 
         return new JsonResult(caves);
     }
 
     [HttpPost("{caveId:length(10)}/favorite")]
-    public async Task<ActionResult> FavoriteCave(string caveId, CreateFavoriteVm values)
+    public async Task<ActionResult> FavoriteCave(string caveId)
     {
-        await Service.FavoriteCave(caveId, values);
+        await Service.FavoriteCave(caveId);
 
         return new OkResult();
     }

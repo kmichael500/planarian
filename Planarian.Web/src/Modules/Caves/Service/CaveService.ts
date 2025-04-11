@@ -13,6 +13,7 @@ import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { FavoriteVm } from "../Models/FavoriteCaveVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -100,6 +101,21 @@ const CaveService = {
 
     const response = await HttpClient.get<PagedResult<CaveSearchVm>>(
       `${baseUrl}/search?${qb.buildAsQueryString()}${queryString}`
+    );
+    return response.data;
+  },
+
+  async FavoriteCave(id: string): Promise<void> {
+    const response = await HttpClient.post<void>(`${baseUrl}/${id}/favorite`);
+    return response.data;
+  },
+  async UnfavoriteCave(id: string): Promise<void> {
+    const response = await HttpClient.delete<void>(`${baseUrl}/${id}/favorite`);
+    return response.data;
+  },
+  async GetFavoriteCaveVm(caveId: string) {
+    const response = await HttpClient.get<FavoriteVm | null>(
+      `${baseUrl}/${caveId}/favorite`
     );
     return response.data;
   },

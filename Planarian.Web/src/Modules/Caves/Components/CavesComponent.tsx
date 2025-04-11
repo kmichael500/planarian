@@ -22,11 +22,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import {
-  EyeOutlined,
-  CompassOutlined,
-  DownloadOutlined,
-} from "@ant-design/icons";
+import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -51,8 +47,8 @@ import { AuthenticationService } from "../../Authentication/Services/Authenticat
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { saveAs } from "file-saver";
-import { AccountService } from "../../Account/Services/AccountService";
-import { AppService } from "../../../Shared/Services/AppService";
+import FavoriteCave from "./FavoriteCave";
+import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -290,6 +286,11 @@ const CavesComponent: React.FC = () => {
         onExportGpx={onExportGpx}
       >
         <Divider>Cave</Divider>
+        <BooleanFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"isFavorite"}
+          label={"Favorites"}
+        />
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>
           <TextFilterFormItem
             queryBuilder={queryBuilder}
@@ -564,8 +565,16 @@ const CavesComponent: React.FC = () => {
                   flexDirection: "column",
                 }}
                 title={`${cave.displayId} ${cave.name}`}
+                extra={
+                  <FavoriteCave
+                    initialIsFavorite={cave.isFavorite}
+                    caveId={cave.id}
+                    onlyShowWhenFavorite
+                    disabled
+                  />
+                }
                 actions={[
-                  <Link to={`/caves/${cave.id}`}>
+                  <Link to={`/caves/${cave.id}`} key="view">
                     <PlanarianButton
                       alwaysShowChildren
                       type="primary"
@@ -582,6 +591,7 @@ const CavesComponent: React.FC = () => {
                           cave.primaryEntranceLongitude,
                           15
                         )}
+                        key="map"
                       >
                         <PlanarianButton
                           alwaysShowChildren

@@ -1,6 +1,7 @@
 export interface CaveSearchParamsVm {
   //#region Cave
   id: string;
+  isFavorite: boolean;
   name: string;
   narrative: string;
   stateId: string;

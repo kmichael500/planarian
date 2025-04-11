@@ -12,11 +12,7 @@ public class Favorite : EntityBase
 
     [MaxLength(PropertyLength.Id)] public string? AccountId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
-
-    [MaxLength(PropertyLength.Max)] public string? Notes { get; set; }
-
-    public List<string> Tags { get; set; } = new();
-
+    
     public virtual Account Account { get; set; } = null!;
     public virtual User User { get; set; } = null!;
     public virtual Cave Cave { get; set; } = null!;
@@ -40,10 +36,5 @@ public class FavoriteConfiguration : BaseEntityTypeConfiguration<Favorite>
             .WithMany(e => e.Favorites)
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.NoAction);
-
-        builder.OwnsOne(favorite => favorite.Tags, buildAction =>
-        {
-            buildAction.ToJson();
-        });
     }
 }

@@ -18,6 +18,8 @@ public class CaveSearchVm
     public double? PrimaryEntranceLongitude { get; set; }
     public double? PrimaryEntranceElevationFeet { get; set; }
     
+    public bool IsFavorite { get; set; }
+    
     public IEnumerable<string> ArchaeologyTagIds { get; set; }
     public IEnumerable<string> BiologyTagIds { get; set; }
     public IEnumerable<string> CartographerNameTagIds { get; set; }

@@ -26,6 +26,7 @@ export interface CaveSearchVm {
   otherTagIds: string[];
   physiographicProvinceTagIds: string[];
   reportedByTagIds: string[];
+  isFavorite: boolean;
 }
 
 export class CaveSearchSortByConstants {

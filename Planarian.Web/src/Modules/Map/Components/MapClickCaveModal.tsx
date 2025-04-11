@@ -7,6 +7,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import { useNavigate } from "react-router-dom";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import FavoriteCave from "../../Caves/Components/FavoriteCave";
 
 interface MapClickCaveModal {
   isModalVisible: boolean;
@@ -24,7 +25,7 @@ const MapClickCaveModal: FC<MapClickCaveModal> = ({
   const navigate = useNavigate();
   return (
     <PlanarianModal
-      header={cave?.name || "Cave"}
+      header={[cave?.name || "Cave", <FavoriteCave caveId={cave?.id} />]}
       open={isModalVisible}
       onClose={handleClose}
       footer={[
