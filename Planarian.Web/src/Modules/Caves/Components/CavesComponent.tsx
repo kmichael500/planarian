@@ -5,6 +5,8 @@ import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridC
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { PagedResult } from "../../Search/Models/PagedResult";
+import DOMPurify from "dompurify";
+
 import {
   QueryBuilder,
   QueryOperator,
@@ -71,6 +73,17 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
+
+  const [expandedNarratives, setExpandedNarratives] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleNarrative = (caveId: string) => {
+    setExpandedNarratives((prev) => ({
+      ...prev,
+      [caveId]: !prev[caveId],
+    }));
+  };
 
   useEffect(() => {
     getCaves();
@@ -297,6 +310,38 @@ const CavesComponent: React.FC = () => {
             field={"narrative"}
             label={"Narrative"}
             queryOperator={QueryOperator.FreeText}
+            helpText={
+              <p>
+                Type one or more words to search anywhere in the narrative.
+                <br />
+                <br />
+                Words are matched fuzzily by default — typing <code>
+                  flow
+                </code>{" "}
+                matches <strong>flowstone</strong>, <strong>flowing</strong>,
+                etc.
+                <br />
+                <br />
+                Use double quotes to search for exact words or phrases. For
+                example: <code>"flowstone breakdown"</code>.<br />
+                <br />
+                You can combine exact phrases and individual words. For example:{" "}
+                <code>"main passage" breakdown flow</code>.<br />
+                <br />
+                Use <code>AND</code>, <code>OR</code>, and <code>!</code> (not)
+                for complex queries:
+                <br />
+                <code>flow AND breakdown</code> – finds entries with both words
+                <br />
+                <code>flow OR stream</code> – finds entries with either word
+                <br />
+                <code>!collapsed</code> – excludes entries with that word
+                <br />
+                <br />
+                Matching text will be highlighted in the results when searching
+                by narrative.
+              </p>
+            }
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>
@@ -626,6 +671,43 @@ const CavesComponent: React.FC = () => {
                       {renderFeature(cave, featureKey)}
                     </div>
                   ))}
+                  {cave.narrativeSnippet && (
+                    <>
+                      <Typography.Text
+                        style={{ marginRight: "8px", fontWeight: "bold" }}
+                      >
+                        Narrative:
+                      </Typography.Text>
+                      <Typography.Paragraph style={{ marginBottom: 8 }}>
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(
+                              expandedNarratives[cave.id] ||
+                                cave.narrativeSnippet.length <= 400
+                                ? cave.narrativeSnippet
+                                : cave.narrativeSnippet.substring(0, 400) + "…",
+                              { ALLOWED_TAGS: ["mark", "br"] }
+                            ),
+                          }}
+                        />
+                      </Typography.Paragraph>
+                      {cave.narrativeSnippet.length > 400 && (
+                        <div style={{ marginBottom: 8 }}>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            type="link"
+                            size="small"
+                            onClick={() => toggleNarrative(cave.id)}
+                            icon={undefined}
+                          >
+                            {expandedNarratives[cave.id]
+                              ? "Show Less"
+                              : "Show More"}
+                          </PlanarianButton>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Space>
               </GridCard>
             )}
