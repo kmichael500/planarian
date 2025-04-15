@@ -6,7 +6,7 @@ import {
 export interface CaveSearchVm {
   id: string;
   name: string;
-  narrativeSnippet: string;
+  narrativeSnippet?: string;
   reportedOn: string | null;
   isArchived: boolean;
   depthFeet: number | null;
