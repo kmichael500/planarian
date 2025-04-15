@@ -98,15 +98,14 @@ public class PlanarianDbContextBase : DbContext
         var tsSimple = typeof(FullTextSearchExtensions).GetMethod(
             nameof(FullTextSearchExtensions.TsHeadlineSimple),
             new[] { typeof(string), typeof(string), typeof(string), typeof(string) });
-
+        
+        if (tsSimple == null)
+            throw new InvalidOperationException("Could not find ts_headline_simple method.");
+        
         modelBuilder.HasDbFunction(tsSimple)       
             .HasName("ts_headline_simple")     
             .HasSchema("public");            
         
-        var webMatch = typeof(FullTextSearchExtensions).GetMethod(
-            nameof(FullTextSearchExtensions.WebSearchMatch),
-            new[] { typeof(string), typeof(string), typeof(string) });
-
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
