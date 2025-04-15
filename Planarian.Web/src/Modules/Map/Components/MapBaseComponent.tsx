@@ -1,11 +1,11 @@
-import React, { useContext, useEffect, useState } from "react";
-import { MapService } from "../Services/MapService";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import {
   Map,
   Source,
   Layer,
   GeolocateControl,
   NavigationControl,
+  Popup,
   MapLayerMouseEvent,
   MapProvider,
   ViewStateChangeEvent,
@@ -22,9 +22,9 @@ import { useNavigate } from "react-router-dom";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 
 import shpjs from "shpjs";
-
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
+import { MapService } from "../Services/MapService";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -81,6 +81,11 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     }[]
   >([]);
 
+  const [popupInfo, setPopupInfo] = useState<{
+    lngLat: [number, number];
+    properties: any;
+  } | null>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -118,24 +123,43 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   };
 
   const handleMapClick = (event: MapLayerMouseEvent) => {
-    if (isOverControl) {
-      return;
-    }
+    if (isOverControl) return;
 
     const clickedFeatures = event.features;
-    const clickedEntrance = clickedFeatures?.find(
-      (feature: any) => feature.layer.id === "entrances"
-    );
-    if (clickedEntrance) {
-      if (clickedEntrance.properties?.CaveId) {
+    if (clickedFeatures && clickedFeatures.length > 0) {
+      // Check for an "entrances" feature click.
+      const clickedEntrance = clickedFeatures.find(
+        (feature: any) => feature.layer.id === "entrances"
+      );
+      if (clickedEntrance && clickedEntrance.properties?.CaveId) {
         onCaveClicked(clickedEntrance.properties?.CaveId);
+        // Clear any existing popup.
+        setPopupInfo(null);
+        return;
       }
-    } else {
-      if (onNonCaveClicked) {
-        const { lat, lng } = event.lngLat;
-        onNonCaveClicked(lat, lng);
+
+      // Check if an uploaded GeoJSON feature was clicked.
+      const geojsonFeature = clickedFeatures.find((feature: any) => {
+        return uploadedShapeFiles.some(
+          (file) => feature.layer.id === `${file.id}-layer`
+        );
+      });
+      if (geojsonFeature) {
+        setPopupInfo({
+          lngLat: [event.lngLat.lng, event.lngLat.lat],
+          properties: geojsonFeature.properties,
+        });
+        return;
       }
     }
+
+    // Fallback for non-cave clicks.
+    if (onNonCaveClicked) {
+      const { lat, lng } = event.lngLat;
+      onNonCaveClicked(lat, lng);
+    }
+    // Clear popup if no feature is found.
+    setPopupInfo(null);
   };
 
   const zoomControlPosition = "top-left";
@@ -172,17 +196,16 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       const arrayBuffer = await file.arrayBuffer();
       const parsed = await shpjs(arrayBuffer);
 
-      // If the shapefile ZIP has multiple shapefiles,
+      // Handle possibility of multiple shapefile layers.
       const asArray = Array.isArray(parsed) ? parsed : [parsed];
 
-      // Add the newly uploaded layers to our state
+      // Add the new layers.
       const newLayers = asArray.map((fc, i) => ({
         id: `${file.name}-${i}`,
         data: fc as FeatureCollection,
       }));
 
       console.log("Parsed shapefile data:", newLayers);
-
       setUploadedShapeFiles((prev) => [...prev, ...newLayers]);
 
       if (newLayers[0]?.data) {
@@ -202,12 +225,21 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       }
     } catch (err) {
       message.error(
-        "Error parsing shapefile. Please ensure it is a valid zipped shapefile."
+        "Error parsing shapefile. Please ensure it is a valid zipped shapefile that contains .shp, and .dbf files."
       );
-
       console.log(err);
     }
   };
+
+  // Compute dynamic interactive layer IDs including uploaded GeoJSON layers.
+  const uploadedLayerIds = useMemo(
+    () => uploadedShapeFiles.map(({ id }) => `${id}-layer`),
+    [uploadedShapeFiles]
+  );
+  const interactiveLayerIds = useMemo(
+    () => ["entrances", ...uploadedLayerIds],
+    [uploadedLayerIds]
+  );
 
   return (
     <Spin spinning={isLoading}>
@@ -252,7 +284,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
               maxPitch={85}
               reuseMaps
               antialias
-              interactiveLayerIds={["entrances"]}
+              interactiveLayerIds={interactiveLayerIds}
               initialViewState={{
                 longitude: mapCenter[1],
                 latitude: mapCenter[0],
@@ -415,9 +447,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 />
               </Source>
 
-              {/* Shapefile uploads (one Source+Layer for each) */}
+              {/* Uploaded Shapefile layers */}
               {uploadedShapeFiles.map(({ id, data }) => {
-                // Determine the geometry type (removing 'Multi' prefix if any)
                 const firstFeature = data.features[0];
                 const geomType =
                   firstFeature?.geometry?.type?.replace("Multi", "") ??
@@ -430,27 +461,20 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   case "Point":
                     layerType = "circle";
                     paint = {
-                      // You can use a custom color here.
-                      // Currently, it’s set to a sample color (#ff5722).
-                      // If you prefer to match the entrances’ color (blue), you can change it to "#00008B".
                       "circle-color": "#ff5722",
                     };
                     break;
                   case "LineString":
                     layerType = "line";
                     paint = {
-                      // Set the line color to be the same as the default entrances circle color.
                       "line-color": "#00008B",
                     };
                     break;
                   default:
-                    // For Polygon (fill) features
                     layerType = "fill";
                     paint = {
-                      // Fill polygons in red.
                       "fill-color": "#FF0000",
                       "fill-opacity": 0.8,
-                      // Optionally, choose an outline color that's a darker red.
                       "fill-outline-color": "#B22222",
                     };
                     break;
@@ -462,6 +486,31 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   </Source>
                 );
               })}
+
+              {/* Popup for displaying GeoJSON feature properties */}
+              {popupInfo && (
+                <Popup
+                  longitude={popupInfo.lngLat[0]}
+                  latitude={popupInfo.lngLat[1]}
+                  onClose={() => setPopupInfo(null)}
+                  closeOnClick={false}
+                  anchor="top"
+                >
+                  <div>
+                    <strong>Properties:</strong>
+                    <pre
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        wordWrap: "break-word",
+                        maxHeight: "200px",
+                        overflow: "auto",
+                      }}
+                    >
+                      {JSON.stringify(popupInfo.properties, null, 2)}
+                    </pre>
+                  </div>
+                </Popup>
+              )}
 
               <div
                 id="navigation-controls"
@@ -489,7 +538,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     handleClick={() => {
                       const latitude = mapCenter[0];
                       const longitude = mapCenter[1];
-
                       NavigationService.NavigateToMap(
                         latitude,
                         longitude,
@@ -509,5 +557,4 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 };
 
 const MapBaseMemo = React.memo(MapBaseComponent);
-
 export { MapBaseMemo as MapBaseComponent };
