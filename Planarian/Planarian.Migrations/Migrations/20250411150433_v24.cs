@@ -27,19 +27,7 @@ namespace Planarian.Migrations.Migrations
                    );
             $$;
             ");
-
-            migrationBuilder.Sql(@"
-             CREATE OR REPLACE FUNCTION public.fts_matches_websearch(
-                config_text text,          -- 'english'
-                doc         text,          -- narrative column
-                query_text  text           -- user input
-            ) RETURNS boolean
-                LANGUAGE sql IMMUTABLE PARALLEL SAFE AS
-            $$
-            SELECT to_tsvector(config_text::regconfig, doc) @@
-                   websearch_to_tsquery(config_text::regconfig, query_text);
-            $$;
-            ");
+            
         }
 
         /// <inheritdoc />
@@ -47,9 +35,6 @@ namespace Planarian.Migrations.Migrations
         {
             migrationBuilder.Sql(
                 @"DROP FUNCTION IF EXISTS public.ts_headline_simple(text,text,text,text);");
-            migrationBuilder.Sql(
-                @"DROP FUNCTION IF EXISTS public.fts_matches_websearch(text,text,text);");
-
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NpgsqlTypes;
 using Planarian.Model.Database.Entities.RidgeWalker.Views;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -28,6 +29,8 @@ public class Cave : EntityBase
 
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; } = false;
+
+    public NpgsqlTsVector NarrativeSearchVector { get; set; } = null!;
 
 
     public virtual Account Account { get; set; } = null!;
@@ -101,5 +104,16 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);
         builder.HasIndex(e => e.Name);
+
+        builder.HasGeneratedTsVectorColumn<Cave>(
+            e => e.NarrativeSearchVector, // The computed column property
+            "english", // The text search configuration
+            e => e.Narrative // The source property for full-text search
+        );
+        // Create a GIN index on the generated tsvector column.
+        builder.HasIndex(e => e.NarrativeSearchVector)
+            .HasMethod("GIN");
+
+
     }
 }

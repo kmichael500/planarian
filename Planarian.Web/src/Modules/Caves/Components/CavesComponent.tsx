@@ -310,38 +310,6 @@ const CavesComponent: React.FC = () => {
             field={"narrative"}
             label={"Narrative"}
             queryOperator={QueryOperator.FreeText}
-            helpText={
-              <p>
-                Type one or more words to search anywhere in the narrative.
-                <br />
-                <br />
-                Words are matched fuzzily by default — typing <code>
-                  flow
-                </code>{" "}
-                matches <strong>flowstone</strong>, <strong>flowing</strong>,
-                etc.
-                <br />
-                <br />
-                Use double quotes to search for exact words or phrases. For
-                example: <code>"flowstone breakdown"</code>.<br />
-                <br />
-                You can combine exact phrases and individual words. For example:{" "}
-                <code>"main passage" breakdown flow</code>.<br />
-                <br />
-                Use <code>AND</code>, <code>OR</code>, and <code>!</code> (not)
-                for complex queries:
-                <br />
-                <code>flow AND breakdown</code> – finds entries with both words
-                <br />
-                <code>flow OR stream</code> – finds entries with either word
-                <br />
-                <code>!collapsed</code> – excludes entries with that word
-                <br />
-                <br />
-                Matching text will be highlighted in the results when searching
-                by narrative.
-              </p>
-            }
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>

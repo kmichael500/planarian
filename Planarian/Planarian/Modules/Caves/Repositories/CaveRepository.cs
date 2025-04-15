@@ -221,10 +221,10 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     {
                         QueryOperator.FreeText => query.Where(e =>
                             e.Narrative != null &&
-                            FullTextSearchExtensions.WebSearchMatch(
-                                "english",
-                                e.Narrative,
-                                queryCondition.Value)),
+                            e.NarrativeSearchVector.Matches(
+                                EF.Functions.WebSearchToTsQuery("english", queryCondition.Value)
+                            )
+                        ),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
