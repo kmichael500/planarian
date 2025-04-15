@@ -2,10 +2,10 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using NpgsqlTypes;
 using Planarian.Model.Database;
 
 #nullable disable
@@ -13,9 +13,11 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250411150433_v24")]
+    partial class v24
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -667,13 +669,6 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("Narrative")
                         .HasColumnType("text");
 
-                    b.Property<NpgsqlTsVector>("NarrativeSearchVector")
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("tsvector")
-                        .HasAnnotation("Npgsql:TsVectorConfig", "english")
-                        .HasAnnotation("Npgsql:TsVectorProperties", new[] { "Narrative" });
-
                     b.Property<int?>("NumberOfPits")
                         .HasColumnType("integer");
 
@@ -702,10 +697,6 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("LengthFeet");
 
                     b.HasIndex("Name");
-
-                    b.HasIndex("NarrativeSearchVector");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("NarrativeSearchVector"), "GIN");
 
                     b.HasIndex("ReportedByUserId");
 

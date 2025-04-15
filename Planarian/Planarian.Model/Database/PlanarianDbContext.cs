@@ -5,6 +5,7 @@ using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.RidgeWalker.Views;
 using Planarian.Model.Database.Entities.Trips;
+using Planarian.Model.Database.Extensions;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -90,9 +91,21 @@ public class PlanarianDbContextBase : DbContext
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
+    { 
         modelBuilder.HasPostgresExtension("postgis");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContextBase).Assembly);
+        
+        var tsSimple = typeof(FullTextSearchExtensions).GetMethod(
+            nameof(FullTextSearchExtensions.TsHeadlineSimple),
+            new[] { typeof(string), typeof(string), typeof(string), typeof(string) });
+        
+        if (tsSimple == null)
+            throw new InvalidOperationException("Could not find ts_headline_simple method.");
+        
+        modelBuilder.HasDbFunction(tsSimple)       
+            .HasName("ts_headline_simple")     
+            .HasSchema("public");            
+        
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

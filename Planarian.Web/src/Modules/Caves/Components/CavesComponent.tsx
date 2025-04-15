@@ -5,6 +5,8 @@ import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridC
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { PagedResult } from "../../Search/Models/PagedResult";
+import DOMPurify from "dompurify";
+
 import {
   QueryBuilder,
   QueryOperator,
@@ -71,6 +73,17 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
+
+  const [expandedNarratives, setExpandedNarratives] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleNarrative = (caveId: string) => {
+    setExpandedNarratives((prev) => ({
+      ...prev,
+      [caveId]: !prev[caveId],
+    }));
+  };
 
   useEffect(() => {
     getCaves();
@@ -626,6 +639,43 @@ const CavesComponent: React.FC = () => {
                       {renderFeature(cave, featureKey)}
                     </div>
                   ))}
+                  {cave.narrativeSnippet && (
+                    <>
+                      <Typography.Text
+                        style={{ marginRight: "8px", fontWeight: "bold" }}
+                      >
+                        Narrative:
+                      </Typography.Text>
+                      <Typography.Paragraph style={{ marginBottom: 8 }}>
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(
+                              expandedNarratives[cave.id] ||
+                                cave.narrativeSnippet.length <= 400
+                                ? cave.narrativeSnippet
+                                : cave.narrativeSnippet.substring(0, 400) + "…",
+                              { ALLOWED_TAGS: ["mark", "br"] }
+                            ),
+                          }}
+                        />
+                      </Typography.Paragraph>
+                      {cave.narrativeSnippet.length > 400 && (
+                        <div style={{ marginBottom: 8 }}>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            type="link"
+                            size="small"
+                            onClick={() => toggleNarrative(cave.id)}
+                            icon={undefined}
+                          >
+                            {expandedNarratives[cave.id]
+                              ? "Show Less"
+                              : "Show More"}
+                          </PlanarianButton>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Space>
               </GridCard>
             )}

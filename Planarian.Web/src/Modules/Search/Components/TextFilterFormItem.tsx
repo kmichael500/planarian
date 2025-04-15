@@ -1,4 +1,5 @@
-import { Form, Input, Select } from "antd";
+import { Form, Input, Tooltip } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
 import { QueryOperator } from "../Services/QueryBuilder";
 import {
   FilterFormItemProps,
@@ -8,6 +9,7 @@ import {
 export interface TextFilterFormItemProps<T extends object>
   extends FilterFormItemProps<T> {
   queryOperator?: QueryOperator;
+  helpText?: string | React.ReactNode;
 }
 
 const TextFilterFormItem = <T extends object>({
@@ -15,10 +17,23 @@ const TextFilterFormItem = <T extends object>({
   field,
   label,
   queryOperator,
+  helpText,
 }: TextFilterFormItemProps<T>) => {
   queryOperator = queryOperator ?? QueryOperator.Contains;
+
+  const labelWithHelp = helpText ? (
+    <span>
+      {label}{" "}
+      <Tooltip title={helpText}>
+        <InfoCircleOutlined style={{ color: "#1890ff" }} />
+      </Tooltip>
+    </span>
+  ) : (
+    label
+  );
+
   return (
-    <Form.Item name={field.toString()} label={label}>
+    <Form.Item name={field.toString()} label={labelWithHelp}>
       <Input
         id={field.toString()}
         onChange={(e) => {

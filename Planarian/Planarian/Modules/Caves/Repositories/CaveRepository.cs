@@ -5,6 +5,7 @@ using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Modules.Caves.Models;
@@ -24,9 +25,25 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
         var query = GetCavesQuery(filterQuery, permissionKey);
+        
+        var narrativeCondition = filterQuery.Conditions
+            .FirstOrDefault(c => c.Field == nameof(CaveSearchParamsVm.Narrative));
+
+        bool isNarrativeSearch   = narrativeCondition != null;
+        string narrativeSearch   = narrativeCondition?.Value ?? string.Empty;
+
+
         var caveSearchQuery = query.Select(e => new CaveSearchVm
         {
             Id = e.Id,
+            NarrativeSnippet = isNarrativeSearch
+                ? FullTextSearchExtensions.TsHeadlineSimple(
+                    "english", // config
+                    e.Narrative, // document column
+                    narrativeSearch, // search term
+                    "StartSel=<mark>,StopSel=</mark>,MaxWords=30,MinWords=10,MaxFragments=100,FragmentDelimiter= ...<br><br>"
+                ) // options
+                : null,
             CountyId = e.County!.Id,
             DisplayId =
                 $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
@@ -204,7 +221,10 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     {
                         QueryOperator.FreeText => query.Where(e =>
                             e.Narrative != null &&
-                            EF.Functions.ToTsVector(e.Narrative).Matches(queryCondition.Value)),
+                            e.NarrativeSearchVector.Matches(
+                                EF.Functions.WebSearchToTsQuery("english", queryCondition.Value)
+                            )
+                        ),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;

@@ -5,6 +5,8 @@ public class CaveSearchVm
     public string Id { get; set; }
     public string Name { get; set; }
     
+    public string? NarrativeSnippet { get; set; }
+    
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; }
     public double? DepthFeet { get; set; }
