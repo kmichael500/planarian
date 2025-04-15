@@ -1037,88 +1037,108 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             foreach (var uploadVm in geoJsonUploads)
             {
-                CaveGeoJson geoJsonEntity;
-                if (!string.IsNullOrWhiteSpace(uploadVm.Id))
+                // Parse the uploaded GeoJSON string
+                var parsedToken = JToken.Parse(uploadVm.GeoJson);
+                IList<JToken> featureCollections;
+
+                // If the token is an array, treat each element as a FeatureCollection.
+                if (parsedToken is JArray jArray)
                 {
-                    // Try to update an existing record
-                    geoJsonEntity = cave.GeoJsons.FirstOrDefault(g => g.Id == uploadVm.Id);
-                    if (geoJsonEntity == null)
+                    featureCollections = jArray.Children().ToList();
+                }
+                // If it’s a single FeatureCollection object, wrap it in a list.
+                else if (parsedToken is JObject)
+                {
+                    featureCollections = new List<JToken> { parsedToken };
+                }
+                else
+                {
+                    throw ApiExceptionDictionary.BadRequest("Invalid GeoJSON format.");
+                }
+
+                // Process each FeatureCollection individually.
+                foreach (var featureCollectionToken in featureCollections)
+                {
+                    CaveGeoJson geoJsonEntity;
+
+                    // Update existing record if an ID is provided. For multiple feature collections,
+                    // you might want to adjust how the ID mapping works.
+                    if (!string.IsNullOrWhiteSpace(uploadVm.Id))
                     {
-                        // Not found? Then treat it as new.
+                        geoJsonEntity = cave.GeoJsons.FirstOrDefault(g => g.Id == uploadVm.Id);
+                        if (geoJsonEntity == null)
+                        {
+                            // Not found? Create a new entity.
+                            geoJsonEntity = new CaveGeoJson { CaveId = caveId };
+                            Repository.Add(geoJsonEntity);
+                            cave.GeoJsons.Add(geoJsonEntity);
+                        }
+                    }
+                    else
+                    {
+                        // Create a new geojson entry
                         geoJsonEntity = new CaveGeoJson { CaveId = caveId };
                         Repository.Add(geoJsonEntity);
                         cave.GeoJsons.Add(geoJsonEntity);
                     }
-                }
-                else
-                {
-                    // Create a new geojson entry
-                    geoJsonEntity = new CaveGeoJson { CaveId = caveId };
-                    Repository.Add(geoJsonEntity);
-                    cave.GeoJsons.Add(geoJsonEntity);
-                }
 
-                var jsonObj = JObject.Parse(uploadVm.GeoJson);
-
-// Get the features array.
-                var featuresArray = jsonObj["features"] as JArray;
-                if (featuresArray == null)
-                {
-                    throw ApiExceptionDictionary.BadRequest("GeoJSON does not contain any features.");
-                }
-
-                var reader = new GeoJsonReader();
-                var validFeatures = new List<IFeature>();
-
-                foreach (var featureToken in featuresArray)
-                {
-                    try
+                    // Get the features array from the current FeatureCollection.
+                    var featuresArray = featureCollectionToken["features"] as JArray;
+                    if (featuresArray == null)
                     {
-                        // Attempt to read the individual feature.
-                        var featureJson = featureToken.ToString();
-                        var feature = reader.Read<Feature>(featureJson);
-                        if (feature != null)
+                        throw ApiExceptionDictionary.BadRequest(
+                            "GeoJSON feature collection does not contain any features.");
+                    }
+
+                    var reader = new GeoJsonReader();
+                    var validFeatures = new List<IFeature>();
+
+                    // Validate and read each feature within the FeatureCollection.
+                    foreach (var featureToken in featuresArray)
+                    {
+                        try
                         {
-                            validFeatures.Add(feature);
+                            var featureJson = featureToken.ToString();
+                            var feature = reader.Read<Feature>(featureJson);
+                            if (feature != null)
+                            {
+                                validFeatures.Add(feature);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log error and skip invalid features.
+                            Console.WriteLine($"Skipping invalid feature: {ex.Message}");
                         }
                     }
-                    catch (Exception ex)
+
+                    // Combine all valid features into a single geometry.
+                    Geometry finalGeometry;
+                    if (validFeatures.Any())
                     {
-                        // Log the error; the feature is invalid so skip it.
-                        // For example, you might log: ex.Message and featureToken.ToString()
-                        // Here you might want to use your application's logging framework.
-                        Console.WriteLine($"Skipping invalid feature: {ex.Message}");
+                        finalGeometry = new GeometryCollection(validFeatures.Select(f => f.Geometry).ToArray());
                     }
-                }
+                    else
+                    {
+                        throw ApiExceptionDictionary.BadRequest("No valid geometries found.");
+                    }
 
-// Now, you can decide what to do with validFeatures.
-// For example, if you want a single GeometryCollection:
-                Geometry finalGeometry;
-                if (validFeatures.Any())
-                {
-                    finalGeometry = new GeometryCollection(validFeatures.Select(f => f.Geometry).ToArray());
+                    // Assign the processed geometry and save the original (now per FeatureCollection)
+                    geoJsonEntity.Geometry = finalGeometry;
+                    geoJsonEntity.OriginalGeoJson = featureCollectionToken.ToString();
                 }
-                else
-                {
-                    throw ApiExceptionDictionary.BadRequest("No valid geometries found.");
-                }
-
-// Assign the processed, valid geometry to your entity.
-                geoJsonEntity.Geometry = finalGeometry;
-                geoJsonEntity.OriginalGeoJson = uploadVm.GeoJson;
-
             }
 
             await Repository.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        catch (Exception e)
+        catch (Exception)
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }
-    
+
 
     #endregion
 }
