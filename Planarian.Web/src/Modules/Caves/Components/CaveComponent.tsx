@@ -114,8 +114,7 @@ const CaveComponent = ({
     data: FeatureCollection<Geometry, GeoJsonProperties>[]
   ) => {
     if (data && data.length > 0) {
-      // Convert the first FeatureCollection to a JSON string (pretty print if desired).
-      const geoJsonString = JSON.stringify(data[0], null, 2);
+      const geoJsonString = JSON.stringify(data, null, 2);
       setGeoJsonToSave(geoJsonString);
       setIsGeoJsonModalVisible(true);
     } else {
@@ -643,7 +642,6 @@ const CaveComponent = ({
           onSaved={() => {
             setIsGeoJsonModalVisible(false);
             setGeoJsonToSave(null);
-            // Optionally trigger an update of the cave details if needed
             updateCave && updateCave();
           }}
         />
