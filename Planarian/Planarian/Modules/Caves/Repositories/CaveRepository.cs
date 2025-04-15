@@ -731,6 +731,25 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     }
 
     #endregion
+
+    #region GeoJson
+
+    public async Task<IEnumerable<CaveGeoJson>> GetCaveGeoJsonsAsync(string caveId)
+    {
+        return await DbContext.CaveGeoJsons.Where(c => c.CaveId == caveId).ToListAsync();
+    }
+
+    public void AddCaveGeoJson(CaveGeoJson geoJson)
+    {
+        DbContext.CaveGeoJsons.Add(geoJson);
+    }
+
+    public void RemoveCaveGeoJson(CaveGeoJson geoJson)
+    {
+        DbContext.CaveGeoJsons.Remove(geoJson);
+    }
+    
+    #endregion
 }
 
 public class CaveRepository : CaveRepository<PlanarianDbContext>

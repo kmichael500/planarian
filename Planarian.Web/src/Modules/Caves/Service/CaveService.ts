@@ -119,6 +119,16 @@ const CaveService = {
     );
     return response.data;
   },
+  async uploadCaveGeoJson(
+    caveId: string,
+    geoJsonUploads: { geoJson: string }[]
+  ): Promise<void> {
+    const response = await HttpClient.post<void>(
+      `${baseUrl}/${caveId}/geojson`,
+      geoJsonUploads
+    );
+    return response.data;
+  },
 };
 
 export { CaveService };

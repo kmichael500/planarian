@@ -8,6 +8,7 @@
 
     <ItemGroup>
       <PackageReference Include="EFCore.BulkExtensions.PostgreSql" Version="8.0.4" />
+      <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="4.0.0" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" Version="8.0.4" />
     </ItemGroup>

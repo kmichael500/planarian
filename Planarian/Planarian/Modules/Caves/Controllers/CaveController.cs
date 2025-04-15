@@ -148,4 +148,16 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     #endregion
+
+    #region GeoJson
+
+    [HttpPost("{caveId:length(10)}/geojson")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    public async Task<ActionResult> UploadCaveGeoJson(string caveId, [FromBody] IEnumerable<GeoJsonUploadVm> geoJsonUploads, CancellationToken cancellationToken)
+    {
+        await Service.UploadCaveGeoJson(caveId, geoJsonUploads, cancellationToken);
+        return new OkResult();
+    }
+    
+    #endregion
 }

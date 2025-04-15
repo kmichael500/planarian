@@ -35,6 +35,7 @@ interface MapBaseComponentProps {
   showFullScreenControl?: boolean;
   showGeolocateControl?: boolean;
   showSearchBar?: boolean;
+  onShapefileUploaded?: (data: FeatureCollection[]) => void;
 }
 
 // MUST be defined outside the function or in useMemo
@@ -56,6 +57,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   showFullScreenControl = false,
   showGeolocateControl = true,
   showSearchBar = true,
+  onShapefileUploaded,
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
@@ -222,6 +224,10 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
             }
           );
         }
+      }
+
+      if (onShapefileUploaded) {
+        onShapefileUploaded(newLayers.map((layer) => layer.data));
       }
     } catch (err) {
       message.error(

@@ -5,6 +5,7 @@ import { MapBaseComponent } from "./MapBaseComponent";
 import { MapClickCaveModal } from "./MapClickCaveModal";
 import { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { MapClickPointModal } from "./MapClickPointModal";
+import { FeatureCollection } from "geojson";
 
 interface MapComponentProps {
   initialCenter?: [number, number];
@@ -13,6 +14,7 @@ interface MapComponentProps {
   showFullScreenControl?: boolean;
   showGeolocateControl?: boolean;
   showSearchBar?: boolean;
+  onShapefileUploaded?: (data: FeatureCollection[]) => void;
 }
 
 const MapComponent = ({
@@ -22,6 +24,7 @@ const MapComponent = ({
   showFullScreenControl = false,
   showGeolocateControl = true,
   showSearchBar = true,
+  onShapefileUploaded,
 }: MapComponentProps) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isModalLoading, setIsModalLoading] = useState(false);
@@ -63,6 +66,7 @@ const MapComponent = ({
         showFullScreenControl={showFullScreenControl}
         showGeolocateControl={showGeolocateControl}
         showSearchBar={showSearchBar}
+        onShapefileUploaded={onShapefileUploaded}
       />
       <MapClickCaveModal
         isModalVisible={isModalVisible}
