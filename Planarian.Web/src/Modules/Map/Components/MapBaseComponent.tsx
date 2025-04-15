@@ -462,6 +462,32 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     layerType = "circle";
                     paint = {
                       "circle-color": "#ff5722",
+                      "circle-radius": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        16,
+                        0.5, // At zoom level 16, radius is 0.5
+                        18,
+                        4, // At zoom level 18, radius is 4
+                        20,
+                        8, // At zoom level 20, radius is 8
+                      ],
+                      "circle-opacity": [
+                        "step",
+                        ["zoom"],
+                        0, // Invisible below zoom level 16
+                        16,
+                        0.8, // Visible at 80% opacity at zoom level 16+
+                      ],
+                      "circle-stroke-color": "#fff",
+                      "circle-stroke-width": [
+                        "step",
+                        ["zoom"],
+                        0, // No stroke below zoom level 16
+                        16,
+                        0.5, // 0.5px stroke at zoom level 16+
+                      ],
                     };
                     break;
                   case "LineString":
