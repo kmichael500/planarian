@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Planarian.Model.Shared;
 using Planarian.Modules.Map.Services;
 using Planarian.Shared.Base;
@@ -30,5 +31,18 @@ public class MapService : ServiceBase<MapRepository>
         
         var result = await Repository.GetEntrancesMVTAsync(z, x, y);
         return result;
+    }
+
+    public async Task<byte[]?> GetLinePlots(int z, int x, int y,
+        CancellationToken cancellationToken)
+    {
+        try{
+            var result = await Repository.GetLinePlots(z, x, y, cancellationToken);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return null;
+        }
     }
 }

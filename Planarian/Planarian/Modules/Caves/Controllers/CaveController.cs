@@ -155,7 +155,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult> UploadCaveGeoJson(string caveId, [FromBody] IEnumerable<GeoJsonUploadVm> geoJsonUploads, CancellationToken cancellationToken)
     {
-        await Service.UploadCaveGeoJson(caveId, geoJsonUploads, cancellationToken);
+            await Service.UploadCaveGeoJson(caveId, geoJsonUploads, cancellationToken);
         return new OkResult();
     }
     

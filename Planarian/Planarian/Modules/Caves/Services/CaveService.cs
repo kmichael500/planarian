@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -412,13 +411,13 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
         var isNew = string.IsNullOrWhiteSpace(values.Id);
 
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
 
-        
+
         #region Data Validation
 
         // must be at least one entrance
@@ -629,7 +628,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 if (!isNewEntrance)
                 {
                     // if the z value was not provided during import, ef core doesn't realize that the z value was added later.
-                    Repository.SetPropertiesModified(entrance, e=> e.Location);
+                    Repository.SetPropertiesModified(entrance, e => e.Location);
                 }
 
                 entrance.EntranceStatusTags.Clear();
@@ -967,12 +966,13 @@ public class CaveService : ServiceBase<CaveRepository>
 
 
     #region Favorite Cave
-    
+
     public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
     {
         var caves = await Repository.GetFavoriteCaves(query);
         return caves;
     }
+
     public async Task FavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
@@ -981,10 +981,10 @@ public class CaveService : ServiceBase<CaveRepository>
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
         var favorite = await Repository.GetFavoriteCave(caveId);
-        
+
         var isNew = favorite == null;
         favorite ??= new Favorite();
-        
+
         favorite.CaveId = caveId;
         favorite.UserId = RequestUser.Id;
         favorite.AccountId = RequestUser.AccountId;
@@ -993,131 +993,132 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             Repository.Add(favorite);
         }
-        
+
         await Repository.SaveChangesAsync();
     }
-    
+
     public async Task UnfavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         var favorite = await Repository.GetFavoriteCave(caveId);
         if (favorite == null) throw ApiExceptionDictionary.NotFound(nameof(favorite.Id));
 
         Repository.Delete(favorite);
         await Repository.SaveChangesAsync();
     }
-    
+
     public async Task<FavoriteVm?> GetFavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         var favorite = await Repository.GetFavoriteCaveVm(caveId);
         return favorite;
     }
-    
+
     #endregion
 
     #region GeoJson
 
-            public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads, CancellationToken cancellationToken = default)
+    public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
+        CancellationToken cancellationToken = default)
+    {
+        // Retrieve the cave entity (your GetAsync method already does permission filtering)
+        var cave = await Repository.GetAsync(caveId);
+        if (cave == null)
+            throw ApiExceptionDictionary.NotFound("Cave");
+
+        // Check that the current user has the Manager-level permission for the cave
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
+
+        // Begin a transaction (similar to your AddCave method)
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
         {
-            // Retrieve the cave entity (your GetAsync method already does permission filtering)
-            var cave = await Repository.GetAsync(caveId);
-            if (cave == null)
-                throw ApiExceptionDictionary.NotFound("Cave");
-
-            // Check that the current user has the Manager-level permission for the cave
-            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
-
-            // Begin a transaction (similar to your AddCave method)
-            await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-            try
+            foreach (var uploadVm in geoJsonUploads)
             {
-                foreach (var uploadVm in geoJsonUploads)
+                CaveGeoJson geoJsonEntity;
+                if (!string.IsNullOrWhiteSpace(uploadVm.Id))
                 {
-                    CaveGeoJson geoJsonEntity;
-                    if (!string.IsNullOrWhiteSpace(uploadVm.Id))
+                    // Try to update an existing record
+                    geoJsonEntity = cave.GeoJsons.FirstOrDefault(g => g.Id == uploadVm.Id);
+                    if (geoJsonEntity == null)
                     {
-                        // Try to update an existing record
-                        geoJsonEntity = cave.GeoJsons.FirstOrDefault(g => g.Id == uploadVm.Id);
-                        if (geoJsonEntity == null)
-                        {
-                            // Not found? Then treat it as new.
-                            geoJsonEntity = new CaveGeoJson { CaveId = caveId };
-                            Repository.Add(geoJsonEntity);
-                            cave.GeoJsons.Add(geoJsonEntity);
-                        }
-                    }
-                    else
-                    {
-                        // Create a new geojson entry
+                        // Not found? Then treat it as new.
                         geoJsonEntity = new CaveGeoJson { CaveId = caveId };
                         Repository.Add(geoJsonEntity);
                         cave.GeoJsons.Add(geoJsonEntity);
                     }
+                }
+                else
+                {
+                    // Create a new geojson entry
+                    geoJsonEntity = new CaveGeoJson { CaveId = caveId };
+                    Repository.Add(geoJsonEntity);
+                    cave.GeoJsons.Add(geoJsonEntity);
+                }
 
-                    var jsonObj = JObject.Parse(uploadVm.GeoJson);
+                var jsonObj = JObject.Parse(uploadVm.GeoJson);
 
 // Get the features array.
-                    var featuresArray = jsonObj["features"] as JArray;
-                    if (featuresArray == null)
-                    {
-                        throw ApiExceptionDictionary.BadRequest("GeoJSON does not contain any features.");
-                    }
+                var featuresArray = jsonObj["features"] as JArray;
+                if (featuresArray == null)
+                {
+                    throw ApiExceptionDictionary.BadRequest("GeoJSON does not contain any features.");
+                }
 
-                    var reader = new GeoJsonReader();
-                    var validFeatures = new List<IFeature>();
+                var reader = new GeoJsonReader();
+                var validFeatures = new List<IFeature>();
 
-                    foreach (var featureToken in featuresArray)
+                foreach (var featureToken in featuresArray)
+                {
+                    try
                     {
-                        try
+                        // Attempt to read the individual feature.
+                        var featureJson = featureToken.ToString();
+                        var feature = reader.Read<Feature>(featureJson);
+                        if (feature != null)
                         {
-                            // Attempt to read the individual feature.
-                            var featureJson = featureToken.ToString();
-                            var feature = reader.Read<Feature>(featureJson);
-                            if (feature != null)
-                            {
-                                validFeatures.Add(feature);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log the error; the feature is invalid so skip it.
-                            // For example, you might log: ex.Message and featureToken.ToString()
-                            // Here you might want to use your application's logging framework.
-                            Console.WriteLine($"Skipping invalid feature: {ex.Message}");
+                            validFeatures.Add(feature);
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        // Log the error; the feature is invalid so skip it.
+                        // For example, you might log: ex.Message and featureToken.ToString()
+                        // Here you might want to use your application's logging framework.
+                        Console.WriteLine($"Skipping invalid feature: {ex.Message}");
+                    }
+                }
 
 // Now, you can decide what to do with validFeatures.
 // For example, if you want a single GeometryCollection:
-                    Geometry finalGeometry;
-                    if (validFeatures.Any())
-                    {
-                        finalGeometry = new GeometryCollection(validFeatures.Select(f => f.Geometry).ToArray());
-                    }
-                    else
-                    {
-                        throw ApiExceptionDictionary.BadRequest("No valid geometries found.");
-                    }
-
-// Assign the processed, valid geometry to your entity.
-                    geoJsonEntity.Geometry = finalGeometry;
-                    geoJsonEntity.OriginalGeoJson = uploadVm.GeoJson;
-
+                Geometry finalGeometry;
+                if (validFeatures.Any())
+                {
+                    finalGeometry = new GeometryCollection(validFeatures.Select(f => f.Geometry).ToArray());
+                }
+                else
+                {
+                    throw ApiExceptionDictionary.BadRequest("No valid geometries found.");
                 }
 
-                await Repository.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch(Exception e)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
-        }
+// Assign the processed, valid geometry to your entity.
+                geoJsonEntity.Geometry = finalGeometry;
+                geoJsonEntity.OriginalGeoJson = uploadVm.GeoJson;
 
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception e)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+    
 
     #endregion
 }

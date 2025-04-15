@@ -104,16 +104,16 @@ public class MapRepository : RepositoryBase
 
     private double GetGridSize(int zoom)
     {
-        const double m = -0.2;  
-        const double b = 2.2;  
+        const double m = -0.2;
+        const double b = 2.2;
 
         var gridSize = m * zoom + b;
 
-        gridSize = Math.Max(0.045, Math.Min(0.8, gridSize));  // Adjust min and max values as needed
-    
+        gridSize = Math.Max(0.045, Math.Min(0.8, gridSize));
+
         return gridSize;
     }
-    
+
     private int GetMinClusterSize(int zoom)
     {
         return Math.Max(2, 20 / (zoom + 1));
@@ -169,13 +169,13 @@ public class MapRepository : RepositoryBase
         double averageLongitude = -98.5855;
         try
         {
-        averageLatitude = await DbContext.Entrances
-            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-            .AverageAsync(e => e.Location.Y);
+            averageLatitude = await DbContext.Entrances
+                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+                .AverageAsync(e => e.Location.Y);
 
-        averageLongitude = await DbContext.Entrances
-            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-            .AverageAsync(e => e.Location.X);
+            averageLongitude = await DbContext.Entrances
+                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+                .AverageAsync(e => e.Location.X);
         }
         catch (Exception)
         {
@@ -183,7 +183,7 @@ public class MapRepository : RepositoryBase
             // will fail if no entrances added
         }
 
-        return new CoordinateDto{Latitude = averageLatitude, Longitude = averageLongitude};
+        return new CoordinateDto { Latitude = averageLatitude, Longitude = averageLongitude };
     }
 
     public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
@@ -248,6 +248,51 @@ FROM (
         return null;
     }
 
+    public async Task<byte[]?> GetLinePlots(int z, int x, int y, CancellationToken cancellationToken)
+    {
+        var query = @"
+        WITH tile AS (
+            SELECT 
+                ST_TileEnvelope({0}, {1}, {2}) AS bbox_3857,
+                ST_Transform(ST_TileEnvelope({0}, {1}, {2}), 4326) AS bbox_native
+        )
+        SELECT ST_AsMVT(tile_geom.*, 'lineplots', 4096, 'geom') AS mvt
+        FROM (
+            SELECT 
+                ""CaveGeoJsons"".""Id"",
+                ""CaveGeoJsons"".""CaveId"",
+                ST_AsMVTGeom(
+                    ST_Transform(ST_SetSRID(""CaveGeoJsons"".""Geometry"", 4326), 3857),
+                    tile.bbox_3857,
+                    4096,
+                    0,
+                    true
+                ) AS geom
+            FROM 
+                ""CaveGeoJsons"", tile
+            WHERE 
+                ST_Intersects(
+                    ST_SetSRID(""CaveGeoJsons"".""Geometry"", 4326),
+                    tile.bbox_native
+                )
+        ) AS tile_geom;
+        ";
+
+        query = string.Format(query, z, x, y);
+
+        await using var command = DbContext.Database.GetDbConnection().CreateCommand();
+        command.CommandText = query;
+        await DbContext.Database.OpenConnectionAsync(cancellationToken: cancellationToken);
+
+        await using var result = await command.ExecuteReaderAsync(cancellationToken);
+        if (await result.ReadAsync(cancellationToken))
+        {
+            return result["mvt"] as byte[];
+        }
+
+        return null;
+
+    }
 
 
 

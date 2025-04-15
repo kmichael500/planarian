@@ -453,6 +453,75 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 />
               </Source>
 
+              <Source
+                id="lineplots"
+                type="vector"
+                tiles={[
+                  `${
+                    AppOptions.serverBaseUrl
+                  }/api/map/lineplots/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}`,
+                ]}
+                attribution={`© ${accountName}`}
+              >
+                {/* Polygon geometries */}
+                <Layer
+                  source-layer="lineplots"
+                  id="lineplots-fill"
+                  type="fill"
+                  paint={{
+                    "fill-color": "#FF0000",
+                    "fill-opacity": [
+                      "step",
+                      ["zoom"],
+                      0, // Invisible below zoom level 10
+                      10,
+                      0.6, // Original opacity at zoom level 10+
+                    ],
+                  }}
+                  filter={["==", ["geometry-type"], "Polygon"]}
+                />
+
+                {/* Line geometries */}
+                <Layer
+                  source-layer="lineplots"
+                  id="lineplots-line"
+                  type="line"
+                  paint={{
+                    "line-color": "#0000FF",
+                    "line-width": 2,
+                    "line-opacity": [
+                      "step",
+                      ["zoom"],
+                      0, // Invisible below zoom level 10
+                      10,
+                      0.8, // Original opacity at zoom level 10+
+                    ],
+                  }}
+                  filter={["==", ["geometry-type"], "LineString"]}
+                />
+
+                {/* Point geometries */}
+                <Layer
+                  source-layer="lineplots"
+                  id="lineplots-point"
+                  type="circle"
+                  paint={{
+                    "circle-radius": 5,
+                    "circle-color": "#00FF00",
+                    "circle-opacity": [
+                      "step",
+                      ["zoom"],
+                      0, // Invisible below zoom level 10
+                      10,
+                      0.8, // Original opacity at zoom level 10+
+                    ],
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": "#FFFFFF",
+                  }}
+                  filter={["==", ["geometry-type"], "Point"]}
+                />
+              </Source>
+
               {/* Uploaded Shapefile layers */}
               {uploadedShapeFiles.map(({ id, data }) => {
                 const firstFeature = data.features[0];

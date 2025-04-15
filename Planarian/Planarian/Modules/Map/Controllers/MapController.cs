@@ -23,7 +23,19 @@ public class MapController : PlanarianControllerBase<MapService>
         var data = await Service.GetMapData(north, south, east, west, zoom, cancellationToken);
         return Ok(data);
     }
-    
+
+    [HttpGet("lineplots/{z}/{x}/{y}.mvt")]
+    public async Task<IActionResult> GetLinePlots(int z, int x, int y, CancellationToken cancellationToken)
+    {
+        var data = await Service.GetLinePlots(z, x, y, cancellationToken);
+        if (data == null)
+        {
+            return NotFound();
+        }
+        return File(data, "application/x-protobuf");
+    }
+
+
     [HttpGet("center")]
     public async Task<ActionResult<object>> GetMapCenter()
     {
