@@ -11,10 +11,4 @@ public static class FullTextSearchExtensions
         string query,
         string options)           
         => throw new NotSupportedException(); // this isn't actually executed
-    
-    [DbFunction("fts_matches_websearch", "public")]
-    public static bool WebSearchMatch(
-        string config,
-        string document,
-        string query) => throw new NotSupportedException(); // this isn't actually executed
 }

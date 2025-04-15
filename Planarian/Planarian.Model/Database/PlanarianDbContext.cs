@@ -99,18 +99,13 @@ public class PlanarianDbContextBase : DbContext
             nameof(FullTextSearchExtensions.TsHeadlineSimple),
             new[] { typeof(string), typeof(string), typeof(string), typeof(string) });
 
-        modelBuilder.HasDbFunction(tsSimple)           // no .HasTranslation()
-            .HasName("ts_headline_simple")     // SQL name
-            .HasSchema("public");              // change if you used another schema
+        modelBuilder.HasDbFunction(tsSimple)       
+            .HasName("ts_headline_simple")     
+            .HasSchema("public");            
         
         var webMatch = typeof(FullTextSearchExtensions).GetMethod(
             nameof(FullTextSearchExtensions.WebSearchMatch),
             new[] { typeof(string), typeof(string), typeof(string) });
-
-        modelBuilder.HasDbFunction(webMatch)
-            .HasName("fts_matches_websearch")
-            .HasSchema("public");
-
 
     }
 
