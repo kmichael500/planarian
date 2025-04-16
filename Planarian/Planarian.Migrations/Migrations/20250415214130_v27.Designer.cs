@@ -14,8 +14,8 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20250415040730_v26")]
-    partial class v26
+    [Migration("20250415214130_v27")]
+    partial class v27
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -738,9 +738,10 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Geometry>("Geometry")
+                    b.Property<string>("GeoJson")
                         .IsRequired()
-                        .HasColumnType("geometry");
+                        .HasMaxLength(2147483647)
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("ModifiedByUserId")
                         .HasMaxLength(10)
@@ -748,10 +749,6 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OriginalGeoJson")
-                        .HasMaxLength(2147483647)
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -1020,6 +1017,10 @@ namespace Planarian.Migrations.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CaveId");
+
+                    b.HasIndex("Location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "GIST");
 
                     b.HasIndex("LocationQualityTagId");
 

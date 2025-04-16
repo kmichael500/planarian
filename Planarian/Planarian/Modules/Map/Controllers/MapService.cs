@@ -26,23 +26,29 @@ public class MapService : ServiceBase<MapRepository>
         return result;
     }
 
-    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, CancellationToken cancellationToken)
     {
         
-        var result = await Repository.GetEntrancesMVTAsync(z, x, y);
+        var result = await Repository.GetEntrancesMVTAsync(z, x, y, cancellationToken);
         return result;
     }
 
-    public async Task<byte[]?> GetLinePlots(int z, int x, int y,
-        CancellationToken cancellationToken)
+    public async Task<List<object>> GetLinePlots(double north, double south, double east, double west, double zoom, CancellationToken cancellationToken)
     {
-        try{
-            var result = await Repository.GetLinePlots(z, x, y, cancellationToken);
+        try
+        {
+            if (zoom < 12)
+            {
+                return new List<object>();
+            }
+            var result = await Repository.GetLinePlots(north, south, east, west, (int)zoom, cancellationToken);
             return result;
         }
         catch (Exception ex)
         {
-            return null;
+            // Optionally log exception
+            return new List<object>();
         }
     }
+
 }

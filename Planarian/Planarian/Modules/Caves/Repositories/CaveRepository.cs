@@ -655,6 +655,13 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Cave?> GetCaveWithLinePlots(string caveId)
+    {
+        return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
+            .Include(e => e.GeoJsons)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
     {
         var usedCountyNumbers = await DbContext.Caves

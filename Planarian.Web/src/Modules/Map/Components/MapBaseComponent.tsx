@@ -38,7 +38,7 @@ interface MapBaseComponentProps {
   onShapefileUploaded?: (data: FeatureCollection[]) => void;
 }
 
-// MUST be defined outside the function or in useMemo
+// MUST be defined outside the function (or via useMemo)
 // otherwise the map might re-render unpredictably
 const mapStyle: StyleSpecification = {
   glyphs:
@@ -47,6 +47,17 @@ const mapStyle: StyleSpecification = {
   sources: {},
   layers: [],
 } as StyleSpecification;
+
+// Helper functions to convert tile coordinates to longitude/latitude.
+// These functions use the standard Web Mercator tile scheme.
+const tile2lon = (x: number, zoom: number): number => {
+  return (x / Math.pow(2, zoom)) * 360 - 180;
+};
+
+const tile2lat = (y: number, zoom: number): number => {
+  const n = Math.PI - (2 * Math.PI * y) / Math.pow(2, zoom);
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+};
 
 const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
@@ -88,6 +99,15 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     properties: any;
   } | null>(null);
 
+  const [lineplotsData, setLineplotsData] = useState<
+    {
+      id: string;
+      data: FeatureCollection;
+      type: string;
+    }[]
+  >([]);
+
+  // Get the map center using the MapService if no initialCenter was provided.
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -104,6 +124,140 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       setIsLoading(false);
     }
   }, [initialCenter]);
+
+  // Instead of relying on the current zoom for caching, we fix the caching zoom to 12.
+  // This way the same geographic area yields the same tile keys regardless of the actual zoom.
+  const cachingZoom = 12;
+  // Track which fixed-level tiles have been fetched.
+  const fetchedTilesRef = React.useRef<Set<string>>(new Set());
+  // Cache the fetched lineplots data.
+  const cachedLineplotsDataRef = React.useRef<
+    { id: string; data: FeatureCollection; type: string }[]
+  >([]);
+
+  const fetchLineplots = async () => {
+    if (!mapRef.current) return;
+    // Only fetch data if the current zoom is 12 or greater.
+    if (zoom < 12) return;
+
+    const mapInstance = mapRef.current.getMap();
+    const bounds = mapInstance.getBounds();
+    const north = bounds.getNorth();
+    const south = bounds.getSouth();
+    const east = bounds.getEast();
+    const west = bounds.getWest();
+
+    // Compute tile indices using the fixed caching zoom.
+    const n = Math.pow(2, cachingZoom);
+    const minTileX = Math.floor(((west + 180) / 360) * n);
+    const maxTileX = Math.floor(((east + 180) / 360) * n);
+    const minTileY = Math.floor(
+      ((1 -
+        Math.log(
+          Math.tan((north * Math.PI) / 180) +
+            1 / Math.cos((north * Math.PI) / 180)
+        ) /
+          Math.PI) /
+        2) *
+        n
+    );
+    const maxTileY = Math.floor(
+      ((1 -
+        Math.log(
+          Math.tan((south * Math.PI) / 180) +
+            1 / Math.cos((south * Math.PI) / 180)
+        ) /
+          Math.PI) /
+        2) *
+        n
+    );
+
+    // Determine which tiles in the current viewport have not yet been fetched.
+    const missingTiles: { x: number; y: number; tileId: string }[] = [];
+    for (let x = minTileX; x <= maxTileX; x++) {
+      for (let y = minTileY; y <= maxTileY; y++) {
+        const tileId = `${cachingZoom}/${x}/${y}`;
+        if (!fetchedTilesRef.current.has(tileId)) {
+          missingTiles.push({ x, y, tileId });
+        }
+      }
+    }
+
+    if (missingTiles.length === 0) {
+      setLineplotsData([...cachedLineplotsDataRef.current]);
+      return;
+    }
+
+    const fetchPromises = missingTiles.map(({ x, y, tileId }) => {
+      const tileWest = tile2lon(x, cachingZoom);
+      const tileEast = tile2lon(x + 1, cachingZoom);
+      const tileNorth = tile2lat(y, cachingZoom);
+      const tileSouth = tile2lat(y + 1, cachingZoom);
+
+      return fetch(
+        `${
+          AppOptions.serverBaseUrl
+        }/api/map/lineplots?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&north=${tileNorth}&south=${tileSouth}&east=${tileEast}&west=${tileWest}&zoom=${zoom}`
+      )
+        .then((resp) => resp.json())
+        .then((data: FeatureCollection[]) => {
+          let processedData: {
+            id: string;
+            data: FeatureCollection;
+            type: string;
+          }[] = [];
+          if (Array.isArray(data)) {
+            data.forEach(
+              (featureCollection: FeatureCollection, index: number) => {
+                if (
+                  featureCollection &&
+                  featureCollection.features &&
+                  featureCollection.features.length > 0
+                ) {
+                  const firstFeature = featureCollection.features[0];
+                  const geomType =
+                    firstFeature?.geometry?.type?.replace("Multi", "") ||
+                    "Polygon";
+                  processedData.push({
+                    id: `lineplot-${tileId}-${Date.now()}-${index}`,
+                    data: featureCollection,
+                    type: geomType,
+                  });
+                }
+              }
+            );
+          }
+          // Mark this tile as fetched.
+          fetchedTilesRef.current.add(tileId);
+          return processedData;
+        })
+        .catch((error) => {
+          console.error(`Error fetching tile ${tileId}`, error);
+          // Mark the tile as fetched to avoid immediate re-fetch attempts.
+          fetchedTilesRef.current.add(tileId);
+          return [];
+        });
+    });
+
+    try {
+      const results = await Promise.all(fetchPromises);
+      let newData: { id: string; data: FeatureCollection; type: string }[] = [];
+      results.forEach((arr) => {
+        newData = newData.concat(arr);
+      });
+      // Merge new data with any previously cached data.
+      const mergedData = [...cachedLineplotsDataRef.current, ...newData];
+      cachedLineplotsDataRef.current = mergedData;
+      setLineplotsData(mergedData);
+    } catch (error) {
+      console.error("Error fetching tiles", error);
+      message.error("Error fetching lineplots data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchLineplots();
+  }, [zoom, mapCenter]);
 
   const handleMoveEnd = (e: ViewStateChangeEvent) => {
     const { latitude, longitude, zoom: currentZoom } = e.viewState;
@@ -150,6 +304,20 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         setPopupInfo({
           lngLat: [event.lngLat.lng, event.lngLat.lat],
           properties: geojsonFeature.properties,
+        });
+        return;
+      }
+
+      // Check if a lineplot feature was clicked
+      const lineplotFeature = clickedFeatures.find((feature: any) => {
+        return lineplotsData.some(
+          (plot) => feature.layer.id === `${plot.id}-layer`
+        );
+      });
+      if (lineplotFeature) {
+        setPopupInfo({
+          lngLat: [event.lngLat.lng, event.lngLat.lat],
+          properties: lineplotFeature.properties,
         });
         return;
       }
@@ -233,7 +401,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       message.error(
         "Error parsing shapefile. Please ensure it is a valid zipped shapefile that contains .shp, and .dbf files."
       );
-      console.log(err);
+      console.error(err);
     }
   };
 
@@ -242,10 +410,31 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     () => uploadedShapeFiles.map(({ id }) => `${id}-layer`),
     [uploadedShapeFiles]
   );
-  const interactiveLayerIds = useMemo(
-    () => ["entrances", ...uploadedLayerIds],
-    [uploadedLayerIds]
+  const lineplotLayerIds = useMemo(
+    () => lineplotsData.map(({ id }) => `${id}-layer`),
+    [lineplotsData]
   );
+  const interactiveLayerIds = useMemo(
+    () => ["entrances", ...uploadedLayerIds, ...lineplotLayerIds],
+    [uploadedLayerIds, lineplotLayerIds]
+  );
+
+  // Sort lineplot data by geometry type for proper layering
+  const sortedLineplotsData = useMemo(() => {
+    // Create a copy of the data to avoid mutating state
+    const sorted = [...lineplotsData];
+
+    // Define order of geometry types (polygons first, then lines, then points)
+    const typeOrder = { Polygon: 0, LineString: 1, Point: 2 };
+
+    // Sort by geometry type
+    return sorted.sort((a, b) => {
+      return (
+        (typeOrder[a.type as keyof typeof typeOrder] || 0) -
+        (typeOrder[b.type as keyof typeof typeOrder] || 0)
+      );
+    });
+  }, [lineplotsData]);
 
   return (
     <Spin spinning={isLoading}>
@@ -295,6 +484,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 longitude: mapCenter[1],
                 latitude: mapCenter[0],
                 zoom: zoom,
+              }}
+              onLoad={() => {
+                fetchLineplots();
               }}
               onClick={handleMapClick}
               mapStyle={mapStyle}
@@ -453,96 +645,66 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 />
               </Source>
 
-              <Source
-                id="lineplots"
-                type="vector"
-                tiles={[
-                  `${
-                    AppOptions.serverBaseUrl
-                  }/api/map/lineplots/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}`,
-                ]}
-                attribution={`© ${accountName}`}
-              >
-                {/* Polygon geometries */}
-                <Layer
-                  source-layer="lineplots"
-                  id="lineplots-fill"
-                  type="fill"
-                  paint={{
-                    "fill-color": "#FF0000",
-                    "fill-opacity": [
-                      "step",
-                      ["zoom"],
-                      0, // Invisible below zoom level 10
-                      10,
-                      0.6, // Original opacity at zoom level 10+
-                    ],
-                  }}
-                  filter={["==", ["geometry-type"], "Polygon"]}
-                />
+              {/* Lineplots layers from fetched data - render in order: Polygons, Lines, Points */}
+              {sortedLineplotsData.map(({ id, data, type }) => {
+                let paint: any;
+                let layerType: "fill" | "line" | "circle";
 
-                {/* Line geometries */}
-                <Layer
-                  source-layer="lineplots"
-                  id="lineplots-line"
-                  type="line"
-                  paint={{
-                    "line-color": "#0000FF",
-                    "line-width": 2,
-                    "line-opacity": [
-                      "step",
-                      ["zoom"],
-                      0, // Invisible below zoom level 10
-                      10,
-                      0.8, // Original opacity at zoom level 10+
-                    ],
-                  }}
-                  filter={["==", ["geometry-type"], "LineString"]}
-                />
+                switch (type) {
+                  case "Point":
+                    layerType = "circle";
+                    paint = {
+                      "circle-color": "#ff5722",
+                      "circle-radius": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        16,
+                        0.5,
+                        18,
+                        4,
+                        20,
+                        8,
+                      ],
+                      "circle-opacity": ["step", ["zoom"], 0, 16, 0.8],
+                      "circle-stroke-color": "#fff",
+                      "circle-stroke-width": ["step", ["zoom"], 0, 16, 0.5],
+                    };
+                    break;
+                  case "LineString":
+                    layerType = "line";
+                    paint = {
+                      "line-color": "#00008B",
+                    };
+                    break;
+                  default:
+                    layerType = "fill";
+                    paint = {
+                      "fill-color": "#FF0000",
+                      "fill-opacity": 0.8,
+                      "fill-outline-color": "#B22222",
+                    };
+                    break;
+                }
 
-                {/* Point geometries */}
-                <Layer
-                  source-layer="lineplots"
-                  id="lineplots-point"
-                  type="circle"
-                  paint={{
-                    "circle-color": "#ff5722",
-                    "circle-radius": [
-                      "interpolate",
-                      ["linear"],
-                      ["zoom"],
-                      16,
-                      0.5, // At zoom level 16, radius is 0.5
-                      18,
-                      4, // At zoom level 18, radius is 4
-                      20,
-                      8, // At zoom level 20, radius is 8
-                    ],
-                    "circle-opacity": [
-                      "step",
-                      ["zoom"],
-                      0, // Invisible below zoom level 16
-                      16,
-                      0.8, // Visible at 80% opacity at zoom level 16+
-                    ],
-                    "circle-stroke-color": "#fff",
-                    "circle-stroke-width": [
-                      "step",
-                      ["zoom"],
-                      0, // No stroke below zoom level 16
-                      16,
-                      0.5, // 0.5px stroke at zoom level 16+
-                    ],
-                  }}
-                  // filter={["==", ["geometry-type"], "Point"]}
-                />
-              </Source>
+                return (
+                  <Source
+                    key={id}
+                    id={id}
+                    type="geojson"
+                    data={data}
+                    attribution={`© ${accountName}`}
+                  >
+                    <Layer id={`${id}-layer`} type={layerType} paint={paint} />
+                  </Source>
+                );
+              })}
 
               {/* Uploaded Shapefile layers */}
               {uploadedShapeFiles.map(({ id, data }) => {
                 const firstFeature = data.features[0];
                 const geomType =
-                  firstFeature?.geometry?.type?.replace("Multi", "") ??
+                  firstFeature?.geometry?.type?.replace("Multi", "") ||
                   "Polygon";
 
                 let paint: any;
@@ -604,7 +766,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 );
               })}
 
-              {/* Popup for displaying GeoJSON feature properties */}
+              {/* Popup for displaying feature properties */}
               {popupInfo && (
                 <Popup
                   longitude={popupInfo.lngLat[0]}

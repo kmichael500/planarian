@@ -1,7 +1,8 @@
 // GeoJsonSaveModal.tsx
 import React, { useState } from "react";
-import { Modal, Button, message } from "antd";
+import { Modal, Button, message, Alert, Space } from "antd";
 import { CaveService } from "../Service/CaveService";
+import { CopyOutlined } from "@ant-design/icons";
 
 export interface GeoJsonSaveModalProps {
   isVisible: boolean;
@@ -25,20 +26,27 @@ const GeoJsonSaveModal: React.FC<GeoJsonSaveModalProps> = ({
     try {
       // The backend endpoint expects an array, so we wrap the object
       await CaveService.uploadCaveGeoJson(caveId, [{ geoJson }]);
-      message.success("GeoJSON saved successfully!");
+      message.success("Shapefile saved successfully!");
       onSaved();
     } catch (error) {
-      console.error("Error saving GeoJSON", error);
-      message.error("Failed to save GeoJSON. Please try again.");
+      console.error("Error saving shapefile", error);
+      message.error("Failed to save shapefile. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
+  const copyToClipboard = () => {
+    navigator.clipboard
+      .writeText(geoJson)
+      .then(() => message.success("Data copied to clipboard"))
+      .catch(() => message.error("Failed to copy data"));
+  };
+
   return (
     <Modal
       visible={isVisible}
-      title="Save GeoJSON"
+      title="Save"
       onCancel={onCancel}
       footer={[
         <Button key="cancel" onClick={onCancel} disabled={isSaving}>
@@ -50,21 +58,24 @@ const GeoJsonSaveModal: React.FC<GeoJsonSaveModalProps> = ({
           loading={isSaving}
           onClick={handleSave}
         >
-          Save GeoJSON
+          Save
         </Button>,
       ]}
     >
-      <p>Would you like to save the uploaded GeoJSON?</p>
-      <pre
-        style={{
-          maxHeight: "200px",
-          overflow: "auto",
-          background: "#f5f5f5",
-          padding: "10px",
-        }}
-      >
-        {geoJson}
-      </pre>
+      <Space direction="vertical" style={{ width: "100%" }}>
+        <Alert
+          type="info"
+          message="What will happen?"
+          description="Saving this shapefile will add it to the map and will overwrite any existing shapefiles that are associated with this cave."
+          showIcon
+        />
+
+        <div style={{ textAlign: "right" }}>
+          <Button icon={<CopyOutlined />} onClick={copyToClipboard}>
+            Copy GeoJSON
+          </Button>
+        </div>
+      </Space>
     </Modal>
   );
 };

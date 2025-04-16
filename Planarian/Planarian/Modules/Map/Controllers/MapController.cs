@@ -24,16 +24,20 @@ public class MapController : PlanarianControllerBase<MapService>
         return Ok(data);
     }
 
-    [HttpGet("lineplots/{z}/{x}/{y}.mvt")]
-    public async Task<IActionResult> GetLinePlots(int z, int x, int y, CancellationToken cancellationToken)
+    [HttpGet("lineplots")]
+    public async Task<IActionResult> GetLinePlots(
+        [FromQuery] double north, 
+        [FromQuery] double south,
+        [FromQuery] double east,
+        [FromQuery] double west, 
+        [FromQuery] double zoom, 
+        CancellationToken cancellationToken)
     {
-        var data = await Service.GetLinePlots(z, x, y, cancellationToken);
-        if (data == null)
-        {
-            return NotFound();
-        }
-        return File(data, "application/x-protobuf");
+        var data = await Service.GetLinePlots(north, south, east, west, zoom, cancellationToken);
+     
+        return new JsonResult(data);
     }
+
 
 
     [HttpGet("center")]
@@ -44,9 +48,9 @@ public class MapController : PlanarianControllerBase<MapService>
     }
     
     [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
-    public async Task<IActionResult> GetTile(int z, int x, int y)
+    public async Task<IActionResult> GetTile(int z, int x, int y, CancellationToken cancellationToken)
     {
-        var mvtData = await Service.GetEntrancesMVTAsync(z, x, y);
+        var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, cancellationToken);
         // Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
         if (mvtData == null)
         {

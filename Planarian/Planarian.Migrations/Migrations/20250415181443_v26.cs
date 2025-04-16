@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using NetTopologySuite.Geometries;
 
 #nullable disable
 
@@ -18,8 +17,7 @@ namespace Planarian.Migrations.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    Geometry = table.Column<Geometry>(type: "geometry", nullable: false),
-                    OriginalGeoJson = table.Column<string>(type: "text", maxLength: 2147483647, nullable: true),
+                    GeoJson = table.Column<string>(type: "jsonb", maxLength: 2147483647, nullable: false),
                     CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     CreatedOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
