@@ -1,6 +1,9 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore.Storage;
+using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
+using Newtonsoft.Json.Linq;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
@@ -408,13 +411,13 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
         var isNew = string.IsNullOrWhiteSpace(values.Id);
 
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
 
-        
+
         #region Data Validation
 
         // must be at least one entrance
@@ -625,7 +628,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 if (!isNewEntrance)
                 {
                     // if the z value was not provided during import, ef core doesn't realize that the z value was added later.
-                    Repository.SetPropertiesModified(entrance, e=> e.Location);
+                    Repository.SetPropertiesModified(entrance, e => e.Location);
                 }
 
                 entrance.EntranceStatusTags.Clear();
@@ -963,12 +966,13 @@ public class CaveService : ServiceBase<CaveRepository>
 
 
     #region Favorite Cave
-    
+
     public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
     {
         var caves = await Repository.GetFavoriteCaves(query);
         return caves;
     }
+
     public async Task FavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
@@ -977,10 +981,10 @@ public class CaveService : ServiceBase<CaveRepository>
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
         var favorite = await Repository.GetFavoriteCave(caveId);
-        
+
         var isNew = favorite == null;
         favorite ??= new Favorite();
-        
+
         favorite.CaveId = caveId;
         favorite.UserId = RequestUser.Id;
         favorite.AccountId = RequestUser.AccountId;
@@ -989,28 +993,307 @@ public class CaveService : ServiceBase<CaveRepository>
         {
             Repository.Add(favorite);
         }
-        
+
         await Repository.SaveChangesAsync();
     }
-    
+
     public async Task UnfavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         var favorite = await Repository.GetFavoriteCave(caveId);
         if (favorite == null) throw ApiExceptionDictionary.NotFound(nameof(favorite.Id));
 
         Repository.Delete(favorite);
         await Repository.SaveChangesAsync();
     }
-    
-    #endregion
 
     public async Task<FavoriteVm?> GetFavoriteCave(string caveId)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        
+
         var favorite = await Repository.GetFavoriteCaveVm(caveId);
         return favorite;
     }
+
+    #endregion
+
+    #region GeoJson
+
+    public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
+        CancellationToken cancellationToken = default)
+    {
+        var cave = await Repository.GetCaveWithLinePlots(caveId);
+        if (cave == null)
+            throw ApiExceptionDictionary.NotFound("Cave");
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
+
+        foreach (var oldGeoJson in cave.GeoJsons.ToList())
+        {
+            Repository.RemoveCaveGeoJson(oldGeoJson);
+        }
+
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var uploadVm in geoJsonUploads)
+            {
+                var parsedToken = JToken.Parse(uploadVm.GeoJson);
+                IList<JToken> featureCollections;
+                // If the token is an array, treat each element as a FeatureCollection.
+                if (parsedToken is JArray jArray)
+                {
+                    featureCollections = jArray.Children().ToList();
+                }
+                // If it’s a single FeatureCollection object, wrap it in a list.
+                else if (parsedToken is JObject)
+                {
+                    featureCollections = new List<JToken> { parsedToken };
+                }
+                else
+                {
+                    throw ApiExceptionDictionary.BadRequest("Invalid GeoJSON format.");
+                }
+
+                // Process each FeatureCollection individually.
+                foreach (var featureCollectionToken in featureCollections)
+                {
+                    // Get the features array from the current FeatureCollection.
+                    var featuresArray = featureCollectionToken["features"] as JArray;
+                    if (featuresArray == null)
+                    {
+                        throw ApiExceptionDictionary.BadRequest(
+                            "GeoJSON feature collection does not contain any features.");
+                    }
+
+                    var geoJsonEntity = new CaveGeoJson
+                    {
+                        CaveId = caveId,
+                        Name = uploadVm.Name,
+                        GeoJson = featureCollectionToken.ToString(),
+                    };
+
+                    Repository.AddCaveGeoJson(geoJsonEntity);
+                    cave.GeoJsons.Add(geoJsonEntity);
+                }
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    #region Example Geometry Code
+    // public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
+    //     CancellationToken cancellationToken = default)
+    // {
+    //     // Retrieve the cave entity (your GetCaveWithLinePlots method already does permission filtering)
+    //     var cave = await Repository.GetCaveWithLinePlots(caveId);
+    //     if (cave == null)
+    //         throw ApiExceptionDictionary.NotFound("Cave");
+
+    //     // Check that the current user has the Manager-level permission for the cave
+    //     await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
+
+    //     // Clear out any old geojson entries for the cave.
+    //     foreach (var oldGeoJson in cave.GeoJsons.ToList())
+    //     {
+    //         Repository.RemoveCaveGeoJson(oldGeoJson);
+    //     }
+
+    //     // Begin a transaction
+    //     await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+    //     try
+    //     {
+    //         var reader = new NetTopologySuite.IO.GeoJsonReader();
+    //         // Iterate over each upload.
+    //         foreach (var uploadVm in geoJsonUploads)
+    //         {
+    //             // Parse the uploaded GeoJSON string.
+    //             var parsedToken = JToken.Parse(uploadVm.GeoJson);
+    //             IList<JToken> featureCollections;
+    //             // If the token is an array, treat each element as a FeatureCollection.
+    //             if (parsedToken is JArray jArray)
+    //             {
+    //                 featureCollections = jArray.Children().ToList();
+    //             }
+    //             // If it’s a single FeatureCollection object, wrap it in a list.
+    //             else if (parsedToken is JObject)
+    //             {
+    //                 featureCollections = new List<JToken> { parsedToken };
+    //             }
+    //             else
+    //             {
+    //                 throw ApiExceptionDictionary.BadRequest("Invalid GeoJSON format.");
+    //             }
+
+    //             // Process each FeatureCollection individually.
+    //             foreach (var featureCollectionToken in featureCollections)
+    //             {
+    //                 // Get the features array from the current FeatureCollection.
+    //                 var featuresArray = featureCollectionToken["features"] as JArray;
+    //                 if (featuresArray == null)
+    //                 {
+    //                     throw ApiExceptionDictionary.BadRequest(
+    //                         "GeoJSON feature collection does not contain any features.");
+    //                 }
+
+    //                 var collectedGeometries = new List<Geometry>();
+
+    //                 // Process each feature individually.
+    //                 foreach (var featureToken in featuresArray)
+    //                 {
+    //                     try
+    //                     {
+    //                         // Get the geometry token.
+    //                         var geometryToken = featureToken["geometry"];
+    //                         if (geometryToken != null)
+    //                         {
+    //                             // Force the rings closed for Polygon or MultiPolygon.
+    //                             featureToken["geometry"] = ForceCloseRings(geometryToken);
+    //                         }
+
+    //                         // Convert the feature token to JSON and parse it.
+    //                         var featureJson = featureToken.ToString();
+    //                         var feature = reader.Read<Feature>(featureJson);
+    //                         if (feature != null && feature.Geometry != null)
+    //                         {
+    //                             collectedGeometries.Add(feature.Geometry);
+    //                         }
+    //                     }
+    //                     catch (Exception ex)
+    //                     {
+    //                         // Log the error and skip any invalid feature.
+    //                         Console.WriteLine($"Skipping invalid feature: {ex.Message}");
+    //                     }
+    //                 }
+
+    //                 // If we collected any valid geometries, combine them in one GeometryCollection.
+    //                 if (collectedGeometries.Any())
+    //                 {
+    //                     Geometry combinedGeometry = new GeometryCollection(collectedGeometries.ToArray());
+    //                     // Create one database record for this feature collection.
+    //                     var geoJsonEntity = new CaveGeoJson
+    //                     {
+    //                         CaveId = caveId,
+    //                         Geometry = combinedGeometry,
+    //                         // Optionally, store the entire feature collection JSON. Remove if not needed.
+    //                         OriginalGeoJson = featureCollectionToken.ToString(),
+    //                         Attributes = "{}"
+    //                     };
+
+    //                     Repository.AddCaveGeoJson(geoJsonEntity);
+    //                     cave.GeoJsons.Add(geoJsonEntity);
+    //                 }
+    //             }
+    //         }
+
+    //         await Repository.SaveChangesAsync(cancellationToken);
+    //         await transaction.CommitAsync(cancellationToken);
+    //     }
+    //     catch (Exception)
+    //     {
+    //         await transaction.RollbackAsync(cancellationToken);
+    //         throw;
+    //     }
+    // }
+
+    // /// <summary>
+    // /// Ensures that for all Polygon or MultiPolygon geometries, each coordinate ring is explicitly closed
+    // /// and has at least four points. Rings that do not meet the criteria are removed.
+    // /// </summary>
+    // /// <param name="geometryToken">The JSON token representing the geometry.</param>
+    // /// <returns>The modified JSON token with only valid rings.</returns>
+    // private JToken? ForceCloseRings(JToken? geometryToken)
+    // {
+    //     if (geometryToken == null) return null;
+
+    //     var type = geometryToken["type"]?.Value<string>();
+    //     if (string.IsNullOrWhiteSpace(type))
+    //         return geometryToken;
+
+    //     // Process Polygon geometry
+    //     if (type == "Polygon")
+    //     {
+    //         var rings = geometryToken["coordinates"] as JArray;
+    //         if (rings != null)
+    //         {
+    //             var validRings = new JArray();
+    //             foreach (var ring in rings)
+    //             {
+    //                 var ringArray = ring as JArray;
+    //                 if (ringArray == null || ringArray.Count == 0)
+    //                     continue;
+
+    //                 // If the first coordinate is not the same as the last, append a copy of the first.
+    //                 if (!JToken.DeepEquals(ringArray.First, ringArray.Last))
+    //                 {
+    //                     ringArray.Add(ringArray.First.DeepClone());
+    //                 }
+
+    //                 // Only include this ring if it has at least 4 coordinates.
+    //                 if (ringArray.Count >= 4)
+    //                 {
+    //                     validRings.Add(ringArray);
+    //                 }
+    //             }
+
+    //             geometryToken["coordinates"] = validRings;
+    //         }
+    //     }
+    //     // Process MultiPolygon geometry
+    //     else if (type == "MultiPolygon")
+    //     {
+    //         var polygons = geometryToken["coordinates"] as JArray;
+    //         if (polygons != null)
+    //         {
+    //             var validPolygons = new JArray();
+    //             foreach (var polygon in polygons)
+    //             {
+    //                 var rings = polygon as JArray;
+    //                 if (rings != null)
+    //                 {
+    //                     var validRings = new JArray();
+    //                     foreach (var ring in rings)
+    //                     {
+    //                         var ringArray = ring as JArray;
+    //                         if (ringArray == null || ringArray.Count == 0)
+    //                             continue;
+
+    //                         if (!JToken.DeepEquals(ringArray.First, ringArray.Last))
+    //                         {
+    //                             ringArray.Add(ringArray.First.DeepClone());
+    //                         }
+
+    //                         if (ringArray.Count >= 4)
+    //                         {
+    //                             validRings.Add(ringArray);
+    //                         }
+    //                     }
+
+    //                     // Only add the polygon if at least one ring is valid.
+    //                     if (validRings.Count > 0)
+    //                     {
+    //                         validPolygons.Add(validRings);
+    //                     }
+    //                 }
+    //             }
+
+    //             geometryToken["coordinates"] = validPolygons;
+    //         }
+    //     }
+
+    //     return geometryToken;
+    // }
+
+    #endregion
+
+
+    #endregion
 }

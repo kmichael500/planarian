@@ -1,3 +1,4 @@
+using LinqToDB.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NetTopologySuite.Geometries.Utilities;
@@ -104,16 +105,16 @@ public class MapRepository : RepositoryBase
 
     private double GetGridSize(int zoom)
     {
-        const double m = -0.2;  
-        const double b = 2.2;  
+        const double m = -0.2;
+        const double b = 2.2;
 
         var gridSize = m * zoom + b;
 
-        gridSize = Math.Max(0.045, Math.Min(0.8, gridSize));  // Adjust min and max values as needed
-    
+        gridSize = Math.Max(0.045, Math.Min(0.8, gridSize));
+
         return gridSize;
     }
-    
+
     private int GetMinClusterSize(int zoom)
     {
         return Math.Max(2, 20 / (zoom + 1));
@@ -169,13 +170,13 @@ public class MapRepository : RepositoryBase
         double averageLongitude = -98.5855;
         try
         {
-        averageLatitude = await DbContext.Entrances
-            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-            .AverageAsync(e => e.Location.Y);
+            averageLatitude = await DbContext.Entrances
+                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+                .AverageAsync(e => e.Location.Y);
 
-        averageLongitude = await DbContext.Entrances
-            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-            .AverageAsync(e => e.Location.X);
+            averageLongitude = await DbContext.Entrances
+                .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+                .AverageAsync(e => e.Location.X);
         }
         catch (Exception)
         {
@@ -183,69 +184,130 @@ public class MapRepository : RepositoryBase
             // will fail if no entrances added
         }
 
-        return new CoordinateDto{Latitude = averageLatitude, Longitude = averageLongitude};
+        return new CoordinateDto { Latitude = averageLatitude, Longitude = averageLongitude };
     }
 
-    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y)
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, CancellationToken cancellationToken)
     {
-        var query = @"
-WITH tile AS (
-    SELECT 
-         ST_TileEnvelope({0}, {1}, {2}) AS bbox_3857,
-         ST_Transform(ST_TileEnvelope({0}, {1}, {2}), 4326) AS bbox_native
-)
-SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
-FROM (
-    SELECT 
-        ""Entrances"".""ReportedByUserId"",
-        ""Entrances"".""CaveId"",
-        ""Caves"".""Name"" as CaveName,
-        ""Entrances"".""LocationQualityTagId"",
-        ""Entrances"".""Name"",
-        ""Entrances"".""IsPrimary"",
-        ""Entrances"".""Description"",
-        (SELECT EXISTS(
-            SELECT 1 
-            FROM ""Favorites""
-            WHERE 
-                ""Favorites"".""UserId"" = '{4}'
-                AND ""Favorites"".""AccountId"" = '{3}'
-                AND ""Favorites"".""CaveId"" = ""Entrances"".""CaveId""
-        )) AS ""IsFavorite"",
-        ST_AsMVTGeom(
-            ST_Transform(""Entrances"".""Location"", 3857),
-            tile.bbox_3857,
-            4096,
-            0,
-            true
-        ) AS geom
-    FROM 
-        ""Entrances""
-    JOIN 
-        ""Caves"" ON ""Entrances"".""CaveId"" = ""Caves"".""Id""
-    JOIN 
-        ""UserCavePermissions"" ucp ON ""Caves"".""Id"" = ucp.""CaveId""
-                                      AND ""Caves"".""AccountId"" = ucp.""AccountId""
-    , tile
-    WHERE 
-        ST_Intersects(""Entrances"".""Location"", tile.bbox_native)
-        AND ""Caves"".""AccountId"" = '{3}'
-        AND ucp.""UserId"" = '{4}'
-) AS tile_geom";
+        var query = """
+
+                    WITH tile AS (
+                        SELECT 
+                             ST_TileEnvelope({0}, {1}, {2}) AS bbox_3857,
+                             ST_Transform(ST_TileEnvelope({0}, {1}, {2}), 4326) AS bbox_native
+                    )
+                    SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
+                    FROM (
+                        SELECT 
+                            "Entrances"."ReportedByUserId",
+                            "Entrances"."CaveId",
+                            "Caves"."Name" as CaveName,
+                            "Entrances"."LocationQualityTagId",
+                            "Entrances"."Name",
+                            "Entrances"."IsPrimary",
+                            "Entrances"."Description",
+                            (SELECT EXISTS(
+                                SELECT 1 
+                                FROM "Favorites"
+                                WHERE 
+                                    "Favorites"."UserId" = '{4}'
+                                    AND "Favorites"."AccountId" = '{3}'
+                                    AND "Favorites"."CaveId" = "Entrances"."CaveId"
+                            )) AS "IsFavorite",
+                            ST_AsMVTGeom(
+                                ST_Transform("Entrances"."Location", 3857),
+                                tile.bbox_3857,
+                                4096,
+                                0,
+                                true
+                            ) AS geom
+                        FROM 
+                            "Entrances"
+                        JOIN 
+                            "Caves" ON "Entrances"."CaveId" = "Caves"."Id"
+                        JOIN 
+                            "UserCavePermissions" ucp ON "Caves"."Id" = ucp."CaveId"
+                                                          AND "Caves"."AccountId" = ucp."AccountId"
+                        , tile
+                        WHERE 
+                            ST_Intersects("Entrances"."Location", tile.bbox_native)
+                            AND "Caves"."AccountId" = '{3}'
+                            AND ucp."UserId" = '{4}'
+                    ) AS tile_geom
+                    """;
 
         query = string.Format(query, z, x, y, RequestUser.AccountId, RequestUser.Id);
 
         await using var command = DbContext.Database.GetDbConnection().CreateCommand();
         command.CommandText = query;
-        await DbContext.Database.OpenConnectionAsync();
+        await DbContext.Database.OpenConnectionAsync(cancellationToken: cancellationToken);
 
-        await using var result = await command.ExecuteReaderAsync();
-        if (await result.ReadAsync())
+        await using var result = await command.ExecuteReaderAsync(cancellationToken);
+        if (await result.ReadAsync(cancellationToken))
         {
             return result["mvt"] as byte[];
         }
 
         return null;
+    }
+
+    public async Task<List<object>> GetLinePlots(double north, double south, double east, double west, int zoom,
+        CancellationToken cancellationToken)
+    {
+        // Only return GeoJSON if the user is zoomed in at least level 11.
+        if (zoom < 11)
+        {
+            return new List<object>();
+        }
+
+        // Build a bounding box from the provided parameters.
+        // Note: ST_MakeEnvelope expects: (xmin, ymin, xmax, ymax, srid)
+        // In our case: xmin = west, ymin = south, xmax = east, ymax = north.
+        var query = """
+
+                    WITH view_box AS (
+                        SELECT ST_MakeEnvelope({3}, {1}, {2}, {0}, 4326) as bbox
+                    )
+                    SELECT cg."GeoJson" as feature_collection
+                    FROM "CaveGeoJsons" cg
+                    JOIN "Entrances" e ON cg."CaveId" = e."CaveId"
+                    JOIN "Caves" c ON c."Id" = cg."CaveId"
+                    JOIN "UserCavePermissions" ucp ON c."Id" = ucp."CaveId" 
+                         AND c."AccountId" = ucp."AccountId"
+                    WHERE 
+                        ST_Intersects(e."Location", (SELECT bbox FROM view_box))
+                        AND c."AccountId" = '{4}'
+                        AND ucp."UserId" = '{5}'
+                    GROUP BY cg."GeoJson";
+
+                    """;
+
+        // Parameters:
+        // {0}: north, {1}: south, {2}: east, {3}: west, {4}: RequestUser.AccountId, {5}: RequestUser.Id
+        query = string.Format(query, north, south, east, west, RequestUser.AccountId, RequestUser.Id);
+
+        List<object> featureCollections = new List<object>();
+        await using var command = DbContext.Database.GetDbConnection().CreateCommand();
+        command.CommandText = query;
+        if (command.Connection != null && command.Connection.State != System.Data.ConnectionState.Open)
+        {
+            await command.Connection.OpenAsync(cancellationToken);
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            // Read the "feature_collection" column (a JSONB value stored as a string)
+            var jsonData = reader["feature_collection"] as string;
+            if (!string.IsNullOrWhiteSpace(jsonData))
+            {
+                // Parse the string into a JSON object (e.g. a FeatureCollection)
+                var jsonObject = System.Text.Json.JsonDocument.Parse(jsonData).RootElement;
+                featureCollections.Add(jsonObject);
+            }
+        }
+
+        return featureCollections;
     }
 
 

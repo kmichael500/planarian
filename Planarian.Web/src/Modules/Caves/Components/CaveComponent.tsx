@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Card,
   Col,
@@ -45,6 +46,7 @@ import { StateTagComponent } from "../../../Shared/Components/Display/StateTagCo
 import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
+import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -104,6 +106,23 @@ const CaveComponent = ({
 
   const [showGeology, setShowGeology] = useState(false);
   const [showGages, setShowGages] = useState(false);
+
+  const [geoJsonToSave, setGeoJsonToSave] = useState<string | null>(null);
+  const [isGeoJsonModalVisible, setIsGeoJsonModalVisible] = useState(false);
+
+  const handleGeoJsonReceived = (
+    data: FeatureCollection<Geometry, GeoJsonProperties>[]
+  ) => {
+    if (data && data.length > 0) {
+      const geoJsonString = JSON.stringify(data, null, 2);
+      setGeoJsonToSave(geoJsonString);
+      setIsGeoJsonModalVisible(true);
+    } else {
+      // Optionally handle the case when data is empty.
+      setGeoJsonToSave(null);
+      setIsGeoJsonModalVisible(false);
+    }
+  };
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
@@ -589,6 +608,7 @@ const CaveComponent = ({
                 showFullScreenControl
                 showSearchBar={false}
                 showGeolocateControl={false}
+                onShapefileUploaded={handleGeoJsonReceived}
               />
             </div>
           )}
@@ -608,6 +628,23 @@ const CaveComponent = ({
         </Card>
       ) : (
         content
+      )}
+
+      {geoJsonToSave && (
+        <GeoJsonSaveModal
+          isVisible={isGeoJsonModalVisible}
+          caveId={cave?.id as string}
+          geoJson={geoJsonToSave}
+          onCancel={() => {
+            setIsGeoJsonModalVisible(false);
+            setGeoJsonToSave(null);
+          }}
+          onSaved={() => {
+            setIsGeoJsonModalVisible(false);
+            setGeoJsonToSave(null);
+            updateCave && updateCave();
+          }}
+        />
       )}
     </>
   );

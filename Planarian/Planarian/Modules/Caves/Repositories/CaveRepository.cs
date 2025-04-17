@@ -655,6 +655,13 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public async Task<Cave?> GetCaveWithLinePlots(string caveId)
+    {
+        return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
+            .Include(e => e.GeoJsons)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
     {
         var usedCountyNumbers = await DbContext.Caves
@@ -730,6 +737,25 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == RequestUser.Id && e.CaveId == caveId);
     }
 
+    #endregion
+
+    #region GeoJson
+
+    public async Task<IEnumerable<CaveGeoJson>> GetCaveGeoJsonsAsync(string caveId)
+    {
+        return await DbContext.CaveGeoJsons.Where(c => c.CaveId == caveId).ToListAsync();
+    }
+
+    public void AddCaveGeoJson(CaveGeoJson geoJson)
+    {
+        DbContext.CaveGeoJsons.Add(geoJson);
+    }
+
+    public void RemoveCaveGeoJson(CaveGeoJson geoJson)
+    {
+        DbContext.CaveGeoJsons.Remove(geoJson);
+    }
+    
     #endregion
 }
 

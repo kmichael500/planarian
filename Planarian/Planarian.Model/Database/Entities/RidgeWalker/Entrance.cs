@@ -55,5 +55,7 @@ public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>
             .WithMany(e => e.EntranceLocationQualitiesTags)
             .HasForeignKey(e => e.LocationQualityTagId)
             .OnDelete(DeleteBehavior.NoAction);
+        
+        builder.HasIndex(e => e.Location).HasMethod("GIST");
     }
 }

@@ -69,6 +69,7 @@ public class Cave : EntityBase
 
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
+    public ICollection<CaveGeoJson> GeoJsons { get; set; } = new HashSet<CaveGeoJson>();
 
 
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>

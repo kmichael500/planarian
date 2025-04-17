@@ -14,6 +14,7 @@ import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
+import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -116,6 +117,16 @@ const CaveService = {
   async GetFavoriteCaveVm(caveId: string) {
     const response = await HttpClient.get<FavoriteVm | null>(
       `${baseUrl}/${caveId}/favorite`
+    );
+    return response.data;
+  },
+  async uploadCaveGeoJson(
+    caveId: string,
+    geoJsonUploads: GeoJsonUploadVm[]
+  ): Promise<void> {
+    const response = await HttpClient.post<void>(
+      `${baseUrl}/${caveId}/geojson`,
+      geoJsonUploads
     );
     return response.data;
   },
