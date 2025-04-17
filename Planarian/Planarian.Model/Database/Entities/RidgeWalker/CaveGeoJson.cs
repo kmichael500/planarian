@@ -13,6 +13,8 @@ public class CaveGeoJson : EntityBase
     [MaxLength(PropertyLength.Id)]
     public string CaveId { get; set; } = null!;
     
+    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
+    
     [MaxLength(PropertyLength.Max)] public string GeoJson { get; set; } = string.Empty;
 
     public virtual Cave Cave { get; set; } = null!;

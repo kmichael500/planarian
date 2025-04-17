@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Models;
 
@@ -8,4 +9,6 @@ public class GeoJsonUploadVm
         
     [Required]
     public string GeoJson { get; set; } = null!;
+    [Required]
+    [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
 }

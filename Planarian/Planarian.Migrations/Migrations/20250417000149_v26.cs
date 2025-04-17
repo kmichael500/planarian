@@ -17,6 +17,7 @@ namespace Planarian.Migrations.Migrations
                 {
                     Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     CaveId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     GeoJson = table.Column<string>(type: "jsonb", maxLength: 2147483647, nullable: false),
                     CreatedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     ModifiedByUserId = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
@@ -34,6 +35,12 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Entrances_Location",
+                table: "Entrances",
+                column: "Location")
+                .Annotation("Npgsql:IndexMethod", "GIST");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_CaveGeoJsons_CaveId",
                 table: "CaveGeoJsons",
                 column: "CaveId");
@@ -44,6 +51,10 @@ namespace Planarian.Migrations.Migrations
         {
             migrationBuilder.DropTable(
                 name: "CaveGeoJsons");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Entrances_Location",
+                table: "Entrances");
         }
     }
 }

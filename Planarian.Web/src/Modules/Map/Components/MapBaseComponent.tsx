@@ -511,6 +511,127 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 <LayerControl position={layerControlPosition} />
               </div>
 
+              {/* Lineplots layers from fetched data - render in order: Polygons, Lines, Points */}
+              {sortedLineplotsData.map(({ id, data, type }) => {
+                let paint: any;
+                let layerType: "fill" | "line" | "circle";
+
+                switch (type) {
+                  case "Point":
+                    layerType = "circle";
+                    paint = {
+                      "circle-color": "#ff5722",
+                      "circle-radius": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        16,
+                        0.5,
+                        18,
+                        4,
+                        20,
+                        8,
+                      ],
+                      "circle-opacity": ["step", ["zoom"], 0, 16, 0.8],
+                      "circle-stroke-color": "#fff",
+                      "circle-stroke-width": ["step", ["zoom"], 0, 16, 0.5],
+                    };
+                    break;
+                  case "LineString":
+                    layerType = "line";
+                    paint = {
+                      "line-color": "#00008B",
+                    };
+                    break;
+                  default:
+                    layerType = "fill";
+                    paint = {
+                      "fill-color": "#FF0000",
+                      "fill-opacity": 0.8,
+                      "fill-outline-color": "#B22222",
+                    };
+                    break;
+                }
+
+                return (
+                  <Source
+                    key={id}
+                    id={id}
+                    type="geojson"
+                    data={data}
+                    attribution={`© ${accountName}`}
+                  >
+                    <Layer id={`${id}-layer`} type={layerType} paint={paint} />
+                  </Source>
+                );
+              })}
+
+              {/* Uploaded Shapefile layers */}
+              {uploadedShapeFiles.map(({ id, data }) => {
+                const firstFeature = data.features[0];
+                const geomType =
+                  firstFeature?.geometry?.type?.replace("Multi", "") ||
+                  "Polygon";
+
+                let paint: any;
+                let layerType: "fill" | "line" | "circle";
+
+                switch (geomType) {
+                  case "Point":
+                    layerType = "circle";
+                    paint = {
+                      "circle-color": "#ff5722",
+                      "circle-radius": [
+                        "interpolate",
+                        ["linear"],
+                        ["zoom"],
+                        16,
+                        0.5, // At zoom level 16, radius is 0.5
+                        18,
+                        4, // At zoom level 18, radius is 4
+                        20,
+                        8, // At zoom level 20, radius is 8
+                      ],
+                      "circle-opacity": [
+                        "step",
+                        ["zoom"],
+                        0, // Invisible below zoom level 16
+                        16,
+                        0.8, // Visible at 80% opacity at zoom level 16+
+                      ],
+                      "circle-stroke-color": "#fff",
+                      "circle-stroke-width": [
+                        "step",
+                        ["zoom"],
+                        0, // No stroke below zoom level 16
+                        16,
+                        0.5, // 0.5px stroke at zoom level 16+
+                      ],
+                    };
+                    break;
+                  case "LineString":
+                    layerType = "line";
+                    paint = {
+                      "line-color": "#00008B",
+                    };
+                    break;
+                  default:
+                    layerType = "fill";
+                    paint = {
+                      "fill-color": "#FF0000",
+                      "fill-opacity": 0.8,
+                      "fill-outline-color": "#B22222",
+                    };
+                    break;
+                }
+
+                return (
+                  <Source key={id} id={id} type="geojson" data={data}>
+                    <Layer id={`${id}-layer`} type={layerType} paint={paint} />
+                  </Source>
+                );
+              })}
+
               {/* Entrances layer */}
               <Source
                 id="entrances"
@@ -644,127 +765,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   }}
                 />
               </Source>
-
-              {/* Lineplots layers from fetched data - render in order: Polygons, Lines, Points */}
-              {sortedLineplotsData.map(({ id, data, type }) => {
-                let paint: any;
-                let layerType: "fill" | "line" | "circle";
-
-                switch (type) {
-                  case "Point":
-                    layerType = "circle";
-                    paint = {
-                      "circle-color": "#ff5722",
-                      "circle-radius": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        16,
-                        0.5,
-                        18,
-                        4,
-                        20,
-                        8,
-                      ],
-                      "circle-opacity": ["step", ["zoom"], 0, 16, 0.8],
-                      "circle-stroke-color": "#fff",
-                      "circle-stroke-width": ["step", ["zoom"], 0, 16, 0.5],
-                    };
-                    break;
-                  case "LineString":
-                    layerType = "line";
-                    paint = {
-                      "line-color": "#00008B",
-                    };
-                    break;
-                  default:
-                    layerType = "fill";
-                    paint = {
-                      "fill-color": "#FF0000",
-                      "fill-opacity": 0.8,
-                      "fill-outline-color": "#B22222",
-                    };
-                    break;
-                }
-
-                return (
-                  <Source
-                    key={id}
-                    id={id}
-                    type="geojson"
-                    data={data}
-                    attribution={`© ${accountName}`}
-                  >
-                    <Layer id={`${id}-layer`} type={layerType} paint={paint} />
-                  </Source>
-                );
-              })}
-
-              {/* Uploaded Shapefile layers */}
-              {uploadedShapeFiles.map(({ id, data }) => {
-                const firstFeature = data.features[0];
-                const geomType =
-                  firstFeature?.geometry?.type?.replace("Multi", "") ||
-                  "Polygon";
-
-                let paint: any;
-                let layerType: "fill" | "line" | "circle";
-
-                switch (geomType) {
-                  case "Point":
-                    layerType = "circle";
-                    paint = {
-                      "circle-color": "#ff5722",
-                      "circle-radius": [
-                        "interpolate",
-                        ["linear"],
-                        ["zoom"],
-                        16,
-                        0.5, // At zoom level 16, radius is 0.5
-                        18,
-                        4, // At zoom level 18, radius is 4
-                        20,
-                        8, // At zoom level 20, radius is 8
-                      ],
-                      "circle-opacity": [
-                        "step",
-                        ["zoom"],
-                        0, // Invisible below zoom level 16
-                        16,
-                        0.8, // Visible at 80% opacity at zoom level 16+
-                      ],
-                      "circle-stroke-color": "#fff",
-                      "circle-stroke-width": [
-                        "step",
-                        ["zoom"],
-                        0, // No stroke below zoom level 16
-                        16,
-                        0.5, // 0.5px stroke at zoom level 16+
-                      ],
-                    };
-                    break;
-                  case "LineString":
-                    layerType = "line";
-                    paint = {
-                      "line-color": "#00008B",
-                    };
-                    break;
-                  default:
-                    layerType = "fill";
-                    paint = {
-                      "fill-color": "#FF0000",
-                      "fill-opacity": 0.8,
-                      "fill-outline-color": "#B22222",
-                    };
-                    break;
-                }
-
-                return (
-                  <Source key={id} id={id} type="geojson" data={data}>
-                    <Layer id={`${id}-layer`} type={layerType} paint={paint} />
-                  </Source>
-                );
-              })}
 
               {/* Popup for displaying feature properties */}
               {popupInfo && (

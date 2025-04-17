@@ -1,8 +1,9 @@
 // GeoJsonSaveModal.tsx
 import React, { useState } from "react";
-import { Modal, Button, message, Alert, Space } from "antd";
+import { Modal, Button, message, Alert, Space, Form, Input } from "antd";
 import { CaveService } from "../Service/CaveService";
 import { CopyOutlined } from "@ant-design/icons";
+import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 
 export interface GeoJsonSaveModalProps {
   isVisible: boolean;
@@ -20,27 +21,38 @@ const GeoJsonSaveModal: React.FC<GeoJsonSaveModalProps> = ({
   onSaved,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const [form] = Form.useForm<GeoJsonUploadVm>();
 
   const handleSave = async () => {
-    setIsSaving(true);
     try {
-      // The backend endpoint expects an array, so we wrap the object
-      await CaveService.uploadCaveGeoJson(caveId, [{ geoJson }]);
-      message.success("Shapefile saved successfully!");
-      onSaved();
-    } catch (error) {
-      console.error("Error saving shapefile", error);
-      message.error("Failed to save shapefile. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
+      const values = await form.validateFields();
+
+      setIsSaving(true);
+      try {
+        await CaveService.uploadCaveGeoJson(caveId, [
+          {
+            geoJson,
+            name: values.name,
+          },
+        ]);
+        message.success("Shapefile saved successfully!");
+        onSaved();
+      } catch (error) {
+        console.error("Error saving shapefile", error);
+        message.error("Failed to save shapefile. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    } catch (validationError) {}
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard
-      .writeText(geoJson)
-      .then(() => message.success("Data copied to clipboard"))
-      .catch(() => message.error("Failed to copy data"));
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(geoJson);
+      message.success("Data copied to clipboard");
+    } catch (error) {
+      message.error("Failed to copy data");
+    }
   };
 
   return (
@@ -69,6 +81,21 @@ const GeoJsonSaveModal: React.FC<GeoJsonSaveModalProps> = ({
           description="Saving this shapefile will add it to the map and will overwrite any existing shapefiles that are associated with this cave."
           showIcon
         />
+
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="name"
+            label="Shapefile Name"
+            rules={[
+              {
+                required: true,
+                message: "Please enter a name for this shapefile",
+              },
+            ]}
+          >
+            <Input placeholder="Enter shapefile name" />
+          </Form.Item>
+        </Form>
 
         <div style={{ textAlign: "right" }}>
           <Button icon={<CopyOutlined />} onClick={copyToClipboard}>

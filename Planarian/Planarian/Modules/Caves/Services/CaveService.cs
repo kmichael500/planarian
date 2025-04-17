@@ -1023,29 +1023,22 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
         CancellationToken cancellationToken = default)
     {
-        // Retrieve the cave entity (your GetCaveWithLinePlots method already does permission filtering)
         var cave = await Repository.GetCaveWithLinePlots(caveId);
         if (cave == null)
             throw ApiExceptionDictionary.NotFound("Cave");
 
-        // Check that the current user has the Manager-level permission for the cave
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
 
-        // Clear out any old geojson entries for the cave.
         foreach (var oldGeoJson in cave.GeoJsons.ToList())
         {
             Repository.RemoveCaveGeoJson(oldGeoJson);
         }
 
-        // Begin a transaction
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            var reader = new NetTopologySuite.IO.GeoJsonReader();
-            // Iterate over each upload.
             foreach (var uploadVm in geoJsonUploads)
             {
-                // Parse the uploaded GeoJSON string.
                 var parsedToken = JToken.Parse(uploadVm.GeoJson);
                 IList<JToken> featureCollections;
                 // If the token is an array, treat each element as a FeatureCollection.
@@ -1074,10 +1067,10 @@ public class CaveService : ServiceBase<CaveRepository>
                             "GeoJSON feature collection does not contain any features.");
                     }
 
-                    // Create one database record for this feature collection.
                     var geoJsonEntity = new CaveGeoJson
                     {
                         CaveId = caveId,
+                        Name = uploadVm.Name,
                         GeoJson = featureCollectionToken.ToString(),
                     };
 
