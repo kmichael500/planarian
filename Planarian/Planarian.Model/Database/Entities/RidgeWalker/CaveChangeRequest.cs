@@ -22,7 +22,6 @@ public class CaveChangeRequest : EntityBase
 
     public AddCave Json { get; set; } = null!;
     [MaxLength(PropertyLength.LargeText)] public string? Notes { get; set; }
-
     [MaxLength(PropertyLength.Key)] public string Status { get; set; } = ChangeRequestStatus.Pending;
     public DateTime? ReviewedOn { get; set; }
     public Account Account { get; set; } = null!;
@@ -52,8 +51,14 @@ public class ChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveChange
         builder.OwnsOne(e => e.Json, jsonNav =>
         {
             jsonNav.ToJson();
-            jsonNav.Ignore(j => j.Entrances);
-            jsonNav.Ignore(j => j.Files);
+
+            // primitive lists don't need to be owned
+
+            jsonNav.OwnsMany(c => c.Entrances, ent =>
+            {
+                ent.ToJson();
+            });
+            jsonNav.OwnsMany(c => c.Files, file => file.ToJson());
         });
     }
 }

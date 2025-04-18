@@ -43,6 +43,16 @@ const SideBarMenuItems = () => {
       isVisible: hasAccount,
     },
     {
+      key: "/caves/review",
+      icon: (
+        <Link to="/caves/review">
+          <DatabaseOutlined />
+        </Link>
+      ),
+      label: "Review",
+      isVisible: hasAccount,
+    },
+    {
       key: "/map",
       icon: (
         <Link to="/map">

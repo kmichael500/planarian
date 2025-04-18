@@ -10,6 +10,7 @@ const { Text } = Typography;
 export interface UserAvatarComponentProps {
   userId: string;
   size?: AvatarSize | undefined;
+  showName?: boolean;
 }
 
 const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
@@ -19,11 +20,9 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
   useEffect(() => {
     if (usersName === undefined) {
       const getUsersName = async () => {
-        const tripNameResponse = await SettingsService.GetUsersName(
-          props.userId
-        );
+        const response = await SettingsService.GetUsersName(props.userId);
 
-        setUsersName(tripNameResponse);
+        setUsersName(response);
         setIsLoading(false);
       };
       getUsersName();
@@ -33,11 +32,20 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
   return (
     <Spin spinning={isLoading}>
       {usersName !== undefined && (
-        <Tooltip title={usersName.name} placement="top">
-          <Avatar src={usersName.profilePhotoUrl} size={props.size}>
-            {StringHelpers.GenerateAbbreviation(usersName.name)}
-          </Avatar>
-        </Tooltip>
+        <>
+          {props.showName && (
+            <>
+              <Text style={{ marginLeft: 8 }}>{usersName.name}</Text>
+            </>
+          )}
+          {!props.showName && (
+            <Tooltip title={usersName.name} placement="top">
+              <Avatar src={usersName.profilePhotoUrl} size={props.size}>
+                {StringHelpers.GenerateAbbreviation(usersName.name)}
+              </Avatar>
+            </Tooltip>
+          )}
+        </>
       )}
     </Spin>
   );

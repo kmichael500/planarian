@@ -1,6 +1,8 @@
 import { RcFile } from "antd/lib/upload";
 import { HttpClient } from "../../..";
 import { PagedResult } from "../../Search/Models/PagedResult";
+import dayjs from "dayjs";
+
 import {
   QueryBuilder,
   QueryOperator,
@@ -15,7 +17,12 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
-import { ProposeChangeRequestVm } from "../Models/ProposeChangeRequestVm";
+import {
+  ProposeChangeRequestVm,
+  ChangesForReviewVm,
+  ReviewChangeRequest,
+} from "../Models/ProposeChangeRequestVm";
+import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -39,9 +46,29 @@ const CaveService = {
   async ProposeChange(values: ProposeChangeRequestVm): Promise<void> {
     await HttpClient.post<string>(`${baseUrl}/`, values);
   },
+  async GetChangesToReview() {
+    const response = await HttpClient.get<ChangesForReviewVm[]>(
+      `${baseUrl}/review`
+    );
+    return response.data;
+  },
+  async GetProposedChange(id: string) {
+    const response = await HttpClient.get<ProposedChangeRequestVm>(
+      `${baseUrl}/review/${id}`
+    );
+
+    response.data.cave = this.processCaveDates(response.data.cave);
+
+    return response.data;
+  },
+  async ReviewChange(values: ReviewChangeRequest): Promise<void> {
+    await HttpClient.post(`${baseUrl}/review`, values);
+  },
   async GetCave(id: string): Promise<CaveVm> {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
-    return response.data;
+    const cave = this.processCaveDates(response.data) as CaveVm;
+
+    return cave;
   },
   async ArchiveCave(id: string): Promise<void> {
     const response = await HttpClient.post<void>(`${baseUrl}/${id}/archive`);
@@ -126,6 +153,18 @@ const CaveService = {
       geoJsonUploads
     );
     return response.data;
+  },
+  processCaveDates(cave: CaveVm | AddCaveVm) {
+    if (!isNullOrWhiteSpace(cave.reportedOn)) {
+      cave.reportedOn = dayjs.utc(cave.reportedOn) as any;
+    }
+    cave.entrances.forEach((entrance) => {
+      if (!isNullOrWhiteSpace(entrance.reportedOn)) {
+        entrance.reportedOn = dayjs.utc(entrance.reportedOn) as any;
+      }
+    });
+
+    return cave;
   },
 };
 

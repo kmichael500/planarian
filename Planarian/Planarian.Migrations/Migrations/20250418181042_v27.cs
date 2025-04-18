@@ -59,7 +59,7 @@ namespace Planarian.Migrations.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CaveChangeRequests",
+                name: "CaveChangeRequest",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
@@ -77,19 +77,19 @@ namespace Planarian.Migrations.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CaveChangeRequests", x => x.Id);
+                    table.PrimaryKey("PK_CaveChangeRequest", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_CaveChangeRequests_Accounts_AccountId",
+                        name: "FK_CaveChangeRequest_Accounts_AccountId",
                         column: x => x.AccountId,
                         principalTable: "Accounts",
                         principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_CaveChangeRequests_Caves_CaveId",
+                        name: "FK_CaveChangeRequest_Caves_CaveId",
                         column: x => x.CaveId,
                         principalTable: "Caves",
                         principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_CaveChangeRequests_Users_ReviewedByUserId",
+                        name: "FK_CaveChangeRequest_Users_ReviewedByUserId",
                         column: x => x.ReviewedByUserId,
                         principalTable: "Users",
                         principalColumn: "Id");
@@ -116,18 +116,18 @@ namespace Planarian.Migrations.Migrations
                 column: "ChangedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveChangeRequests_AccountId",
-                table: "CaveChangeRequests",
+                name: "IX_CaveChangeRequest_AccountId",
+                table: "CaveChangeRequest",
                 column: "AccountId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveChangeRequests_CaveId",
-                table: "CaveChangeRequests",
+                name: "IX_CaveChangeRequest_CaveId",
+                table: "CaveChangeRequest",
                 column: "CaveId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_CaveChangeRequests_ReviewedByUserId",
-                table: "CaveChangeRequests",
+                name: "IX_CaveChangeRequest_ReviewedByUserId",
+                table: "CaveChangeRequest",
                 column: "ReviewedByUserId");
         }
 
@@ -138,7 +138,7 @@ namespace Planarian.Migrations.Migrations
                 name: "CaveChangeLog");
 
             migrationBuilder.DropTable(
-                name: "CaveChangeRequests");
+                name: "CaveChangeRequest");
         }
     }
 }

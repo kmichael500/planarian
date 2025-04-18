@@ -11,6 +11,7 @@ using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
@@ -414,7 +415,7 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     #region Create / Update Cave
-    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken,
+    public async Task<string> AddCave(AddCave values, CancellationToken cancellationToken,
         IDbContextTransaction? transaction = null)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
@@ -738,9 +739,11 @@ public class CaveService : ServiceBase<CaveRepository>
                   throw ApiExceptionDictionary.NotFound("Change Request");
 
             var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
+            
             entity.CaveId = value.Cave.Id;
             entity.AccountId = RequestUser.AccountId;
             entity.Json = value.Cave;
+
             if (isNew)
             {
                 _caveChangeRequestRepository.Add(entity);
@@ -764,7 +767,7 @@ public class CaveService : ServiceBase<CaveRepository>
         var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id, cancellationToken);
         if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, entity.Cave.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, entity.Json.CountyId);
 
         var transaction = await _caveChangeRequestRepository.BeginTransactionAsync(cancellationToken);
 
@@ -791,8 +794,28 @@ public class CaveService : ServiceBase<CaveRepository>
 
         await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
     }
+    
+    public async Task<IEnumerable<ChangesForReviewVm>> GetChangesForReview()
+    {
+        var result = await _caveChangeRequestRepository.GetChangesForReview();
+        return result;
+    }
 
-    private async Task ValidateCave(AddCaveVm values)
+    public async Task<ProposedChangeRequestVm> GetProposedChange(string id)
+    {
+        var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(id, CancellationToken.None);
+        if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
+
+        var result = new ProposedChangeRequestVm
+        {
+            Id = entity.Id,
+            Cave = entity.Json,
+        };
+
+        return result;
+    }
+
+    private async Task ValidateCave(AddCave values)
     {
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
 
@@ -839,7 +862,6 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         var cave = await Repository.GetCave(caveId);
 
-        cave.CountyId = cave.CountyId;
         if (cave == null) throw ApiExceptionDictionary.NotFound("Cave");
 
         foreach (var file in cave.Files)

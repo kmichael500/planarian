@@ -7,6 +7,7 @@ import { customSort, groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { CloudUploadOutlined } from "@ant-design/icons";
 import { ReactNode } from "react";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { TagComponent } from "../../Tag/Components/TagComponent";
 const { Panel } = Collapse;
 
 export interface FileListComponentProps {
@@ -21,24 +22,24 @@ export const FileListComponent = ({
   files,
   isUploading,
   setIsUploading,
-  customOrder,
   hasEditPermission = true,
 }: FileListComponentProps) => {
   if (!files) {
     files = [];
   }
-  const filesByType = groupBy(files, (file) => file.fileTypeKey);
+  const filesByType = groupBy(files, (file) => file.fileTypeTagId);
 
-  let sortedFileTypes = customOrder
-    ? customSort(customOrder, Object.keys(filesByType))
-    : Object.keys(filesByType);
+  let sortedFileTypesIds = Object.keys(filesByType);
 
   return (
     <>
-      {sortedFileTypes.length > 0 ? (
-        <Collapse bordered defaultActiveKey={sortedFileTypes}>
-          {sortedFileTypes.map((fileType) => (
-            <Panel header={fileType} key={fileType}>
+      {sortedFileTypesIds.length > 0 ? (
+        <Collapse bordered defaultActiveKey={sortedFileTypesIds}>
+          {sortedFileTypesIds.map((fileTypeId) => (
+            <Panel
+              header={<TagComponent tagId={fileTypeId} />}
+              key={fileTypeId}
+            >
               <CardGridComponent
                 useList
                 noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
@@ -61,7 +62,7 @@ export const FileListComponent = ({
                 itemKey={(item) => {
                   return item.id;
                 }}
-                items={filesByType[fileType]}
+                items={filesByType[fileTypeId]}
               ></CardGridComponent>
             </Panel>
           ))}

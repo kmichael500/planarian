@@ -25,6 +25,9 @@ import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptI
 import { UserPage } from "../../Modules/Account/Pages/UserPage";
 import { UserPermissionManagementPage } from "../../Modules/Account/Pages/UserPermissionManagementPage";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
+import { CaveReviewsPage } from "../../Modules/Caves/Pages/CaveReviewsPage";
+import { CaveEditReviewPage } from "../../Modules/Caves/Pages/CaveEditReviewPage";
+import { CaveReviewPage } from "../../Modules/Caves/Pages/CaveReviewPage";
 
 export const AppRouting: React.FC = () => {
   return (
@@ -45,13 +48,22 @@ export const AppRouting: React.FC = () => {
         <Route path="/map" element={<MapPage />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
+        <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
+        <Route path="/caves/add" element={<AddCavesPage />} />
         <Route
           element={
             <ProtectedRoutesComponent permissionKey={PermissionKey.Manager} />
           }
         >
-          <Route path="/caves/:caveId/edit" element={<EditCavePage />} />
-          <Route path="/caves/add" element={<AddCavesPage />} />
+          <Route path="/caves/review" element={<CaveReviewsPage />} />
+          <Route
+            path="/caves/review/:caveChangeRequestId/edit"
+            element={<CaveEditReviewPage />}
+          />
+          <Route
+            path="/caves/review/:caveChangeRequestId"
+            element={<CaveReviewPage />}
+          />
           <Route path="/account/users" element={<UserManagerPage />} />
           <Route path="/account/users/:userId" element={<UserPage />} />
           <Route

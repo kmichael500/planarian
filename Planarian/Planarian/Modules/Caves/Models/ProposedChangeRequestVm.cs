@@ -4,8 +4,8 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Models;
 
-public class ProposeChangeRequestVm
+public class ProposedChangeRequestVm
 {
-    [MaxLength(PropertyLength.Id)] public string? Id { get; set; } 
+    [MaxLength(PropertyLength.Id)] public string Id { get; set; } 
     public AddCave Cave { get; set; } = null!;
 }

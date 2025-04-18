@@ -4,3 +4,20 @@ export interface ProposeChangeRequestVm {
   id?: string | null | undefined;
   cave: AddCaveVm;
 }
+
+export interface ChangesForReviewVm {
+  id: string;
+  caveName: string;
+  caveDisplayId: string | null;
+  countyId: string;
+  isNew: boolean;
+  submittedOn: string;
+  submittedByUserId: string;
+}
+
+export interface ReviewChangeRequest {
+  id: string | null;
+  approve: boolean;
+  cave: AddCaveVm;
+  notes: string | null;
+}

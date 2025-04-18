@@ -71,10 +71,26 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return Ok();
     }
+    
+    [HttpGet("review")]
+    public async Task<ActionResult<IEnumerable<ChangesForReviewVm>>> GetChangesForReview()
+    {
+        var changes = await Service.GetChangesForReview();
+
+        return new JsonResult(changes);
+    }
+    
+    [HttpGet("review/{id:length(10)}")]
+    public async Task<ActionResult<ProposedChangeRequestVm>> GetProposedChange(string id)
+    {
+        var change = await Service.GetProposedChange(id);
+
+        return new JsonResult(change);
+    }
 
     [HttpPost("review")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<ActionResult<string>> ReviewChange([FromBody] ReviewChangeRequest values,
+    public async Task<ActionResult> ReviewChange([FromBody] ReviewChangeRequest values,
         CancellationToken cancellationToken)
     {
         await Service.ReviewChange(values, cancellationToken);

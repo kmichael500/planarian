@@ -3,11 +3,11 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 
-public class AddCave
+public class AddCaveVm
 {
-    public AddCave(string stateId, string countyId, string name,
+    public AddCaveVm(string stateId, string countyId, string name,
         double lengthFeet,
-        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds)
+        double depthFeet, int numberOfPits, List<string> geologyTagIds)
     {
         StateId = stateId;
         CountyId = countyId;
@@ -19,10 +19,10 @@ public class AddCave
     }
 
 
-    public AddCave(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
+    public AddCaveVm(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
         string reportedByName, string stateId, string countyId, string name,
         double lengthFeet,
-        double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(stateId, countyId, name,
+        double depthFeet, int numberOfPits, List<string> geologyTagIds) : this(stateId, countyId, name,
         lengthFeet, depthFeet, numberOfPits, geologyTagIds)
     {
         MaxPitDepthFeet = maxPitDepthFeet;
@@ -31,13 +31,14 @@ public class AddCave
         ReportedByName = reportedByName;
     }
 
-    public AddCave()
+    public AddCaveVm()
     {
+        // init all lists
     }
 
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    public IEnumerable<string> AlternateNames { get; set; } = new HashSet<string>();
+    public List<string> AlternateNames { get; set; } = [];
 
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; }
@@ -53,15 +54,15 @@ public class AddCave
     public DateTime? ReportedOn { get; set; }
     [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
-    public IEnumerable<AddEntrance> Entrances { get; set; } = new HashSet<AddEntrance>();
-    public IEnumerable<EditFileMetadata>? Files { get; set; } = new HashSet<EditFileMetadata>();
-    public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> ArcheologyTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> CartographerNameTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> GeologicAgeTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> PhysiographicProvinceTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
+    public List<AddEntrance> Entrances { get; set; } = [];
+    public List<EditFileMetadata>? Files { get; set; } = new List<EditFileMetadata>();
+    public List<string> GeologyTagIds { get; set; } = [];
+    public List<string> ReportedByNameTagIds { get; set; } = [];
+    public List<string> BiologyTagIds { get; set; } = [];
+    public List<string> ArcheologyTagIds { get; set; } = [];
+    public List<string> CartographerNameTagIds { get; set; } = [];
+    public List<string> MapStatusTagIds { get; set; } = [];
+    public List<string> GeologicAgeTagIds { get; set; } = [];
+    public List<string> PhysiographicProvinceTagIds { get; set; } = [];
+    public List<string> OtherTagIds { get; set; } = [];
 }

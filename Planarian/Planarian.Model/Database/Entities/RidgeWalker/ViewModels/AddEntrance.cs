@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Shared;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
@@ -6,8 +7,8 @@ namespace Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 public class AddEntrance
 {
     public AddEntrance(double latitude, double longitude, double elevationFeet,
-        IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds)
+        List<string> entranceStatusTagIds, List<string> fieldIndicationTagIds,
+        List<string> entranceHydrologyTagIds)
     {
         Latitude = latitude;
         Longitude = longitude;
@@ -22,8 +23,8 @@ public class AddEntrance
     public AddEntrance(string name, string description, double latitude, double longitude,
         double elevationFeet,
         double? pitFeet, string locationQualityTagId, string reportedByName,
-        DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
-        IEnumerable<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
+        DateTime? reportedOn, List<string> entranceStatusTagIds, List<string> fieldIndicationTagIds,
+        List<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
         Name = name;
         PitFeet = pitFeet;
@@ -53,9 +54,9 @@ public class AddEntrance
 
     public double? PitFeet { get; set; }
 
-    public IEnumerable<string> EntranceStatusTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
-    public IEnumerable<string> EntranceOtherTagIds { get; set; } = new HashSet<string>();
+    public List<string> EntranceStatusTagIds { get; set; } = [];
+    public List<string> FieldIndicationTagIds { get; set; } = [];
+    public List<string> EntranceHydrologyTagIds { get; set; } = [];
+    public List<string> ReportedByNameTagIds { get; set; } = [];
+    public List<string> EntranceOtherTagIds { get; set; } = [];
 }

@@ -33,6 +33,7 @@ import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { TagComponent } from "../../Tag/Components/TagComponent";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -90,7 +91,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
 
   useEffect(() => {
     if (caveState?.files) {
-      const temp = groupBy(caveState.files, (file) => file.fileTypeKey);
+      const temp = groupBy(caveState.files, (file) => file.fileTypeTagId);
       setGroupedByFiles(temp);
     }
   }, [caveState]);
@@ -745,17 +746,19 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
             {(fields, { add, remove }, { errors }) => (
               <Collapse accordion>
                 {Object.entries(groupedByFileTypes).map(([fileType, files]) => (
-                  <Collapse.Panel header={`${fileType}`} key={fileType}>
+                  <Collapse.Panel
+                    header={<TagComponent tagId={fileType} />}
+                    key={fileType}
+                  >
                     <Row gutter={16}>
                       {fields.map((field) => {
                         // Get the file at the index
                         const f = caveState?.files?.[field.key];
-
-                        if (f?.fileTypeKey === fileType) {
+                        if (f?.fileTypeTagId === fileType) {
                           return (
-                            <Col key={field.key} span={12}>
+                            <Col span={12}>
                               <Card
-                                bordered
+                                variant="outlined"
                                 style={{ height: "100%" }}
                                 actions={[
                                   <DeleteButtonComponent

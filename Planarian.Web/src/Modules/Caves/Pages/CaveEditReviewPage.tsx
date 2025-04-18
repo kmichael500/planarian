@@ -7,16 +7,16 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { CaveVm } from "../Models/CaveVm";
-import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { ProposeChangeRequestVm } from "../Models/ProposeChangeRequestVm";
+import { ReviewChangeRequest } from "../Models/ProposeChangeRequestVm";
+import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
 
-const EditCavePage: React.FC = () => {
-  const { caveId } = useParams();
-  const [cave, setCave] = useState<CaveVm>();
+const CaveEditReviewPage: React.FC = () => {
+  const { caveChangeRequestId } = useParams();
+  const [proposedChange, setProposedChange] =
+    useState<ProposedChangeRequestVm>();
 
-  if (caveId === undefined) {
-    throw new Error("caveId is undefined");
+  if (caveChangeRequestId === undefined) {
+    throw new Error("caveChangeRequestId is undefined");
   }
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -45,29 +45,14 @@ const EditCavePage: React.FC = () => {
 
   useEffect(() => {
     const getCave = async () => {
-      const caveResponse = await CaveService.GetCave(caveId);
+      const caveResponse = await CaveService.GetProposedChange(
+        caveChangeRequestId
+      );
 
-      setCave(caveResponse);
+      setProposedChange(caveResponse);
 
-      setHeaderButtons([
-        <DeleteButtonComponent
-          title={`Are you sure you want to delete '${caveResponse?.name}'? This action is not reversable!'`}
-          onConfirm={async () => {
-            try {
-              await CaveService.DeleteCave(caveResponse?.id as string);
-              message.success(
-                `'${caveResponse?.name}' has been deleted successfully`
-              );
-              navigate(`/caves`);
-            } catch (e: any) {
-              const error = e as ApiErrorResponse;
-              message.error(error.message);
-            }
-          }}
-        />,
-        <BackButtonComponent to={"./.."} />,
-      ]);
-      setHeaderTitle([`Edit ${caveResponse?.displayId} ${caveResponse?.name}`]);
+      setHeaderButtons([<BackButtonComponent to={"./.."} />]);
+      setHeaderTitle([`Review`]);
 
       setIsLoading(false);
     };
@@ -78,13 +63,16 @@ const EditCavePage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      const changeRequest: ProposeChangeRequestVm = {
+      const changeRequest: ReviewChangeRequest = {
         cave: values,
+        id: caveChangeRequestId,
+        approve: true,
+        notes: null,
       };
 
-      await CaveService.ProposeChange(changeRequest);
+      await CaveService.ReviewChange(changeRequest);
       message.success(`'${values?.name}' has been submitted successfully`);
-      navigate(`/caves/${cave?.id}`);
+      navigate(`/caves/review`);
     } catch (e: any) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
@@ -102,16 +90,20 @@ const EditCavePage: React.FC = () => {
       <Card loading={isLoading}>
         <Form<AddCaveVm>
           layout="vertical"
-          initialValues={cave}
+          initialValues={proposedChange?.cave}
           onFinish={handleFormSubmit}
-          onChange={handleFormChange} // Attach change handler
+          onChange={handleFormChange}
           form={form}
         >
-          <AddCaveComponent isEditing={true} form={form} cave={cave} />
+          <AddCaveComponent
+            isEditing={true}
+            form={form}
+            cave={proposedChange?.cave}
+          />
         </Form>
       </Card>
     </>
   );
 };
 
-export { EditCavePage };
+export { CaveEditReviewPage };

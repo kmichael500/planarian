@@ -415,7 +415,6 @@ const CaveComponent = ({
             files={cave?.files}
             isUploading={isUploading}
             setIsUploading={(value) => setIsUploading(value)}
-            customOrder={["Map"]}
             hasEditPermission={hasEditPermission}
           />
         </>
