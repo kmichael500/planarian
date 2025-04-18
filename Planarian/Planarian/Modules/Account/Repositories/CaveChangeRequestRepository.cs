@@ -4,7 +4,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.FeatureSettings.Repositories;
+namespace Planarian.Modules.Account.Repositories;
 
 public class CaveChangeRequestRepository : RepositoryBase
 {

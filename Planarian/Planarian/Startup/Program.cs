@@ -173,6 +173,7 @@ builder.Services.AddScoped<TripRepository>();
 builder.Services.AddScoped<AuthenticationRepository>();
 builder.Services.AddScoped<SettingsRepository>();
 builder.Services.AddScoped(typeof(SettingsRepository<>));
+builder.Services.AddScoped<CaveChangeRequestRepository>();
 builder.Services.AddScoped<LeadRepository>();
 builder.Services.AddScoped<PhotoRepository>();
 builder.Services.AddScoped<TagRepository>();
