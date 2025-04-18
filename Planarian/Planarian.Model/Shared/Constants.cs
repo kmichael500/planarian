@@ -9,6 +9,7 @@ public static class PropertyLength
     public const int PhoneNumber = 20;
     public const int SmallText = 50;
     public const int MediumText = 255;
+    public const int LargeText = 1000;
     public const int Max = Int32.MaxValue;
     public const int BlobKey = 255;
     public const int FileType = 10;

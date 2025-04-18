@@ -1,0 +1,67 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
+
+namespace Planarian.Model.Database.Entities.RidgeWalker;
+public static class ChangeValueType
+{
+    public const string String   = "String";
+    public const string Int      = "Int";
+    public const string Double   = "Double";
+    public const string Bool     = "Bool";
+    public const string DateTime = "DateTime";
+}
+
+public class CaveChangeLog : EntityBase
+{
+    [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
+
+    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string ChangedByUserId { get; set; }
+
+    [MaxLength(PropertyLength.Id)] public string? ApprovedByUserId { get; set; }
+
+
+    [MaxLength(PropertyLength.Key)] public string PropertyName { get; set; } = null!;
+
+    [MaxLength(PropertyLength.Key)] public string ChangeValueType { get; set; } = null!;
+
+    public string? ValueString { get; set; } 
+
+    public int? ValueInt { get; set; }
+
+    public double? ValueDouble { get; set; }
+
+    public bool? ValueBool { get; set; }
+
+    public DateTime? ValueDateTime { get; set; }
+
+    
+    public Account Account { get; set; } = null!;
+    public User ChangedByUser { get; set; } = null!;
+    public Cave Cave { get; set; } = null!;
+    public User ApprovedByUser { get; set; }
+}
+
+public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChangeLog>
+{
+    public override void Configure(EntityTypeBuilder<CaveChangeLog> builder)
+    {
+        builder.HasOne(e => e.Cave)
+            .WithMany(e => e.CaveChangeLogs)
+            .HasForeignKey(e => e.CaveId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(e => e.ChangedByUser)
+            .WithMany(e => e.CaveChangeLogs)
+            .HasForeignKey(e => e.ChangedByUserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(e => e.ApprovedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.ApprovedByUserId)
+            .OnDelete(DeleteBehavior.NoAction);
+    }
+}

@@ -22,6 +22,7 @@ public class Account : EntityBase
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
     public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
+    public ICollection<CaveChangeRequest>? CaveChangeRequests { get; set; } = new HashSet<CaveChangeRequest>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>

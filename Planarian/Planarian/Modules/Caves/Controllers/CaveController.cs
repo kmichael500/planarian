@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -64,22 +65,24 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
 
     [HttpPost]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
+    public async Task<ActionResult<string>> ProposeChange([FromBody] ProposeChangeRequestVm changeRequest, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave, cancellationToken);
+        await Service.ProposeChange(changeRequest, cancellationToken);
 
-        return new JsonResult(result);
+        return Ok();
     }
 
-    [HttpPut]
+    [HttpPost("review")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
+    public async Task<ActionResult<string>> ReviewChange([FromBody] ReviewChangeRequest values,
+        CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave, cancellationToken);
+        await Service.ReviewChange(values, cancellationToken);
 
-        return new JsonResult(result);
+        return Ok();
     }
+
+    [HttpPost]
 
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]

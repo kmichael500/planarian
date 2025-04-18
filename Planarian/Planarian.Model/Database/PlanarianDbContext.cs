@@ -66,6 +66,9 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
     public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    
+    public DbSet<CaveChangeLog> CaveChangeLog { get; set; }
+    public DbSet<CaveChangeRequest> CaveChangeRequests { get; set; }
     public DbSet<CaveGeoJson> CaveGeoJsons { get; set; } = null!;
     public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
     
@@ -142,7 +145,7 @@ public class PlanarianDbContext : PlanarianDbContextBase
     public PlanarianDbContext(DbContextOptions<PlanarianDbContextBase> contextOptions) : base(contextOptions)
     {
     }
-
+    
     // on model creating
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

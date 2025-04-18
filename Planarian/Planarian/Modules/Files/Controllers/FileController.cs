@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Files.Services;
@@ -30,9 +31,4 @@ public class FileController : PlanarianControllerBase<FileService>
     }
 }
 
-public class EditFileMetadataVm
-{
-    public string Id { get; set; }
-    public string DisplayName { get; set; }
-    public string FileTypeTagId { get; set; }
-}
+public class EditFileMetadataVm : EditFileMetadata;

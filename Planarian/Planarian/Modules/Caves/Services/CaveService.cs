@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text;
 using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
@@ -30,11 +31,13 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
+    private readonly CaveChangeRequestRepository _caveChangeRequestRepository;
     private readonly ServerOptions _serverOptions;
+    
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         FileRepository fileRepository, TagRepository tagRepository,
-        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions) : base(
+        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions, CaveChangeRequestRepository caveChangeRequestRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -42,6 +45,7 @@ public class CaveService : ServiceBase<CaveRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _serverOptions = serverOptions;
+        _caveChangeRequestRepository = caveChangeRequestRepository;
     }
 
     #region Caves
@@ -408,58 +412,17 @@ public class CaveService : ServiceBase<CaveRepository>
         return Encoding.UTF8.GetBytes(gpx);
     }
 
-    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
+    #region Create / Update Cave
+    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken,
+        IDbContextTransaction? transaction = null)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+        await ValidateCave(values);
+        
         var isNew = string.IsNullOrWhiteSpace(values.Id);
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
-
-
-        #region Data Validation
-
-        // must be at least one entrance
-        if (values.Entrances == null || !values.Entrances.Any())
-            throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
-
-        if (values.NumberOfPits < 0)
-            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
-
-        if (values.LengthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
-
-        if (values.DepthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
-
-        if (values.MaxPitDepthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
-
-        if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
-            throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
-
-        if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
-            throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
-
-        if (values.Entrances.Any(e => e.ElevationFeet < 0))
-            throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
-
-        if (values.Entrances.Any(e => e.PitFeet < 0))
-            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
-
-        var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
-
-        if (numberOfPrimaryEntrances == 0)
-            throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
-
-        if (numberOfPrimaryEntrances != 1)
-            throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
-
-        #endregion
-
-
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        var existingTransaction = transaction != null;
+        transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
             var entity = isNew ? new Cave() : await Repository.GetAsync(values.Id);
@@ -736,14 +699,88 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
-
+            if(!existingTransaction){
+                await transaction.CommitAsync(cancellationToken);
+            }
+            
             foreach (var blobProperties in blobsToDelete)
                 await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
 
             return entity.Id;
+        }
+        catch (Exception e)
+        {
+            if (!existingTransaction)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
 
+            throw;
+        }
 
+    }
+
+    public async Task ProposeChange(ProposeChangeRequestVm value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+        await ValidateCave(value.Cave);
+        
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var isNew = string.IsNullOrWhiteSpace(value.Id);
+
+            var entity = isNew
+                ? new CaveChangeRequest()
+                : await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id!, cancellationToken) ??
+                  throw ApiExceptionDictionary.NotFound("Change Request");
+
+            var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
+            entity.CaveId = value.Cave.Id;
+            entity.AccountId = RequestUser.AccountId;
+            entity.Json = value.Cave;
+            if (!isNew)
+            {
+                _caveChangeRequestRepository.Add(entity);
+            }
+
+            await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception e)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task ReviewChange(ReviewChangeRequest value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(value.Id)) throw ApiExceptionDictionary.BadRequest("Change Request Id");
+
+        var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id, cancellationToken);
+        if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, entity.Cave.CountyId);
+
+        var transaction = await _caveChangeRequestRepository.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            entity.Status = value.Approve ? ChangeRequestStatus.Approved : ChangeRequestStatus.Rejected;
+            entity.Notes = value.Notes;
+            entity.ReviewedByUserId = RequestUser.Id;
+            entity.ReviewedOn = DateTime.UtcNow;
+
+            if (value.Approve)
+            {
+                await AddCave(value.Cave, cancellationToken, transaction: transaction);
+            }
+            
+            await transaction.CommitAsync(cancellationToken);
+            await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
         }
         catch (Exception e)
         {
@@ -751,12 +788,57 @@ public class CaveService : ServiceBase<CaveRepository>
             throw;
         }
 
+        await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
     }
+
+    private async Task ValidateCave(AddCaveVm values)
+    {
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+
+        // must be at least one entrance
+        if (values.Entrances == null || !values.Entrances.Any())
+            throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
+
+        if (values.NumberOfPits < 0)
+            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
+
+        if (values.LengthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
+
+        if (values.DepthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
+
+        if (values.MaxPitDepthFeet < 0)
+            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
+
+        if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
+            throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
+
+        if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
+            throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
+
+        if (values.Entrances.Any(e => e.ElevationFeet < 0))
+            throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
+
+        if (values.Entrances.Any(e => e.PitFeet < 0))
+            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
+
+        var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
+
+        if (numberOfPrimaryEntrances == 0)
+            throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
+
+        if (numberOfPrimaryEntrances != 1)
+            throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
+    }
+    
+    #endregion
 
     public async Task<CaveVm?> GetCave(string caveId)
     {
         var cave = await Repository.GetCave(caveId);
 
+        cave.CountyId = cave.CountyId;
         if (cave == null) throw ApiExceptionDictionary.NotFound("Cave");
 
         foreach (var file in cave.Files)

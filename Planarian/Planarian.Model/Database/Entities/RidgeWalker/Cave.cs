@@ -70,6 +70,8 @@ public class Cave : EntityBase
     public ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
     public ICollection<CaveGeoJson> GeoJsons { get; set; } = new HashSet<CaveGeoJson>();
+    public ICollection<CaveChangeRequest>? CaveChangeRequests { get; set; } = new HashSet<CaveChangeRequest>();
+    public  ICollection<CaveChangeLog>? CaveChangeLogs { get; set; } = new HashSet<CaveChangeLog>();
 
 
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>
@@ -114,7 +116,6 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         // Create a GIN index on the generated tsvector column.
         builder.HasIndex(e => e.NarrativeSearchVector)
             .HasMethod("GIN");
-
 
     }
 }
