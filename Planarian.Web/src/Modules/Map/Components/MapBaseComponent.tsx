@@ -212,7 +212,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       }
 
       for (const id of ids) {
-        if (loadedPlotIds.has(id)) continue;
+        if (loadedPlotIds.current.has(id)) continue;
         try {
           const featureCollection: FeatureCollection =
             await MapService.getLinePlot(id);
@@ -230,7 +230,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         } catch (err) {
           console.error(`Lineplot ${id} failed to load`, err);
         } finally {
-          loadedPlotIds.add(id);
+          loadedPlotIds.current.add(id);
         }
       }
 
