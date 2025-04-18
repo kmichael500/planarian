@@ -1,7 +1,5 @@
 import { HttpClient } from "../../..";
-import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
-
+import { FeatureCollection } from "geojson";
 const baseUrl = "api/map";
 const cacheDuration = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
@@ -40,6 +38,33 @@ const MapService = {
 
   getMapCenter: async () => {
     const response = await HttpClient.get<CoordinateDto>(`${baseUrl}/center`);
+
+    return response.data;
+  },
+  getLinePlotIds: async (
+    tileNorth: number,
+    tileSouth: number,
+    tileEast: number,
+    tileWest: number,
+    zoom: number
+  ) => {
+    const params = new URLSearchParams();
+    params.append("north", tileNorth.toString());
+    params.append("south", tileSouth.toString());
+    params.append("east", tileEast.toString());
+    params.append("west", tileWest.toString());
+    params.append("zoom", zoom.toString());
+    const response = await HttpClient.get<string[]>(
+      `${baseUrl}/lineplots/ids?${params}`
+    );
+
+    return response.data;
+  },
+
+  getLinePlot: async (linePlotId: string) => {
+    const response = await HttpClient.get<FeatureCollection>(
+      `${baseUrl}/lineplots/${linePlotId}`
+    );
 
     return response.data;
   },

@@ -24,29 +24,13 @@ public class MapController : PlanarianControllerBase<MapService>
         return Ok(data);
     }
 
-    [HttpGet("lineplots")]
-    public async Task<IActionResult> GetLinePlots(
-        [FromQuery] double north, 
-        [FromQuery] double south,
-        [FromQuery] double east,
-        [FromQuery] double west, 
-        [FromQuery] double zoom, 
-        CancellationToken cancellationToken)
-    {
-        var data = await Service.GetLinePlots(north, south, east, west, zoom, cancellationToken);
-     
-        return new JsonResult(data);
-    }
-
-
-
     [HttpGet("center")]
     public async Task<ActionResult<object>> GetMapCenter()
     {
         CoordinateDto data = await Service.GetMapCenter();
         return Ok(data);
     }
-    
+
     [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
     public async Task<IActionResult> GetTile(int z, int x, int y, CancellationToken cancellationToken)
     {
@@ -59,5 +43,34 @@ public class MapController : PlanarianControllerBase<MapService>
 
         return File(mvtData, "application/vnd.mapbox-vector-tile");
     }
-    
+
+    [HttpGet("lineplots/ids")]
+    public async Task<IActionResult> GetLinePlotIds(
+        [FromQuery] double north,
+        [FromQuery] double south,
+        [FromQuery] double east,
+        [FromQuery] double west,
+        [FromQuery] double zoom,
+        CancellationToken cancellationToken)
+    {
+        var ids = await Service.GetLinePlotIds(
+            north, south, east, west, zoom, cancellationToken);
+        return Ok(ids);
+    }
+
+    [HttpGet("lineplots/{plotId}")]
+    public async Task<IActionResult> GetLinePlotById(
+        [FromRoute] string plotId,
+        CancellationToken cancellationToken)
+    {
+        var element = await Service.GetLinePlotGeoJson(
+            plotId, cancellationToken);
+        if (element == null)
+            return NotFound();
+
+        Response.Headers["Cache-Control"] = "public, max-age=2678400"; // cache for 31 days
+        return new JsonResult(element.Value);
+    }
+
+
 }
