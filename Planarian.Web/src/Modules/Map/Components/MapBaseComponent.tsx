@@ -135,7 +135,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     { id: string; data: FeatureCollection; type: string }[]
   >([]);
 
-  const [loadedPlotIds] = useState<Set<string>>(new Set());
+  const loadedPlotIds = React.useRef<Set<string>>(new Set());
 
   const fetchLineplots = async () => {
     if (zoom < 11 || !mapRef.current) return;
