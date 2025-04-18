@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
+using EFCore.BulkExtensions;
 using LinqToDB.Tools;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Constants;
@@ -604,8 +605,14 @@ public class ImportService : ServiceBase
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting caves. This may take a while...");
+
+            var config = new BulkConfig
+            {
+                // TODO: exclude the generated tsvector column. I feel like this should auto-exclude but it isn't...
+                PropertiesToExclude = new List<string> { nameof(Cave.NarrativeSearchVector) }
+            };
             await _repository.BulkInsertAsync(caves, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken, bulkConfig:config);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geology tags.");
