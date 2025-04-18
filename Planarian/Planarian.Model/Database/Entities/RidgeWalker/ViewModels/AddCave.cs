@@ -3,9 +3,9 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 
-public class AddCaveVm
+public class AddCave
 {
-    public AddCaveVm(string stateId, string countyId, string name,
+    public AddCave(string stateId, string countyId, string name,
         double lengthFeet,
         double depthFeet, int numberOfPits, List<string> geologyTagIds)
     {
@@ -19,7 +19,7 @@ public class AddCaveVm
     }
 
 
-    public AddCaveVm(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
+    public AddCave(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
         string reportedByName, string stateId, string countyId, string name,
         double lengthFeet,
         double depthFeet, int numberOfPits, List<string> geologyTagIds) : this(stateId, countyId, name,
@@ -31,9 +31,8 @@ public class AddCaveVm
         ReportedByName = reportedByName;
     }
 
-    public AddCaveVm()
+    public AddCave()
     {
-        // init all lists
     }
 
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; } = null!;
