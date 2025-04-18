@@ -135,10 +135,10 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     { id: string; data: FeatureCollection; type: string }[]
   >([]);
 
+  const loadedPlotIds = React.useRef<Set<string>>(new Set());
+
   const fetchLineplots = async () => {
-    if (!mapRef.current) return;
-    // Only fetch data if the current zoom is 12 or greater.
-    if (zoom < 12) return;
+    if (zoom < 11 || !mapRef.current) return;
 
     const mapInstance = mapRef.current.getMap();
     const bounds = mapInstance.getBounds();
@@ -147,7 +147,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     const east = bounds.getEast();
     const west = bounds.getWest();
 
-    // Compute tile indices using the fixed caching zoom.
+    // Compute fixed‑zoom tile indices
     const n = Math.pow(2, cachingZoom);
     const minTileX = Math.floor(((west + 180) / 360) * n);
     const maxTileX = Math.floor(((east + 180) / 360) * n);
@@ -172,7 +172,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         n
     );
 
-    // Determine which tiles in the current viewport have not yet been fetched.
+    // Find tiles we haven’t fetched yet
     const missingTiles: { x: number; y: number; tileId: string }[] = [];
     for (let x = minTileX; x <= maxTileX; x++) {
       for (let y = minTileY; y <= maxTileY; y++) {
@@ -184,74 +184,57 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     }
 
     if (missingTiles.length === 0) {
-      setLineplotsData([...cachedLineplotsDataRef.current]);
       return;
     }
 
-    const fetchPromises = missingTiles.map(({ x, y, tileId }) => {
+    // For each missing tile, fetch just its IDs then its GeoJSONs
+    for (const { x, y, tileId } of missingTiles) {
+      // Tile bbox
       const tileWest = tile2lon(x, cachingZoom);
       const tileEast = tile2lon(x + 1, cachingZoom);
       const tileNorth = tile2lat(y, cachingZoom);
       const tileSouth = tile2lat(y + 1, cachingZoom);
 
-      return fetch(
-        `${
-          AppOptions.serverBaseUrl
-        }/api/map/lineplots?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&north=${tileNorth}&south=${tileSouth}&east=${tileEast}&west=${tileWest}&zoom=${zoom}`
-      )
-        .then((resp) => resp.json())
-        .then((data: FeatureCollection[]) => {
-          let processedData: {
-            id: string;
-            data: FeatureCollection;
-            type: string;
-          }[] = [];
-          if (Array.isArray(data)) {
-            data.forEach(
-              (featureCollection: FeatureCollection, index: number) => {
-                if (
-                  featureCollection &&
-                  featureCollection.features &&
-                  featureCollection.features.length > 0
-                ) {
-                  const firstFeature = featureCollection.features[0];
-                  const geomType =
-                    firstFeature?.geometry?.type?.replace("Multi", "") ||
-                    "Polygon";
-                  processedData.push({
-                    id: `lineplot-${tileId}-${Date.now()}-${index}`,
-                    data: featureCollection,
-                    type: geomType,
-                  });
-                }
-              }
-            );
-          }
-          // Mark this tile as fetched.
-          fetchedTilesRef.current.add(tileId);
-          return processedData;
-        })
-        .catch((error) => {
-          console.error(`Error fetching tile ${tileId}`, error);
-          // Mark the tile as fetched to avoid immediate re-fetch attempts.
-          fetchedTilesRef.current.add(tileId);
-          return [];
-        });
-    });
+      let ids: string[] = [];
+      try {
+        ids = await MapService.getLinePlotIds(
+          tileNorth,
+          tileSouth,
+          tileEast,
+          tileWest,
+          zoom
+        );
+      } catch (err) {
+        console.error(`Error fetching IDs for tile ${tileId}`, err);
+        // still mark tile so we don’t retry immediately
+        fetchedTilesRef.current.add(tileId);
+        continue;
+      }
 
-    try {
-      const results = await Promise.all(fetchPromises);
-      let newData: { id: string; data: FeatureCollection; type: string }[] = [];
-      results.forEach((arr) => {
-        newData = newData.concat(arr);
-      });
-      // Merge new data with any previously cached data.
-      const mergedData = [...cachedLineplotsDataRef.current, ...newData];
-      cachedLineplotsDataRef.current = mergedData;
-      setLineplotsData(mergedData);
-    } catch (error) {
-      console.error("Error fetching tiles", error);
-      message.error("Error fetching lineplots data.");
+      for (const id of ids) {
+        if (loadedPlotIds.current.has(id)) continue;
+        try {
+          const featureCollection: FeatureCollection =
+            await MapService.getLinePlot(id);
+
+          const geometryType =
+            featureCollection.features[0]?.geometry?.type.replace(
+              "Multi",
+              ""
+            ) || "LineString";
+
+          setLineplotsData((prev) => [
+            ...prev,
+            { id, data: featureCollection, type: geometryType },
+          ]);
+        } catch (err) {
+          console.error(`Lineplot ${id} failed to load`, err);
+        } finally {
+          loadedPlotIds.current.add(id);
+        }
+      }
+
+      fetchedTilesRef.current.add(tileId);
     }
   };
 

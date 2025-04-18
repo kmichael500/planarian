@@ -251,66 +251,81 @@ public class MapRepository : RepositoryBase
         return null;
     }
 
-    public async Task<List<object>> GetLinePlots(double north, double south, double east, double west, int zoom,
+    public async Task<List<string>> GetLinePlotIds(
+        double north,
+        double south,
+        double east,
+        double west,
+        double zoom,
         CancellationToken cancellationToken)
     {
-        // Only return GeoJSON if the user is zoomed in at least level 11.
         if (zoom < 11)
-        {
-            return new List<object>();
-        }
+            return new List<string>();
 
-        // Build a bounding box from the provided parameters.
-        // Note: ST_MakeEnvelope expects: (xmin, ymin, xmax, ymax, srid)
-        // In our case: xmin = west, ymin = south, xmax = east, ymax = north.
-        var query = """
+        const string sql = """
+                           WITH view_box AS (
+                             -- MakeEnvelope(minLon, minLat, maxLon, maxLat, SRID)
+                             SELECT ST_MakeEnvelope(@west, @south, @east, @north, 4326) AS bbox
+                           )
+                           SELECT DISTINCT cg."Id"
+                           FROM "CaveGeoJsons" cg
+                           JOIN "Entrances" e  ON e."CaveId" = cg."CaveId"
+                           JOIN "Caves" c     ON c."Id"     = cg."CaveId"
+                           JOIN "UserCavePermissions" ucp
+                             ON ucp."CaveId"    = c."Id"
+                            AND ucp."AccountId" = c."AccountId"
+                           WHERE
+                             -- fast index filter
+                             e."Location" && (SELECT bbox FROM view_box)
+                             -- then exact containment
+                             AND ST_Within(e."Location", (SELECT bbox FROM view_box))
+                             AND c."AccountId" = @accountId
+                             AND ucp."UserId"  = @userId;
+                           """;
 
-                    WITH view_box AS (
-                        SELECT ST_MakeEnvelope({3}, {1}, {2}, {0}, 4326) as bbox
-                    )
-                    SELECT cg."GeoJson" as feature_collection
-                    FROM "CaveGeoJsons" cg
-                    JOIN "Entrances" e ON cg."CaveId" = e."CaveId"
-                    JOIN "Caves" c ON c."Id" = cg."CaveId"
-                    JOIN "UserCavePermissions" ucp ON c."Id" = ucp."CaveId" 
-                         AND c."AccountId" = ucp."AccountId"
-                    WHERE 
-                        ST_Intersects(e."Location", (SELECT bbox FROM view_box))
-                        AND c."AccountId" = '{4}'
-                        AND ucp."UserId" = '{5}'
-                    GROUP BY cg."GeoJson";
+        var conn = (Npgsql.NpgsqlConnection)DbContext.Database.GetDbConnection();
+        await conn.OpenAsync(cancellationToken);
 
-                    """;
+        await using var cmd = new Npgsql.NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("west",       west);
+        cmd.Parameters.AddWithValue("south",      south);
+        cmd.Parameters.AddWithValue("east",       east);
+        cmd.Parameters.AddWithValue("north",      north);
+        cmd.Parameters.AddWithValue("accountId",  RequestUser.AccountId);
+        cmd.Parameters.AddWithValue("userId",     RequestUser.Id);
 
-        // Parameters:
-        // {0}: north, {1}: south, {2}: east, {3}: west, {4}: RequestUser.AccountId, {5}: RequestUser.Id
-        query = string.Format(query, north, south, east, west, RequestUser.AccountId, RequestUser.Id);
+        var ids = new List<string>();
+        await using var rdr = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await rdr.ReadAsync(cancellationToken))
+            ids.Add(rdr.GetString(0));
 
-        List<object> featureCollections = new List<object>();
-        await using var command = DbContext.Database.GetDbConnection().CreateCommand();
-        command.CommandText = query;
-        if (command.Connection != null && command.Connection.State != System.Data.ConnectionState.Open)
-        {
-            await command.Connection.OpenAsync(cancellationToken);
-        }
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            // Read the "feature_collection" column (a JSONB value stored as a string)
-            var jsonData = reader["feature_collection"] as string;
-            if (!string.IsNullOrWhiteSpace(jsonData))
-            {
-                // Parse the string into a JSON object (e.g. a FeatureCollection)
-                var jsonObject = System.Text.Json.JsonDocument.Parse(jsonData).RootElement;
-                featureCollections.Add(jsonObject);
-            }
-        }
-
-        return featureCollections;
+        return ids;
     }
 
 
+    public async Task<System.Text.Json.JsonElement?> GetLinePlotGeoJson(
+        string plotId, CancellationToken cancellationToken)
+    {
+        var record = await DbContext.CaveGeoJsons
+            .AsNoTracking()
+            .Where(e =>
+                e.Cave.AccountId == RequestUser.AccountId
+                && DbContext.UserCavePermissionView.Any(ucp =>
+                    ucp.AccountId == RequestUser.AccountId &&
+                    ucp.UserId == RequestUser.Id &&
+                    ucp.CaveId == e.Cave.Id)
+            )
+            .FirstOrDefaultAsync(
+                cg => cg.Id == plotId
+                      && cg.Cave.AccountId == RequestUser.AccountId,
+                cancellationToken);
 
+        if (record == null)
+            return null;
 
+        return System.Text.Json.JsonDocument
+            .Parse(record.GeoJson)
+            .RootElement;
+    }
+    
 }

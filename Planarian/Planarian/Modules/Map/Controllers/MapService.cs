@@ -28,27 +28,18 @@ public class MapService : ServiceBase<MapRepository>
 
     public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, CancellationToken cancellationToken)
     {
-        
+
         var result = await Repository.GetEntrancesMVTAsync(z, x, y, cancellationToken);
         return result;
     }
+    
+    public Task<List<string>> GetLinePlotIds(
+        double north, double south, double east, double west, double zoom, CancellationToken ct) =>
+        Repository.GetLinePlotIds(north, south, east, west, zoom, ct);
 
-    public async Task<List<object>> GetLinePlots(double north, double south, double east, double west, double zoom, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (zoom < 12)
-            {
-                return new List<object>();
-            }
-            var result = await Repository.GetLinePlots(north, south, east, west, (int)zoom, cancellationToken);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            // Optionally log exception
-            return new List<object>();
-        }
-    }
+    public Task<System.Text.Json.JsonElement?> GetLinePlotGeoJson(
+        string plotId, CancellationToken ct) =>
+        Repository.GetLinePlotGeoJson(plotId, ct);
+
 
 }
