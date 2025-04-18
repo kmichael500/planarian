@@ -15,6 +15,7 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
+import { ProposeChangeRequestVm } from "../Models/ProposeChangeRequestVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -35,12 +36,8 @@ const CaveService = {
     );
     return response.data;
   },
-  async AddCave(values: AddCaveVm): Promise<string> {
-    const response = await HttpClient.post<string>(`${baseUrl}`, values);
-    return response.data;
-  },
-  async UpdateCave(values: AddCaveVm): Promise<void> {
-    await HttpClient.put<string>(`${baseUrl}/`, values);
+  async ProposeChange(values: ProposeChangeRequestVm): Promise<void> {
+    await HttpClient.post<string>(`${baseUrl}/`, values);
   },
   async GetCave(id: string): Promise<CaveVm> {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);

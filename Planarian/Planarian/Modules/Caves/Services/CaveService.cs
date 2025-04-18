@@ -741,7 +741,7 @@ public class CaveService : ServiceBase<CaveRepository>
             entity.CaveId = value.Cave.Id;
             entity.AccountId = RequestUser.AccountId;
             entity.Json = value.Cave;
-            if (!isNew)
+            if (isNew)
             {
                 _caveChangeRequestRepository.Add(entity);
             }

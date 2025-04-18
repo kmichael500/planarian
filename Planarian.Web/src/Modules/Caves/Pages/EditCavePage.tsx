@@ -8,12 +8,10 @@ import { CaveService } from "../Service/CaveService";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
-import {
-  formatDate,
-  isNullOrWhiteSpace,
-} from "../../../Shared/Helpers/StringHelpers";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import dayjs from "dayjs";
+import { ProposeChangeRequestVm } from "../Models/ProposeChangeRequestVm";
 
 const EditCavePage: React.FC = () => {
   const { caveId } = useParams();
@@ -90,8 +88,13 @@ const EditCavePage: React.FC = () => {
   const handleFormSubmit = async (values: AddCaveVm) => {
     try {
       setIsLoading(true);
-      await CaveService.UpdateCave(values);
-      message.success(`'${values?.name}' has been updated successfully`);
+
+      const changeRequest: ProposeChangeRequestVm = {
+        cave: values,
+      };
+
+      await CaveService.ProposeChange(changeRequest);
+      message.success(`'${values?.name}' has been submitted successfully`);
       navigate(`/caves/${cave?.id}`);
     } catch (e: any) {
       const error = e as ApiErrorResponse;

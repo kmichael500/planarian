@@ -81,9 +81,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return Ok();
     }
-
-    [HttpPost]
-
+    
     [DisableRequestSizeLimit] //TODO
     [HttpPost("{caveId:length(10)}/files")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]

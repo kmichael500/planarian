@@ -8,6 +8,7 @@ import { CaveService } from "../Service/CaveService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { useNavigate } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { ProposeChangeRequestVm } from "../Models/ProposeChangeRequestVm";
 
 const AddCavesPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -58,8 +59,11 @@ const AddCavesPage: React.FC = () => {
 
   const handleFormSubmit = async (values: AddCaveVm) => {
     try {
-      await CaveService.AddCave(values);
-      message.success(`'${values.name}' added successfully`);
+      const changeRequest: ProposeChangeRequestVm = {
+        cave: values,
+      };
+      await CaveService.ProposeChange(changeRequest);
+      message.success(`'${values.name}' submitted for review!`);
       navigate("/caves");
     } catch (e: any) {
       const error = e as ApiErrorResponse;
