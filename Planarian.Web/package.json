@@ -22,6 +22,7 @@
     "chart.js": "^4.4.8",
     "chartjs-adapter-date-fns": "^3.0.0",
     "csv-parse": "^5.4.0",
+    "diff": "^7.0.0",
     "dompurify": "^3.2.5",
     "file-saver": "^2.0.5",
     "imask": "^6.4.3",
@@ -79,6 +80,7 @@
   },
   "devDependencies": {
     "@azure/static-web-apps-cli": "^1.1.4",
+    "@types/diff": "^7.0.2",
     "@types/react-highlight-words": "^0.16.4",
     "@types/react-text-mask": "^5.4.11",
     "@types/shpjs": "^3.4.7",

@@ -33,7 +33,7 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var result = await DbContext.SaveChangesAsync(cancellationToken);
-    }
+        }
 
     public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
     {
@@ -71,6 +71,11 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
     public void Add(EntityBase entity)
     {
         DbContext.Add(entity);
+    }
+    
+    public void AddRange(IEnumerable<EntityBase> entities)
+    {
+        DbContext.AddRange(entities);
     }
 
     public void Delete(EntityBase entity)

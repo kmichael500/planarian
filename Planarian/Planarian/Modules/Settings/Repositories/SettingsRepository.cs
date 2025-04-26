@@ -13,11 +13,18 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
     {
     }
 
-    public async Task<string> GetTagTypeName(string tagTypeId)
+    public async Task<string> GetTagTypeNameOrFail(string tagTypeId)
     {
         return await DbContext.TagTypes
             .Where(e => e.Id == tagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault)).Select(e => e.Name)
             .FirstAsync();
+    }
+    
+    public async Task<string?> GetTagTypeName(string tagTypeId)
+    {
+        return await DbContext.TagTypes
+            .Where(e => e.Id == tagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault)).Select(e => e.Name)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)
@@ -84,7 +91,7 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
                 .Select(e => new SelectListItem<string>(e.Name, e.Id)).ToListAsync();
     }
 
-    public async Task<string?> GetCountyId(string countyId)
+    public async Task<string?> GetCountyName(string countyId)
     {
         return await DbContext.Counties.Where(e => e.Id == countyId && e.AccountId == RequestUser.AccountId)
             .Select(e => e.Name).FirstOrDefaultAsync();

@@ -7,8 +7,8 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { ReviewChangeRequest } from "../Models/ProposeChangeRequestVm";
 import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
+import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
 
 const CaveEditReviewPage: React.FC = () => {
   const { caveChangeRequestId } = useParams();

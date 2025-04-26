@@ -260,7 +260,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) && (
         <Descriptions.Item label="Description" key="description">
-          {entrance.description}
+          {defaultIfEmpty(entrance.description)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
@@ -275,11 +275,7 @@ const CaveComponent = ({
           <TagComponent tagId={entrance.locationQualityTagId} />
         </Descriptions.Item>
       ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceName) && (
-        <Descriptions.Item label="Name" key="name">
-          {entrance.name}
-        </Descriptions.Item>
-      ),
+
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && (
         <Descriptions.Item label="Reported On" key="reported-on">
           {entrance.reportedOn

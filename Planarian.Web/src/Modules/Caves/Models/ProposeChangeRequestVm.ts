@@ -14,10 +14,3 @@ export interface ChangesForReviewVm {
   submittedOn: string;
   submittedByUserId: string;
 }
-
-export interface ReviewChangeRequest {
-  id: string | null;
-  approve: boolean;
-  cave: AddCaveVm;
-  notes: string | null;
-}

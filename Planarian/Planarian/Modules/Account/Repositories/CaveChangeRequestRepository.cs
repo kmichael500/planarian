@@ -24,7 +24,7 @@ public class CaveChangeRequestRepository : RepositoryBase
     public async Task<IEnumerable<ChangesForReviewVm>> GetChangesForReview()
     {
         return await DbContext.CaveChangeRequests
-            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Where(e => e.AccountId == RequestUser.AccountId && e.ReviewedOn == null)
             .Select(e => new ChangesForReviewVm
             {
                 Id = e.Id,

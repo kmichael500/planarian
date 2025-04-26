@@ -21,25 +21,28 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
+using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Caves.Services;
 
-public class CaveService : ServiceBase<CaveRepository>
+public partial class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
     private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
+    private readonly SettingsRepository _settingsRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveChangeRequestRepository _caveChangeRequestRepository;
     private readonly ServerOptions _serverOptions;
-    
+
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         FileRepository fileRepository, TagRepository tagRepository,
-        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions, CaveChangeRequestRepository caveChangeRequestRepository) : base(
+        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions,
+        CaveChangeRequestRepository caveChangeRequestRepository, SettingsRepository settingsRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -48,6 +51,7 @@ public class CaveService : ServiceBase<CaveRepository>
         _featureSettingRepository = featureSettingRepository;
         _serverOptions = serverOptions;
         _caveChangeRequestRepository = caveChangeRequestRepository;
+        _settingsRepository = settingsRepository;
     }
 
     #region Caves
@@ -722,98 +726,6 @@ public class CaveService : ServiceBase<CaveRepository>
 
     }
 
-    public async Task ProposeChange(ProposeChangeRequestVm value, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        await ValidateCave(value.Cave);
-        
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-            var isNew = string.IsNullOrWhiteSpace(value.Id);
-
-            var entity = isNew
-                ? new CaveChangeRequest()
-                : await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id!, cancellationToken) ??
-                  throw ApiExceptionDictionary.NotFound("Change Request");
-
-            var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
-            
-            entity.CaveId = value.Cave.Id;
-            entity.AccountId = RequestUser.AccountId;
-            entity.Json = value.Cave;
-
-            if (isNew)
-            {
-                _caveChangeRequestRepository.Add(entity);
-            }
-
-            await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception e)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
-
-    public async Task ReviewChange(ReviewChangeRequest value, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
-        if (string.IsNullOrWhiteSpace(value.Id)) throw ApiExceptionDictionary.BadRequest("Change Request Id");
-
-        var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id, cancellationToken);
-        if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
-
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, entity.Json.CountyId);
-
-        var transaction = await _caveChangeRequestRepository.BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-            entity.Status = value.Approve ? ChangeRequestStatus.Approved : ChangeRequestStatus.Rejected;
-            entity.Notes = value.Notes;
-            entity.ReviewedByUserId = RequestUser.Id;
-            entity.ReviewedOn = DateTime.UtcNow;
-
-            if (value.Approve)
-            {
-                await AddCave(value.Cave, cancellationToken, transaction: transaction);
-            }
-            
-            await transaction.CommitAsync(cancellationToken);
-            await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
-        }
-        catch (Exception e)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-
-        await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
-    }
-    
-    public async Task<IEnumerable<ChangesForReviewVm>> GetChangesForReview()
-    {
-        var result = await _caveChangeRequestRepository.GetChangesForReview();
-        return result;
-    }
-
-    public async Task<ProposedChangeRequestVm> GetProposedChange(string id)
-    {
-        var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(id, CancellationToken.None);
-        if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
-
-        var result = new ProposedChangeRequestVm
-        {
-            Id = entity.Id,
-            Cave = entity.Json,
-        };
-
-        return result;
-    }
 
     private async Task ValidateCave(AddCave values)
     {
@@ -1401,4 +1313,42 @@ public class CaveService : ServiceBase<CaveRepository>
 
 
     #endregion
+}
+
+public static class CaveLogPropertyNames
+{
+    public const string CountyName                       = "CountyName";
+    public const string StateName                        = "StateName";
+    public const string Name                             = "Name";
+    public const string AlternateNames                   = "AlternateNames";
+    public const string LengthFeet                       = "LengthFeet";
+    public const string DepthFeet                        = "DepthFeet";
+    public const string MaxPitDepthFeet                  = "MaxPitDepthFeet";
+    public const string NumberOfPits                     = "NumberOfPits";
+    public const string Narrative                        = "Narrative";
+    public const string ReportedOn                       = "ReportedOn";
+    public const string GeologyTagName                   = "GeologyTagName";
+    public const string MapStatusTagName                 = "MapStatusTagName";
+    public const string GeologicAgeTagName               = "GeologicAgeTagName";
+    public const string PhysiographicProvinceTagName     = "PhysiographicProvinceTagName";
+    public const string BiologyTagName                   = "BiologyTagName";
+    public const string ArcheologyTagName                = "ArcheologyTagName";
+    public const string CartographerNameTagName          = "CartographerNameTagName";
+    public const string ReportedByNameTagName            = "ReportedByNameTagName";
+    public const string OtherTagName                     = "OtherTagName";
+    
+    public const string EntranceName                     = "EntranceName";
+    public const string EntranceDescription              = "EntranceDescription";
+    public const string EntranceIsPrimary                 = "EntranceIsPrimary";
+    public const string EntranceLocationQualityTagName   = "EntranceLocationQualityTagName";
+    public const string EntrancePitDepthFeet             = "EntrancePitDepthFeet";
+    public const string EntranceReportedOn               = "EntranceReportedOn";
+    public const string EntranceStatusTagName            = "EntranceStatusTagName";
+    public const string EntranceHydrologyTagName         = "EntranceHydrologyTagName";
+    public const string EntranceFieldIndicationTagName   = "EntranceFieldIndicationTagName";
+    public const string EntranceReportedByNameTagName    = "EntranceReportedByNameTagName";
+    public const string EntranceOtherTagName             = "EntranceOtherTagName";
+
+    public const string Entrance = "Entrance";
+    public const string Cave = "Cave";
 }

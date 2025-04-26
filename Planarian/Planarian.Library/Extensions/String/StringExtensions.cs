@@ -7,6 +7,8 @@ namespace Planarian.Library.Extensions.String;
 
 public static class StringExtensions
 {
+    private static readonly Regex IdRegex = new(@"^[A-Za-z0-9]{10}$", RegexOptions.Compiled);
+
     public static bool IsNullOrWhiteSpace([NotNullWhen(false)] this string? input)
     {
         return string.IsNullOrWhiteSpace(input);
@@ -34,6 +36,11 @@ public static class StringExtensions
         return result;
     }
 
+    public static bool IsValidId(this string? input)
+    {
+        return !string.IsNullOrWhiteSpace(input) && IdRegex.IsMatch(input);
+    }
+    
     public static bool IsValidEmail(this string email)
     {
         if (string.IsNullOrEmpty(email)) return false;

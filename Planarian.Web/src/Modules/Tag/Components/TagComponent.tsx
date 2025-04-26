@@ -63,7 +63,7 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
         const tripNameResponse = await SettingsService.GetTagName(props.tagId);
         setTagName(tripNameResponse);
       } catch (error) {
-        setTagName("Error");
+        setTagName(props.tagId);
       }
       setIsTagNameLoading(false);
     };

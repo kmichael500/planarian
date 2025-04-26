@@ -20,9 +20,9 @@ import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import {
   ProposeChangeRequestVm,
   ChangesForReviewVm,
-  ReviewChangeRequest,
 } from "../Models/ProposeChangeRequestVm";
 import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
+import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -64,6 +64,7 @@ const CaveService = {
   async ReviewChange(values: ReviewChangeRequest): Promise<void> {
     await HttpClient.post(`${baseUrl}/review`, values);
   },
+
   async GetCave(id: string): Promise<CaveVm> {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
     const cave = this.processCaveDates(response.data) as CaveVm;

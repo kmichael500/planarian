@@ -1,6 +1,6 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { CaveReviewsComponent } from "../Components/CaveReviewComponent";
+import { CaveReviewsComponent } from "../Components/CaveReviewsComponent";
 
 const CaveReviewsPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);

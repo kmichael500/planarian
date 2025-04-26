@@ -19,12 +19,12 @@ public class SettingsService : ServiceBase<SettingsRepository>
 
     public async Task<string> GetTagTypeName(string tagTypeId)
     {
-        return await Repository.GetTagTypeName(tagTypeId);
+        return await Repository.GetTagTypeNameOrFail(tagTypeId);
     }
     
     public async Task<string?> GetCountyName(string countyId)
     {
-        return await Repository.GetCountyId(countyId);
+        return await Repository.GetCountyName(countyId);
     }
 
     public async Task<string?> GetStateName(string stateId)

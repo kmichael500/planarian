@@ -31,10 +31,11 @@ public class Entrance : EntityBase
     public ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = new HashSet<EntranceHydrologyTag>();
 
     public ICollection<FieldIndicationTag> FieldIndicationTags { get; set; } = new HashSet<FieldIndicationTag>();
-    public virtual ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
+    public ICollection<EntranceReportedByNameTag> EntranceReportedByNameTags { get; set; } =
         new HashSet<EntranceReportedByNameTag>();
 
-    public virtual ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
+    public ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
+    public ICollection<CaveChangeLog>? CaveChangeLogs { get; set; }
 }
 
 public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>

@@ -1,11 +1,9 @@
 import { useContext, useEffect, useState } from "react";
-import { CaveVm } from "../Models/CaveVm";
 import { Link, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { CaveService } from "../Service/CaveService";
-import { CaveComponent } from "../Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import {
   EditOutlined,
@@ -14,17 +12,18 @@ import {
 } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { Grid, Typography } from "antd";
-import { AppService } from "../../../Shared/Services/AppService";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
-import FavoriteCave from "../Components/FavoriteCave";
 import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
-import { CaveReviewComponent } from "../Models/CaveReviewComponent";
+import { CaveReviewComponent } from "../Components/CaveReviewComponent";
+import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
+import { CaveVm } from "../Models/CaveVm";
 
 const CaveReviewPage = () => {
   const [proposedChangeRequest, setReviewChangeRequest] =
     useState<ProposedChangeRequestVm>();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [isDenying, setIsDenying] = useState<boolean>(false);
 
   const {
     setHeaderTitle,
@@ -43,22 +42,69 @@ const CaveReviewPage = () => {
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
 
+  const handleApprove = async () => {
+    if (!caveChangeRequestId) return;
+
+    try {
+      setIsApproving(true);
+
+      const request: ReviewChangeRequest = {
+        id: caveChangeRequestId,
+        approve: true,
+        cave: proposedChangeRequest!.cave,
+        notes: null,
+      };
+
+      await CaveService.ReviewChange(request);
+      // Redirect back or show success message
+      window.history.back();
+    } catch (error) {
+      console.error("Error approving change request:", error);
+      // Could add error notification here
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleDeny = async () => {
+    if (!caveChangeRequestId) return;
+
+    try {
+      setIsDenying(true);
+      // await CaveService.DenyChangeRequest(caveChangeRequestId);
+      // Redirect back or show success message
+      window.history.back();
+    } catch (error) {
+      console.error("Error denying change request:", error);
+      // Could add error notification here
+    } finally {
+      setIsDenying(false);
+    }
+  };
+
   useEffect(() => {
     setHeaderButtons([
       <Link to={`/caves/review/${caveChangeRequestId}/edit`}>
         <PlanarianButton icon={<EditOutlined />}>Edit</PlanarianButton>
       </Link>,
-      <PlanarianButton type="primary" icon={<CheckCircleOutlined />}>
+      <PlanarianButton
+        type="primary"
+        icon={<CheckCircleOutlined />}
+        onClick={handleApprove}
+        loading={isApproving}
+      >
         Approve
       </PlanarianButton>,
-      <PlanarianButton icon={<CloseCircleOutlined />}>Deny</PlanarianButton>,
+      <PlanarianButton
+        icon={<CloseCircleOutlined />}
+        onClick={handleDeny}
+        loading={isDenying}
+      >
+        Deny
+      </PlanarianButton>,
       <BackButtonComponent to={"./.."} />,
     ]);
-  }, [proposedChangeRequest]);
-
-  if (caveChangeRequestId === undefined) {
-    throw new NotFoundError("caveid");
-  }
+  }, [proposedChangeRequest, isApproving, isDenying, caveChangeRequestId]);
 
   useEffect(() => {
     if (!isNullOrWhiteSpace(proposedChangeRequest?.cave.name)) {
@@ -81,6 +127,10 @@ const CaveReviewPage = () => {
   useEffect(() => {
     const getCave = async () => {
       const response = await CaveService.GetProposedChange(caveChangeRequestId);
+
+      if (!response.cave) {
+        throw new NotFoundError("cave");
+      }
       setReviewChangeRequest(response);
 
       setIsLoading(false);
@@ -97,7 +147,9 @@ const CaveReviewPage = () => {
   return (
     <CaveReviewComponent
       cave={proposedChangeRequest?.cave}
+      originalCave={proposedChangeRequest?.originalCave}
       isLoading={isLoading}
+      changes={proposedChangeRequest?.changes}
     ></CaveReviewComponent>
   );
 };
