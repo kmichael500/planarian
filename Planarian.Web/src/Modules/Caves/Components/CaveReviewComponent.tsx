@@ -301,6 +301,13 @@ const CaveReviewComponent = ({
           CaveLogPropertyName.EntranceName,
           entrance.id
         ),
+      updatedDesceriptionItem(
+        "Is Primary",
+        entrance.isPrimary ? "Yes" : "No",
+        originalEnt?.isPrimary ? "Yes" : "No",
+        CaveLogPropertyName.EntranceIsPrimary,
+        entrance.id
+      ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) &&
         updatedDesceriptionItem(
