@@ -92,4 +92,6 @@ public class CaveVm
     public IEnumerable<string> PhysiographicProvinceTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> OtherTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
+    
+    public DateTime? UpdatedOn { get; set; }
 }

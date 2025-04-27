@@ -71,7 +71,7 @@ public class Cave : EntityBase
     public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
     public ICollection<CaveGeoJson> GeoJsons { get; set; } = new HashSet<CaveGeoJson>();
     public ICollection<CaveChangeRequest>? CaveChangeRequests { get; set; } = new HashSet<CaveChangeRequest>();
-    public  ICollection<CaveChangeLog>? CaveChangeLogs { get; set; } = new HashSet<CaveChangeLog>();
+    public  ICollection<CaveChangeLog> CaveChangeLogs { get; set; } = new HashSet<CaveChangeLog>();
 
 
     public void SetAlternateNamesList(IEnumerable<string> alternateNames) =>

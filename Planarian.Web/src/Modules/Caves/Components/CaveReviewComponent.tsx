@@ -25,6 +25,7 @@ import {
   getDirectionsUrl,
   formatCoordinates,
   isNullOrWhiteSpace,
+  formatBoolean,
 } from "../../../Shared/Helpers/StringHelpers";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
@@ -93,17 +94,27 @@ const CaveReviewComponent = ({
         (entranceId ? c.entranceId === entranceId : true)
     );
 
+    const hasCountyChange =
+      changePropertyName === CaveLogPropertyName.CountyName && hasChanges;
+
     if (hasChanges) {
       return (
         <Descriptions.Item
           label={
-            <Tooltip
-              title={
-                <>Original Value: {originalValue ?? defaultIfEmpty(null)}</>
-              }
-            >
-              {label} <Tag color="gold">Changed</Tag>
-            </Tooltip>
+            <>
+              <Tooltip
+                title={
+                  <>Original Value: {originalValue ?? defaultIfEmpty(null)}</>
+                }
+              >
+                {label} <Tag color="green">Changed</Tag>
+              </Tooltip>
+              {hasCountyChange && (
+                <Tooltip title="This change will issue a new county cave number.">
+                  <Tag color="#F8DB6A">Warning</Tag>
+                </Tooltip>
+              )}
+            </>
           }
         >
           <Tooltip
@@ -303,8 +314,8 @@ const CaveReviewComponent = ({
         ),
       updatedDesceriptionItem(
         "Is Primary",
-        entrance.isPrimary ? "Yes" : "No",
-        originalEnt?.isPrimary ? "Yes" : "No",
+        formatBoolean(entrance.isPrimary),
+        formatBoolean(originalEnt?.isPrimary),
         CaveLogPropertyName.EntranceIsPrimary,
         entrance.id
       ),
@@ -424,6 +435,19 @@ const CaveReviewComponent = ({
     return diffLines(originalCave?.narrative ?? "", cave?.narrative ?? "");
   }, [originalCave?.narrative, cave?.narrative]);
 
+  const entrancesWithChanges = React.useMemo(() => {
+    if (!changes || !cave?.entrances) return [];
+
+    return cave.entrances
+      .map((entrance, index) => {
+        const hasChanges = changes.some(
+          (change) => change.entranceId === entrance.id
+        );
+        return hasChanges ? index.toString() : null;
+      })
+      .filter(Boolean) as string[];
+  }, [changes, cave?.entrances]);
+
   const narrativeSection = isFeatureEnabled(
     FeatureKey.EnabledFieldCaveNarrative
   ) && (
@@ -436,16 +460,18 @@ const CaveReviewComponent = ({
           </Space>
         }
         element={
-          <PlanarianButton
-            onClick={() => setShowNarrativeDiff((p) => !p)}
-            icon={undefined}
-          >
-            {showNarrativeDiff ? "Hide Diff" : "Show Diff"}
-          </PlanarianButton>
+          narrativeChanged ? (
+            <PlanarianButton
+              onClick={() => setShowNarrativeDiff((p) => !p)}
+              icon={undefined}
+            >
+              {showNarrativeDiff ? "Hide Diff" : "Show Diff"}
+            </PlanarianButton>
+          ) : null
         }
       />
 
-      {showNarrativeDiff ? (
+      {narrativeChanged && showNarrativeDiff ? (
         <Typography>
           {narrativeDiff.map((part, i) => {
             const bg = part.added
@@ -489,7 +515,7 @@ const CaveReviewComponent = ({
       {cave?.entrances && cave?.entrances.length > 0 && (
         <>
           <PlanarianDividerComponent title="Entrances" />
-          <Collapse bordered defaultActiveKey={["0"]}>
+          <Collapse bordered defaultActiveKey={entrancesWithChanges}>
             {cave.entrances.map((entrance, index) => (
               <Panel
                 header={

@@ -140,6 +140,15 @@ export function formatDateTime(
   return dayjs(date).format(formatString);
 }
 
+export function formatBoolean(
+  value: boolean | null | undefined
+): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return value ? "Yes" : "No";
+}
+
 export function formatCoordinates(
   latitude: number | null | undefined | string,
   longitude: number | null | undefined | string

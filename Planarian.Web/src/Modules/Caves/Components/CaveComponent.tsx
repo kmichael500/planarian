@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import {
+  CarOutlined,
+  CloudUploadOutlined,
+  HistoryOutlined,
+} from "@ant-design/icons";
 import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Card,
@@ -336,7 +340,18 @@ const CaveComponent = ({
 
   const content = (
     <>
-      <PlanarianDividerComponent title="Information" />
+      <PlanarianDividerComponent
+        title="Information"
+        element={
+          <>
+            {cave?.updatedOn && (
+              <PlanarianButton icon={<HistoryOutlined />} type="link">
+                Last updated: {formatDate(cave.updatedOn)}
+              </PlanarianButton>
+            )}
+          </>
+        }
+      />
       <Descriptions layout={descriptionLayout} bordered>
         {descriptionItems}
       </Descriptions>

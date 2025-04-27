@@ -9,6 +9,7 @@ import {
   ImportOutlined,
   CompassOutlined,
   UserOutlined,
+  AuditOutlined,
 } from "@ant-design/icons";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
@@ -46,7 +47,7 @@ const SideBarMenuItems = () => {
       key: "/caves/review",
       icon: (
         <Link to="/caves/review">
-          <DatabaseOutlined />
+          <AuditOutlined />
         </Link>
       ),
       label: "Review",

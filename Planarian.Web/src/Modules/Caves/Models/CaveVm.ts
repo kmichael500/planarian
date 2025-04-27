@@ -29,4 +29,5 @@ export interface CaveVm {
   geologicAgeTagIds: string[];
   physiographicProvinceTagIds: string[];
   otherTagIds: string[];
+  updatedOn: string;
 }
