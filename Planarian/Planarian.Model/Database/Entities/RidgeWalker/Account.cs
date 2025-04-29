@@ -23,7 +23,7 @@ public class Account : EntityBase
     public ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
     public ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
     public ICollection<CaveChangeRequest>? CaveChangeRequests { get; set; } = new HashSet<CaveChangeRequest>();
-    public ICollection<CaveChangeLog>? CaveChangeLogs { get; set; } = new HashSet<CaveChangeLog>();
+    public ICollection<CaveChangeHistory>? CaveChangeLogs { get; set; } = new HashSet<CaveChangeHistory>();
 }
 
 public class AccountConfiguration : IEntityTypeConfiguration<Account>

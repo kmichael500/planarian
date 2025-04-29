@@ -35,7 +35,7 @@ public class Entrance : EntityBase
         new HashSet<EntranceReportedByNameTag>();
 
     public ICollection<EntranceOtherTag> EntranceOtherTags { get; set; } = new HashSet<EntranceOtherTag>();
-    public ICollection<CaveChangeLog>? CaveChangeLogs { get; set; }
+    public ICollection<CaveChangeHistory>? CaveChangeLogs { get; set; }
 }
 
 public class EntranceConfiguration : BaseEntityTypeConfiguration<Entrance>

@@ -21,7 +21,10 @@ import {
   ProposeChangeRequestVm,
   ChangesForReviewVm,
 } from "../Models/ProposeChangeRequestVm";
-import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
+import {
+  CaveChangeLogVm,
+  ProposedChangeRequestVm,
+} from "../Models/ProposedChangeRequestVm";
 import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
 
 const baseUrl = "api/caves";
@@ -70,6 +73,12 @@ const CaveService = {
     const cave = this.processCaveDates(response.data) as CaveVm;
 
     return cave;
+  },
+  async GetCaveHistory(id: string): Promise<CaveChangeLogVm[]> {
+    const response = await HttpClient.get<CaveChangeLogVm[]>(
+      `${baseUrl}/${id}/history`
+    );
+    return response.data;
   },
   async ArchiveCave(id: string): Promise<void> {
     const response = await HttpClient.post<void>(`${baseUrl}/${id}/archive`);

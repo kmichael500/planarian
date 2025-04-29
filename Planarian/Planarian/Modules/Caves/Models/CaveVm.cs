@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 
@@ -94,4 +95,84 @@ public class CaveVm
     public IEnumerable<string> MapStatusTagIds { get; set; } = new HashSet<string>();
     
     public DateTime? UpdatedOn { get; set; }
+    
+    
 }
+
+public static class CaveVmExtensions
+    {
+        public static AddCave ToAddCave(this CaveVm vm)
+        {
+            ArgumentNullException.ThrowIfNull(vm);
+
+            return new AddCave
+            {
+                Id = vm.Id,
+                Name = vm.Name,
+                StateId = vm.StateId,
+                CountyId = vm.CountyId,
+                LengthFeet = vm.LengthFeet ?? default,
+                DepthFeet = vm.DepthFeet ?? default,
+                MaxPitDepthFeet = vm.MaxPitDepthFeet ?? default,
+                NumberOfPits = vm.NumberOfPits ?? default,
+
+                Narrative = vm.Narrative,
+                ReportedOn = vm.ReportedOn,
+
+                AlternateNames = vm.AlternateNames?.ToList() ?? [],
+                GeologyTagIds = vm.GeologyTagIds?.ToList() ?? [],
+                ReportedByNameTagIds = vm.ReportedByNameTagIds?.ToList() ?? [],
+                BiologyTagIds = vm.BiologyTagIds?.ToList() ?? [],
+                ArcheologyTagIds = vm.ArcheologyTagIds?.ToList() ?? [],
+                CartographerNameTagIds = vm.CartographerNameTagIds?.ToList() ?? [],
+                MapStatusTagIds = vm.MapStatusTagIds?.ToList() ?? [],
+                GeologicAgeTagIds = vm.GeologicAgeTagIds?.ToList() ?? [],
+                PhysiographicProvinceTagIds = vm.PhysiographicProvinceTagIds?.ToList() ?? [],
+                OtherTagIds = vm.OtherTagIds?.ToList() ?? [],
+
+                Entrances = vm.Entrances?
+                                .Select(e => e.ToAddEntrance())
+                                .ToList()
+                            ?? [],
+
+                Files = vm.Files?
+                            .Select(f => new EditFileMetadata { Id = f.Id })
+                            .ToList()
+                        ?? []
+            };
+        }
+
+        public static AddEntrance ToAddEntrance(this EntranceVm vm)
+        {
+            ArgumentNullException.ThrowIfNull(vm);
+
+            return new AddEntrance
+            {
+                Id = vm.Id,
+                IsPrimary = vm.IsPrimary,
+                LocationQualityTagId = vm.LocationQualityTagId,
+                Name = vm.Name,
+                Description = vm.Description,
+                Latitude = vm.Latitude,
+                Longitude = vm.Longitude,
+                ElevationFeet = vm.ElevationFeet,
+                PitFeet = vm.PitFeet ?? default,
+                ReportedOn = vm.ReportedOn,
+
+                EntranceStatusTagIds = vm.EntranceStatusTagIds?
+                                           .ToList()
+                                       ?? [],
+                FieldIndicationTagIds = vm.FieldIndicationTagIds?
+                                            .ToList()
+                                        ?? [],
+                EntranceHydrologyTagIds = vm.EntranceHydrologyTagIds?
+                                              .ToList()
+                                          ?? [],
+                ReportedByNameTagIds = vm.ReportedByNameTagIds?
+                                           .ToList()
+                                       ?? [],
+
+                EntranceOtherTagIds = []
+            };
+        }
+    }

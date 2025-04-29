@@ -63,6 +63,14 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new JsonResult(cave);
     }
+    
+    [HttpGet("{caveId:length(10)}/history")]
+    public async Task<ActionResult<CaveVm>> GetCaveHistory(string caveId, CancellationToken cancellationToken)
+    {
+        var cave = await Service.GetCaveHistory(caveId, cancellationToken);
+
+        return new JsonResult(cave);
+    }
 
     [HttpPost]
     public async Task<ActionResult<string>> ProposeChange([FromBody] ProposeChangeRequestVm changeRequest, CancellationToken cancellationToken)

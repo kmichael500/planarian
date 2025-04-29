@@ -11,6 +11,7 @@ import {
   Typography,
 } from "antd";
 import { diffLines, Change } from "diff";
+import styled from "styled-components";
 
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
@@ -75,10 +76,14 @@ const CaveReviewComponent = ({
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
 
+  // Check if this is a new cave (all change logs have null caveId)
+  const isNewCave =
+    changes && changes.length > 0 && changes.every((c) => c.caveId === null);
+
   const [showNarrativeDiff, setShowNarrativeDiff] = React.useState(true);
-  const narrativeChanged = changes?.some(
-    (c) => c.propertyName === CaveLogPropertyName.Narrative
-  );
+  const narrativeChanged =
+    !isNewCave &&
+    changes?.some((c) => c.propertyName === CaveLogPropertyName.Narrative);
 
   const updatedDesceriptionItem = (
     label: React.ReactNode,
@@ -87,6 +92,11 @@ const CaveReviewComponent = ({
     changePropertyName: CaveLogPropertyName,
     entranceId: string | null = null
   ) => {
+    // If it's a new cave, don't show change indicators
+    if (isNewCave) {
+      return <Descriptions.Item label={label}>{value}</Descriptions.Item>;
+    }
+
     const hasChanges = changes?.some(
       (c) =>
         c.propertyName === changePropertyName &&
@@ -104,7 +114,7 @@ const CaveReviewComponent = ({
             <>
               <Tooltip
                 title={
-                  <>Original Value: {originalValue ?? defaultIfEmpty(null)}</>
+                  <>Original Value: {originalValue ?? defaultIfEmpty(null)}</>
                 }
               >
                 {label} <Tag color="green">Changed</Tag>
@@ -118,7 +128,7 @@ const CaveReviewComponent = ({
           }
         >
           <Tooltip
-            title={<>Original Value: {originalValue ?? defaultIfEmpty(null)}</>}
+            title={<>Original Value: {originalValue ?? defaultIfEmpty(null)}</>}
           >
             {value}
           </Tooltip>
@@ -303,16 +313,45 @@ const CaveReviewComponent = ({
       (e) => e.id === entrance.id
     );
 
+    // Check if this entrance was deleted
+    const isDeleted =
+      entrance.id &&
+      !cave?.entrances.some((e) => e.id === entrance.id) &&
+      originalCave?.entrances.some((e) => e.id === entrance.id);
+
+    // For deleted entrances, don't highlight individual property changes
+    const updatedEntranceItem = (
+      label: React.ReactNode,
+      value: React.ReactNode,
+      originalValue: React.ReactNode | null,
+      changePropertyName: CaveLogPropertyName,
+      entranceId: string | null = null
+    ) => {
+      // If entrance is deleted, don't show change highlights
+      if (isDeleted) {
+        return <Descriptions.Item label={label}>{value}</Descriptions.Item>;
+      }
+
+      // Otherwise use the normal change detection and highlighting
+      return updatedDesceriptionItem(
+        label,
+        value,
+        originalValue,
+        changePropertyName,
+        entranceId
+      );
+    };
+
     return [
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceName) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Name",
           entrance.name || defaultIfEmpty(null),
           originalEnt?.name ?? defaultIfEmpty(null),
           CaveLogPropertyName.EntranceName,
           entrance.id
         ),
-      updatedDesceriptionItem(
+      updatedEntranceItem(
         "Is Primary",
         formatBoolean(entrance.isPrimary),
         formatBoolean(originalEnt?.isPrimary),
@@ -321,28 +360,31 @@ const CaveReviewComponent = ({
       ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           <Space>
             Coordinates
             <a
               href={getDirectionsUrl(entrance.latitude, entrance.longitude)}
               target="_blank"
+              className={isDeleted ? "strikethrough-all" : ""}
             >
               <Tooltip title="Directions">
                 <CarOutlined />
               </Tooltip>
             </a>
           </Space>,
-          formatCoordinates(entrance.latitude, entrance.longitude),
+          <span className={isDeleted ? "strikethrough-all" : ""}>
+            {formatCoordinates(entrance.latitude, entrance.longitude)}
+          </span>,
           originalEnt
             ? formatCoordinates(originalEnt.latitude, originalEnt.longitude)
             : defaultIfEmpty(null),
-          CaveLogPropertyName.Entrance, // or create a specific enum if needed
+          CaveLogPropertyName.Entrance,
           entrance.id
         ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Description",
           entrance.description || defaultIfEmpty(null),
           originalEnt?.description ?? defaultIfEmpty(null),
@@ -351,7 +393,7 @@ const CaveReviewComponent = ({
         ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Elevation",
           defaultIfEmpty(
             formatDistance(entrance.elevationFeet, DistanceFormat.feet)
@@ -364,7 +406,7 @@ const CaveReviewComponent = ({
         ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Location Quality",
           <TagComponent tagId={entrance.locationQualityTagId} />,
           originalEnt ? (
@@ -376,7 +418,7 @@ const CaveReviewComponent = ({
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Reported On",
           entrance.reportedOn
             ? formatDate(entrance.reportedOn)
@@ -389,7 +431,7 @@ const CaveReviewComponent = ({
         ),
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Reported By",
           <Row>{generateTags(entrance.reportedByNameTagIds)}</Row>,
           <Row>{generateTags(originalEnt?.reportedByNameTagIds)}</Row>,
@@ -397,7 +439,7 @@ const CaveReviewComponent = ({
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Pit Depth",
           defaultIfEmpty(formatDistance(entrance.pitFeet)),
           defaultIfEmpty(formatDistance(originalEnt?.pitFeet)),
@@ -405,7 +447,7 @@ const CaveReviewComponent = ({
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Status",
           <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>,
           <Row>{generateTags(originalEnt?.entranceStatusTagIds)}</Row>,
@@ -413,7 +455,7 @@ const CaveReviewComponent = ({
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Field Indication",
           <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>,
           <Row>{generateTags(originalEnt?.fieldIndicationTagIds)}</Row>,
@@ -421,7 +463,7 @@ const CaveReviewComponent = ({
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) &&
-        updatedDesceriptionItem(
+        updatedEntranceItem(
           "Hydrology",
           <Row>{generateTags(entrance.entranceHydrologyTagIds)}</Row>,
           <Row>{generateTags(originalEnt?.entranceHydrologyTagIds)}</Row>,
@@ -435,10 +477,35 @@ const CaveReviewComponent = ({
     return diffLines(originalCave?.narrative ?? "", cave?.narrative ?? "");
   }, [originalCave?.narrative, cave?.narrative]);
 
-  const entrancesWithChanges = React.useMemo(() => {
-    if (!changes || !cave?.entrances) return [];
+  // Combine current and deleted entrances for display
+  const entrancesToDisplay = React.useMemo(() => {
+    if (!cave && !originalCave) return [];
 
-    return cave.entrances
+    const currentEntrances = cave?.entrances || [];
+    const deletedEntrances: AddEntranceVm[] = [];
+
+    // Find entrances that exist in originalCave but not in current cave
+    if (originalCave?.entrances) {
+      originalCave.entrances.forEach((originalEntrance) => {
+        // Check if this entrance still exists in current cave
+        const entranceStillExists = currentEntrances.some(
+          (e) => e.id === originalEntrance.id
+        );
+
+        if (!entranceStillExists) {
+          // If entrance doesn't exist in current cave, it was deleted
+          deletedEntrances.push(originalEntrance);
+        }
+      });
+    }
+
+    return [...currentEntrances, ...deletedEntrances];
+  }, [cave, originalCave]);
+
+  const entrancesWithChanges = React.useMemo(() => {
+    if (!changes || !entrancesToDisplay.length) return [];
+
+    return entrancesToDisplay
       .map((entrance, index) => {
         const hasChanges = changes.some(
           (change) => change.entranceId === entrance.id
@@ -446,7 +513,7 @@ const CaveReviewComponent = ({
         return hasChanges ? index.toString() : null;
       })
       .filter(Boolean) as string[];
-  }, [changes, cave?.entrances]);
+  }, [changes, entrancesToDisplay]);
 
   const narrativeSection = isFeatureEnabled(
     FeatureKey.EnabledFieldCaveNarrative
@@ -505,10 +572,20 @@ const CaveReviewComponent = ({
     </>
   );
 
+  // Check if the entire cave is deleted
+  const isCaveDeleted = !!originalCave && !cave;
+
   const content = (
     <>
-      <PlanarianDividerComponent title="Information" />
-      <Descriptions layout={descriptionLayout} bordered>
+      <PlanarianDividerComponent
+        title="Information"
+        element={<>{isNewCave && <Tag color="blue">New</Tag>}</>}
+      />
+      <Descriptions
+        layout={descriptionLayout}
+        bordered
+        className={isCaveDeleted ? "deleted-cave" : ""}
+      >
         {descriptionItems}
       </Descriptions>
 
@@ -516,31 +593,63 @@ const CaveReviewComponent = ({
         <>
           <PlanarianDividerComponent title="Entrances" />
           <Collapse bordered defaultActiveKey={entrancesWithChanges}>
-            {cave.entrances.map((entrance, index) => (
-              <Panel
-                header={
-                  <>
-                    <Row>
-                      Entrance {index + 1}
-                      {!isNullOrWhiteSpace(entrance.name)
-                        ? " - " + entrance.name
-                        : ""}
-                      {entrance.isPrimary && (
-                        <>
-                          <Col flex="auto"></Col>
-                          <Tag>Primary</Tag>
-                        </>
-                      )}
-                    </Row>
-                  </>
-                }
-                key={index}
-              >
-                <Descriptions bordered layout={descriptionLayout}>
-                  {entranceItems(entrance)}
-                </Descriptions>
-              </Panel>
-            ))}
+            {entrancesToDisplay.map((entrance, index) => {
+              // Check if this entrance was deleted - not in current cave but was in original
+              const isDeleted =
+                entrance.id &&
+                !cave?.entrances.some((e) => e.id === entrance.id) &&
+                originalCave?.entrances.some((e) => e.id === entrance.id);
+
+              // Check if this entrance was added - in current cave but wasn't in original
+              const isNew =
+                entrance.id &&
+                cave?.entrances.some((e) => e.id === entrance.id) &&
+                !originalCave?.entrances.some((e) => e.id === entrance.id);
+
+              return (
+                <Panel
+                  header={
+                    <>
+                      <Row>
+                        Entrance {index + 1}
+                        {!isNullOrWhiteSpace(entrance.name)
+                          ? " - " + entrance.name
+                          : ""}
+                        {entrance.isPrimary && (
+                          <>
+                            <Col flex="auto"></Col>
+                            <Tag>Primary</Tag>
+                          </>
+                        )}
+                        {isDeleted && (
+                          <>
+                            <Col flex="auto"></Col>
+                            <Tag color="red">Removed</Tag>
+                          </>
+                        )}
+                        {isNew && (
+                          <>
+                            <Col flex="auto"></Col>
+                            <Tag color="blue">New</Tag>
+                          </>
+                        )}
+                      </Row>
+                    </>
+                  }
+                  key={index}
+                  style={isDeleted ? { opacity: 0.7 } : undefined}
+                >
+                  <Descriptions
+                    bordered
+                    layout={descriptionLayout}
+                    // Apply strikethrough to all properties of deleted entrances
+                    className={isDeleted ? "deleted-entrance" : ""}
+                  >
+                    {entranceItems(entrance)}
+                  </Descriptions>
+                </Panel>
+              );
+            })}
           </Collapse>
         </>
       )}
@@ -564,13 +673,46 @@ const CaveReviewComponent = ({
   );
 
   return (
-    <Card
-      bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
-      loading={isLoading}
-    >
-      {content}
-    </Card>
+    <StyledComponents.DeletedEntrance>
+      <Card
+        bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
+        loading={isLoading}
+      >
+        {content}
+      </Card>
+    </StyledComponents.DeletedEntrance>
   );
+};
+
+const StyledComponents = {
+  DeletedEntrance: styled.div`
+    /* Apply strikethrough to all deleted entrance content */
+    .deleted-entrance .ant-descriptions-item-label,
+    .deleted-entrance .ant-descriptions-item-content,
+    .deleted-cave .ant-descriptions-item-label,
+    .deleted-cave .ant-descriptions-item-content {
+      text-decoration: line-through !important;
+    }
+
+    /* Force strikethrough on all nested elements */
+    .deleted-entrance .ant-descriptions-item-content *,
+    .deleted-cave .ant-descriptions-item-content * {
+      text-decoration: line-through !important;
+    }
+
+    /* Specifically target coordinates field */
+    .deleted-entrance .ant-space,
+    .deleted-entrance .ant-space-item,
+    .deleted-entrance .anticon {
+      text-decoration: line-through !important;
+    }
+
+    /* But keep tooltip content normal */
+    .ant-tooltip-inner,
+    .ant-tooltip-inner * {
+      text-decoration: none !important;
+    }
+  `,
 };
 
 export { CaveReviewComponent };

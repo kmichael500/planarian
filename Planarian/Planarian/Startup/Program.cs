@@ -188,6 +188,7 @@ builder.Services.AddScoped(typeof(CaveRepository<>));
 builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped(typeof(FileRepository<>));
 builder.Services.AddScoped<MapService>();
+builder.Services.AddScoped<CaveChangeLogRepository>();
 builder.Services.AddScoped<MapRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
 builder.Services.AddScoped<FeatureSettingRepository>();

@@ -36,13 +36,14 @@ public partial class CaveService : ServiceBase<CaveRepository>
     private readonly SettingsRepository _settingsRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveChangeRequestRepository _caveChangeRequestRepository;
+    private readonly CaveChangeLogRepository _caveChangeLogRepository;
     private readonly ServerOptions _serverOptions;
 
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         FileRepository fileRepository, TagRepository tagRepository,
         FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions,
-        CaveChangeRequestRepository caveChangeRequestRepository, SettingsRepository settingsRepository) : base(
+        CaveChangeRequestRepository caveChangeRequestRepository, SettingsRepository settingsRepository, CaveChangeLogRepository caveChangeLogRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -52,6 +53,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
         _serverOptions = serverOptions;
         _caveChangeRequestRepository = caveChangeRequestRepository;
         _settingsRepository = settingsRepository;
+        _caveChangeLogRepository = caveChangeLogRepository;
     }
 
     #region Caves
@@ -791,13 +793,90 @@ public partial class CaveService : ServiceBase<CaveRepository>
         return cave;
     }
 
+    public async Task<IEnumerable<CaveChangeLogVm>> GetCaveHistory(string caveId,
+        CancellationToken cancellationToken)
+    {
+        var results = (await _caveChangeLogRepository.GetCaveHistory(caveId, cancellationToken)).ToList();
+
+        foreach (var result in results)
+        {
+            if (string.IsNullOrWhiteSpace(result.EntranceId)) continue;
+            
+            result.EntranceName = GetEntranceName(result.EntranceId, results, result.CreatedOn);
+        }
+
+        return results;
+    }
+
+    private string GetEntranceName(string entranceId, IEnumerable<CaveChangeLogVm> changeLogs, DateTime dateTime)
+    {
+        // materialize once so we don't re‐enumerate
+        var logs = changeLogs.ToList();
+
+        // 1) Try to get an explicit name as of dateTime
+        var entranceName = logs
+            .Where(e =>
+                e.EntranceId == entranceId
+                && e.PropertyName == CaveLogPropertyNames.EntranceName
+                && e.CreatedOn <= dateTime)
+            .MaxBy(e => e.CreatedOn)
+            ?.ValueString;
+
+        if (!entranceName.IsNullOrWhiteSpace())
+            return entranceName!;
+
+        // 2) Build the set of all EntranceIds seen up to dateTime
+        var allIds = logs
+            .Where(e => e.EntranceId != null && e.CreatedOn <= dateTime)
+            .Select(e => e.EntranceId!)
+            .Distinct();
+
+        // 3) Remove any that were deleted on or before dateTime
+        var deletedIds = logs
+            .Where(e =>
+                e.PropertyName == CaveLogPropertyNames.Entrance
+                && e.ChangeValueType == ChangeValueType.Entrance
+                && e.ChangeType == ChangeType.Delete
+                && e.EntranceId != null
+                && e.CreatedOn <= dateTime)
+            .Select(e => e.EntranceId!)
+            .Distinct();
+
+        var presentIds = allIds.Except(deletedIds).ToList();
+
+        // 4) For each remaining entrance, get its latest ReportedOn (may be null)
+        var orderedIds = presentIds
+            .Select(id =>
+            {
+                var lastReport = logs
+                    .Where(e =>
+                        e.EntranceId == id
+                        && e.PropertyName == CaveLogPropertyNames.EntranceReportedOn
+                        && e.CreatedOn <= dateTime)
+                    .MaxBy(e => e.CreatedOn);
+
+                return new { EntranceId = id, ReportedOn = lastReport?.ValueDateTime };
+            })
+            // Actual dates first; nulls sort to the end
+            .OrderByDescending(x => x.ReportedOn)
+            .Select(x => x.EntranceId)
+            .ToList();
+
+        // 5) Return the 1-based position (or empty if missing)
+        var idx = orderedIds.IndexOf(entranceId);
+        return idx >= 0
+            ? (idx + 1).ToString()
+            : string.Empty;
+    }
+
+
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
         IDbContextTransaction? transaction = null)
     {
         var outsideTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
 
-        var files = new List<File>();
+        List<File> files;
         var isSuccessful = false;
         try
         {

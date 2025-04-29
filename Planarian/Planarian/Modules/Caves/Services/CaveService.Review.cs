@@ -75,9 +75,9 @@ public partial class CaveService
                 var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
                 var originalValues = isNewCave ? null : await Repository.GetCave(value.Cave.Id!);
                 var caveId = await AddCave(value.Cave, cancellationToken, transaction: transaction);
-                value.Cave.Id = caveId;
+                var changed= await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave"); ; // we don't have new/update ids here so need to get the new cave
 
-                var changes = await BuildChangeLog(originalValues, value.Cave, RequestUser.Id, entity.CreatedByUserId!);
+                var changes = await BuildChangeLog(originalValues, changed.ToAddCave(), RequestUser.Id, entity.CreatedByUserId!);
                 Repository.AddRange(changes);
                 await Repository.SaveChangesAsync(cancellationToken);
             }
@@ -143,15 +143,13 @@ public partial class CaveService
 
         return result;
     }
-    public async Task<List<CaveChangeLog>> BuildChangeLog(
+    public async Task<List<CaveChangeHistory>> BuildChangeLog(
         CaveVm? original,
         AddCave modified,
         string approvedByUserId,
         string changedByUserId)
     {
         var caveId = modified.Id;
-        if (string.IsNullOrWhiteSpace(caveId))
-            throw ApiExceptionDictionary.BadRequest("Cave Id is required");
 
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw ApiExceptionDictionary.NoAccount;
@@ -161,6 +159,8 @@ public partial class CaveService
             caveId: caveId,
             changedByUserId: changedByUserId,
             approvedByUserId: approvedByUserId);
+        
+        
 
         await builder.AddNamedIdFieldAsync(
             CaveLogPropertyNames.CountyName,
@@ -356,9 +356,19 @@ public partial class CaveService
             .Select(e => e.Id)
             .ToList() ?? [];
         
+        var addedEntrances = modified.Entrances
+            .Where(e => original?.Entrances.All(m => m.Id != e.Id) ?? true)
+            .Select(e => e.Id)
+            .ToList();
+        
         foreach (var removedEntranceId in removedEntrances)
         {
             builder.AddRemoveEntranceLog(removedEntranceId);
+        }
+        
+        foreach (var addedEntranceId in addedEntrances)
+        {
+            builder.AddAddedEntranceLog(addedEntranceId);
         }
 
         #endregion

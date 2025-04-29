@@ -24,7 +24,7 @@ public static class ChangeType
     public const string Delete = "Delete";
 }
 
-public class CaveChangeLog : EntityBase
+public class CaveChangeHistory : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
 
@@ -58,9 +58,9 @@ public class CaveChangeLog : EntityBase
     public User ApprovedByUser { get; set; }
 }
 
-public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChangeLog>
+public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChangeHistory>
 {
-    public override void Configure(EntityTypeBuilder<CaveChangeLog> builder)
+    public override void Configure(EntityTypeBuilder<CaveChangeHistory> builder)
     {
         builder.HasOne(e => e.Cave)
             .WithMany(e => e.CaveChangeLogs)
@@ -72,11 +72,11 @@ public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChange
             .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.NoAction);
         
-        builder.HasOne(e => e.Entrance)
+        var rel = builder.HasOne(e => e.Entrance)
             .WithMany(e => e.CaveChangeLogs)
             .HasForeignKey(e => e.EntranceId)
             .OnDelete(DeleteBehavior.NoAction);
-
+        
         builder.HasOne(e => e.ChangedByUser)
             .WithMany(e => e.CaveChangeLogs)
             .HasForeignKey(e => e.ChangedByUserId)

@@ -71,7 +71,7 @@ public class User : EntityBase
     public virtual ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
     public virtual ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
-    public ICollection<CaveChangeLog> CaveChangeLogs { get; set; } = new HashSet<CaveChangeLog>();
+    public ICollection<CaveChangeHistory> CaveChangeLogs { get; set; } = new HashSet<CaveChangeHistory>();
     public ICollection<CaveChangeRequest>? CaveChangeRequestsReviewed { get; set; } = new HashSet<CaveChangeRequest>();
 
 

@@ -15,8 +15,8 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20250425035436_v28")]
-    partial class v28
+    [Migration("20250427031328_v27")]
+    partial class v27
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -721,7 +721,7 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Caves");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeLog", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeHistory", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(10)
@@ -763,6 +763,10 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("EntranceId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("ModifiedByUserId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -800,7 +804,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ChangedByUserId");
 
-                    b.ToTable("CaveChangeLog");
+                    b.HasIndex("EntranceId");
+
+                    b.ToTable("CaveChangeHistory");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
@@ -856,7 +862,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ReviewedByUserId");
 
-                    b.ToTable("CaveChangeRequest");
+                    b.ToTable("CaveChangeRequests");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveGeoJson", b =>
@@ -2384,12 +2390,12 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("State");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeLog", b =>
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeHistory", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
-                        .WithMany()
+                        .WithMany("CaveChangeLogs")
                         .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Planarian.Model.Database.Entities.User", "ApprovedByUser")
@@ -2409,6 +2415,11 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", "Entrance")
+                        .WithMany("CaveChangeLogs")
+                        .HasForeignKey("EntranceId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Account");
 
                     b.Navigation("ApprovedByUser");
@@ -2416,6 +2427,8 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("Cave");
 
                     b.Navigation("ChangedByUser");
+
+                    b.Navigation("Entrance");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
@@ -2524,7 +2537,7 @@ namespace Planarian.Migrations.Migrations
 
                             b1.HasKey("CaveChangeRequestId");
 
-                            b1.ToTable("CaveChangeRequest");
+                            b1.ToTable("CaveChangeRequests");
 
                             b1.ToJson("Json");
 
@@ -2600,7 +2613,7 @@ namespace Planarian.Migrations.Migrations
 
                                     b2.HasKey("AddCaveCaveChangeRequestId", "__synthesizedOrdinal");
 
-                                    b2.ToTable("CaveChangeRequest");
+                                    b2.ToTable("CaveChangeRequests");
 
                                     b2.ToJson("Entrances");
 
@@ -2630,7 +2643,7 @@ namespace Planarian.Migrations.Migrations
 
                                     b2.HasKey("AddCaveCaveChangeRequestId", "__synthesizedOrdinal");
 
-                                    b2.ToTable("CaveChangeRequest");
+                                    b2.ToTable("CaveChangeRequests");
 
                                     b2.ToJson("Files");
 
@@ -3368,6 +3381,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("AccountUsers");
 
+                    b.Navigation("CaveChangeLogs");
+
                     b.Navigation("CaveChangeRequests");
 
                     b.Navigation("CavePermissions");
@@ -3429,6 +3444,8 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Entrance", b =>
                 {
+                    b.Navigation("CaveChangeLogs");
+
                     b.Navigation("EntranceHydrologyTags");
 
                     b.Navigation("EntranceOtherTags");

@@ -6,7 +6,7 @@ namespace Planarian.Modules.Caves.Services;
 
 public class ChangeLogBuilder
 {
-    private readonly List<CaveChangeLog> _changes = [];
+    private readonly List<CaveChangeHistory> _changes = [];
     private readonly string _accountId;
     private readonly string _caveId;
     private readonly string _changedByUserId;
@@ -170,7 +170,7 @@ public class ChangeLogBuilder
         }
     }
 
-    private CaveChangeLog CreateLog(string propertyName,
+    private CaveChangeHistory CreateLog(string propertyName,
         string changeValueType,
         string? valueString = null,
         int? valueInt = null,
@@ -182,9 +182,9 @@ public class ChangeLogBuilder
         double? originalValueDouble = null,
         DateTime? originalValueDateTime = null,
         bool? originalValueBool = null,
-        string? entranceId = null)
-    {
-        var changeType = DetermineChangeType(
+        string? entranceId = null, string? changeType = null)
+    { 
+        changeType ??= DetermineChangeType(
             original: changeValueType switch
             {
                 ChangeValueType.String => (object?)originalValueString,
@@ -204,7 +204,7 @@ public class ChangeLogBuilder
                 _ => null
             });
 
-        return new CaveChangeLog
+        return new CaveChangeHistory
         {
             AccountId = _accountId,
             CaveId = _caveId,
@@ -250,7 +250,7 @@ public class ChangeLogBuilder
         return (added, removed);
     }
 
-    public List<CaveChangeLog> Build() => _changes;
+    public List<CaveChangeHistory> Build() => _changes;
 
 
     // private lookupFunction that if the lookup function fails it will return the raw value because it is a new value
@@ -272,15 +272,37 @@ public class ChangeLogBuilder
         _changes.Add(CreateLog(
             propertyName: CaveLogPropertyNames.Entrance,
             changeValueType: ChangeValueType.Entrance,
-            entranceId: removedEntranceId
-        ));
+            entranceId: removedEntranceId,
+            changeType: ChangeType.Delete
+            )
+        );
+    }
+
+    public void AddAddedEntranceLog(string? addedEntranceId)
+    {
+        _changes.Add(CreateLog(
+                propertyName: CaveLogPropertyNames.Entrance,
+                changeValueType: ChangeValueType.Entrance,
+                changeType: ChangeType.Add,
+                entranceId: addedEntranceId
+            )
+        );
     }
 
     public void AddRemovedCaveLog()
     {
         _changes.Add(CreateLog(
             propertyName: CaveLogPropertyNames.Cave,
-            changeValueType: ChangeValueType.Cave
+            changeValueType: ChangeValueType.Cave,
+            changeType: ChangeType.Delete
+        ));
+    }
+    public void AddAddedCaveLog()
+    {
+        _changes.Add(CreateLog(
+            propertyName: CaveLogPropertyNames.Cave,
+            changeValueType: ChangeValueType.Cave,
+            changeType: ChangeType.Add
         ));
     }
 }

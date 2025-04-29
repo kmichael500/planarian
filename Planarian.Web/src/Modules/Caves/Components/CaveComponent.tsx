@@ -51,10 +51,10 @@ import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
+import { CaveHistoryModal } from "./CaveHistoryModal";
 
 const { Panel } = Collapse;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 export interface CaveComponentOptions {
   showMap?: boolean;
@@ -110,6 +110,8 @@ const CaveComponent = ({
 
   const [showGeology, setShowGeology] = useState(false);
   const [showGages, setShowGages] = useState(false);
+
+  const [historyVisible, setHistoryVisible] = useState(false);
 
   const [geoJsonToSave, setGeoJsonToSave] = useState<string | null>(null);
   const [isGeoJsonModalVisible, setIsGeoJsonModalVisible] = useState(false);
@@ -345,7 +347,11 @@ const CaveComponent = ({
         element={
           <>
             {cave?.updatedOn && (
-              <PlanarianButton icon={<HistoryOutlined />} type="link">
+              <PlanarianButton
+                icon={<HistoryOutlined />}
+                type="link"
+                onClick={() => setHistoryVisible(true)}
+              >
                 Last updated: {formatDate(cave.updatedOn)}
               </PlanarianButton>
             )}
@@ -656,6 +662,12 @@ const CaveComponent = ({
           }}
         />
       )}
+
+      <CaveHistoryModal
+        caveId={cave?.id}
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
+      />
     </>
   );
 };

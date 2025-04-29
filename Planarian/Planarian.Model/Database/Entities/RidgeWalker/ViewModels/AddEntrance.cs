@@ -19,21 +19,6 @@ public class AddEntrance
         EntranceHydrologyTagIds = entranceHydrologyTagIds;
     }
 
-
-    public AddEntrance(string name, string description, double latitude, double longitude,
-        double elevationFeet,
-        double? pitFeet, string locationQualityTagId, string reportedByName,
-        DateTime? reportedOn, List<string> entranceStatusTagIds, List<string> fieldIndicationTagIds,
-        List<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
-    {
-        Name = name;
-        PitFeet = pitFeet;
-        Description = description;
-        LocationQualityTagId = locationQualityTagId;
-        ReportedByName = reportedByName;
-        ReportedOn = reportedOn;
-    }
-
     public AddEntrance()
     {
     }
@@ -50,7 +35,6 @@ public class AddEntrance
     public double ElevationFeet { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public double? PitFeet { get; set; }
 

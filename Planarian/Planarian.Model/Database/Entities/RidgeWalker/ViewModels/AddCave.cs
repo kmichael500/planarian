@@ -17,19 +17,7 @@ public class AddCave
         NumberOfPits = numberOfPits;
         GeologyTagIds = geologyTagIds;
     }
-
-
-    public AddCave(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
-        string reportedByName, string stateId, string countyId, string name,
-        double lengthFeet,
-        double depthFeet, int numberOfPits, List<string> geologyTagIds) : this(stateId, countyId, name,
-        lengthFeet, depthFeet, numberOfPits, geologyTagIds)
-    {
-        MaxPitDepthFeet = maxPitDepthFeet;
-        Narrative = narrative;
-        ReportedOn = reportedOn;
-        ReportedByName = reportedByName;
-    }
+    
 
     public AddCave()
     {
@@ -51,7 +39,6 @@ public class AddCave
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public List<AddEntrance> Entrances { get; set; } = [];
     public List<EditFileMetadata>? Files { get; set; } = new List<EditFileMetadata>();

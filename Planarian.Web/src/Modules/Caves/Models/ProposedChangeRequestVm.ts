@@ -9,17 +9,20 @@ export interface ProposedChangeRequestVm {
 
 export interface CaveChangeLogVm {
   caveId: string;
-  entranceId?: string;
+  entranceId: string | null;
+  entranceName: string | null;
   changedByUserId: string;
-  approvedByUserId?: string;
-  propertyName: CaveLogPropertyName;
+  approvedByUserId: string | null;
+  propertyName: string;
   changeType: ChangeType;
   changeValueType: ChangeValueType;
-  valueString?: string;
-  valueInt?: number;
-  valueDouble?: number;
-  valueBool?: boolean;
-  valueDateTime?: Date;
+  valueString: string | null;
+  valueInt: number | null;
+  valueDouble: number | null;
+  valueBool: boolean | null;
+  valueDateTime: string | null;
+
+  createdOn: string;
 }
 
 export enum ChangeValueType {
