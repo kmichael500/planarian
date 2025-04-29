@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Timeline, Spin } from "antd";
+import { Modal, Timeline, Spin, Tag } from "antd";
 import dayjs from "dayjs";
 import { CaveService } from "../Service/CaveService";
 import {
   CaveChangeLogVm,
   CaveLogPropertyName,
+  ChangeType,
+  ChangeValueType,
 } from "../Models/ProposedChangeRequestVm";
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import {
+  formatDate,
+  formatDateTime,
+  isNullOrWhiteSpace,
+} from "../../../Shared/Helpers/StringHelpers";
 
 export interface CaveHistoryModalProps {
   caveId?: string;
@@ -127,6 +133,32 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
     }
   };
 
+  const getChangeTypeColor = (changeType: string): string => {
+    switch (changeType) {
+      case ChangeType.Add:
+        return "success";
+      case ChangeType.Update:
+        return "processing";
+      case ChangeType.Delete:
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
+  const getChangeTypeDisplay = (changeType: string): string => {
+    switch (changeType) {
+      case ChangeType.Add:
+        return "Added";
+      case ChangeType.Update:
+        return "Updated";
+      case ChangeType.Delete:
+        return "Deleted";
+      default:
+        return changeType;
+    }
+  };
+
   return (
     <Modal
       title="Change History"
@@ -149,36 +181,55 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
                 key={i}
                 color={isEntranceChange ? "blue" : "green"}
               >
-                {isEntranceChange && (
+                <div className="history-item" style={{ marginBottom: "12px" }}>
+                  {/* Context label */}
+                  <div>
+                    <Tag
+                      style={{ marginRight: "8px" }}
+                      color={isEntranceChange ? "blue" : "green"}
+                    >
+                      {isEntranceChange
+                        ? entry.entranceName || "Entrance"
+                        : "Cave"}
+                    </Tag>
+                    <Tag color={getChangeTypeColor(entry.changeType)}>
+                      {getChangeTypeDisplay(entry.changeType)}
+                    </Tag>
+                  </div>
+
+                  {/* Change detail */}
                   <div
                     style={{
-                      backgroundColor: "#e6f7ff",
-                      padding: "2px 8px",
+                      marginTop: "6px",
+                      padding: "8px",
+                      backgroundColor: "#fafafa",
                       borderRadius: "4px",
-                      marginBottom: "4px",
-                      display: "inline-block",
                     }}
                   >
-                    Entrance {entry.entranceName}
+                    <strong style={{ fontSize: "14px" }}>
+                      {getDisplayName(entry.propertyName)}
+                    </strong>
+
+                    {entry.changeType !== ChangeType.Delete && (
+                      <div style={{ marginTop: "3px" }}>
+                        <span style={{ color: "#666" }}>Value: </span>
+                        <span>{renderValue(entry)}</span>
+                      </div>
+                    )}
                   </div>
-                )}
-                {!isEntranceChange && (
-                  <div
-                    style={{
-                      backgroundColor: "#f6ffed",
-                      padding: "2px 8px",
-                      borderRadius: "4px",
-                      marginBottom: "4px",
-                      display: "inline-block",
-                    }}
-                  >
-                    Cave
-                  </div>
-                )}
-                <div>
-                  <strong>{getDisplayName(entry.propertyName)}</strong>{" "}
-                  {entry.changeType.toLowerCase()} to{" "}
-                  <em>{renderValue(entry)}</em>
+
+                  {/* Timestamp */}
+                  {entry.createdOn && (
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#888",
+                        marginTop: "4px",
+                      }}
+                    >
+                      {formatDateTime(entry.createdOn)}
+                    </div>
+                  )}
                 </div>
               </Timeline.Item>
             );
