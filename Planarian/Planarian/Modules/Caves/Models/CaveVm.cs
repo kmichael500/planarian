@@ -28,7 +28,7 @@ public class CaveVm
         IsArchived = isArchived;
         PrimaryEntrance = primaryEntrance;
         MapIds = mapIds;
-        Entrances = entrances;
+        Entrances = entrances.ToList();
         GeologyTagIds = geologyTagIds;
         Files = files;
     }
@@ -65,7 +65,7 @@ public class CaveVm
     public string DisplayId { get; set; } = null!;
 
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
-    public IEnumerable<string> AlternateNames { get; set; }
+    public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
 
     public double? LengthFeet { get; set; }
     public double? DepthFeet { get; set; }
@@ -83,7 +83,7 @@ public class CaveVm
     public EntranceVm PrimaryEntrance { get; set; } = null!;
 
     public IEnumerable<string> MapIds { get; set; } = new HashSet<string>();
-    public IEnumerable<EntranceVm> Entrances { get; set; } = new HashSet<EntranceVm>();
+    public List<EntranceVm> Entrances { get; set; } = new();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();
@@ -132,6 +132,8 @@ public static class CaveVmExtensions
 
                 Entrances = vm.Entrances?
                                 .Select(e => e.ToAddEntrance())
+                                .OrderByDescending(ee => ee.IsPrimary)
+                                .ThenBy(ee => ee.ReportedOn).ToList()
                                 .ToList()
                             ?? [],
 

@@ -9,7 +9,5 @@ public class ReviewChangeRequest
     public string? Id { get; set; } 
     public bool Approve { get; set; }
     
-    public AddCave Cave { get; set; } = null!;
-    
     [MaxLength(PropertyLength.LargeText)] public string? Notes { get; set; }
 }

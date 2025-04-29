@@ -1,14 +1,13 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
+using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Models;
+using JsonConverter = System.Text.Json.Serialization.JsonConverter;
 
 namespace Planarian.Modules.Caves.Services;
 
@@ -30,16 +29,103 @@ public partial class CaveService
                 : await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id!, cancellationToken) ??
                   throw ApiExceptionDictionary.NotFound("Change Request");
 
-            var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
+            var existingCaveEntity = await Repository.GetCave(value.Cave.Id);
+            var isNewCave = existingCaveEntity == null;
 
-            entity.CaveId = value.Cave.Id;
+            if (isNewCave && value.Cave.Id.IsNullOrWhiteSpace())
+            {
+                value.Cave.Id = IdGenerator.Generate(PropertyLength.Id);
+            }
+
+            foreach (var entrance in value.Cave.Entrances)
+            {
+                if (string.IsNullOrWhiteSpace(entrance.Id))
+                {
+                    entrance.Id = IdGenerator.Generate(PropertyLength.Id);
+                }
+            }
+
+            #region Create People Name Tags
+
+            var tagTypeIds = new List<string>();
+            tagTypeIds.AddRange(value.Cave.CartographerNameTagIds);
+            tagTypeIds.AddRange(value.Cave.ReportedByNameTagIds);
+            tagTypeIds.AddRange(value.Cave.Entrances.SelectMany(e => e.ReportedByNameTagIds));
+            tagTypeIds = tagTypeIds.Select(tag => tag.Trim()).Distinct().ToList();
+            
+            var createdTags = new List<(string Id, string OriginalValue)>();
+            
+            foreach (var personTagTypeId in tagTypeIds)
+            {
+                var tagType = await _tagRepository.GetTag(personTagTypeId);
+                if (tagType == null)
+                {
+                    tagType ??= new TagType
+                    {
+                        Id = IdGenerator.Generate(PropertyLength.Id),
+                        Name = personTagTypeId.Trim(),
+                        AccountId = RequestUser.AccountId,
+                        Key = TagTypeKeyConstant.People,
+                    };
+                    _tagRepository.Add(tagType);
+                    createdTags.Add((tagType.Id, personTagTypeId));
+                }
+            }
+
+            foreach (var createdTag in createdTags)
+            {
+                for (var i = 0; i < value.Cave.CartographerNameTagIds.Count; i++)
+                {
+                    if (value.Cave.CartographerNameTagIds[i].Trim()
+                        .Equals(createdTag.OriginalValue, StringComparison.OrdinalIgnoreCase))
+                    {
+                        value.Cave.CartographerNameTagIds[i] = createdTag.Id;
+                    }
+                }
+
+                for (var i = 0; i < value.Cave.ReportedByNameTagIds.Count; i++)
+                {
+                    if (value.Cave.ReportedByNameTagIds[i].Trim()
+                        .Equals(createdTag.OriginalValue, StringComparison.OrdinalIgnoreCase))
+                    {
+                        value.Cave.ReportedByNameTagIds[i] = createdTag.Id;
+                    }
+                }
+
+                foreach (var entrance in value.Cave.Entrances)
+                {
+                    for (var i = 0; i < entrance.ReportedByNameTagIds.Count; i++)
+                    {
+                        if (entrance.ReportedByNameTagIds[i].Trim().Equals(createdTag.OriginalValue,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            entrance.ReportedByNameTagIds[i] = createdTag.Id;
+                        }
+                    }
+                }
+
+            }
+
+            #endregion
+
             entity.AccountId = RequestUser.AccountId;
-            entity.Json = value.Cave;
-
+            
             if (isNew)
             {
                 _caveChangeRequestRepository.Add(entity);
             }
+
+            if (!isNewCave)
+            {
+                entity.CaveId = value.Cave.Id;
+            }
+            await _caveChangeLogRepository.SaveChangesAsync(cancellationToken);
+            
+            var original = isNewCave
+                ? null
+                : await Repository.GetCave(value.Cave.Id!);
+            var changeLogs = await BuildChangeLog(original, value.Cave, RequestUser.Id, RequestUser.Id, entity.Id);
+            _caveChangeLogRepository.AddRange(changeLogs);
 
             await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -58,8 +144,27 @@ public partial class CaveService
 
         var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(value.Id, cancellationToken);
         if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
+        
+        var isNewCave = entity.CaveId.IsNullOrWhiteSpace();
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, entity.Json.CountyId);
+        var countyIdsToCheckPermission = new List<string>();
+        if (!isNewCave)
+        {
+            var currentCountyId = (await Repository.GetCave(entity.CaveId!) ?? throw ApiExceptionDictionary.NotFound("Cave")).CountyId;
+            countyIdsToCheckPermission.Add(currentCountyId);
+        }
+
+        var changedCountyId = entity.CaveChangeHistory
+            .FirstOrDefault(e => e.PropertyName == CaveLogPropertyNames.CountyName)?.PropertyId;
+        if (!string.IsNullOrWhiteSpace(changedCountyId))
+        {
+            countyIdsToCheckPermission.Add(changedCountyId);
+        }
+
+        foreach (var countyId in countyIdsToCheckPermission)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, entity.CaveId, countyId);
+        }
 
         var transaction = await _caveChangeRequestRepository.BeginTransactionAsync(cancellationToken);
 
@@ -72,13 +177,10 @@ public partial class CaveService
 
             if (value.Approve)
             {
-                var isNewCave = string.IsNullOrWhiteSpace(value.Cave.Id);
-                var originalValues = isNewCave ? null : await Repository.GetCave(value.Cave.Id!);
-                var caveId = await AddCave(value.Cave, cancellationToken, transaction: transaction);
-                var changed= await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave"); ; // we don't have new/update ids here so need to get the new cave
-
-                var changes = await BuildChangeLog(originalValues, changed.ToAddCave(), RequestUser.Id, entity.CreatedByUserId!);
-                Repository.AddRange(changes);
+                var current = await Repository.GetCave(entity.CaveId);
+                var updatedCave = await CaveChangeHistoryToAddCave(entity.CaveChangeHistory, current);
+                var caveId = await AddCave(updatedCave, cancellationToken, transaction: transaction);
+                entity.CaveId = caveId;
                 await Repository.SaveChangesAsync(cancellationToken);
             }
 
@@ -105,12 +207,15 @@ public partial class CaveService
         var entity = await _caveChangeRequestRepository.GetCaveChangeRequest(id, CancellationToken.None);
         if (entity == null) throw ApiExceptionDictionary.NotFound("Change Request");
 
-        var original = !entity.CaveId.IsNullOrWhiteSpace() ? await GetCave(entity.CaveId) : null;
-        var changes = await BuildChangeLogVm(original, entity.Json, entity.ReviewedByUserId!, entity.CreatedByUserId!);
+        var changes = await ToChangeLogVm(entity.CaveChangeHistory);
+        var original = await Repository.GetCave(entity.CaveId);
+
+        var cave = await CaveChangeHistoryToAddCave(entity.CaveChangeHistory, original);
+        
         var result = new ProposedChangeRequestVm
         {
             Id = entity.Id,
-            Cave = entity.Json,
+            Cave = cave,
             Changes = changes,
             OriginalCave = original,
         };
@@ -118,13 +223,8 @@ public partial class CaveService
         return result;
     }
 
-    private async Task<IEnumerable<CaveChangeLogVm>> BuildChangeLogVm(
-        CaveVm? original,
-        AddCave modified,
-        string approvedByUserId,
-        string changedByUserId)
+    private async Task<IEnumerable<CaveChangeLogVm>> ToChangeLogVm(IEnumerable<CaveChangeHistory> changes)
     {
-        var changes = await BuildChangeLog(original, modified, approvedByUserId, changedByUserId);
         var result = changes.Select(e => new CaveChangeLogVm
         {
             CaveId = e.CaveId,
@@ -143,24 +243,26 @@ public partial class CaveService
 
         return result;
     }
-    public async Task<List<CaveChangeHistory>> BuildChangeLog(
-        CaveVm? original,
+    public async Task<List<CaveChangeHistory>> BuildChangeLog(CaveVm? original,
         AddCave modified,
         string approvedByUserId,
-        string changedByUserId)
+        string changedByUserId, string changeRequestId)
     {
         var caveId = modified.Id;
 
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw ApiExceptionDictionary.NoAccount;
 
+        if (string.IsNullOrWhiteSpace(caveId))
+        {
+            throw ApiExceptionDictionary.BadRequest("Cave Id");
+        }
+
         var builder = new ChangeLogBuilder(
             accountId: RequestUser.AccountId,
             caveId: caveId,
             changedByUserId: changedByUserId,
-            approvedByUserId: approvedByUserId);
-        
-        
+            approvedByUserId: approvedByUserId, changeRequestId: changeRequestId);
 
         await builder.AddNamedIdFieldAsync(
             CaveLogPropertyNames.CountyName,
@@ -268,13 +370,13 @@ public partial class CaveService
             modified.OtherTagIds,
             _settingsRepository.GetTagTypeName);
 
-        // TODO: Files, Entrances, GeoJson
+        // TODO: Files, GeoJson
 
         #region Entrance
 
         foreach (var modifiedEntrance in modified.Entrances)
         {
-            var id = modifiedEntrance.Id;
+            var id = modifiedEntrance.Id ?? IdGenerator.Generate(PropertyLength.Id);
             var originalEntrance = original?.Entrances.FirstOrDefault(e => e.Id == id);
 
             // name & description
@@ -282,6 +384,23 @@ public partial class CaveService
                 CaveLogPropertyNames.EntranceName,
                 originalEntrance?.Name,
                 modifiedEntrance.Name,
+                entranceId: id);
+            
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceLatitude,
+                originalEntrance?.Latitude,
+                modifiedEntrance.Latitude,
+                entranceId: id);
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceLongitude,
+                originalEntrance?.Longitude,
+                modifiedEntrance.Longitude,
+                entranceId: id);
+            
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceElevationFeet,
+                originalEntrance?.ElevationFeet,
+                modifiedEntrance.ElevationFeet,
                 entranceId: id);
 
             builder.AddStringFieldAsync(
@@ -375,5 +494,192 @@ public partial class CaveService
 
         var changes = builder.Build();
         return changes;
+    }
+
+    private async Task<AddCave> CaveChangeHistoryToAddCave(IEnumerable<CaveChangeHistory> changes, CaveVm? current)
+    {
+        changes = changes.ToList();
+        var caveId = changes.First().CaveId;
+        
+        // copy the current cave if it exists so we don't modify the original
+        // cave using system text json
+        
+        var currentCopy = JsonConvert.DeserializeObject<CaveVm>(JsonConvert.SerializeObject(current));
+
+        currentCopy ??= new CaveVm
+        {
+            Id = caveId,
+            Entrances = []
+        };
+
+        foreach (var change in changes)
+        {
+            EntranceVm? entrance = null;
+
+            var isNewEntrance = false;
+            if (!change.EntranceId.IsNullOrWhiteSpace())
+            {
+                var existingEntrance = currentCopy.Entrances.FirstOrDefault(e => e.Id == change.EntranceId);
+                if (existingEntrance != null)
+                {
+                    entrance = existingEntrance;
+                }
+                else
+                {
+                    isNewEntrance = true;
+                    entrance = new EntranceVm
+                    {
+                        Id = change.EntranceId,
+                    };
+                }
+
+            }
+            
+            switch (change.PropertyName)
+            {
+                case CaveLogPropertyNames.Name:
+                    currentCopy.Name = change.ValueString!;
+                    break;
+                case CaveLogPropertyNames.AlternateNames:
+                    currentCopy.AlternateNames = MergeList(currentCopy.AlternateNames, change.ValueString!, change.ChangeType)
+                        .ToList();
+                    break;
+                case CaveLogPropertyNames.CountyName:
+                    currentCopy.CountyId = change.PropertyId!;
+                    break;
+                case CaveLogPropertyNames.StateName:
+                    currentCopy.StateId = change.PropertyId!;
+                    break;
+                case CaveLogPropertyNames.LengthFeet:
+                    currentCopy.LengthFeet = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.DepthFeet:
+                    currentCopy.DepthFeet = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.MaxPitDepthFeet:
+                    currentCopy.MaxPitDepthFeet = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.NumberOfPits:
+                    currentCopy.NumberOfPits = change.ValueInt ?? 0;
+                    break;
+                case CaveLogPropertyNames.Narrative:
+                    currentCopy.Narrative = change.ValueString;
+                    break;
+                case CaveLogPropertyNames.ReportedOn:
+                    currentCopy.ReportedOn = change.ValueDateTime;
+                    break;
+                case CaveLogPropertyNames.GeologyTagName:
+                    currentCopy.GeologyTagIds =
+                        MergeList(currentCopy.GeologyTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.ReportedByNameTagName:
+                    currentCopy.ReportedByNameTagIds =
+                        MergeList(currentCopy.ReportedByNameTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.BiologyTagName:
+                    currentCopy.BiologyTagIds =
+                        MergeList(currentCopy.BiologyTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.ArcheologyTagName:
+                    currentCopy.ArcheologyTagIds =
+                        MergeList(currentCopy.ArcheologyTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.CartographerNameTagName:
+                    currentCopy.CartographerNameTagIds =
+                        MergeList(currentCopy.CartographerNameTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.MapStatusTagName:
+                    currentCopy.MapStatusTagIds = MergeList(currentCopy.MapStatusTagIds, change.PropertyId!, change.ChangeType)
+                        .ToList();
+                    break;
+                case CaveLogPropertyNames.GeologicAgeTagName:
+                    currentCopy.GeologicAgeTagIds =
+                        MergeList(currentCopy.GeologicAgeTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.PhysiographicProvinceTagName:
+                    currentCopy.PhysiographicProvinceTagIds = MergeList(currentCopy.PhysiographicProvinceTagIds,
+                        change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.OtherTagName:
+                    currentCopy.OtherTagIds =
+                        MergeList(currentCopy.OtherTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.EntranceName:
+                    entrance!.Name = change.ValueString;
+                    break;
+                case CaveLogPropertyNames.EntranceLatitude:
+                    entrance!.Latitude = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.EntranceLongitude:
+                    entrance!.Longitude = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.EntranceElevationFeet:
+                    entrance!.ElevationFeet = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.EntranceDescription:
+                    entrance!.Description = change.ValueString;
+                    break;
+                case CaveLogPropertyNames.EntranceIsPrimary:
+                    entrance!.IsPrimary = change.ValueBool!.Value;
+                    break;
+                case CaveLogPropertyNames.EntranceLocationQualityTagName:
+                    entrance!.LocationQualityTagId = change.PropertyId;
+                    break;
+                case CaveLogPropertyNames.EntrancePitDepthFeet:
+                    entrance!.PitFeet = change.ValueDouble ?? 0;
+                    break;
+                case CaveLogPropertyNames.EntranceReportedOn:
+                    entrance!.ReportedOn = change.ValueDateTime;
+                    break;
+                case CaveLogPropertyNames.EntranceStatusTagName:
+                    entrance!.EntranceStatusTagIds =
+                        MergeList(entrance.EntranceStatusTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.EntranceHydrologyTagName:
+                    entrance!.EntranceHydrologyTagIds = MergeList(entrance.EntranceHydrologyTagIds, change.PropertyId!,
+                        change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.EntranceFieldIndicationTagName:
+                    entrance!.FieldIndicationTagIds =
+                        MergeList(entrance.FieldIndicationTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.EntranceReportedByNameTagName:
+                    entrance!.ReportedByNameTagIds =
+                        MergeList(entrance.ReportedByNameTagIds, change.PropertyId!, change.ChangeType).ToList();
+                    break;
+                case CaveLogPropertyNames.Entrance:
+                    if (change.ChangeType == ChangeType.Delete)
+                    {
+                        currentCopy.Entrances.Remove(entrance!);
+                    }
+
+                    break;
+            }
+
+            if (isNewEntrance)
+            {
+                currentCopy.Entrances.Add(entrance!);
+            }
+        }
+
+        return currentCopy.ToAddCave();
+    }
+
+    private IEnumerable<T> MergeList<T>(IEnumerable<T> list, T item, string changeType)
+    {
+        var listCopy = list.ToList();
+        switch (changeType)
+        {
+            case ChangeType.Add:
+                listCopy.Add(item);
+                break;
+            case ChangeType.Delete:
+                listCopy.Remove(item);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(changeType), changeType, null);
+        }
+
+        return listCopy;
     }
 }

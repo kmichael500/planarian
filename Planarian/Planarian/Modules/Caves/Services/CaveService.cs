@@ -427,16 +427,21 @@ public partial class CaveService : ServiceBase<CaveRepository>
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
         await ValidateCave(values);
         
-        var isNew = string.IsNullOrWhiteSpace(values.Id);
+        var entity = await Repository.GetAsync(values.Id);
+        var isNew = entity == null;
+
+        if (values.Id.IsNullOrWhiteSpace() || !values.Id.IsValidId())
+        {
+            throw ApiExceptionDictionary.BadRequest("Cave Id must be defined ahead of time.");
+        }
+        
+        entity ??= new Cave { Id = values.Id };
+        
 
         var existingTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            var entity = isNew ? new Cave() : await Repository.GetAsync(values.Id);
-
-            if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
-
             var isNewCounty = entity.CountyId != values.CountyId;
 
             entity.Name = values.Name.Trim();
@@ -574,15 +579,24 @@ public partial class CaveService : ServiceBase<CaveRepository>
 
             foreach (var entranceValue in values.Entrances)
             {
-                var isNewEntrance = string.IsNullOrWhiteSpace(entranceValue.Id);
+                var entrance = entity.Entrances.FirstOrDefault(e => e.Id == entranceValue.Id);
 
-                var entrance = isNewEntrance
-                    ? new Entrance()
-                    : entity.Entrances.FirstOrDefault(e => e.Id == entranceValue.Id);
-
-                if (entrance == null) throw ApiExceptionDictionary.NotFound(nameof(entranceValue.Id));
-
-                entrance.Name = entranceValue.Name;
+                var isNewEntrance = entrance == null;
+                if (isNewEntrance)
+                {
+                    if (entranceValue.Id.IsNullOrWhiteSpace() || !entranceValue.Id.IsValidId())
+                    {
+                        throw ApiExceptionDictionary.BadRequest("Entrance Id must be defined ahead of time.");
+                    }
+                    
+                    entrance = new Entrance
+                    {
+                        Id = entranceValue.Id,
+                        CaveId = entity.Id
+                    };
+                }
+                
+                entrance!.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
                 entrance.ReportedOn = entranceValue.ReportedOn?.ToUtcKind();
@@ -1417,6 +1431,9 @@ public static class CaveLogPropertyNames
     public const string OtherTagName                     = "OtherTagName";
     
     public const string EntranceName                     = "EntranceName";
+    public const string EntranceLatitude                  = "EntranceLatitude";
+    public const string EntranceLongitude                 = "EntranceLongitude";
+    public const string EntranceElevationFeet             = "EntranceElevationFeet";
     public const string EntranceDescription              = "EntranceDescription";
     public const string EntranceIsPrimary                 = "EntranceIsPrimary";
     public const string EntranceLocationQualityTagName   = "EntranceLocationQualityTagName";
@@ -1426,7 +1443,6 @@ public static class CaveLogPropertyNames
     public const string EntranceHydrologyTagName         = "EntranceHydrologyTagName";
     public const string EntranceFieldIndicationTagName   = "EntranceFieldIndicationTagName";
     public const string EntranceReportedByNameTagName    = "EntranceReportedByNameTagName";
-    public const string EntranceOtherTagName             = "EntranceOtherTagName";
 
     public const string Entrance = "Entrance";
     public const string Cave = "Cave";

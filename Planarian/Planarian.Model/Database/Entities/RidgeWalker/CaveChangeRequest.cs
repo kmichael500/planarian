@@ -20,13 +20,14 @@ public class CaveChangeRequest : EntityBase
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? ReviewedByUserId { get; set; }
 
-    public AddCave Json { get; set; } = null!;
     [MaxLength(PropertyLength.LargeText)] public string? Notes { get; set; }
     [MaxLength(PropertyLength.Key)] public string Status { get; set; } = ChangeRequestStatus.Pending;
     public DateTime? ReviewedOn { get; set; }
     public Account Account { get; set; } = null!;
     public Cave Cave { get; set; } = null!;
     public User ReviewedByUser { get; set; } = null!;
+    
+    public IEnumerable<CaveChangeHistory> CaveChangeHistory { get; set; } = new HashSet<CaveChangeHistory>();
 }
 
 public class ChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveChangeRequest>
@@ -47,18 +48,5 @@ public class ChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveChange
             .WithMany(e => e.CaveChangeRequestsReviewed)
             .HasForeignKey(e => e.ReviewedByUserId)
             .OnDelete(DeleteBehavior.NoAction);
-
-        builder.OwnsOne(e => e.Json, jsonNav =>
-        {
-            jsonNav.ToJson();
-
-            // primitive lists don't need to be owned
-
-            jsonNav.OwnsMany(c => c.Entrances, ent =>
-            {
-                ent.ToJson();
-            });
-            jsonNav.OwnsMany(c => c.Files, file => file.ToJson());
-        });
     }
 }

@@ -3,7 +3,10 @@ import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
+import {
+  defaultIfEmpty,
+  isNullOrWhiteSpace,
+} from "../../../Shared/Helpers/StringHelpers";
 
 export interface TripTagComponentProps {
   tagId: string;
@@ -15,6 +18,9 @@ export interface TripTagComponentProps {
   color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 function stringToColor(str: string): string {
+  if (isNullOrWhiteSpace(str)) {
+    return "#000000"; // Default color for empty strings
+  }
   const hash = stringToHash(str);
   const hue = hash % 360;
   return hslToHex(hue, 70, 80); // Adjusted for more distinct pastel colors

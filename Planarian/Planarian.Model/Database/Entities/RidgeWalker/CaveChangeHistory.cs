@@ -26,8 +26,8 @@ public static class ChangeType
 
 public class CaveChangeHistory : EntityBase
 {
+    [MaxLength(PropertyLength.Id)] public string CaveChangeRequestId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
-
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? EntranceId { get; set; }
     [MaxLength(PropertyLength.Id)] public string ChangedByUserId { get; set; }
@@ -36,11 +36,12 @@ public class CaveChangeHistory : EntityBase
 
 
     [MaxLength(PropertyLength.Key)] public string PropertyName { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? PropertyId { get; set; } = null!;
 
     [MaxLength(PropertyLength.Key)] public string ChangeType { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string ChangeValueType { get; set; } = null!;
 
-    public string? ValueString { get; set; } 
+    public string? ValueString { get; set; }
 
     public int? ValueInt { get; set; }
 
@@ -50,12 +51,13 @@ public class CaveChangeHistory : EntityBase
 
     public DateTime? ValueDateTime { get; set; }
 
-    
+
     public Account Account { get; set; } = null!;
+    public CaveChangeRequest? CaveChangeRequest { get; set; }
     public User ChangedByUser { get; set; } = null!;
     public Cave Cave { get; set; } = null!;
     public Entrance? Entrance { get; set; }
-    public User ApprovedByUser { get; set; }
+    public User ApprovedByUser { get; set; } = null!;
 }
 
 public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChangeHistory>
@@ -67,8 +69,13 @@ public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChange
             .HasForeignKey(e => e.CaveId)
             .OnDelete(DeleteBehavior.NoAction);
         
+        builder.HasOne(e=>e.CaveChangeRequest)
+            .WithMany(e => e.CaveChangeHistory)
+            .HasForeignKey(e => e.CaveChangeRequestId)
+            .OnDelete(DeleteBehavior.NoAction);
+        
         builder.HasOne(e => e.Account)
-            .WithMany(e => e.CaveChangeLogs)
+            .WithMany(e => e.CaveChangeHistory)
             .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.NoAction);
         

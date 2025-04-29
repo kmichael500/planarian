@@ -27,6 +27,7 @@ import {
   formatCoordinates,
   isNullOrWhiteSpace,
   formatBoolean,
+  formatCoordinate,
 } from "../../../Shared/Helpers/StringHelpers";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
@@ -77,8 +78,7 @@ const CaveReviewComponent = ({
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
 
   // Check if this is a new cave (all change logs have null caveId)
-  const isNewCave =
-    changes && changes.length > 0 && changes.every((c) => c.caveId === null);
+  const isNewCave = originalCave === null;
 
   const [showNarrativeDiff, setShowNarrativeDiff] = React.useState(true);
   const narrativeChanged =
@@ -361,34 +361,26 @@ const CaveReviewComponent = ({
 
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) &&
         updatedEntranceItem(
-          <Space>
-            Coordinates
-            <a
-              href={getDirectionsUrl(entrance.latitude, entrance.longitude)}
-              target="_blank"
-              className={isDeleted ? "strikethrough-all" : ""}
-            >
-              <Tooltip title="Directions">
-                <CarOutlined />
-              </Tooltip>
-            </a>
-          </Space>,
+          "Latitude",
           <span className={isDeleted ? "strikethrough-all" : ""}>
-            {formatCoordinates(entrance.latitude, entrance.longitude)}
+            {formatCoordinate(entrance.latitude)}
           </span>,
           originalEnt
-            ? formatCoordinates(originalEnt.latitude, originalEnt.longitude)
+            ? formatCoordinate(originalEnt.latitude)
             : defaultIfEmpty(null),
           CaveLogPropertyName.Entrance,
           entrance.id
         ),
-
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) &&
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) &&
         updatedEntranceItem(
-          "Description",
-          entrance.description || defaultIfEmpty(null),
-          originalEnt?.description ?? defaultIfEmpty(null),
-          CaveLogPropertyName.EntranceDescription,
+          "Longitude",
+          <span className={isDeleted ? "strikethrough-all" : ""}>
+            {formatCoordinate(entrance.longitude)}
+          </span>,
+          originalEnt
+            ? formatCoordinate(originalEnt.longitude)
+            : defaultIfEmpty(null),
+          CaveLogPropertyName.Entrance,
           entrance.id
         ),
 
@@ -401,7 +393,15 @@ const CaveReviewComponent = ({
           defaultIfEmpty(
             formatDistance(originalEnt?.elevationFeet, DistanceFormat.feet)
           ),
-          CaveLogPropertyName.Entrance, // or a finer‐grained enum
+          CaveLogPropertyName.EntranceElevationFeet,
+          entrance.id
+        ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) &&
+        updatedEntranceItem(
+          "Description",
+          entrance.description || defaultIfEmpty(null),
+          originalEnt?.description ?? defaultIfEmpty(null),
+          CaveLogPropertyName.EntranceDescription,
           entrance.id
         ),
 
@@ -615,19 +615,13 @@ const CaveReviewComponent = ({
                         {!isNullOrWhiteSpace(entrance.name)
                           ? " - " + entrance.name
                           : ""}
-                        {entrance.isPrimary && (
-                          <>
-                            <Col flex="auto"></Col>
-                            <Tag>Primary</Tag>
-                          </>
-                        )}
-                        {isDeleted && (
+                        {isDeleted && !isNewCave && (
                           <>
                             <Col flex="auto"></Col>
                             <Tag color="red">Removed</Tag>
                           </>
                         )}
-                        {isNew && (
+                        {isNew && !isNewCave && (
                           <>
                             <Col flex="auto"></Col>
                             <Tag color="blue">New</Tag>

@@ -552,7 +552,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return maxCaveNumber.HasValue ? maxCaveNumber.Value + 1 : 1;
     }
 
-    public async Task<CaveVm?> GetCave(string caveId)
+    public async Task<CaveVm?> GetCave(string? caveId)
     {
         return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
             .Select(e => new CaveVm

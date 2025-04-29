@@ -149,23 +149,31 @@ export function formatBoolean(
   return value ? "Yes" : "No";
 }
 
+export function formatCoordinate(
+  coordinate: number | null | undefined | string
+): string | null {
+  if (coordinate === null || coordinate === undefined) {
+    return null;
+  }
+
+  const coord =
+    typeof coordinate === "string" ? parseFloat(coordinate) : coordinate;
+
+  if (isNaN(coord)) {
+    return null;
+  }
+
+  return `${coord}`;
+}
+
 export function formatCoordinates(
   latitude: number | null | undefined | string,
   longitude: number | null | undefined | string
 ): string | null {
-  if (
-    latitude === null ||
-    latitude === undefined ||
-    longitude === null ||
-    longitude === undefined
-  ) {
-    return null;
-  }
+  const lat = formatCoordinate(latitude);
+  const lon = formatCoordinate(longitude);
 
-  const lat = typeof latitude === "string" ? parseFloat(latitude) : latitude;
-  const lon = typeof longitude === "string" ? parseFloat(longitude) : longitude;
-
-  if (isNaN(lat) || isNaN(lon)) {
+  if (lat === null || lon === null) {
     return null;
   }
 

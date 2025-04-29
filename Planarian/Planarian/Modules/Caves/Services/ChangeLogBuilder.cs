@@ -11,8 +11,12 @@ public class ChangeLogBuilder
     private readonly string _caveId;
     private readonly string _changedByUserId;
     private readonly string _approvedByUserId;
+    private readonly string _changeRequestId;
+    
+    private readonly DateTime _now = DateTime.UtcNow;
 
-    public ChangeLogBuilder(string accountId, string caveId, string changedByUserId, string approvedByUserId)
+    public ChangeLogBuilder(string accountId, string caveId, string changedByUserId, string approvedByUserId,
+        string changeRequestId)
     {
         if (string.IsNullOrWhiteSpace(accountId))
             throw ApiExceptionDictionary.NoAccount;
@@ -21,6 +25,7 @@ public class ChangeLogBuilder
         _caveId = caveId;
         _changedByUserId = changedByUserId;
         _approvedByUserId = approvedByUserId;
+        _changeRequestId = changeRequestId;
     }
 
     public void AddStringFieldAsync(string propertyName, string? original, string? current, string? entranceId = null)
@@ -133,7 +138,8 @@ public class ChangeLogBuilder
             ChangeValueType.String,
             valueString: newName,
             originalValueString: origName,
-            entranceId: entranceId
+            entranceId: entranceId,
+            propertyId: currentId
         ));
     }
 
@@ -154,7 +160,8 @@ public class ChangeLogBuilder
                 propertyName,
                 ChangeValueType.String,
                 valueString: name,
-                entranceId: entranceId
+                entranceId: entranceId,
+                propertyId: id
             ));
         }
 
@@ -165,7 +172,8 @@ public class ChangeLogBuilder
                 propertyName,
                 ChangeValueType.String,
                 originalValueString: name,
-                entranceId: entranceId
+                entranceId: entranceId,
+                propertyId: id
             ));
         }
     }
@@ -182,6 +190,7 @@ public class ChangeLogBuilder
         double? originalValueDouble = null,
         DateTime? originalValueDateTime = null,
         bool? originalValueBool = null,
+        string? propertyId = null,
         string? entranceId = null, string? changeType = null)
     { 
         changeType ??= DetermineChangeType(
@@ -211,6 +220,7 @@ public class ChangeLogBuilder
             EntranceId = entranceId,
             ChangedByUserId = _changedByUserId,
             ApprovedByUserId = _approvedByUserId,
+            CaveChangeRequestId = _changeRequestId,
             PropertyName = propertyName,
             ChangeValueType = changeValueType,
             ValueString = valueString,
@@ -218,7 +228,9 @@ public class ChangeLogBuilder
             ValueDouble = valueDouble,
             ValueDateTime = valueDateTime,
             ValueBool = valueBool,
-            ChangeType = changeType
+            ChangeType = changeType,
+            PropertyId = propertyId,
+            CreatedOn = _now
         };
     }
 
@@ -260,11 +272,7 @@ public class ChangeLogBuilder
         if (!value.IsValidId()) return value;
 
         var lookupResult = await lookup(value);
-        return !string.IsNullOrWhiteSpace(lookupResult)
-            ? lookupResult
-            :
-            // if the id is not a valid id then we assume that this is a new user created value which should be the human-readable.
-            value;
+        return lookupResult;
     }
 
     public void AddRemoveEntranceLog(string removedEntranceId)
@@ -283,9 +291,7 @@ public class ChangeLogBuilder
         _changes.Add(CreateLog(
                 propertyName: CaveLogPropertyNames.Entrance,
                 changeValueType: ChangeValueType.Entrance,
-                changeType: ChangeType.Add,
-                entranceId: addedEntranceId
-            )
+                entranceId: addedEntranceId, changeType: ChangeType.Add)
         );
     }
 

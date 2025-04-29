@@ -63,6 +63,9 @@ export enum CaveLogPropertyName {
   OtherTagName = "OtherTagName",
 
   EntranceName = "EntranceName",
+  EntranceLatitude = "EntranceLatitude",
+  EntranceLongitude = "EntranceLongitude",
+  EntranceElevationFeet = "EntranceElevationFeet",
   EntranceDescription = "EntranceDescription",
   EntranceIsPrimary = "EntranceIsPrimary",
   EntranceLocationQualityTagName = "EntranceLocationQualityTagName",
