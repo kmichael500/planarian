@@ -29,15 +29,15 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
     }
   });
 
+  if (!isLoading && props.showName) {
+    return <>{usersName?.name}</>;
+  }
+
   return (
     <Spin spinning={isLoading}>
       {usersName !== undefined && (
         <>
-          {props.showName && (
-            <>
-              <Text style={{ marginLeft: 8 }}>{usersName.name}</Text>
-            </>
-          )}
+          {props.showName && usersName.name}
           {!props.showName && (
             <Tooltip title={usersName.name} placement="top">
               <Avatar src={usersName.profilePhotoUrl} size={props.size}>

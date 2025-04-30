@@ -3,7 +3,7 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Models;
 
-public class CaveChangeLogVm
+public class CaveHistoryRecord
 {
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? EntranceId { get; set; }
@@ -14,6 +14,7 @@ public class CaveChangeLogVm
 
 
     [MaxLength(PropertyLength.Key)] public string PropertyName { get; set; } = null!;
+    public string? PropertyId { get; set; }
 
     [MaxLength(PropertyLength.Key)] public string ChangeType { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string ChangeValueType { get; set; } = null!;
@@ -24,4 +25,9 @@ public class CaveChangeLogVm
     public bool? ValueBool { get; set; }
     public DateTime? ValueDateTime { get; set; }
     public DateTime CreatedOn { get; set; }
+}
+
+public class CaveHistoryRequest
+{
+    
 }

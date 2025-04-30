@@ -38,7 +38,7 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { AddEntranceVm } from "../Models/AddEntranceVm";
 import { FileVm } from "../../Files/Models/FileVm";
 import {
-  CaveChangeLogVm,
+  CaveHistoryRecord,
   CaveLogPropertyName,
 } from "../Models/ProposedChangeRequestVm";
 import React from "react";
@@ -52,7 +52,7 @@ export interface CaveReviewComponentProps {
   cave?: AddCaveVm;
   originalCave?: AddCaveVm;
   isLoading: boolean;
-  changes?: CaveChangeLogVm[];
+  changes?: CaveHistoryRecord[];
 }
 
 const generateTags = (tagIds: string[] | undefined) => {
@@ -532,7 +532,7 @@ const CaveReviewComponent = ({
               onClick={() => setShowNarrativeDiff((p) => !p)}
               icon={undefined}
             >
-              {showNarrativeDiff ? "Hide Diff" : "Show Diff"}
+              {showNarrativeDiff ? "Hide Difference" : "Show Difference"}
             </PlanarianButton>
           ) : null
         }

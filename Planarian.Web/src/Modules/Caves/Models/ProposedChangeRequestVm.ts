@@ -4,10 +4,10 @@ export interface ProposedChangeRequestVm {
   id: string;
   cave: AddCaveVm;
   originalCave: AddCaveVm;
-  changes: CaveChangeLogVm[];
+  changes: CaveHistoryRecord[];
 }
 
-export interface CaveChangeLogVm {
+export interface CaveHistoryRecord {
   caveId: string;
   entranceId: string | null;
   entranceName: string | null;
@@ -75,8 +75,40 @@ export enum CaveLogPropertyName {
   EntranceHydrologyTagName = "EntranceHydrologyTagName",
   EntranceFieldIndicationTagName = "EntranceFieldIndicationTagName",
   EntranceReportedByNameTagName = "EntranceReportedByNameTagName",
-  EntranceOtherTagName = "EntranceOtherTagName",
 
   Entrance = "Entrance",
   Cave = "Cave",
+}
+
+export interface CaveHistory {
+  changedByUserId: string | null;
+  approvedByUserId: string | null;
+  submittedOn: string;
+  reviewedOn: string | null;
+  caveHistoryDetails: HistoryDetail[];
+  entranceHistorySummary: EntranceHistorySummary[];
+  records: CaveHistoryRecord[];
+}
+
+export interface HistoryDetail {
+  propertyName: CaveLogPropertyName;
+  valueStrings: string[];
+  valueString: string | null;
+  valueInt: number | null;
+  valueDouble: number | null;
+  valueBool: boolean | null;
+  valueDateTime: string | null;
+  previousValueStrings: string[];
+  previousValueString: string | null;
+  previousValueInt: number | null;
+  previousValueDouble: number | null;
+  previousValueBool: boolean | null;
+  previousValueDateTime: string | null;
+}
+
+export interface EntranceHistorySummary {
+  entranceName: string;
+  entranceId: string;
+  details: HistoryDetail[];
+  changeType: ChangeType;
 }

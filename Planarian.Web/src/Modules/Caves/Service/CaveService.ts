@@ -22,7 +22,8 @@ import {
   ChangesForReviewVm,
 } from "../Models/ProposeChangeRequestVm";
 import {
-  CaveChangeLogVm,
+  CaveHistory,
+  CaveHistoryRecord,
   ProposedChangeRequestVm,
 } from "../Models/ProposedChangeRequestVm";
 import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
@@ -74,8 +75,8 @@ const CaveService = {
 
     return cave;
   },
-  async GetCaveHistory(id: string): Promise<CaveChangeLogVm[]> {
-    const response = await HttpClient.get<CaveChangeLogVm[]>(
+  async GetCaveHistory(id: string): Promise<CaveHistory[]> {
+    const response = await HttpClient.get<CaveHistory[]>(
       `${baseUrl}/${id}/history`
     );
     return response.data;

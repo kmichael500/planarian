@@ -204,3 +204,11 @@ export function capitalizeFirstLetter(
   if (isNullOrWhiteSpace(input)) return "";
   return input.charAt(0).toUpperCase() + input.slice(1);
 }
+
+export function toCommaString(input: string[] | null | undefined): string {
+  if (input == null || input.length < 1) return "";
+  if (input.length === 1) return input[0];
+  if (input.length === 2) return `${input[0]} and ${input[1]}`;
+  const lastItem = input.pop();
+  return `${input.join(", ")}, and ${lastItem}`;
+}

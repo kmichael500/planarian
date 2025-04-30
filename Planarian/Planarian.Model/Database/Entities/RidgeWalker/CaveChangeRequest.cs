@@ -23,6 +23,7 @@ public class CaveChangeRequest : EntityBase
     [MaxLength(PropertyLength.LargeText)] public string? Notes { get; set; }
     [MaxLength(PropertyLength.Key)] public string Status { get; set; } = ChangeRequestStatus.Pending;
     public DateTime? ReviewedOn { get; set; }
+    public bool? IsApproved { get; set; }
     public Account Account { get; set; } = null!;
     public Cave Cave { get; set; } = null!;
     public User ReviewedByUser { get; set; } = null!;

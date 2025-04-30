@@ -9,6 +9,6 @@ public class ProposedChangeRequestVm
 {
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } 
     public AddCave Cave { get; set; } = null!;
-    public IEnumerable<CaveChangeLogVm> Changes { get; set; }
+    public IEnumerable<CaveHistoryRecord> Changes { get; set; }
     public CaveVm? OriginalCave { get; set; }
 }

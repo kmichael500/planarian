@@ -807,22 +807,106 @@ public partial class CaveService : ServiceBase<CaveRepository>
         return cave;
     }
 
-    public async Task<IEnumerable<CaveChangeLogVm>> GetCaveHistory(string caveId,
+    public async Task<IEnumerable<CaveHistory>> GetCaveHistory(string caveId,
         CancellationToken cancellationToken)
     {
-        var results = (await _caveChangeLogRepository.GetCaveHistory(caveId, cancellationToken)).ToList();
+        var caveHistorySummaries = (await _caveChangeLogRepository.GetCaveHistory(caveId, cancellationToken)).ToList();
 
-        foreach (var result in results)
+        var entireHistory =
+            caveHistorySummaries
+                .SelectMany(e => e.Records)
+                .OrderByDescending(e => e.CreatedOn)
+                .ToList();
+        
+        foreach (var historySummary in caveHistorySummaries)
         {
-            if (string.IsNullOrWhiteSpace(result.EntranceId)) continue;
+            var entranceHistorySummary = new List<EntranceHistorySummary>();
+            var caveHistoryDetails = new List<HistoryDetail>();
             
-            result.EntranceName = GetEntranceName(result.EntranceId, results, result.CreatedOn);
+            // there can be multiple add, delete, etc. For the same change history, we only want to process once
+            var listsAlreadyProcessed = new List<string>();
+            
+            foreach (var record in historySummary.Records)
+            {
+                var previousRecord = GetPreviousRecord(entireHistory, record.PropertyName, record.EntranceId, record.CreatedOn);
+                var historyDetail = new HistoryDetail
+                {
+                    PropertyName = record.PropertyName,
+                    ValueString = record.ValueString,
+                    ValueInt = record.ValueInt,
+                    ValueDouble = record.ValueDouble,
+                    ValueBool = record.ValueBool,
+                    ValueDateTime = record.ValueDateTime,
+                    PreviousValueString = previousRecord?.ValueString,
+                    PreviousValueInt = previousRecord?.ValueInt,
+                    PreviousValueDouble = previousRecord?.ValueDouble,
+                    PreviousValueBool = previousRecord?.ValueBool,
+                    PreviousValueDateTime = previousRecord?.ValueDateTime
+                };
+                switch (record.PropertyName)
+                {
+                    case CaveLogPropertyNames.AlternateNames:
+                    case CaveLogPropertyNames.GeologyTagName:
+                    case CaveLogPropertyNames.MapStatusTagName:
+                    case CaveLogPropertyNames.GeologicAgeTagName:
+                    case CaveLogPropertyNames.PhysiographicProvinceTagName:
+                    case CaveLogPropertyNames.BiologyTagName:
+                    case CaveLogPropertyNames.ArcheologyTagName:
+                    case CaveLogPropertyNames.CartographerNameTagName:
+                    case CaveLogPropertyNames.ReportedByNameTagName:
+                    case CaveLogPropertyNames.OtherTagName:
+                    case CaveLogPropertyNames.EntranceHydrologyTagName:
+                    case CaveLogPropertyNames.EntranceFieldIndicationTagName:
+                    case CaveLogPropertyNames.EntranceReportedByNameTagName:
+                        if (listsAlreadyProcessed.Contains(record.PropertyName)) continue;
+                        
+                        var current = GetListAtDateTime(entireHistory, record.PropertyName, record.CreatedOn);
+                        var previousAlternateNames = previousRecord != null
+                            ? GetListAtDateTime(entireHistory, record.PropertyName, previousRecord.CreatedOn)
+                            : [];
+                        historyDetail.ValueStrings = current.ToList();
+                        historyDetail.PreviousValueStrings = previousAlternateNames.ToList();
+                        
+                        listsAlreadyProcessed.Add(record.PropertyName);
+                        break;
+                }
+                if (!string.IsNullOrWhiteSpace(record.EntranceId))
+                {
+                    var entrance =
+                        entranceHistorySummary.FirstOrDefault(e => e.EntranceId == record.EntranceId);
+                    var entranceInList = entrance != null;
+                    entrance ??= new EntranceHistorySummary
+                    {
+                        EntranceName = GetEntranceName(record.EntranceId, entireHistory,
+                            record.CreatedOn),
+                        EntranceId = record.EntranceId,
+                        ChangeType = ChangeType.Update,
+                    };
+                    
+                    if(record.PropertyName == CaveLogPropertyNames.Entrance)
+                    {
+                        entrance.ChangeType = record.ChangeType;
+                    }
+                    entrance.Details = entrance.Details.Append(historyDetail);
+
+                    if (!entranceInList)
+                    {
+                        entranceHistorySummary.Add(entrance);
+                    }
+                    continue;
+                }
+                caveHistoryDetails.Add(historyDetail);
+            }
+            
+            historySummary.CaveHistoryDetails = caveHistoryDetails;
+            historySummary.EntranceHistorySummary = entranceHistorySummary;
         }
 
-        return results;
+        return caveHistorySummaries;
     }
 
-    private string GetEntranceName(string entranceId, IEnumerable<CaveChangeLogVm> changeLogs, DateTime dateTime)
+    
+    private string GetEntranceName(string entranceId, IEnumerable<CaveHistoryRecord> changeLogs, DateTime dateTime)
     {
         // materialize once so we don't re‐enumerate
         var logs = changeLogs.ToList();
@@ -848,10 +932,11 @@ public partial class CaveService : ServiceBase<CaveRepository>
         // 3) Remove any that were deleted on or before dateTime
         var deletedIds = logs
             .Where(e =>
-                e.PropertyName == CaveLogPropertyNames.Entrance
-                && e.ChangeValueType == ChangeValueType.Entrance
-                && e.ChangeType == ChangeType.Delete
-                && e.EntranceId != null
+                e is
+                {
+                    PropertyName: CaveLogPropertyNames.Entrance, ChangeValueType: ChangeValueType.Entrance,
+                    ChangeType: ChangeType.Delete, EntranceId: not null
+                }
                 && e.CreatedOn <= dateTime)
             .Select(e => e.EntranceId!)
             .Distinct();
@@ -879,10 +964,62 @@ public partial class CaveService : ServiceBase<CaveRepository>
         // 5) Return the 1-based position (or empty if missing)
         var idx = orderedIds.IndexOf(entranceId);
         return idx >= 0
-            ? (idx + 1).ToString()
+            ? $"Entrance {(idx + 1)}".ToString()
             : string.Empty;
     }
 
+    private IEnumerable<string?> GetListAtDateTime(
+        IEnumerable<CaveHistoryRecord> changeLogs,
+        string? propertyName,
+        DateTime dateTime)
+    {
+        var changeLogsAtDateTime = changeLogs.Where(e => e.PropertyName == propertyName && e.CreatedOn <= dateTime)
+            .OrderBy(e => e.CreatedOn)
+            .ThenBy(e => e.ChangeType switch
+            {
+                ChangeType.Add => 1,
+                ChangeType.Update => 2,
+                ChangeType.Delete => 3,
+                _ => 4
+            }).ToList();
+
+        var values = new List<(string? Id, string? Value)>();
+        foreach (var log in changeLogsAtDateTime)
+        {
+
+            var value = values.FirstOrDefault(e => e.Id == log.PropertyId);
+
+            switch (log.ChangeType)
+            {
+                case ChangeType.Add:
+                    values.Add((log.PropertyId, log.ValueString));
+                    break;
+                case ChangeType.Update:
+                {
+                    values.Remove(value);
+                    values.Add((log.PropertyId, log.ValueString));
+                    break;
+                }
+                case ChangeType.Delete:
+                    values.Remove(value);
+                    break;
+            }
+        }
+
+        return values.Select(e => e.Value);
+    }
+
+    private CaveHistoryRecord? GetPreviousRecord(IEnumerable<CaveHistoryRecord> changeLogs,
+        string propertyName,
+        string? entranceId,
+        DateTime dateTime)
+    {
+        var changeLogsAtDateTime = changeLogs.Where(e => e.PropertyName == propertyName && e.EntranceId == entranceId && e.CreatedOn < dateTime)
+            .OrderByDescending(e => e.CreatedOn)
+            .ToList();
+
+        return changeLogsAtDateTime.FirstOrDefault();
+    }
 
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
         IDbContextTransaction? transaction = null)

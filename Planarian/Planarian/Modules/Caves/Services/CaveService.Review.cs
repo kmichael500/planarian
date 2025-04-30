@@ -223,9 +223,9 @@ public partial class CaveService
         return result;
     }
 
-    private async Task<IEnumerable<CaveChangeLogVm>> ToChangeLogVm(IEnumerable<CaveChangeHistory> changes)
+    private async Task<IEnumerable<CaveHistoryRecord>> ToChangeLogVm(IEnumerable<CaveChangeHistory> changes)
     {
-        var result = changes.Select(e => new CaveChangeLogVm
+        var result = changes.Select(e => new CaveHistoryRecord
         {
             CaveId = e.CaveId,
             EntranceId = e.EntranceId,

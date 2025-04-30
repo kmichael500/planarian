@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Services;
@@ -65,7 +66,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     }
     
     [HttpGet("{caveId:length(10)}/history")]
-    public async Task<ActionResult<CaveVm>> GetCaveHistory(string caveId, CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<CaveHistory>>> GetCaveHistory(string caveId, CancellationToken cancellationToken)
     {
         var cave = await Service.GetCaveHistory(caveId, cancellationToken);
 
