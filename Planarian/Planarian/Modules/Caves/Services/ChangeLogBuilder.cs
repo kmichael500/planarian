@@ -8,14 +8,14 @@ public class ChangeLogBuilder
 {
     private readonly List<CaveChangeHistory> _changes = [];
     private readonly string _accountId;
-    private readonly string _caveId;
+    private readonly string? _caveId;
     private readonly string _changedByUserId;
     private readonly string _approvedByUserId;
     private readonly string _changeRequestId;
     
     private readonly DateTime _now = DateTime.UtcNow;
 
-    public ChangeLogBuilder(string accountId, string caveId, string changedByUserId, string approvedByUserId,
+    public ChangeLogBuilder(string accountId, string? caveId, string changedByUserId, string approvedByUserId,
         string changeRequestId)
     {
         if (string.IsNullOrWhiteSpace(accountId))
@@ -138,16 +138,13 @@ public class ChangeLogBuilder
             ChangeValueType.String,
             valueString: newName,
             originalValueString: origName,
-            entranceId: entranceId,
-            propertyId: currentId
-        ));
+            propertyId: currentId, entranceId: entranceId));
     }
 
-    public async Task AddNamedArrayFieldAsync(
-        string propertyName,
+    public async Task AddNamedArrayFieldAsync(string propertyName,
         IEnumerable<string>? originalIds,
         IEnumerable<string>? currentIds,
-        Func<string, Task<string?>> lookup, string? entranceId = null)
+        Func<string, Task<string?>> lookup, string? entranceId = null, string? overrideCaveId = null)
     {
         var (added, removed) = DiffStringArrays(originalIds ?? [], currentIds ?? []);
 
@@ -160,9 +157,9 @@ public class ChangeLogBuilder
                 propertyName,
                 ChangeValueType.String,
                 valueString: name,
-                entranceId: entranceId,
-                propertyId: id
-            ));
+                propertyId: id, entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
         }
 
         foreach (var id in removed)
@@ -172,9 +169,9 @@ public class ChangeLogBuilder
                 propertyName,
                 ChangeValueType.String,
                 originalValueString: name,
-                entranceId: entranceId,
-                propertyId: id
-            ));
+                propertyId: id, entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
         }
     }
 
@@ -191,7 +188,7 @@ public class ChangeLogBuilder
         DateTime? originalValueDateTime = null,
         bool? originalValueBool = null,
         string? propertyId = null,
-        string? entranceId = null, string? changeType = null)
+        string? entranceId = null, string? changeType = null, string? overrideCaveId = null)
     { 
         changeType ??= DetermineChangeType(
             original: changeValueType switch
@@ -213,10 +210,10 @@ public class ChangeLogBuilder
                 _ => null
             });
 
-        return new CaveChangeHistory
+        var record = new CaveChangeHistory
         {
             AccountId = _accountId,
-            CaveId = _caveId,
+            CaveId = overrideCaveId ?? _caveId,
             EntranceId = entranceId,
             ChangedByUserId = _changedByUserId,
             ApprovedByUserId = _approvedByUserId,
@@ -232,6 +229,14 @@ public class ChangeLogBuilder
             PropertyId = propertyId,
             CreatedOn = _now
         };
+
+        if (changeValueType == ChangeValueType.Entrance && entranceId.IsNullOrWhiteSpace())
+        {
+            throw new ArgumentNullException(nameof(entranceId),
+                "EntranceId must be provided for ChangeValueType.Entrance");
+        }
+
+        return record;
     }
 
     private static string DetermineChangeType(object? original, object? current)

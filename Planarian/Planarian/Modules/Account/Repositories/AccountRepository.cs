@@ -4,12 +4,15 @@ using LinqToDB.EntityFrameworkCore;
 using LinqToDB.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Model;
+using Planarian.Modules.Caves.Services;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
@@ -433,8 +436,34 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,
         CancellationToken cancellationToken)
     {
+        if (RequestUser.AccountId.IsNullOrWhiteSpace())
+        {
+            throw ApiExceptionDictionary.NotFound("Account");
+        }
         var dbTransaction = await BeginTransactionAsync(cancellationToken);
 
+        var mergeRequest = new CaveChangeRequest
+        {
+            AccountId        = RequestUser.AccountId,
+            Type             = ChangeRequestType.Merge,
+            Status           = ChangeRequestStatus.Approved,
+            ReviewedOn = DateTime.UtcNow,
+            CaveId           = null,               
+            ReviewedByUserId = RequestUser.Id,
+            Notes            = null
+        };
+        
+        Add(mergeRequest);
+        await SaveChangesAsync(cancellationToken);
+        
+        var builder = new ChangeLogBuilder(
+            accountId:        RequestUser.AccountId,
+            caveId:           null,
+            changedByUserId:  RequestUser.Id,
+            approvedByUserId: RequestUser.Id,
+            changeRequestId:  mergeRequest.Id
+        );
+        
         try
         {
             var destinationTagType = await DbContext.TagTypes
@@ -445,6 +474,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             {
                 throw ApiExceptionDictionary.NotFound("Destination tag type");
             }
+            
+            var destinationTagName = destinationTagType.Name;
 
             var destinationTagTypeKey = destinationTagType.Key;
 
@@ -453,125 +484,181 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             foreach (var sourceTagTypeId in tagTypeIds)
             {
                 if (sourceTagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
-                
+
+
                 var sourceTagType = await DbContext.TagTypes
                     .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
                     .FirstOrDefaultAsyncEF(cancellationToken);
-                
+
                 if (sourceTagType == null)
                 {
                     throw ApiExceptionDictionary.NotFound("Source tag type");
                 }
-                
+
+                var sourceTagName = sourceTagType.Name;
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 #region Cave Tags
-                
+
                 if (TagTypeKeyConstant.Archeology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.ArcheologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.ArcheologyTagName, sourceTagName, destinationTagName, builder,
+                        e => e.CaveId, null);
                     await MergeTags<ArcheologyTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.ArcheologyTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.Biology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.BiologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken, CaveLogPropertyNames.BiologyTagName,
+                        sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<BiologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.BiologyTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.People.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.CartographerNameTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId, 
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId, 
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.CartographerNameTagName, sourceTagName, destinationTagName, builder,
+                        e => e.CaveId, null);
+
+                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId,
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.ReportedByNameTagName, sourceTagName, destinationTagName, builder,
+                        e => e.CaveId, null);
+
+                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags,
+                        tag => tag.TagTypeId,
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.EntranceReportedByNameTagName, sourceTagName, destinationTagName, builder,
+                        e => e.Entrance.CaveId, e => e.EntranceId);
+
                     await MergeTags<CartographerNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.CartographerNameTagName, sourceTagName, destinationTagName, builder);
                     await MergeTags<CaveReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.ReportedByNameTagName, sourceTagName, destinationTagName, builder);
                     await MergeTags<EntranceReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
+                        e => e.EntranceId, CaveLogPropertyNames.EntranceReportedByNameTagName, sourceTagName,
+                        destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.CaveOther.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.CaveOtherTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken, CaveLogPropertyNames.OtherTagName,
+                        sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<CaveOtherTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.OtherTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.File.Equals(destinationTagTypeKey))
                 {
                     // we do not delete duplicate file tags because each file can only have one tag. it would remove the file in some cases
                     await MergeTags<File>(sourceTagTypeId, destinationTagTypeId, e => e.FileTypeTagId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId!, null, CaveLogPropertyNames.File,
+                        sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.GeologicAge.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.GeologicAgeTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.GeologicAgeTagName, sourceTagName, destinationTagName, builder,
+                        e => e.CaveId, null);
                     await MergeTags<GeologicAgeTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.GeologicAgeTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.Geology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.GeologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken, CaveLogPropertyNames.GeologyTagName,
+                        sourceTagName, destinationTagName, builder, e => e.CaveId, null);
+
                     await MergeTags<GeologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.GeologyTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.MapStatus.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.MapStatusTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken, CaveLogPropertyNames.MapStatusTagName,
+                        sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<MapStatusTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.MapStatusTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.PhysiographicProvince.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.PhysiographicProvinceTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.PhysiographicProvinceTagName, sourceTagName, destinationTagName, builder,
+                        e => e.CaveId, null);
                     await MergeTags<PhysiographicProvinceTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
+                        CaveLogPropertyNames.PhysiographicProvinceTagName, sourceTagName, destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.LocationQuality.Equals(destinationTagTypeKey))
                 {
                     // we do not delete duplicate location quality tags because each entrance can only have one tag. it would remove the entrance in some cases
                     await MergeTags<Entrance>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.LocationQualityTagId, e => e.Cave!.AccountId, cancellationToken);
+                        e => e.LocationQualityTagId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId,
+                        e => e.Id, CaveLogPropertyNames.EntranceLocationQualityTagName, sourceTagName,
+                        destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.EntranceHydrology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceHydrologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.EntranceHydrologyTagName, sourceTagName, destinationTagName, builder,
+                        e => e.Entrance.CaveId, e => e.EntranceId);
                     await MergeTags<EntranceHydrologyTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
+                        e => e.EntranceId, CaveLogPropertyNames.EntranceHydrologyTagName, sourceTagName,
+                        destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.EntranceStatus.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceStatusTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.EntranceStatusTagName, sourceTagName, destinationTagName, builder,
+                        e => e.Entrance.CaveId, e => e.EntranceId);
                     await MergeTags<EntranceStatusTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
+                        e => e.EntranceId, CaveLogPropertyNames.EntranceStatusTagName, sourceTagName,
+                        destinationTagName, builder);
                 }
                 else if (TagTypeKeyConstant.FieldIndication.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(entrancesParentSet, e => e.FieldIndicationTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
+                        sourceTagTypeId, destinationTagTypeId, cancellationToken,
+                        CaveLogPropertyNames.EntranceFieldIndicationTagName, sourceTagName, destinationTagName, builder,
+                        e => e.Entrance.CaveId, e => e.EntranceId);
                     await MergeTags<FieldIndicationTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
+                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
+                        e => e.EntranceId, CaveLogPropertyNames.EntranceFieldIndicationTagName, sourceTagName,
+                        destinationTagName, builder);
                 }
 
                 #endregion
             }
+
+            var changeLogs = builder.Build();
+            foreach (var changeLog in changeLogs)
+            {
+                changeLog.Id = IdGenerator.Generate();
+                changeLog.CreatedByUserId = RequestUser.Id;
+            }
+
+            await BulkInsertAsync(changeLogs, cancellationToken: cancellationToken);
 
             await DbContext.SaveChangesAsync(cancellationToken);
             await dbTransaction.CommitAsync(cancellationToken);
@@ -587,12 +674,54 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         string destinationTagTypeId,
         Expression<Func<T, string>> tagTypeSelector,
         Expression<Func<T, string>> accountIdSelector,
-        CancellationToken cancellationToken) where T : class
+        CancellationToken cancellationToken, Expression<Func<T, string>> caveIdSelector,
+        Expression<Func<T, string>>? entranceIdSelector, string caveLogPropertyName, string? sourceTagName,
+        string? destinationTagName, ChangeLogBuilder builder) where T : class
     {
         // Update the source tags to the destination type.
         var tags = DbContext.Set<T>()
             .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
             .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
+
+        string cavePropName;
+        string? entrancePropName = null;
+        if (caveIdSelector.Body is MemberExpression caveMember)
+        {
+            cavePropName = caveMember.Member.Name;
+        }
+        else
+        {
+            throw new ArgumentException("caveIdSelector must be a member access expression.",
+                nameof(caveIdSelector));
+        }
+        
+        if (entranceIdSelector?.Body is MemberExpression entMember)
+            entrancePropName = entMember.Member.Name;
+
+        var affectedTags = await tags
+            .Select(tag => new {
+                CaveId =  EF.Property<string>(tag, cavePropName),
+                EntranceId = entrancePropName != null
+                    ? EF.Property<string?>(tag, entrancePropName)
+                    : null
+            })
+            .ToListAsyncEF(cancellationToken);
+
+        var tagTypeNames = new Dictionary<string, string?>
+        {
+            { sourceTagTypeId, sourceTagName },
+            { destinationTagTypeId, destinationTagName }
+        };
+
+        Task<string?> Lookup(string id) => Task.FromResult(tagTypeNames.GetValueOrDefault(id));
+
+        foreach (var affectedTag in affectedTags)
+        {
+            await builder.AddNamedArrayFieldAsync(caveLogPropertyName,
+                originalIds: new[] { sourceTagTypeId },
+                currentIds: new[] { destinationTagTypeId },
+                lookup: Lookup, entranceId: affectedTag.EntranceId, overrideCaveId: affectedTag.CaveId);
+        }
 
         await tags
             .IgnoreQueryFilters()
@@ -604,12 +733,15 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         Expression<Func<TTag, string>> tagTypeIdSelector,
         string sourceTagTypeId,
         string destinationTagTypeId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string caveLogPropertyName, string? sourceTagName,
+        string? destinationTagName,
+        ChangeLogBuilder changeLogBuilder, Expression<Func<TTag, string>> caveIdSelector,
+        Expression<Func<TTag, string>>? entranceIdSelector)
         where TEntity : class
         where TTag : class
     {
         // Extract the collection property name.
-        if (!(tagCollectionSelector.Body is MemberExpression memberExpression))
+        if (tagCollectionSelector.Body is not MemberExpression memberExpression)
         {
             throw new ArgumentException("tagCollectionSelector must be a member access expression.",
                 nameof(tagCollectionSelector));
@@ -618,7 +750,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         var collectionPropertyName = memberExpression.Member.Name;
 
         // Extract the tag type property name.
-        if (!(tagTypeIdSelector.Body is MemberExpression tagMemberExpression))
+        if (tagTypeIdSelector.Body is not MemberExpression tagMemberExpression)
         {
             throw new ArgumentException("tagTypeIdSelector must be a member access expression.",
                 nameof(tagTypeIdSelector));
@@ -636,6 +768,47 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             )
             .SelectMany(e => EF.Property<IEnumerable<TTag>>(e, collectionPropertyName))
             .Where(tag => EF.Property<string>(tag, tagTypeIdPropertyName) == sourceTagTypeId);
+
+
+        string cavePropName;
+        string? entrancePropName = null;
+        if (caveIdSelector.Body is MemberExpression caveMember)
+        {
+            cavePropName = caveMember.Member.Name;
+        }
+        else
+        {
+            throw new ArgumentException("caveIdSelector must be a member access expression.",
+                nameof(caveIdSelector));
+        }
+        
+        if (entranceIdSelector?.Body is MemberExpression entMember)
+            entrancePropName = entMember.Member.Name;
+
+        var deletedCaves = await query
+            .Select(tag => new {
+                CaveId =  EF.Property<string>(tag, cavePropName),
+                EntranceId = entrancePropName != null
+                    ? EF.Property<string?>(tag, entrancePropName)
+                    : null
+            })
+            .ToListAsyncEF(cancellationToken);
+
+        var tagTypeNames = new Dictionary<string, string?>
+        {
+            { sourceTagTypeId, sourceTagName },
+            { destinationTagTypeId, destinationTagName }
+        };
+
+        Task<string?> Lookup(string id) => Task.FromResult(tagTypeNames.GetValueOrDefault(id));
+            
+        foreach (var toDelete in deletedCaves)
+        {
+            await changeLogBuilder.AddNamedArrayFieldAsync(caveLogPropertyName,
+                originalIds: new[] { sourceTagTypeId, destinationTagTypeId },
+                currentIds: new[] { destinationTagTypeId },
+                lookup: Lookup, entranceId: toDelete.EntranceId, overrideCaveId: toDelete.CaveId);
+        }
 
         // Execute the deletion of duplicate (source) tags.
         await query.ExecuteDeleteAsync(cancellationToken);

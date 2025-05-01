@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Timeline, Spin, Tag } from "antd";
+import { Timeline, Spin, Tag, Typography } from "antd";
 import { CaveService } from "../Service/CaveService";
 import {
   CaveHistory,
   HistoryDetail,
-  EntranceHistorySummary,
   CaveLogPropertyName,
   ChangeType,
 } from "../Models/ProposedChangeRequestVm";
@@ -21,7 +20,10 @@ import {
   formatDate,
 } from "../../../Shared/Helpers/StringHelpers";
 import { UserAvatarComponent } from "../../User/Componenets/UserAvatarComponent";
+import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { ChangeRequestType } from "../Models/ChangeRequestType";
 
 // ——— display‐name mapping ———
 const getDisplayName = (propertyName: string): string => {
@@ -122,28 +124,49 @@ const getChangeTypeDisplay = (t: ChangeType): string => {
   }
 };
 
-// Explicitly handle every property
-// Helper function that can handle React nodes
-const defaultIfEmptyNode = (
-  value: string | null | React.ReactNode
-): React.ReactNode => {
-  if (
-    value === null ||
-    value === undefined ||
-    (typeof value === "string" && isNullOrWhiteSpace(value))
-  ) {
-    return "-";
-  } else {
-    return value;
+const ExpandableNarrative: React.FC<{
+  text: string | undefined;
+  style?: React.CSSProperties;
+}> = ({ text, style }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!text) {
+    return null;
   }
+
+  const isLongText = text.length > 500;
+  const displayedText =
+    expanded || !isLongText ? text : text.slice(0, 500) + "...";
+
+  return (
+    <div>
+      <ParagraphDisplayComponent
+        text={displayedText}
+        style={{ margin: 0, ...style }}
+      />
+      {isLongText && (
+        <PlanarianButton
+          style={{ padding: 0 }}
+          onClick={() => setExpanded(!expanded)}
+          alwaysShowChildren
+          type="link"
+          icon={undefined}
+        >
+          {expanded ? "Show Less" : "Show More"}
+        </PlanarianButton>
+      )}
+    </div>
+  );
 };
 
-const renderDetail = (d: HistoryDetail): JSX.Element => {
+// Explicitly handle every property
+const renderDetail = (d: HistoryDetail) => {
   let newValRaw: string | null | React.ReactNode = null;
   let prevValRaw: string | null | React.ReactNode = null;
 
+  let showProperty = true;
+
   switch (d.propertyName) {
-    // --- Cave-level fields ---
     case CaveLogPropertyName.Name:
     case CaveLogPropertyName.CountyName:
     case CaveLogPropertyName.StateName:
@@ -163,19 +186,20 @@ const renderDetail = (d: HistoryDetail): JSX.Element => {
     case CaveLogPropertyName.LengthFeet:
     case CaveLogPropertyName.DepthFeet:
     case CaveLogPropertyName.MaxPitDepthFeet:
-      newValRaw = formatDistance(
-        d.valueDouble ?? d.valueInt ?? undefined,
-        DistanceFormat.feet
-      );
+      newValRaw = formatDistance(d.valueDouble ?? d.valueInt ?? undefined);
       prevValRaw = formatDistance(
-        d.previousValueDouble ?? d.previousValueInt ?? undefined,
-        DistanceFormat.feet
+        d.previousValueDouble ?? d.previousValueInt ?? undefined
       );
       break;
 
     case CaveLogPropertyName.Narrative:
-      newValRaw = d.valueString;
-      prevValRaw = d.previousValueString;
+      newValRaw = <ExpandableNarrative text={d.valueString || undefined} />;
+      prevValRaw = d.previousValueString ? (
+        <ExpandableNarrative
+          text={d.previousValueString || undefined}
+          style={{ color: "#888" }}
+        />
+      ) : null;
       break;
 
     case CaveLogPropertyName.NumberOfPits:
@@ -230,40 +254,105 @@ const renderDetail = (d: HistoryDetail): JSX.Element => {
     case CaveLogPropertyName.EntranceHydrologyTagName:
     case CaveLogPropertyName.EntranceFieldIndicationTagName:
     case CaveLogPropertyName.EntranceReportedByNameTagName:
-      const newVal = defaultIfEmptyNode(newValRaw);
-      const showPrev =
-        prevValRaw !== null &&
-        prevValRaw !== undefined &&
-        prevValRaw !== newValRaw;
-      const prevVal = showPrev ? defaultIfEmptyNode(prevValRaw) : null;
+      newValRaw = toCommaString(d.valueStrings) ?? null;
+      prevValRaw = toCommaString(d.previousValueStrings) ?? null;
+      if (d.propertyName === CaveLogPropertyName.GeologyTagName) {
+        console.log("New Value: ", newValRaw);
+        console.log("Previous Value: ", prevValRaw);
+      }
+      break;
+
+    case CaveLogPropertyName.Entrance:
+      showProperty = false;
+      break;
 
     default:
       newValRaw = "Not implemented";
       prevValRaw = "Not implemented";
   }
 
-  const newVal = defaultIfEmpty(newValRaw);
-  const showPrev = !isNullOrWhiteSpace(prevValRaw) && prevValRaw !== newValRaw;
-  const prevVal = showPrev ? defaultIfEmpty(prevValRaw) : null;
+  const newVal =
+    typeof newValRaw === "string" ||
+    newValRaw === null ||
+    newValRaw === undefined
+      ? defaultIfEmpty(newValRaw)
+      : newValRaw;
 
+  const showPrev =
+    typeof prevValRaw === "string"
+      ? !isNullOrWhiteSpace(prevValRaw)
+      : prevValRaw !== null && prevValRaw !== undefined;
+
+  const prevVal = showPrev
+    ? typeof prevValRaw === "string" ||
+      prevValRaw === null ||
+      prevValRaw === undefined
+      ? defaultIfEmpty(prevValRaw)
+      : prevValRaw
+    : null;
+
+  if (showProperty) {
+    return (
+      <div style={{ marginBottom: 4, marginLeft: 16 }}>
+        <strong>{getDisplayName(d.propertyName)}:</strong> {newVal}
+        {showPrev && (
+          <div style={{ color: "#888", fontSize: 12 }}>Previous: {prevVal}</div>
+        )}
+      </div>
+    );
+  }
+};
+
+const ChangeHeader = ({ entry }: { entry: CaveHistory }) => {
+  const requestTypeDisplay =
+    entry.type == ChangeRequestType.Submission
+      ? "Submitted"
+      : entry.type == ChangeRequestType.Import
+      ? "Imported"
+      : entry.type == ChangeRequestType.Merge
+      ? "Merged"
+      : entry.type == ChangeRequestType.Initial
+      ? "Last Modified"
+      : entry.type;
   return (
-    <div style={{ marginBottom: 4, marginLeft: 16 }}>
-      <strong>{getDisplayName(d.propertyName)}:</strong> {newVal}
-      {showPrev && (
-        <div style={{ color: "#888", fontSize: 12 }}>Previous: {prevVal}</div>
+    <div style={{ marginBottom: 8 }}>
+      {entry.reviewedOn && (
+        <div>
+          <strong>{formatDateTime(entry.reviewedOn)}</strong>
+          {entry.approvedByUserId &&
+            entry.type == ChangeRequestType.Submission && (
+              <span style={{ fontSize: 12, color: "#888", marginLeft: 8 }}>
+                Approved by{" "}
+                <UserAvatarComponent showName userId={entry.approvedByUserId} />
+              </span>
+            )}
+        </div>
       )}
+      <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+        <span>
+          {requestTypeDisplay}{" "}
+          {entry.type == ChangeRequestType.Submission &&
+            formatDateTime(entry.submittedOn)}
+        </span>
+        <span>
+          {" "}
+          by <UserAvatarComponent showName userId={entry.changedByUserId!} />
+        </span>
+      </div>
     </div>
   );
 };
 
 export interface CaveHistoryModalProps {
   caveId?: string;
+  caveName: string;
   visible: boolean;
   onClose: () => void;
 }
 
 const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
   caveId,
+  caveName,
   visible,
   onClose,
 }) => {
@@ -280,7 +369,7 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
 
   return (
     <PlanarianModal
-      header="Change History"
+      header={`History for ${caveName}`}
       open={visible}
       width={700}
       footer={null}
@@ -294,41 +383,7 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
         <Timeline>
           {entries.map((entry, i) => (
             <Timeline.Item key={i} color="blue">
-              {/* Header: reviewed first, then submitted */}
-              <div style={{ marginBottom: 8 }}>
-                {entry.reviewedOn && (
-                  <div>
-                    <strong>
-                      {formatDateTime(entry.reviewedOn, "MMM D, YYYY h:mm A")}
-                    </strong>
-                    {entry.approvedByUserId && (
-                      <span
-                        style={{ fontSize: 12, color: "#888", marginLeft: 8 }}
-                      >
-                        Approved by{" "}
-                        <UserAvatarComponent
-                          showName
-                          userId={entry.approvedByUserId}
-                        />
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-                  <span>
-                    Submitted{" "}
-                    {formatDateTime(entry.submittedOn, "MMM D, YYYY h:mm A")}
-                  </span>
-                  <span>
-                    {" "}
-                    by{" "}
-                    <UserAvatarComponent
-                      showName
-                      userId={entry.changedByUserId!}
-                    />
-                  </span>
-                </div>
-              </div>
+              <ChangeHeader entry={entry} />
 
               {/* Cave-level changes */}
               {entry.caveHistoryDetails.length > 0 && (

@@ -421,12 +421,13 @@ public partial class CaveService : ServiceBase<CaveRepository>
     }
 
     #region Create / Update Cave
+
     public async Task<string> AddCave(AddCave values, CancellationToken cancellationToken,
         IDbContextTransaction? transaction = null)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
         await ValidateCave(values);
-        
+
         var entity = await Repository.GetAsync(values.Id);
         var isNew = entity == null;
 
@@ -434,9 +435,9 @@ public partial class CaveService : ServiceBase<CaveRepository>
         {
             throw ApiExceptionDictionary.BadRequest("Cave Id must be defined ahead of time.");
         }
-        
+
         entity ??= new Cave { Id = values.Id };
-        
+
 
         var existingTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
@@ -573,6 +574,13 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     var entranceValue = values.Entrances.FirstOrDefault(e => e.Id == entrance.Id);
 
                     if (entranceValue != null) continue;
+                    
+                    entrance.EntranceStatusTags.Clear();
+                    entrance.FieldIndicationTags.Clear();
+                    entrance.EntranceOtherTags.Clear();
+                    entrance.EntranceHydrologyTags.Clear();
+                    entrance.EntranceReportedByNameTags.Clear();
+                    
                     entity.Entrances.Remove(entrance);
                     Repository.Delete(entrance);
                 }
@@ -588,14 +596,14 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     {
                         throw ApiExceptionDictionary.BadRequest("Entrance Id must be defined ahead of time.");
                     }
-                    
+
                     entrance = new Entrance
                     {
                         Id = entranceValue.Id,
                         CaveId = entity.Id
                     };
                 }
-                
+
                 entrance!.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
                 entrance.Description = entranceValue.Description;
@@ -721,10 +729,11 @@ public partial class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
-            if(!existingTransaction){
+            if (!existingTransaction)
+            {
                 await transaction.CommitAsync(cancellationToken);
             }
-            
+
             foreach (var blobProperties in blobsToDelete)
                 await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
 
@@ -817,18 +826,19 @@ public partial class CaveService : ServiceBase<CaveRepository>
                 .SelectMany(e => e.Records)
                 .OrderByDescending(e => e.CreatedOn)
                 .ToList();
-        
+
         foreach (var historySummary in caveHistorySummaries)
         {
             var entranceHistorySummary = new List<EntranceHistorySummary>();
             var caveHistoryDetails = new List<HistoryDetail>();
-            
+
             // there can be multiple add, delete, etc. For the same change history, we only want to process once
             var listsAlreadyProcessed = new List<string>();
-            
+
             foreach (var record in historySummary.Records)
             {
-                var previousRecord = GetPreviousRecord(entireHistory, record.PropertyName, record.EntranceId, record.CreatedOn);
+                var previousRecord = GetPreviousRecord(entireHistory, record.PropertyName, record.EntranceId,
+                    record.CreatedOn);
                 var historyDetail = new HistoryDetail
                 {
                     PropertyName = record.PropertyName,
@@ -859,17 +869,28 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     case CaveLogPropertyNames.EntranceFieldIndicationTagName:
                     case CaveLogPropertyNames.EntranceReportedByNameTagName:
                         if (listsAlreadyProcessed.Contains(record.PropertyName)) continue;
-                        
+
                         var current = GetListAtDateTime(entireHistory, record.PropertyName, record.CreatedOn);
                         var previousAlternateNames = previousRecord != null
                             ? GetListAtDateTime(entireHistory, record.PropertyName, previousRecord.CreatedOn)
                             : [];
                         historyDetail.ValueStrings = current.ToList();
                         historyDetail.PreviousValueStrings = previousAlternateNames.ToList();
-                        
+
+                        historyDetail.ValueString = null;
+                        historyDetail.ValueInt = null;
+                        historyDetail.ValueDouble = null;
+                        historyDetail.ValueBool = null;
+                        historyDetail.ValueDateTime = null;
+                        historyDetail.PreviousValueString = null;
+                        historyDetail.PreviousValueInt = null;
+                        historyDetail.PreviousValueDouble = null;
+                        historyDetail.PreviousValueBool = null;
+                        historyDetail.PreviousValueDateTime = null;
                         listsAlreadyProcessed.Add(record.PropertyName);
                         break;
                 }
+
                 if (!string.IsNullOrWhiteSpace(record.EntranceId))
                 {
                     var entrance =
@@ -882,22 +903,25 @@ public partial class CaveService : ServiceBase<CaveRepository>
                         EntranceId = record.EntranceId,
                         ChangeType = ChangeType.Update,
                     };
-                    
-                    if(record.PropertyName == CaveLogPropertyNames.Entrance)
+
+                    if (record.PropertyName == CaveLogPropertyNames.Entrance)
                     {
                         entrance.ChangeType = record.ChangeType;
                     }
+
                     entrance.Details = entrance.Details.Append(historyDetail);
 
                     if (!entranceInList)
                     {
                         entranceHistorySummary.Add(entrance);
                     }
+
                     continue;
                 }
+
                 caveHistoryDetails.Add(historyDetail);
             }
-            
+
             historySummary.CaveHistoryDetails = caveHistoryDetails;
             historySummary.EntranceHistorySummary = entranceHistorySummary;
         }
@@ -905,7 +929,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
         return caveHistorySummaries;
     }
 
-    
+
     private string GetEntranceName(string entranceId, IEnumerable<CaveHistoryRecord> changeLogs, DateTime dateTime)
     {
         // materialize once so we don't re‐enumerate
@@ -1583,4 +1607,5 @@ public static class CaveLogPropertyNames
 
     public const string Entrance = "Entrance";
     public const string Cave = "Cave";
+    public const string File = "File";
 }

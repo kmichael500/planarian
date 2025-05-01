@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
@@ -53,10 +54,9 @@ public class CaveChangeHistory : EntityBase
 
 
     public Account Account { get; set; } = null!;
-    public CaveChangeRequest? CaveChangeRequest { get; set; }
+    public CaveChangeRequest CaveChangeRequest { get; set; }
     public User ChangedByUser { get; set; } = null!;
     public Cave Cave { get; set; } = null!;
-    public Entrance? Entrance { get; set; }
     public User ApprovedByUser { get; set; } = null!;
 }
 
@@ -78,11 +78,12 @@ public class CaveChangeLogConfiguration : BaseEntityTypeConfiguration<CaveChange
             .WithMany(e => e.CaveChangeHistory)
             .HasForeignKey(e => e.AccountId)
             .OnDelete(DeleteBehavior.NoAction);
-        
-        var rel = builder.HasOne(e => e.Entrance)
-            .WithMany(e => e.CaveChangeLogs)
-            .HasForeignKey(e => e.EntranceId)
-            .OnDelete(DeleteBehavior.NoAction);
+
+        builder
+            .Property(e => e.EntranceId)
+            .ValueGeneratedNever()
+            .Metadata
+            .SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
         
         builder.HasOne(e => e.ChangedByUser)
             .WithMany(e => e.CaveChangeLogs)

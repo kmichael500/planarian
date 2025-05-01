@@ -665,6 +665,7 @@ const CaveComponent = ({
 
       <CaveHistoryModal
         caveId={cave?.id}
+        caveName={`${cave?.displayId} ${cave?.name}`}
         visible={historyVisible}
         onClose={() => setHistoryVisible(false)}
       />

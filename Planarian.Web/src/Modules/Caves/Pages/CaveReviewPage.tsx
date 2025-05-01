@@ -11,11 +11,12 @@ import {
   CloseCircleOutlined,
 } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { Grid, Typography } from "antd";
+import { Grid, message, Typography } from "antd";
 import { ProposedChangeRequestVm } from "../Models/ProposedChangeRequestVm";
 import { CaveReviewComponent } from "../Components/CaveReviewComponent";
 import { ReviewChangeRequest } from "../Models/ReviewChangeRequest";
 import { CaveVm } from "../Models/CaveVm";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
 const CaveReviewPage = () => {
   const [proposedChangeRequest, setReviewChangeRequest] =
@@ -42,7 +43,7 @@ const CaveReviewPage = () => {
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
 
-  const handleApprove = async () => {
+  const handleApprove = async (isApproved: boolean) => {
     if (!caveChangeRequestId) return;
 
     try {
@@ -50,7 +51,7 @@ const CaveReviewPage = () => {
 
       const request: ReviewChangeRequest = {
         id: caveChangeRequestId,
-        approve: true,
+        approve: isApproved,
         cave: proposedChangeRequest!.cave,
         notes: null,
       };
@@ -58,27 +59,11 @@ const CaveReviewPage = () => {
       await CaveService.ReviewChange(request);
       // Redirect back or show success message
       window.history.back();
-    } catch (error) {
-      console.error("Error approving change request:", error);
-      // Could add error notification here
+    } catch (err) {
+      const error = err as ApiErrorResponse;
+      message.error(error?.message);
     } finally {
       setIsApproving(false);
-    }
-  };
-
-  const handleDeny = async () => {
-    if (!caveChangeRequestId) return;
-
-    try {
-      setIsDenying(true);
-      // await CaveService.DenyChangeRequest(caveChangeRequestId);
-      // Redirect back or show success message
-      window.history.back();
-    } catch (error) {
-      console.error("Error denying change request:", error);
-      // Could add error notification here
-    } finally {
-      setIsDenying(false);
     }
   };
 
@@ -90,14 +75,18 @@ const CaveReviewPage = () => {
       <PlanarianButton
         type="primary"
         icon={<CheckCircleOutlined />}
-        onClick={handleApprove}
+        onClick={() => {
+          handleApprove(true);
+        }}
         loading={isApproving}
       >
         Approve
       </PlanarianButton>,
       <PlanarianButton
         icon={<CloseCircleOutlined />}
-        onClick={handleDeny}
+        onClick={() => {
+          handleApprove(false);
+        }}
         loading={isDenying}
       >
         Deny

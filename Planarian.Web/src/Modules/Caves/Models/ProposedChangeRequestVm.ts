@@ -1,4 +1,5 @@
 import { AddCaveVm } from "./AddCaveVm";
+import { ChangeRequestType } from "./ChangeRequestType";
 
 export interface ProposedChangeRequestVm {
   id: string;
@@ -88,6 +89,7 @@ export interface CaveHistory {
   caveHistoryDetails: HistoryDetail[];
   entranceHistorySummary: EntranceHistorySummary[];
   records: CaveHistoryRecord[];
+  type: ChangeRequestType;
 }
 
 export interface HistoryDetail {

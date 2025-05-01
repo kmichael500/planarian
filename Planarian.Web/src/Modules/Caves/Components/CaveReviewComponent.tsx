@@ -10,7 +10,6 @@ import {
   Card,
   Typography,
 } from "antd";
-import { diffLines, Change } from "diff";
 import styled from "styled-components";
 
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
@@ -23,8 +22,6 @@ import {
   DistanceFormat,
   formatNumber,
   formatDate,
-  getDirectionsUrl,
-  formatCoordinates,
   isNullOrWhiteSpace,
   formatBoolean,
   formatCoordinate,
@@ -33,7 +30,6 @@ import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/Shou
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { TagComponent } from "../../Tag/Components/TagComponent";
-import { CarOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { AddEntranceVm } from "../Models/AddEntranceVm";
 import { FileVm } from "../../Files/Models/FileVm";
@@ -43,8 +39,6 @@ import {
 } from "../Models/ProposedChangeRequestVm";
 import React from "react";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-
-const { Paragraph } = Typography;
 
 const { Panel } = Collapse;
 
@@ -80,7 +74,8 @@ const CaveReviewComponent = ({
   // Check if this is a new cave (all change logs have null caveId)
   const isNewCave = originalCave === null;
 
-  const [showNarrativeDiff, setShowNarrativeDiff] = React.useState(true);
+  const [showOriginalNarrative, setShowOriginalNarrative] =
+    React.useState(false);
   const narrativeChanged =
     !isNewCave &&
     changes?.some((c) => c.propertyName === CaveLogPropertyName.Narrative);
@@ -368,7 +363,7 @@ const CaveReviewComponent = ({
           originalEnt
             ? formatCoordinate(originalEnt.latitude)
             : defaultIfEmpty(null),
-          CaveLogPropertyName.Entrance,
+          CaveLogPropertyName.EntranceLatitude,
           entrance.id
         ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) &&
@@ -380,7 +375,7 @@ const CaveReviewComponent = ({
           originalEnt
             ? formatCoordinate(originalEnt.longitude)
             : defaultIfEmpty(null),
-          CaveLogPropertyName.Entrance,
+          CaveLogPropertyName.EntranceLongitude,
           entrance.id
         ),
 
@@ -473,10 +468,6 @@ const CaveReviewComponent = ({
     ].filter(Boolean);
   };
 
-  const narrativeDiff: Change[] = React.useMemo(() => {
-    return diffLines(originalCave?.narrative ?? "", cave?.narrative ?? "");
-  }, [originalCave?.narrative, cave?.narrative]);
-
   // Combine current and deleted entrances for display
   const entrancesToDisplay = React.useMemo(() => {
     if (!cave && !originalCave) return [];
@@ -529,41 +520,21 @@ const CaveReviewComponent = ({
         element={
           narrativeChanged ? (
             <PlanarianButton
-              onClick={() => setShowNarrativeDiff((p) => !p)}
+              onClick={() => setShowOriginalNarrative((prev) => !prev)}
               icon={undefined}
             >
-              {showNarrativeDiff ? "Hide Difference" : "Show Difference"}
+              {showOriginalNarrative ? "Show New" : "Show Original"}
             </PlanarianButton>
           ) : null
         }
       />
 
-      {narrativeChanged && showNarrativeDiff ? (
-        <Typography>
-          {narrativeDiff.map((part, i) => {
-            const bg = part.added
-              ? "#e6ffed"
-              : part.removed
-              ? "#ffeef0"
-              : "transparent";
-            const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
-
-            const paragraphs = part.value.split("\n");
-
-            return paragraphs.map((paragraph, j) => (
-              <Paragraph
-                key={`${i}-${j}`}
-                style={{
-                  backgroundColor: bg,
-                  margin: part.added || part.removed ? "0" : undefined,
-                }}
-              >
-                {prefix}
-                {paragraph}
-              </Paragraph>
-            ));
-          })}
-        </Typography>
+      {narrativeChanged ? (
+        <ParagraphDisplayComponent
+          text={
+            showOriginalNarrative ? originalCave?.narrative : cave?.narrative
+          }
+        />
       ) : (
         !isNullOrWhiteSpace(cave?.narrative) && (
           <ParagraphDisplayComponent text={cave?.narrative} />

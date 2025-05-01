@@ -109,6 +109,7 @@ public partial class CaveService
             #endregion
 
             entity.AccountId = RequestUser.AccountId;
+            entity.Type = ChangeRequestType.Submission;
             
             if (isNew)
             {
@@ -175,17 +176,27 @@ public partial class CaveService
             entity.ReviewedByUserId = RequestUser.Id;
             entity.ReviewedOn = DateTime.UtcNow;
 
+            entity.Status = value.Approve switch
+            {
+                true => ChangeRequestStatus.Approved,
+                false => ChangeRequestStatus.Rejected
+            };
+            
             if (value.Approve)
             {
                 var current = await Repository.GetCave(entity.CaveId);
                 var updatedCave = await CaveChangeHistoryToAddCave(entity.CaveChangeHistory, current);
+                
+        
+                
+                // this is deleting the entranceId from the cahnge log if we removed the entrance...wtf
+                
                 var caveId = await AddCave(updatedCave, cancellationToken, transaction: transaction);
                 entity.CaveId = caveId;
-                await Repository.SaveChangesAsync(cancellationToken);
             }
-
-            await transaction.CommitAsync(cancellationToken);
+            
             await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception e)
         {

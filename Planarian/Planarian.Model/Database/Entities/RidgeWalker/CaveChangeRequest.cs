@@ -14,6 +14,14 @@ public static class ChangeRequestStatus
     public const string Rejected  = "Rejected";
 }
 
+public static class ChangeRequestType
+{
+    public const string Submission = "Submission";
+    public const string Import = "Import";
+    public const string Merge = "Merge";
+    public const string Initial = "Initial";
+}
+
 public class CaveChangeRequest : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
@@ -22,8 +30,8 @@ public class CaveChangeRequest : EntityBase
 
     [MaxLength(PropertyLength.LargeText)] public string? Notes { get; set; }
     [MaxLength(PropertyLength.Key)] public string Status { get; set; } = ChangeRequestStatus.Pending;
+    [MaxLength(PropertyLength.Key)] public string Type { get; set; } = null!;
     public DateTime? ReviewedOn { get; set; }
-    public bool? IsApproved { get; set; }
     public Account Account { get; set; } = null!;
     public Cave Cave { get; set; } = null!;
     public User ReviewedByUser { get; set; } = null!;

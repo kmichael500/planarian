@@ -209,6 +209,7 @@ export function toCommaString(input: string[] | null | undefined): string {
   if (input == null || input.length < 1) return "";
   if (input.length === 1) return input[0];
   if (input.length === 2) return `${input[0]} and ${input[1]}`;
-  const lastItem = input.pop();
-  return `${input.join(", ")}, and ${lastItem}`;
+  const items = [...input]; // Create a copy of the array to avoid mutation
+  const lastItem = items.pop();
+  return `${items.join(", ")}, and ${lastItem}`;
 }
