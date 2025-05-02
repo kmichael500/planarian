@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Serialization;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
@@ -316,8 +319,32 @@ builder.Services.AddAuthorization(options =>
 
 #endregion
 
+#region Compression
+
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.MimeTypes = new[]
+    {
+        "application/json",      // all your normal JSON
+        "application/geo+json",  // GeoJSON
+        "application/gpx+xml"    // GPX files
+    };
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(o =>
+    o.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(o =>
+    o.Level = CompressionLevel.Optimal);
+
+
+#endregion
+
 var app = builder.Build();
 
+app.UseResponseCompression();
 
 if (false)
 {
