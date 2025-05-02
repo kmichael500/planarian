@@ -3,4 +3,5 @@ export enum ChangeRequestType {
   Import = "Import",
   Merge = "Merge",
   Initial = "Initial",
+  Rename = "Rename",
 }

@@ -40,6 +40,7 @@ export enum ChangeType {
   Add = "Add",
   Update = "Update",
   Delete = "Delete",
+  Rename = "Rename",
 }
 
 export enum CaveLogPropertyName {

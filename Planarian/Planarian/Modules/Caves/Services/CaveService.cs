@@ -837,8 +837,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
 
             foreach (var record in historySummary.Records)
             {
-                var previousRecord = GetPreviousRecord(entireHistory, record.PropertyName, record.EntranceId,
-                    record.CreatedOn);
+                var previousRecord = GetPreviousRecord(entireHistory, record.PropertyName, record.EntranceId, record.CreatedOn);
                 var historyDetail = new HistoryDetail
                 {
                     PropertyName = record.PropertyName,
@@ -869,6 +868,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     case CaveLogPropertyNames.EntranceFieldIndicationTagName:
                     case CaveLogPropertyNames.EntranceReportedByNameTagName:
                         if (listsAlreadyProcessed.Contains(record.PropertyName)) continue;
+                        listsAlreadyProcessed.Add(record.PropertyName);
 
                         var current = GetListAtDateTime(entireHistory, record.PropertyName, record.CreatedOn);
                         var previousAlternateNames = previousRecord != null
@@ -877,17 +877,19 @@ public partial class CaveService : ServiceBase<CaveRepository>
                         historyDetail.ValueStrings = current.ToList();
                         historyDetail.PreviousValueStrings = previousAlternateNames.ToList();
 
-                        historyDetail.ValueString = null;
-                        historyDetail.ValueInt = null;
-                        historyDetail.ValueDouble = null;
-                        historyDetail.ValueBool = null;
-                        historyDetail.ValueDateTime = null;
-                        historyDetail.PreviousValueString = null;
-                        historyDetail.PreviousValueInt = null;
-                        historyDetail.PreviousValueDouble = null;
-                        historyDetail.PreviousValueBool = null;
-                        historyDetail.PreviousValueDateTime = null;
-                        listsAlreadyProcessed.Add(record.PropertyName);
+                        if (record.ChangeType != ChangeType.Rename && historySummary.Type != ChangeRequestType.Merge)
+                        {
+                            historyDetail.ValueString = null;
+                            historyDetail.ValueInt = null;
+                            historyDetail.ValueDouble = null;
+                            historyDetail.ValueBool = null;
+                            historyDetail.ValueDateTime = null;
+                            historyDetail.PreviousValueString = null;
+                            historyDetail.PreviousValueInt = null;
+                            historyDetail.PreviousValueDouble = null;
+                            historyDetail.PreviousValueBool = null;
+                            historyDetail.PreviousValueDateTime = null;
+                        }
                         break;
                 }
 
@@ -928,7 +930,6 @@ public partial class CaveService : ServiceBase<CaveRepository>
 
         return caveHistorySummaries;
     }
-
 
     private string GetEntranceName(string entranceId, IEnumerable<CaveHistoryRecord> changeLogs, DateTime dateTime)
     {

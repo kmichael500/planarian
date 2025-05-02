@@ -20,6 +20,7 @@ public static class ChangeRequestType
     public const string Import = "Import";
     public const string Merge = "Merge";
     public const string Initial = "Initial";
+    public static string Rename = "Rename";
 }
 
 public class CaveChangeRequest : EntityBase

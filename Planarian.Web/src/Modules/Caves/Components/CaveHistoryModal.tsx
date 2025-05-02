@@ -160,7 +160,7 @@ const ExpandableNarrative: React.FC<{
 };
 
 // Explicitly handle every property
-const renderDetail = (d: HistoryDetail) => {
+const renderDetail = (d: HistoryDetail, entry: CaveHistory) => {
   let newValRaw: string | null | React.ReactNode = null;
   let prevValRaw: string | null | React.ReactNode = null;
 
@@ -254,12 +254,25 @@ const renderDetail = (d: HistoryDetail) => {
     case CaveLogPropertyName.EntranceHydrologyTagName:
     case CaveLogPropertyName.EntranceFieldIndicationTagName:
     case CaveLogPropertyName.EntranceReportedByNameTagName:
+      if (
+        entry.type === ChangeRequestType.Rename ||
+        entry.type === ChangeRequestType.Merge
+      ) {
+        const requestTypeDisplay =
+          entry.type == ChangeRequestType.Rename
+            ? "renamed to"
+            : entry.type == ChangeRequestType.Merge
+            ? "merged into"
+            : entry.type;
+        newValRaw = `'${d.previousValueString ?? ""}' ${requestTypeDisplay} '${
+          d.valueString ?? ""
+        }'`;
+        // prevValRaw = d.previousValueString;
+        break;
+      }
       newValRaw = toCommaString(d.valueStrings) ?? null;
       prevValRaw = toCommaString(d.previousValueStrings) ?? null;
-      if (d.propertyName === CaveLogPropertyName.GeologyTagName) {
-        console.log("New Value: ", newValRaw);
-        console.log("Previous Value: ", prevValRaw);
-      }
+
       break;
 
     case CaveLogPropertyName.Entrance:
@@ -313,6 +326,8 @@ const ChangeHeader = ({ entry }: { entry: CaveHistory }) => {
       ? "Merged"
       : entry.type == ChangeRequestType.Initial
       ? "Last Modified"
+      : entry.type == ChangeRequestType.Rename
+      ? "Renamed"
       : entry.type;
   return (
     <div style={{ marginBottom: 8 }}>
@@ -389,7 +404,9 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
               {entry.caveHistoryDetails.length > 0 && (
                 <div style={{ marginBottom: 12 }}>
                   {entry.caveHistoryDetails.map((d, idx) => (
-                    <React.Fragment key={idx}>{renderDetail(d)}</React.Fragment>
+                    <React.Fragment key={idx}>
+                      {renderDetail(d, entry)}
+                    </React.Fragment>
                   ))}
                 </div>
               )}
@@ -417,7 +434,9 @@ const CaveHistoryModal: React.FC<CaveHistoryModalProps> = ({
                     )}
                   </div>
                   {sum.details.map((d, j) => (
-                    <React.Fragment key={j}>{renderDetail(d)}</React.Fragment>
+                    <React.Fragment key={j}>
+                      {renderDetail(d, entry)}
+                    </React.Fragment>
                   ))}
                 </div>
               ))}

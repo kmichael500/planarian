@@ -226,18 +226,19 @@ public class AccountController : PlanarianControllerBase<AccountService>
     [HttpPut("tags/{tagTypeId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<TagTypeTableVm>> UpdateTagTypeName(string tagTypeId,
-        [FromBody] CreateEditTagTypeVm tag)
+        [FromBody] CreateEditTagTypeVm tag, CancellationToken cancellationToken)
     {
-        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId);
+        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId, cancellationToken);
 
         return new JsonResult(result);
     }
 
     [HttpPost("tags")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<TagTypeTableVm>> CreateTagType(string tagTypeId, [FromBody] CreateEditTagTypeVm tag)
+    public async Task<ActionResult<TagTypeTableVm>> CreateTagType(string tagTypeId, [FromBody] CreateEditTagTypeVm tag,
+        CancellationToken cancellationToken)
     {
-        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId);
+        var result = await Service.CreateOrUpdateTagType(tag, tagTypeId, cancellationToken);
 
         return new JsonResult(result);
     }

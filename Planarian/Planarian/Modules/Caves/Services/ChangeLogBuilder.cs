@@ -175,6 +175,82 @@ public class ChangeLogBuilder
         }
     }
 
+    public void AddNamedArrayField(
+        string propertyName,
+        IEnumerable<(string Id, string Name)>? original,
+        IEnumerable<(string Id, string Name)>? current,
+        string? entranceId = null,
+        string? overrideCaveId = null)
+    {
+        current ??= [];
+        current = current.ToList();
+        original ??= [];
+        original = original.ToList();
+       
+        var (added, removed) = DiffStringArrays(original.Select(e => e.Id), current.Select(e => e.Id));
+
+        foreach (var id in added)
+        {
+            var name = current.FirstOrDefault(e => e.Id == id).Name;
+
+            _changes.Add(CreateLog(
+                    propertyName,
+                    ChangeValueType.String,
+                    valueString: name,
+                    propertyId: id, entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
+        }
+
+        foreach (var id in removed)
+        {
+            var name = original.FirstOrDefault(e => e.Id == id).Name;
+            _changes.Add(CreateLog(
+                    propertyName,
+                    ChangeValueType.String,
+                    originalValueString: name,
+                    propertyId: id, entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
+        }
+
+        var renamed = DiffStringArrays(original.Select(e => e.Name), current.Select(e => e.Name));
+        
+        if (renamed.Added.Count == 1 && renamed.Removed.Count == 1 && added.Count == 0 && removed.Count == 0)
+        {
+            var name = current.FirstOrDefault(e => e.Name == renamed.Added[0]).Name;
+            var originalName = original.FirstOrDefault(e => e.Name == renamed.Removed[0]).Name;
+
+            _changes.Add(CreateLog(
+                    propertyName,
+                    ChangeValueType.String,
+                    valueString: name,
+                    originalValueString: originalName,
+                    changeType:ChangeType.Rename,
+                    propertyId: current.First().Id, entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
+        }
+        else if (added.Count == 1 && removed.Count == 1)
+        {
+            var name = current.FirstOrDefault(e => e.Id == added[0]).Name;
+            var originalName = original.FirstOrDefault(e => e.Id == removed[0]).Name;
+
+            _changes.Add(CreateLog(
+                    propertyName,
+                    ChangeValueType.String,
+                    valueString: name,
+                    originalValueString: originalName,
+                    changeType:ChangeType.Rename,
+                    propertyId: added[0], entranceId: entranceId, overrideCaveId: overrideCaveId
+                )
+            );
+        }
+        {
+            
+        }
+    }
+
     private CaveChangeHistory CreateLog(string propertyName,
         string changeValueType,
         string? valueString = null,

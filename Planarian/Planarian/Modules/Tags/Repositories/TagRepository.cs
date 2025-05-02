@@ -1,3 +1,4 @@
+using System.Collections;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
@@ -82,6 +83,27 @@ public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCon
         return DbContext.TagTypes
             .Where(e => e.Key == key &&
                         (e.AccountId == RequestUser.AccountId || e.IsDefault));
+    }
+    
+    public async Task<IEnumerable<string>> GetCavesWithTagType(string tagTypeId, CancellationToken cancellationToken)
+    {
+        var caves = await DbContext.Caves
+            .Where(c =>
+                c.AccountId == RequestUser.AccountId && (
+                    c.GeologyTags.Any(gt => gt.TagTypeId == tagTypeId)
+                    || c.MapStatusTags.Any(ms => ms.TagTypeId == tagTypeId)
+                    || c.GeologicAgeTags.Any(gat => gat.TagTypeId == tagTypeId)
+                    || c.PhysiographicProvinceTags.Any(pp => pp.TagTypeId == tagTypeId)
+                    || c.BiologyTags.Any(bt => bt.TagTypeId == tagTypeId)
+                    || c.ArcheologyTags.Any(at => at.TagTypeId == tagTypeId)
+                    || c.CartographerNameTags.Any(ct => ct.TagTypeId == tagTypeId)
+                    || c.CaveReportedByNameTags.Any(rt => rt.TagTypeId == tagTypeId)
+                    || c.CaveOtherTags.Any(ot => ot.TagTypeId == tagTypeId)
+                )
+            )
+            .Select(e=>e.Id)
+            .ToListAsync(cancellationToken);
+        return caves;
     }
 }
 

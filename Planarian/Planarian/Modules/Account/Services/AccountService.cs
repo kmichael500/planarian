@@ -4,9 +4,11 @@ using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
+using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
@@ -25,10 +27,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly NotificationService _notificationService;
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
-    private readonly CaveService _caveService;
+    private readonly CaveRepository _caveRepository;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveRepository caveRepository) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -36,7 +38,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _notificationService = notificationService;
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
-        _caveService = caveService;
+        _caveRepository = caveRepository;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -129,41 +131,166 @@ public class AccountService : ServiceBase<AccountRepository>
         return await Repository.GetTagsForTable(tagTypeKey, cancellationToken);
     }
 
-    public async Task<TagTypeTableVm> CreateOrUpdateTagType(CreateEditTagTypeVm tag, string tagTypeId)
+    public async Task<TagTypeTableVm> CreateOrUpdateTagType(CreateEditTagTypeVm tag, string tagTypeId,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(tag.Name)) throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw ApiExceptionDictionary.NoAccount;
 
-        var isNewTagType = string.IsNullOrWhiteSpace(tagTypeId);
-        var entity = !isNewTagType ? await _tagRepository.GetTag(tagTypeId) : new TagType();
+        var transaction = await Repository.BeginTransactionAsync(cancellationToken);
 
-        if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
-
-        if (entity.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
-
-
-        entity.Name = tag.Name;
-
-        if (isNewTagType)
+        try
         {
-            if (!TagTypeKeyConstant.IsValidAccountTagKey(tag.Key))
-                throw ApiExceptionDictionary.BadRequest("Invalid tag key.");
+            var isNewTagType = string.IsNullOrWhiteSpace(tagTypeId);
+            var entity = !isNewTagType ? await _tagRepository.GetTag(tagTypeId) : new TagType();
 
-            entity.Key = tag.Key;
-            entity.AccountId = RequestUser.AccountId;
-            _tagRepository.Add(entity);
+            if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
+
+            if (entity.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
+
+            var oldTagName = entity.Name;
+
+            entity.Name = tag.Name;
+
+            if (isNewTagType)
+            {
+                if (!TagTypeKeyConstant.IsValidAccountTagKey(tag.Key))
+                    throw ApiExceptionDictionary.BadRequest("Invalid tag key.");
+
+                entity.Key = tag.Key;
+                entity.AccountId = RequestUser.AccountId;
+                _tagRepository.Add(entity);
+            }
+
+            await _tagRepository.SaveChangesAsync(cancellationToken);
+
+            var caveLogPropertyName = string.Empty;
+            var isEntranceTag = false;
+            var isCaveTag = false;
+
+            switch (entity.Key)
+            {
+                case TagTypeKeyConstant.LocationQuality:
+                    caveLogPropertyName = CaveLogPropertyNames.EntranceLocationQualityTagName;
+                    isEntranceTag = true;
+                    break;
+                case TagTypeKeyConstant.Geology:
+                    caveLogPropertyName = CaveLogPropertyNames.GeologyTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.EntranceStatus:
+                    caveLogPropertyName = CaveLogPropertyNames.EntranceStatusTagName;
+                    isEntranceTag = true;
+                    break;
+                case TagTypeKeyConstant.FieldIndication:
+                    caveLogPropertyName = CaveLogPropertyNames.EntranceFieldIndicationTagName;
+                    isEntranceTag = true;
+                    break;
+                case TagTypeKeyConstant.EntranceHydrology:
+                    caveLogPropertyName = CaveLogPropertyNames.EntranceHydrologyTagName;
+                    isEntranceTag = true;
+                    break;
+                case TagTypeKeyConstant.File:
+                    // TODO
+                    caveLogPropertyName = CaveLogPropertyNames.File;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.People:
+                    break;
+                case TagTypeKeyConstant.Biology:
+                    caveLogPropertyName = CaveLogPropertyNames.BiologyTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.Archeology:
+                    caveLogPropertyName = CaveLogPropertyNames.ArcheologyTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.MapStatus:
+                    caveLogPropertyName = CaveLogPropertyNames.MapStatusTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.CaveOther:
+                    caveLogPropertyName = CaveLogPropertyNames.OtherTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.GeologicAge:
+                    caveLogPropertyName = CaveLogPropertyNames.GeologicAgeTagName;
+                    isCaveTag = true;
+                    break;
+                case TagTypeKeyConstant.PhysiographicProvince:
+                    caveLogPropertyName = CaveLogPropertyNames.PhysiographicProvinceTagName;
+                    isCaveTag = true;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(entity.Key), "Unknown tag type key");
+            }
+
+            if (!isEntranceTag)
+            {
+                var cavesAffected =
+                    (await _tagRepository.GetCavesWithTagType(tagTypeId, cancellationToken)).ToList();
+
+                if (cavesAffected.Any())
+                {
+                    var renameRequest = new CaveChangeRequest
+                    {
+                        AccountId = RequestUser.AccountId,
+                        Type = ChangeRequestType.Rename,
+                        Status = ChangeRequestStatus.Approved,
+                        ReviewedOn = DateTime.UtcNow,
+                        CaveId = null,
+                        ReviewedByUserId = RequestUser.Id,
+                        Notes = null
+                    };
+                    Repository.Add(renameRequest);
+                    await Repository.SaveChangesAsync(cancellationToken);
+
+                    var builder = new ChangeLogBuilder(
+                        accountId: RequestUser.AccountId,
+                        caveId: null,
+                        changedByUserId: RequestUser.Id,
+                        approvedByUserId: RequestUser.Id,
+                        changeRequestId: renameRequest.Id
+                    );
+                    
+                    foreach (var caveId in cavesAffected)
+                    {
+                        builder.AddNamedArrayField(caveLogPropertyName, [(entity.Id, oldTagName)],[
+                            (entity.Id, tag.Name)], overrideCaveId: caveId);
+                    }
+
+
+                    var changeLogs = builder.Build();
+                    foreach (var changeLog in changeLogs)
+                    {
+                        changeLog.Id = IdGenerator.Generate();
+                        changeLog.CreatedByUserId = RequestUser.Id;
+                    }
+
+                    await Repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken);
+                }
+            }
+            
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+
+            var result = new TagTypeTableVm
+            {
+                TagTypeId = entity.Id,
+                Name = entity.Name,
+                IsUserModifiable = !string.IsNullOrWhiteSpace(entity.AccountId),
+                Occurrences = await Repository.GetNumberOfOccurrences(entity.Id)
+            };
+
+            return result;
         }
-
-        await _tagRepository.SaveChangesAsync();
-
-        var result = new TagTypeTableVm
+        catch (Exception e)
         {
-            TagTypeId = entity.Id,
-            Name = entity.Name,
-            IsUserModifiable = !string.IsNullOrWhiteSpace(entity.AccountId),
-            Occurrences = await Repository.GetNumberOfOccurrences(entity.Id)
-        };
-
-        return result;
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<int> DeleteTagTypes(IEnumerable<string> tagTypeIds)
@@ -218,7 +345,8 @@ public class AccountService : ServiceBase<AccountRepository>
             Repository.Add(entity);
         }
 
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
+        
 
         var result = new TagTypeTableCountyVm
         {

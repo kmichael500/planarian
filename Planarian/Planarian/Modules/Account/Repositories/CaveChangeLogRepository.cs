@@ -31,7 +31,9 @@ public class CaveChangeLogRepository : RepositoryBase
                 SubmittedOn = e.CreatedOn,
                 ReviewedOn = e.ReviewedOn,
                 Type = e.Type,
-                Records = e.CaveChangeHistory.Select(record => new CaveHistoryRecord
+                Records = e.CaveChangeHistory
+                    .Where(h=>h.CaveId == caveId)
+                    .Select(record => new CaveHistoryRecord
                 {
                     CaveId = record.CaveId,
                     EntranceId = record.EntranceId,
