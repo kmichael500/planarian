@@ -9,6 +9,7 @@ import {
   MapLayerMouseEvent,
   MapProvider,
   ViewStateChangeEvent,
+  ScaleControl, // Import ScaleControl
 } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { message, Spin } from "antd";
@@ -316,6 +317,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   };
 
   const zoomControlPosition = "top-left";
+  const scaleControlPosition = "bottom-left"; // Define position for scale control
   const accountName = AuthenticationService.GetAccountName();
 
   const fullScreenControlPosition = {
@@ -787,6 +789,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     trackUserLocation={true}
                   />
                 )}
+                <ScaleControl position={scaleControlPosition} unit="imperial" />
               </div>
 
               {showFullScreenControl && (
