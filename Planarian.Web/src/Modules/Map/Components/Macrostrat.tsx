@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Collapse,
   Descriptions,
@@ -237,16 +237,19 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   const xddSnippets = xddData?.success.data || [];
 
   // Get unique scales for the filter dropdown, maintaining the sort order (finest first, -1 last)
-  const uniqueScales: number[] = [];
-  if (geologicMapsData.length > 0) {
-    const scaleSet = new Set<number>();
-    geologicMapsData.forEach((map) => {
-      if (!scaleSet.has(map.scale)) {
-        uniqueScales.push(map.scale);
-        scaleSet.add(map.scale);
-      }
-    });
-  }
+  const uniqueScales = useMemo(() => {
+    const scales: number[] = [];
+    if (geologicMapsData.length > 0) {
+      const scaleSet = new Set<number>();
+      geologicMapsData.forEach((map) => {
+        if (!scaleSet.has(map.scale)) {
+          scales.push(map.scale);
+          scaleSet.add(map.scale);
+        }
+      });
+    }
+    return scales;
+  }, [geologicMapsData]);
 
   useEffect(() => {
     if (uniqueScales.length > 0) {
@@ -261,7 +264,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({
     } else {
       setSelectedScales([]);
     }
-  }, [JSON.stringify(uniqueScales)]);
+  }, [uniqueScales]);
 
   const handleScaleChange = (checkedList: (number | string)[]) => {
     const allWasPreviouslyInSelectedScales =
