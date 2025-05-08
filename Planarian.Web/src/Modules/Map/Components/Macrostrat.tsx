@@ -10,12 +10,16 @@ import {
   Alert,
   Tag,
   Grid,
+  Checkbox,
 } from "antd";
 import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
+import { MapService, GeologicMapResult } from "../Services/MapService";
 
 const { Panel } = Collapse;
 const { Text, Paragraph } = Typography;
 const { useBreakpoint } = Grid;
+
+const allOptionValue = "all";
 
 interface MacrostratResponse {
   success: {
@@ -118,8 +122,18 @@ const Macrostrat: React.FC<MacrostratProps> = ({
 
   const [macroData, setMacroData] = useState<MacrostratResponse | null>(null);
   const [xddData, setXddData] = useState<XDDResponse | null>(null);
+  const [geologicMapsData, setGeologicMapsData] = useState<GeologicMapResult[]>(
+    []
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [geologicMapsLoading, setGeologicMapsLoading] =
+    useState<boolean>(false);
+  const [geologicMapsError, setGeologicMapsError] = useState<string | null>(
+    null
+  );
+  const [selectedScales, setSelectedScales] = useState<(number | string)[]>([]); // Changed type
 
   const isColorLight = (color: string): boolean => {
     if (!color || color[0] !== "#") return false;
@@ -151,7 +165,10 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   const fetchMacrostratData = async () => {
     try {
       setLoading(true);
+      setGeologicMapsLoading(true);
       setError(null);
+      setGeologicMapsError(null);
+
       const macrostratUrl = `https://macrostrat.org/api/v2/mobile/map_query_v2?lng=${lng}&lat=${lat}&z=9`;
       const resp = await fetch(macrostratUrl);
       if (!resp.ok) {
@@ -159,6 +176,38 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       }
       const data = (await resp.json()) as MacrostratResponse;
       setMacroData(data);
+
+      try {
+        let maps = await MapService.getGeologicMaps(lat, lng);
+
+        // Sort maps:
+        // 1. Primary sort by scale: ascending for positive scales, -1 (unscaled) goes to the end.
+        // 2. Secondary sort by year: descending (newer first).
+        maps.sort((a, b) => {
+          const aIsUnscaled = a.scale === -1;
+          const bIsUnscaled = b.scale === -1;
+
+          // Rule 1: Unscaled items go to the end
+          if (aIsUnscaled && !bIsUnscaled) return 1; // a (-1) comes after b (positive)
+          if (!aIsUnscaled && bIsUnscaled) return -1; // a (positive) comes before b (-1)
+
+          // Rule 2: If scales are different (applies only if both are positive and different)
+          // If both are unscaled, their scales are "equal" for this check (both -1)
+          if (a.scale !== b.scale && !aIsUnscaled && !bIsUnscaled) {
+            return a.scale - b.scale; // Sort positive scales numerically ascending
+          }
+
+          // Rule 3: If scales are effectively the same (both -1, or same positive value), sort by year descending
+          return b.year - a.year;
+        });
+
+        setGeologicMapsData(maps);
+      } catch (mapErr: any) {
+        setGeologicMapsError(mapErr.message || "Failed to load geologic maps.");
+        setGeologicMapsData([]);
+      } finally {
+        setGeologicMapsLoading(false);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -184,6 +233,91 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       setLoading(false);
     }
   };
+
+  const xddSnippets = xddData?.success.data || [];
+
+  // Get unique scales for the filter dropdown, maintaining the sort order (finest first, -1 last)
+  const uniqueScales: number[] = [];
+  if (geologicMapsData.length > 0) {
+    const scaleSet = new Set<number>();
+    geologicMapsData.forEach((map) => {
+      if (!scaleSet.has(map.scale)) {
+        uniqueScales.push(map.scale);
+        scaleSet.add(map.scale);
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (uniqueScales.length > 0) {
+      const finestScale = uniqueScales[0];
+      if (uniqueScales.length === 1) {
+        // If only one unique scale, select it and "All"
+        setSelectedScales([finestScale, allOptionValue]);
+      } else {
+        // Otherwise, select only the finest scale
+        setSelectedScales([finestScale]);
+      }
+    } else {
+      setSelectedScales([]);
+    }
+  }, [JSON.stringify(uniqueScales)]);
+
+  const handleScaleChange = (checkedList: (number | string)[]) => {
+    const allWasPreviouslyInSelectedScales =
+      selectedScales.includes(allOptionValue);
+    const allIsCurrentlyInCheckedList = checkedList.includes(allOptionValue);
+    const allUniqueScalesAvailable = uniqueScales.length > 0;
+
+    let newSelectedValues: (number | string)[];
+
+    if (allIsCurrentlyInCheckedList && !allWasPreviouslyInSelectedScales) {
+      // "All" was just explicitly checked by the user
+      newSelectedValues = allUniqueScalesAvailable
+        ? [...uniqueScales, allOptionValue]
+        : [allOptionValue];
+    } else if (
+      !allIsCurrentlyInCheckedList &&
+      allWasPreviouslyInSelectedScales
+    ) {
+      // "All" was just explicitly unchecked by the user
+      // Revert to selecting only the highest resolution scale (or none if no scales)
+      newSelectedValues = allUniqueScalesAvailable ? [uniqueScales[0]] : [];
+    } else {
+      // "All" was not the item directly clicked, or its state in checkedList matches its previous state.
+      // This means an individual scale was checked/unchecked.
+      const currentlySelectedNumeric = checkedList.filter(
+        (v) => typeof v === "number"
+      ) as number[];
+      newSelectedValues = [...currentlySelectedNumeric];
+
+      if (
+        allUniqueScalesAvailable &&
+        currentlySelectedNumeric.length === uniqueScales.length
+      ) {
+        // All individual scales are now checked, so add "all" to the selection
+        if (!newSelectedValues.includes(allOptionValue)) {
+          newSelectedValues.push(allOptionValue);
+        }
+      }
+    }
+    setSelectedScales(newSelectedValues);
+  };
+
+  const filteredGeologicMaps =
+    selectedScales.filter((s) => typeof s === "number").length > 0
+      ? geologicMapsData.filter((map) => selectedScales.includes(map.scale))
+      : geologicMapsData;
+
+  const groupOptions = [
+    ...uniqueScales.map((scale) => ({
+      label: scale === -1 ? "N/A" : scale.toLocaleString(),
+      value: scale,
+    })),
+    ...(uniqueScales.length > 0
+      ? [{ label: "All", value: allOptionValue, style: { marginRight: "8px" } }]
+      : []),
+  ];
 
   useEffect(() => {
     fetchMacrostratData();
@@ -218,7 +352,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   }
 
   if (!macroData) {
-    return null;
+    return null; // Or a <Text>No data available</Text> component
   }
 
   const { mapData = [], regions = [] } = macroData.success.data;
@@ -259,15 +393,12 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       ? `${min_min_thick} – ${max_thick} m`
       : defaultIfEmpty("");
 
-  const xddSnippets = xddData?.success.data || [];
-
   return (
     <div>
       <style>{highlightCSS}</style>
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Collapse defaultActiveKey={openByDefault ? ["1"] : []}>
-            {/* Geologic map panel */}
             <Panel header="Geologic map" key="1">
               <Descriptions
                 layout={descriptionLayout}
@@ -276,6 +407,73 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                 size="small"
               >
                 <Descriptions.Item label="Name">{name}</Descriptions.Item>
+                <Descriptions.Item label="NGMDB Geologic Maps" span={1}>
+                  {geologicMapsLoading ? (
+                    <Text>Loading...</Text>
+                  ) : geologicMapsError ? (
+                    <Text type="danger">{geologicMapsError}</Text>
+                  ) : geologicMapsData.length > 0 ? (
+                    <>
+                      <div style={{ marginBottom: 8 }}>
+                        <Text>Scale: </Text>
+                        <Checkbox.Group
+                          options={groupOptions}
+                          value={selectedScales}
+                          onChange={handleScaleChange}
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
+                        />
+                      </div>
+                      <List
+                        size="small"
+                        dataSource={filteredGeologicMaps} // Use filtered data
+                        renderItem={(map) => (
+                          <List.Item style={{ padding: "8px 0" }}>
+                            <List.Item.Meta
+                              description={
+                                <>
+                                  <a
+                                    href={`https://ngmdb.usgs.gov/Prodesc/proddesc_${map.id}.htm`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {map.title}
+                                  </a>
+                                  <br />
+                                  <Text type="secondary">
+                                    Scale:{" "}
+                                    {map.scale === -1 ? "N/A" : map.scale}
+                                  </Text>
+                                  <br />
+                                  <Text type="secondary">
+                                    Authors: {map.authors}
+                                  </Text>
+                                  <br />
+                                  <Text type="secondary">
+                                    Source: {map.publisher} ({map.series},{" "}
+                                    {map.year})
+                                  </Text>
+                                </>
+                              }
+                            />
+                            {map.thumbnail && (
+                              <img
+                                style={{ maxHeight: "300px" }}
+                                src={`https://ngmdb.usgs.gov${map.thumbnail}`}
+                                alt={map.title}
+                              />
+                            )}
+                          </List.Item>
+                        )}
+                      />
+                    </>
+                  ) : (
+                    defaultIfEmpty(null)
+                  )}
+                </Descriptions.Item>
                 <Descriptions.Item label="Age">
                   <Tag color={color || "default"} style={getTagStyle(color)}>
                     {age}

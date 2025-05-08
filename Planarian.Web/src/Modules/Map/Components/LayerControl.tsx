@@ -16,9 +16,9 @@ interface PlanarianMapLayer {
   isActive: boolean;
   opacity: number;
   id: string;
-  type: string;
+  type: "raster" | "vector" | "group" | string; // Added "group"
   attribution?: string;
-  source: {
+  source?: {
     layerName?: string;
     type: string;
     tiles: string[];
@@ -58,6 +58,8 @@ interface PlanarianMapLayer {
     paint: (opacity: number) => { [key: string]: any };
   };
   legend?: React.ReactNode;
+  memberLayerIds?: string[]; // For group layers
+  isGroupMember?: boolean; // For layers part of a group
 }
 
 interface LayerControlProps {
@@ -147,7 +149,6 @@ const LAYERS: PlanarianMapLayer[] = [
     type: "vector",
     source: {
       type: "vector",
-      // Define the source-layer name here (used as a default if not overridden)
       layerName: "PADUS",
       tiles: [
         "https://tiles.arcgis.com/tiles/v01gqwM5QqNysAAi/arcgis/rest/services/PADUS4_0VectorAnalysis_National_WebMerc_PA/VectorTileServer/tile/{z}/{y}/{x}.pbf",
@@ -157,7 +158,6 @@ const LAYERS: PlanarianMapLayer[] = [
     isActive: false,
     opacity: 0.8,
     attribution: "PADUS 4.0",
-    // Fill layer configuration defined in the layer.
     fillLayer: {
       id: "arcgis-public-access-fill",
       sourceLayer: "PADUS",
@@ -165,15 +165,13 @@ const LAYERS: PlanarianMapLayer[] = [
       paint: {
         "fill-color": publicAccessColorExpression,
         "fill-outline-color": "#000000",
-        // This value will be overridden by the layer's opacity state.
         "fill-opacity": 0.8,
       },
     },
-    // Text layer configuration defined in the layer.
     secondaryLayer: {
       id: "arcgis-public-access-text",
-      minzoom: 8, // Layer appears from zoom level 8 onward.
-      maxzoom: 15, // Layer is hidden past zoom level 15.
+      minzoom: 8,
+      maxzoom: 15,
       source: {
         id: "management-owner",
         layerName: "PADUS",
@@ -191,13 +189,13 @@ const LAYERS: PlanarianMapLayer[] = [
           ["linear"],
           ["zoom"],
           8,
-          0, // At zoom 8, text is hidden.
+          0,
           10,
-          8, // At zoom 10, text size is 8.
+          8,
           13,
-          12, // At zoom 13, text size grows to 12.
+          12,
           15,
-          16, // Past zoom 13, text size increases to 16 by zoom 15.
+          16,
         ],
         "text-anchor": "center",
         "text-offset": [0, 0],
@@ -237,6 +235,135 @@ const LAYERS: PlanarianMapLayer[] = [
     attribution: "Macrostrat",
   },
   {
+    id: "ngmdb-geology-group",
+    displayName: "NGMDB Geology",
+    type: "group",
+    isActive: false,
+    opacity: 1,
+    memberLayerIds: [
+      "usgs-500k-geology",
+      "usgs-250k-geology",
+      "usgs-125k-geology",
+      "usgs-100k-geology",
+      "usgs-62k-geology",
+      "usgs-48k-geology",
+      "usgs-24k-geology",
+    ],
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-500k-geology",
+    displayName: "500K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-250k-geology",
+    displayName: "250K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-125k-geology",
+    displayName: "125K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-100k-geology",
+    displayName: "100K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-62k-geology",
+    displayName: "62K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-48k-geology",
+    displayName: "48K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
+    id: "usgs-24k-geology",
+    displayName: "24K",
+    type: "raster",
+    source: {
+      type: "raster",
+      tiles: [
+        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    isGroupMember: true,
+    attribution: "NGMDB Map Viewer",
+  },
+  {
     id: "usgs-hydro",
     displayName: "Hydrology",
     type: "raster",
@@ -274,18 +401,88 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
   const [isTerrainActive, setIsTerrainActive] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
   const { current: map } = useMap();
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
   const onLayerChecked = (layer: PlanarianMapLayer) => {
-    const newLayers = mapLayers.map((l) =>
-      l.id === layer.id ? { ...l, isActive: !l.isActive } : l
-    );
+    let newLayers = [...mapLayers];
+    const layerIndex = newLayers.findIndex((l) => l.id === layer.id);
+    if (layerIndex === -1) return;
+
+    const newActiveState = !newLayers[layerIndex].isActive;
+    newLayers[layerIndex] = {
+      ...newLayers[layerIndex],
+      isActive: newActiveState,
+    };
+
+    if (layer.type === "group" && layer.memberLayerIds) {
+      // Toggle all member layers
+      newLayers = newLayers.map((l) =>
+        layer.memberLayerIds?.includes(l.id)
+          ? { ...l, isActive: newActiveState }
+          : l
+      );
+    } else if (layer.isGroupMember) {
+      // Check if all members of the parent group are now in the same state
+      const parentGroup = newLayers.find(
+        (g) => g.type === "group" && g.memberLayerIds?.includes(layer.id)
+      );
+      if (parentGroup && parentGroup.memberLayerIds) {
+        const allMembersActive = parentGroup.memberLayerIds.every(
+          (memberId) => newLayers.find((l) => l.id === memberId)?.isActive
+        );
+        const allMembersInactive = parentGroup.memberLayerIds.every(
+          (memberId) => !newLayers.find((l) => l.id === memberId)?.isActive
+        );
+
+        if (allMembersActive) {
+          const parentGroupIndex = newLayers.findIndex(
+            (g) => g.id === parentGroup.id
+          );
+          if (parentGroupIndex !== -1) {
+            newLayers[parentGroupIndex] = {
+              ...newLayers[parentGroupIndex],
+              isActive: true,
+            };
+          }
+        } else if (allMembersInactive) {
+          const parentGroupIndex = newLayers.findIndex(
+            (g) => g.id === parentGroup.id
+          );
+          if (parentGroupIndex !== -1) {
+            newLayers[parentGroupIndex] = {
+              ...newLayers[parentGroupIndex],
+              isActive: false,
+            };
+          }
+        } else {
+          // If members are in mixed states, set parent group to a "mixed" or indeterminate state if desired,
+          // or simply reflect that not all are active by setting isActive to false.
+          // For now, we'll ensure it's not fully "active" unless all members are.
+          const parentGroupIndex = newLayers.findIndex(
+            (g) => g.id === parentGroup.id
+          );
+          if (parentGroupIndex !== -1 && newLayers[parentGroupIndex].isActive) {
+            // If the group was active, but now not all members are, set group to inactive.
+            // Or, introduce an indeterminate state for the group checkbox if your UI library supports it.
+            // For simplicity here, we'll just ensure it's not marked as fully active.
+            // A more sophisticated approach might involve a tri-state checkbox for the group.
+          }
+        }
+      }
+    }
     setMapLayers(newLayers);
   };
 
   const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
-    const newLayers = mapLayers.map((l) =>
+    let newLayers = mapLayers.map((l) =>
       l.id === layer.id ? { ...l, opacity } : l
     );
+
+    if (layer.type === "group" && layer.memberLayerIds) {
+      newLayers = newLayers.map((l) =>
+        layer.memberLayerIds?.includes(l.id) ? { ...l, opacity } : l
+      );
+    }
     setMapLayers(newLayers);
   };
 
@@ -301,13 +498,20 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
     }
   };
 
-  // Calculate legend position based on layer control position
   const legendPosition = {
     top:
       position && position.top ? `${parseInt(position.top) + 50}px` : "100px",
     right: position?.right || "0",
     left: position?.left || "auto",
     bottom: position?.bottom || "auto",
+  };
+
+  const toggleGroupExpansion = (groupId: string) => {
+    setExpandedGroups((prev) =>
+      prev.includes(groupId)
+        ? prev.filter((id) => id !== groupId)
+        : [...prev, groupId]
+    );
   };
 
   return (
@@ -327,7 +531,7 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
               key={layer.id}
               id={layer.id}
               type="raster"
-              tiles={layer.source.tiles}
+              tiles={layer.source!.tiles}
               attribution={layer.attribution}
             >
               <Layer
@@ -339,7 +543,7 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
               />
             </Source>
           );
-        } else if (layer.type === "vector") {
+        } else if (layer.type === "vector" && layer.source) {
           return (
             <React.Fragment key={layer.id}>
               <Source
@@ -352,7 +556,6 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                   <Layer
                     id={layer.fillLayer.id}
                     source={layer.id}
-                    // Use the fill layer sourceLayer defined in the configuration.
                     source-layer={
                       layer.fillLayer.sourceLayer || layer.source.layerName
                     }
@@ -427,25 +630,54 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
               marginBottom: "10px",
             }}
           >
-            {mapLayers.map((layer) => (
-              <div key={layer.id} style={{ marginBottom: "15px" }}>
-                <Checkbox
-                  onChange={() => onLayerChecked(layer)}
-                  checked={layer.isActive}
-                >
-                  {layer.displayName}
-                </Checkbox>
-                <Slider
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={layer.opacity}
-                  onChange={(value: number) =>
-                    onLayerOpacityChanged(layer, value)
-                  }
-                />
-              </div>
-            ))}
+            {mapLayers
+              .filter((layer) => !layer.isGroupMember)
+              .map((layer) => (
+                <div key={layer.id} style={{ marginBottom: "15px" }}>
+                  <Checkbox
+                    onChange={() => {
+                      onLayerChecked(layer);
+                      toggleGroupExpansion(layer.id);
+                    }}
+                    checked={layer.isActive}
+                  >
+                    {layer.displayName}
+                  </Checkbox>
+
+                  <Slider
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={layer.opacity}
+                    onChange={(value: number) =>
+                      onLayerOpacityChanged(layer, value)
+                    }
+                  />
+                  {layer.type === "group" &&
+                    expandedGroups.includes(layer.id) &&
+                    layer.memberLayerIds && (
+                      <div style={{ marginLeft: "20px", marginTop: "5px" }}>
+                        {mapLayers
+                          .filter((member) =>
+                            layer.memberLayerIds?.includes(member.id)
+                          )
+                          .map((memberLayer) => (
+                            <div
+                              key={memberLayer.id}
+                              style={{ marginBottom: "5px" }}
+                            >
+                              <Checkbox
+                                onChange={() => onLayerChecked(memberLayer)}
+                                checked={memberLayer.isActive}
+                              >
+                                {memberLayer.displayName}
+                              </Checkbox>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                </div>
+              ))}
           </div>
           <Space direction="vertical">
             <PlanarianButton
@@ -522,7 +754,7 @@ const ControlPanel = styled.div`
 
 const LegendPanel = styled.div`
   position: absolute;
-  top: 100px; // Default position
+  top: 100px;
   right: 0;
   border-radius: 8px;
   background: white;
