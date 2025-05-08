@@ -12,7 +12,10 @@ import {
   Grid,
   Checkbox,
 } from "antd";
-import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
+import {
+  defaultIfEmpty,
+  formatNumber,
+} from "../../../Shared/Helpers/StringHelpers";
 import { MapService, GeologicMapResult } from "../Services/MapService";
 
 const { Panel } = Collapse;
@@ -155,10 +158,13 @@ const Macrostrat: React.FC<MacrostratProps> = ({
   };
 
   const highlightCSS = `
-    .hl {
-      background-color: #C4EEB2;
-      font-weight: 500;
-      padding: 0 2px;
+    .clickable-list-item {
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    .clickable-list-item:hover {
+      background-color: #fafafa;
     }
   `;
 
@@ -314,7 +320,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({
 
   const groupOptions = [
     ...uniqueScales.map((scale) => ({
-      label: scale === -1 ? "N/A" : scale.toLocaleString(),
+      label: scale === -1 ? "N/A" : formatNumber(scale),
       value: scale,
     })),
     ...(uniqueScales.length > 0
@@ -417,7 +423,7 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                     <Text type="danger">{geologicMapsError}</Text>
                   ) : geologicMapsData.length > 0 ? (
                     <>
-                      <div style={{ marginBottom: 8 }}>
+                      <div>
                         <Text>Scale: </Text>
                         <Checkbox.Group
                           options={groupOptions}
@@ -430,25 +436,37 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                           }}
                         />
                       </div>
-                      <List
-                        size="small"
-                        dataSource={filteredGeologicMaps} // Use filtered data
-                        renderItem={(map) => (
-                          <List.Item style={{ padding: "8px 0" }}>
-                            <List.Item.Meta
-                              description={
-                                <>
-                                  <a
-                                    href={`https://ngmdb.usgs.gov/Prodesc/proddesc_${map.id}.htm`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    {map.title}
-                                  </a>
+                      {filteredGeologicMaps.map((map) => (
+                        <a
+                          key={map.id}
+                          href={`https://ngmdb.usgs.gov/Prodesc/proddesc_${map.id}.htm`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: "block", marginTop: "8px" }}
+                          className="clickable-list-item"
+                        >
+                          <div>
+                            <Row
+                              gutter={[16, 16]}
+                              style={{ width: "100%" }}
+                              align="middle"
+                            >
+                              <Col
+                                xs={24}
+                                sm={24}
+                                md={map.thumbnail ? 16 : 24}
+                                lg={map.thumbnail ? 18 : 24}
+                              >
+                                <Typography>
+                                  {" "}
+                                  {/* Using Typography for consistent text styling */}
+                                  <Text>{map.title}</Text>
                                   <br />
                                   <Text type="secondary">
                                     Scale:{" "}
-                                    {map.scale === -1 ? "N/A" : map.scale}
+                                    {map.scale === -1
+                                      ? "N/A"
+                                      : formatNumber(map.scale)}
                                   </Text>
                                   <br />
                                   <Text type="secondary">
@@ -459,19 +477,29 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                                     Source: {map.publisher} ({map.series},{" "}
                                     {map.year})
                                   </Text>
-                                </>
-                              }
-                            />
-                            {map.thumbnail && (
-                              <img
-                                style={{ maxHeight: "300px" }}
-                                src={`https://ngmdb.usgs.gov${map.thumbnail}`}
-                                alt={map.title}
-                              />
-                            )}
-                          </List.Item>
-                        )}
-                      />
+                                </Typography>
+                              </Col>
+                              {map.thumbnail && (
+                                <Col xs={24} sm={24} md={8} lg={6}>
+                                  <img
+                                    style={{
+                                      maxHeight: "300px",
+                                      maxWidth: "100%",
+                                      display: "block",
+                                      margin:
+                                        screens.xs || screens.sm
+                                          ? "8px auto 0"
+                                          : "0 auto",
+                                    }}
+                                    src={`https://ngmdb.usgs.gov${map.thumbnail}`}
+                                    alt={map.title}
+                                  />
+                                </Col>
+                              )}
+                            </Row>
+                          </div>
+                        </a>
+                      ))}
                     </>
                   ) : (
                     defaultIfEmpty(null)
