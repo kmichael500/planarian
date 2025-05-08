@@ -68,11 +68,41 @@ const MapService = {
 
     return response.data;
   },
+
+  getGeologicMaps: async (latitude: number, longitude: number) => {
+    const params = new URLSearchParams();
+    params.append("latitude", latitude.toString());
+    params.append("longitude", longitude.toString());
+    const response = await HttpClient.get<GeologicMapResult[]>(
+      `${baseUrl}/geologic-maps?${params}`
+    );
+
+    return response.data;
+  },
 };
 
 export interface CoordinateDto {
   latitude: number;
   longitude: number;
+}
+
+export interface GeologicMapResult {
+  id: number;
+  title: string;
+  authors: string;
+  publisher: string;
+  series: string;
+  year: number;
+  scale: number;
+  include: number;
+  bed_surf: number;
+  gis?: number;
+  thumbnail?: string;
+  north: string;
+  south: string;
+  east: string;
+  west: string;
+  mv?: number;
 }
 
 export { MapService };

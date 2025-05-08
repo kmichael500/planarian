@@ -34,6 +34,7 @@ using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
 using Planarian.Modules.Map.Controllers;
+using Planarian.Modules.Map.Services;
 using Planarian.Modules.Notifications.Hubs;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
@@ -193,6 +194,13 @@ builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
 builder.Services.AddScoped<TemporaryEntranceRepository>();
 builder.Services.AddScoped<FeatureSettingRepository>();
+
+
+#endregion
+
+#region Http Clients
+
+builder.Services.AddHttpClient<GeologicMapHttpClient>();
 
 #endregion
 

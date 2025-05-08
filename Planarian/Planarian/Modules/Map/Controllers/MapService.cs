@@ -7,8 +7,10 @@ namespace Planarian.Modules.Map.Controllers;
 
 public class MapService : ServiceBase<MapRepository>
 {
-    public MapService(MapRepository repository, RequestUser requestUser) : base(repository, requestUser)
+    private readonly GeologicMapHttpClient _geologicMapHttpClient;
+    public MapService(MapRepository repository, RequestUser requestUser, GeologicMapHttpClient geologicMapHttpClient) : base(repository, requestUser)
     {
+        _geologicMapHttpClient = geologicMapHttpClient;
     }
 
     public async Task<IEnumerable<object>> GetMapData(double north, double south, double east, double west, int zoom,
@@ -41,5 +43,11 @@ public class MapService : ServiceBase<MapRepository>
         string plotId, CancellationToken ct) =>
         Repository.GetLinePlotGeoJson(plotId, ct);
 
+    public async Task<IEnumerable<GeologicMapResult>> GetGeologicMaps(double latitude, double longitude, CancellationToken cancellationToken)
+    {
+        var result = await _geologicMapHttpClient.GetMapsAsync(latitude, longitude, cancellationToken);
+
+        return result.Results;
+    }
 
 }
