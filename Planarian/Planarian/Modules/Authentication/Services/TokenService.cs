@@ -11,7 +11,7 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class TokenService
 {
-    private const double ExpiryDurationMinutes = 2880;
+    private const double ExpiryDurationMinutes = 43200;
     private readonly AuthOptions _authOptions;
 
     public TokenService(AuthOptions authOptions)

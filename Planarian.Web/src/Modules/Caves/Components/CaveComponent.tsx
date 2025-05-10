@@ -460,7 +460,7 @@ const CaveComponent = ({
         <>
           <PlanarianDividerComponent
             title="Geology"
-            secondaryTitle="from Macrostrat"
+            secondaryTitle="from Macrostrat and NGMDB Map Viewer"
             element={
               <div style={{ textAlign: "right" }}>
                 <a onClick={() => setShowGeology(!showGeology)}>
@@ -473,8 +473,8 @@ const CaveComponent = ({
             <div style={{ marginBottom: "8px" }}>
               <p>
                 Access geological data through Macrostrat's comprehensive
-                database. View information about local geological formations and
-                rock types at cave entrances.
+                database and view geologic maps from the National Geologic Map
+                Database Mapviewer.
               </p>
             </div>
           )}
@@ -521,7 +521,7 @@ const CaveComponent = ({
 
           <PlanarianDividerComponent
             title="Stream Gages"
-            secondaryTitle="from USGS"
+            secondaryTitle="from USGS NWIS"
             element={
               <div style={{ textAlign: "right" }}>
                 <a onClick={() => setShowGages(!showGages)}>

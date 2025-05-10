@@ -178,7 +178,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
 
       <PlanarianDividerComponent
         title="Geology"
-        secondaryTitle="from Macrostrat"
+        secondaryTitle="from Macrostrat and NGMDB Map Viewer"
       />
       <Macrostrat lat={lat} lng={lng} />
 

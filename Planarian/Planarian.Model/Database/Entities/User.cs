@@ -16,7 +16,7 @@ public class User : EntityBase
         if (!email.IsValidEmail()) throw new ArgumentException("Invalid email address", nameof(email));
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
-        EmailAddress = email.Trim();
+        EmailAddress = email.Trim().ToLowerInvariant();
     }
 
     public User(string firstName, string lastName, string emailAddress, string phoneNumber) : this(firstName, lastName,

@@ -71,6 +71,14 @@ public class MapController : PlanarianControllerBase<MapService>
         Response.Headers["Cache-Control"] = "public, max-age=2678400"; // cache for 31 days
         return new JsonResult(element.Value);
     }
-
-
+    
+    [HttpGet("geologic-maps")]
+    public async Task<ActionResult<object>> GetMapCenter(
+        [FromQuery] double latitude,
+        [FromQuery] double longitude,
+        CancellationToken cancellationToken)
+    {
+        var data = await Service.GetGeologicMaps(latitude, longitude, cancellationToken);
+        Response.Headers["Cache-Control"] = "public, max-age=2592000"; // cache for 30 days
+        return new JsonResult(data);    }
 }
