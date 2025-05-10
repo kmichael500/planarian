@@ -125,20 +125,38 @@ public class ChangeLogBuilder
     public async Task AddNamedIdFieldAsync(string propertyName,
         string? originalId,
         string? currentId,
-        Func<string, Task<string?>> lookup, string? entranceId = null)
+        Func<string, Task<string?>> lookup, string? entranceId = null, string? overrideCaveId = null)
     {
-        if (string.Equals(originalId, currentId, StringComparison.Ordinal))
-            return;
-
         var origName = originalId != null ? await InternalLookup(originalId, lookup) : null;
         var newName = currentId != null ? await InternalLookup(currentId, lookup) : null;
 
+        AddNamedIdFieldAsync(propertyName, (originalId, origName), (currentId, newName), entranceId,
+            overrideCaveId);
+    }
+
+    public void AddNamedIdFieldAsync(string propertyName, (string? Id, string? Name)? original,
+        (string? Id, string? Name)? current, string? entranceId = null, string? overrideCaveId = null)
+    {
+        var isRenamed = false;
+        if (string.Equals(original?.Id, current?.Id, StringComparison.Ordinal))
+        {
+            isRenamed = !(bool)original?.Name?.Equals(current?.Name);
+            if(!isRenamed)
+                return;
+        }
+        
+        var origName = original?.Name;
+        var newName = current?.Name;
+
+        var changeType = isRenamed ? ChangeType.Rename : null;
         _changes.Add(CreateLog(
             propertyName,
             ChangeValueType.String,
             valueString: newName,
             originalValueString: origName,
-            propertyId: currentId, entranceId: entranceId));
+            overrideCaveId: overrideCaveId,
+            changeType:changeType,
+            propertyId: current?.Id, entranceId: entranceId));
     }
 
     public async Task AddNamedArrayFieldAsync(string propertyName,

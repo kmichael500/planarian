@@ -258,10 +258,20 @@ public class AccountService : ServiceBase<AccountRepository>
                     
                 foreach (var entrance in entrancesAffected)
                 {
-                    builder.AddNamedArrayField(
-                        tagTypeAffected.CaveLogPropertyName, [(entity.Id, oldTagName)], [
-                            (entity.Id, tag.Name)
-                        ], overrideCaveId: entrance.CaveId);
+                    if (tagTypeAffected.CaveLogPropertyName == CaveLogPropertyNames.EntranceLocationQualityTagName)
+                    {
+
+                        builder.AddNamedIdFieldAsync(tagTypeAffected.CaveLogPropertyName,
+                            (entity.Id, oldTagName), (entity.Id, entity.Name), entranceId: entrance.EntranceId,
+                            overrideCaveId: entrance.CaveId);
+                    }
+                    else
+                    {
+                        builder.AddNamedArrayField(
+                            tagTypeAffected.CaveLogPropertyName, [(entity.Id, oldTagName)], [
+                                (entity.Id, tag.Name)
+                            ], overrideCaveId: entrance.CaveId);
+                    }
                 }
             }
 

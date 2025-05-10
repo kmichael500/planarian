@@ -353,6 +353,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 TagTypeId = e.Id,
                 Name = e.Name,
                 IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
+                CanRename = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
                 Occurrences = e.TripTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
                               e.LeadTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
                               e.EntranceStatusTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
@@ -510,7 +511,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<ArcheologyTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.ArcheologyTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.ArcheologyTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.Biology.Equals(destinationTagTypeKey))
                 {
@@ -519,7 +520,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                         sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<BiologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.BiologyTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.BiologyTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.People.Equals(destinationTagTypeKey))
                 {
@@ -541,14 +542,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
                     await MergeTags<CartographerNameTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.CartographerNameTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.CartographerNameTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                     await MergeTags<CaveReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.ReportedByNameTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.ReportedByNameTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                     await MergeTags<EntranceReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
                         e => e.EntranceId, CaveLogPropertyNames.EntranceReportedByNameTagName, sourceTagName,
-                        destinationTagName, builder);
+                        destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.CaveOther.Equals(destinationTagTypeKey))
                 {
@@ -557,14 +558,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                         sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<CaveOtherTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.OtherTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.OtherTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.File.Equals(destinationTagTypeKey))
                 {
                     // we do not delete duplicate file tags because each file can only have one tag. it would remove the file in some cases
                     await MergeTags<File>(sourceTagTypeId, destinationTagTypeId, e => e.FileTypeTagId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId!, null, CaveLogPropertyNames.File,
-                        sourceTagName, destinationTagName, builder);
+                        sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.GeologicAge.Equals(destinationTagTypeKey))
                 {
@@ -575,7 +576,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<GeologicAgeTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.GeologicAgeTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.GeologicAgeTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.Geology.Equals(destinationTagTypeKey))
                 {
@@ -585,7 +586,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
                     await MergeTags<GeologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.GeologyTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.GeologyTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.MapStatus.Equals(destinationTagTypeKey))
                 {
@@ -594,7 +595,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                         sourceTagName, destinationTagName, builder, e => e.CaveId, null);
                     await MergeTags<MapStatusTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
                         e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.MapStatusTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.MapStatusTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.PhysiographicProvince.Equals(destinationTagTypeKey))
                 {
@@ -604,7 +605,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                         e => e.CaveId, null);
                     await MergeTags<PhysiographicProvinceTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId, null,
-                        CaveLogPropertyNames.PhysiographicProvinceTagName, sourceTagName, destinationTagName, builder);
+                        CaveLogPropertyNames.PhysiographicProvinceTagName, sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.LocationQuality.Equals(destinationTagTypeKey))
                 {
@@ -612,7 +613,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<Entrance>(sourceTagTypeId, destinationTagTypeId,
                         e => e.LocationQualityTagId, e => e.Cave!.AccountId, cancellationToken, e => e.CaveId,
                         e => e.Id, CaveLogPropertyNames.EntranceLocationQualityTagName, sourceTagName,
-                        destinationTagName, builder);
+                        destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.EntranceHydrology.Equals(destinationTagTypeKey))
                 {
@@ -623,7 +624,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<EntranceHydrologyTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
                         e => e.EntranceId, CaveLogPropertyNames.EntranceHydrologyTagName, sourceTagName,
-                        destinationTagName, builder);
+                        destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.EntranceStatus.Equals(destinationTagTypeKey))
                 {
@@ -634,7 +635,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<EntranceStatusTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
                         e => e.EntranceId, CaveLogPropertyNames.EntranceStatusTagName, sourceTagName,
-                        destinationTagName, builder);
+                        destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.FieldIndication.Equals(destinationTagTypeKey))
                 {
@@ -645,7 +646,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     await MergeTags<FieldIndicationTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken, e => e.Entrance.CaveId,
                         e => e.EntranceId, CaveLogPropertyNames.EntranceFieldIndicationTagName, sourceTagName,
-                        destinationTagName, builder);
+                        destinationTagName, builder, destinationTagTypeKey);
                 }
 
                 #endregion
@@ -676,7 +677,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         Expression<Func<T, string>> accountIdSelector,
         CancellationToken cancellationToken, Expression<Func<T, string>> caveIdSelector,
         Expression<Func<T, string>>? entranceIdSelector, string caveLogPropertyName, string? sourceTagName,
-        string? destinationTagName, ChangeLogBuilder builder) where T : class
+        string? destinationTagName, ChangeLogBuilder builder, string tagTypeKey) where T : class
     {
         // Update the source tags to the destination type.
         var tags = DbContext.Set<T>()
@@ -719,10 +720,18 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         foreach (var affectedTag in affectedTags)
         {
-            await builder.AddNamedArrayFieldAsync(caveLogPropertyName,
-                originalIds: new[] { sourceTagTypeId },
-                currentIds: new[] { destinationTagTypeId },
-                lookup: Lookup, entranceId: affectedTag.EntranceId, overrideCaveId: affectedTag.CaveId);
+            if (tagTypeKey.Equals(TagTypeKeyConstant.LocationQuality))
+            {
+                await builder.AddNamedIdFieldAsync(caveLogPropertyName, sourceTagTypeId, destinationTagTypeId,
+                    Lookup, entranceId: affectedTag.EntranceId, overrideCaveId: affectedTag.CaveId);
+            }
+            else
+            {
+                await builder.AddNamedArrayFieldAsync(caveLogPropertyName,
+                    originalIds: new[] { sourceTagTypeId },
+                    currentIds: new[] { destinationTagTypeId },
+                    lookup: Lookup, entranceId: affectedTag.EntranceId, overrideCaveId: affectedTag.CaveId);
+            }
         }
 
         await tags

@@ -302,7 +302,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
               </>
             ) : (
               <EditButtonComponentt
-                disabled={!record.isUserModifiable}
+                disabled={!record.canRename}
                 onClick={() => setEditedTagType(record)}
               />
             )}
