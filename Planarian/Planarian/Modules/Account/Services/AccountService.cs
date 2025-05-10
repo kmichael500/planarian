@@ -162,120 +162,126 @@ public class AccountService : ServiceBase<AccountRepository>
                 entity.AccountId = RequestUser.AccountId;
                 _tagRepository.Add(entity);
             }
-
+            
             await _tagRepository.SaveChangesAsync(cancellationToken);
-
-            var caveLogPropertyName = string.Empty;
-            var isEntranceTag = false;
-            var isCaveTag = false;
-
+            
+            var tagTypesAffected = new List<(string CaveLogPropertyName, bool IsCaveTag, bool IsEntranceTag)>();
             switch (entity.Key)
             {
                 case TagTypeKeyConstant.LocationQuality:
-                    caveLogPropertyName = CaveLogPropertyNames.EntranceLocationQualityTagName;
-                    isEntranceTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.EntranceLocationQualityTagName, false, true));
                     break;
                 case TagTypeKeyConstant.Geology:
-                    caveLogPropertyName = CaveLogPropertyNames.GeologyTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.GeologyTagName, true, false));
                     break;
                 case TagTypeKeyConstant.EntranceStatus:
-                    caveLogPropertyName = CaveLogPropertyNames.EntranceStatusTagName;
-                    isEntranceTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.EntranceStatusTagName, false, true));
                     break;
                 case TagTypeKeyConstant.FieldIndication:
-                    caveLogPropertyName = CaveLogPropertyNames.EntranceFieldIndicationTagName;
-                    isEntranceTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.EntranceFieldIndicationTagName, false, true));
                     break;
                 case TagTypeKeyConstant.EntranceHydrology:
-                    caveLogPropertyName = CaveLogPropertyNames.EntranceHydrologyTagName;
-                    isEntranceTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.EntranceHydrologyTagName, false, true));
                     break;
                 case TagTypeKeyConstant.File:
-                    // TODO
-                    caveLogPropertyName = CaveLogPropertyNames.File;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.File, true, false));
                     break;
                 case TagTypeKeyConstant.People:
+                    tagTypesAffected.Add((CaveLogPropertyNames.CartographerNameTagName, true, false));
+                    tagTypesAffected.Add((CaveLogPropertyNames.ReportedByNameTagName, true, false));
+                    tagTypesAffected.Add((CaveLogPropertyNames.EntranceReportedByNameTagName, false, true));
                     break;
                 case TagTypeKeyConstant.Biology:
-                    caveLogPropertyName = CaveLogPropertyNames.BiologyTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.BiologyTagName, true, false));
                     break;
                 case TagTypeKeyConstant.Archeology:
-                    caveLogPropertyName = CaveLogPropertyNames.ArcheologyTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.ArcheologyTagName, true, false));
                     break;
                 case TagTypeKeyConstant.MapStatus:
-                    caveLogPropertyName = CaveLogPropertyNames.MapStatusTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.MapStatusTagName, true, false));
                     break;
                 case TagTypeKeyConstant.CaveOther:
-                    caveLogPropertyName = CaveLogPropertyNames.OtherTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.OtherTagName, true, false));
                     break;
                 case TagTypeKeyConstant.GeologicAge:
-                    caveLogPropertyName = CaveLogPropertyNames.GeologicAgeTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.GeologicAgeTagName, true, false));
                     break;
                 case TagTypeKeyConstant.PhysiographicProvince:
-                    caveLogPropertyName = CaveLogPropertyNames.PhysiographicProvinceTagName;
-                    isCaveTag = true;
+                    tagTypesAffected.Add((CaveLogPropertyNames.PhysiographicProvinceTagName, true, false));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(entity.Key), "Unknown tag type key");
             }
 
-            if (!isEntranceTag)
+            var renameRequest = new CaveChangeRequest
             {
-                var cavesAffected =
-                    (await _tagRepository.GetCavesWithTagType(tagTypeId, cancellationToken)).ToList();
+                Id = IdGenerator.Generate(),
+                AccountId = RequestUser.AccountId,
+                Type = ChangeRequestType.Rename,
+                Status = ChangeRequestStatus.Approved,
+                ReviewedOn = DateTime.UtcNow,
+                CaveId = null,
+                ReviewedByUserId = RequestUser.Id,
+                Notes = null
+            };
 
-                if (cavesAffected.Any())
+            var builder = new ChangeLogBuilder(
+                accountId: RequestUser.AccountId,
+                caveId: null,
+                changedByUserId: RequestUser.Id,
+                approvedByUserId: RequestUser.Id,
+                changeRequestId: renameRequest.Id
+            );
+
+            foreach (var tagTypeAffected in tagTypesAffected)
+            {
+                if (tagTypeAffected.IsCaveTag)
                 {
-                    var renameRequest = new CaveChangeRequest
-                    {
-                        AccountId = RequestUser.AccountId,
-                        Type = ChangeRequestType.Rename,
-                        Status = ChangeRequestStatus.Approved,
-                        ReviewedOn = DateTime.UtcNow,
-                        CaveId = null,
-                        ReviewedByUserId = RequestUser.Id,
-                        Notes = null
-                    };
-                    Repository.Add(renameRequest);
-                    await Repository.SaveChangesAsync(cancellationToken);
+                    var cavesAffected =
+                        (await _tagRepository.GetCavesWithTagType(tagTypeId, cancellationToken)).ToList();
 
-                    var builder = new ChangeLogBuilder(
-                        accountId: RequestUser.AccountId,
-                        caveId: null,
-                        changedByUserId: RequestUser.Id,
-                        approvedByUserId: RequestUser.Id,
-                        changeRequestId: renameRequest.Id
-                    );
-                    
-                    foreach (var caveId in cavesAffected)
+                    if (cavesAffected.Count != 0)
                     {
-                        builder.AddNamedArrayField(caveLogPropertyName, [(entity.Id, oldTagName)],[
-                            (entity.Id, tag.Name)], overrideCaveId: caveId);
+                        foreach (var caveId in cavesAffected)
+                        {
+                            builder.AddNamedArrayField(tagTypeAffected.CaveLogPropertyName, [(entity.Id, oldTagName)], [
+                                (entity.Id, tag.Name)
+                            ], overrideCaveId: caveId);
+                        }
                     }
-
-
-                    var changeLogs = builder.Build();
-                    foreach (var changeLog in changeLogs)
-                    {
-                        changeLog.Id = IdGenerator.Generate();
-                        changeLog.CreatedByUserId = RequestUser.Id;
-                    }
-
-                    await Repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken);
                 }
+                if (!tagTypeAffected.IsEntranceTag) continue;
+                
+                var entrancesAffected =
+                    (await _tagRepository.GetEntrancesWithTagType(tagTypeId, cancellationToken)).ToList();
+                if (entrancesAffected.Count == 0) continue;
+                    
+                foreach (var entrance in entrancesAffected)
+                {
+                    builder.AddNamedArrayField(
+                        tagTypeAffected.CaveLogPropertyName, [(entity.Id, oldTagName)], [
+                            (entity.Id, tag.Name)
+                        ], overrideCaveId: entrance.CaveId);
+                }
+            }
+
+            var changeLogs = builder.Build();
+            if (changeLogs.Any())
+            {
+                Repository.Add(renameRequest);
+                await Repository.SaveChangesAsync(cancellationToken);
+                
+                foreach (var changeLog in changeLogs)
+                {
+                    changeLog.Id = IdGenerator.Generate();
+                    changeLog.CreatedByUserId = RequestUser.Id;
+                }
+                await Repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken);
             }
             
             await Repository.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-
-
+            
             var result = new TagTypeTableVm
             {
                 TagTypeId = entity.Id,

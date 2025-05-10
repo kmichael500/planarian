@@ -867,17 +867,27 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     case CaveLogPropertyNames.EntranceHydrologyTagName:
                     case CaveLogPropertyNames.EntranceFieldIndicationTagName:
                     case CaveLogPropertyNames.EntranceReportedByNameTagName:
-                        if (listsAlreadyProcessed.Contains(record.PropertyName)) continue;
-                        listsAlreadyProcessed.Add(record.PropertyName);
+                        if (listsAlreadyProcessed.Contains($"{record.PropertyName}_{record.EntranceId}")) continue;
+                        listsAlreadyProcessed.Add($"{record.PropertyName}_{record.EntranceId}");
 
-                        var current = GetListAtDateTime(entireHistory, record.PropertyName, record.CreatedOn);
+                        var current = GetListAtDateTime(entireHistory, record.PropertyName, record.EntranceId, record.CreatedOn);
                         var previousAlternateNames = previousRecord != null
-                            ? GetListAtDateTime(entireHistory, record.PropertyName, previousRecord.CreatedOn)
+                            ? GetListAtDateTime(entireHistory, record.PropertyName, record.EntranceId, previousRecord.CreatedOn)
                             : [];
                         historyDetail.ValueStrings = current.ToList();
                         historyDetail.PreviousValueStrings = previousAlternateNames.ToList();
 
-                        if (record.ChangeType != ChangeType.Rename && historySummary.Type != ChangeRequestType.Merge)
+                        if (record.ChangeType == ChangeType.Rename || historySummary.Type == ChangeRequestType.Merge)
+                        {
+                            var renamedTo = historyDetail.ValueStrings.Except(historyDetail.PreviousValueStrings)
+                                .FirstOrDefault();
+                            var renamedFrom = historyDetail.PreviousValueStrings.Except(historyDetail.ValueStrings)
+                                .FirstOrDefault();
+
+                            historyDetail.ValueString = renamedTo;
+                            historyDetail.PreviousValueString = renamedFrom;
+                        }
+                        else
                         {
                             historyDetail.ValueString = null;
                             historyDetail.ValueInt = null;
@@ -890,6 +900,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
                             historyDetail.PreviousValueBool = null;
                             historyDetail.PreviousValueDateTime = null;
                         }
+
                         break;
                 }
 
@@ -993,12 +1004,15 @@ public partial class CaveService : ServiceBase<CaveRepository>
             : string.Empty;
     }
 
-    private IEnumerable<string?> GetListAtDateTime(
-        IEnumerable<CaveHistoryRecord> changeLogs,
+    private IEnumerable<string?> GetListAtDateTime(IEnumerable<CaveHistoryRecord> changeLogs,
         string? propertyName,
+        string? entranceId,
         DateTime dateTime)
     {
-        var changeLogsAtDateTime = changeLogs.Where(e => e.PropertyName == propertyName && e.CreatedOn <= dateTime)
+        var changeLogsAtDateTime = changeLogs.Where(e => 
+                e.PropertyName == propertyName 
+                && e.EntranceId == entranceId
+                && e.CreatedOn <= dateTime)
             .OrderBy(e => e.CreatedOn)
             .ThenBy(e => e.ChangeType switch
             {
@@ -1025,6 +1039,10 @@ public partial class CaveService : ServiceBase<CaveRepository>
                     values.Add((log.PropertyId, log.ValueString));
                     break;
                 }
+                case ChangeType.Rename:
+                    values.Remove(value);
+                    values.Add((log.PropertyId, log.ValueString));
+                    break;
                 case ChangeType.Delete:
                     values.Remove(value);
                     break;
@@ -1039,9 +1057,14 @@ public partial class CaveService : ServiceBase<CaveRepository>
         string? entranceId,
         DateTime dateTime)
     {
-        var changeLogsAtDateTime = changeLogs.Where(e => e.PropertyName == propertyName && e.EntranceId == entranceId && e.CreatedOn < dateTime)
-            .OrderByDescending(e => e.CreatedOn)
-            .ToList();
+        var changeLogsAtDateTime =
+            changeLogs.Where(e =>
+                    e.PropertyName == propertyName
+                    && e.EntranceId == entranceId
+                    && e.CreatedOn < dateTime
+                )
+                .OrderByDescending(e => e.CreatedOn)
+                .ToList();
 
         return changeLogsAtDateTime.FirstOrDefault();
     }

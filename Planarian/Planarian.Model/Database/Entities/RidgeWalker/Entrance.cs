@@ -25,7 +25,7 @@ public class Entrance : EntityBase
     public double? PitDepthFeet { get; set; }
 
     public User? ReportedByUser { get; set; }
-    public virtual Cave? Cave { get; set; } = null!;
+    public virtual Cave Cave { get; set; } = null!;
     public virtual TagType LocationQualityTag { get; set; } = null!;
     public ICollection<EntranceStatusTag> EntranceStatusTags { get; set; } = new HashSet<EntranceStatusTag>();
     public ICollection<EntranceHydrologyTag> EntranceHydrologyTags { get; set; } = new HashSet<EntranceHydrologyTag>();

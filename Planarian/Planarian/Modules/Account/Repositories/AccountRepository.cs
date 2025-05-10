@@ -683,27 +683,29 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
             .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
 
-        string cavePropName;
-        string? entrancePropName = null;
-        if (caveIdSelector.Body is MemberExpression caveMember)
-        {
-            cavePropName = caveMember.Member.Name;
-        }
-        else
-        {
-            throw new ArgumentException("caveIdSelector must be a member access expression.",
-                nameof(caveIdSelector));
-        }
+        var caveExpr          = caveIdSelector.Body as MemberExpression;
+        string  caveLeafName  = caveExpr.Member.Name;
+        string? caveNavName   = (caveExpr.Expression as MemberExpression)?.Member.Name;
         
-        if (entranceIdSelector?.Body is MemberExpression entMember)
-            entrancePropName = entMember.Member.Name;
+        var entExpr          = entranceIdSelector?.Body as MemberExpression;
+        string? entLeafName     = entExpr?.Member.Name;
+        string? entNavName      = (entExpr?.Expression as MemberExpression)?.Member.Name;
+
 
         var affectedTags = await tags
-            .Select(tag => new {
-                CaveId =  EF.Property<string>(tag, cavePropName),
-                EntranceId = entrancePropName != null
-                    ? EF.Property<string?>(tag, entrancePropName)
-                    : null
+            .Select(tag => new
+            {
+                CaveId = caveNavName == null
+                    ? EF.Property<string>(tag, caveLeafName) 
+                    : EF.Property<string>(
+                        EF.Property<object>(tag, caveNavName),
+                        caveLeafName),
+                EntranceId = entLeafName == null
+                    ? null
+                    : entNavName == null
+                        ? EF.Property<string?>(tag, entLeafName)
+                        : EF.Property<string?>(
+                            EF.Property<object>(tag, entNavName), entLeafName)
             })
             .ToListAsyncEF(cancellationToken);
 
@@ -770,27 +772,26 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Where(tag => EF.Property<string>(tag, tagTypeIdPropertyName) == sourceTagTypeId);
 
 
-        string cavePropName;
-        string? entrancePropName = null;
-        if (caveIdSelector.Body is MemberExpression caveMember)
-        {
-            cavePropName = caveMember.Member.Name;
-        }
-        else
-        {
-            throw new ArgumentException("caveIdSelector must be a member access expression.",
-                nameof(caveIdSelector));
-        }
+        var caveExpr          = caveIdSelector.Body as MemberExpression;
+        string  caveLeafName  = caveExpr.Member.Name;
+        string? caveNavName   = (caveExpr.Expression as MemberExpression)?.Member.Name;
         
-        if (entranceIdSelector?.Body is MemberExpression entMember)
-            entrancePropName = entMember.Member.Name;
-
+        var entExpr          = entranceIdSelector?.Body as MemberExpression;
+        string? entLeafName     = entExpr?.Member.Name;
+        string? entNavName      = (entExpr?.Expression as MemberExpression)?.Member.Name;
+        
         var deletedCaves = await query
             .Select(tag => new {
-                CaveId =  EF.Property<string>(tag, cavePropName),
-                EntranceId = entrancePropName != null
-                    ? EF.Property<string?>(tag, entrancePropName)
-                    : null
+                CaveId = caveNavName == null
+                    ? EF.Property<string>(tag, caveLeafName)                               // tag => tag.CaveId
+                    : EF.Property<string>(
+                        EF.Property<object>(tag, caveNavName), caveLeafName),            // tag => tag.Entrance.CaveId  (one nav hop)
+                EntranceId = entLeafName == null
+                    ? null
+                    : entNavName == null
+                        ? EF.Property<string?>(tag, entLeafName)                                  // e => e.CaveId
+                        : EF.Property<string?>(
+                            EF.Property<object>(tag, entNavName), entLeafName)
             })
             .ToListAsyncEF(cancellationToken);
 
@@ -812,6 +813,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         // Execute the deletion of duplicate (source) tags.
         await query.ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private static string GetFullMemberExpressionPath(MemberExpression m)
+    {
+        return m.Expression is MemberExpression parent
+            ? $"{GetFullMemberExpressionPath(parent)}.{m.Member.Name}"
+            : m.Member.Name;
     }
 
 

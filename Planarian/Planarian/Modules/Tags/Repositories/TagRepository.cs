@@ -105,6 +105,25 @@ public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCon
             .ToListAsync(cancellationToken);
         return caves;
     }
+
+    public async Task<IEnumerable<(string EntranceId, string CaveId)>> GetEntrancesWithTagType(string tagTypeId,
+        CancellationToken cancellationToken)
+    {
+        var entrances = await DbContext.Entrances
+            .Where(c =>
+                c.Cave.AccountId == RequestUser.AccountId && (
+                    c.LocationQualityTagId == tagTypeId
+                    || c.EntranceStatusTags.Any(ms => ms.TagTypeId == tagTypeId)
+                    || c.EntranceHydrologyTags.Any(gat => gat.TagTypeId == tagTypeId)
+                    || c.FieldIndicationTags.Any(pp => pp.TagTypeId == tagTypeId)
+                    || c.EntranceReportedByNameTags.Any(bt => bt.TagTypeId == tagTypeId
+                    )
+                )
+            )
+            .Select(e => new { EntranceId = e.Id, CaveId = e.CaveId })
+            .ToListAsync(cancellationToken);
+        return entrances.Select((e) => (e.EntranceId, e.CaveId));
+    }
 }
 
 public class TagRepository : TagRepository<PlanarianDbContext>
@@ -112,4 +131,6 @@ public class TagRepository : TagRepository<PlanarianDbContext>
     public TagRepository(PlanarianDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
+
+ 
 }
