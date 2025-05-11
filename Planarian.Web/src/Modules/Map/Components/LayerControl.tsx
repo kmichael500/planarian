@@ -8,15 +8,12 @@ import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 
-const MAPBOX_ACCESS_TOKEN =
-  "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
-
 interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
   opacity: number;
   id: string;
-  type: "raster" | "vector" | "group" | string; // Added "group"
+  type: "raster" | "vector" | "group" | string;
   attribution?: string;
   source?: {
     layerName?: string;
@@ -24,14 +21,12 @@ interface PlanarianMapLayer {
     tiles: string[];
     tileSize?: number;
   };
-  paint?: {
-    "raster-opacity"?: number;
-  };
+  paint?: { "raster-opacity"?: number };
   fillLayer?: {
     id: string;
     sourceLayer: string;
-    layout: { [key: string]: any };
-    paint: { [key: string]: any };
+    layout: Record<string, any>;
+    paint: Record<string, any>;
   };
   secondaryLayer?: {
     type:
@@ -54,22 +49,22 @@ interface PlanarianMapLayer {
       tiles: string[];
       tileSize?: number;
     };
-    layout: (isActive: boolean) => { [key: string]: any };
-    paint: (opacity: number) => { [key: string]: any };
+    layout: (isActive: boolean) => Record<string, any>;
+    paint: (opacity: number) => Record<string, any>;
   };
   legend?: React.ReactNode;
-  memberLayerIds?: string[]; // For group layers
-  isGroupMember?: boolean; // For layers part of a group
+  memberLayerIds?: string[];
+  isGroupMember?: boolean;
+
+  indeterminate?: boolean;
 }
 
 interface LayerControlProps {
-  position?: {
-    top?: string;
-    right?: string;
-    left?: string;
-    bottom?: string;
-  };
+  position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
 }
+
+const MAPBOX_ACCESS_TOKEN =
+  "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
 
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
   [
@@ -79,7 +74,7 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
       code,
       info.color,
     ]),
-    "#cccccc", // fallback
+    "#cccccc",
   ] as unknown as DataDrivenPropertyValueSpecification<string>;
 
 const LAYERS: PlanarianMapLayer[] = [
@@ -223,7 +218,7 @@ const LAYERS: PlanarianMapLayer[] = [
   },
   {
     id: "macrostrat",
-    displayName: "Geology",
+    displayName: "Macrostrat Geology",
     type: "raster",
     source: {
       type: "raster",
@@ -399,120 +394,90 @@ const LAYERS: PlanarianMapLayer[] = [
 const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
   const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
   const [isTerrainActive, setIsTerrainActive] = useState(false);
-  const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
+  const [terrainExaggeration, setTerrainExaggeration] = useState(1);
   const { current: map } = useMap();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  const onLayerChecked = (layer: PlanarianMapLayer) => {
-    let newLayers = [...mapLayers];
-    const layerIndex = newLayers.findIndex((l) => l.id === layer.id);
-    if (layerIndex === -1) return;
+  const recomputeGroup = (
+    layers: PlanarianMapLayer[],
+    groupId: string
+  ): void => {
+    const group = layers.find((l) => l.id === groupId);
+    if (!group || !group.memberLayerIds) return;
 
-    const newActiveState = !newLayers[layerIndex].isActive;
-    newLayers[layerIndex] = {
-      ...newLayers[layerIndex],
-      isActive: newActiveState,
-    };
+    const memberStates = group.memberLayerIds.map(
+      (id) => layers.find((l) => l.id === id)?.isActive
+    );
+    const allOn = memberStates.every((s) => s);
+    const allOff = memberStates.every((s) => !s);
 
-    if (layer.type === "group" && layer.memberLayerIds) {
-      // Toggle all member layers
-      newLayers = newLayers.map((l) =>
-        layer.memberLayerIds?.includes(l.id)
-          ? { ...l, isActive: newActiveState }
-          : l
-      );
-    } else if (layer.isGroupMember) {
-      // Check if all members of the parent group are now in the same state
-      const parentGroup = newLayers.find(
-        (g) => g.type === "group" && g.memberLayerIds?.includes(layer.id)
-      );
-      if (parentGroup && parentGroup.memberLayerIds) {
-        const allMembersActive = parentGroup.memberLayerIds.every(
-          (memberId) => newLayers.find((l) => l.id === memberId)?.isActive
-        );
-        const allMembersInactive = parentGroup.memberLayerIds.every(
-          (memberId) => !newLayers.find((l) => l.id === memberId)?.isActive
-        );
-
-        if (allMembersActive) {
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1) {
-            newLayers[parentGroupIndex] = {
-              ...newLayers[parentGroupIndex],
-              isActive: true,
-            };
-          }
-        } else if (allMembersInactive) {
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1) {
-            newLayers[parentGroupIndex] = {
-              ...newLayers[parentGroupIndex],
-              isActive: false,
-            };
-          }
-        } else {
-          // If members are in mixed states, set parent group to a "mixed" or indeterminate state if desired,
-          // or simply reflect that not all are active by setting isActive to false.
-          // For now, we'll ensure it's not fully "active" unless all members are.
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1 && newLayers[parentGroupIndex].isActive) {
-            // If the group was active, but now not all members are, set group to inactive.
-            // Or, introduce an indeterminate state for the group checkbox if your UI library supports it.
-            // For simplicity here, we'll just ensure it's not marked as fully active.
-            // A more sophisticated approach might involve a tri-state checkbox for the group.
-          }
-        }
-      }
-    }
-    setMapLayers(newLayers);
+    group.isActive = allOn;
+    group.indeterminate = !allOn && !allOff;
   };
 
-  const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
-    let newLayers = mapLayers.map((l) =>
-      l.id === layer.id ? { ...l, opacity } : l
+  const onLayerChecked = (layer: PlanarianMapLayer) => {
+    setMapLayers((prev) => {
+      const next = prev.map((l) => ({ ...l }));
+
+      const idx = next.findIndex((l) => l.id === layer.id);
+      if (idx === -1) return prev;
+
+      const toggledState = !next[idx].isActive;
+      next[idx].isActive = toggledState;
+
+      if (layer.type === "group" && layer.memberLayerIds) {
+        next.forEach((l) => {
+          if (layer.memberLayerIds!.includes(l.id)) l.isActive = toggledState;
+        });
+      } else if (layer.isGroupMember) {
+        const parent = next.find(
+          (g) => g.type === "group" && g.memberLayerIds?.includes(layer.id)
+        );
+        if (parent) recomputeGroup(next, parent.id);
+      }
+
+      next
+        .filter((g) => g.type === "group")
+        .forEach((g) => recomputeGroup(next, g.id));
+
+      return next;
+    });
+  };
+
+  const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) =>
+    setMapLayers((prev) =>
+      prev.map((l) => {
+        const clone = { ...l };
+        if (l.id === layer.id) clone.opacity = opacity;
+        if (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
+          clone.opacity = opacity;
+        return clone;
+      })
     );
 
-    if (layer.type === "group" && layer.memberLayerIds) {
-      newLayers = newLayers.map((l) =>
-        layer.memberLayerIds?.includes(l.id) ? { ...l, opacity } : l
-      );
-    }
-    setMapLayers(newLayers);
-  };
-
   const onTerrainToggle = () => {
-    setIsTerrainActive((prevState) => !prevState);
-    if (isTerrainActive) {
-      map?.getMap().setTerrain(null);
-    } else {
+    setIsTerrainActive((s) => !s);
+    if (isTerrainActive) map?.getMap().setTerrain(null);
+    else
       map?.getMap().setTerrain({
         source: "terrainLayer",
         exaggeration: terrainExaggeration,
       });
-    }
   };
 
   const legendPosition = {
-    top:
-      position && position.top ? `${parseInt(position.top) + 50}px` : "100px",
+    top: position?.top ? `${parseInt(position.top) + 50}px` : "100px",
     right: position?.right || "0",
     left: position?.left || "auto",
     bottom: position?.bottom || "auto",
   };
 
-  const toggleGroupExpansion = (groupId: string) => {
+  const toggleGroupExpansion = (groupId: string) =>
     setExpandedGroups((prev) =>
       prev.includes(groupId)
         ? prev.filter((id) => id !== groupId)
         : [...prev, groupId]
     );
-  };
 
   return (
     <>
@@ -555,11 +520,11 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                 {layer.fillLayer && (
                   <Layer
                     id={layer.fillLayer.id}
+                    type="fill"
                     source={layer.id}
                     source-layer={
                       layer.fillLayer.sourceLayer || layer.source.layerName
                     }
-                    type="fill"
                     layout={{
                       ...layer.fillLayer.layout,
                       visibility: layer.isActive ? "visible" : "none",
@@ -579,9 +544,9 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                 >
                   <Layer
                     id={layer.secondaryLayer.id}
+                    type={layer.secondaryLayer.type}
                     source={layer.secondaryLayer.id}
                     source-layer={layer.secondaryLayer.source.layerName}
-                    type={layer.secondaryLayer.type}
                     layout={layer.secondaryLayer.layout(layer.isActive)}
                     paint={layer.secondaryLayer.paint(layer.opacity)}
                     {...(layer.secondaryLayer.minzoom !== undefined && {
@@ -611,10 +576,10 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
             : {}),
         }}
       >
-        <HoverIcon style={{ zIndex: 200 }}>
+        <HoverIcon>
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            height="24px"
+            height="24"
             viewBox="0 0 576 512"
           >
             <path d="M264.5 5.2c14.9-6.9 32.1-6.9 47 0l218.6 101c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 149.8C37.4 145.8 32 137.3 32 128s5.4-17.9 13.9-21.8L264.5 5.2zM476.9 209.6l53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 277.8C37.4 273.8 32 265.3 32 256s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0l152-70.2zm-152 198.2l152-70.2 53.2 24.6c8.5 3.9 13.9 12.4 13.9 21.8s-5.4 17.9-13.9 21.8l-218.6 101c-14.9 6.9-32.1 6.9-47 0L45.9 405.8C37.4 401.8 32 393.3 32 384s5.4-17.9 13.9-21.8l53.2-24.6 152 70.2c23.4 10.8 50.4 10.8 73.8 0z" />
@@ -631,53 +596,62 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
             }}
           >
             {mapLayers
-              .filter((layer) => !layer.isGroupMember)
-              .map((layer) => (
-                <div key={layer.id} style={{ marginBottom: "15px" }}>
-                  <Checkbox
-                    onChange={() => {
-                      onLayerChecked(layer);
-                      toggleGroupExpansion(layer.id);
-                    }}
-                    checked={layer.isActive}
-                  >
-                    {layer.displayName}
-                  </Checkbox>
+              .filter((l) => !l.isGroupMember)
+              .map((layer) => {
+                const isGroup = layer.type === "group";
+                const indeterminate =
+                  isGroup && layer.memberLayerIds
+                    ? (() => {
+                        const states = layer.memberLayerIds!.map(
+                          (id) => mapLayers.find((x) => x.id === id)?.isActive
+                        );
+                        return (
+                          !states.every(Boolean) && !states.every((s) => !s)
+                        );
+                      })()
+                    : false;
 
-                  <Slider
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={layer.opacity}
-                    onChange={(value: number) =>
-                      onLayerOpacityChanged(layer, value)
-                    }
-                  />
-                  {layer.type === "group" &&
-                    expandedGroups.includes(layer.id) &&
-                    layer.memberLayerIds && (
-                      <div style={{ marginLeft: "20px", marginTop: "5px" }}>
-                        {mapLayers
-                          .filter((member) =>
-                            layer.memberLayerIds?.includes(member.id)
-                          )
-                          .map((memberLayer) => (
-                            <div
-                              key={memberLayer.id}
-                              style={{ marginBottom: "5px" }}
-                            >
-                              <Checkbox
-                                onChange={() => onLayerChecked(memberLayer)}
-                                checked={memberLayer.isActive}
-                              >
-                                {memberLayer.displayName}
-                              </Checkbox>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                </div>
-              ))}
+                return (
+                  <div key={layer.id} style={{ marginBottom: 15 }}>
+                    <Checkbox
+                      checked={layer.isActive}
+                      indeterminate={indeterminate}
+                      onChange={() => {
+                        onLayerChecked(layer);
+                        if (isGroup) toggleGroupExpansion(layer.id);
+                      }}
+                    >
+                      {layer.displayName}
+                    </Checkbox>
+
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={layer.opacity}
+                      onChange={(v) => onLayerOpacityChanged(layer, v)}
+                    />
+                    {isGroup &&
+                      expandedGroups.includes(layer.id) &&
+                      layer.memberLayerIds && (
+                        <div style={{ marginLeft: 20, marginTop: 5 }}>
+                          {layer.memberLayerIds
+                            .map((id) => mapLayers.find((m) => m.id === id)!)
+                            .map((member) => (
+                              <div key={member.id} style={{ marginBottom: 5 }}>
+                                <Checkbox
+                                  checked={member.isActive}
+                                  onChange={() => onLayerChecked(member)}
+                                >
+                                  {member.displayName}
+                                </Checkbox>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                  </div>
+                );
+              })}
           </div>
           <Space direction="vertical">
             <PlanarianButton
@@ -695,12 +669,12 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                   max={10}
                   step={0.1}
                   value={terrainExaggeration}
-                  onChange={(value) => {
-                    if (value !== null) {
-                      setTerrainExaggeration(value);
+                  onChange={(v) => {
+                    if (v !== null) {
+                      setTerrainExaggeration(v);
                       map?.getMap().setTerrain({
                         source: "terrainLayer",
-                        exaggeration: value,
+                        exaggeration: v,
                       });
                     }
                   }}
@@ -711,33 +685,28 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
         </ContentWrapper>
       </ControlPanel>
 
-      <div>
-        {mapLayers
-          .filter((layer) => layer.isActive)
-          .map((layer) =>
-            layer.legend ? (
-              <LegendPanel style={legendPosition}>
-                <HoverIcon style={{ zIndex: 0 }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                    <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
-                  </svg>
-                </HoverIcon>
-                <ContentWrapper>
-                  <div key={`legend-${layer.id}`}>{layer.legend}</div>
-                </ContentWrapper>
-              </LegendPanel>
-            ) : null
-          )}
-      </div>
+      {mapLayers
+        .filter((l) => l.isActive && l.legend)
+        .map((l) => (
+          <LegendPanel key={`legend-${l.id}`} style={legendPosition}>
+            <HoverIcon>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
+              </svg>
+            </HoverIcon>
+            <ContentWrapper>{l.legend}</ContentWrapper>
+          </LegendPanel>
+        ))}
     </>
   );
 };
 
+/* ──────────────────────────────────────────────────────────
+   styled bits – untouched
+─────────────────────────────────────────────────────────── */
 const ControlPanel = styled.div`
   position: absolute;
-  top: 50px;
-  right: 0;
-  background: white;
+  background: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px;
   margin: 20px;
@@ -752,27 +721,12 @@ const ControlPanel = styled.div`
   }
 `;
 
-const LegendPanel = styled.div`
-  position: absolute;
+const LegendPanel = styled(ControlPanel)`
   top: 100px;
-  right: 0;
-  border-radius: 8px;
-  background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  padding: 8px;
-  margin: 20px;
-  font-size: 13px;
-  line-height: 2;
-  color: #6b6b76;
   z-index: 12;
-  transition: all 0.3s ease;
-  &:hover {
-    max-width: none;
-  }
 `;
 
 const HoverIcon = styled.div`
-  display: block;
   width: 28px;
   height: 24px;
   cursor: pointer;
@@ -790,6 +744,5 @@ const ContentWrapper = styled.div`
   }
 `;
 
-const LayerMemoComponent = React.memo(LayerControl);
-
+export const LayerMemoComponent = React.memo(LayerControl);
 export { LayerMemoComponent as LayerControl };
