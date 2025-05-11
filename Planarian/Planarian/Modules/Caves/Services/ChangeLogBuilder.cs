@@ -73,7 +73,7 @@ public class ChangeLogBuilder
         ));
     }
 
-    public void AddBoolFieldAsync(string propertyName, bool? original, bool? current, string? entranceId = null)
+    public void AddBoolFieldAsync(string propertyName, bool? original, bool? current, string? entranceId = null, string? overrideCaveId = null)
     {
         if (original.Equals(current))
             return;
@@ -83,7 +83,8 @@ public class ChangeLogBuilder
             ChangeValueType.Bool,
             valueBool: current,
             originalValueBool: original,
-            entranceId: entranceId
+            entranceId: entranceId,
+            overrideCaveId: overrideCaveId
         ));
     }
 

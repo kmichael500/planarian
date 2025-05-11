@@ -1455,6 +1455,22 @@ public class ImportService : ServiceBase
                     .ToList());
             var associatedEntrancesDict = associatedEntrances.ToDictionary(e => e.Id);
 
+            var now = DateTime.UtcNow;
+            var changeRequest = new CaveChangeRequest
+            {
+                Id = IdGenerator.Generate(),
+                CreatedByUserId = RequestUser.Id,
+                CreatedOn = now,
+                AccountId = RequestUser.AccountId,
+                ReviewedByUserId = RequestUser.Id,
+                Status = ChangeRequestStatus.Approved,
+                Type = ChangeRequestType.Import,
+                ReviewedOn = now,
+            };
+
+            var builder = new ChangeLogBuilder(RequestUser.AccountId, null, RequestUser.Id, RequestUser.Id,
+                changeRequest.Id);
+
             foreach (var entrance in entrances)
             {
                 associatedEntrancesDict.TryGetValue(entrance.Id, out var associatedCave);
@@ -1492,8 +1508,106 @@ public class ImportService : ServiceBase
                 {
                     await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Processing preview of {records.Count} entrances out of {entrances.Count}");
                 }
+
+                builder.AddStringFieldAsync(
+                    CaveLogPropertyNames.EntranceName,
+                    null,
+                    record.EntranceName,
+                    entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+            
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceLatitude,
+                null,
+                entrance.Latitude,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceLongitude,
+                null,
+                entrance.Longitude,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+            
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntranceElevationFeet,
+                null,
+                entrance.Elevation,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddStringFieldAsync(
+                CaveLogPropertyNames.EntranceDescription,
+                null,
+                entrance.Description,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddBoolFieldAsync(
+                CaveLogPropertyNames.EntranceIsPrimary,
+                null,
+                entrance.IsPrimary,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddNamedIdFieldAsync(
+                CaveLogPropertyNames.EntranceLocationQualityTagName,
+                null,
+                (entrance.LocationQualityTagId, locationQualityDict[entrance.LocationQualityTagId]),
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddDoubleFieldAsync(
+                CaveLogPropertyNames.EntrancePitDepthFeet,
+                null,
+                entrance.PitFeet,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddDateTimeFieldAsync(
+                CaveLogPropertyNames.EntranceReportedOn,
+                null,
+                entrance.ReportedOn,
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddNamedArrayField(
+                CaveLogPropertyNames.EntranceStatusTagName,
+                null,
+                entranceStatusTags
+                    .Where(e => e.EntranceId == entrance.Id)
+                    .Select(e => (e.TagTypeId, allEntranceStatusTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddNamedArrayField(
+                CaveLogPropertyNames.EntranceHydrologyTagName,
+                null,
+                entranceHydrologyTags
+                    .Where(e => e.EntranceId == entrance.Id)
+                    .Select(e => (e.TagTypeId, allEntranceHydrologyTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddNamedArrayField(
+                CaveLogPropertyNames.EntranceFieldIndicationTagName,
+                null,
+                entranceFieldIndicationTags
+                    .Where(e => e.EntranceId == entrance.Id)
+                    .Select(e => (e.TagTypeId, allFieldIndicationTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
+
+            builder.AddNamedArrayField(
+                CaveLogPropertyNames.EntranceReportedByNameTagName,
+                null,
+                entranceReportedByNameTags
+                    .Where(e => e.EntranceId == entrance.Id)
+                    .Select(e => (e.TagTypeId, allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                entranceId: entrance.Id, overrideCaveId: associatedCave.CaveId);
                 
             }
+            
+            _repository.Add(changeRequest);
+            await _repository.SaveChangesAsync(cancellationToken);
+            var changeLogs = builder.Build();
+            foreach (var changeLog in changeLogs)
+            {
+                changeLog.Id = IdGenerator.Generate();
+                changeLog.CreatedByUserId = RequestUser.Id;
+            }
+            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                $"Inserting {changeLogs.Count} changes");
+            await _repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken, onBatchProcessed: OnBatchProcessed);
 
             if (!isDryRun)
             {

@@ -390,7 +390,6 @@ public partial class CaveService
             var id = modifiedEntrance.Id ?? IdGenerator.Generate(PropertyLength.Id);
             var originalEntrance = original?.Entrances.FirstOrDefault(e => e.Id == id);
 
-            // name & description
             builder.AddStringFieldAsync(
                 CaveLogPropertyNames.EntranceName,
                 originalEntrance?.Name,
@@ -426,7 +425,6 @@ public partial class CaveService
                 modifiedEntrance.IsPrimary,
                 entranceId: id);
 
-            // location‐quality tag
             await builder.AddNamedIdFieldAsync(
                 CaveLogPropertyNames.EntranceLocationQualityTagName,
                 originalEntrance?.LocationQualityTagId,
@@ -434,21 +432,18 @@ public partial class CaveService
                 _settingsRepository.GetTagTypeName,
                 entranceId: id);
 
-            // pit depth
             builder.AddDoubleFieldAsync(
                 CaveLogPropertyNames.EntrancePitDepthFeet,
                 originalEntrance?.PitFeet,
                 modifiedEntrance.PitFeet,
                 entranceId: id);
 
-            // reported on
             builder.AddDateTimeFieldAsync(
                 CaveLogPropertyNames.EntranceReportedOn,
                 originalEntrance?.ReportedOn,
                 modifiedEntrance.ReportedOn,
                 entranceId: id);
 
-            // status tags
             await builder.AddNamedArrayFieldAsync(
                 CaveLogPropertyNames.EntranceStatusTagName,
                 originalEntrance?.EntranceStatusTagIds,
@@ -456,7 +451,6 @@ public partial class CaveService
                 _settingsRepository.GetTagTypeName,
                 entranceId: id);
 
-            // hydrology tags
             await builder.AddNamedArrayFieldAsync(
                 CaveLogPropertyNames.EntranceHydrologyTagName,
                 originalEntrance?.EntranceHydrologyTagIds,
@@ -464,7 +458,6 @@ public partial class CaveService
                 _settingsRepository.GetTagTypeName,
                 entranceId: id);
 
-            // field indications
             await builder.AddNamedArrayFieldAsync(
                 CaveLogPropertyNames.EntranceFieldIndicationTagName,
                 originalEntrance?.FieldIndicationTagIds,
@@ -472,7 +465,6 @@ public partial class CaveService
                 _settingsRepository.GetTagTypeName,
                 entranceId: id);
 
-            // reported-by name tags
             await builder.AddNamedArrayFieldAsync(
                 CaveLogPropertyNames.EntranceReportedByNameTagName,
                 originalEntrance?.ReportedByNameTagIds,
@@ -486,6 +478,7 @@ public partial class CaveService
             .Select(e => e.Id)
             .ToList() ?? [];
         
+        // TODO: Do we need the added entrances? We should be able to figure it out based on the first time it was seen...
         var addedEntrances = modified.Entrances
             .Where(e => original?.Entrances.All(m => m.Id != e.Id) ?? true)
             .Select(e => e.Id)
