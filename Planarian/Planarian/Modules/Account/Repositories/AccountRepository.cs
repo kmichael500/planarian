@@ -411,28 +411,70 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         var deletedRecords = 0;
 
-        await using var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
             foreach (var batch in tagTypeIds.Chunk(100))
+            {
                 deletedRecords += await DbContext.TagTypes
                     .Where(e => e.AccountId == RequestUser.AccountId)
                     .Where(e => batch.Contains(e.Id))
                     .DeleteAsync(cancellationToken);
+            }
 
             await SaveChangesAsync(cancellationToken);
-            
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            // rollback transaction
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-
         return deletedRecords;
     }
+    public async Task DeleteAffectedCaveTagsIEnumerable(string tagTypeId, CancellationToken cancellationToken)
+    {
+        await DbContext.GeologyTags.Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.MapStatusTags.Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.GeologicAgeTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.PhysiographicProvinceTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.BiologyTags.Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.ArcheologyTags.Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.CartographerNameTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.CaveReportedByNameTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.CaveOtherTags.Where(e => e.TagTypeId == tagTypeId && e.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+    }
+    public async Task DeleteAffectedTagsFromEntrancesIEnumerable(string tagTypeId, CancellationToken cancellationToken)
+    {
+        await DbContext.EntranceStatusTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId && e.TagType.Account.AccountUsers.Any())
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.EntranceHydrologyTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId && e.TagType.Account.AccountUsers.Any())
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.FieldIndicationTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        
+        await DbContext.EntranceReportedByNameTags
+            .Where(e => e.TagTypeId == tagTypeId && e.Entrance.Cave.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+    }
+    
+    
 
     public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,
         CancellationToken cancellationToken)
@@ -739,7 +781,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Set(tagTypeSelector, destinationTagTypeId).UpdateAsync(cancellationToken);
     }
 
-    private async Task DeleteDuplicateTags<TEntity, TTag>(IQueryable<TEntity> parentSet,
+    public async Task DeleteDuplicateTags<TEntity, TTag>(IQueryable<TEntity> parentSet,
         Expression<Func<TEntity, IEnumerable<TTag>>> tagCollectionSelector,
         Expression<Func<TTag, string>> tagTypeIdSelector,
         string sourceTagTypeId,

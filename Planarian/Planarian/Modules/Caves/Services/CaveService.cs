@@ -877,7 +877,7 @@ public partial class CaveService : ServiceBase<CaveRepository>
                         historyDetail.ValueStrings = current.ToList();
                         historyDetail.PreviousValueStrings = previousAlternateNames.ToList();
 
-                        if (record.ChangeType == ChangeType.Rename || historySummary.Type == ChangeRequestType.Merge)
+                        if (record.ChangeType == ChangeType.Rename || historySummary.Type == ChangeRequestType.Merge || historySummary.Type == ChangeRequestType.Delete)
                         {
                             var renamedTo = historyDetail.ValueStrings.Except(historyDetail.PreviousValueStrings)
                                 .FirstOrDefault();

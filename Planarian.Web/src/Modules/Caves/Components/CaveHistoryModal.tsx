@@ -256,17 +256,23 @@ const renderDetail = (d: HistoryDetail, entry: CaveHistory) => {
     case CaveLogPropertyName.EntranceReportedByNameTagName:
       if (
         entry.type === ChangeRequestType.Rename ||
-        entry.type === ChangeRequestType.Merge
+        entry.type === ChangeRequestType.Merge ||
+        entry.type === ChangeRequestType.Delete
       ) {
         const requestTypeDisplay =
           entry.type == ChangeRequestType.Rename
             ? "renamed to"
             : entry.type == ChangeRequestType.Merge
             ? "merged into"
+            : entry.type == ChangeRequestType.Delete
+            ? "Deleted"
             : entry.type;
-        newValRaw = `'${d.previousValueString ?? ""}' ${requestTypeDisplay} '${
-          d.valueString ?? ""
-        }'`;
+        newValRaw =
+          entry.type == ChangeRequestType.Delete
+            ? `${requestTypeDisplay} '${d.previousValueString}'`
+            : `'${d.previousValueString ?? ""}' ${requestTypeDisplay} '${
+                d.valueString ?? ""
+              }'`;
         // prevValRaw = d.previousValueString;
         break;
       }
@@ -327,7 +333,9 @@ const ChangeHeader = ({ entry }: { entry: CaveHistory }) => {
       : entry.type == ChangeRequestType.Initial
       ? "Last Modified"
       : entry.type == ChangeRequestType.Rename
-      ? "Renamed"
+      ? "Tag Renamed"
+      : entry.type == ChangeRequestType.Delete
+      ? "Tag Deleted"
       : entry.type;
   return (
     <div style={{ marginBottom: 8 }}>

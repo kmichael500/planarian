@@ -238,7 +238,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 if (tagTypeAffected.IsCaveTag)
                 {
                     var cavesAffected =
-                        (await _tagRepository.GetCavesWithTagType(tagTypeId, cancellationToken)).ToList();
+                        (await _tagRepository.GetAffectedCaveTagsIEnumerable(tagTypeId, cancellationToken)).ToList();
 
                     if (cavesAffected.Count != 0)
                     {
@@ -309,11 +309,170 @@ public class AccountService : ServiceBase<AccountRepository>
         }
     }
 
-    public async Task<int> DeleteTagTypes(IEnumerable<string> tagTypeIds)
+    public async Task<int> DeleteTagTypes(IEnumerable<string> tagTypeIds, CancellationToken cancellationToken)
     {
-        var result = await Repository.DeleteTagsAsync(tagTypeIds, CancellationToken.None);
 
-        return result;
+        tagTypeIds = tagTypeIds.ToList();
+
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
+        {
+
+            var changeRequest = new CaveChangeRequest
+            {
+                Id = IdGenerator.Generate(),
+                AccountId = RequestUser.AccountId,
+                Type = ChangeRequestType.Delete,
+                Status = ChangeRequestStatus.Approved,
+                ReviewedOn = DateTime.UtcNow,
+                CaveId = null,
+                ReviewedByUserId = RequestUser.Id,
+                Notes = null
+            };
+
+            var builder = new ChangeLogBuilder(
+                accountId: RequestUser.AccountId,
+                caveId: null,
+                changedByUserId: RequestUser.Id,
+                approvedByUserId: RequestUser.Id,
+                changeRequestId: changeRequest.Id
+            );
+
+            foreach (var tagTypeId in tagTypeIds)
+            {
+                var tagType = await _tagRepository.GetTag(tagTypeId);
+                if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
+                if (tagType.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot delete default tag types.");
+
+                #region Cave Tags
+
+                var caveLogPropertyNamesAffected = new List<string>();
+                if (TagTypeKeyConstant.Archeology.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.ArcheologyTagName);
+                }
+                else if (TagTypeKeyConstant.Biology.Equals(tagType.Key))
+                {
+
+                }
+                else if (TagTypeKeyConstant.People.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.CartographerNameTagName);
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.ReportedByNameTagName);
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.EntranceReportedByNameTagName);
+                }
+                else if (TagTypeKeyConstant.CaveOther.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.OtherTagName);
+
+                }
+                else if (TagTypeKeyConstant.File.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.File);
+
+                }
+                else if (TagTypeKeyConstant.GeologicAge.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.GeologicAgeTagName);
+
+                }
+                else if (TagTypeKeyConstant.Geology.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.GeologyTagName);
+
+                }
+                else if (TagTypeKeyConstant.MapStatus.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.MapStatusTagName);
+
+                }
+                else if (TagTypeKeyConstant.PhysiographicProvince.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.PhysiographicProvinceTagName);
+
+                }
+                else if (TagTypeKeyConstant.EntranceHydrology.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.EntranceHydrologyTagName);
+
+                }
+                else if (TagTypeKeyConstant.EntranceStatus.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.EntranceStatusTagName);
+
+                }
+                else if (TagTypeKeyConstant.FieldIndication.Equals(tagType.Key))
+                {
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.EntranceFieldIndicationTagName);
+                }
+
+                #endregion
+
+                foreach (var cageLogPropertyName in caveLogPropertyNamesAffected)
+                {
+                    var cavesAffected =
+                        (await _tagRepository.GetAffectedCaveTagsIEnumerable(tagTypeId, cancellationToken)).ToList();
+
+                    if (cavesAffected.Count != 0)
+                    {
+                        foreach (var caveId in cavesAffected)
+                        {
+                            builder.AddNamedArrayField(cageLogPropertyName, [(tagTypeId, tagType.Name)], null,
+                                overrideCaveId: caveId);
+                        }
+                    }
+
+                    var entrancesAffected =
+                        (await _tagRepository.GetEntrancesWithTagType(tagTypeId, cancellationToken)).ToList();
+                    if (entrancesAffected.Count == 0) continue;
+
+                    foreach (var entrance in entrancesAffected)
+                    {
+                        builder.AddNamedArrayField(
+                            cageLogPropertyName, [(tagTypeId, tagType.Name)], null, overrideCaveId: entrance.CaveId);
+                    }
+                }
+
+                await Repository.DeleteAffectedTagsFromEntrancesIEnumerable(tagTypeId, cancellationToken);
+                await Repository.DeleteAffectedCaveTagsIEnumerable(tagTypeId, cancellationToken);
+
+            }
+            
+            var changeLogs = builder.Build();
+
+            if (changeLogs.Any())
+            {
+                Repository.Add(changeRequest);
+                await Repository.SaveChangesAsync(cancellationToken);
+                
+                foreach (var changeLog in changeLogs)
+                {
+                    changeLog.Id = IdGenerator.Generate();
+                    changeLog.CreatedByUserId = RequestUser.Id;
+                }
+            }
+            
+          
+
+            await Repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken);
+            
+            var result = await Repository.DeleteTagsAsync(tagTypeIds, cancellationToken);
+            
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return result;
+        }
+        catch (Exception e)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,

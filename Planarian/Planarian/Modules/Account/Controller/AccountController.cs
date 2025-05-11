@@ -245,10 +245,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpDelete("tags")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> DeleteTagType([FromQuery] string tagTypeIds)
+    public async Task<ActionResult> DeleteTagTypes([FromQuery] string tagTypeIds, CancellationToken cancellationToken)
     {
         var ids = tagTypeIds.SplitAndTrim();
-        var result = await Service.DeleteTagTypes(ids);
+        var result = await Service.DeleteTagTypes(ids, cancellationToken);
         return Ok(result);
     }
 
