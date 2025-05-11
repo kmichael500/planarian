@@ -47,7 +47,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
     {
         if (eventData.Context == null) return;
         
-        var context = (PlanarianDbContext)eventData.Context;
+        var context = (PlanarianDbContextBase)eventData.Context;
         foreach (var entityEntry in eventData.Context.ChangeTracker.Entries())
             if (entityEntry.Entity.GetType().BaseType == typeof(EntityBase) ||
                 entityEntry.Entity.GetType().BaseType == typeof(EntityBaseNameId))
@@ -90,7 +90,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
             }
     }
 
-    private async Task Validate(PlanarianDbContext context, EntityEntry entity, EntityState entityState)
+    private async Task Validate(PlanarianDbContextBase context, EntityEntry entity, EntityState entityState)
     {
         var name = entity.Entity.GetType().Name;
         switch (name)

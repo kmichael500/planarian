@@ -19,6 +19,7 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
@@ -103,6 +104,21 @@ public class ImportService : ServiceBase
         await using var transaction = await _repository.BeginTransactionAsync(cancellationToken);
         try
         {
+            var now = DateTime.UtcNow;
+            var changeRequest = new CaveChangeRequest
+            {
+                Id = IdGenerator.Generate(),
+                CreatedByUserId = RequestUser.Id,
+                ModifiedByUserId = null,
+                CreatedOn = now,
+                AccountId = RequestUser.AccountId,
+                ReviewedByUserId = RequestUser.Id,
+                Notes = null,
+                Status = ChangeRequestStatus.Approved,
+                Type = ChangeRequestType.Import,
+                ReviewedOn = now,
+
+            };
             var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
@@ -547,7 +563,7 @@ public class ImportService : ServiceBase
                             cave.CartographerNameTags.Add(cartographerTag);
                         }
                     }
-                    
+
                     if (caveRecord.ReportedByNames != null)
                     {
                         var reportedByNames = caveRecord.ReportedByNames.SplitAndTrim()
@@ -556,7 +572,7 @@ public class ImportService : ServiceBase
                         {
                             var tag = allPeopleTags.FirstOrDefault(e =>
                                 e.Name.Equals(reportedByName, StringComparison.InvariantCultureIgnoreCase));
-                            
+
                             if (tag == null)
                             {
                                 failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
@@ -577,7 +593,7 @@ public class ImportService : ServiceBase
                                 CreatedOn = DateTime.UtcNow,
                                 CreatedByUserId = RequestUser.Id
                             };
-                            
+
                             cave.CaveReportedByNameTags.Add(reportedByTag);
                         }
                     }
@@ -612,7 +628,7 @@ public class ImportService : ServiceBase
                 PropertiesToExclude = new List<string> { nameof(Cave.NarrativeSearchVector) }
             };
             await _repository.BulkInsertAsync(caves, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken, bulkConfig:config);
+                cancellationToken: cancellationToken, bulkConfig: config);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geology tags.");
@@ -678,6 +694,9 @@ public class ImportService : ServiceBase
 
             var records = new List<CaveDryRunRecord>();
 
+            var builder = new ChangeLogBuilder(RequestUser.AccountId, null, RequestUser.Id, RequestUser.Id,
+                changeRequest.Id);
+
             foreach (var cave in caves)
             {
                 var record = new CaveDryRunRecord();
@@ -704,6 +723,9 @@ public class ImportService : ServiceBase
                     .Select(e => allArcheologyTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
                 record.CartographerNames = cave.CartographerNameTags
                     .Select(e => allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+
+                cave.GeologicAgeTags = cave.GeologicAgeTags.ToList();
+
                 record.GeologicAges = cave.GeologicAgeTags
                     .Select(e => allGeologicAgeTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
                 record.PhysiographicProvinces = cave.PhysiographicProvinceTags
@@ -714,7 +736,136 @@ public class ImportService : ServiceBase
                     .Select(e => allMapStatusTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
 
                 records.Add(record);
+
+                #region Cave Change History
+
+                builder.AddNamedIdFieldAsync(
+                    CaveLogPropertyNames.CountyName,
+                    null,
+                    (cave.CountyId, record.CountyName), overrideCaveId: cave.Id);
+
+                builder.AddNamedIdFieldAsync(
+                    CaveLogPropertyNames.StateName,
+                    null,
+                    (cave.StateId, record.State), overrideCaveId: cave.Id);
+
+                builder.AddStringFieldAsync(
+                    CaveLogPropertyNames.Name,
+                    null,
+                    cave.Name, overrideCaveId: cave.Id);
+
+                builder.AddArrayFieldAsync(
+                    CaveLogPropertyNames.AlternateNames,
+                    null,
+                    cave.AlternateNamesList, overrideCaveId: cave.Id);
+
+                builder.AddDoubleFieldAsync(
+                    CaveLogPropertyNames.LengthFeet,
+                    null,
+                    cave.LengthFeet, overrideCaveId: cave.Id);
+
+                builder.AddDoubleFieldAsync(
+                    CaveLogPropertyNames.DepthFeet,
+                    null,
+                    cave.DepthFeet, overrideCaveId: cave.Id);
+
+                builder.AddDoubleFieldAsync(
+                    CaveLogPropertyNames.MaxPitDepthFeet,
+                    null,
+                    cave.MaxPitDepthFeet, overrideCaveId: cave.Id);
+
+                builder.AddIntFieldAsync(
+                    CaveLogPropertyNames.NumberOfPits,
+                    null,
+                    cave.NumberOfPits, overrideCaveId: cave.Id);
+
+                builder.AddStringFieldAsync(
+                    CaveLogPropertyNames.Narrative,
+                    null,
+                    cave.Narrative, overrideCaveId: cave.Id);
+
+                builder.AddDateTimeFieldAsync(
+                    CaveLogPropertyNames.ReportedOn,
+                    null,
+                    cave.ReportedOn, overrideCaveId: cave.Id);
+                
+
+                builder.AddNamedArrayField(CaveLogPropertyNames.GeologyTagName, null, cave.GeologyTags
+                    .Select(e => (e.TagTypeId, allGeologyTags.First(ee => ee.Id == e.TagTypeId).Name)
+                    ), overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.MapStatusTagName,
+                    null,
+                    cave.MapStatusTags
+                        .Select(e => (e.TagTypeId, allMapStatusTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.GeologicAgeTagName,
+                    null,
+                    cave.GeologicAgeTags
+                        .Select(e => (e.TagTypeId, allGeologicAgeTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.PhysiographicProvinceTagName,
+                    null,
+                    cave.PhysiographicProvinceTags
+                        .Select(e => (e.TagTypeId,
+                            allPhysiographicProvincesTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.BiologyTagName,
+                    null,
+                    cave.BiologyTags
+                        .Select(e => (e.TagTypeId, allBiologyTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.ArcheologyTagName,
+                    null,
+                    cave.ArcheologyTags
+                        .Select(e => (e.TagTypeId, allArcheologyTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.CartographerNameTagName,
+                    null,
+                    cave.CartographerNameTags
+                        .Select(e => (e.TagTypeId, allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.ReportedByNameTagName,
+                    null,
+                    cave.CaveReportedByNameTags
+                        .Select(e => (e.TagTypeId, allPeopleTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                builder.AddNamedArrayField(
+                    CaveLogPropertyNames.OtherTagName,
+                    null,
+                    cave.CaveOtherTags
+                        .Select(e => (e.TagTypeId, allOtherTags.First(ee => ee.Id == e.TagTypeId).Name)),
+                    overrideCaveId: cave.Id);
+
+                #endregion
             }
+            
+            _repository.Add(changeRequest);
+            await _repository.SaveChangesAsync(cancellationToken);
+            var changeLogs = builder.Build();
+            foreach (var changeLog in changeLogs)
+            {
+                changeLog.Id = IdGenerator.Generate();
+                changeLog.CreatedByUserId = RequestUser.Id;
+            }
+            
+            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                $"Inserting {changeLogs.Count} changes");
+            await _repository.BulkInsertAsync(changeLogs, cancellationToken: cancellationToken, onBatchProcessed: OnBatchProcessed);
 
             if (!isDryRun)
             {

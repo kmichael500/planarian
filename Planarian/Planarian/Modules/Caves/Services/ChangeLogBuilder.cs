@@ -28,7 +28,7 @@ public class ChangeLogBuilder
         _changeRequestId = changeRequestId;
     }
 
-    public void AddStringFieldAsync(string propertyName, string? original, string? current, string? entranceId = null)
+    public void AddStringFieldAsync(string propertyName, string? original, string? current, string? entranceId = null, string? overrideCaveId = null)
     {
         if (string.Equals(original, current, StringComparison.InvariantCulture))
             return;
@@ -38,11 +38,12 @@ public class ChangeLogBuilder
             ChangeValueType.String,
             valueString: current,
             originalValueString: original,
-            entranceId: entranceId
+            entranceId: entranceId,
+            overrideCaveId: overrideCaveId
         ));
     }
 
-    public void AddIntFieldAsync(string propertyName, int? original, int? current, string? entranceId = null)
+    public void AddIntFieldAsync(string propertyName, int? original, int? current, string? entranceId = null, string? overrideCaveId = null)
     {
         if (original.Equals(current))
             return;
@@ -52,11 +53,12 @@ public class ChangeLogBuilder
             ChangeValueType.Int,
             valueInt: current,
             originalValueInt: original,
-            entranceId: entranceId
+            entranceId: entranceId,
+            overrideCaveId: overrideCaveId
         ));
     }
 
-    public void AddDoubleFieldAsync(string propertyName, double? original, double? current, string? entranceId = null)
+    public void AddDoubleFieldAsync(string propertyName, double? original, double? current, string? entranceId = null, string? overrideCaveId = null)
     {
         if (original.Equals(current))
             return;
@@ -66,7 +68,8 @@ public class ChangeLogBuilder
             ChangeValueType.Double,
             valueDouble: current,
             originalValueDouble: original,
-            entranceId: entranceId
+            entranceId: entranceId,
+            overrideCaveId: overrideCaveId
         ));
     }
 
@@ -85,7 +88,7 @@ public class ChangeLogBuilder
     }
 
     public void AddDateTimeFieldAsync(string propertyName, DateTime? original, DateTime? current,
-        string? entranceId = null)
+        string? entranceId = null, string? overrideCaveId = null)
     {
         if (original.Equals(current))
             return;
@@ -95,12 +98,13 @@ public class ChangeLogBuilder
             ChangeValueType.DateTime,
             valueDateTime: current,
             originalValueDateTime: original,
-            entranceId: entranceId
+            entranceId: entranceId,
+            overrideCaveId: overrideCaveId
         ));
     }
 
     public void AddArrayFieldAsync(string propertyName, IEnumerable<string>? original, IEnumerable<string>? current,
-        string? entranceId = null)
+        string? entranceId = null, string? overrideCaveId = null)
     {
         var (added, removed) = DiffStringArrays(original ?? [],
             current ?? []);
@@ -118,7 +122,8 @@ public class ChangeLogBuilder
                 propertyName,
                 ChangeValueType.String,
                 originalValueString: val,
-                entranceId: entranceId
+                entranceId: entranceId,
+                overrideCaveId: overrideCaveId
             ));
     }
 
