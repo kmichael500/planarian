@@ -40,6 +40,9 @@ class QueryCondition<T extends object> {
 }
 
 class QueryBuilder<T extends object> {
+  hasFilters() {
+    return this.conditions.length > 0;
+  }
   private conditions: QueryCondition<T>[];
   private currentPage: number;
   private pageSize: number;

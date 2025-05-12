@@ -1,5 +1,5 @@
 import { Checkbox, InputNumber, Slider, Space } from "antd";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -7,16 +7,15 @@ import { BuildOutlined } from "@ant-design/icons";
 import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
-
-const MAPBOX_ACCESS_TOKEN =
-  "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface PlanarianMapLayer {
   displayName: string;
   isActive: boolean;
   opacity: number;
   id: string;
-  type: "raster" | "vector" | "group" | string; // Added "group"
+  type: "raster" | "vector" | "group" | string;
   attribution?: string;
   source?: {
     layerName?: string;
@@ -24,14 +23,12 @@ interface PlanarianMapLayer {
     tiles: string[];
     tileSize?: number;
   };
-  paint?: {
-    "raster-opacity"?: number;
-  };
+  paint?: { "raster-opacity"?: number };
   fillLayer?: {
     id: string;
     sourceLayer: string;
-    layout: { [key: string]: any };
-    paint: { [key: string]: any };
+    layout: Record<string, any>;
+    paint: Record<string, any>;
   };
   secondaryLayer?: {
     type:
@@ -54,22 +51,16 @@ interface PlanarianMapLayer {
       tiles: string[];
       tileSize?: number;
     };
-    layout: (isActive: boolean) => { [key: string]: any };
-    paint: (opacity: number) => { [key: string]: any };
+    layout: (isActive: boolean) => Record<string, any>;
+    paint: (opacity: number) => Record<string, any>;
   };
   legend?: React.ReactNode;
-  memberLayerIds?: string[]; // For group layers
-  isGroupMember?: boolean; // For layers part of a group
+  memberLayerIds?: string[];
+  isGroupMember?: boolean;
 }
 
-interface LayerControlProps {
-  position?: {
-    top?: string;
-    right?: string;
-    left?: string;
-    bottom?: string;
-  };
-}
+const MAPBOX_ACCESS_TOKEN =
+  "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
 
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
   [
@@ -79,7 +70,7 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
       code,
       info.color,
     ]),
-    "#cccccc", // fallback
+    "#cccccc",
   ] as unknown as DataDrivenPropertyValueSpecification<string>;
 
 const LAYERS: PlanarianMapLayer[] = [
@@ -223,7 +214,7 @@ const LAYERS: PlanarianMapLayer[] = [
   },
   {
     id: "macrostrat",
-    displayName: "Geology",
+    displayName: "Macrostrat Geology",
     type: "raster",
     source: {
       type: "raster",
@@ -396,126 +387,269 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 ];
 
-const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
-  const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
-  const [isTerrainActive, setIsTerrainActive] = useState(false);
-  const [terrainExaggeration, setTerrainExaggeration] = useState(1.5);
-  const { current: map } = useMap();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+const LayerControl: React.FC<{
+  position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
+}> = ({ position }) => {
+  const accountId = AuthenticationService.GetAccountId();
+  const LOCAL_STORAGE_LAYER_STATES_KEY = `planarianMapLayerStates-${accountId}`;
+  const LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY = `planarianPrevGroupMembers-${accountId}`;
+  const LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY = `planarianMacrostratDisclaimerShown-${accountId}`;
 
-  const onLayerChecked = (layer: PlanarianMapLayer) => {
-    let newLayers = [...mapLayers];
-    const layerIndex = newLayers.findIndex((l) => l.id === layer.id);
-    if (layerIndex === -1) return;
+  const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(() => {
+    const savedLayerStatesString = localStorage.getItem(
+      LOCAL_STORAGE_LAYER_STATES_KEY
+    );
+    let initialLayers = LAYERS.map((layer) => ({ ...layer }));
 
-    const newActiveState = !newLayers[layerIndex].isActive;
-    newLayers[layerIndex] = {
-      ...newLayers[layerIndex],
-      isActive: newActiveState,
-    };
-
-    if (layer.type === "group" && layer.memberLayerIds) {
-      // Toggle all member layers
-      newLayers = newLayers.map((l) =>
-        layer.memberLayerIds?.includes(l.id)
-          ? { ...l, isActive: newActiveState }
-          : l
-      );
-    } else if (layer.isGroupMember) {
-      // Check if all members of the parent group are now in the same state
-      const parentGroup = newLayers.find(
-        (g) => g.type === "group" && g.memberLayerIds?.includes(layer.id)
-      );
-      if (parentGroup && parentGroup.memberLayerIds) {
-        const allMembersActive = parentGroup.memberLayerIds.every(
-          (memberId) => newLayers.find((l) => l.id === memberId)?.isActive
-        );
-        const allMembersInactive = parentGroup.memberLayerIds.every(
-          (memberId) => !newLayers.find((l) => l.id === memberId)?.isActive
-        );
-
-        if (allMembersActive) {
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1) {
-            newLayers[parentGroupIndex] = {
-              ...newLayers[parentGroupIndex],
-              isActive: true,
+    if (savedLayerStatesString) {
+      try {
+        const savedStates: Array<{
+          id: string;
+          isActive: boolean;
+          opacity: number;
+        }> = JSON.parse(savedLayerStatesString);
+        initialLayers = initialLayers.map((defaultLayer) => {
+          const savedState = savedStates.find((s) => s.id === defaultLayer.id);
+          if (savedState) {
+            return {
+              ...defaultLayer,
+              isActive: savedState.isActive,
+              opacity: savedState.opacity,
             };
           }
-        } else if (allMembersInactive) {
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1) {
-            newLayers[parentGroupIndex] = {
-              ...newLayers[parentGroupIndex],
-              isActive: false,
-            };
-          }
-        } else {
-          // If members are in mixed states, set parent group to a "mixed" or indeterminate state if desired,
-          // or simply reflect that not all are active by setting isActive to false.
-          // For now, we'll ensure it's not fully "active" unless all members are.
-          const parentGroupIndex = newLayers.findIndex(
-            (g) => g.id === parentGroup.id
-          );
-          if (parentGroupIndex !== -1 && newLayers[parentGroupIndex].isActive) {
-            // If the group was active, but now not all members are, set group to inactive.
-            // Or, introduce an indeterminate state for the group checkbox if your UI library supports it.
-            // For simplicity here, we'll just ensure it's not marked as fully active.
-            // A more sophisticated approach might involve a tri-state checkbox for the group.
-          }
-        }
+          return defaultLayer;
+        });
+      } catch (e) {
+        console.error(
+          "Failed to parse saved layer states from localStorage",
+          e
+        );
       }
     }
-    setMapLayers(newLayers);
+    return initialLayers;
+  });
+
+  const [prevGroupMembers, setPrevGroupMembers] = useState<
+    Record<string, string[]>
+  >(() => {
+    const savedPrevGroupMembersString = localStorage.getItem(
+      LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY
+    );
+    if (savedPrevGroupMembersString) {
+      try {
+        return JSON.parse(savedPrevGroupMembersString);
+      } catch (e) {
+        console.error(
+          "Failed to parse saved prevGroupMembers from localStorage",
+          e
+        );
+      }
+    }
+    return {};
+  });
+
+  const [isTerrainActive, setIsTerrainActive] = useState(false);
+  const [terrainExaggeration, setTerrainExaggeration] = useState(1);
+  const [showMacrostratDisclaimer, setShowMacrostratDisclaimer] =
+    useState(false);
+
+  const { current: map } = useMap();
+
+  useEffect(() => {
+    const statesToSave = mapLayers.map((l) => ({
+      id: l.id,
+      isActive: l.isActive,
+      opacity: l.opacity,
+    }));
+    localStorage.setItem(
+      LOCAL_STORAGE_LAYER_STATES_KEY,
+      JSON.stringify(statesToSave)
+    );
+  }, [mapLayers, LOCAL_STORAGE_LAYER_STATES_KEY]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY,
+      JSON.stringify(prevGroupMembers)
+    );
+  }, [prevGroupMembers, LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY]);
+
+  useEffect(() => {
+    if (map) {
+      if (isTerrainActive) {
+        map.getMap().setTerrain({
+          source: "terrainLayer",
+          exaggeration: terrainExaggeration,
+        });
+      } else {
+        map.getMap().setTerrain(null);
+      }
+    }
+  }, [map, isTerrainActive, terrainExaggeration]);
+
+  const handleNormalToggle = (layer: PlanarianMapLayer) => {
+    const newIsActive = !layer.isActive;
+    if (
+      layer.id === "macrostrat" &&
+      newIsActive &&
+      !localStorage.getItem(LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY)
+    ) {
+      setShowMacrostratDisclaimer(true);
+    }
+    setMapLayers((prev) =>
+      prev.map((l) => (l.id === layer.id ? { ...l, isActive: newIsActive } : l))
+    );
+  };
+
+  const handleMemberToggle = (layer: PlanarianMapLayer) => {
+    const memberId = layer.id;
+    const newState = !layer.isActive;
+
+    setMapLayers((prevMapLayers) => {
+      const newLayers = prevMapLayers.map((l) =>
+        l.id === memberId ? { ...l, isActive: newState } : l
+      );
+
+      const parentGroupDefinition = LAYERS.find(
+        (l) => l.type === "group" && l.memberLayerIds?.includes(memberId)
+      );
+
+      if (parentGroupDefinition && parentGroupDefinition.memberLayerIds) {
+        const parentGroupId = parentGroupDefinition.id;
+        const activeMembersInGroup =
+          parentGroupDefinition.memberLayerIds.filter((id) => {
+            const member = newLayers.find((m) => m.id === id);
+            return member && member.isActive;
+          }).length;
+
+        if (activeMembersInGroup === 0) {
+          setPrevGroupMembers((prev) => {
+            const copy = { ...prev };
+            delete copy[parentGroupId];
+            return copy;
+          });
+        }
+      }
+      return newLayers;
+    });
+  };
+
+  const handleGroupToggle = (layer: PlanarianMapLayer) => {
+    const groupId = layer.id;
+    const memberIds = layer.memberLayerIds!;
+
+    const currentlyActiveMemberIds = mapLayers
+      .filter((l) => memberIds.includes(l.id) && l.isActive)
+      .map((l) => l.id);
+    const isAnyMemberCurrentlyActive = currentlyActiveMemberIds.length > 0;
+
+    if (isAnyMemberCurrentlyActive) {
+      setPrevGroupMembers((prev) => ({
+        ...prev,
+        [groupId]: currentlyActiveMemberIds,
+      }));
+      setMapLayers((prevMapLayers) =>
+        prevMapLayers.map((l) =>
+          memberIds.includes(l.id) ? { ...l, isActive: false } : l
+        )
+      );
+    } else {
+      const previouslyRememberedActiveMembers = prevGroupMembers[groupId];
+      let membersToActivate: string[];
+
+      if (
+        previouslyRememberedActiveMembers &&
+        previouslyRememberedActiveMembers.length > 0
+      ) {
+        membersToActivate = previouslyRememberedActiveMembers;
+      } else {
+        membersToActivate = [...memberIds];
+      }
+
+      setMapLayers((prevMapLayers) =>
+        prevMapLayers.map((l) =>
+          memberIds.includes(l.id)
+            ? { ...l, isActive: membersToActivate.includes(l.id) }
+            : l
+        )
+      );
+    }
+  };
+
+  const handleLayerToggle = (layer: PlanarianMapLayer) => {
+    if (layer.type === "group" && layer.memberLayerIds) {
+      handleGroupToggle(layer);
+    } else if (layer.isGroupMember) {
+      handleMemberToggle(layer);
+    } else {
+      handleNormalToggle(layer);
+    }
   };
 
   const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
-    let newLayers = mapLayers.map((l) =>
-      l.id === layer.id ? { ...l, opacity } : l
+    setMapLayers((prev) =>
+      prev.map((l) =>
+        l.id === layer.id ||
+        (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
+          ? { ...l, opacity }
+          : l
+      )
     );
-
-    if (layer.type === "group" && layer.memberLayerIds) {
-      newLayers = newLayers.map((l) =>
-        layer.memberLayerIds?.includes(l.id) ? { ...l, opacity } : l
-      );
-    }
-    setMapLayers(newLayers);
   };
 
   const onTerrainToggle = () => {
-    setIsTerrainActive((prevState) => !prevState);
-    if (isTerrainActive) {
-      map?.getMap().setTerrain(null);
-    } else {
-      map?.getMap().setTerrain({
-        source: "terrainLayer",
-        exaggeration: terrainExaggeration,
-      });
+    setIsTerrainActive((on: boolean) => !on);
+  };
+
+  const handleCloseMacrostratDisclaimer = () => {
+    if (showMacrostratDisclaimer) {
+      localStorage.setItem(LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY, "true");
     }
+    setShowMacrostratDisclaimer(false);
   };
 
   const legendPosition = {
-    top:
-      position && position.top ? `${parseInt(position.top) + 50}px` : "100px",
+    top: position?.top ? `${parseInt(position.top) + 50}px` : "100px",
     right: position?.right || "0",
     left: position?.left || "auto",
     bottom: position?.bottom || "auto",
   };
 
-  const toggleGroupExpansion = (groupId: string) => {
-    setExpandedGroups((prev) =>
-      prev.includes(groupId)
-        ? prev.filter((id) => id !== groupId)
-        : [...prev, groupId]
-    );
-  };
-
   return (
     <>
+      <PlanarianModal
+        open={showMacrostratDisclaimer}
+        onClose={handleCloseMacrostratDisclaimer}
+        height={"auto"}
+        header="Macrostrat Geology Disclaimer"
+        footer={
+          <PlanarianButton
+            alwaysShowChildren
+            onClick={handleCloseMacrostratDisclaimer}
+            icon={undefined}
+          >
+            Close
+          </PlanarianButton>
+        }
+        width="600px"
+      >
+        <p>
+          Macrostrat coverage varies by region and may be less detailed than
+          traditional geologic maps.
+        </p>
+        <p>Typical resolution by state:</p>
+        <ul>
+          <li>KY – 1:24,000</li>
+          <li>TN – 1:250,000</li>
+          <li>AL – 1:250,000</li>
+          <li>GA – 1:500,000</li>
+        </ul>
+        <p>Only 1:24,000 is generally suitable for precision use.</p>
+        <p>
+          For the most detailed map available, turn on the NGMDB Geology layer
+          and select the smallest scale.
+        </p>
+      </PlanarianModal>
       <Source
         id="terrainLayer"
         type="raster-dem"
@@ -524,26 +658,29 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
         ]}
         tileSize={256}
       />
+
       {mapLayers.map((layer) => {
-        if (layer.type === "raster") {
+        if (layer.type === "raster" && layer.source) {
           return (
             <Source
               key={layer.id}
               id={layer.id}
               type="raster"
-              tiles={layer.source!.tiles}
+              tiles={layer.source.tiles}
               attribution={layer.attribution}
             >
               <Layer
+                id={layer.id}
                 key={layer.id}
                 source={layer.id}
-                paint={{ "raster-opacity": layer.opacity }}
                 type="raster"
+                paint={{ "raster-opacity": layer.opacity }}
                 layout={{ visibility: layer.isActive ? "visible" : "none" }}
               />
             </Source>
           );
-        } else if (layer.type === "vector" && layer.source) {
+        }
+        if (layer.type === "vector" && layer.source) {
           return (
             <React.Fragment key={layer.id}>
               <Source
@@ -555,11 +692,11 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                 {layer.fillLayer && (
                   <Layer
                     id={layer.fillLayer.id}
+                    type="fill"
                     source={layer.id}
                     source-layer={
                       layer.fillLayer.sourceLayer || layer.source.layerName
                     }
-                    type="fill"
                     layout={{
                       ...layer.fillLayer.layout,
                       visibility: layer.isActive ? "visible" : "none",
@@ -579,9 +716,9 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                 >
                   <Layer
                     id={layer.secondaryLayer.id}
+                    type={layer.secondaryLayer.type}
                     source={layer.secondaryLayer.id}
                     source-layer={layer.secondaryLayer.source.layerName}
-                    type={layer.secondaryLayer.type}
                     layout={layer.secondaryLayer.layout(layer.isActive)}
                     paint={layer.secondaryLayer.paint(layer.opacity)}
                     {...(layer.secondaryLayer.minzoom !== undefined && {
@@ -631,53 +768,59 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
             }}
           >
             {mapLayers
-              .filter((layer) => !layer.isGroupMember)
-              .map((layer) => (
-                <div key={layer.id} style={{ marginBottom: "15px" }}>
-                  <Checkbox
-                    onChange={() => {
-                      onLayerChecked(layer);
-                      toggleGroupExpansion(layer.id);
-                    }}
-                    checked={layer.isActive}
-                  >
-                    {layer.displayName}
-                  </Checkbox>
+              .filter((l) => !l.isGroupMember)
+              .map((layer) => {
+                const isGroup =
+                  layer.type === "group" && !!layer.memberLayerIds;
+                const memberIds = layer.memberLayerIds || [];
+                const members = mapLayers.filter((l) =>
+                  memberIds.includes(l.id)
+                );
+                const activeCount = members.filter((m) => m.isActive).length;
+                const allCount = members.length;
+                const checked = isGroup
+                  ? activeCount === allCount && allCount > 0
+                  : layer.isActive;
+                const indeterminate = isGroup
+                  ? activeCount > 0 && activeCount < allCount
+                  : false;
 
-                  <Slider
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={layer.opacity}
-                    onChange={(value: number) =>
-                      onLayerOpacityChanged(layer, value)
-                    }
-                  />
-                  {layer.type === "group" &&
-                    expandedGroups.includes(layer.id) &&
-                    layer.memberLayerIds && (
-                      <div style={{ marginLeft: "20px", marginTop: "5px" }}>
-                        {mapLayers
-                          .filter((member) =>
-                            layer.memberLayerIds?.includes(member.id)
-                          )
-                          .map((memberLayer) => (
-                            <div
-                              key={memberLayer.id}
-                              style={{ marginBottom: "5px" }}
-                            >
+                return (
+                  <div key={layer.id} style={{ marginBottom: 15 }}>
+                    <Checkbox
+                      checked={checked}
+                      indeterminate={indeterminate}
+                      onChange={() => handleLayerToggle(layer)}
+                    >
+                      {layer.displayName}
+                    </Checkbox>
+                    <Slider
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      value={layer.opacity}
+                      onChange={(v) => onLayerOpacityChanged(layer, v)}
+                    />
+                    {isGroup && activeCount > 0 && (
+                      <div style={{ marginLeft: 20, marginTop: 5 }}>
+                        {layer.memberLayerIds!.map((id) => {
+                          const member = mapLayers.find((m) => m.id === id)!;
+                          return (
+                            <div key={id} style={{ marginBottom: 5 }}>
                               <Checkbox
-                                onChange={() => onLayerChecked(memberLayer)}
-                                checked={memberLayer.isActive}
+                                checked={member.isActive}
+                                onChange={() => handleLayerToggle(member)}
                               >
-                                {memberLayer.displayName}
+                                {member.displayName}
                               </Checkbox>
                             </div>
-                          ))}
+                          );
+                        })}
                       </div>
                     )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
           </div>
           <Space direction="vertical">
             <PlanarianButton
@@ -695,12 +838,12 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                   max={10}
                   step={0.1}
                   value={terrainExaggeration}
-                  onChange={(value) => {
-                    if (value !== null) {
-                      setTerrainExaggeration(value);
+                  onChange={(v) => {
+                    if (v !== null) {
+                      setTerrainExaggeration(v);
                       map?.getMap().setTerrain({
                         source: "terrainLayer",
-                        exaggeration: value,
+                        exaggeration: v,
                       });
                     }
                   }}
@@ -711,33 +854,25 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
         </ContentWrapper>
       </ControlPanel>
 
-      <div>
-        {mapLayers
-          .filter((layer) => layer.isActive)
-          .map((layer) =>
-            layer.legend ? (
-              <LegendPanel style={legendPosition}>
-                <HoverIcon style={{ zIndex: 0 }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                    <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
-                  </svg>
-                </HoverIcon>
-                <ContentWrapper>
-                  <div key={`legend-${layer.id}`}>{layer.legend}</div>
-                </ContentWrapper>
-              </LegendPanel>
-            ) : null
-          )}
-      </div>
+      {mapLayers
+        .filter((l) => l.isActive && l.legend)
+        .map((l) => (
+          <LegendPanel key={`legend-${l.id}`} style={legendPosition}>
+            <HoverIcon>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
+              </svg>
+            </HoverIcon>
+            <ContentWrapper>{l.legend}</ContentWrapper>{" "}
+          </LegendPanel>
+        ))}
     </>
   );
 };
 
 const ControlPanel = styled.div`
   position: absolute;
-  top: 50px;
-  right: 0;
-  background: white;
+  background: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px;
   margin: 20px;
@@ -752,27 +887,12 @@ const ControlPanel = styled.div`
   }
 `;
 
-const LegendPanel = styled.div`
-  position: absolute;
+const LegendPanel = styled(ControlPanel)`
   top: 100px;
-  right: 0;
-  border-radius: 8px;
-  background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  padding: 8px;
-  margin: 20px;
-  font-size: 13px;
-  line-height: 2;
-  color: #6b6b76;
   z-index: 12;
-  transition: all 0.3s ease;
-  &:hover {
-    max-width: none;
-  }
 `;
 
 const HoverIcon = styled.div`
-  display: block;
   width: 28px;
   height: 24px;
   cursor: pointer;
@@ -790,6 +910,5 @@ const ContentWrapper = styled.div`
   }
 `;
 
-const LayerMemoComponent = React.memo(LayerControl);
-
+export const LayerMemoComponent = React.memo(LayerControl);
 export { LayerMemoComponent as LayerControl };
