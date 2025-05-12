@@ -1,4 +1,13 @@
-import { Typography, Form, Checkbox, Space, Divider, message } from "antd";
+import {
+  Typography,
+  Form,
+  Checkbox,
+  Space,
+  Divider,
+  message,
+  Tag,
+  Spin,
+} from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
@@ -561,10 +570,31 @@ const CavesComponent: React.FC = () => {
             }}
           />
         </div>
-        {caves && (
-          <Typography.Text>
-            {formatNumber(caves.totalCount)} results found
-          </Typography.Text>
+        {isCavesLoading ? (
+          <Space align="center">
+            <Spin size="small" />
+            <Typography.Text type="secondary">
+              Loading results...
+            </Typography.Text>
+          </Space>
+        ) : (
+          caves && (
+            <>
+              {queryBuilder.hasFilters() ? (
+                <Tag color="#F8DB6A" style={{ color: "black" }}>
+                  <Typography.Text style={{ color: "black" }}>
+                    Filtered: {formatNumber(caves.totalCount)} results found
+                  </Typography.Text>
+                </Tag>
+              ) : (
+                <Tag>
+                  <Typography.Text>
+                    {formatNumber(caves.totalCount)} results found
+                  </Typography.Text>
+                </Tag>
+              )}
+            </>
+          )
         )}
         <SpinnerCardComponent spinning={isCavesLoading}>
           <CardGridComponent
