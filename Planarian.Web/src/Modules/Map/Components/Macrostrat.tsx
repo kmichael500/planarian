@@ -552,6 +552,11 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                   )}
                 </Descriptions.Item>
               </Descriptions>
+              <Typography>
+                {" "}
+                Macrostrat coverage varies by region and may be less detailed
+                than traditional geologic maps.
+              </Typography>
             </Panel>
 
             {/* Macrostrat-linked data panel */}

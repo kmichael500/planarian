@@ -8,6 +8,7 @@ import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
 interface PlanarianMapLayer {
   displayName: string;
@@ -392,6 +393,7 @@ const LayerControl: React.FC<{
   const accountId = AuthenticationService.GetAccountId();
   const LOCAL_STORAGE_LAYER_STATES_KEY = `planarianMapLayerStates-${accountId}`;
   const LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY = `planarianPrevGroupMembers-${accountId}`;
+  const LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY = `planarianMacrostratDisclaimerShown-${accountId}`;
 
   const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(() => {
     const savedLayerStatesString = localStorage.getItem(
@@ -448,6 +450,8 @@ const LayerControl: React.FC<{
 
   const [isTerrainActive, setIsTerrainActive] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1);
+  const [showMacrostratDisclaimer, setShowMacrostratDisclaimer] =
+    useState(false);
 
   const { current: map } = useMap();
 
@@ -484,8 +488,16 @@ const LayerControl: React.FC<{
   }, [map, isTerrainActive, terrainExaggeration]);
 
   const handleNormalToggle = (layer: PlanarianMapLayer) => {
+    const newIsActive = !layer.isActive;
+    if (
+      layer.id === "macrostrat" &&
+      newIsActive &&
+      !localStorage.getItem(LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY)
+    ) {
+      setShowMacrostratDisclaimer(true);
+    }
     setMapLayers((prev) =>
-      prev.map((l) => (l.id === layer.id ? { ...l, isActive: !l.isActive } : l))
+      prev.map((l) => (l.id === layer.id ? { ...l, isActive: newIsActive } : l))
     );
   };
 
@@ -589,6 +601,13 @@ const LayerControl: React.FC<{
     setIsTerrainActive((on: boolean) => !on);
   };
 
+  const handleCloseMacrostratDisclaimer = () => {
+    if (showMacrostratDisclaimer) {
+      localStorage.setItem(LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY, "true");
+    }
+    setShowMacrostratDisclaimer(false);
+  };
+
   const legendPosition = {
     top: position?.top ? `${parseInt(position.top) + 50}px` : "100px",
     right: position?.right || "0",
@@ -598,6 +617,39 @@ const LayerControl: React.FC<{
 
   return (
     <>
+      <PlanarianModal
+        open={showMacrostratDisclaimer}
+        onClose={handleCloseMacrostratDisclaimer}
+        height={"auto"}
+        header="Macrostrat Geology Disclaimer"
+        footer={
+          <PlanarianButton
+            alwaysShowChildren
+            onClick={handleCloseMacrostratDisclaimer}
+            icon={undefined}
+          >
+            Close
+          </PlanarianButton>
+        }
+        width="600px"
+      >
+        <p>
+          Macrostrat coverage varies by region and may be less detailed than
+          traditional geologic maps.
+        </p>
+        <p>Typical resolution by state:</p>
+        <ul>
+          <li>KY – 1:24,000</li>
+          <li>TN – 1:250,000</li>
+          <li>AL – 1:250,000</li>
+          <li>GA – 1:500,000</li>
+        </ul>
+        <p>Only 1:24,000 is generally suitable for precision use.</p>
+        <p>
+          For the most detailed map available, turn on the NGMDB Geology layer
+          and select the smallest scale.
+        </p>
+      </PlanarianModal>
       <Source
         id="terrainLayer"
         type="raster-dem"
