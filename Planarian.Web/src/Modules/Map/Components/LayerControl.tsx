@@ -1,5 +1,5 @@
 import { Checkbox, InputNumber, Slider, Space } from "antd";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -7,6 +7,7 @@ import { BuildOutlined } from "@ant-design/icons";
 import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 interface PlanarianMapLayer {
   displayName: string;
@@ -55,12 +56,6 @@ interface PlanarianMapLayer {
   legend?: React.ReactNode;
   memberLayerIds?: string[];
   isGroupMember?: boolean;
-
-  indeterminate?: boolean;
-}
-
-interface LayerControlProps {
-  position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
 }
 
 const MAPBOX_ACCESS_TOKEN =
@@ -391,78 +386,207 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 ];
 
-const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
-  const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(LAYERS);
+const LayerControl: React.FC<{
+  position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
+}> = ({ position }) => {
+  const accountId = AuthenticationService.GetAccountId();
+  const LOCAL_STORAGE_LAYER_STATES_KEY = `planarianMapLayerStates-${accountId}`;
+  const LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY = `planarianPrevGroupMembers-${accountId}`;
+
+  const [mapLayers, setMapLayers] = useState<PlanarianMapLayer[]>(() => {
+    const savedLayerStatesString = localStorage.getItem(
+      LOCAL_STORAGE_LAYER_STATES_KEY
+    );
+    let initialLayers = LAYERS.map((layer) => ({ ...layer }));
+
+    if (savedLayerStatesString) {
+      try {
+        const savedStates: Array<{
+          id: string;
+          isActive: boolean;
+          opacity: number;
+        }> = JSON.parse(savedLayerStatesString);
+        initialLayers = initialLayers.map((defaultLayer) => {
+          const savedState = savedStates.find((s) => s.id === defaultLayer.id);
+          if (savedState) {
+            return {
+              ...defaultLayer,
+              isActive: savedState.isActive,
+              opacity: savedState.opacity,
+            };
+          }
+          return defaultLayer;
+        });
+      } catch (e) {
+        console.error(
+          "Failed to parse saved layer states from localStorage",
+          e
+        );
+      }
+    }
+    return initialLayers;
+  });
+
+  const [prevGroupMembers, setPrevGroupMembers] = useState<
+    Record<string, string[]>
+  >(() => {
+    const savedPrevGroupMembersString = localStorage.getItem(
+      LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY
+    );
+    if (savedPrevGroupMembersString) {
+      try {
+        return JSON.parse(savedPrevGroupMembersString);
+      } catch (e) {
+        console.error(
+          "Failed to parse saved prevGroupMembers from localStorage",
+          e
+        );
+      }
+    }
+    return {};
+  });
+
   const [isTerrainActive, setIsTerrainActive] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1);
+
   const { current: map } = useMap();
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
-  const recomputeGroup = (
-    layers: PlanarianMapLayer[],
-    groupId: string
-  ): void => {
-    const group = layers.find((l) => l.id === groupId);
-    if (!group || !group.memberLayerIds) return;
-
-    const memberStates = group.memberLayerIds.map(
-      (id) => layers.find((l) => l.id === id)?.isActive
+  useEffect(() => {
+    const statesToSave = mapLayers.map((l) => ({
+      id: l.id,
+      isActive: l.isActive,
+      opacity: l.opacity,
+    }));
+    localStorage.setItem(
+      LOCAL_STORAGE_LAYER_STATES_KEY,
+      JSON.stringify(statesToSave)
     );
-    const allOn = memberStates.every((s) => s);
-    const allOff = memberStates.every((s) => !s);
+  }, [mapLayers, LOCAL_STORAGE_LAYER_STATES_KEY]);
 
-    group.isActive = allOn;
-    group.indeterminate = !allOn && !allOff;
+  useEffect(() => {
+    localStorage.setItem(
+      LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY,
+      JSON.stringify(prevGroupMembers)
+    );
+  }, [prevGroupMembers, LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY]);
+
+  useEffect(() => {
+    if (map) {
+      if (isTerrainActive) {
+        map.getMap().setTerrain({
+          source: "terrainLayer",
+          exaggeration: terrainExaggeration,
+        });
+      } else {
+        map.getMap().setTerrain(null);
+      }
+    }
+  }, [map, isTerrainActive, terrainExaggeration]);
+
+  const handleNormalToggle = (layer: PlanarianMapLayer) => {
+    setMapLayers((prev) =>
+      prev.map((l) => (l.id === layer.id ? { ...l, isActive: !l.isActive } : l))
+    );
   };
 
-  const onLayerChecked = (layer: PlanarianMapLayer) => {
-    setMapLayers((prev) => {
-      const next = prev.map((l) => ({ ...l }));
+  const handleMemberToggle = (layer: PlanarianMapLayer) => {
+    const memberId = layer.id;
+    const newState = !layer.isActive;
 
-      const idx = next.findIndex((l) => l.id === layer.id);
-      if (idx === -1) return prev;
+    setMapLayers((prevMapLayers) => {
+      const newLayers = prevMapLayers.map((l) =>
+        l.id === memberId ? { ...l, isActive: newState } : l
+      );
 
-      const toggledState = !next[idx].isActive;
-      next[idx].isActive = toggledState;
+      const parentGroupDefinition = LAYERS.find(
+        (l) => l.type === "group" && l.memberLayerIds?.includes(memberId)
+      );
 
-      if (layer.type === "group" && layer.memberLayerIds) {
-        next.forEach((l) => {
-          if (layer.memberLayerIds!.includes(l.id)) l.isActive = toggledState;
-        });
-      } else if (layer.isGroupMember) {
-        const parent = next.find(
-          (g) => g.type === "group" && g.memberLayerIds?.includes(layer.id)
-        );
-        if (parent) recomputeGroup(next, parent.id);
+      if (parentGroupDefinition && parentGroupDefinition.memberLayerIds) {
+        const parentGroupId = parentGroupDefinition.id;
+        const activeMembersInGroup =
+          parentGroupDefinition.memberLayerIds.filter((id) => {
+            const member = newLayers.find((m) => m.id === id);
+            return member && member.isActive;
+          }).length;
+
+        if (activeMembersInGroup === 0) {
+          setPrevGroupMembers((prev) => {
+            const copy = { ...prev };
+            delete copy[parentGroupId];
+            return copy;
+          });
+        }
       }
-
-      next
-        .filter((g) => g.type === "group")
-        .forEach((g) => recomputeGroup(next, g.id));
-
-      return next;
+      return newLayers;
     });
   };
 
-  const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) =>
+  const handleGroupToggle = (layer: PlanarianMapLayer) => {
+    const groupId = layer.id;
+    const memberIds = layer.memberLayerIds!;
+
+    const currentlyActiveMemberIds = mapLayers
+      .filter((l) => memberIds.includes(l.id) && l.isActive)
+      .map((l) => l.id);
+    const isAnyMemberCurrentlyActive = currentlyActiveMemberIds.length > 0;
+
+    if (isAnyMemberCurrentlyActive) {
+      setPrevGroupMembers((prev) => ({
+        ...prev,
+        [groupId]: currentlyActiveMemberIds,
+      }));
+      setMapLayers((prevMapLayers) =>
+        prevMapLayers.map((l) =>
+          memberIds.includes(l.id) ? { ...l, isActive: false } : l
+        )
+      );
+    } else {
+      const previouslyRememberedActiveMembers = prevGroupMembers[groupId];
+      let membersToActivate: string[];
+
+      if (
+        previouslyRememberedActiveMembers &&
+        previouslyRememberedActiveMembers.length > 0
+      ) {
+        membersToActivate = previouslyRememberedActiveMembers;
+      } else {
+        membersToActivate = [...memberIds];
+      }
+
+      setMapLayers((prevMapLayers) =>
+        prevMapLayers.map((l) =>
+          memberIds.includes(l.id)
+            ? { ...l, isActive: membersToActivate.includes(l.id) }
+            : l
+        )
+      );
+    }
+  };
+
+  const handleLayerToggle = (layer: PlanarianMapLayer) => {
+    if (layer.type === "group" && layer.memberLayerIds) {
+      handleGroupToggle(layer);
+    } else if (layer.isGroupMember) {
+      handleMemberToggle(layer);
+    } else {
+      handleNormalToggle(layer);
+    }
+  };
+
+  const onLayerOpacityChanged = (layer: PlanarianMapLayer, opacity: number) => {
     setMapLayers((prev) =>
-      prev.map((l) => {
-        const clone = { ...l };
-        if (l.id === layer.id) clone.opacity = opacity;
-        if (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
-          clone.opacity = opacity;
-        return clone;
-      })
+      prev.map((l) =>
+        l.id === layer.id ||
+        (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
+          ? { ...l, opacity }
+          : l
+      )
     );
+  };
 
   const onTerrainToggle = () => {
-    setIsTerrainActive((s) => !s);
-    if (isTerrainActive) map?.getMap().setTerrain(null);
-    else
-      map?.getMap().setTerrain({
-        source: "terrainLayer",
-        exaggeration: terrainExaggeration,
-      });
+    setIsTerrainActive((on: boolean) => !on);
   };
 
   const legendPosition = {
@@ -471,13 +595,6 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
     left: position?.left || "auto",
     bottom: position?.bottom || "auto",
   };
-
-  const toggleGroupExpansion = (groupId: string) =>
-    setExpandedGroups((prev) =>
-      prev.includes(groupId)
-        ? prev.filter((id) => id !== groupId)
-        : [...prev, groupId]
-    );
 
   return (
     <>
@@ -489,26 +606,28 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
         ]}
         tileSize={256}
       />
+
       {mapLayers.map((layer) => {
-        if (layer.type === "raster") {
+        if (layer.type === "raster" && layer.source) {
           return (
             <Source
               key={layer.id}
               id={layer.id}
               type="raster"
-              tiles={layer.source!.tiles}
+              tiles={layer.source.tiles}
               attribution={layer.attribution}
             >
               <Layer
-                key={layer.id}
+                id={layer.id}
                 source={layer.id}
-                paint={{ "raster-opacity": layer.opacity }}
                 type="raster"
+                paint={{ "raster-opacity": layer.opacity }}
                 layout={{ visibility: layer.isActive ? "visible" : "none" }}
               />
             </Source>
           );
-        } else if (layer.type === "vector" && layer.source) {
+        }
+        if (layer.type === "vector" && layer.source) {
           return (
             <React.Fragment key={layer.id}>
               <Source
@@ -588,42 +707,35 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
         <ContentWrapper>
           Layers
           <div
-            style={{
-              maxHeight: "55vh",
-              overflowY: "auto",
-              overflowX: "hidden",
-              marginBottom: "10px",
-            }}
+            style={{ maxHeight: "55vh", overflowY: "auto", marginBottom: 10 }}
           >
             {mapLayers
               .filter((l) => !l.isGroupMember)
               .map((layer) => {
-                const isGroup = layer.type === "group";
-                const indeterminate =
-                  isGroup && layer.memberLayerIds
-                    ? (() => {
-                        const states = layer.memberLayerIds!.map(
-                          (id) => mapLayers.find((x) => x.id === id)?.isActive
-                        );
-                        return (
-                          !states.every(Boolean) && !states.every((s) => !s)
-                        );
-                      })()
-                    : false;
+                const isGroup =
+                  layer.type === "group" && !!layer.memberLayerIds;
+                const memberIds = layer.memberLayerIds || [];
+                const members = mapLayers.filter((l) =>
+                  memberIds.includes(l.id)
+                );
+                const activeCount = members.filter((m) => m.isActive).length;
+                const allCount = members.length;
+                const checked = isGroup
+                  ? activeCount === allCount && allCount > 0
+                  : layer.isActive;
+                const indeterminate = isGroup
+                  ? activeCount > 0 && activeCount < allCount
+                  : false;
 
                 return (
                   <div key={layer.id} style={{ marginBottom: 15 }}>
                     <Checkbox
-                      checked={layer.isActive}
+                      checked={checked}
                       indeterminate={indeterminate}
-                      onChange={() => {
-                        onLayerChecked(layer);
-                        if (isGroup) toggleGroupExpansion(layer.id);
-                      }}
+                      onChange={() => handleLayerToggle(layer)}
                     >
                       {layer.displayName}
                     </Checkbox>
-
                     <Slider
                       min={0}
                       max={1}
@@ -631,24 +743,23 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                       value={layer.opacity}
                       onChange={(v) => onLayerOpacityChanged(layer, v)}
                     />
-                    {isGroup &&
-                      expandedGroups.includes(layer.id) &&
-                      layer.memberLayerIds && (
-                        <div style={{ marginLeft: 20, marginTop: 5 }}>
-                          {layer.memberLayerIds
-                            .map((id) => mapLayers.find((m) => m.id === id)!)
-                            .map((member) => (
-                              <div key={member.id} style={{ marginBottom: 5 }}>
-                                <Checkbox
-                                  checked={member.isActive}
-                                  onChange={() => onLayerChecked(member)}
-                                >
-                                  {member.displayName}
-                                </Checkbox>
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                    {isGroup && activeCount > 0 && (
+                      <div style={{ marginLeft: 20, marginTop: 5 }}>
+                        {layer.memberLayerIds!.map((id) => {
+                          const member = mapLayers.find((m) => m.id === id)!;
+                          return (
+                            <div key={id} style={{ marginBottom: 5 }}>
+                              <Checkbox
+                                checked={member.isActive}
+                                onChange={() => handleLayerToggle(member)}
+                              >
+                                {member.displayName}
+                              </Checkbox>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -694,16 +805,13 @@ const LayerControl: React.FC<LayerControlProps> = ({ position }) => {
                 <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM216 336l24 0 0-64-24 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0c13.3 0 24 10.7 24 24l0 88 8 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-80 0c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 1 1 0 64 32 32 0 1 1 0-64z" />
               </svg>
             </HoverIcon>
-            <ContentWrapper>{l.legend}</ContentWrapper>
+            <ContentWrapper>{l.legend}</ContentWrapper>{" "}
           </LegendPanel>
         ))}
     </>
   );
 };
 
-/* ──────────────────────────────────────────────────────────
-   styled bits – untouched
-─────────────────────────────────────────────────────────── */
 const ControlPanel = styled.div`
   position: absolute;
   background: #fff;
