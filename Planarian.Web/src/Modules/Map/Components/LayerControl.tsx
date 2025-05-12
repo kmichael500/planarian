@@ -671,6 +671,7 @@ const LayerControl: React.FC<{
             >
               <Layer
                 id={layer.id}
+                key={layer.id}
                 source={layer.id}
                 type="raster"
                 paint={{ "raster-opacity": layer.opacity }}
@@ -759,7 +760,12 @@ const LayerControl: React.FC<{
         <ContentWrapper>
           Layers
           <div
-            style={{ maxHeight: "55vh", overflowY: "auto", marginBottom: 10 }}
+            style={{
+              maxHeight: "55vh",
+              overflowY: "auto",
+              overflowX: "hidden",
+              marginBottom: "10px",
+            }}
           >
             {mapLayers
               .filter((l) => !l.isGroupMember)
