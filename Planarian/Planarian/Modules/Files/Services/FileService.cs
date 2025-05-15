@@ -97,7 +97,7 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
-    public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
+    public async Task<FileVm> AddTemporaryFile(Stream stream, string fileName, string fileTypeTagName,
         CancellationToken cancellationToken,
         string? uuid = null)
     {
@@ -124,6 +124,7 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = tagTypeId,
             ExpiresOn = DateTime.UtcNow.AddDays(10)
         };
+        
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
 
@@ -134,7 +135,7 @@ public class FileService : ServiceBase<FileRepository>
 
 
         Repository.Add(entity);
-        await Repository.SaveChangesAsync();
+        await Repository.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm

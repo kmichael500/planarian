@@ -1,3 +1,5 @@
+import { RcFile } from "antd/es/upload";
+import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../..";
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 import { FileVm } from "../Models/FileVm";
@@ -9,6 +11,28 @@ const FileService = {
   },
   async GetFile(id: string): Promise<void> {
     await HttpClient.get<FileVm>(`${baseUrl}/${id}`);
+  },
+  async AddTemporaryFile(
+    file: string | Blob | RcFile,
+    uuid: string,
+    onProgress: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<FileVm> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      onUploadProgress: onProgress,
+    };
+
+    const response = await HttpClient.post<FileVm>(
+      `${baseUrl}/temporary?uuid=${uuid}`,
+      formData,
+      config
+    );
+    return response.data;
   },
 };
 export { FileService };

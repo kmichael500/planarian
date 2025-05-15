@@ -77,19 +77,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     #region Import
 
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("import/caves/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportCavesFile(string? uuid, IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
-                cancellationToken);
-
-        return new JsonResult(result);
-    }
-
     [HttpPost("import/caves/process/{fileId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
@@ -97,19 +84,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
         CancellationToken cancellationToken)
     {
         var result = await _importService.ImportCavesFileProcess(fileId, isDryRun, cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("import/entrances/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportEntrancesFile(string? uuid, IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
-                cancellationToken);
 
         return new JsonResult(result);
     }

@@ -11,8 +11,10 @@ import {
   Collapse,
   Select,
   DatePicker,
+  Upload,
+  message,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, UploadOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -34,6 +36,12 @@ import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianD
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { TagComponent } from "../../Tag/Components/TagComponent";
+import { v4 as uuidv4 } from "uuid";
+import { FileService } from "../../Files/Services/FileService";
+import { FileVm } from "../../Files/Models/FileVm";
+import { RcFile } from "antd/es/upload/interface";
+import { UploadRequestOption as RcUploadRequestOption } from "rc-upload/lib/interface";
+import { AxiosProgressEvent } from "axios";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -43,6 +51,7 @@ export interface AddCaveComponentProps {
 const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   const [selectedStateId, setSelectedStateId] = useState<string>();
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+  const [isFileUploading, setIsFileUploading] = useState<boolean>(false);
 
   const [caveState, setCaveState] = useState<AddCaveVm>(
     cave ?? ({} as AddCaveVm)
@@ -82,9 +91,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     }
   };
 
-  // let groupedByFileTypes: {
-  //   [key: string]: EditFileMetadataVm[];
-  // } = {};
   const [groupedByFileTypes, setGroupedByFiles] = useState<{
     [key: string]: EditFileMetadataVm[];
   }>({});
@@ -93,8 +99,10 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     if (caveState?.files) {
       const temp = groupBy(caveState.files, (file) => file.fileTypeTagId);
       setGroupedByFiles(temp);
+    } else {
+      setGroupedByFiles({});
     }
-  }, [caveState]);
+  }, [caveState?.files]);
 
   //#region  Column Props
   const fourColProps = {
@@ -133,6 +141,54 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     xs: 24,
   } as ColProps;
   //#endregion
+
+  const handleUpload = async (options: RcUploadRequestOption) => {
+    const { onSuccess, onError, file, onProgress } = options;
+    setIsFileUploading(true);
+
+    const tempId = uuidv4();
+
+    try {
+      const currentFile = file as RcFile;
+      const uploadedFileVm = await FileService.AddTemporaryFile(
+        currentFile,
+        tempId,
+        (event: AxiosProgressEvent) => {
+          if (event.total) {
+            onProgress?.({ percent: (event.loaded / event.total) * 100 });
+          }
+        }
+      );
+
+      const newFileMetadata: EditFileMetadataVm = {
+        id: uploadedFileVm.id,
+        displayName: uploadedFileVm.displayName || uploadedFileVm.fileName,
+        fileTypeTagId: uploadedFileVm.fileTypeTagId,
+        fileTypeKey: uploadedFileVm.fileTypeKey,
+      };
+
+      const currentFiles: EditFileMetadataVm[] =
+        form.getFieldValue("files") || [];
+      const updatedFiles = [...currentFiles, newFileMetadata];
+
+      form.setFieldsValue({ [nameof<AddCaveVm>("files")]: updatedFiles });
+      setCaveState((prevState) => ({ ...prevState, files: updatedFiles }));
+
+      onSuccess?.(uploadedFileVm, currentFile);
+      message.success(`${currentFile.name} file uploaded successfully.`);
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+      message.error(
+        `${(file as RcFile).name} file upload failed: ${
+          err.message || "Unknown error"
+        }`
+      );
+      onError?.(err);
+    } finally {
+      setIsFileUploading(false);
+    }
+  };
+
   return (
     <Row style={{ marginBottom: 10 }} gutter={5}>
       <Form.Item name="id" noStyle>
@@ -735,96 +791,98 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           )}
         </Form.List>
       </Col>
-      {Object.entries(groupedByFileTypes).length > 0 && (
-        <Col span={24}>
-          <PlanarianDividerComponent title={"Files"} />
-        </Col>
-      )}
+      <Col span={24}>
+        <PlanarianDividerComponent title={"Files"} />
+      </Col>
+      <Col span={24} style={{ marginBottom: 16 }}>
+        <Upload
+          customRequest={handleUpload}
+          showUploadList={false}
+          disabled={isFileUploading}
+        >
+          <Button icon={<UploadOutlined />} loading={isFileUploading}>
+            Upload New File
+          </Button>
+        </Upload>
+      </Col>
       {Object.entries(groupedByFileTypes).length > 0 && (
         <Col span={24}>
           <Form.List name={nameof<AddCaveVm>("files")}>
-            {(fields, { add, remove }, { errors }) => (
+            {(fields, { add, remove: removeFormListItem }, { errors }) => (
               <Collapse accordion>
-                {Object.entries(groupedByFileTypes).map(([fileType, files]) => (
-                  <Collapse.Panel
-                    header={<TagComponent tagId={fileType} />}
-                    key={fileType}
-                  >
-                    <Row gutter={16}>
-                      {fields.map((field) => {
-                        // Get the file at the index
-                        const f = caveState?.files?.[field.key];
-                        if (f?.fileTypeTagId === fileType) {
-                          return (
-                            <Col span={12}>
-                              <Card
-                                variant="outlined"
-                                style={{ height: "100%" }}
-                                actions={[
-                                  <DeleteButtonComponent
-                                    title={
-                                      "Are you sure? This cannot be undone!"
-                                    }
-                                    onConfirm={() => {
-                                      if (caveState?.files) {
-                                        remove(field.name);
-
-                                        const filteredFiles =
-                                          caveState.files.filter(
-                                            (file, index) =>
-                                              index !== field.key &&
-                                              fields.some(
-                                                (formField) =>
-                                                  formField.key === index
-                                              )
-                                          );
-
-                                        const temp = groupBy(
-                                          filteredFiles,
-                                          (file) => file.fileTypeKey
-                                        );
-                                        setGroupedByFiles(temp);
+                {Object.entries(groupedByFileTypes).map(
+                  ([fileType, filesInGroup]) => (
+                    <Collapse.Panel
+                      header={<TagComponent tagId={fileType} />}
+                      key={fileType}
+                    >
+                      <Row gutter={16}>
+                        {fields.map((field) => {
+                          const f = caveState?.files?.[field.name];
+                          if (f?.fileTypeTagId === fileType) {
+                            return (
+                              <Col key={field.key} span={12}>
+                                <Card
+                                  variant="outlined"
+                                  style={{ height: "100%" }}
+                                  actions={[
+                                    <DeleteButtonComponent
+                                      title={
+                                        "Are you sure? This cannot be undone!"
                                       }
-                                    }}
-                                  />,
-                                ]}
-                              >
-                                <Form.Item
-                                  {...field}
-                                  label="Name"
-                                  name={[
-                                    field.name,
-                                    nameof<EditFileMetadataVm>("displayName"),
-                                  ]}
-                                  rules={[
-                                    {
-                                      required: true,
-                                      message: "Please enter a name",
-                                    },
+                                      onConfirm={() => {
+                                        removeFormListItem(field.name);
+                                        const updatedFilesFromForm =
+                                          form.getFieldValue("files") || [];
+                                        setCaveState((prevState) => ({
+                                          ...prevState,
+                                          files: updatedFilesFromForm,
+                                        }));
+                                      }}
+                                    />,
                                   ]}
                                 >
-                                  <Input />
-                                </Form.Item>
-                                <Form.Item
-                                  {...field}
-                                  label="File Type"
-                                  name={[
-                                    field.name,
-                                    nameof<EditFileMetadataVm>("fileTypeTagId"),
-                                  ]}
-                                >
-                                  <TagSelectComponent tagType={TagType.File} />
-                                </Form.Item>
-                              </Card>
-                            </Col>
-                          );
-                        }
+                                  <Form.Item
+                                    {...field}
+                                    label="Name"
+                                    name={[
+                                      field.name,
+                                      nameof<EditFileMetadataVm>("displayName"),
+                                    ]}
+                                    rules={[
+                                      {
+                                        required: true,
+                                        message: "Please enter a name",
+                                      },
+                                    ]}
+                                  >
+                                    <Input />
+                                  </Form.Item>
+                                  <Form.Item
+                                    {...field}
+                                    label="File Type"
+                                    name={[
+                                      field.name,
+                                      nameof<EditFileMetadataVm>(
+                                        "fileTypeTagId"
+                                      ),
+                                    ]}
+                                  >
+                                    <TagSelectComponent
+                                      tagType={TagType.File}
+                                    />
+                                  </Form.Item>
+                                </Card>
+                              </Col>
+                            );
+                          }
 
-                        return null;
-                      })}
-                    </Row>
-                  </Collapse.Panel>
-                ))}
+                          return null;
+                        })}
+                      </Row>
+                    </Collapse.Panel>
+                  )
+                )}
               </Collapse>
             )}
           </Form.List>

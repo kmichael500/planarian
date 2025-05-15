@@ -61,10 +61,10 @@ public class ImportService : ServiceBase
         _fileRepository = fileRepository;
     }
 
-    public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
+    public async Task<FileVm> AddTemporaryFile(Stream stream, string fileName, string? uuid,
         CancellationToken cancellationToken)
     {
-        var result = await _fileService.AddTemporaryAccountFile(stream, fileName,
+        var result = await _fileService.AddTemporaryFile(stream, fileName,
             FileTypeTagName.Other, cancellationToken, uuid);
 
         return result;
