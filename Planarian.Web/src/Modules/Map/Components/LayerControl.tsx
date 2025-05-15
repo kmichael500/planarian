@@ -467,6 +467,7 @@ const LayerControl: React.FC<{
   const [terrainExaggeration, setTerrainExaggeration] = useState(1);
   const [showMacrostratDisclaimer, setShowMacrostratDisclaimer] =
     useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   const { current: map } = useMap();
 
@@ -491,16 +492,38 @@ const LayerControl: React.FC<{
 
   useEffect(() => {
     if (map) {
+      const mapInstance = map.getMap();
+      const handleMapLoad = () => {
+        setIsMapLoaded(true);
+      };
+
+      if (mapInstance.isStyleLoaded()) {
+        setIsMapLoaded(true);
+      } else {
+        mapInstance.on("load", handleMapLoad);
+      }
+
+      return () => {
+        if (mapInstance) {
+          mapInstance.off("load", handleMapLoad);
+        }
+      };
+    }
+  }, [map]);
+
+  useEffect(() => {
+    if (map && isMapLoaded) {
+      const mapInstance = map.getMap();
       if (isTerrainActive) {
-        map.getMap().setTerrain({
+        mapInstance.setTerrain({
           source: "terrainLayer",
           exaggeration: terrainExaggeration,
         });
       } else {
-        map.getMap().setTerrain(null);
+        mapInstance.setTerrain(null);
       }
     }
-  }, [map, isTerrainActive, terrainExaggeration]);
+  }, [map, isMapLoaded, isTerrainActive, terrainExaggeration]);
 
   const handleNormalToggle = (layer: PlanarianMapLayer) => {
     const newIsActive = !layer.isActive;
@@ -856,10 +879,6 @@ const LayerControl: React.FC<{
                   onChange={(v) => {
                     if (v !== null) {
                       setTerrainExaggeration(v);
-                      map?.getMap().setTerrain({
-                        source: "terrainLayer",
-                        exaggeration: v,
-                      });
                     }
                   }}
                 />
