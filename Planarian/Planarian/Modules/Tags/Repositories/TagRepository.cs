@@ -16,7 +16,7 @@ public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCon
     {
     }
 
-    public async Task<TagType?> GetTag(string tagTypeId)
+    public async Task<TagType?> GetTag(string? tagTypeId)
     {
         return await EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(DbContext.TagTypes, e => e.Id == tagTypeId);
     }

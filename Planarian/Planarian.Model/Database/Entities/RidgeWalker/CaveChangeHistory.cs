@@ -32,6 +32,7 @@ public class CaveChangeHistory : EntityBase
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? EntranceId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? FileId { get; set; }
     [MaxLength(PropertyLength.Id)] public string ChangedByUserId { get; set; }
 
     [MaxLength(PropertyLength.Id)] public string? ApprovedByUserId { get; set; }

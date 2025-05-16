@@ -9,4 +9,5 @@ export interface FileVm {
   fileTypeKey: FileTypeKey;
   embedUrl: string;
   downloadUrl: string;
+  isNew: boolean;
 }

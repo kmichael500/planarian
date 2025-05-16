@@ -38,7 +38,6 @@ import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { v4 as uuidv4 } from "uuid";
 import { FileService } from "../../Files/Services/FileService";
-import { FileVm } from "../../Files/Models/FileVm";
 import { RcFile } from "antd/es/upload/interface";
 import { UploadRequestOption as RcUploadRequestOption } from "rc-upload/lib/interface";
 import { AxiosProgressEvent } from "axios";
@@ -56,6 +55,12 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   const [caveState, setCaveState] = useState<AddCaveVm>(
     cave ?? ({} as AddCaveVm)
   );
+  const [groupedNewFiles, setGroupedNewFiles] = useState<{
+    [key: string]: EditFileMetadataVm[];
+  }>({});
+  const [groupedExistingFiles, setGroupedExistingFiles] = useState<{
+    [key: string]: EditFileMetadataVm[];
+  }>({});
 
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
@@ -91,18 +96,24 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     }
   };
 
-  const [groupedByFileTypes, setGroupedByFiles] = useState<{
-    [key: string]: EditFileMetadataVm[];
-  }>({});
-
   useEffect(() => {
-    if (caveState?.files) {
-      const temp = groupBy(caveState.files, (file) => file.fileTypeTagId);
-      setGroupedByFiles(temp);
-    } else {
-      setGroupedByFiles({});
-    }
-  }, [caveState?.files]);
+    const currentFilesFromState = caveState.files || [];
+    const newFilesList: EditFileMetadataVm[] = [];
+    const existingFilesList: EditFileMetadataVm[] = [];
+
+    currentFilesFromState.forEach((file) => {
+      if (file.isNew) {
+        newFilesList.push(file);
+      } else {
+        existingFilesList.push(file);
+      }
+    });
+
+    setGroupedNewFiles(groupBy(newFilesList, (file) => file.fileTypeTagId));
+    setGroupedExistingFiles(
+      groupBy(existingFilesList, (file) => file.fileTypeTagId)
+    );
+  }, [caveState.files]);
 
   //#region  Column Props
   const fourColProps = {
@@ -165,6 +176,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
         displayName: uploadedFileVm.displayName || uploadedFileVm.fileName,
         fileTypeTagId: uploadedFileVm.fileTypeTagId,
         fileTypeKey: uploadedFileVm.fileTypeKey,
+        isNew: true,
       };
 
       const currentFiles: EditFileMetadataVm[] =
@@ -792,7 +804,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
         </Form.List>
       </Col>
       <Col span={24}>
-        <PlanarianDividerComponent title={"Files"} />
+        <PlanarianDividerComponent title={"File Uploads"} />
       </Col>
       <Col span={24} style={{ marginBottom: 16 }}>
         <Upload
@@ -805,89 +817,206 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           </Button>
         </Upload>
       </Col>
-      {Object.entries(groupedByFileTypes).length > 0 && (
-        <Col span={24}>
-          <Form.List name={nameof<AddCaveVm>("files")}>
-            {(fields, { add, remove: removeFormListItem }, { errors }) => (
-              <Collapse accordion>
-                {Object.entries(groupedByFileTypes).map(
-                  ([fileType, filesInGroup]) => (
-                    <Collapse.Panel
-                      header={<TagComponent tagId={fileType} />}
-                      key={fileType}
-                    >
-                      <Row gutter={16}>
-                        {fields.map((field) => {
-                          const f = caveState?.files?.[field.name];
-                          if (f?.fileTypeTagId === fileType) {
-                            return (
-                              <Col key={field.key} span={12}>
-                                <Card
-                                  variant="outlined"
-                                  style={{ height: "100%" }}
-                                  actions={[
-                                    <DeleteButtonComponent
-                                      title={
-                                        "Are you sure? This cannot be undone!"
-                                      }
-                                      onConfirm={() => {
-                                        removeFormListItem(field.name);
-                                        const updatedFilesFromForm =
-                                          form.getFieldValue("files") || [];
-                                        setCaveState((prevState) => ({
-                                          ...prevState,
-                                          files: updatedFilesFromForm,
-                                        }));
-                                      }}
-                                    />,
+
+      <Col span={24}>
+        <Form.List name={nameof<AddCaveVm>("files")}>
+          {(fields, { remove: removeFormListItem }) => (
+            <>
+              {Object.entries(groupedNewFiles).length > 0 && (
+                <>
+                  <Col span={24}>
+                    <PlanarianDividerComponent title={"New Files"} />
+                  </Col>
+                  <Col span={24} style={{ marginBottom: "16px" }}>
+                    <Row gutter={16}>
+                      {" "}
+                      {/* MODIFIED: Removed Collapse, added Row here */}
+                      {fields.map((field) => {
+                        const fileData = form.getFieldValue("files")[
+                          field.name
+                        ] as EditFileMetadataVm | undefined;
+                        if (fileData && fileData.isNew) {
+                          return (
+                            <Col
+                              key={field.key} // MODIFIED: Ensure key is unique if field.key isn't sufficient, e.g., `fileData.id || field.key`
+                              span={12}
+                              style={{ marginBottom: "16px" }}
+                            >
+                              <Card
+                                variant="outlined"
+                                style={{ height: "100%" }}
+                                actions={[
+                                  <DeleteButtonComponent
+                                    title={"Remove this new file?"}
+                                    onConfirm={() => {
+                                      removeFormListItem(field.name);
+                                      const updatedFilesFromForm =
+                                        form.getFieldValue("files") || [];
+                                      setCaveState((prevState) => ({
+                                        ...prevState,
+                                        files: updatedFilesFromForm,
+                                      }));
+                                    }}
+                                  />,
+                                ]}
+                              >
+                                <Form.Item
+                                  {...field}
+                                  label="Name"
+                                  name={[
+                                    field.name,
+                                    nameof<EditFileMetadataVm>("displayName"),
+                                  ]}
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Please enter a name",
+                                    },
                                   ]}
                                 >
-                                  <Form.Item
-                                    {...field}
-                                    label="Name"
-                                    name={[
-                                      field.name,
-                                      nameof<EditFileMetadataVm>("displayName"),
-                                    ]}
-                                    rules={[
-                                      {
-                                        required: true,
-                                        message: "Please enter a name",
-                                      },
-                                    ]}
-                                  >
-                                    <Input />
-                                  </Form.Item>
-                                  <Form.Item
-                                    {...field}
-                                    label="File Type"
-                                    name={[
-                                      field.name,
-                                      nameof<EditFileMetadataVm>(
-                                        "fileTypeTagId"
-                                      ),
-                                    ]}
-                                  >
-                                    <TagSelectComponent
-                                      tagType={TagType.File}
-                                    />
-                                  </Form.Item>
-                                </Card>
-                              </Col>
-                            );
-                          }
+                                  <Input />
+                                </Form.Item>
+                                <Form.Item
+                                  {...field}
+                                  label="File Type"
+                                  name={[
+                                    field.name,
+                                    nameof<EditFileMetadataVm>("fileTypeTagId"),
+                                  ]}
+                                  rules={[
+                                    {
+                                      required: true,
+                                      message: "Please select a file type",
+                                    },
+                                  ]}
+                                >
+                                  <TagSelectComponent tagType={TagType.File} />
+                                </Form.Item>
+                              </Card>
+                            </Col>
+                          );
+                        }
+                        return null;
+                      })}
+                    </Row>{" "}
+                    {/* MODIFIED: Removed Collapse */}
+                  </Col>
+                </>
+              )}
 
-                          return null;
-                        })}
-                      </Row>
-                    </Collapse.Panel>
-                  )
-                )}
-              </Collapse>
-            )}
-          </Form.List>
-        </Col>
-      )}
+              {Object.entries(groupedExistingFiles).length > 0 && (
+                <>
+                  <Col
+                    span={24}
+                    style={{
+                      marginTop:
+                        Object.entries(groupedNewFiles).length > 0 ? "16px" : 0,
+                    }}
+                  >
+                    <PlanarianDividerComponent title={"Files"} />
+                  </Col>
+                  <Col span={24}>
+                    <Collapse accordion>
+                      {Object.entries(groupedExistingFiles).map(
+                        ([fileType, _filesInGroup]) => (
+                          <Collapse.Panel
+                            header={<TagComponent tagId={fileType} />}
+                            key={`existing-${fileType}`}
+                          >
+                            <Row gutter={16}>
+                              {fields.map((field) => {
+                                const fileData = form.getFieldValue("files")[
+                                  field.name
+                                ] as EditFileMetadataVm | undefined;
+                                if (
+                                  fileData &&
+                                  !fileData.isNew &&
+                                  fileData.fileTypeTagId === fileType
+                                ) {
+                                  return (
+                                    <Col
+                                      key={field.key}
+                                      span={12}
+                                      style={{ marginBottom: "16px" }}
+                                    >
+                                      <Card
+                                        variant="outlined"
+                                        style={{ height: "100%" }}
+                                        actions={[
+                                          <DeleteButtonComponent
+                                            title={
+                                              "Are you sure? This cannot be undone!"
+                                            }
+                                            onConfirm={() => {
+                                              removeFormListItem(field.name);
+                                              const updatedFilesFromForm =
+                                                form.getFieldValue("files") ||
+                                                [];
+                                              setCaveState((prevState) => ({
+                                                ...prevState,
+                                                files: updatedFilesFromForm,
+                                              }));
+                                            }}
+                                          />,
+                                        ]}
+                                      >
+                                        <Form.Item
+                                          {...field}
+                                          label="Name"
+                                          name={[
+                                            field.name,
+                                            nameof<EditFileMetadataVm>(
+                                              "displayName"
+                                            ),
+                                          ]}
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Please enter a name",
+                                            },
+                                          ]}
+                                        >
+                                          <Input />
+                                        </Form.Item>
+                                        <Form.Item
+                                          {...field}
+                                          label="File Type"
+                                          name={[
+                                            field.name,
+                                            nameof<EditFileMetadataVm>(
+                                              "fileTypeTagId"
+                                            ),
+                                          ]}
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message:
+                                                "Please select a file type",
+                                            },
+                                          ]}
+                                        >
+                                          <TagSelectComponent
+                                            tagType={TagType.File}
+                                          />
+                                        </Form.Item>
+                                      </Card>
+                                    </Col>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </Row>
+                          </Collapse.Panel>
+                        )
+                      )}
+                    </Collapse>
+                  </Col>
+                </>
+              )}
+            </>
+          )}
+        </Form.List>
+      </Col>
       <Col>
         <Form.Item>
           <Button

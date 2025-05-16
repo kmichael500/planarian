@@ -1632,4 +1632,5 @@ public static class CaveLogPropertyNames
     public const string Entrance = "Entrance";
     public const string Cave = "Cave";
     public const string File = "File";
+    public const string FileTag = "FileTag";
 }

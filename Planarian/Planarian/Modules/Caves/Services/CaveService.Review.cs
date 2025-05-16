@@ -7,6 +7,7 @@ using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Files.Repositories;
 using JsonConverter = System.Text.Json.Serialization.JsonConverter;
 
 namespace Planarian.Modules.Caves.Services;
@@ -108,6 +109,31 @@ public partial class CaveService
 
             #endregion
 
+            // TODO: I don't think this is necessary
+            // #region New Files
+            // // for new files we need to update the file directly
+            //
+            // var newFileIds = value.Cave.Files?.Select(e => e.Id)
+            //     .Except(existingCaveEntity?.Files.Select(f => f.Id) ?? [])
+            //     .ToList() ?? [];
+            //
+            // foreach (var fileId in newFileIds)
+            // {
+            //     var fileEntity = await _fileRepository.GetFileById(fileId);
+            //     var submittedFile = value.Cave.Files?.FirstOrDefault(e => e.Id == fileId);
+            //     if (fileEntity == null || submittedFile == null)
+            //     {
+            //         throw ApiExceptionDictionary.NotFound("File");
+            //     }
+            //     
+            //     var newFileName = $"{submittedFile.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
+            //     fileEntity.FileName = newFileName;
+            // }
+            //
+            // await Repository.SaveChangesAsync(cancellationToken);
+            //
+            // #endregion
+
             entity.AccountId = RequestUser.AccountId;
             entity.Type = ChangeRequestType.Submission;
             
@@ -186,8 +212,6 @@ public partial class CaveService
             {
                 var current = await Repository.GetCave(entity.CaveId);
                 var updatedCave = await CaveChangeHistoryToAddCave(entity.CaveChangeHistory, current);
-                
-        
                 
                 // this is deleting the entranceId from the cahnge log if we removed the entrance...wtf
                 
@@ -381,7 +405,46 @@ public partial class CaveService
             modified.OtherTagIds,
             _settingsRepository.GetTagTypeName);
 
-        // TODO: Files, GeoJson
+        // TODO: GeoJson
+
+        var originalFiles = original?.Files.ToList() ?? [];
+        var modifiedFiles = modified.Files?.ToList() ?? [];
+
+        var distinctFileIds = originalFiles
+            .Select(f => f.Id)
+            .Union(modifiedFiles.Select(f => f.Id))
+            .Distinct()
+            .ToList();
+        foreach (var fileId in distinctFileIds)
+        {
+            var originalFile = originalFiles.FirstOrDefault(f => f.Id == fileId);
+            var modifiedFile = modifiedFiles.FirstOrDefault(f => f.Id == fileId);
+            
+            var originalFileTag = await _tagRepository.GetTag(originalFile?.FileTypeTagId);
+            var modifiedFileTag = originalFile?.FileTypeTagId == modifiedFile?.FileTypeTagId
+                ? originalFileTag
+                : await _tagRepository.GetTag(modifiedFile?.FileTypeTagId);
+
+            var og = new ChangeLogBuilder.ChangeLogBuilderAddFile((originalFile?.Id, originalFile?.FileName),
+                (originalFile?.Id, originalFileTag?.Id, originalFileTag?.Name));
+            
+            string? modFileName = null;
+            if (modifiedFile != null)
+            {
+                var file = await _fileRepository.GetFileVm(modifiedFile.Id);
+                if (file != null)
+                {
+                    modFileName = file.FileName = $"{modifiedFile.DisplayName}{Path.GetExtension(file.FileName)}";
+                }
+            }
+            
+            var mod = new ChangeLogBuilder.ChangeLogBuilderAddFile((modifiedFile?.Id, modFileName),
+                (modifiedFile?.Id, modifiedFileTag?.Id, modifiedFileTag?.Name));
+
+
+            builder.AddFile(og, mod);
+        }
+        
 
         #region Entrance
 

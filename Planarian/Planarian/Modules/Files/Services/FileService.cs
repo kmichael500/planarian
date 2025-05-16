@@ -342,6 +342,8 @@ public class FileVm
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
+    
+    public string? BlobName { get; set; }
     public string? Uuid { get; set; }
     public string? EmbedUrl { get; set; }
     public string? DownloadUrl { get; set; }

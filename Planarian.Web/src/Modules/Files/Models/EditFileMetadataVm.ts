@@ -3,4 +3,5 @@ export interface EditFileMetadataVm {
   displayName: string | null;
   fileTypeTagId: string;
   fileTypeKey: string;
+  isNew: boolean;
 }
