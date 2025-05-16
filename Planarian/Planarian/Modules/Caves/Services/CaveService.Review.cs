@@ -7,8 +7,7 @@ using Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Models;
-using Planarian.Modules.Files.Repositories;
-using JsonConverter = System.Text.Json.Serialization.JsonConverter;
+using Planarian.Modules.Files.Services;
 
 namespace Planarian.Modules.Caves.Services;
 
@@ -264,6 +263,7 @@ public partial class CaveService
         {
             CaveId = e.CaveId,
             EntranceId = e.EntranceId,
+            FileId = e.FileId,
             ChangedByUserId = e.ChangedByUserId,
             ApprovedByUserId = e.ApprovedByUserId,
             PropertyName = e.PropertyName,
@@ -581,17 +581,37 @@ public partial class CaveService
 
         foreach (var change in changes)
         {
-            EntranceVm? entrance = null;
+             FileVm? file = null;
+             var isNewFile = false;
+             if (change.PropertyName is CaveLogPropertyNames.FileName or CaveLogPropertyNames.FileTag)
+             { 
+                 file = currentCopy.Files.FirstOrDefault(f => f.Id == change.FileId);
+                 if (file == null)
+                 {
+                     isNewFile = true;
+                     var fileEntity = await _fileRepository.GetFileVm(change.FileId ?? throw new ArgumentNullException(nameof(change.FileId)));
+                     if (fileEntity == null)
+                     {
+                         throw ApiExceptionDictionary.NotFound("File");
+                     }
 
+                     file = new FileVm
+                     {
+                         Id = change.FileId,
+                         DisplayName = fileEntity.DisplayName,
+                         FileName = fileEntity.FileName,
+                         FileTypeKey = fileEntity.FileTypeKey,
+                         BlobName = fileEntity.FileName
+                     };
+                 }
+             }
+
+             EntranceVm? entrance = null;
             var isNewEntrance = false;
             if (!change.EntranceId.IsNullOrWhiteSpace())
             {
-                var existingEntrance = currentCopy.Entrances.FirstOrDefault(e => e.Id == change.EntranceId);
-                if (existingEntrance != null)
-                {
-                    entrance = existingEntrance;
-                }
-                else
+                entrance = currentCopy.Entrances.FirstOrDefault(e => e.Id == change.EntranceId);
+                if (entrance == null)
                 {
                     isNewEntrance = true;
                     entrance = new EntranceVm
@@ -599,17 +619,17 @@ public partial class CaveService
                         Id = change.EntranceId,
                     };
                 }
-
             }
-            
+
             switch (change.PropertyName)
             {
                 case CaveLogPropertyNames.Name:
                     currentCopy.Name = change.ValueString!;
                     break;
                 case CaveLogPropertyNames.AlternateNames:
-                    currentCopy.AlternateNames = MergeList(currentCopy.AlternateNames, change.ValueString!, change.ChangeType)
-                        .ToList();
+                    currentCopy.AlternateNames =
+                        MergeList(currentCopy.AlternateNames, change.ValueString!, change.ChangeType)
+                            .ToList();
                     break;
                 case CaveLogPropertyNames.CountyName:
                     currentCopy.CountyId = change.PropertyId!;
@@ -656,8 +676,9 @@ public partial class CaveService
                         MergeList(currentCopy.CartographerNameTagIds, change.PropertyId!, change.ChangeType).ToList();
                     break;
                 case CaveLogPropertyNames.MapStatusTagName:
-                    currentCopy.MapStatusTagIds = MergeList(currentCopy.MapStatusTagIds, change.PropertyId!, change.ChangeType)
-                        .ToList();
+                    currentCopy.MapStatusTagIds =
+                        MergeList(currentCopy.MapStatusTagIds, change.PropertyId!, change.ChangeType)
+                            .ToList();
                     break;
                 case CaveLogPropertyNames.GeologicAgeTagName:
                     currentCopy.GeologicAgeTagIds =
@@ -690,7 +711,8 @@ public partial class CaveService
                     entrance!.IsPrimary = change.ValueBool!.Value;
                     break;
                 case CaveLogPropertyNames.EntranceLocationQualityTagName:
-                    entrance!.LocationQualityTagId = change.PropertyId;
+                    entrance!.LocationQualityTagId =
+                        change.PropertyId ?? throw new ArgumentNullException(nameof(change.PropertyId));
                     break;
                 case CaveLogPropertyNames.EntrancePitDepthFeet:
                     entrance!.PitFeet = change.ValueDouble ?? 0;
@@ -719,7 +741,25 @@ public partial class CaveService
                     {
                         currentCopy.Entrances.Remove(entrance!);
                     }
-
+                    break;
+                case CaveLogPropertyNames.File:
+                    if (file == null) throw new ArgumentNullException(nameof(file));
+                    
+                    if (change.ChangeType != ChangeType.Delete) break;
+                    currentCopy.Files.Remove(file ?? throw new ArgumentNullException(nameof(file)));
+                    break;
+                case CaveLogPropertyNames.FileName:
+                    if (file == null) throw new ArgumentNullException(nameof(file));
+                    
+                    var displayName = change.ValueString ?? throw new ArgumentNullException(nameof(change.ValueString));
+                    var fileName = $"{displayName}{Path.GetExtension(file.FileName)}";
+                    
+                    file.FileName = fileName;
+                    file.DisplayName = displayName;
+                    break;
+                case CaveLogPropertyNames.FileTag:
+                    if (file == null) throw new ArgumentNullException(nameof(file));
+                    file.FileTypeTagId = change.PropertyId ?? throw new ArgumentNullException(nameof(change.PropertyId));
                     break;
             }
 
@@ -727,7 +767,14 @@ public partial class CaveService
             {
                 currentCopy.Entrances.Add(entrance!);
             }
+            
+            if (isNewFile)
+            { 
+                currentCopy.Files.Add(file!);
+            }
         }
+
+        await ProcessFiles(currentCopy.Files);
 
         return currentCopy.ToAddCave();
     }

@@ -30,7 +30,7 @@ public class CaveVm
         MapIds = mapIds;
         Entrances = entrances.ToList();
         GeologyTagIds = geologyTagIds;
-        Files = files;
+        Files = files.ToList();
     }
 
 
@@ -78,7 +78,7 @@ public class CaveVm
 
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; } = false;
-    public IEnumerable<FileVm> Files { get; set; } = new HashSet<FileVm>();
+    public List<FileVm> Files { get; set; } = new();
 
     public EntranceVm PrimaryEntrance { get; set; } = null!;
 
@@ -137,10 +137,7 @@ public static class CaveVmExtensions
                                 .ToList()
                             ?? [],
 
-                Files = vm.Files?
-                            .Select(f => new EditFileMetadata { Id = f.Id })
-                            .ToList()
-                        ?? []
+                Files = vm.Files.ToList()
             };
         }
 

@@ -30,7 +30,6 @@ import {
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
 import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputDistance";
-import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
@@ -41,6 +40,7 @@ import { FileService } from "../../Files/Services/FileService";
 import { RcFile } from "antd/es/upload/interface";
 import { UploadRequestOption as RcUploadRequestOption } from "rc-upload/lib/interface";
 import { AxiosProgressEvent } from "axios";
+import { FileVm } from "../../Files/Models/FileVm";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -56,11 +56,13 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     cave ?? ({} as AddCaveVm)
   );
   const [groupedNewFiles, setGroupedNewFiles] = useState<{
-    [key: string]: EditFileMetadataVm[];
+    [key: string]: FileVm[];
   }>({});
   const [groupedExistingFiles, setGroupedExistingFiles] = useState<{
-    [key: string]: EditFileMetadataVm[];
+    [key: string]: FileVm[];
   }>({});
+
+  const filesFromForm = Form.useWatch(nameof<AddCaveVm>("files"), form) || [];
 
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
@@ -97,11 +99,12 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   };
 
   useEffect(() => {
-    const currentFilesFromState = caveState.files || [];
-    const newFilesList: EditFileMetadataVm[] = [];
-    const existingFilesList: EditFileMetadataVm[] = [];
+    // Use filesFromForm (derived from form.getFieldValue) instead of caveState.files
+    const currentFiles = filesFromForm as FileVm[]; // Cast if necessary, or ensure filesFromForm is typed
+    const newFilesList: FileVm[] = [];
+    const existingFilesList: FileVm[] = [];
 
-    currentFilesFromState.forEach((file) => {
+    currentFiles.forEach((file) => {
       if (file.isNew) {
         newFilesList.push(file);
       } else {
@@ -113,7 +116,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     setGroupedExistingFiles(
       groupBy(existingFilesList, (file) => file.fileTypeTagId)
     );
-  }, [caveState.files]);
+  }, [filesFromForm]); // Depend on filesFromForm instead of caveState.files
 
   //#region  Column Props
   const fourColProps = {
@@ -171,19 +174,20 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
         }
       );
 
-      const newFileMetadata: EditFileMetadataVm = {
+      const newFileMetadata: FileVm = {
         id: uploadedFileVm.id,
-        displayName: uploadedFileVm.displayName || uploadedFileVm.fileName,
+        displayName:
+          uploadedFileVm.displayName || uploadedFileVm.fileName || null,
         fileTypeTagId: uploadedFileVm.fileTypeTagId,
         fileTypeKey: uploadedFileVm.fileTypeKey,
         isNew: true,
       };
 
-      const currentFiles: EditFileMetadataVm[] =
-        form.getFieldValue("files") || [];
-      const updatedFiles = [...currentFiles, newFileMetadata];
+      const currentFilesValue: FileVm[] = form.getFieldValue("files") || [];
+      const updatedFiles = [...currentFilesValue, newFileMetadata];
 
       form.setFieldsValue({ [nameof<AddCaveVm>("files")]: updatedFiles });
+
       setCaveState((prevState) => ({ ...prevState, files: updatedFiles }));
 
       onSuccess?.(uploadedFileVm, currentFile);
@@ -834,7 +838,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                       {fields.map((field) => {
                         const fileData = form.getFieldValue("files")[
                           field.name
-                        ] as EditFileMetadataVm | undefined;
+                        ] as FileVm | undefined;
                         if (fileData && fileData.isNew) {
                           return (
                             <Col
@@ -865,7 +869,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                   label="Name"
                                   name={[
                                     field.name,
-                                    nameof<EditFileMetadataVm>("displayName"),
+                                    nameof<FileVm>("displayName"),
                                   ]}
                                   rules={[
                                     {
@@ -881,7 +885,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                   label="File Type"
                                   name={[
                                     field.name,
-                                    nameof<EditFileMetadataVm>("fileTypeTagId"),
+                                    nameof<FileVm>("fileTypeTagId"),
                                   ]}
                                   rules={[
                                     {
@@ -927,7 +931,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                               {fields.map((field) => {
                                 const fileData = form.getFieldValue("files")[
                                   field.name
-                                ] as EditFileMetadataVm | undefined;
+                                ] as FileVm | undefined;
                                 if (
                                   fileData &&
                                   !fileData.isNew &&
@@ -965,9 +969,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                           label="Name"
                                           name={[
                                             field.name,
-                                            nameof<EditFileMetadataVm>(
-                                              "displayName"
-                                            ),
+                                            nameof<FileVm>("displayName"),
                                           ]}
                                           rules={[
                                             {
@@ -983,9 +985,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                           label="File Type"
                                           name={[
                                             field.name,
-                                            nameof<EditFileMetadataVm>(
-                                              "fileTypeTagId"
-                                            ),
+                                            nameof<FileVm>("fileTypeTagId"),
                                           ]}
                                           rules={[
                                             {

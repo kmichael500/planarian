@@ -184,7 +184,7 @@ public class AccountService : ServiceBase<AccountRepository>
                     tagTypesAffected.Add((CaveLogPropertyNames.EntranceHydrologyTagName, false, true));
                     break;
                 case TagTypeKeyConstant.File:
-                    tagTypesAffected.Add((CaveLogPropertyNames.File, true, false));
+                    tagTypesAffected.Add((CaveLogPropertyNames.FileName, true, false));
                     break;
                 case TagTypeKeyConstant.People:
                     tagTypesAffected.Add((CaveLogPropertyNames.CartographerNameTagName, true, false));
@@ -373,7 +373,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 }
                 else if (TagTypeKeyConstant.File.Equals(tagType.Key))
                 {
-                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.File);
+                    caveLogPropertyNamesAffected.Add(CaveLogPropertyNames.FileName);
 
                 }
                 else if (TagTypeKeyConstant.GeologicAge.Equals(tagType.Key))

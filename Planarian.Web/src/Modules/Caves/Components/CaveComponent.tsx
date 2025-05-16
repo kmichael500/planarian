@@ -17,7 +17,6 @@ import {
   Tag,
   Tooltip,
   Select,
-  DatePicker,
   InputNumber,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
@@ -36,13 +35,9 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { MapComponent } from "../../Map/Components/MapComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
-import { UploadComponent } from "../../Files/Components/UploadComponent";
-import { FileService } from "../../Files/Services/FileService";
-import { CaveService } from "../Service/CaveService";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
 import dayjs, { Dayjs } from "dayjs";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
@@ -91,7 +86,6 @@ const CaveComponent = ({
   // Set default for inCardContainer within options
   const inCardContainer = options.inCardContainer !== false; // Default to true unless explicitly set to false
 
-  const [isUploading, setIsUploading] = useState(false);
   const { isFeatureEnabled } = useFeatureEnabled();
 
   const [showMap, setShowMap] = useState(true);
@@ -410,51 +404,17 @@ const CaveComponent = ({
         title="Files"
         element={
           <>
-            {!isUploading && (
-              <PlanarianButton
-                permissionKey={PermissionKey.Manager}
-                disabled={!hasEditPermission}
-                icon={<CloudUploadOutlined />}
-                onClick={() => {
-                  setIsUploading(true);
-                }}
-              >
-                Upload
-              </PlanarianButton>
-            )}
+            <PlanarianButton icon={<CloudUploadOutlined />}>
+              Upload
+            </PlanarianButton>
           </>
         }
       />
 
-      {!isUploading && (
-        <>
-          <FileListComponent
-            files={cave?.files}
-            isUploading={isUploading}
-            setIsUploading={(value) => setIsUploading(value)}
-            hasEditPermission={hasEditPermission}
-          />
-        </>
-      )}
-      {isUploading && (
-        <UploadComponent
-          onClose={() => {
-            if (updateCave) {
-              updateCave();
-            }
-            setIsUploading(false);
-          }}
-          uploadFunction={(params) =>
-            CaveService.AddCaveFile(
-              params.file,
-              cave?.id as string,
-              params.uid,
-              params.onProgress
-            )
-          }
-          updateFunction={FileService.UpdateFilesMetadata}
-        />
-      )}
+      <FileListComponent
+        files={cave?.files}
+        hasEditPermission={hasEditPermission}
+      />
 
       {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
         <>

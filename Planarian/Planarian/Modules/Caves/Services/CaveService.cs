@@ -801,7 +801,14 @@ public partial class CaveService : ServiceBase<CaveRepository>
 
         if (cave == null) throw ApiExceptionDictionary.NotFound("Cave");
 
-        foreach (var file in cave.Files)
+        await ProcessFiles(cave.Files);
+
+        return cave;
+    }
+    
+    private async Task ProcessFiles(IEnumerable<FileVm> files)
+    {
+        foreach (var file in files)
         {
             var fileProperties = await _fileRepository.GetFileBlobProperties(file.Id);
             if (fileProperties == null || string.IsNullOrWhiteSpace(fileProperties.BlobKey) ||
@@ -812,8 +819,6 @@ public partial class CaveService : ServiceBase<CaveRepository>
             file.DownloadUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName,
                 file.FileName, true);
         }
-
-        return cave;
     }
 
     public async Task<IEnumerable<CaveHistory>> GetCaveHistory(string caveId,
@@ -1631,6 +1636,7 @@ public static class CaveLogPropertyNames
 
     public const string Entrance = "Entrance";
     public const string Cave = "Cave";
+    public const string FileName = "FileName";
     public const string File = "File";
     public const string FileTag = "FileTag";
 }

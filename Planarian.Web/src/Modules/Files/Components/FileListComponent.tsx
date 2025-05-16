@@ -3,7 +3,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileVm } from "../Models/FileVm";
 import { FileListItemComponent } from "./FileListItemComponent";
-import { customSort, groupBy } from "../../../Shared/Helpers/ArrayHelpers";
+import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { CloudUploadOutlined } from "@ant-design/icons";
 import { ReactNode } from "react";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
@@ -13,15 +13,11 @@ const { Panel } = Collapse;
 export interface FileListComponentProps {
   files?: FileVm[];
   customOrder?: string[];
-  isUploading: boolean;
-  setIsUploading?: (value: boolean) => void;
   hasEditPermission?: boolean;
 }
 
 export const FileListComponent = ({
   files,
-  isUploading,
-  setIsUploading,
   hasEditPermission = true,
 }: FileListComponentProps) => {
   if (!files) {
@@ -47,11 +43,6 @@ export const FileListComponent = ({
                   <PlanarianButton
                     alwaysShowChildren
                     icon={<CloudUploadOutlined />}
-                    onClick={() => {
-                      if (setIsUploading) {
-                        setIsUploading(true);
-                      }
-                    }}
                   >
                     Upload
                   </PlanarianButton>
@@ -76,11 +67,6 @@ export const FileListComponent = ({
               alwaysShowChildren
               permissionKey={PermissionKey.Manager}
               disabled={!hasEditPermission}
-              onClick={() => {
-                if (setIsUploading) {
-                  setIsUploading(true);
-                }
-              }}
             >
               Upload
             </PlanarianButton>

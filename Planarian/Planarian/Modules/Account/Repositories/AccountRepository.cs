@@ -606,7 +606,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 {
                     // we do not delete duplicate file tags because each file can only have one tag. it would remove the file in some cases
                     await MergeTags<File>(sourceTagTypeId, destinationTagTypeId, e => e.FileTypeTagId,
-                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId!, null, CaveLogPropertyNames.File,
+                        e => e.Cave!.AccountId, cancellationToken, e => e.CaveId!, null, CaveLogPropertyNames.FileName,
                         sourceTagName, destinationTagName, builder, destinationTagTypeKey);
                 }
                 else if (TagTypeKeyConstant.GeologicAge.Equals(destinationTagTypeKey))

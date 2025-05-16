@@ -19,6 +19,7 @@
 
 
     <ItemGroup>
+        <Folder Include="Database\Entities\RidgeWalker\ViewModels\" />
         <Folder Include="Shared\Exceptions\" />
     </ItemGroup>
 

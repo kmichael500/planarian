@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using NetTopologySuite.Geometries.Utilities;
 using Npgsql;
+using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
@@ -261,6 +263,9 @@ public class MapRepository : RepositoryBase
     {
         if (zoom < 11)
             return new List<string>();
+
+        if (RequestUser.AccountId.IsNullOrWhiteSpace())
+            throw ApiExceptionDictionary.NoAccount;
 
         const string sql = """
                            WITH view_box AS (

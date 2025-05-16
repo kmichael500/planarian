@@ -1,12 +1,11 @@
 import { RcFile } from "antd/es/upload";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../..";
-import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 import { FileVm } from "../Models/FileVm";
 
 const baseUrl = "api/files";
 const FileService = {
-  async UpdateFilesMetadata(values: EditFileMetadataVm[]): Promise<void> {
+  async UpdateFilesMetadata(values: FileVm[]): Promise<void> {
     await HttpClient.put<string>(`${baseUrl}/multiple`, values);
   },
   async GetFile(id: string): Promise<void> {

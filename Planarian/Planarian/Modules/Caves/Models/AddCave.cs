@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Planarian.Model.Shared;
+using Planarian.Modules.Files.Services;
 
 namespace Planarian.Model.Database.Entities.RidgeWalker.ViewModels;
 
@@ -41,7 +42,7 @@ public class AddCave
     public DateTime? ReportedOn { get; set; }
 
     public List<AddEntrance> Entrances { get; set; } = [];
-    public List<EditFileMetadata>? Files { get; set; } = new List<EditFileMetadata>();
+    public List<FileVm>? Files { get; set; } = new List<FileVm>();
     public List<string> GeologyTagIds { get; set; } = [];
     public List<string> ReportedByNameTagIds { get; set; } = [];
     public List<string> BiologyTagIds { get; set; } = [];

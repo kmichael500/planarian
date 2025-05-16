@@ -623,17 +623,7 @@ const CaveReviewComponent = ({
 
       <PlanarianDividerComponent title="Files" />
 
-      <FileListComponent
-        files={cave?.files?.map(
-          (file) =>
-            ({
-              displayName: file.displayName,
-              fileTypeTagId: file.fileTypeTagId,
-            } as FileVm)
-        )}
-        customOrder={["Map"]}
-        isUploading={false}
-      />
+      <FileListComponent files={cave?.files} customOrder={["Map"]} />
     </>
   );
 

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
@@ -180,14 +182,15 @@ public class FileService : ServiceBase<FileRepository>
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
-        await containerClient.CreateIfNotExistsAsync();
+
+        await containerClient.CreateIfNotExistsAsync(cancellationToken: default);
 
         return containerClient;
     }
 
     #endregion
 
-    public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values, CancellationToken cancellationToken)
+    public async Task UpdateFilesMetadata(IEnumerable<FileVm> values, CancellationToken cancellationToken)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
@@ -337,14 +340,15 @@ public class FileTypeTagName
 
 public class FileVm
 {
-    [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
+
+    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
     
-    public string? BlobName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
     public string? Uuid { get; set; }
     public string? EmbedUrl { get; set; }
     public string? DownloadUrl { get; set; }
+    [JsonIgnore] public string? BlobName { get; set; }
 }

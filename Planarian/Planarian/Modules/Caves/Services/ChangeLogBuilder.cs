@@ -172,14 +172,14 @@ public class ChangeLogBuilder
 
             var changeType = isRenamed ? ChangeType.Rename : null;
             _changes.Add(CreateLog(
-                CaveLogPropertyNames.File,
+                CaveLogPropertyNames.FileName,
                 ChangeValueType.String,
                 valueString: current?.FileChange?.FileName,
                 originalValueString: original?.FileChange?.FileName,
                 changeType: changeType, overrideCaveId: overrideCaveId, fileId: fileId));
 
 
-            AddStringFieldAsync(CaveLogPropertyNames.File, current?.FileChange?.FileName, current?.FileChange?.FileName,
+            AddStringFieldAsync(CaveLogPropertyNames.FileName, current?.FileChange?.FileName, current?.FileChange?.FileName,
                 entranceId: null, overrideCaveId: overrideCaveId, fileId: fileId);
 
         }

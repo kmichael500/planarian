@@ -7,6 +7,8 @@ public class CaveHistoryRecord
 {
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? EntranceId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? FileId { get; set; }
+
     [MaxLength(PropertyLength.Name)] public string? EntranceName { get; set; } 
     [MaxLength(PropertyLength.Id)] public string ChangedByUserId { get; set; } = null!;
 

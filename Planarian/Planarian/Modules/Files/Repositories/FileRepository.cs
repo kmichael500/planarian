@@ -24,6 +24,12 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return await DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
             .FirstOrDefaultAsync();
     }
+    
+    public async Task<string?> GetFileBlobKey(string id)
+    {
+        return await DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.BlobKey).FirstOrDefaultAsync();
+    }
 
 
     public sealed record GetFileBlobPropertiesResult(string? BlobKey, string? ContainerName);

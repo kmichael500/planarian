@@ -1,13 +1,15 @@
 import { FileTypeKey } from "./FileTypeKey";
 
 export interface FileVm {
-  fileName: string;
-  displayName: string | null;
   id: string;
-  uuid?: string;
+
+  displayName: string | null;
   fileTypeTagId: string;
   fileTypeKey: FileTypeKey;
-  embedUrl: string;
-  downloadUrl: string;
   isNew: boolean;
+
+  fileName?: string;
+  uuid?: string;
+  embedUrl?: string;
+  downloadUrl?: string;
 }

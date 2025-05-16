@@ -616,7 +616,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     FileName = ee.FileName,
                     FileTypeKey = ee.FileTypeTag.Name,
                     FileTypeTagId = ee.FileTypeTagId
-                }),
+                }).ToList(),
                 BiologyTagIds = e.BiologyTags.Select(ee => ee.TagTypeId),
                 ArcheologyTagIds = e.ArcheologyTags.Select(ee => ee.TagTypeId),
                 CartographerNameTagIds = e.CartographerNameTags.Select(ee => ee.TagTypeId),

@@ -22,7 +22,6 @@ import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 import { getFileType } from "../Services/FileHelpers";
 
 interface AddCaveFilesForm {
@@ -262,10 +261,7 @@ const UploadComponent = ({
                       <Col>
                         <Card bordered style={{ height: "100%" }}>
                           <Form.Item
-                            name={[
-                              field.name,
-                              nameof<EditFileMetadataVm>("displayName"),
-                            ]}
+                            name={[field.name, nameof<FileVm>("displayName")]}
                             key={field.key}
                             label={`Name`}
                             required
@@ -273,10 +269,7 @@ const UploadComponent = ({
                             <Input />
                           </Form.Item>
                           <Form.Item
-                            name={[
-                              field.name,
-                              nameof<EditFileMetadataVm>("fileTypeTagId"),
-                            ]}
+                            name={[field.name, nameof<FileVm>("fileTypeTagId")]}
                             key={field.key}
                             label={`File Type`}
                             required
