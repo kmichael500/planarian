@@ -8,7 +8,6 @@ import {
   Space,
   Tooltip,
   Card,
-  Typography,
 } from "antd";
 import styled from "styled-components";
 
@@ -32,7 +31,6 @@ import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { AddEntranceVm } from "../Models/AddEntranceVm";
-import { FileVm } from "../../Files/Models/FileVm";
 import {
   CaveHistoryRecord,
   CaveLogPropertyName,
@@ -623,7 +621,12 @@ const CaveReviewComponent = ({
 
       <PlanarianDividerComponent title="Files" />
 
-      <FileListComponent files={cave?.files} customOrder={["Map"]} />
+      <FileListComponent
+        originalFiles={originalCave?.files}
+        changes={changes}
+        files={cave?.files}
+        customOrder={["Map"]}
+      />
     </>
   );
 

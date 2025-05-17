@@ -16,6 +16,7 @@ public static class ChangeValueType
     
     public const string Entrance = "Entrance";
     public const string Cave     = "Cave";
+    public const string File     = "File";
 }
 
 public static class ChangeType 

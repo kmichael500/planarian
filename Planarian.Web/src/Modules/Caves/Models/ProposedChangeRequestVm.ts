@@ -10,6 +10,7 @@ export interface ProposedChangeRequestVm {
 
 export interface CaveHistoryRecord {
   caveId: string;
+  fileId: string | null;
   entranceId: string | null;
   entranceName: string | null;
   changedByUserId: string;
@@ -80,6 +81,10 @@ export enum CaveLogPropertyName {
 
   Entrance = "Entrance",
   Cave = "Cave",
+
+  File = "File",
+  FileName = "FileName",
+  FileTag = "FileTag",
 }
 
 export interface CaveHistory {

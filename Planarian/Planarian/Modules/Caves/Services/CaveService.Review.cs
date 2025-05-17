@@ -419,6 +419,12 @@ public partial class CaveService
         {
             var originalFile = originalFiles.FirstOrDefault(f => f.Id == fileId);
             var modifiedFile = modifiedFiles.FirstOrDefault(f => f.Id == fileId);
+
+            if (originalFile != null && modifiedFile == null)
+            {
+                builder.AddRemoveFileLog(originalFile.Id);
+                continue;
+            }
             
             var originalFileTag = await _tagRepository.GetTag(originalFile?.FileTypeTagId);
             var modifiedFileTag = originalFile?.FileTypeTagId == modifiedFile?.FileTypeTagId
@@ -427,7 +433,7 @@ public partial class CaveService
 
             var og = new ChangeLogBuilder.ChangeLogBuilderAddFile((originalFile?.Id, originalFile?.FileName),
                 (originalFile?.Id, originalFileTag?.Id, originalFileTag?.Name));
-            
+
             string? modFileName = null;
             if (modifiedFile != null)
             {
@@ -568,9 +574,6 @@ public partial class CaveService
         changes = changes.ToList();
         var caveId = changes.First().CaveId;
         
-        // copy the current cave if it exists so we don't modify the original
-        // cave using system text json
-        
         var currentCopy = JsonConvert.DeserializeObject<CaveVm>(JsonConvert.SerializeObject(current));
 
         currentCopy ??= new CaveVm
@@ -583,7 +586,7 @@ public partial class CaveService
         {
              FileVm? file = null;
              var isNewFile = false;
-             if (change.PropertyName is CaveLogPropertyNames.FileName or CaveLogPropertyNames.FileTag)
+             if (change.PropertyName is CaveLogPropertyNames.FileName or CaveLogPropertyNames.FileTag or CaveLogPropertyNames.File)
              { 
                  file = currentCopy.Files.FirstOrDefault(f => f.Id == change.FileId);
                  if (file == null)

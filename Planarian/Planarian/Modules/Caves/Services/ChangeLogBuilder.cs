@@ -468,4 +468,14 @@ public class ChangeLogBuilder
             changeType: ChangeType.Add
         ));
     }
+
+    public void AddRemoveFileLog(string fileId)
+    {
+        _changes.Add(CreateLog(
+            propertyName: CaveLogPropertyNames.File,
+            changeValueType: ChangeValueType.File,
+            fileId: fileId,
+            changeType: ChangeType.Delete
+        ));
+    }
 }
