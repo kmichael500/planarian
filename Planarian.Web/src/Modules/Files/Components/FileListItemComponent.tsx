@@ -14,7 +14,6 @@ const FileListItemComponent = ({
   isRemoved?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
-  // Allow opening viewer even if removed, as per new requirement
   const onFileClick = () => setOpen(true);
   const fileType = getFileType(file.fileName);
 
@@ -36,14 +35,12 @@ const FileListItemComponent = ({
           >
             Download
           </Typography.Link>,
-          // If you want a specific text for removed items in actions, you can add it here conditionally
-          // For example: isRemoved && <Typography.Text disabled> (Original File)</Typography.Text>
         ]}
       >
         <Typography.Text style={textStyle}>
           <Tag>{fileType}</Tag>
           {file.displayName}
-          {isNew && !isRemoved && ( // Show "New" tag only if it's new AND not also marked as removed (edge case)
+          {isNew && (
             <Tag color="success" style={{ marginLeft: 8 }}>
               New
             </Tag>
@@ -55,7 +52,6 @@ const FileListItemComponent = ({
           )}
         </Typography.Text>
       </List.Item>
-      {/* Allow FileViewer for removed files as well, as they can still be "viewed" */}
       {file.embedUrl && (
         <FileViewer
           open={open}

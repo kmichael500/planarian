@@ -47,6 +47,7 @@ import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
 import { CaveHistoryModal } from "./CaveHistoryModal";
+import { FileTypeKey } from "../../Files/Models/FileTypeKey";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -413,6 +414,7 @@ const CaveComponent = ({
 
       <FileListComponent
         files={cave?.files}
+        customOrder={[FileTypeKey.Map]}
         hasEditPermission={hasEditPermission}
       />
 
