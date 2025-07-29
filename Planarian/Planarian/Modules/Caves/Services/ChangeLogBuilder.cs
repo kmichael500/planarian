@@ -30,7 +30,7 @@ public class ChangeLogBuilder
     }
 
     public void AddStringFieldAsync(string propertyName, string? original, string? current, string? entranceId = null,
-        string? overrideCaveId = null, string? fileId = null)
+        string? overrideCaveId = null, string? fileId = null, string? changeType = null)
     {
         if (string.Equals(original, current, StringComparison.InvariantCulture))
             return;
@@ -42,7 +42,8 @@ public class ChangeLogBuilder
             originalValueString: original,
             entranceId: entranceId,
             overrideCaveId: overrideCaveId,
-            fileId: fileId
+            fileId: fileId,
+            changeType: changeType
         ));
     }
 
@@ -156,6 +157,17 @@ public class ChangeLogBuilder
     public void AddFile(ChangeLogBuilderAddFile? original, ChangeLogBuilderAddFile? current,
         string? overrideCaveId = null)
     {
+        if (original?.TagChange != null || current?.TagChange != null)
+        {
+            var fileId = current?.TagChange?.FileId ??
+                         original?.TagChange?.FileId ?? throw new ArgumentNullException("fileId");
+
+            AddNamedIdFieldAsync(CaveLogPropertyNames.FileTag,
+                (original?.TagChange?.TagTypeId, original?.TagChange?.TagName),
+                (current?.TagChange?.TagTypeId, current?.TagChange?.TagName), entranceId: null,
+                overrideCaveId: overrideCaveId, fileId: fileId);
+        }
+        
         if (original?.FileChange != null || current?.FileChange != null)
         {
             var isRenamed = false;
@@ -171,28 +183,17 @@ public class ChangeLogBuilder
                          original?.FileChange?.FileId ?? throw new ArgumentNullException("fileId");
 
             var changeType = isRenamed ? ChangeType.Rename : null;
-            _changes.Add(CreateLog(
-                CaveLogPropertyNames.FileName,
-                ChangeValueType.String,
-                valueString: current?.FileChange?.FileName,
-                originalValueString: original?.FileChange?.FileName,
-                changeType: changeType, overrideCaveId: overrideCaveId, fileId: fileId));
+            // _changes.Add(CreateLog(
+            //     CaveLogPropertyNames.FileName,
+            //     ChangeValueType.String,
+            //     valueString: current?.FileChange?.FileName,
+            //     originalValueString: original?.FileChange?.FileName,
+            //     changeType: changeType, overrideCaveId: overrideCaveId, fileId: fileId));
 
 
             AddStringFieldAsync(CaveLogPropertyNames.FileName, current?.FileChange?.FileName, current?.FileChange?.FileName,
-                entranceId: null, overrideCaveId: overrideCaveId, fileId: fileId);
+                entranceId: null, overrideCaveId: overrideCaveId, fileId: fileId, changeType: changeType);
 
-        }
-
-        if (original?.TagChange != null || current?.TagChange != null)
-        {
-            var fileId = current?.TagChange?.FileId ??
-                         original?.TagChange?.FileId ?? throw new ArgumentNullException("fileId");
-
-            AddNamedIdFieldAsync(CaveLogPropertyNames.FileTag,
-                (original?.TagChange?.TagTypeId, original?.TagChange?.TagName),
-                (current?.TagChange?.TagTypeId, current?.TagChange?.TagName), entranceId: null,
-                overrideCaveId: overrideCaveId, fileId: fileId);
         }
 
     }

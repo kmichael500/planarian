@@ -151,6 +151,12 @@ public partial class CaveService
                 ? null
                 : await Repository.GetCave(value.Cave.Id!);
             var changeLogs = await BuildChangeLog(original, value.Cave, RequestUser.Id, RequestUser.Id, entity.Id);
+
+            if (changeLogs.Count == 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("It does not appear that any changes were made to the cave. Please make a change and try again.");
+            }
+            
             _caveChangeLogRepository.AddRange(changeLogs);
 
             await _caveChangeRequestRepository.SaveChangesAsync(cancellationToken);
@@ -763,6 +769,7 @@ public partial class CaveService
                 case CaveLogPropertyNames.FileTag:
                     if (file == null) throw new ArgumentNullException(nameof(file));
                     file.FileTypeTagId = change.PropertyId ?? throw new ArgumentNullException(nameof(change.PropertyId));
+                    file.FileTypeKey = change.ValueString ?? throw new ArgumentNullException(nameof(change.ValueString));
                     break;
             }
 

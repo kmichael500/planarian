@@ -1,17 +1,26 @@
-import { List, Tag, Typography } from "antd";
+// src/modules/Files/Components/FileListItemComponent.tsx
+import React, { useState } from "react";
+import { List, Tag, Typography, Tooltip } from "antd";
 import { FileVm } from "../Models/FileVm";
-import { useState } from "react";
 import { getFileType } from "../Services/FileHelpers";
 import { FileViewer } from "./FileViewerComponent";
 
-const FileListItemComponent = ({
+export const FileListItemComponent = ({
   file,
   isNew,
   isRemoved,
+  isRenamed,
+  isTagChanged,
+  originalDisplayName,
+  originalTagValue,
 }: {
   file: FileVm;
   isNew?: boolean;
   isRemoved?: boolean;
+  isRenamed?: boolean;
+  isTagChanged?: boolean;
+  originalDisplayName?: string | null;
+  originalTagValue?: string | null;
 }) => {
   const [open, setOpen] = useState(false);
   const onFileClick = () => setOpen(true);
@@ -27,8 +36,11 @@ const FileListItemComponent = ({
     <>
       <List.Item
         actions={[
-          <Typography.Link onClick={onFileClick}>View</Typography.Link>,
+          <Typography.Link key="view" onClick={onFileClick}>
+            View
+          </Typography.Link>,
           <Typography.Link
+            key="download"
             href={file.downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -38,20 +50,37 @@ const FileListItemComponent = ({
         ]}
       >
         <Typography.Text style={textStyle}>
+          {/* File type tag */}
           <Tag>{fileType}</Tag>
+
+          {/* File name */}
           {file.displayName}
-          {isNew && (
-            <Tag color="success" style={{ marginLeft: 8 }}>
-              New
-            </Tag>
-          )}
-          {isRemoved && (
-            <Tag color="error" style={{ marginLeft: 8 }}>
-              Removed
-            </Tag>
-          )}
+
+          {/* Status tags container */}
+          <span
+            style={{
+              marginLeft: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            {isNew && <Tag color="success">New</Tag>}
+            {isRemoved && <Tag color="error">Removed</Tag>}
+            {isRenamed && originalDisplayName && (
+              <Tooltip title={`Original Value: ${originalDisplayName}`}>
+                <Tag color="warning">Renamed</Tag>
+              </Tooltip>
+            )}
+            {isTagChanged && originalTagValue && (
+              <Tooltip title={`Original Value: ${originalTagValue}`}>
+                <Tag color="processing">Tag Changed</Tag>
+              </Tooltip>
+            )}
+          </span>
         </Typography.Text>
       </List.Item>
+
       {file.embedUrl && (
         <FileViewer
           open={open}
@@ -65,5 +94,3 @@ const FileListItemComponent = ({
     </>
   );
 };
-
-export { FileListItemComponent };
