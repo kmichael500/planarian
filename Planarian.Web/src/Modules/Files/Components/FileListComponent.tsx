@@ -10,7 +10,6 @@ import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { FileVm } from "../Models/FileVm";
 import {
   CaveHistoryRecord,
-  ChangeType,
   CaveLogPropertyName,
 } from "../../Caves/Models/ProposedChangeRequestVm";
 
@@ -33,18 +32,20 @@ export const FileListComponent = ({
 }: FileListComponentProps) => {
   const diffMode = Boolean(changes.length && originalFiles.length);
 
-  // group current + original by type
+  // group current files by type
   const currentByType = groupBy(files, (f) => f.fileTypeKey);
-  const originalByType = diffMode
-    ? groupBy(originalFiles, (f) => f.fileTypeKey)
-    : {};
+
+  // figure out which originals have been removed
+  const removedFiles = diffMode
+    ? originalFiles.filter((o) => !files.some((f) => f.id === o.id))
+    : [];
+  const removedByType = groupBy(removedFiles, (f) => f.fileTypeKey);
 
   // collect change-records by fileId
   const fileChangesById: Record<string, CaveHistoryRecord[]> = diffMode
     ? changes.reduce((acc, rec) => {
         if (rec.fileId) {
-          acc[rec.fileId] = acc[rec.fileId] || [];
-          acc[rec.fileId].push(rec);
+          (acc[rec.fileId] ||= []).push(rec);
         }
         return acc;
       }, {} as Record<string, CaveHistoryRecord[]>)
@@ -52,7 +53,7 @@ export const FileListComponent = ({
 
   // determine panel order
   const allTypes = Array.from(
-    new Set([...Object.keys(currentByType), ...Object.keys(originalByType)])
+    new Set([...Object.keys(currentByType), ...Object.keys(removedByType)])
   );
   const sortedTypes = [
     ...customOrder.filter((t) => allTypes.includes(t)),
@@ -61,15 +62,13 @@ export const FileListComponent = ({
       .sort((a, b) => a.localeCompare(b)),
   ];
 
-  // build panels, tagging new/removed/changed + formatting originalValue
+  // build panels
   const panelData = sortedTypes.map((type) => {
+    console.log(originalFiles, files);
+    // current items (from files)
     const current = currentByType[type] || [];
-    const original = originalByType[type] || [];
-
     const newItems = current.map((f) => {
-      const orig = original.find((o) => o.id === f.id);
       const recs = fileChangesById[f.id] || [];
-
       const nameRec = recs.find(
         (c) => c.propertyName === CaveLogPropertyName.FileName
       );
@@ -77,57 +76,41 @@ export const FileListComponent = ({
         (c) => c.propertyName === CaveLogPropertyName.FileTag
       );
 
-      let isRenamed = false;
-      let isTagChanged = false;
-      let itemOriginalDisplayName: string | undefined | null;
-      let itemOriginalTagValue: string | undefined | null;
-
-      if (orig) {
-        if (nameRec) {
-          isRenamed = true;
-          itemOriginalDisplayName = orig.displayName;
-        }
-        if (tagRec) {
-          isTagChanged = true;
-          itemOriginalTagValue = orig.fileTypeKey;
-        }
-      }
-
-      const isChanged = isRenamed || isTagChanged;
-
       return {
         ...f,
-        isNew: Boolean(diffMode && !orig),
+        isNew: diffMode && !originalFiles.some((o) => o.id === f.id),
         isRemoved: false,
-        isChanged,
-        isRenamed,
-        isTagChanged,
-        originalDisplayName: itemOriginalDisplayName,
-        originalTagValue: itemOriginalTagValue,
+        isRenamed: Boolean(nameRec),
+        isTagChanged: Boolean(tagRec),
+        originalDisplayName: nameRec
+          ? originalFiles.find((o) => o.id === f.id)?.displayName
+          : undefined,
+        originalTagValue: tagRec
+          ? originalFiles.find((o) => o.id === f.id)?.fileTypeKey
+          : undefined,
       };
     });
 
-    const removedItems = diffMode
-      ? original
-          .filter((o) => !current.some((f) => f.id === o.id))
-          .map((f) => ({
-            ...f,
-            isNew: false,
-            isRemoved: true,
-            isChanged: false,
-            isRenamed: false,
-            isTagChanged: false,
-            originalDisplayName: undefined,
-            originalTagValue: undefined,
-          }))
-      : [];
+    // removed items (only use originalFiles here)
+    const removedItems = removedFiles
+      .filter((f) => f.fileTypeKey === type)
+      .map((f) => ({
+        ...f,
+        isNew: false,
+        isRemoved: true,
+        isRenamed: false,
+        isTagChanged: false,
+        originalDisplayName: undefined,
+        originalTagValue: undefined,
+      }));
 
     const items = [...newItems, ...removedItems];
-
     return {
       type,
       items,
-      hasDiff: items.some((i) => i.isNew || i.isRemoved || i.isChanged),
+      hasDiff: items.some(
+        (i) => i.isNew || i.isRemoved || i.isRenamed || i.isTagChanged
+      ),
       hasCurrent: current.length > 0,
     };
   });
@@ -158,17 +141,7 @@ export const FileListComponent = ({
               }
               items={items}
               itemKey={(it) => it.id + (it.isRemoved ? "_removed" : "")}
-              renderItem={(
-                it: FileVm & {
-                  isNew?: boolean;
-                  isRemoved?: boolean;
-                  isChanged?: boolean;
-                  isRenamed?: boolean;
-                  isTagChanged?: boolean;
-                  originalDisplayName?: string | null;
-                  originalTagValue?: string | null;
-                }
-              ) => (
+              renderItem={(it) => (
                 <FileListItemComponent
                   file={it}
                   isNew={it.isNew}
