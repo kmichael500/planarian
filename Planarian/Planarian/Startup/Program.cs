@@ -53,8 +53,7 @@ using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
-using Southport.Messaging.Email.SendGrid.Interfaces;
-using Southport.Messaging.Email.SendGrid.Message;
+using Southport.Messaging.Email.MailGun;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -136,7 +135,7 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
-builder.Services.AddSingleton(Options.Create<SendGridOptions>(emailOptions));
+builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
 #endregion
@@ -165,7 +164,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
-builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
+builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 
 #endregion
 

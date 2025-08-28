@@ -11,7 +11,6 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using SendGrid.Helpers.Errors.Model;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
@@ -38,7 +37,7 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken, string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
         var caveEntity = await _caveRepository.GetCave(caveId);
         if (caveEntity == null)
@@ -102,7 +101,7 @@ public class FileService : ServiceBase<FileRepository>
         string? uuid = null)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        if (RequestUser.AccountId == null) throw new BadRequestException("Account Id is null");
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
         await RemoveExpiredFiles();
 
