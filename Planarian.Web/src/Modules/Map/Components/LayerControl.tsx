@@ -249,7 +249,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -265,7 +265,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -281,7 +281,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -297,7 +297,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -313,7 +313,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -329,7 +329,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -345,7 +345,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
