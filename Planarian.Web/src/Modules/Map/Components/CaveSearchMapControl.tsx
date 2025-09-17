@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { AutoComplete, Input, message } from "antd";
-import { useMap } from "react-map-gl";
+import { useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { CaveService } from "../../Caves/Service/CaveService";
 import {
