@@ -407,7 +407,8 @@ const CavesComponent: React.FC = () => {
         `${AuthenticationService.GetAccountId()}-selectedFeatures`
       );
       let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
-      if (savedFeaturesJson) {
+
+      if (savedFeaturesJson !== null) {
         savedFeatures = JSON.parse(savedFeaturesJson);
       } else {
         savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
@@ -421,8 +422,11 @@ const CavesComponent: React.FC = () => {
         }
       }
 
-      // Location check for initial setup if distanceMiles is enabled and selected
+      // Filter defaults against enabled features
       let filteredSelectedFeatures = savedFeatures.filter(f => enabledFeatures.some(e => e.value === f));
+
+
+      // Location check for initial setup if distanceMiles is enabled and selected
       if (filteredSelectedFeatures.includes("distanceMiles")) {
         const userLocation = await LocationHelpers.getUsersLocation(message);
         if (userLocation) {
@@ -879,6 +883,9 @@ const CavesComponent: React.FC = () => {
                   );
                 }
               } else {
+                queryBuilder.setUserLocation(undefined, undefined);
+                queryBuilder.buildAsQueryString(); // Clear out user location from URL
+
                 setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
                 localStorage.setItem(
                   `${AuthenticationService.GetAccountId()}-selectedFeatures`,

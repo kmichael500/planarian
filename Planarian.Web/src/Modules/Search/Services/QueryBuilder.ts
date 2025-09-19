@@ -81,9 +81,7 @@ class QueryBuilder<T extends object> {
   }
 
   public setUserLocation(latitude?: number, longitude?: number) {
-    if (latitude === undefined || longitude === undefined) {
-      return this;
-    }
+
 
     this.userLatitude = latitude;
     this.userLongitude = longitude;
