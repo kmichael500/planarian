@@ -269,14 +269,5 @@ public class UserRepository : RepositoryBase
             .Select(u => u.LastActiveOn)
             .FirstOrDefaultAsync();
     }
-
-    public async Task UpdateLastActiveOn(string userId)
-    {
-        var user = await DbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user != null)
-        {
-            user.LastActiveOn = DateTime.UtcNow;
-            await DbContext.SaveChangesAsync();
-        }
-    }
+    
 }
