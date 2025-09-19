@@ -4,4 +4,5 @@ export interface UserManagerGridVm {
   fullName: string;
   invitationAcceptedOn: string | null;
   invitationSentOn: string | null;
+  lastActiveOn: string | null;
 }

@@ -132,6 +132,15 @@ const UserManagerComponent: React.FC = () => {
       responsive: ["xs", "sm", "md", "lg", "xl"],
     },
     {
+      title: "Last Active",
+      dataIndex: nameof<UserManagerGridVm>("lastActiveOn"),
+      sorter: (a, b) =>
+        new Date(a.lastActiveOn ?? 0).getTime() -
+        new Date(b.lastActiveOn ?? 0).getTime(),
+      render: (text: string) => (text ? formatDateTime(text) : ""),
+      responsive: ["xs", "sm", "md", "lg", "xl"],
+    },
+    {
       title: "Action",
       render: (_: any, record: UserManagerGridVm) => (
         <Space direction={screens.xs ? "vertical" : "horizontal"}>

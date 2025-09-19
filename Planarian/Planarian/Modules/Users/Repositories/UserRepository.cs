@@ -232,8 +232,14 @@ public class UserRepository : RepositoryBase
     
     private static IQueryable<UserManagerGridVm> ToUserGridVmQuery(IQueryable<AccountUser> query)
     {
-        return query.Select(e => new UserManagerGridVm(e.UserId, e.User!.EmailAddress, e.User.FullName, e.InvitationSentOn,
-            e.InvitationAcceptedOn));
+        return query.Select(e => new UserManagerGridVm(
+            e.UserId, 
+            e.User!.EmailAddress, 
+            e.User.FullName, 
+            e.InvitationSentOn,
+            e.InvitationAcceptedOn,
+            e.User.LastActiveOn
+        ));
     }
 
     /// <summary>
@@ -255,4 +261,13 @@ public class UserRepository : RepositoryBase
                 .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey && e.AccountId == RequestUser.AccountId)
                 .FirstOrDefaultAsync();
         }
+
+    public async Task<DateTime?> GetLastActiveOn(string userId)
+    {
+        return await DbContext.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.LastActiveOn)
+            .FirstOrDefaultAsync();
+    }
+    
 }

@@ -49,7 +49,12 @@ public class RequestUser
         {
             AccountId = accountId;
             UserGroupPrefix = $"{userId}-{AccountId}";
-        }
+        } 
+        
+        user.LastActiveOn = DateTime.UtcNow;
+        await _dbContext.SaveChangesAsync();
+
+
     }
 
     public string AccountContainerName =>
