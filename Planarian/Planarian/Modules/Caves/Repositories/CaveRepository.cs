@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
@@ -10,7 +8,6 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
-using Planarian.Model.Shared.Base;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
@@ -27,6 +24,9 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
     }
 
+    private const double EarthRadiusMiles = 3958.756;
+
+
     public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
         var query = GetCavesQuery(filterQuery, permissionKey);
@@ -35,7 +35,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         var userLongitude = filterQuery.Ulon;
         var hasLocationForDistance = userLatitude.HasValue && userLongitude.HasValue;
         
-        const double earthRadiusMiles = 3958.756;
         double cosUserLatitude = 0;
 
         if (hasLocationForDistance)
@@ -83,7 +82,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 ? e.Entrances
                     .Where(ee => ee.Location != null && !ee.Location.IsEmpty)
                     .Select(ee => (double?)(
-                        2 * earthRadiusMiles *
+                        2 * EarthRadiusMiles *
                         Math.Asin(
                             Math.Sqrt(
                                 Math.Pow(
@@ -823,7 +822,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     longitude.ToString(CultureInfo.InvariantCulture));
             }
 
-            const double EarthRadiusMiles = 3958.756;
             var latitudeRadians = latitude * Math.PI / 180d;
             var longitudeRadians = longitude * Math.PI / 180d;
 

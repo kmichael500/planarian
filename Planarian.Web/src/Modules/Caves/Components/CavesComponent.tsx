@@ -32,7 +32,6 @@ import {
   formatDate,
   defaultIfEmpty,
   formatNumber,
-  DistanceFormat,
   formatCoordinateNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
@@ -66,7 +65,6 @@ import FavoriteCave from "./FavoriteCave";
 import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
 import { EntrancePolygonFilterFormItem } from "../../Search/Components/EntrancePolygonFilterFormItem";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
-import { get } from "http";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);

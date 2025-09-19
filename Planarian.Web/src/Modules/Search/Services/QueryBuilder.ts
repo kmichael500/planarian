@@ -197,7 +197,11 @@ class QueryBuilder<T extends object> {
   public buildAsQueryString() {
     const conditions = [] as QueryCondition<T>[];
     this.conditions.forEach((condition) => {
-      if (condition.value !== null || condition.value !== undefined || (typeof condition.value === "string" && condition.value !== "undefined")) {
+      if (
+        condition.value !== null &&
+        condition.value !== undefined &&
+        (typeof condition.value !== "string" || condition.value !== "undefined")
+      ) {
         if (
           Array.isArray(condition.value) &&
           condition.value.every((item) => typeof item === "string")
