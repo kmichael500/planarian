@@ -414,55 +414,31 @@ const CavesComponent: React.FC = () => {
       }
 
       const enabledFeatures: SelectListItem<NestedKeyOf<CaveSearchVm>>[] = [];
-      let locationPermissionResult: boolean | null = null;
-
       for (const feature of possibleFeaturesToRender) {
         const isEnabled = isFeatureEnabled(feature.data.key);
-
-        if (feature.value === "distanceMiles" && isEnabled) {
-          const userLocation = await LocationHelpers.getUsersLocation();
-          if (userLocation) {
-            queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
-            locationPermissionResult = true;
-          } else {
-            locationPermissionResult = false;
-          }
-        }
-
-        if (feature.value === "distanceMiles") {
-          if (locationPermissionResult === true && isEnabled) {
-            enabledFeatures.push(feature);
-          }
-          // If permission was denied, don't include the distance feature at all
-        } else if (isEnabled) {
+        if (isEnabled) {
           enabledFeatures.push(feature);
         }
       }
 
-      setLocationPermissionGranted(locationPermissionResult);
-
-      setFilteredFeatures(enabledFeatures);
-
-      const validSavedFeatures = savedFeatures.filter((feature) => {
-        if (feature === "distanceMiles" && locationPermissionResult === false) {
-          return false;
-        }
-      });
-
-      if (locationPermissionResult === true && enabledFeatures.some(f => f.value === "distanceMiles")) {
-        if (!validSavedFeatures.includes("distanceMiles")) {
-
-          validSavedFeatures.unshift("distanceMiles");
+      // Location check for initial setup if distanceMiles is enabled and selected
+      let filteredSelectedFeatures = savedFeatures.filter(f => enabledFeatures.some(e => e.value === f));
+      if (filteredSelectedFeatures.includes("distanceMiles")) {
+        const userLocation = await LocationHelpers.getUsersLocation(message);
+        if (userLocation) {
+          queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+        } else {
+          // Remove distanceMiles from selection if permission denied
+          filteredSelectedFeatures = filteredSelectedFeatures.filter(f => f !== "distanceMiles");
         }
       }
 
-      setSelectedFeatures(validSavedFeatures);
-
+      setFilteredFeatures(enabledFeatures);
+      setSelectedFeatures(filteredSelectedFeatures);
       localStorage.setItem(
         `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-        JSON.stringify(validSavedFeatures)
+        JSON.stringify(filteredSelectedFeatures)
       );
-
       await getCaves();
     };
 
@@ -883,33 +859,31 @@ const CavesComponent: React.FC = () => {
               const isDistanceBeingChecked = (checkedValues as string[]).includes("distanceMiles") &&
                 !previousFeatures.includes("distanceMiles");
 
-              setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
-              localStorage.setItem(
-                `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-                JSON.stringify(checkedValues)
-              );
-
               if (isDistanceBeingChecked) {
-                if (locationPermissionGranted !== true) {
-                  const userLocation = await LocationHelpers.getUsersLocation(message);
-                  if (userLocation) {
-                    queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
-                    setLocationPermissionGranted(true);
-                    await getCaves();
-                  } else {
-                    setLocationPermissionGranted(false);
-
-                    // Remove distanceMiles from selection if permission denied
-                    const updatedValues = (checkedValues as string[]).filter(v => v !== "distanceMiles");
-                    setSelectedFeatures(updatedValues as NestedKeyOf<CaveSearchVm>[]);
-                    localStorage.setItem(
-                      `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-                      JSON.stringify(updatedValues)
-                    );
-                  }
-                } else {
+                const userLocation = await LocationHelpers.getUsersLocation(message);
+                if (userLocation) {
+                  queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+                  setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+                  localStorage.setItem(
+                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    JSON.stringify(checkedValues)
+                  );
                   await getCaves();
+                } else {
+                  // Remove distanceMiles from selection if permission denied
+                  const updatedValues = (checkedValues as string[]).filter(v => v !== "distanceMiles");
+                  setSelectedFeatures(updatedValues as NestedKeyOf<CaveSearchVm>[]);
+                  localStorage.setItem(
+                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    JSON.stringify(updatedValues)
+                  );
                 }
+              } else {
+                setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+                localStorage.setItem(
+                  `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                  JSON.stringify(checkedValues)
+                );
               }
             }}
           />
