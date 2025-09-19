@@ -41,15 +41,18 @@ public class CaveSearchParamsVm
     public int EntrancePitDepthFeet { get; set; }
     public string LocationQualityTagIds { get; set; }
     public string EntranceHydrologyTagIds { get; set; }
+    public string EntranceLocation { get; set; }
+    public string EntrancePolygon { get; set; }
     public string EntranceReportedByPeopleTagIds { get; set; }
     public DateTime EntranceReportedOnDate { get; set; }
 
     #endregion
 
     #region Files
-    
+
     public string FileTypeTagIds { get; set; }
     public string FileDisplayName { get; set; }
-    
+    public string FileExtension { get; set; }
+
     #endregion
 }

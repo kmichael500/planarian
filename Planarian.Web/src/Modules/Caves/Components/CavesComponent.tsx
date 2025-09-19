@@ -7,6 +7,8 @@ import {
   message,
   Tag,
   Spin,
+  InputNumber,
+  Button,
 } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -30,10 +32,11 @@ import {
   formatDate,
   defaultIfEmpty,
   formatNumber,
+  formatCoordinateNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
+import { EyeOutlined, CompassOutlined, AimOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -60,20 +63,11 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { saveAs } from "file-saver";
 import FavoriteCave from "./FavoriteCave";
 import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
+import { EntrancePolygonFilterFormItem } from "../../Search/Components/EntrancePolygonFilterFormItem";
+import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
-const sortOptions = [
-  { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
-  { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
-  {
-    display: "Max Pit Depth",
-    value: CaveSearchSortByConstants.MaxPitDepthFeet,
-  },
-  { display: "Number of Pits", value: CaveSearchSortByConstants.NumberOfPits },
-  { display: "Reported On", value: CaveSearchSortByConstants.ReportedOn },
-  { display: "Name", value: CaveSearchSortByConstants.Name },
-] as SelectListItem<string>[];
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -82,10 +76,185 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(
+    queryBuilder.hasFilters()
+  );
+  const [filterClearSignal, setFilterClearSignal] = useState(0);
+  const [polygonResetSignal, setPolygonResetSignal] = useState(0);
+
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean | null>(null);
 
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
+
+  const sortOptions = [
+    ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
+    { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
+    { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
+    {
+      display: "Max Pit Depth",
+      value: CaveSearchSortByConstants.MaxPitDepthFeet,
+    },
+    { display: "Number of Pits", value: CaveSearchSortByConstants.NumberOfPits },
+    { display: "Reported On", value: CaveSearchSortByConstants.ReportedOn },
+    { display: "Name", value: CaveSearchSortByConstants.Name },
+  ] as SelectListItem<string>[];
+
+  type EntranceLocationFilter = {
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+  };
+
+  const parseEntranceLocationFilter = (
+    value: string | undefined | null
+  ): EntranceLocationFilter => {
+    if (!value) {
+      return {};
+    }
+
+    const parts = value.split(",").map((part) => part.trim());
+    if (parts.length !== 3) {
+      return {};
+    }
+
+    const latitude = Number(parts[0]);
+    const longitude = Number(parts[1]);
+    const radius = Number(parts[2]);
+
+    if (
+      [latitude, longitude, radius].some(
+        (entry) => Number.isNaN(entry) || !Number.isFinite(entry)
+      )
+    ) {
+      return {};
+    }
+
+    return { latitude, longitude, radius };
+  };
+
+  const [entranceLocationFilter, setEntranceLocationFilter] =
+    useState<EntranceLocationFilter>(() =>
+      parseEntranceLocationFilter(
+        queryBuilder.getFieldValue("entranceLocation") as string | undefined
+      )
+    );
+  const [isFetchingEntranceLocation, setIsFetchingEntranceLocation] =
+    useState(false);
+
+
+  const handleSortChange = async (sortValue: string) => {
+    if (sortValue === CaveSearchSortByConstants.DistanceMiles) {
+
+      if (locationPermissionGranted !== true) {
+        const position = await LocationHelpers.getUsersLocation(message);
+        if (!position) {
+          setLocationPermissionGranted(false);
+          return;
+        }
+        queryBuilder.setUserLocation(position.latitude, position.longitude);
+        setLocationPermissionGranted(true);
+      }
+
+      queryBuilder.setSort(sortValue);
+      await getCaves();
+      return;
+    }
+
+    queryBuilder.setSort(sortValue);
+    await getCaves();
+  };
+
+
+
+  const applyEntranceLocationFilter = (next: EntranceLocationFilter) => {
+    setEntranceLocationFilter(next);
+
+    const { latitude, longitude, radius } = next;
+
+    if (
+      latitude !== undefined &&
+      longitude !== undefined &&
+      radius !== undefined &&
+      !Number.isNaN(latitude) &&
+      !Number.isNaN(longitude) &&
+      !Number.isNaN(radius) &&
+      radius > 0
+    ) {
+      const formattedLatitude = formatCoordinateNumber(latitude);
+      const formattedLongitude = formatCoordinateNumber(longitude);
+      const formattedRadius = radius;
+
+      const serializedValue = `${formattedLatitude},${formattedLongitude},${formattedRadius}`;
+
+      queryBuilder.filterBy(
+        "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
+        QueryOperator.Equal,
+        serializedValue as any
+      );
+    } else {
+      queryBuilder.removeFromDictionary("entranceLocation");
+    }
+  };
+
+  const handleEntranceLocationChange = (
+    field: keyof EntranceLocationFilter,
+    rawValue: number | string | null
+  ) => {
+    let parsedValue: number | undefined;
+
+    if (rawValue === null || rawValue === undefined || rawValue === "") {
+      parsedValue = undefined;
+    } else {
+      const numericValue = Number(rawValue);
+      parsedValue = Number.isFinite(numericValue) ? numericValue : undefined;
+    }
+
+    applyEntranceLocationFilter({
+      ...entranceLocationFilter,
+      [field]: parsedValue,
+    });
+  };
+
+  const syncEntranceLocationState = () => {
+    const currentValue = queryBuilder.getFieldValue(
+      "entranceLocation"
+    ) as string | undefined;
+    setEntranceLocationFilter(parseEntranceLocationFilter(currentValue));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator?.geolocation) {
+      message.error("Geolocation is not supported in this browser.");
+      return;
+    }
+
+    setIsFetchingEntranceLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const radius = entranceLocationFilter.radius ?? 5;
+
+        applyEntranceLocationFilter({
+          latitude,
+          longitude,
+          radius,
+        });
+        setIsFetchingEntranceLocation(false);
+      },
+      (error) => {
+        message.error(error.message || "Unable to fetch current location.");
+        setIsFetchingEntranceLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  };
 
   const toggleNarrative = (caveId: string) => {
     setExpandedNarratives((prev) => ({
@@ -94,18 +263,30 @@ const CavesComponent: React.FC = () => {
     }));
   };
 
-  useEffect(() => {
-    getCaves();
-  }, []);
 
   const getCaves = async () => {
     setIsCavesLoading(true);
+
+    if (
+      queryBuilder.getSortBy() === CaveSearchSortByConstants.DistanceMiles ||
+      (selectedFeatures as string[]).includes("distanceMiles")
+    ) {
+      if (!queryBuilder.getUserLocation().latitude || !queryBuilder.getUserLocation().longitude) {
+        const userLocation = await LocationHelpers.getUsersLocation(message);
+        if (userLocation) {
+          queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+        }
+      }
+    }
+
     const cavesResponse = await CaveService.GetCaves(queryBuilder);
     setCaves(cavesResponse);
+    setHasAppliedFilters(queryBuilder.hasFilters());
     setIsCavesLoading(false);
   };
 
   const onSearch = async () => {
+    syncEntranceLocationState();
     await getCaves();
   };
 
@@ -133,6 +314,11 @@ const CavesComponent: React.FC = () => {
       display: "ID",
       value: "displayId",
       data: { key: FeatureKey.EnabledFieldCaveId },
+    },
+    {
+      display: "Distance",
+      value: "distanceMiles",
+      data: { key: FeatureKey.EnabledFieldCaveDistance },
     },
     {
       display: "County",
@@ -216,29 +402,48 @@ const CavesComponent: React.FC = () => {
   >([]);
 
   useEffect(() => {
-    const filterFeatures = () => {
+    const filterFeatures = async () => {
       const savedFeaturesJson = localStorage.getItem(
         `${AuthenticationService.GetAccountId()}-selectedFeatures`
       );
       let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
-      if (savedFeaturesJson) {
+
+      if (savedFeaturesJson !== null) {
         savedFeatures = JSON.parse(savedFeaturesJson);
       } else {
         savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
       }
 
-      const enabledFeatures = possibleFeaturesToRender.filter((feature) => {
+      const enabledFeatures: SelectListItem<NestedKeyOf<CaveSearchVm>>[] = [];
+      for (const feature of possibleFeaturesToRender) {
         const isEnabled = isFeatureEnabled(feature.data.key);
+        if (isEnabled) {
+          enabledFeatures.push(feature);
+        }
+      }
 
-        return isEnabled;
-      });
+      // Filter defaults against enabled features
+      let filteredSelectedFeatures = savedFeatures.filter(f => enabledFeatures.some(e => e.value === f));
+
+
+      // Location check for initial setup if distanceMiles is enabled and selected
+      if (filteredSelectedFeatures.includes("distanceMiles")) {
+        const userLocation = await LocationHelpers.getUsersLocation(message);
+        if (userLocation) {
+          queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+        } else {
+          // Remove distanceMiles from selection if permission denied
+          filteredSelectedFeatures = filteredSelectedFeatures.filter(f => f !== "distanceMiles");
+        }
+      }
 
       setFilteredFeatures(enabledFeatures);
-      setSelectedFeatures(
-        savedFeatures.filter((feature) =>
-          enabledFeatures.map((f) => f.value).includes(feature)
-        )
+      setSelectedFeatures(filteredSelectedFeatures);
+      localStorage.setItem(
+        `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+        JSON.stringify(filteredSelectedFeatures)
       );
+      await getCaves();
     };
 
     filterFeatures();
@@ -263,6 +468,12 @@ const CavesComponent: React.FC = () => {
         return defaultIfEmpty(formatDistance(cave.maxPitDepthFeet));
       case nameof<CaveSearchVm>("numberOfPits"):
         return defaultIfEmpty(cave.numberOfPits?.toString());
+
+      case nameof<CaveSearchVm>("distanceMiles"):
+        if (cave.distanceMiles) {
+          return defaultIfEmpty(formatDistance(cave.distanceMiles * 5280));
+        }
+        return defaultIfEmpty(null);
       case nameof<CaveSearchVm>("countyId"):
         return <CountyTagComponent countyId={cave.countyId} />;
       case nameof<CaveSearchVm>("displayId"):
@@ -305,7 +516,13 @@ const CavesComponent: React.FC = () => {
         queryBuilder={queryBuilder}
         form={form}
         sortOptions={sortOptions}
+        onSortChange={handleSortChange}
         onExportGpx={onExportGpx}
+        onFiltersCleared={() => {
+          applyEntranceLocationFilter({});
+          setFilterClearSignal((previous) => previous + 1);
+          setPolygonResetSignal((previous) => previous + 1);
+        }}
       >
         <Divider>Cave</Divider>
         <BooleanFilterFormItem
@@ -331,12 +548,78 @@ const CavesComponent: React.FC = () => {
             countyLabel={"County"}
           />
         </ShouldDisplay>
+        <Form.Item label="Entrance Radius Search">
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            <Space wrap>
+              <InputNumber
+                value={entranceLocationFilter.latitude}
+                placeholder="Latitude"
+                min={-90}
+                max={90}
+                step={0.000001}
+                style={{ width: 140 }}
+                onChange={(value) =>
+                  handleEntranceLocationChange("latitude", value)
+                }
+              />
+              <InputNumber
+                value={entranceLocationFilter.longitude}
+                placeholder="Longitude"
+                min={-180}
+                max={180}
+                step={0.000001}
+                style={{ width: 140 }}
+                onChange={(value) =>
+                  handleEntranceLocationChange("longitude", value)
+                }
+              />
+              <InputNumber
+                value={entranceLocationFilter.radius}
+                placeholder="Radius (miles)"
+                min={0}
+                step={0.25}
+                style={{ width: 160 }}
+                onChange={(value) =>
+                  handleEntranceLocationChange("radius", value)
+                }
+              />
+              <Button
+                size="small"
+                loading={isFetchingEntranceLocation}
+                icon={<AimOutlined />}
+                onClick={handleUseCurrentLocation}
+              >
+                Use Current Location
+              </Button>
+              <Button
+                size="small"
+                onClick={() => applyEntranceLocationFilter({})}
+              >
+                Clear
+              </Button>
+            </Space>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Finds caves with an entrance within the selected radius of the
+              specified point.
+            </Typography.Text>
+          </Space>
+        </Form.Item>
+        <EntrancePolygonFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"entrancePolygon" as NestedKeyOf<CaveSearchParamsVm>}
+          label={"Entrance Polygon Search"}
+          resetSignal={polygonResetSignal}
+          helpText={
+            "Draw a polygon on the map or drag a zipped shapefile onto the map to return caves whose entrances fall inside the area. Note: The shapefile must contain a polygon; lines or points are not supported."
+          }
+        />
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveLengthFeet}>
           <NumberComparisonFormItem
             inputType={"number"}
             queryBuilder={queryBuilder}
             field={"lengthFeet"}
             label={"Length (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveDepthFeet}>
@@ -345,6 +628,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"depthFeet"}
             label={"Depth (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNumberOfPits}>
@@ -353,6 +637,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"numberOfPits"}
             label={"Number of Pits (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
@@ -361,6 +646,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"maxPitDepthFeet"}
             label={"Max Pit Depth (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
@@ -447,6 +733,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"caveReportedOnDate"}
             label={"Reported On"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <Divider>Entrance</Divider>
@@ -456,6 +743,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"elevationFeet"}
             label={"Elevation (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceDescription}>
@@ -510,6 +798,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"entrancePitDepthFeet"}
             label={"Entrance Pit Depth (Feet)"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <ShouldDisplay
@@ -528,6 +817,7 @@ const CavesComponent: React.FC = () => {
             queryBuilder={queryBuilder}
             field={"entranceReportedOnDate"}
             label={"Entrance Reported On"}
+            onFiltersCleared={filterClearSignal}
           />
         </ShouldDisplay>
         <Divider>Files</Divider>
@@ -542,7 +832,14 @@ const CavesComponent: React.FC = () => {
           field={"fileDisplayName"}
           label={"File Name"}
           queryOperator={QueryOperator.Contains}
-        />{" "}
+        />
+        <TextFilterFormItem
+          queryBuilder={queryBuilder}
+          field={"fileExtension"}
+          label={"File Extension"}
+          queryOperator={QueryOperator.EndsWith}
+          helpText={"Enter values like pdf or .pdf"}
+        />
       </AdvancedSearchDrawerComponent>
 
       <Space direction="vertical" style={{ width: "100%" }}>
@@ -561,12 +858,40 @@ const CavesComponent: React.FC = () => {
               value: feature.value,
             }))}
             value={selectedFeatures}
-            onChange={(checkedValues) => {
-              setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
-              localStorage.setItem(
-                `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-                JSON.stringify(checkedValues)
-              );
+            onChange={async (checkedValues) => {
+              const previousFeatures = selectedFeatures;
+              const isDistanceBeingChecked = (checkedValues as string[]).includes("distanceMiles") &&
+                !previousFeatures.includes("distanceMiles");
+
+              if (isDistanceBeingChecked) {
+                const userLocation = await LocationHelpers.getUsersLocation(message);
+                if (userLocation) {
+                  queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+                  setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+                  localStorage.setItem(
+                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    JSON.stringify(checkedValues)
+                  );
+                  await getCaves();
+                } else {
+                  // Remove distanceMiles from selection if permission denied
+                  const updatedValues = (checkedValues as string[]).filter(v => v !== "distanceMiles");
+                  setSelectedFeatures(updatedValues as NestedKeyOf<CaveSearchVm>[]);
+                  localStorage.setItem(
+                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    JSON.stringify(updatedValues)
+                  );
+                }
+              } else {
+                queryBuilder.setUserLocation(undefined, undefined);
+                queryBuilder.buildAsQueryString(); // Clear out user location from URL
+
+                setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+                localStorage.setItem(
+                  `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                  JSON.stringify(checkedValues)
+                );
+              }
             }}
           />
         </div>
@@ -580,7 +905,7 @@ const CavesComponent: React.FC = () => {
         ) : (
           caves && (
             <>
-              {queryBuilder.hasFilters() ? (
+              {hasAppliedFilters ? (
                 <Tag color="#F8DB6A" style={{ color: "black" }}>
                   <Typography.Text style={{ color: "black" }}>
                     Filtered: {formatNumber(caves.totalCount)} results found
@@ -627,23 +952,23 @@ const CavesComponent: React.FC = () => {
                     </PlanarianButton>
                   </Link>,
                   cave.primaryEntranceLatitude &&
-                    cave.primaryEntranceLongitude && (
-                      <Link
-                        to={NavigationService.GenerateMapUrl(
-                          cave.primaryEntranceLatitude,
-                          cave.primaryEntranceLongitude,
-                          15
-                        )}
-                        key="map"
+                  cave.primaryEntranceLongitude && (
+                    <Link
+                      to={NavigationService.GenerateMapUrl(
+                        cave.primaryEntranceLatitude,
+                        cave.primaryEntranceLongitude,
+                        15
+                      )}
+                      key="map"
+                    >
+                      <PlanarianButton
+                        alwaysShowChildren
+                        icon={<CompassOutlined />}
                       >
-                        <PlanarianButton
-                          alwaysShowChildren
-                          icon={<CompassOutlined />}
-                        >
-                          Map
-                        </PlanarianButton>
-                      </Link>
-                    ),
+                        Map
+                      </PlanarianButton>
+                    </Link>
+                  ),
                 ]}
               >
                 <Space direction="vertical">
@@ -721,3 +1046,5 @@ const CavesComponent: React.FC = () => {
 };
 
 export { CavesComponent };
+
+

@@ -1,4 +1,5 @@
-using System.Linq.Expressions;
+using System.Globalization;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -7,12 +8,13 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
-using Planarian.Model.Shared.Base;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
 
 namespace Planarian.Modules.Caves.Repositories;
 
@@ -22,16 +24,30 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
     }
 
+    private const double EarthRadiusMiles = 3958.756;
+
+
     public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
         var query = GetCavesQuery(filterQuery, permissionKey);
+
+        var userLatitude = filterQuery.Ulat;
+        var userLongitude = filterQuery.Ulon;
+        var hasLocationForDistance = userLatitude.HasValue && userLongitude.HasValue;
         
+        double cosUserLatitude = 0;
+
+        if (hasLocationForDistance)
+        {
+            var userLatitudeRadians = userLatitude!.Value * Math.PI / 180d;
+            cosUserLatitude = Math.Cos(userLatitudeRadians);
+        }
+
         var narrativeCondition = filterQuery.Conditions
             .FirstOrDefault(c => c.Field == nameof(CaveSearchParamsVm.Narrative));
 
-        bool isNarrativeSearch   = narrativeCondition != null;
-        string narrativeSearch   = narrativeCondition?.Value ?? string.Empty;
-
+        var isNarrativeSearch = narrativeCondition != null;
+        var narrativeSearch = narrativeCondition?.Value ?? string.Empty;
 
         var caveSearchQuery = query.Select(e => new CaveSearchVm
         {
@@ -62,6 +78,28 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 : e.Entrances.Where(ee => ee.IsPrimary == true)
                     .Select(ee => ee.Location.Z)
                     .FirstOrDefault(),
+            DistanceMiles = hasLocationForDistance
+                ? e.Entrances
+                    .Where(ee => ee.Location != null && !ee.Location.IsEmpty)
+                    .Select(ee => (double?)(
+                        2 * EarthRadiusMiles *
+                        Math.Asin(
+                            Math.Sqrt(
+                                Math.Pow(
+                                    Math.Sin(((ee.Location.Y - userLatitude!.Value) * Math.PI / 180d) / 2),
+                                    2
+                                ) +
+                                cosUserLatitude *
+                                Math.Cos(ee.Location.Y * Math.PI / 180d) *
+                                Math.Pow(
+                                    Math.Sin(((ee.Location.X - userLongitude!.Value) * Math.PI / 180d) / 2),
+                                    2
+                                )
+                            )
+                        )
+                    ))
+                    .Min()
+                : null,
             IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
             ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
             Name = e.Name,
@@ -96,6 +134,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
             nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                 filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            nameof(CaveSearchVm.DistanceMiles) => hasLocationForDistance
+                ? await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                    filterQuery.PageSize, e => e.DistanceMiles, !filterQuery.SortDescending)
+                : await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
+                    filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
             _ => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet,
                 filterQuery.SortDescending)
         };
@@ -184,6 +227,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     && ucp.CaveId == cave.Id)).AsQueryable();
 
         if (!filterQuery.Conditions.Any()) return query;
+
+        double? entranceLocationLatitude = null;
+        double? entranceLocationLongitude = null;
+        double? entranceLocationRadiusMiles = null;
+        Geometry? entranceSearchPolygon = null;
 
         foreach (var queryCondition in filterQuery.Conditions)
             switch (queryCondition.Field)
@@ -324,6 +372,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 case nameof(CaveSearchParamsVm.MapStatusTagIds):
                     var mapStatusTagIds = queryCondition.Value.SplitAndTrim();
 
+                    if (mapStatusTagIds.Length == 0)
+                    {
+                        break;
+                    }
+
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -335,6 +388,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 case nameof(CaveSearchParamsVm.CartographerNamePeopleTagIds):
                     var cartographerNamePeopleTagIds = queryCondition.Value.SplitAndTrim();
 
+                    if (cartographerNamePeopleTagIds.Length == 0)
+                    {
+                        break;
+                    }
+
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -345,6 +403,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.GeologyTagIds):
                     var geologyTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (geologyTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -355,6 +418,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.GeologicAgeTagIds):
                     var geologicAgeTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (geologicAgeTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -364,6 +432,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.PhysiographicProvinceTagIds):
                     var physiographicProvinceTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (physiographicProvinceTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -374,6 +447,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.BiologyTagIds):
                     var biologyTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (biologyTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -384,6 +462,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.ArchaeologyTagIds):
                     var archeologyTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (archeologyTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -394,6 +477,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.CaveReportedByNameTagIds):
                     var reportedByNameTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (reportedByNameTagIds.Length == 0)
+                    {
+                        break;
+                    }
 
                     query = queryCondition.Operator switch
                     {
@@ -421,6 +509,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 case nameof(CaveSearchParamsVm.CaveOtherTagIds):
                     var caveOtherTagIds = queryCondition.Value.SplitAndTrim();
 
+                    if (caveOtherTagIds.Length == 0)
+                    {
+                        break;
+                    }
+
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -431,6 +524,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.EntranceStatusTagIds):
                     var entranceStatusTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceStatusTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -451,6 +549,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.EntranceFieldIndicationTagIds):
                     var entranceFieldIndicationTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceFieldIndicationTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -477,6 +580,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     break;
                 case nameof(CaveSearchParamsVm.EntranceHydrologyTagIds):
                     var entranceHydrologyTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceHydrologyTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -485,8 +593,119 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
+                case nameof(CaveSearchParamsVm.EntranceLocation):
+                    var rawLocationValue = queryCondition.Value;
+
+                    if (string.IsNullOrWhiteSpace(rawLocationValue))
+                    {
+                        break;
+                    }
+
+                    var locationParts = rawLocationValue.Split(",", StringSplitOptions.RemoveEmptyEntries)
+                        .Select(part => part.Trim())
+                        .ToArray();
+
+                    if (locationParts.Length != 3 ||
+                        !double.TryParse(locationParts[0], NumberStyles.Float, CultureInfo.InvariantCulture,
+                            out var parsedLatitude) ||
+                        !double.TryParse(locationParts[1], NumberStyles.Float, CultureInfo.InvariantCulture,
+                            out var parsedLongitude) ||
+                        !double.TryParse(locationParts[2], NumberStyles.Float, CultureInfo.InvariantCulture,
+                            out var parsedRadiusMiles))
+                    {
+                        throw ApiExceptionDictionary.QueryInvalidValue(queryCondition.Field, queryCondition.Value);
+                    }
+
+                    entranceLocationLatitude = parsedLatitude;
+                    entranceLocationLongitude = parsedLongitude;
+                    entranceLocationRadiusMiles = parsedRadiusMiles;
+                    break;
+                case nameof(CaveSearchParamsVm.EntrancePolygon):
+                    var polygonRawValue = queryCondition.Value;
+
+                    if (string.IsNullOrWhiteSpace(polygonRawValue))
+                    {
+                        entranceSearchPolygon = null;
+                        break;
+                    }
+
+                    try
+                    {
+                        var geoJsonReader = new GeoJsonReader();
+                        var parsedGeometry = geoJsonReader.Read<Geometry>(polygonRawValue);
+
+                        if (parsedGeometry == null || parsedGeometry.IsEmpty)
+                        {
+                            throw ApiExceptionDictionary.QueryInvalidValue(
+                                nameof(CaveSearchParamsVm.EntrancePolygon),
+                                polygonRawValue);
+                        }
+
+                        parsedGeometry.SRID = 4326;
+
+                        if (parsedGeometry is not Polygon && parsedGeometry is not MultiPolygon)
+                        {
+                            throw ApiExceptionDictionary.QueryInvalidValue(
+                                nameof(CaveSearchParamsVm.EntrancePolygon),
+                                polygonRawValue);
+                        }
+
+                        if (!parsedGeometry.IsValid)
+                        {
+                            parsedGeometry = parsedGeometry.Buffer(0);
+                        }
+
+                        if (!parsedGeometry.IsValid)
+                        {
+                            throw ApiExceptionDictionary.QueryInvalidValue(
+                                nameof(CaveSearchParamsVm.EntrancePolygon),
+                                polygonRawValue);
+                        }
+
+                        entranceSearchPolygon = parsedGeometry;
+                    }
+                    catch (JsonException)
+                    {
+                        throw ApiExceptionDictionary.QueryInvalidValue(
+                            nameof(CaveSearchParamsVm.EntrancePolygon),
+                            polygonRawValue);
+                    }
+                    catch (ParseException)
+                    {
+                        throw ApiExceptionDictionary.QueryInvalidValue(
+                            nameof(CaveSearchParamsVm.EntrancePolygon),
+                            polygonRawValue);
+                    }
+                    catch (Exception)
+                    {
+                        throw ApiExceptionDictionary.QueryInvalidValue(
+                            nameof(CaveSearchParamsVm.EntrancePolygon),
+                            polygonRawValue);
+                    }
+                    break;
+                case nameof(CaveSearchParamsVm.EntranceReportedByPeopleTagIds):
+                    var entranceReportedByPeopleTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceReportedByPeopleTagIds.Length == 0)
+                    {
+                        break;
+                    }
+
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.In => query = query.Where(e =>
+                            e.Entrances.SelectMany(ee => ee.EntranceReportedByNameTags)
+                                .Any(ee => entranceReportedByPeopleTagIds.Contains(ee.TagTypeId))),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
                 case nameof(CaveSearchParamsVm.LocationQualityTagIds):
                     var entranceLocationQualityTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceLocationQualityTagIds.Length == 0)
+                    {
+                        break;
+                    }
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query = query.Where(e =>
@@ -516,10 +735,17 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     };
                     break;
                 case nameof(CaveSearchParamsVm.FileTypeTagIds):
+                    var fileTypeTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (fileTypeTagIds.Length == 0)
+                    {
+                        break;
+                    }
+
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.In => query.Where(e =>
-                            e.Files.Any(ee => ee.FileTypeTagId.Contains(queryCondition.Value))),
+                            e.Files.Any(ee => fileTypeTagIds.Contains(ee.FileTypeTagId))),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
@@ -532,10 +758,103 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
+                case nameof(CaveSearchParamsVm.FileExtension):
+                    var fileExtension = queryCondition.Value?.Trim();
+
+                    if (fileExtension.IsNullOrWhiteSpace())
+                    {
+                        break;
+                    }
+
+                    var normalizedExtension = fileExtension!
+                        .TrimStart('.')
+                        .ToLowerInvariant();
+
+                    if (normalizedExtension.IsNullOrWhiteSpace())
+                    {
+                        break;
+                    }
+
+                    var extensionPattern = $"%.{normalizedExtension}";
+
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.EndsWith => query.Where(e =>
+                            e.Files.Any(ee =>
+                                ee.FileName != null &&
+                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                        QueryOperator.Equal => query.Where(e =>
+                            e.Files.Any(ee =>
+                                ee.FileName != null &&
+                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                        QueryOperator.Contains => query.Where(e =>
+                            e.Files.Any(ee =>
+                                ee.FileName != null &&
+                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(queryCondition.Field));
             }
+
+        if (entranceLocationLatitude.HasValue &&
+            entranceLocationLongitude.HasValue &&
+            entranceLocationRadiusMiles.HasValue &&
+            entranceLocationRadiusMiles.Value > 0)
+        {
+            var latitude = entranceLocationLatitude.Value;
+            var longitude = entranceLocationLongitude.Value;
+            var radiusMiles = entranceLocationRadiusMiles.Value;
+
+            if (latitude is < -90 or > 90)
+            {
+                throw ApiExceptionDictionary.QueryInvalidValue(
+                    nameof(CaveSearchParamsVm.EntranceLocation),
+                    latitude.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (longitude is < -180 or > 180)
+            {
+                throw ApiExceptionDictionary.QueryInvalidValue(
+                    nameof(CaveSearchParamsVm.EntranceLocation),
+                    longitude.ToString(CultureInfo.InvariantCulture));
+            }
+
+            var latitudeRadians = latitude * Math.PI / 180d;
+            var longitudeRadians = longitude * Math.PI / 180d;
+
+            query = query.Where(e =>
+                e.Entrances.Any(ee =>
+                    ee.Location != null &&
+                    !ee.Location.IsEmpty &&
+                    2 * EarthRadiusMiles *
+                    Math.Asin(
+                        Math.Sqrt(
+                            Math.Pow(
+                                Math.Sin(((ee.Location.Y - latitude) * Math.PI / 180d) / 2),
+                                2
+                            ) +
+                            Math.Cos(latitudeRadians) *
+                            Math.Cos(ee.Location.Y * Math.PI / 180d) *
+                            Math.Pow(
+                                Math.Sin(((ee.Location.X - longitude) * Math.PI / 180d) / 2),
+                                2
+                            )
+                        )
+                    ) <= radiusMiles));
+        }
+
+        if (entranceSearchPolygon != null)
+        {
+            var polygon = entranceSearchPolygon;
+            query = query.Where(e =>
+                e.Entrances.Any(ee =>
+                    ee.Location != null &&
+                    !ee.Location.IsEmpty &&
+                    polygon.Intersects(ee.Location)));
+        }
 
         return query;
     }

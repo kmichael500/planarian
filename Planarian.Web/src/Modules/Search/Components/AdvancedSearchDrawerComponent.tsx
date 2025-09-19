@@ -33,6 +33,8 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   form?: FormInstance<T>;
   sortOptions?: SelectListItem<string>[];
   onExportGpx?: () => Promise<void>;
+  onFiltersCleared?: () => void;
+  onSortChange?: (sortBy: string) => Promise<void> | void;
 }
 
 const AdvancedSearchDrawerComponent = <T extends object>({
@@ -44,6 +46,8 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   form,
   sortOptions,
   onExportGpx,
+  onFiltersCleared,
+  onSortChange,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
@@ -54,6 +58,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   const onClearSearch = async () => {
     queryBuilder.clear();
     form?.resetFields();
+    onFiltersCleared?.();
     await onSearch();
   };
 
@@ -81,9 +86,13 @@ const AdvancedSearchDrawerComponent = <T extends object>({
                 <Select
                   style={{ width: "139px" }}
                   value={queryBuilder.getSortBy()}
-                  onChange={(value) => {
-                    queryBuilder.setSort(value);
-                    onSearch();
+                  onChange={async (value) => {
+                    if (onSortChange) {
+                      await onSortChange(value);
+                    } else {
+                      queryBuilder.setSort(value);
+                      await onSearch();
+                    }
                   }}
                 >
                   {sortOptions.map((option) => (

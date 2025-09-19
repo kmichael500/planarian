@@ -26,6 +26,7 @@ export enum FeatureKey {
   EnabledFieldCaveCartographerNameTags = "EnabledFieldCaveCartographerNameTags",
   EnabledFieldCaveOtherTags = "EnabledFieldCaveOtherTags",
   EnabledFieldCaveNarrative = "EnabledFieldCaveNarrative",
+  EnabledFieldCaveDistance = "EnabledFieldCaveDistance",
 
   EnabledFieldEntranceCoordinates = "EnabledFieldEntranceCoordinates",
   EnabledFieldEntranceElevation = "EnabledFieldEntranceElevation",
