@@ -72,6 +72,7 @@ public class User : EntityBase
     public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
     public virtual ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
 
+    public DateTime? LastActiveOn { get; set; }
 
     #region Helper Functions
 

@@ -112,6 +112,19 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 break;
             case nameof(User):
                 var user = (User)entity.Entity;
+                if (context?.RequestUser == null || string.IsNullOrWhiteSpace(context.RequestUser.Id))
+                {
+                    // Exit early if RequestUser is null and the only property being modified is LastActiveOn
+
+                    var modifiedProperties = entity.Properties.Where(p => p.IsModified);
+                    if (modifiedProperties.All(p => p.Metadata.Name == nameof(User.LastActiveOn)))
+                    {
+                        return;
+                    }
+
+                    throw new NullReferenceException("RequestUser or its Id is null.");
+                }
+
                 var requestUserId = context.RequestUser.Id;
 
                 var inSameAccount = await context.AccountUsers.AnyAsync(e =>
