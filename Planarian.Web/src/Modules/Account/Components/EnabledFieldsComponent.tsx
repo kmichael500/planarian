@@ -29,6 +29,7 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldCaveState: "State",
   EnabledFieldCaveCounty: "County",
   EnabledFieldCaveReportedOn: "Reported On",
+  EnabledFieldCaveDistance: "Distance",
 
   EnabledFieldEntranceCoordinates: "Coordinates",
   EnabledFieldEntranceDescription: "Description",

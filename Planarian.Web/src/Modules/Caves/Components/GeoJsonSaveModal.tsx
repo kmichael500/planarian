@@ -43,11 +43,15 @@ const GeoJsonSaveModal: React.FC<GeoJsonSaveModalProps> = ({
       } finally {
         setIsSaving(false);
       }
-    } catch (validationError) {}
+    } catch (validationError) { }
   };
 
   const copyToClipboard = async () => {
     try {
+
+      const sizeInMb = new Blob([geoJson]).size / (1024 * 1024);
+      message.info(`GeoJSON size: ${sizeInMb.toFixed(2)} MB`);
+
       await navigator.clipboard.writeText(geoJson);
       message.success("Data copied to clipboard");
     } catch (error) {

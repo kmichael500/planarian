@@ -151,7 +151,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
     #region GeoJson
 
-    [RequestSizeLimit(100 * 1024 * 1024)]      // 100MB
+    [RequestSizeLimit(200 * 1024 * 1024)]      // 200MB for large GeoJSON files
     [HttpPost("{caveId:length(10)}/geojson")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult> UploadCaveGeoJson(string caveId, [FromBody] IEnumerable<GeoJsonUploadVm> geoJsonUploads, CancellationToken cancellationToken)

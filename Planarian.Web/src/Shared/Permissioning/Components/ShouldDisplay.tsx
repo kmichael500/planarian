@@ -37,6 +37,11 @@ export const useFeatureEnabled = () => {
     featureKey?: FeatureKey | null | undefined,
     permissionKey?: PermissionKey
   ): boolean => {
+
+    if (featureKey === FeatureKey.EnabledFieldCaveDistance) {
+      return true;
+    }
+
     if (featureKey) {
       const feature = permissions.visibleFields.find(
         (f) => f.key === featureKey

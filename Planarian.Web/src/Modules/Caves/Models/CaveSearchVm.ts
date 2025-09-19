@@ -18,6 +18,7 @@ export interface CaveSearchVm {
   primaryEntranceLatitude: number | null;
   primaryEntranceLongitude: number | null;
   primaryEntranceElevationFeet: number | null;
+  distanceMiles: number | null;
   archaeologyTagIds: string[];
   biologyTagIds: string[];
   cartographerNameTagIds: string[];
@@ -47,4 +48,11 @@ export class CaveSearchSortByConstants {
   static readonly NumberOfPits = capitalizeFirstLetter(
     nameof<CaveSearchVm>("numberOfPits")
   );
+  static readonly DistanceMiles = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("distanceMiles")
+  );
 }
+
+export const CaveSortMetadataKeys = Object.freeze({
+  distanceLocation: "distanceSortLocation",
+});

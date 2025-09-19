@@ -32,15 +32,15 @@ interface PlanarianMapLayer {
   };
   secondaryLayer?: {
     type:
-      | "symbol"
-      | "raster"
-      | "circle"
-      | "line"
-      | "background"
-      | "fill"
-      | "fill-extrusion"
-      | "heatmap"
-      | "hillshade";
+    | "symbol"
+    | "raster"
+    | "circle"
+    | "line"
+    | "background"
+    | "fill"
+    | "fill-extrusion"
+    | "heatmap"
+    | "hillshade";
     id: string;
     minzoom?: number;
     maxzoom?: number;
@@ -613,7 +613,7 @@ const LayerControl: React.FC<{
     setMapLayers((prev) =>
       prev.map((l) =>
         l.id === layer.id ||
-        (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
+          (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
           ? { ...l, opacity }
           : l
       )
@@ -763,11 +763,11 @@ const LayerControl: React.FC<{
           zIndex: 200,
           ...(position
             ? {
-                top: position.top || "50px",
-                right: position.right || "0",
-                left: position.left || "auto",
-                bottom: position.bottom || "auto",
-              }
+              top: position.top || "50px",
+              right: position.right || "0",
+              left: position.left || "auto",
+              bottom: position.bottom || "auto",
+            }
             : {}),
         }}
       >

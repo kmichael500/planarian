@@ -48,6 +48,8 @@ class QueryBuilder<T extends object> {
   private pageSize: number;
   private sortBy?: string;
   private sortDescending?: boolean;
+  private userLatitude?: number;
+  private userLongitude?: number;
 
   constructor(queryString: string, private pushToBrowser: boolean = true) {
     const filerQuery =
@@ -64,6 +66,8 @@ class QueryBuilder<T extends object> {
     this.pageSize = filerQuery.pageSize ?? 16;
     this.sortBy = filerQuery.sortBy ?? CaveSearchSortByConstants.LengthFeet;
     this.sortDescending = filerQuery.sortDescending ?? true;
+    this.userLatitude = filerQuery.ulat;
+    this.userLongitude = filerQuery.ulon;
   }
 
   public setSort(sortBy: string) {
@@ -74,6 +78,23 @@ class QueryBuilder<T extends object> {
   public setSortDescending(sortDescending: boolean) {
     this.sortDescending = sortDescending;
     return this;
+  }
+
+  public setUserLocation(latitude?: number, longitude?: number) {
+    if (latitude === undefined || longitude === undefined) {
+      return this;
+    }
+
+    this.userLatitude = latitude;
+    this.userLongitude = longitude;
+    return this;
+  }
+
+  public getUserLocation(): { latitude?: number; longitude?: number } {
+    return {
+      latitude: this.userLatitude,
+      longitude: this.userLongitude,
+    };
   }
 
   changeOperators(
@@ -176,7 +197,7 @@ class QueryBuilder<T extends object> {
   public buildAsQueryString() {
     const conditions = [] as QueryCondition<T>[];
     this.conditions.forEach((condition) => {
-      if (condition.value !== null || condition.value !== undefined) {
+      if (condition.value !== null || condition.value !== undefined || (typeof condition.value === "string" && condition.value !== "undefined")) {
         if (
           Array.isArray(condition.value) &&
           condition.value.every((item) => typeof item === "string")
@@ -199,12 +220,19 @@ class QueryBuilder<T extends object> {
       }
     });
 
-    const pageQueryString = this.convertToQueryParams({
+    const pageQueryParams: { [key: string]: any } = {
       pageNumber: this.currentPage,
       pageSize: this.pageSize,
       sortBy: this.sortBy,
       sortDescending: this.sortDescending,
-    });
+    };
+
+    if (this.userLatitude !== undefined && this.userLongitude !== undefined) {
+      pageQueryParams.ulat = this.userLatitude;
+      pageQueryParams.ulon = this.userLongitude;
+    }
+
+    const pageQueryString = this.convertToQueryParams(pageQueryParams);
 
     const conditionsQueryString = this.convertArrayToQueryParams(conditions);
 
@@ -264,6 +292,8 @@ export interface FilterQuery {
   pageNumber?: number;
   sortBy?: string;
   sortDescending?: boolean;
+  ulat?: number;
+  ulon?: number;
 }
 
 export { QueryBuilder };
