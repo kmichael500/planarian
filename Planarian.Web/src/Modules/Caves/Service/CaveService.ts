@@ -15,6 +15,7 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
+import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 
 const baseUrl = "api/caves";
 const CaveService = {
@@ -27,12 +28,39 @@ const CaveService = {
     return response.data;
   },
   async ExportCavesGpx(
-    queryBuilder: QueryBuilder<CaveSearchParamsVm>
+    queryBuilder: QueryBuilder<CaveSearchParamsVm>,
+    exportFields?: FeatureKey[]
   ): Promise<Blob> {
-    const response = await HttpClient.get(
-      `${baseUrl}/export/gpx?${queryBuilder.buildAsQueryString()}`,
-      { responseType: "blob" }
-    );
+    const params = new URLSearchParams(queryBuilder.buildAsQueryString());
+    exportFields?.forEach((field) => {
+      params.append("exportFields", field);
+    });
+
+    const paramsString = params.toString();
+    const url = paramsString
+      ? `${baseUrl}/export/gpx?${paramsString}`
+      : `${baseUrl}/export/gpx`;
+
+    const response = await HttpClient.get(url, { responseType: "blob" });
+    return response.data;
+  },
+  async ExportCavesCsv(
+    queryBuilder: QueryBuilder<CaveSearchParamsVm>,
+    exportFields?: FeatureKey[]
+  ): Promise<Blob> {
+    const params = new URLSearchParams(queryBuilder.buildAsQueryString());
+    exportFields?.forEach((field) => {
+      params.append("exportFields", field);
+    });
+
+    const paramsString = params.toString();
+    const url = paramsString
+      ? `${baseUrl}/export/csv?${paramsString}`
+      : `${baseUrl}/export/csv`;
+
+    const response = await HttpClient.get<Blob>(url, {
+      responseType: "blob",
+    });
     return response.data;
   },
   async AddCave(values: AddCaveVm): Promise<string> {

@@ -1,7 +1,6 @@
 import {
   Typography,
   Form,
-  Checkbox,
   Space,
   Divider,
   message,
@@ -36,7 +35,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CompassOutlined, AimOutlined } from "@ant-design/icons";
+import { EyeOutlined, CompassOutlined, AimOutlined, DownloadOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -65,6 +64,10 @@ import FavoriteCave from "./FavoriteCave";
 import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
 import { EntrancePolygonFilterFormItem } from "../../Search/Components/EntrancePolygonFilterFormItem";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
+import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
+import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { getFeatureKeyLabel } from "../../Account/Models/FeatureKeyHelpers";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -76,6 +79,8 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
+  const [exportFeatureKeys, setExportFeatureKeys] = useState<FeatureKey[]>([]);
+  const [enabledExportKeys, setEnabledExportKeys] = useState<FeatureKey[]>([]);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(
     queryBuilder.hasFilters()
   );
@@ -87,6 +92,19 @@ const CavesComponent: React.FC = () => {
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
+  const [isExportModalVisible, setIsExportModalVisible] = useState(false);
+  const [pendingExportType, setPendingExportType] = useState<
+    "csv" | "gpx" | null
+  >(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const accountId = AuthenticationService.GetAccountId();
+  const featureStorageKey = accountId
+    ? `${accountId}-selectedFeatures`
+    : "selectedFeatures";
+  const exportFeatureStorageKey = accountId
+    ? `${accountId}-exportFeatures`
+    : "exportFeatures";
 
   const sortOptions = [
     ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
@@ -290,23 +308,56 @@ const CavesComponent: React.FC = () => {
     await getCaves();
   };
 
-  const onExportGpx = async () => {
-    const hide = message.loading("Exporting GPX...", 0);
+  type ExportType = "csv" | "gpx";
+
+  const beginExport = (type: ExportType) => {
+    setPendingExportType(type);
+    setIsExportModalVisible(true);
+  };
+
+  const handleCloseExportModal = () => {
+    setIsExportModalVisible(false);
+    setPendingExportType(null);
+    setIsExporting(false);
+  };
+
+  const handleExportConfirm = async () => {
+    if (!pendingExportType) {
+      return;
+    }
+
+    setIsExporting(true);
+    const exportLabel = pendingExportType.toUpperCase();
+    const hide = message.loading(`Exporting ${exportLabel}...`, 0);
+
     try {
-      const response = await CaveService.ExportCavesGpx(queryBuilder);
+      const response =
+        pendingExportType === "gpx"
+          ? await CaveService.ExportCavesGpx(queryBuilder, exportFeatureKeys)
+          : await CaveService.ExportCavesCsv(queryBuilder, exportFeatureKeys);
 
       const accountName = AuthenticationService.GetAccountName();
       const localDateTime = new Date().toISOString();
-
-      const fileName = `${accountName} ${localDateTime}.gpx`;
+      const fileExtension = pendingExportType;
+      const fileName = `${accountName} ${localDateTime}.${fileExtension}`;
 
       saveAs(response, fileName);
+      handleCloseExportModal();
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     } finally {
-      hide(); // Remove the loading message
+      hide();
+      setIsExporting(false);
     }
+  };
+
+  const onExportGpx = async () => {
+    beginExport("gpx");
+  };
+
+  const onExportCsv = async () => {
+    beginExport("csv");
   };
 
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
@@ -396,6 +447,45 @@ const CavesComponent: React.FC = () => {
       data: { key: FeatureKey.EnabledFieldCaveOtherTags },
     },
   ];
+  const exportFeatureOrder: FeatureKey[] = [
+    FeatureKey.EnabledFieldCaveId,
+    FeatureKey.EnabledFieldCaveDistance,
+    FeatureKey.EnabledFieldCaveCounty,
+    FeatureKey.EnabledFieldCaveLengthFeet,
+    FeatureKey.EnabledFieldCaveDepthFeet,
+    FeatureKey.EnabledFieldCaveReportedOn,
+    FeatureKey.EnabledFieldCaveMaxPitDepthFeet,
+    FeatureKey.EnabledFieldCaveNumberOfPits,
+    FeatureKey.EnabledFieldCaveMapStatusTags,
+    FeatureKey.EnabledFieldCaveGeologyTags,
+    FeatureKey.EnabledFieldCaveGeologicAgeTags,
+    FeatureKey.EnabledFieldCaveArcheologyTags,
+    FeatureKey.EnabledFieldCaveBiologyTags,
+    FeatureKey.EnabledFieldCaveCartographerNameTags,
+    FeatureKey.EnabledFieldCavePhysiographicProvinceTags,
+    FeatureKey.EnabledFieldCaveReportedByNameTags,
+    FeatureKey.EnabledFieldCaveOtherTags,
+    FeatureKey.EnabledFieldCaveName,
+    FeatureKey.EnabledFieldCaveAlternateNames,
+    FeatureKey.EnabledFieldCaveState,
+    FeatureKey.EnabledFieldCaveNarrative,
+    FeatureKey.EnabledFieldEntranceName,
+    FeatureKey.EnabledFieldEntranceDescription,
+    FeatureKey.EnabledFieldEntranceReportedOn,
+    FeatureKey.EnabledFieldEntrancePitDepth,
+    FeatureKey.EnabledFieldEntranceCoordinates,
+    FeatureKey.EnabledFieldEntranceElevation,
+    FeatureKey.EnabledFieldEntranceLocationQuality,
+    FeatureKey.EnabledFieldEntranceStatusTags,
+    FeatureKey.EnabledFieldEntranceFieldIndicationTags,
+    FeatureKey.EnabledFieldEntranceHydrologyTags,
+    FeatureKey.EnabledFieldEntranceReportedByNameTags,
+  ];
+
+  const getFeatureOrder = (key: FeatureKey) => {
+    const index = exportFeatureOrder.indexOf(key);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
   const { isFeatureEnabled } = useFeatureEnabled();
   const [filteredFeatures, setFilteredFeatures] = useState<
     SelectListItemKey<CaveSearchVm>[]
@@ -403,18 +493,22 @@ const CavesComponent: React.FC = () => {
 
   useEffect(() => {
     const filterFeatures = async () => {
-      const savedFeaturesJson = localStorage.getItem(
-        `${AuthenticationService.GetAccountId()}-selectedFeatures`
-      );
+      const savedFeaturesJson = featureStorageKey
+        ? localStorage.getItem(featureStorageKey)
+        : null;
       let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
 
       if (savedFeaturesJson !== null) {
-        savedFeatures = JSON.parse(savedFeaturesJson);
+        try {
+          savedFeatures = JSON.parse(savedFeaturesJson);
+        } catch {
+          savedFeatures = [];
+        }
       } else {
         savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
       }
 
-      const enabledFeatures: SelectListItem<NestedKeyOf<CaveSearchVm>>[] = [];
+      const enabledFeatures: SelectListItemKey<CaveSearchVm>[] = [];
       for (const feature of possibleFeaturesToRender) {
         const isEnabled = isFeatureEnabled(feature.data.key);
         if (isEnabled) {
@@ -423,26 +517,81 @@ const CavesComponent: React.FC = () => {
       }
 
       // Filter defaults against enabled features
-      let filteredSelectedFeatures = savedFeatures.filter(f => enabledFeatures.some(e => e.value === f));
-
+      let filteredSelectedFeatures = savedFeatures.filter((featureKey) =>
+        enabledFeatures.some((enabled) => enabled.value === featureKey)
+      );
 
       // Location check for initial setup if distanceMiles is enabled and selected
       if (filteredSelectedFeatures.includes("distanceMiles")) {
         const userLocation = await LocationHelpers.getUsersLocation(message);
         if (userLocation) {
-          queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+          queryBuilder.setUserLocation(
+            userLocation.latitude,
+            userLocation.longitude
+          );
         } else {
           // Remove distanceMiles from selection if permission denied
-          filteredSelectedFeatures = filteredSelectedFeatures.filter(f => f !== "distanceMiles");
+          filteredSelectedFeatures = filteredSelectedFeatures.filter(
+            (value) => value !== "distanceMiles"
+          );
+        }
+      }
+
+      const allFeatureKeys = Object.values(FeatureKey) as FeatureKey[];
+      const enabledExportKeysList = allFeatureKeys.filter(
+        (key) =>
+          key !== FeatureKey.EnabledFieldCaveDistance &&
+          isFeatureEnabled(key)
+      );
+      const sortedExportKeys = [...enabledExportKeysList].sort((a, b) => {
+        const orderA = getFeatureOrder(a);
+        const orderB = getFeatureOrder(b);
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        return getFeatureKeyLabel(a).localeCompare(getFeatureKeyLabel(b));
+      });
+      setEnabledExportKeys(sortedExportKeys);
+
+      let savedExportFeatureKeys: FeatureKey[] = sortedExportKeys;
+      const savedExportJson = exportFeatureStorageKey
+        ? localStorage.getItem(exportFeatureStorageKey)
+        : null;
+
+      if (savedExportJson) {
+        try {
+          const parsed = JSON.parse(savedExportJson) as FeatureKey[];
+          const filtered = parsed.filter((key) =>
+            enabledExportKeysList.includes(key)
+          );
+          if (filtered.length > 0) {
+            savedExportFeatureKeys = filtered;
+          }
+        } catch {
+          savedExportFeatureKeys = sortedExportKeys;
         }
       }
 
       setFilteredFeatures(enabledFeatures);
       setSelectedFeatures(filteredSelectedFeatures);
-      localStorage.setItem(
-        `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-        JSON.stringify(filteredSelectedFeatures)
-      );
+      setExportFeatureKeys(savedExportFeatureKeys);
+
+      if (featureStorageKey) {
+        localStorage.setItem(
+          featureStorageKey,
+          JSON.stringify(filteredSelectedFeatures)
+        );
+      }
+
+      if (exportFeatureStorageKey) {
+        localStorage.setItem(
+          exportFeatureStorageKey,
+          JSON.stringify(savedExportFeatureKeys)
+        );
+      }
+
       await getCaves();
     };
 
@@ -507,6 +656,28 @@ const CavesComponent: React.FC = () => {
     }
   };
 
+  const displayFeatureOptions = filteredFeatures.map((feature) => ({
+    label: feature.display,
+    value: feature.value,
+  }));
+
+  const exportFeatureOptions = enabledExportKeys
+    .slice()
+    .sort((a, b) => {
+      const orderA = getFeatureOrder(a);
+      const orderB = getFeatureOrder(b);
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return getFeatureKeyLabel(a).localeCompare(getFeatureKeyLabel(b));
+    })
+    .map((key) => ({
+      label: getFeatureKeyLabel(key),
+      value: key,
+    }));
+
   return (
     <>
       <AdvancedSearchDrawerComponent
@@ -518,6 +689,7 @@ const CavesComponent: React.FC = () => {
         sortOptions={sortOptions}
         onSortChange={handleSortChange}
         onExportGpx={onExportGpx}
+        onExportCsv={onExportCsv}
         onFiltersCleared={() => {
           applyEntranceLocationFilter({});
           setFilterClearSignal((previous) => previous + 1);
@@ -843,58 +1015,58 @@ const CavesComponent: React.FC = () => {
       </AdvancedSearchDrawerComponent>
 
       <Space direction="vertical" style={{ width: "100%" }}>
-        <div
-          style={{
-            borderRadius: "2px",
-            padding: "10px",
-            border: "1px solid #d9d9d9",
-            backgroundColor: "white",
-          }}
-        >
-          <div style={{ fontWeight: 450 }}>Display</div>
-          <Checkbox.Group
-            options={filteredFeatures.map((feature) => ({
-              label: feature.display,
-              value: feature.value,
-            }))}
-            value={selectedFeatures}
-            onChange={async (checkedValues) => {
-              const previousFeatures = selectedFeatures;
-              const isDistanceBeingChecked = (checkedValues as string[]).includes("distanceMiles") &&
-                !previousFeatures.includes("distanceMiles");
+        <FeatureCheckboxGroup
+          title="Display"
+          options={displayFeatureOptions}
+          value={selectedFeatures}
+          onChange={async (checkedValues) => {
+            const previousFeatures = selectedFeatures;
+            const isDistanceBeingChecked = checkedValues.includes(
+              "distanceMiles" as NestedKeyOf<CaveSearchVm>
+            ) && !previousFeatures.includes("distanceMiles");
 
-              if (isDistanceBeingChecked) {
-                const userLocation = await LocationHelpers.getUsersLocation(message);
-                if (userLocation) {
-                  queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
-                  setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+            if (isDistanceBeingChecked) {
+              const userLocation = await LocationHelpers.getUsersLocation(message);
+              if (userLocation) {
+                queryBuilder.setUserLocation(
+                  userLocation.latitude,
+                  userLocation.longitude
+                );
+                setSelectedFeatures(checkedValues);
+                if (featureStorageKey) {
                   localStorage.setItem(
-                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    featureStorageKey,
                     JSON.stringify(checkedValues)
                   );
-                  await getCaves();
-                } else {
-                  // Remove distanceMiles from selection if permission denied
-                  const updatedValues = (checkedValues as string[]).filter(v => v !== "distanceMiles");
-                  setSelectedFeatures(updatedValues as NestedKeyOf<CaveSearchVm>[]);
+                }
+                await getCaves();
+              } else {
+                // Remove distanceMiles from selection if permission denied
+                const updatedValues = checkedValues.filter(
+                  (value) => value !== "distanceMiles"
+                );
+                setSelectedFeatures(updatedValues);
+                if (featureStorageKey) {
                   localStorage.setItem(
-                    `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                    featureStorageKey,
                     JSON.stringify(updatedValues)
                   );
                 }
-              } else {
-                queryBuilder.setUserLocation(undefined, undefined);
-                queryBuilder.buildAsQueryString(); // Clear out user location from URL
+              }
+            } else {
+              queryBuilder.setUserLocation(undefined, undefined);
+              queryBuilder.buildAsQueryString(); // Clear out user location from URL
 
-                setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
+              setSelectedFeatures(checkedValues);
+              if (featureStorageKey) {
                 localStorage.setItem(
-                  `${AuthenticationService.GetAccountId()}-selectedFeatures`,
+                  featureStorageKey,
                   JSON.stringify(checkedValues)
                 );
               }
-            }}
-          />
-        </div>
+            }
+          }}
+        />
         {isCavesLoading ? (
           <Space align="center">
             <Spin size="small" />
@@ -1041,10 +1213,64 @@ const CavesComponent: React.FC = () => {
           />
         </SpinnerCardComponent>
       </Space>
+      <PlanarianModal
+        open={isExportModalVisible}
+        onClose={handleCloseExportModal}
+        header={
+          pendingExportType
+            ? `Export ${pendingExportType.toUpperCase()}`
+            : "Select Export Fields"
+        }
+        footer={[
+          <CancelButtonComponent
+
+            key="cancel"
+            onClick={handleCloseExportModal}
+          />
+          ,
+          <PlanarianButton
+            key="export"
+            type="primary"
+            alwaysShowChildren
+            onClick={handleExportConfirm}
+            loading={isExporting}
+            disabled={exportFeatureKeys.length === 0 || isExporting}
+            icon={<DownloadOutlined />}
+          >
+            {pendingExportType
+              ? `Export ${pendingExportType.toUpperCase()}`
+              : "Export"}
+          </PlanarianButton>,
+        ]}
+      >
+        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+          <Typography.Paragraph style={{ marginBottom: 0 }}>
+            Choose which fields to include in the export file.
+          </Typography.Paragraph>
+          {exportFeatureOptions.length > 0 ? (
+            <FeatureCheckboxGroup
+              title="Export Fields"
+              options={exportFeatureOptions}
+              value={exportFeatureKeys}
+              onChange={(values) => {
+                setExportFeatureKeys(values);
+                if (exportFeatureStorageKey) {
+                  localStorage.setItem(
+                    exportFeatureStorageKey,
+                    JSON.stringify(values)
+                  );
+                }
+              }}
+            />
+          ) : (
+            <Typography.Text type="secondary">
+              No exportable fields are currently enabled.
+            </Typography.Text>
+          )}
+        </Space>
+      </PlanarianModal>
     </>
   );
 };
 
 export { CavesComponent };
-
-
