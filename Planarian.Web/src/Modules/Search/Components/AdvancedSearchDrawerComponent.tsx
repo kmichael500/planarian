@@ -7,7 +7,8 @@ import {
   Input,
   Row,
   Select,
-  Space,
+  Dropdown,
+  MenuProps,
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -20,7 +21,6 @@ import {
 } from "@ant-design/icons";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { CaveService } from "../../Caves/Service/CaveService";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
@@ -33,6 +33,7 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   form?: FormInstance<T>;
   sortOptions?: SelectListItem<string>[];
   onExportGpx?: () => Promise<void>;
+  onExportCsv?: () => Promise<void>;
   onFiltersCleared?: () => void;
   onSortChange?: (sortBy: string) => Promise<void> | void;
 }
@@ -46,6 +47,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   form,
   sortOptions,
   onExportGpx,
+  onExportCsv,
   onFiltersCleared,
   onSortChange,
 }: AdvancedSearchDrawerComponentProps<T>) => {
@@ -60,6 +62,25 @@ const AdvancedSearchDrawerComponent = <T extends object>({
     form?.resetFields();
     onFiltersCleared?.();
     await onSearch();
+  };
+
+  const exportMenuItems: MenuProps["items"] = [
+    {
+      key: "gpx",
+      label: "Export GPX",
+    },
+    {
+      key: "csv",
+      label: "Export CSV",
+    },
+  ];
+
+  const handleExportClick: MenuProps["onClick"] = async (e) => {
+    if (e.key === "gpx" && onExportGpx) {
+      await onExportGpx();
+    } else if (e.key === "csv" && onExportCsv) {
+      await onExportCsv();
+    }
   };
 
   return (
@@ -151,15 +172,24 @@ const AdvancedSearchDrawerComponent = <T extends object>({
                   Search
                 </Button>
                 {onExportGpx && (
-                  <ShouldDisplay permissionKey={PermissionKey.Export}>
-                    <Button
-                      onClick={async () => {
-                        await onExportGpx();
-                      }}
-                    >
-                      Export GPX
-                    </Button>
-                  </ShouldDisplay>
+                  <div style={{ marginLeft: "auto" }}>
+                    <ShouldDisplay permissionKey={PermissionKey.Export}>
+                      <Dropdown.Button
+                        menu={{
+                          items: exportMenuItems,
+                          onClick: handleExportClick,
+                        }}
+                        onClick={() => {
+                          if (onExportGpx) {
+                            onExportGpx();
+                          }
+                        }}
+                        icon={<DownloadOutlined />}
+                      >
+                        Export
+                      </Dropdown.Button>
+                    </ShouldDisplay>
+                  </div>
                 )}
               </div>
             }

@@ -80,7 +80,8 @@ public enum FeatureKey
     EnabledFieldEntranceStatusTags,
     EnabledFieldEntranceFieldIndicationTags,
     EnabledFieldEntranceHydrologyTags,
-    EnabledFieldEntranceDescription
+    EnabledFieldEntranceDescription,
+    EnabledFieldEntranceOtherTags
 
     #endregion
 
