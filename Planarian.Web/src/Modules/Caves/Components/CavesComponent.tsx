@@ -540,7 +540,7 @@ const CavesComponent: React.FC = () => {
       const allFeatureKeys = Object.values(FeatureKey) as FeatureKey[];
       const enabledExportKeysList = allFeatureKeys.filter(
         (key) =>
-          key !== FeatureKey.EnabledFieldCaveDistance &&
+          key !== FeatureKey.EnabledFieldCaveDistance && key !== FeatureKey.Nam && isFeatureEnabled(key)
           isFeatureEnabled(key)
       );
       const sortedExportKeys = [...enabledExportKeysList].sort((a, b) => {

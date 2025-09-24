@@ -84,10 +84,7 @@ public class CaveEntranceCsvModelMap : ClassMap<CaveEntranceCsvModel>
 
         if (Include(FeatureKey.EnabledFieldCaveNumberOfPits))
             Map(m => m.CaveNumberOfPits).Name("Cave Number of Pits");
-
-        if (Include(FeatureKey.EnabledFieldCaveNarrative))
-            Map(m => m.CaveNarrative).Name("Cave Narrative");
-
+        
         if (Include(FeatureKey.EnabledFieldCaveReportedOn))
             Map(m => m.CaveReportedOn).Name("Cave Reported On");
 
@@ -120,5 +117,9 @@ public class CaveEntranceCsvModelMap : ClassMap<CaveEntranceCsvModel>
 
         if (Include(FeatureKey.EnabledFieldCaveOtherTags))
             Map(m => m.CaveOtherTags).Name("Cave Other");
+        
+        if (Include(FeatureKey.EnabledFieldCaveNarrative))
+            Map(m => m.CaveNarrative).Name("Cave Narrative");
+
     }
 }
