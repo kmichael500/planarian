@@ -1105,12 +1105,10 @@ const CavesComponent: React.FC = () => {
                   flexDirection: "column",
                 }}
                 title={
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <span style={{ fontSize: 18, fontWeight: 700 }}>
-                      <span style={{ color: '#3874f6', fontWeight: 800, marginRight: 8 }}>{cave.displayId}</span>
-                      {cave.name}
-                    </span>
-                  </div>}
+                  <span>
+                    <span style={{ color: '#3874f6', fontWeight: "bold" }}>{cave.displayId}</span>
+                    {" "}{cave.name}
+                  </span>}
                 extra={
                   <FavoriteCave
                     initialIsFavorite={cave.isFavorite}
