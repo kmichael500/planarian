@@ -326,6 +326,8 @@ const CavesComponent: React.FC = () => {
       return;
     }
 
+    handleCloseExportModal();
+
     setIsExporting(true);
     const exportLabel = pendingExportType.toUpperCase();
     const hide = message.loading(`Exporting ${exportLabel}...`, 0);
@@ -342,7 +344,6 @@ const CavesComponent: React.FC = () => {
       const fileName = `${accountName} ${localDateTime}.${fileExtension}`;
 
       saveAs(response, fileName);
-      handleCloseExportModal();
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
