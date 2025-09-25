@@ -4,7 +4,10 @@ import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { BuildOutlined } from "@ant-design/icons";
-import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
+import type {
+  DataDrivenPropertyValueSpecification,
+  MapSourceDataEvent,
+} from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
@@ -676,10 +679,9 @@ const LayerControl: React.FC<{
       <Source
         id="terrainLayer"
         type="raster-dem"
-        tiles={[
-          "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=G0kZR1vCDJukD1MigCcI",
-        ]}
+        url="https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=G0kZR1vCDJukD1MigCcI"
         tileSize={256}
+        encoding="mapbox"
       />
 
       {mapLayers.map((layer) => {
