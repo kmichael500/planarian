@@ -146,10 +146,10 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
         initialCenter={center}
         initialZoom={10}
         onCaveClicked={() => { }}
-        onNonCaveClicked={undefined}
+        onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
-        onMoveEnd={undefined}
+        onMoveEnd={() => { }}
         additionalInteractiveLayerIds={[
           VECTOR_FILL_LAYER_ID,
           VECTOR_LINE_LAYER_ID,
