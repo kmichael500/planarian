@@ -133,10 +133,10 @@ export const PltViewer: React.FC<PltViewerProps> = ({
         initialCenter={center}
         initialZoom={10}
         onCaveClicked={() => { }}
-        onNonCaveClicked={undefined}
+        onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
-        onMoveEnd={undefined}
+        onMoveEnd={() => { }}
         additionalInteractiveLayerIds={[PLT_LAYER_ID]}
       >
         <PltOverlay data={result.collection} bounds={bounds} />
