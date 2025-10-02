@@ -262,8 +262,8 @@ export const GpxViewer: React.FC<GpxViewerProps> = ({
       <MapBaseComponent
         initialCenter={center}
         initialZoom={12}
-        onCaveClicked={() => { }}
-        onNonCaveClicked={() => { }}
+        onCaveClicked={undefined}
+        onNonCaveClicked={undefined}
         manageBodyPadding={false}
         showFullScreenControl={false}
         onMoveEnd={undefined}
