@@ -13,10 +13,16 @@ import {
   isSupportedFileType,
   isTextFileType,
   isCsvFileType,
+  isGpxFileType,
+  isVectorDatasetFileType,
+  isPltFileType,
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { GpxViewer } from "./GpxViewer";
+import { VectorDatasetViewer } from "./VectorDatasetViewer";
+import { PltViewer } from "./PltViewer";
 
 interface FileViewerProps {
   embedUrl: string | null | undefined;
@@ -45,6 +51,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
 }) => {
   const isImage = isImageFileType(fileType);
   const isPdf = isPdfFileType(fileType);
+  const isGpx = isGpxFileType(fileType);
+  const isVectorDataset = isVectorDatasetFileType(fileType);
+  const isPlt = isPltFileType(fileType);
   const isSupported = isSupportedFileType(fileType);
   const headerTitle = (
     <>
@@ -67,38 +76,44 @@ const FileViewer: React.FC<FileViewerProps> = ({
       return;
     }
 
-    if (!embedUrl || !(isTextFileType(fileType) || isCsvFileType(fileType))) {
+    if (!embedUrl) {
       setFileContent(null);
       setIsLoading(false);
       return;
     }
 
-    let isCancelled = false;
-    setIsLoading(true);
-    setFileContent(null);
+    if (isTextFileType(fileType) || isCsvFileType(fileType)) {
+      let isCancelled = false;
+      setIsLoading(true);
+      setFileContent(null);
 
-    fetch(embedUrl)
-      .then((response) => response.text())
-      .then((data) => {
-        if (isCancelled) {
-          return;
-        }
+      fetch(embedUrl)
+        .then((response) => response.text())
+        .then((data) => {
+          if (isCancelled) {
+            return;
+          }
 
-        if (isTextFileType(fileType) || isCsvFileType(fileType)) {
-          setFileContent(data);
-        }
+          if (isTextFileType(fileType) || isCsvFileType(fileType)) {
+            setFileContent(data);
+          }
 
-        setIsLoading(false);
-      })
-      .catch(() => {
-        if (!isCancelled) {
           setIsLoading(false);
-        }
-      });
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            setIsLoading(false);
+          }
+        });
 
-    return () => {
-      isCancelled = true;
-    };
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    // For all other file types (including GPX) we do not fetch here.
+    setFileContent(null);
+    setIsLoading(false);
   }, [open, embedUrl, fileType]);
 
   const hasPrevious = typeof onPrevious === "function";
@@ -201,7 +216,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
                     height: "100%",
                     overflow: "hidden",
                     position: "relative",
-                    WebkitOverflowScrolling: "touch", // Enables momentum scrolling on iOS
+                    WebkitOverflowScrolling: "touch",
                   }}
                 >
                   <iframe
@@ -234,7 +249,20 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 >
                   {isLoading ? <Spin /> : fileContent}
                 </pre>
-              )}{" "}
+              )}
+              {isVectorDataset && embedUrl && (
+                <VectorDatasetViewer
+                  embedUrl={embedUrl}
+                  fileType={fileType}
+                  downloadButton={downloadButton}
+                />
+              )}
+              {isPlt && embedUrl && (
+                <PltViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              )}
+              {isGpx && embedUrl && (
+                <GpxViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              )}
             </>
           ) : (
             <Result
