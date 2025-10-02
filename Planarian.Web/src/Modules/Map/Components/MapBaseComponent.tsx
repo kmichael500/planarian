@@ -37,6 +37,9 @@ interface MapBaseComponentProps {
   showGeolocateControl?: boolean;
   showSearchBar?: boolean;
   onShapefileUploaded?: (data: FeatureCollection[]) => void;
+  children?: React.ReactNode;
+  manageBodyPadding?: boolean;
+  additionalInteractiveLayerIds?: string[];
 }
 
 // MUST be defined outside the function (or via useMemo)
@@ -70,14 +73,20 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   showGeolocateControl = true,
   showSearchBar = true,
   onShapefileUploaded,
+  children,
+  manageBodyPadding = true,
+  additionalInteractiveLayerIds = [],
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
+    if (!manageBodyPadding) {
+      return;
+    }
     setHideBodyPadding(true);
     return () => {
       setHideBodyPadding(false);
     };
-  }, [setHideBodyPadding]);
+  }, [setHideBodyPadding, manageBodyPadding]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
@@ -156,21 +165,21 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       ((1 -
         Math.log(
           Math.tan((north * Math.PI) / 180) +
-            1 / Math.cos((north * Math.PI) / 180)
+          1 / Math.cos((north * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
-        n
+      n
     );
     const maxTileY = Math.floor(
       ((1 -
         Math.log(
           Math.tan((south * Math.PI) / 180) +
-            1 / Math.cos((south * Math.PI) / 180)
+          1 / Math.cos((south * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
-        n
+      n
     );
 
     // Find tiles we haven’t fetched yet
@@ -305,6 +314,19 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         });
         return;
       }
+
+      if (additionalInteractiveLayerIds.length > 0) {
+        const customFeature = clickedFeatures.find((feature: any) =>
+          additionalInteractiveLayerIds.includes(feature.layer.id)
+        );
+        if (customFeature) {
+          setPopupInfo({
+            lngLat: [event.lngLat.lng, event.lngLat.lat],
+            properties: customFeature.properties,
+          });
+          return;
+        }
+      }
     }
 
     // Fallback for non-cave clicks.
@@ -400,8 +422,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     [lineplotsData]
   );
   const interactiveLayerIds = useMemo(
-    () => ["entrances", ...uploadedLayerIds, ...lineplotLayerIds],
-    [uploadedLayerIds, lineplotLayerIds]
+    () => [
+      "entrances",
+      ...uploadedLayerIds,
+      ...lineplotLayerIds,
+      ...additionalInteractiveLayerIds,
+    ],
+    [uploadedLayerIds, lineplotLayerIds, additionalInteractiveLayerIds]
   );
 
   // Sort lineplot data by geometry type for proper layering
@@ -421,9 +448,11 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     });
   }, [lineplotsData]);
 
+  const bodyPaddingReady = manageBodyPadding ? hideBodyPadding : true;
+
   return (
     <Spin spinning={isLoading}>
-      {!isLoading && AppOptions.serverBaseUrl && hideBodyPadding && (
+      {!isLoading && AppOptions.serverBaseUrl && bodyPaddingReady && (
         <div
           style={{ position: "relative", width: "100%", height: "100%" }}
           onDragOver={onDragOver}
@@ -622,8 +651,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 id="entrances"
                 type="vector"
                 tiles={[
-                  `${
-                    AppOptions.serverBaseUrl
+                  `${AppOptions.serverBaseUrl
                   }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&test=1`,
                 ]}
                 attribution={`© ${accountName}`}
@@ -813,6 +841,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   />
                 </div>
               )}
+
+              {children}
             </Map>
           </MapProvider>
         </div>
