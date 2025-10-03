@@ -5,7 +5,7 @@ import bbox from "@turf/bbox";
 import proj4 from "proj4";
 import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
-import type { LngLatBoundsLike } from "maplibre-gl";
+import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
 
 const FEET_TO_METERS = 0.3048;
 const PLT_SOURCE_ID = "plt-viewer-source";
@@ -130,14 +130,18 @@ export const PltViewer: React.FC<PltViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={10}
+        initialBounds={bounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
         onMoveEnd={() => { }}
         additionalInteractiveLayerIds={[PLT_LAYER_ID]}
+        reuseMaps={false}
       >
         <PltOverlay data={result.collection} bounds={bounds} />
       </MapBaseComponent>
@@ -151,37 +155,10 @@ interface PltOverlayProps {
 }
 
 const PltOverlay: React.FC<PltOverlayProps> = ({ data, bounds }) => {
-  const { current: map } = useMap();
+  const map = useMap();
+  const mapRef = map?.current;
 
-  useEffect(() => {
-    if (!map) {
-      return;
-    }
-
-    const mapInstance = map.getMap();
-    const fitToBounds = () => {
-      try {
-        mapInstance.fitBounds(bounds as LngLatBoundsLike, {
-          padding: 20,
-          duration: 0,
-          maxZoom: 15,
-        });
-      } catch (error) {
-        // Ignore fit errors
-      }
-    };
-
-    if (mapInstance.isStyleLoaded()) {
-      fitToBounds();
-      return;
-    }
-
-    mapInstance.once("load", fitToBounds);
-
-    return () => {
-      mapInstance.off("load", fitToBounds);
-    };
-  }, [map, bounds]);
+  useFitMapBounds(mapRef, bounds, { maxZoom: 15, padding: 20 });
 
   return (
     <Source id={PLT_SOURCE_ID} type="geojson" data={data}>

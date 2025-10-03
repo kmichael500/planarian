@@ -7,7 +7,7 @@ import shp from "shpjs";
 import { kml as convertKmlToGeoJson } from "@tmcw/togeojson";
 import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
-import type { LngLatBoundsLike } from "maplibre-gl";
+import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
 
 const VECTOR_SOURCE_ID = "vector-dataset-viewer-source";
 const VECTOR_FILL_LAYER_ID = "vector-dataset-viewer-fill";
@@ -143,8 +143,11 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={10}
+        initialBounds={bounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
@@ -155,6 +158,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
           VECTOR_LINE_LAYER_ID,
           VECTOR_POINT_LAYER_ID,
         ]}
+        reuseMaps={false}
       >
         <VectorOverlay data={collection} bounds={bounds} />
       </MapBaseComponent>
@@ -168,48 +172,17 @@ interface VectorOverlayProps {
 }
 
 const VectorOverlay: React.FC<VectorOverlayProps> = ({ data, bounds }) => {
-  const { current: map } = useMap();
+  const map = useMap();
+  const mapRef = map?.current;
+
+  useFitMapBounds(mapRef, bounds, { maxZoom: 15, padding: 20 });
 
   useEffect(() => {
-    if (!map) {
+    if (!mapRef) {
       return;
     }
 
-    const mapInstance = map.getMap();
-    if (!mapInstance || !bounds) {
-      return;
-    }
-
-    const fitToBounds = () => {
-      try {
-        mapInstance.fitBounds(bounds as LngLatBoundsLike, {
-          padding: 20,
-          duration: 0,
-          maxZoom: 15,
-        });
-      } catch (error) {
-        // Ignore fit errors
-      }
-    };
-
-    if (mapInstance.isStyleLoaded()) {
-      fitToBounds();
-      return;
-    }
-
-    mapInstance.once("load", fitToBounds);
-
-    return () => {
-      mapInstance.off("load", fitToBounds);
-    };
-  }, [map, bounds]);
-
-  useEffect(() => {
-    if (!map) {
-      return;
-    }
-
-    const mapInstance = map.getMap();
+    const mapInstance = mapRef.getMap();
     const layerIds = [
       VECTOR_FILL_LAYER_ID,
       VECTOR_LINE_LAYER_ID,
@@ -236,7 +209,7 @@ const VectorOverlay: React.FC<VectorOverlayProps> = ({ data, bounds }) => {
       });
       mapInstance.getCanvas().style.cursor = "";
     };
-  }, [map]);
+  }, [mapRef]);
 
   return (
     <>

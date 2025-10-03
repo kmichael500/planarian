@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import type { FeatureCollection, Feature, Position } from "geojson";
 import bbox from "@turf/bbox";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
-import type { LngLatBoundsLike } from "maplibre-gl";
 import { gpx as convertGpxToGeoJson } from "@tmcw/togeojson";
 import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
+import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
 
 const GPX_LAYER_ID = "gpx-viewer-layer";
 const GPX_SOURCE_ID = "gpx-viewer-source";
@@ -260,13 +260,17 @@ export const GpxViewer: React.FC<GpxViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={12}
+        initialBounds={gpxBounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
         onMoveEnd={() => { }}
+        reuseMaps={false}
       >
         <GpxOverlay data={gpxGeoJson} bounds={gpxBounds} />
       </MapBaseComponent>
@@ -280,41 +284,10 @@ interface GpxOverlayProps {
 }
 
 const GpxOverlay: React.FC<GpxOverlayProps> = ({ data, bounds }) => {
-  const { current: map } = useMap();
+  const map = useMap();
+  const mapRef = map?.current;
 
-  useEffect(() => {
-    if (!map) {
-      return;
-    }
-
-    const mapInstance = map.getMap();
-    if (!mapInstance || !bounds) {
-      return;
-    }
-
-    const fitToBounds = () => {
-      try {
-        mapInstance.fitBounds(bounds as LngLatBoundsLike, {
-          padding: 20,
-          duration: 0,
-          maxZoom: 16,
-        });
-      } catch (error) {
-        // Ignore fit errors
-      }
-    };
-
-    if (mapInstance.isStyleLoaded()) {
-      fitToBounds();
-      return;
-    }
-
-    mapInstance.once("load", fitToBounds);
-
-    return () => {
-      mapInstance.off("load", fitToBounds);
-    };
-  }, [map, bounds]);
+  useFitMapBounds(mapRef, bounds, { maxZoom: 16, padding: 20 });
 
   return (
     <Source id={GPX_SOURCE_ID} type="geojson" data={data}>
