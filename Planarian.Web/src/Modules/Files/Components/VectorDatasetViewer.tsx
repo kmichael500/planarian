@@ -143,8 +143,11 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={10}
+        initialBounds={bounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
@@ -155,6 +158,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
           VECTOR_LINE_LAYER_ID,
           VECTOR_POINT_LAYER_ID,
         ]}
+        reuseMaps={false}
       >
         <VectorOverlay data={collection} bounds={bounds} />
       </MapBaseComponent>

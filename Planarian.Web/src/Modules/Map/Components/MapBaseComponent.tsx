@@ -11,6 +11,7 @@ import {
   ViewStateChangeEvent,
   ScaleControl, // Import ScaleControl
 } from "react-map-gl/maplibre";
+import type { MapProps } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { message, Spin } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
@@ -26,10 +27,13 @@ import shpjs from "shpjs";
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
+import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
   initialZoom?: number;
+  initialBounds?: LngLatBoundsLike;
+  initialFitBoundsOptions?: FitBoundsOptions;
   onCaveClicked: (caveId: string) => void;
   onNonCaveClicked?: (lat: number, lng: number) => void;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
@@ -40,6 +44,7 @@ interface MapBaseComponentProps {
   children?: React.ReactNode;
   manageBodyPadding?: boolean;
   additionalInteractiveLayerIds?: string[];
+  reuseMaps?: boolean;
 }
 
 // MUST be defined outside the function (or via useMemo)
@@ -66,6 +71,8 @@ const tile2lat = (y: number, zoom: number): number => {
 const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
   initialZoom,
+  initialBounds,
+  initialFitBoundsOptions,
   onCaveClicked,
   onNonCaveClicked,
   onMoveEnd,
@@ -76,6 +83,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   children,
   manageBodyPadding = true,
   additionalInteractiveLayerIds = [],
+  reuseMaps = true,
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
@@ -116,6 +124,55 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       type: string;
     }[]
   >([]);
+
+  useEffect(() => {
+    if (initialCenter) {
+      setMapCenter(initialCenter);
+    }
+  }, [initialCenter]);
+
+  useEffect(() => {
+    if (typeof initialZoom === "number") {
+      setZoom(initialZoom);
+    }
+  }, [initialZoom]);
+
+  const memoizedFitBoundsOptions = useMemo(() => {
+    if (!initialBounds) {
+      return undefined;
+    }
+
+    return {
+      padding: 20,
+      ...initialFitBoundsOptions,
+    };
+  }, [initialBounds, initialFitBoundsOptions]);
+
+  const initialViewState = useMemo(() => {
+    if (initialBounds) {
+      return {
+        bounds: initialBounds,
+        fitBoundsOptions: memoizedFitBoundsOptions,
+      };
+    }
+
+    return {
+      longitude: mapCenter[1],
+      latitude: mapCenter[0],
+      zoom: zoom,
+    };
+  }, [initialBounds, memoizedFitBoundsOptions, mapCenter, zoom]) as MapProps["initialViewState"];
+
+  const mapComponentKey = useMemo(() => {
+    if (initialBounds) {
+      return `bounds-${JSON.stringify(initialBounds)}`;
+    }
+    if (initialCenter) {
+      const centerString = initialCenter.join(",");
+      return `center-${centerString}-${initialZoom ?? "auto"}`;
+    }
+    return "default-map";
+  }, [initialBounds, initialCenter, initialZoom]);
 
   // Get the map center using the MapService if no initialCenter was provided.
   useEffect(() => {
@@ -489,16 +546,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
           <MapProvider>
             <Map
+              key={mapComponentKey}
               ref={mapRef}
               maxPitch={85}
-              reuseMaps
+              reuseMaps={reuseMaps}
               antialias
               interactiveLayerIds={interactiveLayerIds}
-              initialViewState={{
-                longitude: mapCenter[1],
-                latitude: mapCenter[0],
-                zoom: zoom,
-              }}
+              initialViewState={initialViewState}
               onLoad={() => {
                 fetchLineplots();
               }}

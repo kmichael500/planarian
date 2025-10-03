@@ -260,13 +260,17 @@ export const GpxViewer: React.FC<GpxViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={12}
+        initialBounds={gpxBounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
         onMoveEnd={() => { }}
+        reuseMaps={false}
       >
         <GpxOverlay data={gpxGeoJson} bounds={gpxBounds} />
       </MapBaseComponent>

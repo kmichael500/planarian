@@ -130,14 +130,18 @@ export const PltViewer: React.FC<PltViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={10}
+        initialBounds={bounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
         onCaveClicked={() => { }}
         onNonCaveClicked={() => { }}
         manageBodyPadding={false}
         showFullScreenControl={false}
         onMoveEnd={() => { }}
         additionalInteractiveLayerIds={[PLT_LAYER_ID]}
+        reuseMaps={false}
       >
         <PltOverlay data={result.collection} bounds={bounds} />
       </MapBaseComponent>
