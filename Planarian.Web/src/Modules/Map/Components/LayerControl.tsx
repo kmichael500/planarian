@@ -78,19 +78,19 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
 
 const LAYERS: PlanarianMapLayer[] = [
   {
-    id: "mapbox-street",
-    displayName: "Street",
+    id: "osm-street",
+    displayName: "OpenStreetMap",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/512/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       ],
-      tileSize: 512,
+      tileSize: 256,
     },
     isActive: true,
     opacity: 1,
-    attribution: "© Mapbox",
+    attribution: "© OpenStreetMap contributors",
   },
 
   {
@@ -108,19 +108,19 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 
   {
-    id: "mapbox-satellite",
+    id: "esri-satellite",
     displayName: "Satellite",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
     isActive: false,
     opacity: 1,
-    attribution: "© Mapbox",
+    attribution: "Esri",
   },
 
   {
