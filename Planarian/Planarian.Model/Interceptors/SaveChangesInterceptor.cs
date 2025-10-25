@@ -114,10 +114,11 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 var user = (User)entity.Entity;
                 if (context?.RequestUser == null || string.IsNullOrWhiteSpace(context.RequestUser.Id))
                 {
-                    // Exit early if RequestUser is null and the only property being modified is LastActiveOn
+                    // Exit early if RequestUser is null and the only property being modified is related to signing up or user metadata
 
                     var modifiedProperties = entity.Properties.Where(p => p.IsModified);
-                    if (modifiedProperties.All(p => p.Metadata.Name == nameof(User.LastActiveOn)))
+                    if (modifiedProperties.All(p => p.Metadata.Name is nameof(User.LastActiveOn)
+                            or nameof(User.EmailConfirmedOn) or nameof(User.EmailConfirmationCode)))
                     {
                         return;
                     }
