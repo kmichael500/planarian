@@ -79,7 +79,7 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
 const LAYERS: PlanarianMapLayer[] = [
   {
     id: "osm-street",
-    displayName: "OpenStreetMap",
+    displayName: "Street",
     type: "raster",
     source: {
       type: "raster",
