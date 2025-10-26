@@ -1,19 +1,8 @@
-import {
-  Typography,
-  Form,
-  Space,
-  Divider,
-  message,
-  Tag,
-  Spin,
-  InputNumber,
-  Button,
-} from "antd";
+import { Typography, Form, Space, message, Tag, Spin } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
-import { AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
 
@@ -35,7 +24,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CompassOutlined, AimOutlined, DownloadOutlined } from "@ant-design/icons";
+import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
 import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
@@ -45,12 +34,7 @@ import {
   CaveSearchSortByConstants,
   CaveSearchVm,
 } from "../Models/CaveSearchVm";
-import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
-import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
-import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
-import { TagType } from "../../Tag/Models/TagType";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
-import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
 import {
   ShouldDisplay,
   useFeatureEnabled,
@@ -58,17 +42,13 @@ import {
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { saveAs } from "file-saver";
 import FavoriteCave from "./FavoriteCave";
-import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
-import { EntrancePolygonFilterFormItem } from "../../Search/Components/EntrancePolygonFilterFormItem";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
 import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
-import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
-import { getFeatureKeyLabel } from "../../Account/Models/FeatureKeyHelpers";
-import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-
+import {
+  CaveAdvancedSearchDrawer,
+  EntranceLocationFilter,
+} from "./CaveAdvancedSearchDrawer";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 
@@ -79,8 +59,6 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
-  const [exportFeatureKeys, setExportFeatureKeys] = useState<FeatureKey[]>([]);
-  const [enabledExportKeys, setEnabledExportKeys] = useState<FeatureKey[]>([]);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(
     queryBuilder.hasFilters()
   );
@@ -92,20 +70,11 @@ const CavesComponent: React.FC = () => {
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
-  const [isExportModalVisible, setIsExportModalVisible] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState<
-    "csv" | "gpx" | null
-  >(null);
-  const [isExporting, setIsExporting] = useState(false);
 
   const accountId = AuthenticationService.GetAccountId();
   const featureStorageKey = accountId
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";
-  const exportFeatureStorageKey = accountId
-    ? `${accountId}-exportFeatures`
-    : "exportFeatures";
-
   const sortOptions = [
     ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
     { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
@@ -119,11 +88,6 @@ const CavesComponent: React.FC = () => {
     { display: "Name", value: CaveSearchSortByConstants.Name },
   ] as SelectListItem<string>[];
 
-  type EntranceLocationFilter = {
-    latitude?: number;
-    longitude?: number;
-    radius?: number;
-  };
 
   const parseEntranceLocationFilter = (
     value: string | undefined | null
@@ -308,59 +272,6 @@ const CavesComponent: React.FC = () => {
     await getCaves();
   };
 
-  type ExportType = "csv" | "gpx";
-
-  const beginExport = (type: ExportType) => {
-    setPendingExportType(type);
-    setIsExportModalVisible(true);
-  };
-
-  const handleCloseExportModal = () => {
-    setIsExportModalVisible(false);
-    setPendingExportType(null);
-    setIsExporting(false);
-  };
-
-  const handleExportConfirm = async () => {
-    if (!pendingExportType) {
-      return;
-    }
-
-    handleCloseExportModal();
-
-    setIsExporting(true);
-    const exportLabel = pendingExportType.toUpperCase();
-    const hide = message.loading(`Exporting ${exportLabel}...`, 0);
-
-    try {
-      const response =
-        pendingExportType === "gpx"
-          ? await CaveService.ExportCavesGpx(queryBuilder, exportFeatureKeys)
-          : await CaveService.ExportCavesCsv(queryBuilder, exportFeatureKeys);
-
-      const accountName = AuthenticationService.GetAccountName();
-      const localDateTime = new Date().toISOString();
-      const fileExtension = pendingExportType;
-      const fileName = `${accountName} ${localDateTime}.${fileExtension}`;
-
-      saveAs(response, fileName);
-    } catch (err) {
-      const error = err as ApiErrorResponse;
-      message.error(error.message);
-    } finally {
-      hide();
-      setIsExporting(false);
-    }
-  };
-
-  const onExportGpx = async () => {
-    beginExport("gpx");
-  };
-
-  const onExportCsv = async () => {
-    beginExport("csv");
-  };
-
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
     {
       display: "ID",
@@ -448,45 +359,6 @@ const CavesComponent: React.FC = () => {
       data: { key: FeatureKey.EnabledFieldCaveOtherTags },
     },
   ];
-  const exportFeatureOrder: FeatureKey[] = [
-    FeatureKey.EnabledFieldCaveId,
-    FeatureKey.EnabledFieldCaveDistance,
-    FeatureKey.EnabledFieldCaveCounty,
-    FeatureKey.EnabledFieldCaveLengthFeet,
-    FeatureKey.EnabledFieldCaveDepthFeet,
-    FeatureKey.EnabledFieldCaveReportedOn,
-    FeatureKey.EnabledFieldCaveMaxPitDepthFeet,
-    FeatureKey.EnabledFieldCaveNumberOfPits,
-    FeatureKey.EnabledFieldCaveMapStatusTags,
-    FeatureKey.EnabledFieldCaveGeologyTags,
-    FeatureKey.EnabledFieldCaveGeologicAgeTags,
-    FeatureKey.EnabledFieldCaveArcheologyTags,
-    FeatureKey.EnabledFieldCaveBiologyTags,
-    FeatureKey.EnabledFieldCaveCartographerNameTags,
-    FeatureKey.EnabledFieldCavePhysiographicProvinceTags,
-    FeatureKey.EnabledFieldCaveReportedByNameTags,
-    FeatureKey.EnabledFieldCaveOtherTags,
-    FeatureKey.EnabledFieldCaveName,
-    FeatureKey.EnabledFieldCaveAlternateNames,
-    FeatureKey.EnabledFieldCaveState,
-    FeatureKey.EnabledFieldCaveNarrative,
-    FeatureKey.EnabledFieldEntranceName,
-    FeatureKey.EnabledFieldEntranceDescription,
-    FeatureKey.EnabledFieldEntranceReportedOn,
-    FeatureKey.EnabledFieldEntrancePitDepth,
-    FeatureKey.EnabledFieldEntranceCoordinates,
-    FeatureKey.EnabledFieldEntranceElevation,
-    FeatureKey.EnabledFieldEntranceLocationQuality,
-    FeatureKey.EnabledFieldEntranceStatusTags,
-    FeatureKey.EnabledFieldEntranceFieldIndicationTags,
-    FeatureKey.EnabledFieldEntranceHydrologyTags,
-    FeatureKey.EnabledFieldEntranceReportedByNameTags,
-  ];
-
-  const getFeatureOrder = (key: FeatureKey) => {
-    const index = exportFeatureOrder.indexOf(key);
-    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-  };
   const { isFeatureEnabled } = useFeatureEnabled();
   const [filteredFeatures, setFilteredFeatures] = useState<
     SelectListItemKey<CaveSearchVm>[]
@@ -538,58 +410,13 @@ const CavesComponent: React.FC = () => {
         }
       }
 
-      const allFeatureKeys = Object.values(FeatureKey) as FeatureKey[];
-      const enabledExportKeysList = allFeatureKeys.filter(
-        (key) =>
-          key !== FeatureKey.EnabledFieldCaveDistance &&
-          isFeatureEnabled(key)
-      );
-      const sortedExportKeys = [...enabledExportKeysList].sort((a, b) => {
-        const orderA = getFeatureOrder(a);
-        const orderB = getFeatureOrder(b);
-
-        if (orderA !== orderB) {
-          return orderA - orderB;
-        }
-
-        return getFeatureKeyLabel(a).localeCompare(getFeatureKeyLabel(b));
-      });
-      setEnabledExportKeys(sortedExportKeys);
-
-      let savedExportFeatureKeys: FeatureKey[] = sortedExportKeys;
-      const savedExportJson = exportFeatureStorageKey
-        ? localStorage.getItem(exportFeatureStorageKey)
-        : null;
-
-      if (savedExportJson) {
-        try {
-          const parsed = JSON.parse(savedExportJson) as FeatureKey[];
-          const filtered = parsed.filter((key) =>
-            enabledExportKeysList.includes(key)
-          );
-          if (filtered.length > 0) {
-            savedExportFeatureKeys = filtered;
-          }
-        } catch {
-          savedExportFeatureKeys = sortedExportKeys;
-        }
-      }
-
       setFilteredFeatures(enabledFeatures);
       setSelectedFeatures(filteredSelectedFeatures);
-      setExportFeatureKeys(savedExportFeatureKeys);
 
       if (featureStorageKey) {
         localStorage.setItem(
           featureStorageKey,
           JSON.stringify(filteredSelectedFeatures)
-        );
-      }
-
-      if (exportFeatureStorageKey) {
-        localStorage.setItem(
-          exportFeatureStorageKey,
-          JSON.stringify(savedExportFeatureKeys)
         );
       }
 
@@ -662,358 +489,27 @@ const CavesComponent: React.FC = () => {
     value: feature.value,
   }));
 
-  const exportFeatureOptions = enabledExportKeys
-    .slice()
-    .sort((a, b) => {
-      const orderA = getFeatureOrder(a);
-      const orderB = getFeatureOrder(b);
-
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
-
-      return getFeatureKeyLabel(a).localeCompare(getFeatureKeyLabel(b));
-    })
-    .map((key) => ({
-      label: getFeatureKeyLabel(key),
-      value: key,
-    }));
-
   return (
     <>
-      <AdvancedSearchDrawerComponent
-        mainSearchField={"name"}
-        mainSearchFieldLabel={"Name or ID"}
+      <CaveAdvancedSearchDrawer
         onSearch={onSearch}
         queryBuilder={queryBuilder}
         form={form}
         sortOptions={sortOptions}
         onSortChange={handleSortChange}
-        onExportGpx={onExportGpx}
-        onExportCsv={onExportCsv}
         onFiltersCleared={() => {
           applyEntranceLocationFilter({});
           setFilterClearSignal((previous) => previous + 1);
           setPolygonResetSignal((previous) => previous + 1);
         }}
-      >
-        <Divider>Cave</Divider>
-        <BooleanFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"isFavorite"}
-          label={"Favorites"}
-        />
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>
-          <TextFilterFormItem
-            queryBuilder={queryBuilder}
-            field={"narrative"}
-            label={"Narrative"}
-            queryOperator={QueryOperator.FreeText}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>
-          <StateCountyFilterFormItem
-            queryBuilder={queryBuilder}
-            autoSelectFirst={true}
-            stateField={"stateId"}
-            stateLabel={"State"}
-            countyField={"countyId"}
-            countyLabel={"County"}
-          />
-        </ShouldDisplay>
-        <Form.Item label="Entrance Radius Search">
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            <Space wrap>
-              <InputNumber
-                value={entranceLocationFilter.latitude}
-                placeholder="Latitude"
-                min={-90}
-                max={90}
-                step={0.000001}
-                style={{ width: 140 }}
-                onChange={(value) =>
-                  handleEntranceLocationChange("latitude", value)
-                }
-              />
-              <InputNumber
-                value={entranceLocationFilter.longitude}
-                placeholder="Longitude"
-                min={-180}
-                max={180}
-                step={0.000001}
-                style={{ width: 140 }}
-                onChange={(value) =>
-                  handleEntranceLocationChange("longitude", value)
-                }
-              />
-              <InputNumber
-                value={entranceLocationFilter.radius}
-                placeholder="Radius (miles)"
-                min={0}
-                step={0.25}
-                style={{ width: 160 }}
-                onChange={(value) =>
-                  handleEntranceLocationChange("radius", value)
-                }
-              />
-              <Button
-                size="small"
-                loading={isFetchingEntranceLocation}
-                icon={<AimOutlined />}
-                onClick={handleUseCurrentLocation}
-              >
-                Use Current Location
-              </Button>
-              <Button
-                size="small"
-                onClick={() => applyEntranceLocationFilter({})}
-              >
-                Clear
-              </Button>
-            </Space>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Finds caves with an entrance within the selected radius of the
-              specified point.
-            </Typography.Text>
-          </Space>
-        </Form.Item>
-        <EntrancePolygonFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"entrancePolygon" as NestedKeyOf<CaveSearchParamsVm>}
-          label={"Entrance Polygon Search"}
-          resetSignal={polygonResetSignal}
-          helpText={
-            "Draw a polygon on the map or drag a zipped shapefile onto the map to return caves whose entrances fall inside the area. Note: The shapefile must contain a polygon; lines or points are not supported."
-          }
-        />
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveLengthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"lengthFeet"}
-            label={"Length (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"depthFeet"}
-            label={"Depth (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNumberOfPits}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"numberOfPits"}
-            label={"Number of Pits (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"maxPitDepthFeet"}
-            label={"Max Pit Depth (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
-          <TagFilterFormItem
-            tagType={TagType.MapStatus}
-            queryBuilder={queryBuilder}
-            field={"mapStatusTagIds"}
-            label={"Map Status"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCaveCartographerNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"cartographerNamePeopleTagIds"}
-            label={"Cartographer Names"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Geology}
-            queryBuilder={queryBuilder}
-            field={"geologyTagIds"}
-            label={"Geology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologicAgeTags}>
-          <TagFilterFormItem
-            tagType={TagType.GeologicAge}
-            queryBuilder={queryBuilder}
-            field={"geologicAgeTagIds"}
-            label={"Geologic Age"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCavePhysiographicProvinceTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.PhysiographicProvince}
-            queryBuilder={queryBuilder}
-            field={"physiographicProvinceTagIds"}
-            label={"Physiographic Province"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveBiologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Biology}
-            queryBuilder={queryBuilder}
-            field={"biologyTagIds"}
-            label={"Biology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveArcheologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Archeology}
-            queryBuilder={queryBuilder}
-            field={"archaeologyTagIds" as any}
-            label={"Archeology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveOtherTags}>
-          <TagFilterFormItem
-            tagType={TagType.CaveOther}
-            queryBuilder={queryBuilder}
-            field={"caveOtherTagIds"}
-            label={"Other"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"caveReportedByNameTagIds"}
-            label={"Reported By"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedOn}>
-          <NumberComparisonFormItem
-            inputType={"date"}
-            queryBuilder={queryBuilder}
-            field={"caveReportedOnDate"}
-            label={"Reported On"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <Divider>Entrance</Divider>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceElevation}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"elevationFeet"}
-            label={"Elevation (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceDescription}>
-          <TextFilterFormItem
-            queryBuilder={queryBuilder}
-            field={"entranceDescription"}
-            label={"Entrance Description"}
-            queryOperator={QueryOperator.FreeText}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceStatusTags}>
-          <TagFilterFormItem
-            tagType={TagType.EntranceStatus}
-            queryBuilder={queryBuilder}
-            field={"entranceStatusTagIds"}
-            label={"Entrance Status"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceFieldIndicationTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.FieldIndication}
-            queryBuilder={queryBuilder}
-            field={"entranceFieldIndicationTagIds"}
-            label={"Entrance Field Indication"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceLocationQuality}
-        >
-          <TagFilterFormItem
-            tagType={TagType.LocationQuality}
-            queryBuilder={queryBuilder}
-            field={"locationQualityTagIds"}
-            label={"Entrance Location Quality"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceHydrologyTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.EntranceHydrology}
-            queryBuilder={queryBuilder}
-            field={"entranceHydrologyTagIds"}
-            label={"Entrance Hydrology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"entrancePitDepthFeet"}
-            label={"Entrance Pit Depth (Feet)"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceReportedByNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"entranceReportedByPeopleTagIds"}
-            label={"Entrance Reported By"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceReportedOn}>
-          <NumberComparisonFormItem
-            inputType={"date"}
-            queryBuilder={queryBuilder}
-            field={"entranceReportedOnDate"}
-            label={"Entrance Reported On"}
-            onFiltersCleared={filterClearSignal}
-          />
-        </ShouldDisplay>
-        <Divider>Files</Divider>
-        <TagFilterFormItem
-          tagType={TagType.File}
-          queryBuilder={queryBuilder}
-          field={"fileTypeTagIds"}
-          label={"File Types"}
-        />
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"fileDisplayName"}
-          label={"File Name"}
-          queryOperator={QueryOperator.Contains}
-        />
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"fileExtension"}
-          label={"File Extension"}
-          queryOperator={QueryOperator.EndsWith}
-          helpText={"Enter values like pdf or .pdf"}
-        />
-      </AdvancedSearchDrawerComponent>
+        entranceLocationFilter={entranceLocationFilter}
+        isFetchingEntranceLocation={isFetchingEntranceLocation}
+        onEntranceLocationChange={handleEntranceLocationChange}
+        onUseCurrentLocation={handleUseCurrentLocation}
+        onClearEntranceLocation={() => applyEntranceLocationFilter({})}
+        polygonResetSignal={polygonResetSignal}
+        filterClearSignal={filterClearSignal}
+      />
 
       <Space direction="vertical" style={{ width: "100%" }}>
         <FeatureCheckboxGroup
@@ -1218,62 +714,6 @@ const CavesComponent: React.FC = () => {
           />
         </SpinnerCardComponent>
       </Space>
-      <PlanarianModal
-        open={isExportModalVisible}
-        onClose={handleCloseExportModal}
-        header={
-          pendingExportType
-            ? `Export ${pendingExportType.toUpperCase()}`
-            : "Select Export Fields"
-        }
-        footer={[
-          <CancelButtonComponent
-
-            key="cancel"
-            onClick={handleCloseExportModal}
-          />
-          ,
-          <PlanarianButton
-            key="export"
-            type="primary"
-            alwaysShowChildren
-            onClick={handleExportConfirm}
-            loading={isExporting}
-            disabled={exportFeatureKeys.length === 0 || isExporting}
-            icon={<DownloadOutlined />}
-          >
-            {pendingExportType
-              ? `Export ${pendingExportType.toUpperCase()}`
-              : "Export"}
-          </PlanarianButton>,
-        ]}
-      >
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
-          <Typography.Paragraph style={{ marginBottom: 0 }}>
-            Choose which fields to include in the export file.
-          </Typography.Paragraph>
-          {exportFeatureOptions.length > 0 ? (
-            <FeatureCheckboxGroup
-              title="Export Fields"
-              options={exportFeatureOptions}
-              value={exportFeatureKeys}
-              onChange={(values) => {
-                setExportFeatureKeys(values);
-                if (exportFeatureStorageKey) {
-                  localStorage.setItem(
-                    exportFeatureStorageKey,
-                    JSON.stringify(values)
-                  );
-                }
-              }}
-            />
-          ) : (
-            <Typography.Text type="secondary">
-              No exportable fields are currently enabled.
-            </Typography.Text>
-          )}
-        </Space>
-      </PlanarianModal>
     </>
   );
 };
