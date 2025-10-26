@@ -368,9 +368,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     }
 
     const updatedSearch = urlSearchParams.toString();
-    const nextUrl = `${window.location.pathname}${
-      updatedSearch ? `?${updatedSearch}` : ""
-    }`;
+    const nextUrl = `${window.location.pathname}${updatedSearch ? `?${updatedSearch}` : ""
+      }`;
     window.history.replaceState({}, "", nextUrl);
 
     setHasAppliedFilters(hasFilters);
@@ -708,7 +707,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const advancedSearchPosition = useMemo(
     () => ({
-      top: offsetPositionValue(layerControlPosition.top, 80),
+      top: offsetPositionValue(layerControlPosition.top, 50),
       right: layerControlPosition.right ?? "0",
     }),
     [layerControlPosition]
@@ -718,7 +717,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     (
       context: AdvancedSearchInlineControlsContext<CaveSearchParamsVm>
     ) => (
-      <FloatingPanel style={{ zIndex: 200, ...advancedSearchPosition }}>
+      <FloatingPanel style={{ zIndex: 100, ...advancedSearchPosition }}>
         <PlanarianButton
           icon={<SlidersOutlined />}
           onClick={() => context.openDrawer()}
@@ -726,16 +725,17 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
           neverShowChildren
           type={hasAppliedFilters ? "primary" : "default"}
         />
-        <PlanarianButton
-          icon={<ClearOutlined />}
-          onClick={(event) => {
-            event.preventDefault();
-            void context.clearFilters();
-          }}
-          tooltip="Clear filters"
-          neverShowChildren
-          disabled={!hasAppliedFilters}
-        />
+        {hasAppliedFilters && (
+          <PlanarianButton
+            icon={<ClearOutlined />}
+            onClick={(event) => {
+              event.preventDefault();
+              void context.clearFilters();
+            }}
+            tooltip="Clear filters"
+            neverShowChildren
+          />
+        )}
       </FloatingPanel>
     ),
     [advancedSearchPosition, hasAppliedFilters]
