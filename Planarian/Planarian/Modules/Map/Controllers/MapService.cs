@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Planarian.Model.Shared;
 using Planarian.Modules.Map.Services;
+using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Map.Controllers;
@@ -28,10 +29,11 @@ public class MapService : ServiceBase<MapRepository>
         return result;
     }
 
-    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, CancellationToken cancellationToken)
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, FilterQuery filterQuery, CancellationToken cancellationToken)
     {
+        filterQuery ??= new FilterQuery();
 
-        var result = await Repository.GetEntrancesMVTAsync(z, x, y, cancellationToken);
+        var result = await Repository.GetEntrancesMVTAsync(z, x, y, filterQuery, cancellationToken);
         return result;
     }
     
