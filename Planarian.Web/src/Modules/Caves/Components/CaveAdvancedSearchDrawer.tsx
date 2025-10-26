@@ -43,12 +43,7 @@ import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
 import { performCaveExport, ExportType } from "../Service/CaveExportService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { getFeatureKeyLabel } from "../../Account/Models/FeatureKeyHelpers";
-
-export type EntranceLocationFilter = {
-  latitude?: number;
-  longitude?: number;
-  radius?: number;
-};
+import { EntranceLocationFilter } from "../../Search/Helpers/EntranceLocationFilterHelpers";
 
 export interface CaveAdvancedSearchDrawerProps {
   queryBuilder: QueryBuilder<CaveSearchParamsVm>;

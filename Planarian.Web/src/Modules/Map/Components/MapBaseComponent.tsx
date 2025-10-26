@@ -35,13 +35,18 @@ import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
 import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
-import { QueryBuilder, QueryOperator } from "../../Search/Services/QueryBuilder";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { CaveSearchParamsVm } from "../../Caves/Models/CaveSearchParamsVm";
-import { NestedKeyOf, formatCoordinateNumber } from "../../../Shared/Helpers/StringHelpers";
+import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import styled from "styled-components";
 import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
 import { CaveAdvancedSearchDrawer } from "../../Caves/Components/CaveAdvancedSearchDrawer";
+import {
+  applyEntranceLocationFilterToQuery,
+  EntranceLocationFilter,
+  parseEntranceLocationFilter,
+} from "../../Search/Helpers/EntranceLocationFilterHelpers";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -106,39 +111,6 @@ const offsetPositionValue = (value: string | undefined, offset: number) => {
   }
 
   return `calc(${value} + ${offset}px)`;
-};
-
-type EntranceLocationFilter = {
-  latitude?: number;
-  longitude?: number;
-  radius?: number;
-};
-
-const parseEntranceLocationFilter = (
-  value: string | undefined | null
-): EntranceLocationFilter => {
-  if (!value) {
-    return {};
-  }
-
-  const parts = value.split(",").map((part) => part.trim());
-  if (parts.length !== 3) {
-    return {};
-  }
-
-  const latitude = Number(parts[0]);
-  const longitude = Number(parts[1]);
-  const radius = Number(parts[2]);
-
-  if (
-    [latitude, longitude, radius].some(
-      (entry) => Number.isNaN(entry) || !Number.isFinite(entry)
-    )
-  ) {
-    return {};
-  }
-
-  return { latitude, longitude, radius };
 };
 
 const FloatingPanel = styled.div`
@@ -254,30 +226,11 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   const applyEntranceLocationFilter = useCallback(
     (next: EntranceLocationFilter) => {
       setEntranceLocationFilter(next);
-
-      const { latitude, longitude, radius } = next;
-
-      if (
-        latitude !== undefined &&
-        longitude !== undefined &&
-        radius !== undefined &&
-        !Number.isNaN(latitude) &&
-        !Number.isNaN(longitude) &&
-        !Number.isNaN(radius) &&
-        radius > 0
-      ) {
-        const formattedLatitude = formatCoordinateNumber(latitude);
-        const formattedLongitude = formatCoordinateNumber(longitude);
-        const serializedValue = `${formattedLatitude},${formattedLongitude},${radius}`;
-
-        queryBuilder.filterBy(
-          "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
-          QueryOperator.Equal,
-          serializedValue as any
-        );
-      } else {
-        queryBuilder.removeFromDictionary("entranceLocation");
-      }
+      applyEntranceLocationFilterToQuery(
+        queryBuilder,
+        "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
+        next
+      );
     },
     [queryBuilder]
   );

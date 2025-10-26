@@ -6,10 +6,7 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
 
-import {
-  QueryBuilder,
-  QueryOperator,
-} from "../../Search/Services/QueryBuilder";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { CaveService } from "../Service/CaveService";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { CaveCreateButtonComponent } from "./CaveCreateButtonComponent";
@@ -20,7 +17,6 @@ import {
   formatDate,
   defaultIfEmpty,
   formatNumber,
-  formatCoordinateNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -45,10 +41,12 @@ import { NavigationService } from "../../../Shared/Services/NavigationService";
 import FavoriteCave from "./FavoriteCave";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
 import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
+import { CaveAdvancedSearchDrawer } from "./CaveAdvancedSearchDrawer";
 import {
-  CaveAdvancedSearchDrawer,
+  applyEntranceLocationFilterToQuery,
   EntranceLocationFilter,
-} from "./CaveAdvancedSearchDrawer";
+  parseEntranceLocationFilter,
+} from "../../Search/Helpers/EntranceLocationFilterHelpers";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 
@@ -89,33 +87,6 @@ const CavesComponent: React.FC = () => {
   ] as SelectListItem<string>[];
 
 
-  const parseEntranceLocationFilter = (
-    value: string | undefined | null
-  ): EntranceLocationFilter => {
-    if (!value) {
-      return {};
-    }
-
-    const parts = value.split(",").map((part) => part.trim());
-    if (parts.length !== 3) {
-      return {};
-    }
-
-    const latitude = Number(parts[0]);
-    const longitude = Number(parts[1]);
-    const radius = Number(parts[2]);
-
-    if (
-      [latitude, longitude, radius].some(
-        (entry) => Number.isNaN(entry) || !Number.isFinite(entry)
-      )
-    ) {
-      return {};
-    }
-
-    return { latitude, longitude, radius };
-  };
-
   const [entranceLocationFilter, setEntranceLocationFilter] =
     useState<EntranceLocationFilter>(() =>
       parseEntranceLocationFilter(
@@ -147,37 +118,13 @@ const CavesComponent: React.FC = () => {
     queryBuilder.setSort(sortValue);
     await getCaves();
   };
-
-
-
   const applyEntranceLocationFilter = (next: EntranceLocationFilter) => {
     setEntranceLocationFilter(next);
-
-    const { latitude, longitude, radius } = next;
-
-    if (
-      latitude !== undefined &&
-      longitude !== undefined &&
-      radius !== undefined &&
-      !Number.isNaN(latitude) &&
-      !Number.isNaN(longitude) &&
-      !Number.isNaN(radius) &&
-      radius > 0
-    ) {
-      const formattedLatitude = formatCoordinateNumber(latitude);
-      const formattedLongitude = formatCoordinateNumber(longitude);
-      const formattedRadius = radius;
-
-      const serializedValue = `${formattedLatitude},${formattedLongitude},${formattedRadius}`;
-
-      queryBuilder.filterBy(
-        "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
-        QueryOperator.Equal,
-        serializedValue as any
-      );
-    } else {
-      queryBuilder.removeFromDictionary("entranceLocation");
-    }
+    applyEntranceLocationFilterToQuery(
+      queryBuilder,
+      "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
+      next
+    );
   };
 
   const handleEntranceLocationChange = (
