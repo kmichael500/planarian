@@ -12,8 +12,8 @@ import {
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { QueryOperator } from "../Services/QueryBuilder";
-import { useState } from "react";
+import { QueryOperator, QueryBuilder } from "../Services/QueryBuilder";
+import { ReactNode, useState } from "react";
 import {
   SlidersOutlined,
   ClearOutlined,
@@ -36,6 +36,21 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   onExportCsv?: () => Promise<void>;
   onFiltersCleared?: () => void;
   onSortChange?: (sortBy: string) => Promise<void> | void;
+  inlineControls?: (
+    context: AdvancedSearchInlineControlsContext<T>
+  ) => React.ReactNode;
+}
+
+export interface AdvancedSearchInlineControlsContext<T extends object> {
+  defaultControls: ReactNode;
+  openDrawer: () => void;
+  clearFilters: () => Promise<void>;
+  onSearch: () => Promise<void>;
+  setMainSearchValue: (value: string) => void;
+  mainSearchValue: string;
+  mainSearchFieldLabel: string;
+  hasFilters: boolean;
+  queryBuilder: QueryBuilder<T>;
 }
 
 const AdvancedSearchDrawerComponent = <T extends object>({
@@ -50,6 +65,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   onExportCsv,
   onFiltersCleared,
   onSortChange,
+  inlineControls,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const onClickSearch = async () => {
@@ -64,38 +80,24 @@ const AdvancedSearchDrawerComponent = <T extends object>({
     await onSearch();
   };
 
-  const exportMenuItems: MenuProps["items"] = [
-    {
-      key: "gpx",
-      label: "Export GPX",
-    },
-    {
-      key: "csv",
-      label: "Export CSV",
-    },
-  ];
-
-  const handleExportClick: MenuProps["onClick"] = async (e) => {
-    if (e.key === "gpx" && onExportGpx) {
-      await onExportGpx();
-    } else if (e.key === "csv" && onExportCsv) {
-      await onExportCsv();
-    }
+  const handleMainSearchChange = (value: string) => {
+    queryBuilder.filterBy(
+      mainSearchField,
+      QueryOperator.Contains,
+      value as any
+    );
   };
 
-  return (
+  const mainSearchValue =
+    (queryBuilder.getFieldValue(mainSearchField) as string) ?? "";
+
+  const defaultControls = (
     <Row align="middle" gutter={[16, 10]} style={{ marginBottom: 10 }}>
       <Col>
         <Input.Search
           placeholder={mainSearchFieldLabel}
-          defaultValue={queryBuilder.getFieldValue(mainSearchField) as string}
-          onChange={(e) => {
-            queryBuilder.filterBy(
-              mainSearchField,
-              QueryOperator.Contains,
-              e.target.value as any
-            );
-          }}
+          defaultValue={mainSearchValue}
+          onChange={(e) => handleMainSearchChange(e.target.value)}
           onSearch={onClickSearch}
         />
       </Col>
@@ -156,60 +158,99 @@ const AdvancedSearchDrawerComponent = <T extends object>({
               Clear
             </PlanarianButton>
           </Col>
-          <Drawer
-            title="Advanced Search"
-            open={isAdvancedSearchOpen}
-            onClose={() => setIsAdvancedSearchOpen(false)}
-            footer={
-              <div
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Button type="primary" onClick={onClickSearch}>
-                  Search
-                </Button>
-                {onExportGpx && (
-                  <div style={{ marginLeft: "auto" }}>
-                    <ShouldDisplay permissionKey={PermissionKey.Export}>
-                      <Dropdown.Button
-                        menu={{
-                          items: exportMenuItems,
-                          onClick: handleExportClick,
-                        }}
-                        onClick={() => {
-                          if (onExportGpx) {
-                            onExportGpx();
-                          }
-                        }}
-                        icon={<DownloadOutlined />}
-                      >
-                        Export
-                      </Dropdown.Button>
-                    </ShouldDisplay>
-                  </div>
-                )}
-              </div>
-            }
-          >
-            <Form
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onClickSearch();
-                }
-              }}
-              layout="vertical"
-              initialValues={queryBuilder.getDefaultValues()}
-              form={form}
-            >
-              {children}
-            </Form>
-          </Drawer>
         </Row>
       </Col>
     </Row>
+  );
+
+  const exportMenuItems: MenuProps["items"] = [
+    {
+      key: "gpx",
+      label: "Export GPX",
+    },
+    {
+      key: "csv",
+      label: "Export CSV",
+    },
+  ];
+
+  const handleExportClick: MenuProps["onClick"] = async (e) => {
+    if (e.key === "gpx" && onExportGpx) {
+      await onExportGpx();
+    } else if (e.key === "csv" && onExportCsv) {
+      await onExportCsv();
+    }
+  };
+
+  const inlineControlsNode = inlineControls
+    ? inlineControls({
+        defaultControls,
+        openDrawer: () => setIsAdvancedSearchOpen(true),
+        clearFilters: onClearSearch,
+        onSearch: onClickSearch,
+        setMainSearchValue: handleMainSearchChange,
+        mainSearchValue,
+        mainSearchFieldLabel,
+        hasFilters: queryBuilder.hasFilters(),
+        queryBuilder,
+      })
+    : defaultControls;
+
+  return (
+    <>
+      {inlineControlsNode}
+      <Drawer
+        title="Advanced Search"
+        open={isAdvancedSearchOpen}
+        onClose={() => setIsAdvancedSearchOpen(false)}
+        footer={
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+          >
+            <Button type="primary" onClick={onClickSearch}>
+              Search
+            </Button>
+            {onExportGpx && (
+              <div style={{ marginLeft: "auto" }}>
+                <ShouldDisplay permissionKey={PermissionKey.Export}>
+                  <Dropdown.Button
+                    menu={{
+                      items: exportMenuItems,
+                      onClick: handleExportClick,
+                    }}
+                    onClick={() => {
+                      if (onExportGpx) {
+                        onExportGpx();
+                      }
+                    }}
+                    icon={<DownloadOutlined />}
+                  >
+                    Export
+                  </Dropdown.Button>
+                </ShouldDisplay>
+              </div>
+            )}
+          </div>
+        }
+      >
+        <Form
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              onClickSearch();
+            }
+          }}
+          layout="vertical"
+          initialValues={queryBuilder.getDefaultValues()}
+          form={form}
+        >
+          {children}
+        </Form>
+      </Drawer>
+    </>
   );
 };
 

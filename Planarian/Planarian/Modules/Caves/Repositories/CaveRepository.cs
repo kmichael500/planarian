@@ -24,6 +24,11 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
     }
 
+    public IQueryable<string> GetCaveIds(FilterQuery filterQuery, string? permissionKey = null)
+    {
+        return GetCavesQuery(filterQuery, permissionKey).Select(c => c.Id);
+    }
+
     private const double EarthRadiusMiles = 3958.756;
 
 

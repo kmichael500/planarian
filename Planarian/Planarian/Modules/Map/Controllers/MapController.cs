@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Map.Controllers;
@@ -32,9 +33,9 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
-    public async Task<IActionResult> GetTile(int z, int x, int y, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTile(int z, int x, int y, [FromQuery] FilterQuery query, CancellationToken cancellationToken)
     {
-        var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, cancellationToken);
+        var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, query, cancellationToken);
         // Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
         if (mvtData == null)
         {
