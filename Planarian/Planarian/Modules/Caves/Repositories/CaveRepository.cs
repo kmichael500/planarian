@@ -290,6 +290,29 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
+                case nameof(CaveSearchParamsVm.CountyDisplayId):
+                    var countyDisplayId = queryCondition.Value.ToLower();
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Contains => query.Where(e =>
+                            e.County.DisplayId.ToLower() == countyDisplayId
+                        ),
+                        QueryOperator.Equal => query.Where(e =>
+                            e.County.DisplayId.ToLower() == countyDisplayId
+                        ),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
+                case nameof(CaveSearchParamsVm.CountyNumber):
+                    var hasCountyNumber = int.TryParse(queryCondition.Value, out var countyNumber);
+                    if (!hasCountyNumber)
+                        throw ApiExceptionDictionary.QueryInvalidValue(queryCondition.Field, queryCondition.Value);
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Equal => query.Where(e => e.CountyNumber == countyNumber),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
                 case nameof(CaveSearchParamsVm.LengthFeet):
                     var lengthHasNumber = double.TryParse(queryCondition.Value, out var lengthFeet);
                     if (!lengthHasNumber)
