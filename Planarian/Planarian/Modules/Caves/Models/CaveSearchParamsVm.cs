@@ -14,6 +14,8 @@ public class CaveSearchParamsVm
     public string Narrative { get; set; }
     public string StateId { get; set; }
     public string CountyId { get; set; }
+    public string CountyDisplayId { get; set; }
+    public int CountyNumber { get; set; }
     public int LengthFeet { get; set; }
     public int DepthFeet { get; set; }
     public int ElevationFeet { get; set; }
