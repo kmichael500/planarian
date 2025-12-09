@@ -110,6 +110,7 @@ const CavesComponent: React.FC = () => {
 
   const sortOptions = [
     ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
+    { display: "Cave ID", value: CaveSearchSortByConstants.DisplayId },
     { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
     { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
     {
