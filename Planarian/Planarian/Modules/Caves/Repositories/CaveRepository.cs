@@ -61,6 +61,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 ) // options
                 : null,
             CountyId = e.County!.Id,
+            CountyDisplayId = e.County!.DisplayId,
+            CountyNumber = e.CountyNumber,
             DisplayId =
                 $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
             PrimaryEntranceLatitude = e.Entrances.Count == 0
@@ -134,6 +136,15 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
             nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                 filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            nameof(CaveSearchVm.DisplayId) => filterQuery.SortDescending
+                ? await caveSearchQuery
+                    .OrderByDescending(e => e.CountyDisplayId)
+                    .ThenByDescending(e => e.CountyNumber)
+                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize)
+                : await caveSearchQuery
+                    .OrderBy(e => e.CountyDisplayId)
+                    .ThenBy(e => e.CountyNumber)
+                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize),
             nameof(CaveSearchVm.DistanceMiles) => hasLocationForDistance
                 ? await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                     filterQuery.PageSize, e => e.DistanceMiles, !filterQuery.SortDescending)

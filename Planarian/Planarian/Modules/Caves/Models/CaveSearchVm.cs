@@ -14,6 +14,8 @@ public class CaveSearchVm
     public double? MaxPitDepthFeet { get; set; }
     public int? NumberOfPits { get; set; }
     public string CountyId { get; set; }
+    public string CountyDisplayId { get; set; } = null!;
+    public int CountyNumber { get; set; }
     public string DisplayId { get; set; }
     
     public double? PrimaryEntranceLatitude { get; set; }
