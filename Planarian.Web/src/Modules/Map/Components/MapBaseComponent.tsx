@@ -624,7 +624,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     if (accountId) {
       params.set("account_id", accountId);
     }
-    params.set("test", "1");
 
     if (mapFiltersQueryString) {
       const filterParams = new URLSearchParams(mapFiltersQueryString);

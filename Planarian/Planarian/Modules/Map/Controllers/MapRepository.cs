@@ -15,12 +15,17 @@ namespace Planarian.Modules.Map.Controllers;
 public class MapRepository : RepositoryBase
 {
     private readonly MemoryCache _cache;
+    private readonly CaveRepository _caveRepository;
     private string _allPointsCacheKey;
 
-    public MapRepository(PlanarianDbContext dbContext, RequestUser requestUser, MemoryCache cache) : base(dbContext,
-        requestUser)
+    public MapRepository(
+        PlanarianDbContext dbContext,
+        RequestUser requestUser,
+        MemoryCache cache,
+        CaveRepository caveRepository) : base(dbContext, requestUser)
     {
         _cache = cache;
+        _caveRepository = caveRepository;
     }
 
     public async Task<IEnumerable<object>> GetMapData(double north, double south, double east, double west, int zoom,
@@ -199,8 +204,7 @@ public class MapRepository : RepositoryBase
 
         if (filterQuery.Conditions?.Any() == true)
         {
-            var caveRepository = new CaveRepository<PlanarianDbContext>(DbContext, RequestUser);
-            filteredCaveIds = await caveRepository
+            filteredCaveIds = await _caveRepository
                 .GetCaveIds(filterQuery)
                 .ToListAsync(cancellationToken);
 
@@ -235,8 +239,8 @@ public class MapRepository : RepositoryBase
                                 SELECT 1 
                                 FROM "Favorites"
                                 WHERE 
-                                    "Favorites"."UserId" = '{4}'
-                                    AND "Favorites"."AccountId" = '{3}'
+                                    "Favorites"."UserId" = @userId
+                                    AND "Favorites"."AccountId" = @accountId
                                     AND "Favorites"."CaveId" = "Entrances"."CaveId"
                             )) AS "IsFavorite",
                             ST_AsMVTGeom(
@@ -256,16 +260,27 @@ public class MapRepository : RepositoryBase
                         , tile
                         WHERE 
                             ST_Intersects("Entrances"."Location", tile.bbox_native)
-                            AND "Caves"."AccountId" = '{3}'
-                            AND ucp."UserId" = '{4}'
+                            AND "Caves"."AccountId" = @accountId
+                            AND ucp."UserId" = @userId
                             {5}
                     ) AS tile_geom
                     """;
 
-        query = string.Format(query, z, x, y, RequestUser.AccountId, RequestUser.Id, additionalFilterClause);
+        query = string.Format(query, z, x, y, additionalFilterClause);
 
         await using var command = DbContext.Database.GetDbConnection().CreateCommand();
         command.CommandText = query;
+        var accountIdParameter = new NpgsqlParameter("@accountId", NpgsqlDbType.Text)
+        {
+            Value = RequestUser.AccountId
+        };
+        command.Parameters.Add(accountIdParameter);
+
+        var userIdParameter = new NpgsqlParameter("@userId", NpgsqlDbType.Text)
+        {
+            Value = RequestUser.Id
+        };
+        command.Parameters.Add(userIdParameter);
 
         if (filteredCaveIds != null)
         {
