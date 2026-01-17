@@ -31,10 +31,7 @@ import {
   CaveSearchVm,
 } from "../Models/CaveSearchVm";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
-import {
-  ShouldDisplay,
-  useFeatureEnabled,
-} from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
@@ -75,6 +72,7 @@ const CavesComponent: React.FC = () => {
     : "selectedFeatures";
   const sortOptions = [
     ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
+    { display: "Cave ID", value: CaveSearchSortByConstants.DisplayId },
     { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
     { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
     {

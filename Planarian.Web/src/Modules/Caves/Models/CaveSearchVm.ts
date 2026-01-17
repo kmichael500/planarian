@@ -14,6 +14,8 @@ export interface CaveSearchVm {
   maxPitDepthFeet: number | null;
   numberOfPits: number | null;
   countyId: string;
+  countyDisplayId: string;
+  countyNumber: number;
   displayId: string;
   primaryEntranceLatitude: number | null;
   primaryEntranceLongitude: number | null;
@@ -32,6 +34,9 @@ export interface CaveSearchVm {
 }
 
 export class CaveSearchSortByConstants {
+  static readonly DisplayId = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("displayId")
+  );
   static readonly Name = capitalizeFirstLetter(nameof<CaveSearchVm>("name"));
   static readonly ReportedOn = capitalizeFirstLetter(
     nameof<CaveSearchVm>("reportedOn")

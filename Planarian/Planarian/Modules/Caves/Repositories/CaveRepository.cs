@@ -66,6 +66,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 ) // options
                 : null,
             CountyId = e.County!.Id,
+            CountyDisplayId = e.County!.DisplayId,
+            CountyNumber = e.CountyNumber,
             DisplayId =
                 $"{e.County.DisplayId}{e.Account!.CountyIdDelimiter}{e.CountyNumber}",
             PrimaryEntranceLatitude = e.Entrances.Count == 0
@@ -139,6 +141,15 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
             nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                 filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            nameof(CaveSearchVm.DisplayId) => filterQuery.SortDescending
+                ? await caveSearchQuery
+                    .OrderByDescending(e => e.CountyDisplayId)
+                    .ThenByDescending(e => e.CountyNumber)
+                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize)
+                : await caveSearchQuery
+                    .OrderBy(e => e.CountyDisplayId)
+                    .ThenBy(e => e.CountyNumber)
+                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize),
             nameof(CaveSearchVm.DistanceMiles) => hasLocationForDistance
                 ? await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
                     filterQuery.PageSize, e => e.DistanceMiles, !filterQuery.SortDescending)
@@ -292,6 +303,29 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.Contains => query.Where(e => e.CountyId == queryCondition.Value),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
+                case nameof(CaveSearchParamsVm.CountyDisplayId):
+                    var countyDisplayId = queryCondition.Value.ToLower();
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Contains => query.Where(e =>
+                            e.County.DisplayId.ToLower() == countyDisplayId
+                        ),
+                        QueryOperator.Equal => query.Where(e =>
+                            e.County.DisplayId.ToLower() == countyDisplayId
+                        ),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
+                case nameof(CaveSearchParamsVm.CountyNumber):
+                    var hasCountyNumber = int.TryParse(queryCondition.Value, out var countyNumber);
+                    if (!hasCountyNumber)
+                        throw ApiExceptionDictionary.QueryInvalidValue(queryCondition.Field, queryCondition.Value);
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.Equal => query.Where(e => e.CountyNumber == countyNumber),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;

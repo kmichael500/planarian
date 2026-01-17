@@ -6,6 +6,8 @@ export interface CaveSearchParamsVm {
   narrative: string;
   stateId: string;
   countyId: string;
+  countyDisplayId: string;
+  countyNumber: number;
   lengthFeet: number;
   depthFeet: number;
   elevationFeet: number;

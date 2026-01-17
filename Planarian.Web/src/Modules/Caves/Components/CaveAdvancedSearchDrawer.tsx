@@ -4,6 +4,8 @@ import {
   Form,
   FormInstance,
   InputNumber,
+  Row,
+  Col,
   Space,
   Typography,
 } from "antd";
@@ -254,6 +256,35 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
         inlineControls={inlineControls}
       >
         <Divider>Cave</Divider>
+        <Row gutter={[12, 12]} align="middle" wrap>
+          <Col xs={24} sm={12} md={10}>
+            <TextFilterFormItem
+              queryBuilder={queryBuilder}
+              field={"countyDisplayId"}
+              label={"County Code"}
+              queryOperator={QueryOperator.Equal}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={10}>
+            <Form.Item name={"countyNumber"} label={"Cave Number"}>
+              <InputNumber
+                min={0}
+                style={{ width: "100%" }}
+                onChange={(value) => {
+                  if (value === null || value === undefined) {
+                    queryBuilder.removeFromDictionary("countyNumber");
+                    return;
+                  }
+                  queryBuilder.filterBy(
+                    "countyNumber",
+                    QueryOperator.Equal,
+                    value as any
+                  );
+                }}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
         <BooleanFilterFormItem
           queryBuilder={queryBuilder}
           field={"isFavorite"}
