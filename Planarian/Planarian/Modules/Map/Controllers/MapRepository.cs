@@ -262,7 +262,7 @@ public class MapRepository : RepositoryBase
                             ST_Intersects("Entrances"."Location", tile.bbox_native)
                             AND "Caves"."AccountId" = @accountId
                             AND ucp."UserId" = @userId
-                            {5}
+                            {3}
                     ) AS tile_geom
                     """;
 
