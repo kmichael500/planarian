@@ -1,4 +1,4 @@
-import React, { ReactNode, useContext } from "react";
+import React, { ReactNode, useCallback, useContext } from "react";
 import { FeatureKey } from "../../../Modules/Account/Models/FeatureSettingVm";
 import { PermissionKey } from "../../../Modules/Authentication/Models/PermissionKey";
 import { AppContext } from "../../../Configuration/Context/AppContext";
@@ -33,26 +33,30 @@ export interface UseFeatureEnabledProps {
 export const useFeatureEnabled = () => {
   const { permissions } = useContext(AppContext);
 
-  const isFeatureEnabled = (
-    featureKey?: FeatureKey | null | undefined,
-    permissionKey?: PermissionKey
-  ): boolean => {
-    if (featureKey) {
-      const feature = permissions.visibleFields.find(
-        (f) => f.key === featureKey
-      );
-      const isEnabled = feature?.isEnabled || false;
-      if (!isEnabled) return false;
-    }
-
-    if (permissionKey && permissionKey.length > 0) {
-      if (permissionKey === PermissionKey.Export) {
+  const isFeatureEnabled = useCallback(
+    (featureKey?: FeatureKey | null | undefined, permissionKey?: PermissionKey): boolean => {
+      if (featureKey === FeatureKey.EnabledFieldCaveDistance) {
+        return true;
       }
-      return AppService.HasPermission(permissionKey);
-    }
 
-    return true;
-  };
+      if (featureKey) {
+        const feature = permissions.visibleFields.find(
+          (f) => f.key === featureKey
+        );
+        const isEnabled = feature?.isEnabled || false;
+        if (!isEnabled) return false;
+      }
+
+      if (permissionKey && permissionKey.length > 0) {
+        if (permissionKey === PermissionKey.Export) {
+        }
+        return AppService.HasPermission(permissionKey);
+      }
+
+      return true;
+    },
+    [permissions]
+  );
 
   return { isFeatureEnabled };
 };

@@ -53,11 +53,17 @@ using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
-using Southport.Messaging.Email.SendGrid.Interfaces;
-using Southport.Messaging.Email.SendGrid.Message;
+using Southport.Messaging.Email.MailGun;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Limits.MaxRequestLineSize = 1024 * 1024; // 1MB for entire request line query params on searching with polygons
+    serverOptions.Limits.MaxRequestHeadersTotalSize = 1024 * 1024; // 1MB for headers
+    serverOptions.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 200MB for large GeoJSON files
+});
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
@@ -80,7 +86,18 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        // Configure JSON options for large GeoJSON files
+        options.JsonSerializerOptions.MaxDepth = 64; // Increase max depth for complex GeoJSON
+        options.JsonSerializerOptions.DefaultBufferSize = 16 * 1024; // 16KB buffer
     });
+
+// Configure form options for large file uploads
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 500MB
+    options.ValueLengthLimit = 500 * 1024 * 1024; // 500MB
+    options.MemoryBufferThreshold = Int32.MaxValue;
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -136,7 +153,7 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
-builder.Services.AddSingleton(Options.Create<SendGridOptions>(emailOptions));
+builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
 #endregion
@@ -165,7 +182,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
 
-builder.Services.AddHttpClient<IEmailMessageFactory, SendGridMessageFactory>();
+builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 
 #endregion
 

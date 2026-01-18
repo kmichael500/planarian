@@ -4,7 +4,10 @@ import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { BuildOutlined } from "@ant-design/icons";
-import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
+import type {
+  DataDrivenPropertyValueSpecification,
+  MapSourceDataEvent,
+} from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
@@ -32,15 +35,15 @@ interface PlanarianMapLayer {
   };
   secondaryLayer?: {
     type:
-      | "symbol"
-      | "raster"
-      | "circle"
-      | "line"
-      | "background"
-      | "fill"
-      | "fill-extrusion"
-      | "heatmap"
-      | "hillshade";
+    | "symbol"
+    | "raster"
+    | "circle"
+    | "line"
+    | "background"
+    | "fill"
+    | "fill-extrusion"
+    | "heatmap"
+    | "hillshade";
     id: string;
     minzoom?: number;
     maxzoom?: number;
@@ -75,19 +78,19 @@ const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> 
 
 const LAYERS: PlanarianMapLayer[] = [
   {
-    id: "mapbox-street",
+    id: "osm-street",
     displayName: "Street",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/512/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       ],
-      tileSize: 512,
+      tileSize: 256,
     },
     isActive: true,
     opacity: 1,
-    attribution: "© Mapbox",
+    attribution: "© OpenStreetMap contributors",
   },
 
   {
@@ -105,19 +108,19 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 
   {
-    id: "mapbox-satellite",
+    id: "esri-satellite",
     displayName: "Satellite",
     type: "raster",
     source: {
       type: "raster",
       tiles: [
-        `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_ACCESS_TOKEN}`,
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
     isActive: false,
     opacity: 1,
-    attribution: "© Mapbox",
+    attribution: "Esri",
   },
 
   {
@@ -264,7 +267,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -280,7 +283,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -296,7 +299,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -312,7 +315,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -328,7 +331,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -344,7 +347,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -360,7 +363,7 @@ const LAYERS: PlanarianMapLayer[] = [
     source: {
       type: "raster",
       tiles: [
-        "https://ngmdb.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
+        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
     },
@@ -628,7 +631,7 @@ const LayerControl: React.FC<{
     setMapLayers((prev) =>
       prev.map((l) =>
         l.id === layer.id ||
-        (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
+          (layer.type === "group" && layer.memberLayerIds?.includes(l.id))
           ? { ...l, opacity }
           : l
       )
@@ -691,10 +694,9 @@ const LayerControl: React.FC<{
       <Source
         id="terrainLayer"
         type="raster-dem"
-        tiles={[
-          "https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=G0kZR1vCDJukD1MigCcI",
-        ]}
+        url="https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=G0kZR1vCDJukD1MigCcI"
         tileSize={256}
+        encoding="mapbox"
       />
 
       {mapLayers.map((layer) => {
@@ -778,11 +780,11 @@ const LayerControl: React.FC<{
           zIndex: 200,
           ...(position
             ? {
-                top: position.top || "50px",
-                right: position.right || "0",
-                left: position.left || "auto",
-                bottom: position.bottom || "auto",
-              }
+              top: position.top || "50px",
+              right: position.right || "0",
+              left: position.left || "auto",
+              bottom: position.bottom || "auto",
+            }
             : {}),
         }}
       >

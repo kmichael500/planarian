@@ -14,14 +14,18 @@ public class CaveSearchVm
     public double? MaxPitDepthFeet { get; set; }
     public int? NumberOfPits { get; set; }
     public string CountyId { get; set; }
+    public string CountyDisplayId { get; set; } = null!;
+    public int CountyNumber { get; set; }
     public string DisplayId { get; set; }
     
     public double? PrimaryEntranceLatitude { get; set; }
     public double? PrimaryEntranceLongitude { get; set; }
     public double? PrimaryEntranceElevationFeet { get; set; }
-    
+
+    public double? DistanceMiles { get; set; }
+
     public bool IsFavorite { get; set; }
-    
+
     public IEnumerable<string> ArchaeologyTagIds { get; set; }
     public IEnumerable<string> BiologyTagIds { get; set; }
     public IEnumerable<string> CartographerNameTagIds { get; set; }

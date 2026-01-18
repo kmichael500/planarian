@@ -5,8 +5,11 @@ using NetTopologySuite.Geometries.Utilities;
 using Npgsql;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
+using NpgsqlTypes;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Map.Controllers;
@@ -14,12 +17,17 @@ namespace Planarian.Modules.Map.Controllers;
 public class MapRepository : RepositoryBase
 {
     private readonly MemoryCache _cache;
+    private readonly CaveRepository _caveRepository;
     private string _allPointsCacheKey;
 
-    public MapRepository(PlanarianDbContext dbContext, RequestUser requestUser, MemoryCache cache) : base(dbContext,
-        requestUser)
+    public MapRepository(
+        PlanarianDbContext dbContext,
+        RequestUser requestUser,
+        MemoryCache cache,
+        CaveRepository caveRepository) : base(dbContext, requestUser)
     {
         _cache = cache;
+        _caveRepository = caveRepository;
     }
 
     public async Task<IEnumerable<object>> GetMapData(double north, double south, double east, double west, int zoom,
@@ -189,8 +197,29 @@ public class MapRepository : RepositoryBase
         return new CoordinateDto { Latitude = averageLatitude, Longitude = averageLongitude };
     }
 
-    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, CancellationToken cancellationToken)
+    public async Task<byte[]?> GetEntrancesMVTAsync(int z, int x, int y, FilterQuery filterQuery, CancellationToken cancellationToken)
     {
+        filterQuery ??= new FilterQuery();
+
+        string additionalFilterClause = string.Empty;
+        List<string>? filteredCaveIds = null;
+
+        if (filterQuery.Conditions?.Any() == true)
+        {
+            filteredCaveIds = await _caveRepository
+                .GetCaveIds(filterQuery)
+                .ToListAsync(cancellationToken);
+
+            if (filteredCaveIds.Count == 0)
+            {
+                return null;
+            }
+
+            additionalFilterClause = """
+                            AND "Entrances"."CaveId" = ANY(@caveIds)
+                """;
+        }
+
         var query = """
 
                     WITH tile AS (
@@ -212,8 +241,8 @@ public class MapRepository : RepositoryBase
                                 SELECT 1 
                                 FROM "Favorites"
                                 WHERE 
-                                    "Favorites"."UserId" = '{4}'
-                                    AND "Favorites"."AccountId" = '{3}'
+                                    "Favorites"."UserId" = @userId
+                                    AND "Favorites"."AccountId" = @accountId
                                     AND "Favorites"."CaveId" = "Entrances"."CaveId"
                             )) AS "IsFavorite",
                             ST_AsMVTGeom(
@@ -233,15 +262,37 @@ public class MapRepository : RepositoryBase
                         , tile
                         WHERE 
                             ST_Intersects("Entrances"."Location", tile.bbox_native)
-                            AND "Caves"."AccountId" = '{3}'
-                            AND ucp."UserId" = '{4}'
+                            AND "Caves"."AccountId" = @accountId
+                            AND ucp."UserId" = @userId
+                            {3}
                     ) AS tile_geom
                     """;
 
-        query = string.Format(query, z, x, y, RequestUser.AccountId, RequestUser.Id);
+        query = string.Format(query, z, x, y, additionalFilterClause);
 
         await using var command = DbContext.Database.GetDbConnection().CreateCommand();
         command.CommandText = query;
+        var accountIdParameter = new NpgsqlParameter("@accountId", NpgsqlDbType.Text)
+        {
+            Value = RequestUser.AccountId
+        };
+        command.Parameters.Add(accountIdParameter);
+
+        var userIdParameter = new NpgsqlParameter("@userId", NpgsqlDbType.Text)
+        {
+            Value = RequestUser.Id
+        };
+        command.Parameters.Add(userIdParameter);
+
+        if (filteredCaveIds != null)
+        {
+            var caveIdsParameter = new NpgsqlParameter("@caveIds", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = filteredCaveIds.ToArray()
+            };
+            command.Parameters.Add(caveIdsParameter);
+        }
+
         await DbContext.Database.OpenConnectionAsync(cancellationToken: cancellationToken);
 
         await using var result = await command.ExecuteReaderAsync(cancellationToken);

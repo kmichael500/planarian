@@ -20,6 +20,36 @@ export const isCsvFileType = (fileType: string | null | undefined) => {
   return fileType ? fileType.toLowerCase() === "csv" : false;
 };
 
+export const isGpxFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "gpx" : false;
+};
+
+export const isGeoJsonFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "geojson" : false;
+};
+
+export const isKmlFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "kml" : false;
+};
+
+export const isZipFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "zip" : false;
+};
+
+export const isVectorDatasetFileType = (
+  fileType: string | null | undefined
+) => {
+  if (!fileType) {
+    return false;
+  }
+  const normalized = fileType.toLowerCase();
+  return ["geojson", "kml", "zip", "json"].includes(normalized);
+};
+
+export const isPltFileType = (fileType: string | null | undefined) => {
+  return fileType ? fileType.toLowerCase() === "plt" : false;
+};
+
 export function isSupportedFileType(
   fileType: string | null | undefined
 ): boolean {
@@ -30,7 +60,10 @@ export function isSupportedFileType(
     isPdfFileType(fileType) ||
     isImageFileType(fileType) ||
     isTextFileType(fileType) ||
-    isCsvFileType(fileType)
+    isCsvFileType(fileType) ||
+    isGpxFileType(fileType) ||
+    isVectorDatasetFileType(fileType) ||
+    isPltFileType(fileType)
   );
 }
 

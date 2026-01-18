@@ -1,7 +1,10 @@
-import { Tag, Spin, Result, Drawer } from "antd";
-import Papa from "papaparse";
+import { Tag, Spin, Result } from "antd";
 import { useState, useEffect } from "react";
-import { CloudDownloadOutlined } from "@ant-design/icons";
+import {
+  CloudDownloadOutlined,
+  LeftOutlined,
+  RightOutlined,
+} from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import "./FileViewerComponent.scss";
 import {
@@ -10,10 +13,16 @@ import {
   isSupportedFileType,
   isTextFileType,
   isCsvFileType,
+  isGpxFileType,
+  isVectorDatasetFileType,
+  isPltFileType,
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { GpxViewer } from "./GpxViewer";
+import { VectorDatasetViewer } from "./VectorDatasetViewer";
+import { PltViewer } from "./PltViewer";
 
 interface FileViewerProps {
   embedUrl: string | null | undefined;
@@ -22,11 +31,12 @@ interface FileViewerProps {
   fileType?: string | null;
   open: boolean;
   onCancel?: (() => void) | undefined;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  canGoNext?: boolean;
+  canGoPrevious?: boolean;
 }
 
-type TableRow = {
-  [key: string]: string;
-};
 const FileViewer: React.FC<FileViewerProps> = ({
   embedUrl,
   downloadUrl,
@@ -34,10 +44,23 @@ const FileViewer: React.FC<FileViewerProps> = ({
   fileType,
   open,
   onCancel: onClose,
+  onNext,
+  onPrevious,
+  canGoNext,
+  canGoPrevious,
 }) => {
   const isImage = isImageFileType(fileType);
   const isPdf = isPdfFileType(fileType);
+  const isGpx = isGpxFileType(fileType);
+  const isVectorDataset = isVectorDatasetFileType(fileType);
+  const isPlt = isPltFileType(fileType);
   const isSupported = isSupportedFileType(fileType);
+  const headerTitle = (
+    <>
+      {displayName}
+      {fileType && <Tag style={{ marginLeft: "0.5rem" }}>{fileType}</Tag>}
+    </>
+  );
 
   const downloadButton = downloadUrl ? (
     <PlanarianButton href={downloadUrl || ""} icon={<CloudDownloadOutlined />}>
@@ -49,48 +72,126 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (
-      open &&
-      (isTextFileType(fileType) || isCsvFileType(fileType)) &&
-      embedUrl
-    ) {
+    if (!open) {
+      return;
+    }
+
+    if (!embedUrl) {
+      setFileContent(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (isTextFileType(fileType) || isCsvFileType(fileType)) {
+      let isCancelled = false;
       setIsLoading(true);
+      setFileContent(null);
+
       fetch(embedUrl)
         .then((response) => response.text())
         .then((data) => {
-          if (isTextFileType(fileType)) {
-            setFileContent(data);
-          } else if (isCsvFileType(fileType)) {
+          if (isCancelled) {
+            return;
+          }
+
+          if (isTextFileType(fileType) || isCsvFileType(fileType)) {
             setFileContent(data);
           }
+
           setIsLoading(false);
         })
-        .catch(() => setIsLoading(false));
+        .catch(() => {
+          if (!isCancelled) {
+            setIsLoading(false);
+          }
+        });
+
+      return () => {
+        isCancelled = true;
+      };
     }
-  }, [open]);
+
+    // For all other file types (including GPX) we do not fetch here.
+    setFileContent(null);
+    setIsLoading(false);
+  }, [open, embedUrl, fileType]);
+
+  const hasPrevious = typeof onPrevious === "function";
+  const hasNext = typeof onNext === "function";
+  const previousDisabled = hasPrevious && canGoPrevious === false;
+  const nextDisabled = hasNext && canGoNext === false;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName.toLowerCase();
+        if (
+          tagName === "input" ||
+          tagName === "textarea" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (event.key === "ArrowLeft" && hasPrevious && !previousDisabled) {
+        event.preventDefault();
+        onPrevious?.();
+      }
+
+      if (event.key === "ArrowRight" && hasNext && !nextDisabled) {
+        event.preventDefault();
+        onNext?.();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, hasPrevious, previousDisabled, hasNext, nextDisabled, onPrevious, onNext]);
+
+  const actionButtons = [
+    hasPrevious ? (
+      <PlanarianButton
+        key="previous"
+        icon={<LeftOutlined />}
+        onClick={onPrevious}
+        disabled={previousDisabled}
+        aria-label="Previous file"
+      />
+    ) : null,
+    hasNext ? (
+      <PlanarianButton
+        key="next"
+        icon={<RightOutlined />}
+        onClick={onNext}
+        disabled={nextDisabled}
+        aria-label="Next file"
+      />
+    ) : null,
+    downloadButton,
+  ].filter(Boolean);
+
+  const headerItems = [headerTitle, ...actionButtons];
 
   return (
     <>
       <PlanarianModal
-        // fullScreen
         open={open}
         fullScreen
-        header={[
-          <>
-            {displayName} <Tag>{fileType}</Tag>
-          </>,
-          downloadButton,
-        ]}
+        header={headerItems}
         onClose={() => {
-          {
-            if (onClose) {
-              onClose();
-            }
-          }
+          onClose?.();
         }}
       >
         <Spin spinning={isLoading}>
-          {isSupported && (
+          {isSupported ? (
             <>
               {isImage && (
                 <div
@@ -115,10 +216,11 @@ const FileViewer: React.FC<FileViewerProps> = ({
                     height: "100%",
                     overflow: "hidden",
                     position: "relative",
-                    WebkitOverflowScrolling: "touch", // Enables momentum scrolling on iOS
+                    WebkitOverflowScrolling: "touch",
                   }}
                 >
                   <iframe
+                    key={embedUrl || undefined}
                     src={`https://docs.google.com/gview?url=${encodeURIComponent(
                       embedUrl
                     )}&embedded=true`}
@@ -147,11 +249,22 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 >
                   {isLoading ? <Spin /> : fileContent}
                 </pre>
-              )}{" "}
+              )}
+              {isVectorDataset && embedUrl && (
+                <VectorDatasetViewer
+                  embedUrl={embedUrl}
+                  fileType={fileType}
+                  downloadButton={downloadButton}
+                />
+              )}
+              {isPlt && embedUrl && (
+                <PltViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              )}
+              {isGpx && embedUrl && (
+                <GpxViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              )}
             </>
-          )}
-
-          {!isSupported && (
+          ) : (
             <Result
               status="warning"
               title={`The filetype '${fileType}' is not currently supported.`}

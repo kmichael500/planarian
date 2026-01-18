@@ -14,10 +14,13 @@ export interface CaveSearchVm {
   maxPitDepthFeet: number | null;
   numberOfPits: number | null;
   countyId: string;
+  countyDisplayId: string;
+  countyNumber: number;
   displayId: string;
   primaryEntranceLatitude: number | null;
   primaryEntranceLongitude: number | null;
   primaryEntranceElevationFeet: number | null;
+  distanceMiles: number | null;
   archaeologyTagIds: string[];
   biologyTagIds: string[];
   cartographerNameTagIds: string[];
@@ -31,6 +34,9 @@ export interface CaveSearchVm {
 }
 
 export class CaveSearchSortByConstants {
+  static readonly DisplayId = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("displayId")
+  );
   static readonly Name = capitalizeFirstLetter(nameof<CaveSearchVm>("name"));
   static readonly ReportedOn = capitalizeFirstLetter(
     nameof<CaveSearchVm>("reportedOn")
@@ -47,4 +53,11 @@ export class CaveSearchSortByConstants {
   static readonly NumberOfPits = capitalizeFirstLetter(
     nameof<CaveSearchVm>("numberOfPits")
   );
+  static readonly DistanceMiles = capitalizeFirstLetter(
+    nameof<CaveSearchVm>("distanceMiles")
+  );
 }
+
+export const CaveSortMetadataKeys = Object.freeze({
+  distanceLocation: "distanceSortLocation",
+});

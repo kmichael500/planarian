@@ -1,25 +1,12 @@
-import {
-  Typography,
-  Form,
-  Checkbox,
-  Space,
-  Divider,
-  message,
-  Tag,
-  Spin,
-} from "antd";
+import { Typography, Form, Space, message, Tag, Spin } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
-import { AdvancedSearchDrawerComponent } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
 
-import {
-  QueryBuilder,
-  QueryOperator,
-} from "../../Search/Services/QueryBuilder";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
 import { CaveService } from "../Service/CaveService";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { CaveCreateButtonComponent } from "./CaveCreateButtonComponent";
@@ -43,37 +30,22 @@ import {
   CaveSearchSortByConstants,
   CaveSearchVm,
 } from "../Models/CaveSearchVm";
-import { NumberComparisonFormItem } from "../../Search/Components/NumberFilterFormItem";
-import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
-import { TagFilterFormItem } from "../../Search/Components/TagFilterFormItem";
-import { TagType } from "../../Tag/Models/TagType";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
-import { TextFilterFormItem } from "../../Search/Components/TextFilterFormItem";
-import {
-  ShouldDisplay,
-  useFeatureEnabled,
-} from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { saveAs } from "file-saver";
 import FavoriteCave from "./FavoriteCave";
-import { BooleanFilterFormItem } from "../../Search/Components/BooleanFilterFormItem";
-
+import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
+import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
+import { CaveAdvancedSearchDrawer } from "./CaveAdvancedSearchDrawer";
+import {
+  applyEntranceLocationFilterToQuery,
+  EntranceLocationFilter,
+  parseEntranceLocationFilter,
+} from "../../Search/Helpers/EntranceLocationFilterHelpers";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
-const sortOptions = [
-  { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
-  { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
-  {
-    display: "Max Pit Depth",
-    value: CaveSearchSortByConstants.MaxPitDepthFeet,
-  },
-  { display: "Number of Pits", value: CaveSearchSortByConstants.NumberOfPits },
-  { display: "Reported On", value: CaveSearchSortByConstants.ReportedOn },
-  { display: "Name", value: CaveSearchSortByConstants.Name },
-] as SelectListItem<string>[];
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -82,10 +54,134 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(
+    queryBuilder.hasFilters()
+  );
+  const [filterClearSignal, setFilterClearSignal] = useState(0);
+  const [polygonResetSignal, setPolygonResetSignal] = useState(0);
+
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean | null>(null);
 
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
+
+  const accountId = AuthenticationService.GetAccountId();
+  const featureStorageKey = accountId
+    ? `${accountId}-selectedFeatures`
+    : "selectedFeatures";
+  const sortOptions = [
+    ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
+    { display: "Cave ID", value: CaveSearchSortByConstants.DisplayId },
+    { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
+    { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
+    {
+      display: "Max Pit Depth",
+      value: CaveSearchSortByConstants.MaxPitDepthFeet,
+    },
+    { display: "Number of Pits", value: CaveSearchSortByConstants.NumberOfPits },
+    { display: "Reported On", value: CaveSearchSortByConstants.ReportedOn },
+    { display: "Name", value: CaveSearchSortByConstants.Name },
+  ] as SelectListItem<string>[];
+
+
+  const [entranceLocationFilter, setEntranceLocationFilter] =
+    useState<EntranceLocationFilter>(() =>
+      parseEntranceLocationFilter(
+        queryBuilder.getFieldValue("entranceLocation") as string | undefined
+      )
+    );
+  const [isFetchingEntranceLocation, setIsFetchingEntranceLocation] =
+    useState(false);
+
+
+  const handleSortChange = async (sortValue: string) => {
+    if (sortValue === CaveSearchSortByConstants.DistanceMiles) {
+
+      if (locationPermissionGranted !== true) {
+        const position = await LocationHelpers.getUsersLocation(message);
+        if (!position) {
+          setLocationPermissionGranted(false);
+          return;
+        }
+        queryBuilder.setUserLocation(position.latitude, position.longitude);
+        setLocationPermissionGranted(true);
+      }
+
+      queryBuilder.setSort(sortValue);
+      await getCaves();
+      return;
+    }
+
+    queryBuilder.setSort(sortValue);
+    await getCaves();
+  };
+  const applyEntranceLocationFilter = (next: EntranceLocationFilter) => {
+    setEntranceLocationFilter(next);
+    applyEntranceLocationFilterToQuery(
+      queryBuilder,
+      "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
+      next
+    );
+  };
+
+  const handleEntranceLocationChange = (
+    field: keyof EntranceLocationFilter,
+    rawValue: number | string | null
+  ) => {
+    let parsedValue: number | undefined;
+
+    if (rawValue === null || rawValue === undefined || rawValue === "") {
+      parsedValue = undefined;
+    } else {
+      const numericValue = Number(rawValue);
+      parsedValue = Number.isFinite(numericValue) ? numericValue : undefined;
+    }
+
+    applyEntranceLocationFilter({
+      ...entranceLocationFilter,
+      [field]: parsedValue,
+    });
+  };
+
+  const syncEntranceLocationState = () => {
+    const currentValue = queryBuilder.getFieldValue(
+      "entranceLocation"
+    ) as string | undefined;
+    setEntranceLocationFilter(parseEntranceLocationFilter(currentValue));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator?.geolocation) {
+      message.error("Geolocation is not supported in this browser.");
+      return;
+    }
+
+    setIsFetchingEntranceLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const radius = entranceLocationFilter.radius ?? 5;
+
+        applyEntranceLocationFilter({
+          latitude,
+          longitude,
+          radius,
+        });
+        setIsFetchingEntranceLocation(false);
+      },
+      (error) => {
+        message.error(error.message || "Unable to fetch current location.");
+        setIsFetchingEntranceLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  };
 
   const toggleNarrative = (caveId: string) => {
     setExpandedNarratives((prev) => ({
@@ -94,38 +190,31 @@ const CavesComponent: React.FC = () => {
     }));
   };
 
-  useEffect(() => {
-    getCaves();
-  }, []);
 
   const getCaves = async () => {
     setIsCavesLoading(true);
+
+    if (
+      queryBuilder.getSortBy() === CaveSearchSortByConstants.DistanceMiles ||
+      (selectedFeatures as string[]).includes("distanceMiles")
+    ) {
+      if (!queryBuilder.getUserLocation().latitude || !queryBuilder.getUserLocation().longitude) {
+        const userLocation = await LocationHelpers.getUsersLocation(message);
+        if (userLocation) {
+          queryBuilder.setUserLocation(userLocation.latitude, userLocation.longitude);
+        }
+      }
+    }
+
     const cavesResponse = await CaveService.GetCaves(queryBuilder);
     setCaves(cavesResponse);
+    setHasAppliedFilters(queryBuilder.hasFilters());
     setIsCavesLoading(false);
   };
 
   const onSearch = async () => {
+    syncEntranceLocationState();
     await getCaves();
-  };
-
-  const onExportGpx = async () => {
-    const hide = message.loading("Exporting GPX...", 0);
-    try {
-      const response = await CaveService.ExportCavesGpx(queryBuilder);
-
-      const accountName = AuthenticationService.GetAccountName();
-      const localDateTime = new Date().toISOString();
-
-      const fileName = `${accountName} ${localDateTime}.gpx`;
-
-      saveAs(response, fileName);
-    } catch (err) {
-      const error = err as ApiErrorResponse;
-      message.error(error.message);
-    } finally {
-      hide(); // Remove the loading message
-    }
   };
 
   const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
@@ -133,6 +222,11 @@ const CavesComponent: React.FC = () => {
       display: "ID",
       value: "displayId",
       data: { key: FeatureKey.EnabledFieldCaveId },
+    },
+    {
+      display: "Distance",
+      value: "distanceMiles",
+      data: { key: FeatureKey.EnabledFieldCaveDistance },
     },
     {
       display: "County",
@@ -216,29 +310,62 @@ const CavesComponent: React.FC = () => {
   >([]);
 
   useEffect(() => {
-    const filterFeatures = () => {
-      const savedFeaturesJson = localStorage.getItem(
-        `${AuthenticationService.GetAccountId()}-selectedFeatures`
-      );
+    const filterFeatures = async () => {
+      const savedFeaturesJson = featureStorageKey
+        ? localStorage.getItem(featureStorageKey)
+        : null;
       let savedFeatures: NestedKeyOf<CaveSearchVm>[] = [];
-      if (savedFeaturesJson) {
-        savedFeatures = JSON.parse(savedFeaturesJson);
+
+      if (savedFeaturesJson !== null) {
+        try {
+          savedFeatures = JSON.parse(savedFeaturesJson);
+        } catch {
+          savedFeatures = [];
+        }
       } else {
         savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
       }
 
-      const enabledFeatures = possibleFeaturesToRender.filter((feature) => {
+      const enabledFeatures: SelectListItemKey<CaveSearchVm>[] = [];
+      for (const feature of possibleFeaturesToRender) {
         const isEnabled = isFeatureEnabled(feature.data.key);
+        if (isEnabled) {
+          enabledFeatures.push(feature);
+        }
+      }
 
-        return isEnabled;
-      });
+      // Filter defaults against enabled features
+      let filteredSelectedFeatures = savedFeatures.filter((featureKey) =>
+        enabledFeatures.some((enabled) => enabled.value === featureKey)
+      );
+
+      // Location check for initial setup if distanceMiles is enabled and selected
+      if (filteredSelectedFeatures.includes("distanceMiles")) {
+        const userLocation = await LocationHelpers.getUsersLocation(message);
+        if (userLocation) {
+          queryBuilder.setUserLocation(
+            userLocation.latitude,
+            userLocation.longitude
+          );
+        } else {
+          // Remove distanceMiles from selection if permission denied
+          filteredSelectedFeatures = filteredSelectedFeatures.filter(
+            (value) => value !== "distanceMiles"
+          );
+        }
+      }
 
       setFilteredFeatures(enabledFeatures);
-      setSelectedFeatures(
-        savedFeatures.filter((feature) =>
-          enabledFeatures.map((f) => f.value).includes(feature)
-        )
-      );
+      setSelectedFeatures(filteredSelectedFeatures);
+
+      if (featureStorageKey) {
+        localStorage.setItem(
+          featureStorageKey,
+          JSON.stringify(filteredSelectedFeatures)
+        );
+      }
+
+      await getCaves();
     };
 
     filterFeatures();
@@ -263,6 +390,12 @@ const CavesComponent: React.FC = () => {
         return defaultIfEmpty(formatDistance(cave.maxPitDepthFeet));
       case nameof<CaveSearchVm>("numberOfPits"):
         return defaultIfEmpty(cave.numberOfPits?.toString());
+
+      case nameof<CaveSearchVm>("distanceMiles"):
+        if (cave.distanceMiles) {
+          return defaultIfEmpty(formatDistance(cave.distanceMiles * 5280));
+        }
+        return defaultIfEmpty(null);
       case nameof<CaveSearchVm>("countyId"):
         return <CountyTagComponent countyId={cave.countyId} />;
       case nameof<CaveSearchVm>("displayId"):
@@ -296,280 +429,86 @@ const CavesComponent: React.FC = () => {
     }
   };
 
+  const displayFeatureOptions = filteredFeatures.map((feature) => ({
+    label: feature.display,
+    value: feature.value,
+  }));
+
   return (
     <>
-      <AdvancedSearchDrawerComponent
-        mainSearchField={"name"}
-        mainSearchFieldLabel={"Name or ID"}
+      <CaveAdvancedSearchDrawer
         onSearch={onSearch}
         queryBuilder={queryBuilder}
         form={form}
         sortOptions={sortOptions}
-        onExportGpx={onExportGpx}
-      >
-        <Divider>Cave</Divider>
-        <BooleanFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"isFavorite"}
-          label={"Favorites"}
-        />
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNarrative}>
-          <TextFilterFormItem
-            queryBuilder={queryBuilder}
-            field={"narrative"}
-            label={"Narrative"}
-            queryOperator={QueryOperator.FreeText}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveState}>
-          <StateCountyFilterFormItem
-            queryBuilder={queryBuilder}
-            autoSelectFirst={true}
-            stateField={"stateId"}
-            stateLabel={"State"}
-            countyField={"countyId"}
-            countyLabel={"County"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveLengthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"lengthFeet"}
-            label={"Length (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"depthFeet"}
-            label={"Depth (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveNumberOfPits}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"numberOfPits"}
-            label={"Number of Pits (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"maxPitDepthFeet"}
-            label={"Max Pit Depth (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMapStatusTags}>
-          <TagFilterFormItem
-            tagType={TagType.MapStatus}
-            queryBuilder={queryBuilder}
-            field={"mapStatusTagIds"}
-            label={"Map Status"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCaveCartographerNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"cartographerNamePeopleTagIds"}
-            label={"Cartographer Names"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Geology}
-            queryBuilder={queryBuilder}
-            field={"geologyTagIds"}
-            label={"Geology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveGeologicAgeTags}>
-          <TagFilterFormItem
-            tagType={TagType.GeologicAge}
-            queryBuilder={queryBuilder}
-            field={"geologicAgeTagIds"}
-            label={"Geologic Age"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCavePhysiographicProvinceTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.PhysiographicProvince}
-            queryBuilder={queryBuilder}
-            field={"physiographicProvinceTagIds"}
-            label={"Physiographic Province"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveBiologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Biology}
-            queryBuilder={queryBuilder}
-            field={"biologyTagIds"}
-            label={"Biology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveArcheologyTags}>
-          <TagFilterFormItem
-            tagType={TagType.Archeology}
-            queryBuilder={queryBuilder}
-            field={"archaeologyTagIds" as any}
-            label={"Archeology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveOtherTags}>
-          <TagFilterFormItem
-            tagType={TagType.CaveOther}
-            queryBuilder={queryBuilder}
-            field={"caveOtherTagIds"}
-            label={"Other"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldCaveReportedByNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"caveReportedByNameTagIds"}
-            label={"Reported By"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveReportedOn}>
-          <NumberComparisonFormItem
-            inputType={"date"}
-            queryBuilder={queryBuilder}
-            field={"caveReportedOnDate"}
-            label={"Reported On"}
-          />
-        </ShouldDisplay>
-        <Divider>Entrance</Divider>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceElevation}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"elevationFeet"}
-            label={"Elevation (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceDescription}>
-          <TextFilterFormItem
-            queryBuilder={queryBuilder}
-            field={"entranceDescription"}
-            label={"Entrance Description"}
-            queryOperator={QueryOperator.FreeText}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceStatusTags}>
-          <TagFilterFormItem
-            tagType={TagType.EntranceStatus}
-            queryBuilder={queryBuilder}
-            field={"entranceStatusTagIds"}
-            label={"Entrance Status"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceFieldIndicationTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.FieldIndication}
-            queryBuilder={queryBuilder}
-            field={"entranceFieldIndicationTagIds"}
-            label={"Entrance Field Indication"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceLocationQuality}
-        >
-          <TagFilterFormItem
-            tagType={TagType.LocationQuality}
-            queryBuilder={queryBuilder}
-            field={"locationQualityTagIds"}
-            label={"Entrance Location Quality"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceHydrologyTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.EntranceHydrology}
-            queryBuilder={queryBuilder}
-            field={"entranceHydrologyTagIds"}
-            label={"Entrance Hydrology"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveMaxPitDepthFeet}>
-          <NumberComparisonFormItem
-            inputType={"number"}
-            queryBuilder={queryBuilder}
-            field={"entrancePitDepthFeet"}
-            label={"Entrance Pit Depth (Feet)"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay
-          featureKey={FeatureKey.EnabledFieldEntranceReportedByNameTags}
-        >
-          <TagFilterFormItem
-            tagType={TagType.People}
-            queryBuilder={queryBuilder}
-            field={"entranceReportedByPeopleTagIds"}
-            label={"Entrance Reported By"}
-          />
-        </ShouldDisplay>
-        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceReportedOn}>
-          <NumberComparisonFormItem
-            inputType={"date"}
-            queryBuilder={queryBuilder}
-            field={"entranceReportedOnDate"}
-            label={"Entrance Reported On"}
-          />
-        </ShouldDisplay>
-        <Divider>Files</Divider>
-        <TagFilterFormItem
-          tagType={TagType.File}
-          queryBuilder={queryBuilder}
-          field={"fileTypeTagIds"}
-          label={"File Types"}
-        />
-        <TextFilterFormItem
-          queryBuilder={queryBuilder}
-          field={"fileDisplayName"}
-          label={"File Name"}
-          queryOperator={QueryOperator.Contains}
-        />{" "}
-      </AdvancedSearchDrawerComponent>
+        onSortChange={handleSortChange}
+        onFiltersCleared={() => {
+          applyEntranceLocationFilter({});
+          setFilterClearSignal((previous) => previous + 1);
+          setPolygonResetSignal((previous) => previous + 1);
+        }}
+        entranceLocationFilter={entranceLocationFilter}
+        isFetchingEntranceLocation={isFetchingEntranceLocation}
+        onEntranceLocationChange={handleEntranceLocationChange}
+        onUseCurrentLocation={handleUseCurrentLocation}
+        onClearEntranceLocation={() => applyEntranceLocationFilter({})}
+        polygonResetSignal={polygonResetSignal}
+        filterClearSignal={filterClearSignal}
+      />
 
       <Space direction="vertical" style={{ width: "100%" }}>
-        <div
-          style={{
-            borderRadius: "2px",
-            padding: "10px",
-            border: "1px solid #d9d9d9",
-            backgroundColor: "white",
+        <FeatureCheckboxGroup
+          title="Display"
+          options={displayFeatureOptions}
+          value={selectedFeatures}
+          onChange={async (checkedValues) => {
+            const previousFeatures = selectedFeatures;
+            const isDistanceBeingChecked = checkedValues.includes(
+              "distanceMiles" as NestedKeyOf<CaveSearchVm>
+            ) && !previousFeatures.includes("distanceMiles");
+
+            if (isDistanceBeingChecked) {
+              const userLocation = await LocationHelpers.getUsersLocation(message);
+              if (userLocation) {
+                queryBuilder.setUserLocation(
+                  userLocation.latitude,
+                  userLocation.longitude
+                );
+                setSelectedFeatures(checkedValues);
+                if (featureStorageKey) {
+                  localStorage.setItem(
+                    featureStorageKey,
+                    JSON.stringify(checkedValues)
+                  );
+                }
+                await getCaves();
+              } else {
+                // Remove distanceMiles from selection if permission denied
+                const updatedValues = checkedValues.filter(
+                  (value) => value !== "distanceMiles"
+                );
+                setSelectedFeatures(updatedValues);
+                if (featureStorageKey) {
+                  localStorage.setItem(
+                    featureStorageKey,
+                    JSON.stringify(updatedValues)
+                  );
+                }
+              }
+            } else {
+              queryBuilder.setUserLocation(undefined, undefined);
+              queryBuilder.buildAsQueryString(); // Clear out user location from URL
+
+              setSelectedFeatures(checkedValues);
+              if (featureStorageKey) {
+                localStorage.setItem(
+                  featureStorageKey,
+                  JSON.stringify(checkedValues)
+                );
+              }
+            }
           }}
-        >
-          <div style={{ fontWeight: 450 }}>Display</div>
-          <Checkbox.Group
-            options={filteredFeatures.map((feature) => ({
-              label: feature.display,
-              value: feature.value,
-            }))}
-            value={selectedFeatures}
-            onChange={(checkedValues) => {
-              setSelectedFeatures(checkedValues as NestedKeyOf<CaveSearchVm>[]);
-              localStorage.setItem(
-                `${AuthenticationService.GetAccountId()}-selectedFeatures`,
-                JSON.stringify(checkedValues)
-              );
-            }}
-          />
-        </div>
+        />
         {isCavesLoading ? (
           <Space align="center">
             <Spin size="small" />
@@ -580,7 +519,7 @@ const CavesComponent: React.FC = () => {
         ) : (
           caves && (
             <>
-              {queryBuilder.hasFilters() ? (
+              {hasAppliedFilters ? (
                 <Tag color="#F8DB6A" style={{ color: "black" }}>
                   <Typography.Text style={{ color: "black" }}>
                     Filtered: {formatNumber(caves.totalCount)} results found
@@ -607,7 +546,11 @@ const CavesComponent: React.FC = () => {
                   display: "flex",
                   flexDirection: "column",
                 }}
-                title={`${cave.displayId} ${cave.name}`}
+                title={
+                  <span>
+                    <span style={{ color: '#3874f6', fontWeight: "bold" }}>{cave.displayId}</span>
+                    {" "}{cave.name}
+                  </span>}
                 extra={
                   <FavoriteCave
                     initialIsFavorite={cave.isFavorite}
@@ -627,23 +570,23 @@ const CavesComponent: React.FC = () => {
                     </PlanarianButton>
                   </Link>,
                   cave.primaryEntranceLatitude &&
-                    cave.primaryEntranceLongitude && (
-                      <Link
-                        to={NavigationService.GenerateMapUrl(
-                          cave.primaryEntranceLatitude,
-                          cave.primaryEntranceLongitude,
-                          15
-                        )}
-                        key="map"
+                  cave.primaryEntranceLongitude && (
+                    <Link
+                      to={NavigationService.GenerateMapUrl(
+                        cave.primaryEntranceLatitude,
+                        cave.primaryEntranceLongitude,
+                        15
+                      )}
+                      key="map"
+                    >
+                      <PlanarianButton
+                        alwaysShowChildren
+                        icon={<CompassOutlined />}
                       >
-                        <PlanarianButton
-                          alwaysShowChildren
-                          icon={<CompassOutlined />}
-                        >
-                          Map
-                        </PlanarianButton>
-                      </Link>
-                    ),
+                        Map
+                      </PlanarianButton>
+                    </Link>
+                  ),
                 ]}
               >
                 <Space direction="vertical">

@@ -99,8 +99,8 @@ export const nameof = <T extends object>(name: NestedKeyOf<T>): string => name;
 // https://dev.to/pffigueiredo/typescript-utility-keyof-nested-object-2pa3
 export type NestedKeyOf<ObjectType extends object> = {
   [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
-    ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`
-    : `${Key}`;
+  ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`
+  : `${Key}`;
 }[keyof ObjectType & (string | number)];
 
 //#endregion
@@ -179,6 +179,10 @@ export function formatCoordinates(
 
   return `${lat}, ${lon}`;
 }
+
+export const formatCoordinateNumber = (value: number) => {
+  return Number(value.toFixed(6));
+};
 
 export function formatNumber(value: number | null | undefined): string | null {
   if (value !== null && value !== undefined) {

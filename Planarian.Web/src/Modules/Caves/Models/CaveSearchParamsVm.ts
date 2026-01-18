@@ -6,6 +6,8 @@ export interface CaveSearchParamsVm {
   narrative: string;
   stateId: string;
   countyId: string;
+  countyDisplayId: string;
+  countyNumber: number;
   lengthFeet: number;
   depthFeet: number;
   elevationFeet: number;
@@ -30,10 +32,13 @@ export interface CaveSearchParamsVm {
   entrancePitDepthFeet: number;
   locationQualityTagIds: string;
   entranceHydrologyTagIds: string;
+  entranceLocation: string;
+  entrancePolygon: string;
   entranceReportedByPeopleTagIds: string;
   entranceReportedOnDate: string;
   //#endregion
   //#region Files
   fileTypeTagIds: string;
   fileDisplayName: string;
+  fileExtension: string;
 }

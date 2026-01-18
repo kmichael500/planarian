@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -13,13 +14,15 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250919175531_v27")]
+    partial class v27
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("ProductVersion", "8.0.6")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
@@ -715,170 +718,6 @@ namespace Planarian.Migrations.Migrations
                         .IsUnique();
 
                     b.ToTable("Caves");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeHistory", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("AccountId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ApprovedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CaveChangeRequestId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CaveId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ChangeValueType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ChangedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EntranceId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("FileId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("PropertyId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("PropertyName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool?>("ValueBool")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("ValueDateTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<double?>("ValueDouble")
-                        .HasColumnType("double precision");
-
-                    b.Property<int?>("ValueInt")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ValueString")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("ApprovedByUserId");
-
-                    b.HasIndex("CaveChangeRequestId");
-
-                    b.HasIndex("CaveId");
-
-                    b.HasIndex("ChangedByUserId");
-
-                    b.HasIndex("EntranceId");
-
-                    b.ToTable("CaveChangeHistory");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("AccountId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CaveId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("ReviewedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ReviewedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("CaveId");
-
-                    b.HasIndex("ReviewedByUserId");
-
-                    b.ToTable("CaveChangeRequests");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveGeoJson", b =>
@@ -2409,77 +2248,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("State");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeHistory", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
-                        .WithMany("CaveChangeHistory")
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "ApprovedByUser")
-                        .WithMany()
-                        .HasForeignKey("ApprovedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", "CaveChangeRequest")
-                        .WithMany("CaveChangeHistory")
-                        .HasForeignKey("CaveChangeRequestId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
-                        .WithMany("CaveChangeLogs")
-                        .HasForeignKey("CaveId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "ChangedByUser")
-                        .WithMany("CaveChangeLogs")
-                        .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Entrance", null)
-                        .WithMany("CaveChangeLogs")
-                        .HasForeignKey("EntranceId");
-
-                    b.Navigation("Account");
-
-                    b.Navigation("ApprovedByUser");
-
-                    b.Navigation("Cave");
-
-                    b.Navigation("CaveChangeRequest");
-
-                    b.Navigation("ChangedByUser");
-                });
-
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
-                {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", "Account")
-                        .WithMany("CaveChangeRequests")
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
-                        .WithMany("CaveChangeRequests")
-                        .HasForeignKey("CaveId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("Planarian.Model.Database.Entities.User", "ReviewedByUser")
-                        .WithMany("CaveChangeRequestsReviewed")
-                        .HasForeignKey("ReviewedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.Navigation("Account");
-
-                    b.Navigation("Cave");
-
-                    b.Navigation("ReviewedByUser");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveGeoJson", b =>
                 {
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
@@ -3195,10 +2963,6 @@ namespace Planarian.Migrations.Migrations
 
                     b.Navigation("AccountUsers");
 
-                    b.Navigation("CaveChangeHistory");
-
-                    b.Navigation("CaveChangeRequests");
-
                     b.Navigation("CavePermissions");
 
                     b.Navigation("Caves");
@@ -3221,10 +2985,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("BiologyTags");
 
                     b.Navigation("CartographerNameTags");
-
-                    b.Navigation("CaveChangeLogs");
-
-                    b.Navigation("CaveChangeRequests");
 
                     b.Navigation("CaveOtherTags");
 
@@ -3249,11 +3009,6 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("PhysiographicProvinceTags");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
-                {
-                    b.Navigation("CaveChangeHistory");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
                 {
                     b.Navigation("CavePermissions");
@@ -3263,8 +3018,6 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Entrance", b =>
                 {
-                    b.Navigation("CaveChangeLogs");
-
                     b.Navigation("EntranceHydrologyTags");
 
                     b.Navigation("EntranceOtherTags");
@@ -3347,10 +3100,6 @@ namespace Planarian.Migrations.Migrations
             modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
                 {
                     b.Navigation("AccountUsers");
-
-                    b.Navigation("CaveChangeLogs");
-
-                    b.Navigation("CaveChangeRequestsReviewed");
 
                     b.Navigation("CavePermissions");
 

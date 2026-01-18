@@ -74,6 +74,7 @@ public class User : EntityBase
     public ICollection<CaveChangeHistory> CaveChangeLogs { get; set; } = new HashSet<CaveChangeHistory>();
     public ICollection<CaveChangeRequest>? CaveChangeRequestsReviewed { get; set; } = new HashSet<CaveChangeRequest>();
 
+    public DateTime? LastActiveOn { get; set; }
 
     #region Helper Functions
 

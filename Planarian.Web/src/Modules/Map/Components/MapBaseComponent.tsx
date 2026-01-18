@@ -1,4 +1,10 @@
-import React, { useContext, useEffect, useState, useMemo } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Map,
   Source,
@@ -11,8 +17,9 @@ import {
   ViewStateChangeEvent,
   ScaleControl, // Import ScaleControl
 } from "react-map-gl/maplibre";
+import type { MapProps } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
-import { message, Spin } from "antd";
+import { message, Spin, Form } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
@@ -26,10 +33,26 @@ import shpjs from "shpjs";
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
+import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
+import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
+import { QueryBuilder } from "../../Search/Services/QueryBuilder";
+import { CaveSearchParamsVm } from "../../Caves/Models/CaveSearchParamsVm";
+import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import styled from "styled-components";
+import { SlidersOutlined, ClearOutlined } from "@ant-design/icons";
+import { CaveAdvancedSearchDrawer } from "../../Caves/Components/CaveAdvancedSearchDrawer";
+import {
+  applyEntranceLocationFilterToQuery,
+  EntranceLocationFilter,
+  parseEntranceLocationFilter,
+} from "../../Search/Helpers/EntranceLocationFilterHelpers";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
   initialZoom?: number;
+  initialBounds?: LngLatBoundsLike;
+  initialFitBoundsOptions?: FitBoundsOptions;
   onCaveClicked: (caveId: string) => void;
   onNonCaveClicked?: (lat: number, lng: number) => void;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void) | undefined;
@@ -37,6 +60,10 @@ interface MapBaseComponentProps {
   showGeolocateControl?: boolean;
   showSearchBar?: boolean;
   onShapefileUploaded?: (data: FeatureCollection[]) => void;
+  children?: React.ReactNode;
+  manageBodyPadding?: boolean;
+  additionalInteractiveLayerIds?: string[];
+  reuseMaps?: boolean;
 }
 
 // MUST be defined outside the function (or via useMemo)
@@ -60,9 +87,51 @@ const tile2lat = (y: number, zoom: number): number => {
   return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 };
 
+const hashString = (input: string): string => {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return `h${Math.abs(hash)}`;
+};
+
+const offsetPositionValue = (value: string | undefined, offset: number) => {
+  if (!value) {
+    return `${offset}px`;
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed.endsWith("px")) {
+    const numeric = Number.parseFloat(trimmed);
+    if (!Number.isNaN(numeric)) {
+      return `${numeric + offset}px`;
+    }
+  }
+
+  return `calc(${value} + ${offset}px)`;
+};
+
+const FloatingPanel = styled.div`
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  margin: 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+`;
+
 const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   initialCenter,
   initialZoom,
+  initialBounds,
+  initialFitBoundsOptions,
   onCaveClicked,
   onNonCaveClicked,
   onMoveEnd,
@@ -70,14 +139,21 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   showGeolocateControl = true,
   showSearchBar = true,
   onShapefileUploaded,
+  children,
+  manageBodyPadding = true,
+  additionalInteractiveLayerIds = [],
+  reuseMaps = true,
 }) => {
   const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
   useEffect(() => {
+    if (!manageBodyPadding) {
+      return;
+    }
     setHideBodyPadding(true);
     return () => {
       setHideBodyPadding(false);
     };
-  }, [setHideBodyPadding]);
+  }, [setHideBodyPadding, manageBodyPadding]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [mapCenter, setMapCenter] = useState<[number, number]>(
@@ -100,6 +176,10 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     properties: any;
   } | null>(null);
 
+  const [mapFiltersQueryString, setMapFiltersQueryString] =
+    useState<string>("");
+  const [mapFiltersVersion, setMapFiltersVersion] = useState(0);
+
   const [lineplotsData, setLineplotsData] = useState<
     {
       id: string;
@@ -107,6 +187,206 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       type: string;
     }[]
   >([]);
+
+  const queryBuilder = useMemo(
+    () =>
+      new QueryBuilder<CaveSearchParamsVm>(
+        window.location.search.substring(1),
+        false
+      ),
+    []
+  );
+  const [form] = Form.useForm<CaveSearchParamsVm>();
+  const [filterClearSignal, setFilterClearSignal] = useState(0);
+  const [polygonResetSignal, setPolygonResetSignal] = useState(0);
+  const [entranceLocationFilter, setEntranceLocationFilter] =
+    useState<EntranceLocationFilter>(() =>
+      parseEntranceLocationFilter(
+        queryBuilder.getFieldValue("entranceLocation") as string | undefined
+      )
+    );
+  const [isFetchingEntranceLocation, setIsFetchingEntranceLocation] =
+    useState(false);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(
+    queryBuilder.hasFilters()
+  );
+
+  useEffect(() => {
+    if (queryBuilder.hasFilters()) {
+      const initialQuery = queryBuilder.buildAsQueryString();
+      setHasAppliedFilters(true);
+      setMapFiltersQueryString(initialQuery);
+      setMapFiltersVersion((version) => version + 1);
+    } else {
+      setMapFiltersQueryString("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyEntranceLocationFilter = useCallback(
+    (next: EntranceLocationFilter) => {
+      setEntranceLocationFilter(next);
+      applyEntranceLocationFilterToQuery(
+        queryBuilder,
+        "entranceLocation" as NestedKeyOf<CaveSearchParamsVm>,
+        next
+      );
+    },
+    [queryBuilder]
+  );
+
+  const handleEntranceLocationChange = useCallback(
+    (field: keyof EntranceLocationFilter, rawValue: number | string | null) => {
+      let parsedValue: number | undefined;
+
+      if (rawValue === null || rawValue === undefined || rawValue === "") {
+        parsedValue = undefined;
+      } else {
+        const numericValue = Number(rawValue);
+        parsedValue = Number.isFinite(numericValue) ? numericValue : undefined;
+      }
+
+      applyEntranceLocationFilter({
+        ...entranceLocationFilter,
+        [field]: parsedValue,
+      });
+    },
+    [applyEntranceLocationFilter, entranceLocationFilter]
+  );
+
+  const syncEntranceLocationState = useCallback(() => {
+    const currentValue = queryBuilder.getFieldValue(
+      "entranceLocation"
+    ) as string | undefined;
+    setEntranceLocationFilter(parseEntranceLocationFilter(currentValue));
+  }, [queryBuilder]);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    if (!navigator?.geolocation) {
+      message.error("Geolocation is not supported in this browser.");
+      return;
+    }
+
+    setIsFetchingEntranceLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const radius = entranceLocationFilter.radius ?? 5;
+
+        applyEntranceLocationFilter({
+          latitude,
+          longitude,
+          radius,
+        });
+        setIsFetchingEntranceLocation(false);
+      },
+      (error) => {
+        message.error(error.message || "Unable to fetch current location.");
+        setIsFetchingEntranceLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }, [applyEntranceLocationFilter, entranceLocationFilter.radius]);
+
+  const handleFiltersCleared = useCallback(() => {
+    applyEntranceLocationFilter({});
+    setFilterClearSignal((previous) => previous + 1);
+    setPolygonResetSignal((previous) => previous + 1);
+  }, [applyEntranceLocationFilter]);
+
+  const runSearch = useCallback(async () => {
+    syncEntranceLocationState();
+    const hasFilters = queryBuilder.hasFilters();
+    const queryString = hasFilters ? queryBuilder.buildAsQueryString() : "";
+    const previousFilterQuery = mapFiltersQueryString;
+
+    const urlSearchParams = new URLSearchParams(window.location.search);
+    if (previousFilterQuery) {
+      const previousParams = new URLSearchParams(previousFilterQuery);
+      previousParams.forEach((_, key) => {
+        urlSearchParams.delete(key);
+      });
+    }
+
+    if (hasFilters) {
+      const nextParams = new URLSearchParams(queryString);
+      nextParams.forEach((value, key) => {
+        urlSearchParams.set(key, value);
+      });
+    }
+
+    const updatedSearch = urlSearchParams.toString();
+    const nextUrl = `${window.location.pathname}${updatedSearch ? `?${updatedSearch}` : ""
+      }`;
+    window.history.replaceState({}, "", nextUrl);
+
+    setHasAppliedFilters(hasFilters);
+    setMapFiltersQueryString((previous) => {
+      if (previous === queryString) {
+        return previous;
+      }
+      setMapFiltersVersion((version) => version + 1);
+      return queryString;
+    });
+  }, [
+    mapFiltersQueryString,
+    queryBuilder,
+    syncEntranceLocationState,
+  ]);
+
+  useEffect(() => {
+    if (initialCenter) {
+      setMapCenter(initialCenter);
+    }
+  }, [initialCenter]);
+
+  useEffect(() => {
+    if (typeof initialZoom === "number") {
+      setZoom(initialZoom);
+    }
+  }, [initialZoom]);
+
+  const memoizedFitBoundsOptions = useMemo(() => {
+    if (!initialBounds) {
+      return undefined;
+    }
+
+    return {
+      padding: 20,
+      ...initialFitBoundsOptions,
+    };
+  }, [initialBounds, initialFitBoundsOptions]);
+
+  const initialViewState = useMemo(() => {
+    if (initialBounds) {
+      return {
+        bounds: initialBounds,
+        fitBoundsOptions: memoizedFitBoundsOptions,
+      };
+    }
+
+    return {
+      longitude: mapCenter[1],
+      latitude: mapCenter[0],
+      zoom: zoom,
+    };
+  }, [initialBounds, memoizedFitBoundsOptions, mapCenter, zoom]) as MapProps["initialViewState"];
+
+  const mapComponentKey = useMemo(() => {
+    if (initialBounds) {
+      return `bounds-${JSON.stringify(initialBounds)}`;
+    }
+    if (initialCenter) {
+      const centerString = initialCenter.join(",");
+      return `center-${centerString}-${initialZoom ?? "auto"}`;
+    }
+    return "default-map";
+  }, [initialBounds, initialCenter, initialZoom]);
 
   // Get the map center using the MapService if no initialCenter was provided.
   useEffect(() => {
@@ -156,21 +436,21 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       ((1 -
         Math.log(
           Math.tan((north * Math.PI) / 180) +
-            1 / Math.cos((north * Math.PI) / 180)
+          1 / Math.cos((north * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
-        n
+      n
     );
     const maxTileY = Math.floor(
       ((1 -
         Math.log(
           Math.tan((south * Math.PI) / 180) +
-            1 / Math.cos((south * Math.PI) / 180)
+          1 / Math.cos((south * Math.PI) / 180)
         ) /
-          Math.PI) /
+        Math.PI) /
         2) *
-        n
+      n
     );
 
     // Find tiles we haven’t fetched yet
@@ -305,6 +585,19 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         });
         return;
       }
+
+      if (additionalInteractiveLayerIds.length > 0) {
+        const customFeature = clickedFeatures.find((feature: any) =>
+          additionalInteractiveLayerIds.includes(feature.layer.id)
+        );
+        if (customFeature) {
+          setPopupInfo({
+            lngLat: [event.lngLat.lng, event.lngLat.lat],
+            properties: customFeature.properties,
+          });
+          return;
+        }
+      }
     }
 
     // Fallback for non-cave clicks.
@@ -320,6 +613,41 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   const scaleControlPosition = "bottom-left"; // Define position for scale control
   const accountName = AuthenticationService.GetAccountName();
 
+  const entrancesTileParams = useMemo(() => {
+    const params = new URLSearchParams();
+    const token = AuthenticationService.GetToken();
+    const accountId = AuthenticationService.GetAccountId();
+
+    if (token) {
+      params.set("access_token", token);
+    }
+    if (accountId) {
+      params.set("account_id", accountId);
+    }
+
+    if (mapFiltersQueryString) {
+      const filterParams = new URLSearchParams(mapFiltersQueryString);
+      filterParams.forEach((value, key) => {
+        params.set(key, value);
+      });
+    }
+    return params.toString();
+  }, [mapFiltersQueryString]);
+
+  const entranceTiles = useMemo(() => {
+    if (!AppOptions.serverBaseUrl) {
+      return [];
+    }
+    return [
+      `${AppOptions.serverBaseUrl}/api/map/{z}/{x}/{y}.mvt?${entrancesTileParams}`,
+    ];
+  }, [entrancesTileParams]);
+
+  const entrancesSourceKey = useMemo(
+    () => hashString(`${mapFiltersVersion}-${mapFiltersQueryString}`),
+    [mapFiltersQueryString, mapFiltersVersion]
+  );
+
   const fullScreenControlPosition = {
     top: "110px",
     left: "10px",
@@ -328,6 +656,42 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     top: showSearchBar ? "50px" : "0px",
     right: "0",
   };
+
+  const advancedSearchPosition = useMemo(
+    () => ({
+      top: offsetPositionValue(layerControlPosition.top, 50),
+      right: layerControlPosition.right ?? "0",
+    }),
+    [layerControlPosition]
+  );
+
+  const renderAdvancedSearchControls = useCallback(
+    (
+      context: AdvancedSearchInlineControlsContext<CaveSearchParamsVm>
+    ) => (
+      <FloatingPanel style={{ zIndex: 100, ...advancedSearchPosition }}>
+        <PlanarianButton
+          icon={<SlidersOutlined />}
+          onClick={() => context.openDrawer()}
+          tooltip="Advanced search"
+          neverShowChildren
+          type={hasAppliedFilters ? "primary" : "default"}
+        />
+        {hasAppliedFilters && (
+          <PlanarianButton
+            icon={<ClearOutlined />}
+            onClick={(event) => {
+              event.preventDefault();
+              void context.clearFilters();
+            }}
+            tooltip="Clear filters"
+            neverShowChildren
+          />
+        )}
+      </FloatingPanel>
+    ),
+    [advancedSearchPosition, hasAppliedFilters]
+  );
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -400,8 +764,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     [lineplotsData]
   );
   const interactiveLayerIds = useMemo(
-    () => ["entrances", ...uploadedLayerIds, ...lineplotLayerIds],
-    [uploadedLayerIds, lineplotLayerIds]
+    () => [
+      "entrances",
+      ...uploadedLayerIds,
+      ...lineplotLayerIds,
+      ...additionalInteractiveLayerIds,
+    ],
+    [uploadedLayerIds, lineplotLayerIds, additionalInteractiveLayerIds]
   );
 
   // Sort lineplot data by geometry type for proper layering
@@ -421,9 +790,11 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     });
   }, [lineplotsData]);
 
+  const bodyPaddingReady = manageBodyPadding ? hideBodyPadding : true;
+
   return (
     <Spin spinning={isLoading}>
-      {!isLoading && AppOptions.serverBaseUrl && hideBodyPadding && (
+      {!isLoading && AppOptions.serverBaseUrl && bodyPaddingReady && (
         <div
           style={{ position: "relative", width: "100%", height: "100%" }}
           onDragOver={onDragOver}
@@ -460,16 +831,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
           <MapProvider>
             <Map
+              key={mapComponentKey}
               ref={mapRef}
               maxPitch={85}
-              reuseMaps
+              reuseMaps={reuseMaps}
               antialias
               interactiveLayerIds={interactiveLayerIds}
-              initialViewState={{
-                longitude: mapCenter[1],
-                latitude: mapCenter[0],
-                zoom: zoom,
-              }}
+              initialViewState={initialViewState}
               onLoad={() => {
                 fetchLineplots();
               }}
@@ -494,6 +862,26 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 onMouseLeave={handleControlMouseLeave}
               >
                 <LayerControl position={layerControlPosition} />
+              </div>
+              <div
+                id="advanced-search-control"
+                onMouseEnter={handleControlMouseEnter}
+                onMouseLeave={handleControlMouseLeave}
+              >
+                <CaveAdvancedSearchDrawer
+                  onSearch={runSearch}
+                  queryBuilder={queryBuilder}
+                  form={form}
+                  onFiltersCleared={handleFiltersCleared}
+                  inlineControls={renderAdvancedSearchControls}
+                  entranceLocationFilter={entranceLocationFilter}
+                  isFetchingEntranceLocation={isFetchingEntranceLocation}
+                  onEntranceLocationChange={handleEntranceLocationChange}
+                  onUseCurrentLocation={handleUseCurrentLocation}
+                  onClearEntranceLocation={() => applyEntranceLocationFilter({})}
+                  polygonResetSignal={polygonResetSignal}
+                  filterClearSignal={filterClearSignal}
+                />
               </div>
 
               {/* Lineplots layers from fetched data - render in order: Polygons, Lines, Points */}
@@ -619,13 +1007,10 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
               {/* Entrances layer */}
               <Source
+                key={entrancesSourceKey}
                 id="entrances"
                 type="vector"
-                tiles={[
-                  `${
-                    AppOptions.serverBaseUrl
-                  }/api/map/{z}/{x}/{y}.mvt?access_token=${AuthenticationService.GetToken()}&account_id=${AuthenticationService.GetAccountId()}&test=1`,
-                ]}
+                tiles={entranceTiles}
                 attribution={`© ${accountName}`}
               >
                 <Layer
@@ -813,6 +1198,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   />
                 </div>
               )}
+
+              {children}
             </Map>
           </MapProvider>
         </div>

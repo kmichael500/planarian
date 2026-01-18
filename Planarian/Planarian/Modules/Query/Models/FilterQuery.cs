@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Planarian.Modules.Query.Constants;
 
 namespace Planarian.Modules.Query.Models;
@@ -9,4 +10,7 @@ public class FilterQuery
     public int PageNumber { get; set; } = 1;
     public string SortBy { get; set; } = QueryConstants.DefaultSortBy;
     public bool SortDescending { get; set; } = true;
+    public IEnumerable<string>? ExportFields { get; set; }
+    public double? Ulat { get; set; }
+    public double? Ulon { get; set; }
 }

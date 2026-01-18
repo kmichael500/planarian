@@ -1,8 +1,8 @@
-using Southport.Messaging.Email.SendGrid.Interfaces;
+using Southport.Messaging.Email.MailGun;
 
 namespace Planarian.Shared.Options;
 
-public class EmailOptions : SendGridOptions
+public class EmailOptions : MailGunOptions
 {
     public const string Key = "Email";
 
