@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import {
-  CarOutlined,
-  CloudUploadOutlined,
-  HistoryOutlined,
-} from "@ant-design/icons";
+import { CarOutlined, EditOutlined, HistoryOutlined } from "@ant-design/icons";
 import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Card,
@@ -35,6 +31,7 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { MapComponent } from "../../Map/Components/MapComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
+import { Link } from "react-router-dom";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
@@ -48,6 +45,7 @@ import { PlanarianDateRange } from "../../../Shared/Components/Buttons/Planarian
 import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
 import { CaveHistoryModal } from "./CaveHistoryModal";
 import { FileTypeKey } from "../../Files/Models/FileTypeKey";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -405,9 +403,15 @@ const CaveComponent = ({
         title="Files"
         element={
           <>
-            <PlanarianButton icon={<CloudUploadOutlined />}>
-              Upload
-            </PlanarianButton>
+            {cave?.id && cave?.files && cave.files.length > 0 && (
+              <Link to={`/caves/${cave.id}/edit`}>
+                <PlanarianButton
+                  icon={<EditOutlined />}
+                >
+                  Edit
+                </PlanarianButton>
+              </Link>
+            )}
           </>
         }
       />
@@ -415,7 +419,7 @@ const CaveComponent = ({
       <FileListComponent
         files={cave?.files}
         customOrder={[FileTypeKey.Map]}
-        hasEditPermission={hasEditPermission}
+        editUrl={cave?.id ? `/caves/${cave.id}/edit` : undefined}
       />
 
       {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (

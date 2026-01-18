@@ -10,8 +10,6 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { EditOutlined } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { Grid, Typography } from "antd";
-import { AppService } from "../../../Shared/Services/AppService";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import FavoriteCave from "../Components/FavoriteCave";
 
 const CavePage = () => {
@@ -31,8 +29,6 @@ const CavePage = () => {
     throw new NotFoundError("caveid");
   }
 
-  const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
-
   const screens = Grid.useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
@@ -44,8 +40,6 @@ const CavePage = () => {
 
       <Link to={`/caves/${caveId}/edit`}>
         <PlanarianButton
-          permissionKey={PermissionKey.Manager}
-          disabled={!hasEditPermission}
           icon={<EditOutlined />}
         >
           Edit
@@ -53,7 +47,7 @@ const CavePage = () => {
       </Link>,
       <BackButtonComponent to={"./.."} />,
     ]);
-  }, [cave, hasEditPermission]);
+  }, [cave]);
 
   if (caveId === undefined) {
     throw new NotFoundError("caveid");
@@ -81,11 +75,6 @@ const CavePage = () => {
     const getCave = async () => {
       const caveResponse = await CaveService.GetCave(caveId);
       setCave(caveResponse);
-      const hasEditPermission = await AppService.HasCavePermission(
-        PermissionKey.Manager,
-        caveId
-      );
-      setHasEditPermission(hasEditPermission);
       setIsLoading(false);
     };
     getCave();
@@ -102,7 +91,6 @@ const CavePage = () => {
       <CaveComponent
         cave={cave}
         isLoading={isLoading}
-        hasEditPermission={hasEditPermission}
         options={{
           showMap: true,
         }}

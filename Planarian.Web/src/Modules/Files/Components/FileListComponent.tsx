@@ -1,7 +1,8 @@
 // src/modules/Files/Components/FileListComponent.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Collapse, Typography } from "antd";
-import { CloudUploadOutlined } from "@ant-design/icons";
+import { EditOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { FileListItemComponent } from "./FileListItemComponent";
@@ -23,8 +24,7 @@ export interface FileListComponentProps {
   changes?: CaveHistoryRecord[];
   customOrder?: string[];
   isUploading?: boolean;
-  setIsUploading?: (value: boolean) => void;
-  hasEditPermission?: boolean;
+  editUrl?: string;
 }
 
 type FileListItemVm = FileVm & {
@@ -41,9 +41,9 @@ export const FileListComponent = ({
   originalFiles = [],
   changes = [],
   customOrder = [],
-  setIsUploading,
-  hasEditPermission = true,
+  editUrl,
 }: FileListComponentProps) => {
+  const navigate = useNavigate();
   const diffMode = Boolean(changes.length && originalFiles.length);
 
   const filesByType = useMemo(
@@ -233,21 +233,23 @@ export const FileListComponent = ({
     ? getFileType(activeFile.fileName)
     : undefined;
 
-  const renderUploadButton = () => (
-    <PlanarianButton
-      icon={<CloudUploadOutlined />}
-      alwaysShowChildren
-      permissionKey={PermissionKey.Manager}
-      disabled={!hasEditPermission}
-      onClick={() => {
-        if (setIsUploading) {
-          setIsUploading(true);
-        }
-      }}
-    >
-      Upload
-    </PlanarianButton>
-  );
+  const renderEditButton = () => {
+    if (!editUrl) {
+      return null;
+    }
+
+    return (
+      <PlanarianButton
+        icon={<EditOutlined />}
+        alwaysShowChildren
+        onClick={() => {
+          navigate(editUrl);
+        }}
+      >
+        Edit
+      </PlanarianButton>
+    );
+  };
 
   return (
     <>
@@ -266,7 +268,7 @@ export const FileListComponent = ({
                 <CardGridComponent
                   useList
                   noDataDescription="Looks like this cave was scooped … do you want to change that?"
-                  noDataCreateButton={renderUploadButton()}
+                  noDataCreateButton={renderEditButton()}
                   items={items}
                   itemKey={(it) => it.id + (it.isRemoved ? "_removed" : "")}
                   renderItem={(it) => (
@@ -289,7 +291,7 @@ export const FileListComponent = ({
       ) : (
         <CardGridComponent
           noDataDescription="Looks like this cave was scooped … do you want to change that?"
-          noDataCreateButton={renderUploadButton()}
+          noDataCreateButton={renderEditButton()}
           renderItem={() => <Typography.Text />}
           itemKey={() => ""}
         />
