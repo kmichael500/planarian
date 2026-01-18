@@ -138,21 +138,6 @@ const LAYERS: PlanarianMapLayer[] = [
     attribution: "USGS 3DEP Elevation Program",
   },
   {
-    id: "3-dep-hillshade-usgs-notmulti",
-    displayName: "Hillshade Not Multi",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Gray",
-      ],
-    },
-
-    isActive: false,
-    opacity: 1,
-    attribution: "USGS 3DEP Elevation Program",
-  },
-  {
     id: "arcgis-public-access",
     displayName: "Public Land",
     type: "vector",
