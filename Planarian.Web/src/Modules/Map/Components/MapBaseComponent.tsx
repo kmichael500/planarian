@@ -113,6 +113,18 @@ const offsetPositionValue = (value: string | undefined, offset: number) => {
   return `calc(${value} + ${offset}px)`;
 };
 
+const mapControlContainerIds = {
+  caveSearch: "cave-search-container",
+  layerControl: "layer-control-container",
+  advancedSearch: "advanced-search-control",
+  navigationControls: "navigation-controls",
+  fullScreenControl: "fullscreen-control",
+} as const;
+
+const mapControlSelector = Object.values(mapControlContainerIds)
+  .map((id) => `#${id}`)
+  .join(", ");
+
 const FloatingPanel = styled.div`
   position: absolute;
   background: #fff;
@@ -160,7 +172,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     initialCenter || [0, 0]
   );
   const [zoom, setZoom] = useState(initialZoom || 7);
-  const [isOverControl, setIsOverControl] = useState(false);
   const mapRef = React.useRef<any>(null);
 
   const [dragActive, setDragActive] = useState(false);
@@ -534,16 +545,15 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const navigate = useNavigate();
 
-  const handleControlMouseEnter = () => {
-    setIsOverControl(true);
-  };
-
-  const handleControlMouseLeave = () => {
-    setIsOverControl(false);
-  };
-
   const handleMapClick = (event: MapLayerMouseEvent) => {
-    if (isOverControl) return;
+    const clickTarget = event.originalEvent?.target as HTMLElement | null;
+    if (
+      clickTarget?.closest(
+        mapControlSelector
+      )
+    ) {
+      return;
+    }
 
     const clickedFeatures = event.features;
     if (clickedFeatures && clickedFeatures.length > 0) {
@@ -848,25 +858,19 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
             >
               {showSearchBar && (
                 <div
-                  id="cave-search-container"
-                  onMouseEnter={handleControlMouseEnter}
-                  onMouseLeave={handleControlMouseLeave}
+                  id={mapControlContainerIds.caveSearch}
                 >
                   <CaveSearchMapControl />
                 </div>
               )}
 
               <div
-                id="layer-control-container"
-                onMouseEnter={handleControlMouseEnter}
-                onMouseLeave={handleControlMouseLeave}
+                id={mapControlContainerIds.layerControl}
               >
                 <LayerControl position={layerControlPosition} />
               </div>
               <div
-                id="advanced-search-control"
-                onMouseEnter={handleControlMouseEnter}
-                onMouseLeave={handleControlMouseLeave}
+                id={mapControlContainerIds.advancedSearch}
               >
                 <CaveAdvancedSearchDrawer
                   onSearch={runSearch}
@@ -1162,9 +1166,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
               )}
 
               <div
-                id="navigation-controls"
-                onMouseEnter={handleControlMouseEnter}
-                onMouseLeave={handleControlMouseLeave}
+                id={mapControlContainerIds.navigationControls}
               >
                 <NavigationControl position={zoomControlPosition} />
                 {showGeolocateControl && (
@@ -1179,9 +1181,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
               {showFullScreenControl && (
                 <div
-                  id="fullscreen-control"
-                  onMouseEnter={handleControlMouseEnter}
-                  onMouseLeave={handleControlMouseLeave}
+                  id={mapControlContainerIds.fullScreenControl}
                 >
                   <FullScreenControl
                     position={fullScreenControlPosition}
