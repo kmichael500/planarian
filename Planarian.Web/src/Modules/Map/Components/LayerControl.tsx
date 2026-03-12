@@ -19,6 +19,8 @@ interface PlanarianMapLayer {
   opacity: number;
   id: string;
   type: "raster" | "vector" | "group" | string;
+  minzoom?: number;
+  maxzoom?: number;
   attribution?: string;
   source?: {
     layerName?: string;
@@ -214,6 +216,23 @@ const LAYERS: PlanarianMapLayer[] = [
       }),
     },
     legend: <PublicAccessLegend />,
+  },
+  {
+    id: "regrid-parcel-boundaries",
+    displayName: "Parcel Boundaries",
+    type: "raster",
+    minzoom: 15,
+    maxzoom: 17,
+    source: {
+      type: "raster",
+      tiles: [
+        "https://tiles.arcgis.com/tiles/KzeiCaQsMoeCfoCq/arcgis/rest/services/Regrid_Nationwide_Parcel_Boundaries_v1/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
+    isActive: false,
+    opacity: 1,
+    attribution: "Regrid Nationwide Parcel Boundaries v1",
   },
   {
     id: "macrostrat",
@@ -701,6 +720,12 @@ const LayerControl: React.FC<{
                 type="raster"
                 paint={{ "raster-opacity": layer.opacity }}
                 layout={{ visibility: layer.isActive ? "visible" : "none" }}
+                {...(layer.minzoom !== undefined && {
+                  minzoom: layer.minzoom,
+                })}
+                {...(layer.maxzoom !== undefined && {
+                  maxzoom: layer.maxzoom,
+                })}
               />
             </Source>
           );
