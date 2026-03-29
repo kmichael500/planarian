@@ -42,6 +42,6 @@ public class AppService : ServiceBase<AppRepository>
 
     public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId)
     {
-        return await RequestUser.HasCavePermission(permissionKey, caveId, countyId, false);
+        return await RequestUser.HasCavePermission(permissionKey, caveId, countyId, @throw: false);
     }
 }

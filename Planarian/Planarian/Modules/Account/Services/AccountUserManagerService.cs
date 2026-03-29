@@ -222,126 +222,65 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         // Retrieve existing permissions for this user and permission key
         var existingPermissions =
             (await Repository.GetCavePermissions(userId, RequestUser.AccountId, permissionKey)).ToList();
+        var existingStatePermissions = existingPermissions
+            .Where(p =>
+                !string.IsNullOrWhiteSpace(p.StateId)
+                && string.IsNullOrWhiteSpace(p.CountyId)
+                && string.IsNullOrWhiteSpace(p.CaveId))
+            .ToList();
+        var existingCountyPermissions = existingPermissions
+            .Where(p =>
+                string.IsNullOrWhiteSpace(p.StateId)
+                && !string.IsNullOrWhiteSpace(p.CountyId)
+                && string.IsNullOrWhiteSpace(p.CaveId))
+            .ToList();
+        var existingCavePermissions = existingPermissions
+            .Where(p =>
+                string.IsNullOrWhiteSpace(p.StateId)
+                && !string.IsNullOrWhiteSpace(p.CaveId)
+                && string.IsNullOrWhiteSpace(p.CountyId))
+            .ToList();
 
         var isExistingTransaction = dbTransaction != null;
         dbTransaction ??= await Repository.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            // Handle the "all locations" case
-            if (vm.HasAllLocations)
+            var handledAllLocations = await HandleAllLocationsAsync(
+                userId,
+                permission,
+                vm.HasAllLocations,
+                existingPermissions);
+
+            if (handledAllLocations)
             {
-                // Look for an existing "all locations" record (both CountyId and CaveId null)
-                var allLocationPermission = existingPermissions.FirstOrDefault(p =>
-                    string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId));
-                if (allLocationPermission == null)
+                await Repository.SaveChangesAsync(cancellationToken);
+
+                if (!isExistingTransaction)
                 {
-                    // No record exists, so create one
-                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
-                    allLocationPermission = new CavePermission
-                    {
-                        UserId = userId,
-                        AccountId = RequestUser.AccountId,
-                        CountyId = null,
-                        CaveId = null,
-                        Permission = permission
-                    };
-                    Repository.Add(allLocationPermission);
-
-                    var others = existingPermissions.Where(p =>
-                        !string.IsNullOrWhiteSpace(p.CountyId) || !string.IsNullOrWhiteSpace(p.CaveId));
-                    Repository.DeleteRange(others);
-
-                    await Repository.SaveChangesAsync(cancellationToken);
-
-                    if (!isExistingTransaction)
-                    {
-                        await dbTransaction.CommitAsync(cancellationToken);
-                    }
-
-                    return;
-                }
-            }
-            else
-            {
-                // Remove any "all locations" if it exists
-                var allLocationPermission = existingPermissions.FirstOrDefault(p =>
-                    string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId));
-
-                if (allLocationPermission != null)
-                {
-                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
-                    Repository.Delete(allLocationPermission);
+                    await dbTransaction.CommitAsync(cancellationToken);
                 }
 
+                return;
             }
 
-            // --- Process county-level permissions ---
-            var desiredCountyIds = vm.CountyIds?.Distinct().ToList() ?? new List<string>();
-            var existingCountyPermissions = existingPermissions
-                .Where(p => !string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId)).ToList();
+            await UpdateStatePermissionsAsync(
+                userId,
+                permission,
+                vm.StateIds?.Distinct().ToList() ?? new List<string>(),
+                existingStatePermissions);
 
-            var existingCountyIds = existingCountyPermissions.Select(p => p.CountyId).ToList();
+            await UpdateCountyPermissionsAsync(
+                userId,
+                permission,
+                vm.CountyIds?.Distinct().ToList() ?? new List<string>(),
+                existingCountyPermissions);
 
-            // Identify which county permissions need to be removed and which added
-            var countiesToRemove = existingCountyIds.Except(desiredCountyIds).ToList();
-            var countiesToAdd = desiredCountyIds.Except(existingCountyIds).ToList();
-
-            // Remove county permissions that are no longer desired
-            foreach (var per in existingCountyPermissions.Where(p => countiesToRemove.Contains(p.CountyId)))
-            {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, per.CountyId);
-                Repository.Delete(per);
-            }
-
-            // Add new county permissions
-            foreach (var countyId in countiesToAdd)
-            {
-                // Ensure the current user has the necessary rights for this county
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, countyId);
-                var newCountyPerm = new CavePermission
-                {
-                    UserId = userId,
-                    AccountId = RequestUser.AccountId,
-                    CountyId = countyId,
-                    CaveId = null,
-                    Permission = permission
-                };
-                Repository.Add(newCountyPerm);
-            }
-
-            // --- Process cave-level permissions ---
-            var desiredCaveIds = vm.CaveIds.Distinct().ToList() ?? [];
-            var existingCavePermissions =
-                existingPermissions
-                    .Where(p => !string.IsNullOrWhiteSpace(p.CaveId) && string.IsNullOrWhiteSpace(p.CountyId)).ToList();
-            var existingCaveIds = existingCavePermissions.Select(p => p.CaveId).ToList();
-
-            // Identify which cave permissions need to be removed and which added
-            var cavesToRemove = existingCaveIds.Except(desiredCaveIds).ToList();
-            var cavesToAdd = desiredCaveIds.Except(existingCaveIds).ToList();
-
-            // Remove cave permissions that are no longer desired
-            foreach (var perm in existingCavePermissions.Where(p => cavesToRemove.Contains(p.CaveId)))
-            {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, perm.CaveId, null);
-                Repository.Delete(perm);
-            }
-
-            // Add new cave permissions
-            foreach (var caveId in cavesToAdd)
-            {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, null);
-                var newCavePerm = new CavePermission
-                {
-                    UserId = userId,
-                    AccountId = RequestUser.AccountId,
-                    CaveId = caveId,
-                    CountyId = null,
-                    Permission = permission
-                };
-                Repository.Add(newCavePerm);
-            }
+            await UpdateCavePermissionsAsync(
+                userId,
+                permission,
+                vm.CaveIds.Distinct().ToList() ?? [],
+                existingCavePermissions);
 
             await Repository.SaveChangesAsync(cancellationToken);
 
@@ -358,6 +297,150 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             }
 
             throw;
+        }
+    }
+
+    private async Task<bool> HandleAllLocationsAsync(
+        string userId,
+        Permission permission,
+        bool hasAllLocations,
+        List<CavePermission> existingPermissions)
+    {
+        var allLocationPermission = existingPermissions.FirstOrDefault(p =>
+            string.IsNullOrWhiteSpace(p.StateId)
+            && string.IsNullOrWhiteSpace(p.CountyId)
+            && string.IsNullOrWhiteSpace(p.CaveId));
+
+        if (hasAllLocations)
+        {
+            if (allLocationPermission != null)
+            {
+                return true;
+            }
+
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
+            allLocationPermission = new CavePermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                CountyId = null,
+                CaveId = null,
+                Permission = permission
+            };
+            Repository.Add(allLocationPermission);
+
+            var others = existingPermissions.Where(p =>
+                !string.IsNullOrWhiteSpace(p.StateId)
+                || !string.IsNullOrWhiteSpace(p.CountyId)
+                || !string.IsNullOrWhiteSpace(p.CaveId));
+            Repository.DeleteRange(others);
+
+            return true;
+        }
+
+        if (allLocationPermission != null)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
+            Repository.Delete(allLocationPermission);
+        }
+
+        return false;
+    }
+
+    private async Task UpdateStatePermissionsAsync(
+        string userId,
+        Permission permission,
+        List<string> desiredStateIds,
+        List<CavePermission> existingStatePermissions)
+    {
+        var existingStateIds = existingStatePermissions.Select(p => p.StateId).ToList();
+
+        var statesToRemove = existingStateIds.Except(desiredStateIds).ToList();
+        var statesToAdd = desiredStateIds.Except(existingStateIds).ToList();
+
+        foreach (var per in existingStatePermissions.Where(p => statesToRemove.Contains(p.StateId)))
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, per.StateId);
+            Repository.Delete(per);
+        }
+
+        foreach (var stateId in statesToAdd)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, stateId);
+            var newStatePerm = new CavePermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                StateId = stateId,
+                CountyId = null,
+                CaveId = null,
+                Permission = permission
+            };
+            Repository.Add(newStatePerm);
+        }
+    }
+
+    private async Task UpdateCountyPermissionsAsync(
+        string userId,
+        Permission permission,
+        List<string> desiredCountyIds,
+        List<CavePermission> existingCountyPermissions)
+    {
+        var existingCountyIds = existingCountyPermissions.Select(p => p.CountyId).ToList();
+
+        var countiesToRemove = existingCountyIds.Except(desiredCountyIds).ToList();
+        var countiesToAdd = desiredCountyIds.Except(existingCountyIds).ToList();
+
+        foreach (var per in existingCountyPermissions.Where(p => countiesToRemove.Contains(p.CountyId)))
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, per.CountyId);
+            Repository.Delete(per);
+        }
+
+        foreach (var countyId in countiesToAdd)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, countyId);
+            var newCountyPerm = new CavePermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                CountyId = countyId,
+                CaveId = null,
+                Permission = permission
+            };
+            Repository.Add(newCountyPerm);
+        }
+    }
+
+    private async Task UpdateCavePermissionsAsync(
+        string userId,
+        Permission permission,
+        List<string> desiredCaveIds,
+        List<CavePermission> existingCavePermissions)
+    {
+        var existingCaveIds = existingCavePermissions.Select(p => p.CaveId).ToList();
+
+        var cavesToRemove = existingCaveIds.Except(desiredCaveIds).ToList();
+        var cavesToAdd = desiredCaveIds.Except(existingCaveIds).ToList();
+
+        foreach (var perm in existingCavePermissions.Where(p => cavesToRemove.Contains(p.CaveId)))
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, perm.CaveId, null);
+            Repository.Delete(perm);
+        }
+
+        foreach (var caveId in cavesToAdd)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, null);
+            var newCavePerm = new CavePermission
+            {
+                UserId = userId,
+                AccountId = RequestUser.AccountId,
+                CaveId = caveId,
+                CountyId = null,
+                Permission = permission
+            };
+            Repository.Add(newCavePerm);
         }
     }
 

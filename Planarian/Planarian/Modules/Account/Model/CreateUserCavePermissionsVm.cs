@@ -6,6 +6,7 @@ namespace Planarian.Modules.Account.Model;
 public class CreateUserCavePermissionsVm
 {
     public bool HasAllLocations { get; set; }
+    public IEnumerable<string> StateIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> CountyIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> CaveIds { get; set; } = new HashSet<string>();
 }

@@ -10,6 +10,7 @@ public class UserCavePermissionsView : ViewBase
 {
     [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string UserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string PermissionId { get; set; } = null!;
@@ -22,6 +23,7 @@ public class UserCavePermissionsView : ViewBase
     public virtual User User { get; set; } = null!;
     public virtual Permission Permission { get; set; } = null!;
     public virtual County County { get; set; } = null!;
+    public virtual State State { get; set; } = null!;
 }
 
 public class UserCavePermissionsViewConfiguration : IEntityTypeConfiguration<UserCavePermissionsView>
@@ -49,5 +51,9 @@ public class UserCavePermissionsViewConfiguration : IEntityTypeConfiguration<Use
         builder.HasOne(e => e.County)
             .WithMany()
             .HasForeignKey(e=>e.CountyId);
+
+        builder.HasOne(e => e.State)
+            .WithMany()
+            .HasForeignKey(e => e.StateId);
     }
 }

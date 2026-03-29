@@ -113,17 +113,19 @@ public class UserRepository : RepositoryBase
             CaveCountyId = e.Cave!.CountyId,
             e.CaveId,
             e.CountyId,
-            StateId = e.County!.StateId
+            e.StateId,
+            ResolvedStateId = e.StateId ?? e.County!.StateId
         }).ToListAsync();
         
-        var hasAllLocations = data.Any(permission => permission.CountyId == null && permission.CaveId == null);
+        var hasAllLocations = data.Any(permission =>
+            permission.StateId == null && permission.CountyId == null && permission.CaveId == null);
 
         var stateCountyValues = new StateCountyValue
         {
-            States = data.Where(e=>!string.IsNullOrWhiteSpace(e.StateId)).Select(permission => permission.StateId).Distinct().ToList(),
+            States = data.Where(e=>!string.IsNullOrWhiteSpace(e.ResolvedStateId)).Select(permission => permission.ResolvedStateId!).Distinct().ToList(),
             CountiesByState = 
-                data.Where(e => !string.IsNullOrWhiteSpace(e.StateId) && !string.IsNullOrWhiteSpace(e.CountyId))
-                .GroupBy(permission => permission.StateId)
+                data.Where(e => !string.IsNullOrWhiteSpace(e.ResolvedStateId) && !string.IsNullOrWhiteSpace(e.CountyId))
+                .GroupBy(permission => permission.ResolvedStateId)
                 .ToDictionary(group => group.Key, e => e.Select(ee => ee.CountyId!).ToList())
         };
 
@@ -139,7 +141,7 @@ public class UserRepository : RepositoryBase
                     {
                         CountyId = cave.CaveCountyId,
                         RequestUserHasAccess =
-                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, false)
+                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, @throw: false)
                     }
                 }
             );
@@ -185,6 +187,7 @@ public class UserRepository : RepositoryBase
             .Where(e =>
                 e.UserId == userId
                 && e.AccountId == accountId
+                && string.IsNullOrWhiteSpace(e.StateId)
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && e.Permission!.Key == PermissionPolicyKey.Manager
