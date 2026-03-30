@@ -44,7 +44,7 @@ public class FileService : ServiceBase<FileRepository>
         {
             throw ApiExceptionDictionary.NotFound("Cave");
         }
-        
+
         await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
@@ -73,7 +73,7 @@ public class FileService : ServiceBase<FileRepository>
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync(cancellationToken);
-        
+
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
@@ -209,27 +209,6 @@ public class FileService : ServiceBase<FileRepository>
         await transaction.CommitAsync();
     }
 
-    public async Task<FileVm> GetFile(string id)
-    {
-        await EnsureFileAccess(id, PermissionKey.View);
-
-        var file = await Repository.GetFileVm(id);
-        var blobProperties = await Repository.GetFileBlobProperties(id);
-        if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
-            string.IsNullOrWhiteSpace(blobProperties.BlobKey))
-            throw ApiExceptionDictionary.NotFound("File");
-
-        var client = await GetBlobContainerClient(blobProperties.ContainerName);
-        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
-
-        var sasLinkDownload = GetSasLink(blobClient, file.FileName, true);
-        var sasLinkEmbed = GetSasLink(blobClient, file.FileName, true);
-        file.EmbedUrl = sasLinkEmbed;
-        file.DownloadUrl = sasLinkDownload;
-
-        return file;
-    }
-
     private async Task EnsureFileAccess(string fileId, string permissionKey)
     {
         var fileContext = await Repository.GetFileAuthorizationContext(fileId);
@@ -238,6 +217,25 @@ public class FileService : ServiceBase<FileRepository>
 
         if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
         {
+            // TODO: Add this logic to the Requset User
+            if (permissionKey == PermissionKey.View)
+            {
+                var canView = await RequestUser.HasCavePermission(PermissionKey.View, fileContext.CaveId,
+                    fileContext.CountyId, false);
+                if (!canView)
+                {
+                    canView = await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId,
+                        fileContext.CountyId, false);
+                }
+
+                if (!canView)
+                {
+                    await RequestUser.HasCavePermission(PermissionKey.View, fileContext.CaveId, fileContext.CountyId);
+                }
+
+                return;
+            }
+
             await RequestUser.HasCavePermission(permissionKey, fileContext.CaveId, fileContext.CountyId);
             return;
         }
@@ -319,15 +317,15 @@ public class FileService : ServiceBase<FileRepository>
         var blobClient = client.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
     }
-    
+
     public async Task DeleteContainer(string containerName)
     {
-        if (RequestUser.AccountId == null) 
+        if (RequestUser.AccountId == null)
             throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
-            _fileOptions.ConnectionString, 
+            _fileOptions.ConnectionString,
             containerName.ToLowerInvariant());
 
         // Attempt to delete the entire container

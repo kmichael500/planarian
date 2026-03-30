@@ -25,13 +25,6 @@ public class FileController : PlanarianControllerBase<FileService>
         await Service.UpdateFilesMetadata(values, cancellationToken);
         return Ok();
     }
-
-    [HttpGet("{id:length(10)}")]
-    public async Task<IActionResult> GetFile(string id)
-    {
-        var file = await Service.GetFile(id);
-        return new JsonResult(file);
-    }
 }
 
 public class EditFileMetadataVm

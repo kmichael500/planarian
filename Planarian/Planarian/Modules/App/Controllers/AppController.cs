@@ -8,7 +8,6 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.App.Controllers;
 
 [Route("api/app")]
-[AllowAnonymous]
 public class AppController : PlanarianControllerBase<AppService>
 {
     public AppController(RequestUser requestUser, TokenService tokenService, AppService service) : base(requestUser,
@@ -16,6 +15,7 @@ public class AppController : PlanarianControllerBase<AppService>
     {
     }
 
+    [AllowAnonymous]
     [HttpGet("initialize")]
     public async Task<ActionResult<string>> Initialize()
     {

@@ -55,9 +55,11 @@ public class TokenService
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
                     ValidateAudience = true,
+                    ValidateLifetime = true,
                     ValidIssuer = issuer,
                     ValidAudience = issuer,
-                    IssuerSigningKey = mySecurityKey
+                    IssuerSigningKey = mySecurityKey,
+                    ClockSkew = TimeSpan.Zero
                 }, out var validatedToken);
         }
         catch
