@@ -27,6 +27,7 @@ public class AppController : PlanarianControllerBase<AppService>
     }
     
     [HttpGet("permissions/caves")]
+    [Authorize]
     public async Task<ActionResult<string>> HasCavePermission([FromQuery] string? caveId, [FromQuery] string? countyId, [FromQuery] string permissionKey)
     {
         var result = await Service.HasCavePermission(permissionKey, caveId, countyId);

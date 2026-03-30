@@ -190,6 +190,8 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
         {
+            await EnsureFileAccess(value.Id, PermissionKey.Manager);
+
             var file = await Repository.GetFileById(value.Id);
             if (file == null) throw ApiExceptionDictionary.NotFound("File");
 
@@ -209,6 +211,8 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task<FileVm> GetFile(string id)
     {
+        await EnsureFileAccess(id, PermissionKey.View);
+
         var file = await Repository.GetFileVm(id);
         var blobProperties = await Repository.GetFileBlobProperties(id);
         if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
@@ -224,6 +228,27 @@ public class FileService : ServiceBase<FileRepository>
         file.DownloadUrl = sasLinkDownload;
 
         return file;
+    }
+
+    private async Task EnsureFileAccess(string fileId, string permissionKey)
+    {
+        var fileContext = await Repository.GetFileAuthorizationContext(fileId);
+        if (fileContext == null)
+            throw ApiExceptionDictionary.NotFound("File");
+
+        if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
+        {
+            await RequestUser.HasCavePermission(permissionKey, fileContext.CaveId, fileContext.CountyId);
+            return;
+        }
+
+        if (permissionKey == PermissionKey.Manager)
+        {
+            await RequestUser.HasCavePermission(PermissionKey.Manager);
+            return;
+        }
+
+        await RequestUser.HasCavePermission(PermissionKey.View);
     }
 
     // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
