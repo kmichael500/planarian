@@ -12,6 +12,7 @@ namespace Planarian.Modules.Authentication.Services;
 public class TokenService
 {
     private const double ExpiryDurationMinutes = 43200;
+    public static readonly string UserIdClaimType = nameof(UserToken.Id).ToCamelCase();
     private readonly AuthOptions _authOptions;
 
     public TokenService(AuthOptions authOptions)
@@ -24,7 +25,7 @@ public class TokenService
         var claims = new List<Claim>()
         {
             new(ClaimTypes.Name, user.FullName),
-            new(nameof(user.Id).ToCamelCase(), user.Id)
+            new(UserIdClaimType, user.Id)
         };
 
         if (!string.IsNullOrWhiteSpace(user.CurrentAccountId))
@@ -54,9 +55,11 @@ public class TokenService
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
                     ValidateAudience = true,
+                    ValidateLifetime = true,
                     ValidIssuer = issuer,
                     ValidAudience = issuer,
-                    IssuerSigningKey = mySecurityKey
+                    IssuerSigningKey = mySecurityKey,
+                    ClockSkew = TimeSpan.Zero
                 }, out var validatedToken);
         }
         catch
@@ -69,8 +72,16 @@ public class TokenService
 
     public string GetUserIdFromToken(string token)
     {
+        if (!IsTokenValid(token))
+            throw new SecurityTokenException("Invalid token");
+
         var tokenHandler = new JwtSecurityTokenHandler();
         var jwtToken = tokenHandler.ReadJwtToken(token);
-        return jwtToken.Claims.First(claim => claim.Type == nameof(UserToken.Id).ToCamelCase()).Value;
+        return jwtToken.Claims.First(claim => claim.Type == UserIdClaimType).Value;
+    }
+
+    public string? GetUserId(ClaimsPrincipal principal)
+    {
+        return principal.FindFirst(UserIdClaimType)?.Value;
     }
 }

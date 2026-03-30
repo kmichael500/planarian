@@ -25,6 +25,16 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public sealed record FileAuthorizationContextResult(string Id, string? CaveId, string? CountyId);
+
+    public async Task<FileAuthorizationContextResult?> GetFileAuthorizationContext(string id)
+    {
+        return await DbContext.Files
+            .Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
+            .Select(e => new FileAuthorizationContextResult(e.Id, e.CaveId, e.Cave != null ? e.Cave.CountyId : null))
+            .FirstOrDefaultAsync();
+    }
+
 
     public sealed record GetFileBlobPropertiesResult(string? BlobKey, string? ContainerName);
 

@@ -10,7 +10,7 @@ using Planarian.Shared.Base;
 namespace Planarian.Modules.Leads.Controllers;
 
 [Route("api/leads")]
-[AllowAnonymous]
+[Authorize]
 public class LeadController : PlanarianControllerBase<LeadService>
 {
     public LeadController(RequestUser requestUser, TokenService tokenService, LeadService service) : base(requestUser,

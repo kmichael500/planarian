@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Models;
 
@@ -39,26 +38,22 @@ public class RequestUserMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Resolve the scoped services from the current request's IServiceProvider.
         var tokenService = context.RequestServices.GetRequiredService<TokenService>();
         var requestUser = context.RequestServices.GetRequiredService<RequestUser>();
 
-        // Extract the token from header or query string.
-        var token = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            token = context.Request.Query["access_token"];
-        }
-
-        if (!string.IsNullOrWhiteSpace(token))
+        if (context.User.Identity?.IsAuthenticated == true)
         {
             var accountId = context.Request.Headers["x-account"].ToString();
             if (string.IsNullOrWhiteSpace(accountId))
             {
                 accountId = context.Request.Query["account_id"];
             }
-            var userId = tokenService.GetUserIdFromToken(token);
-            await requestUser.Initialize(accountId, userId);
+
+            var userId = tokenService.GetUserId(context.User);
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                await requestUser.Initialize(accountId, userId);
+            }
         }
 
         await _next(context);

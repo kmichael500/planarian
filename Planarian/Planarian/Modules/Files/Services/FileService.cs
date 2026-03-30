@@ -44,7 +44,7 @@ public class FileService : ServiceBase<FileRepository>
         {
             throw ApiExceptionDictionary.NotFound("Cave");
         }
-        
+
         await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
@@ -73,7 +73,7 @@ public class FileService : ServiceBase<FileRepository>
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync(cancellationToken);
-        
+
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
@@ -190,6 +190,8 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
         {
+            await EnsureFileManagerAccess(value.Id);
+
             var file = await Repository.GetFileById(value.Id);
             if (file == null) throw ApiExceptionDictionary.NotFound("File");
 
@@ -207,23 +209,19 @@ public class FileService : ServiceBase<FileRepository>
         await transaction.CommitAsync();
     }
 
-    public async Task<FileVm> GetFile(string id)
+    private async Task EnsureFileManagerAccess(string fileId)
     {
-        var file = await Repository.GetFileVm(id);
-        var blobProperties = await Repository.GetFileBlobProperties(id);
-        if (file == null || blobProperties == null || string.IsNullOrWhiteSpace(blobProperties.ContainerName) ||
-            string.IsNullOrWhiteSpace(blobProperties.BlobKey))
+        var fileContext = await Repository.GetFileAuthorizationContext(fileId);
+        if (fileContext == null)
             throw ApiExceptionDictionary.NotFound("File");
 
-        var client = await GetBlobContainerClient(blobProperties.ContainerName);
-        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
+        {
+            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId, fileContext.CountyId);
+            return;
+        }
 
-        var sasLinkDownload = GetSasLink(blobClient, file.FileName, true);
-        var sasLinkEmbed = GetSasLink(blobClient, file.FileName, true);
-        file.EmbedUrl = sasLinkEmbed;
-        file.DownloadUrl = sasLinkDownload;
-
-        return file;
+        await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
     // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
@@ -294,15 +292,15 @@ public class FileService : ServiceBase<FileRepository>
         var blobClient = client.GetBlobClient(blobKey);
         await blobClient.DeleteIfExistsAsync();
     }
-    
+
     public async Task DeleteContainer(string containerName)
     {
-        if (RequestUser.AccountId == null) 
+        if (RequestUser.AccountId == null)
             throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
-            _fileOptions.ConnectionString, 
+            _fileOptions.ConnectionString,
             containerName.ToLowerInvariant());
 
         // Attempt to delete the entire container
