@@ -190,7 +190,7 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         foreach (var value in values)
         {
-            await EnsureFileAccess(value.Id, PermissionKey.Manager);
+            await EnsureFileManagerAccess(value.Id);
 
             var file = await Repository.GetFileById(value.Id);
             if (file == null) throw ApiExceptionDictionary.NotFound("File");
@@ -209,7 +209,7 @@ public class FileService : ServiceBase<FileRepository>
         await transaction.CommitAsync();
     }
 
-    private async Task EnsureFileAccess(string fileId, string permissionKey)
+    private async Task EnsureFileManagerAccess(string fileId)
     {
         var fileContext = await Repository.GetFileAuthorizationContext(fileId);
         if (fileContext == null)
@@ -217,36 +217,11 @@ public class FileService : ServiceBase<FileRepository>
 
         if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
         {
-            // TODO: Add this logic to the Requset User
-            if (permissionKey == PermissionKey.View)
-            {
-                var canView = await RequestUser.HasCavePermission(PermissionKey.View, fileContext.CaveId,
-                    fileContext.CountyId, false);
-                if (!canView)
-                {
-                    canView = await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId,
-                        fileContext.CountyId, false);
-                }
-
-                if (!canView)
-                {
-                    await RequestUser.HasCavePermission(PermissionKey.View, fileContext.CaveId, fileContext.CountyId);
-                }
-
-                return;
-            }
-
-            await RequestUser.HasCavePermission(permissionKey, fileContext.CaveId, fileContext.CountyId);
+            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId, fileContext.CountyId);
             return;
         }
 
-        if (permissionKey == PermissionKey.Manager)
-        {
-            await RequestUser.HasCavePermission(PermissionKey.Manager);
-            return;
-        }
-
-        await RequestUser.HasCavePermission(PermissionKey.View);
+        await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
     // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
