@@ -98,7 +98,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
 
     [HttpGet("{userId:length(10)}/user-permissions")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<IEnumerable<UserPermissionVm>>>
         GetUserPermissions(string userId)
     {
@@ -107,7 +107,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpPost("{userId:length(10)}/user-permissions/{permissionKey}")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> AddUserPermission(string userId, string permissionKey)
     {
         await Service.AddUserPermission(userId, permissionKey);
@@ -115,7 +115,7 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
     }
 
     [HttpDelete("{userId:length(10)}/user-permissions/{permissionKey}")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> RemoveUserPermission(
         string userId,
         string permissionKey)
