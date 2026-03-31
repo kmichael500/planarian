@@ -489,6 +489,16 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
+        if (RequestUser.Id.Equals(userId))
+        {
+            throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
+        }
+
+        if (permissionKey == PermissionKey.PlanarianAdmin)
+        {
+            throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be managed from account user management.");
+        }
+
         var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
         if (userPermission == null)
         {
