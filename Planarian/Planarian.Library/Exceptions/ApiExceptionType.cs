@@ -25,5 +25,6 @@ public enum ApiExceptionType
     InvalidImport = 400,
     NullValue = 401,
     QueryInvalidValue = 500,
+    TooManyRequests = 501,
     UnexpectedIssue = -1,
 }

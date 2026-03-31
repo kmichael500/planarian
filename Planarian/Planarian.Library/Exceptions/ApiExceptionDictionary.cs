@@ -31,6 +31,11 @@ public static class ApiExceptionDictionary
         return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.Conflict, message);
     }
 
+    public static ApiException TooManyRequests(string message)
+    {
+        return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message);
+    }
+
     public static ApiException InternalServerError(string message)
     {
         return new ApiException(500, ApiExceptionType.InternalServerError, message);
