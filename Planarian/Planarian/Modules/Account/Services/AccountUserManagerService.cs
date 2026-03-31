@@ -380,7 +380,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return user;
     }
 
-    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>> 
+    public async Task<IEnumerable<SelectListItemDescriptionData<string, PermissionSelectListData>>>
         GetPermissionSelectList(string permissionType)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
@@ -388,71 +388,114 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var permissions = await _permissionRepository.GetPermissionSelectList(permissionType);
+        IEnumerable<string>? allowedPermissionKeys = null;
+        if (permissionType == PermissionType.User)
+        {
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
+        }
+        else if (permissionType == PermissionType.Cave)
+        {
+            allowedPermissionKeys = [PermissionKey.View, PermissionKey.Manager];
+        }
+
+        var permissions = await _permissionRepository.GetPermissionSelectList(permissionType, allowedPermissionKeys);
         return permissions;
     }
-    
-      public async Task<IEnumerable<UserPermissionVm>> GetUserPermissions(string userId)
-        {
-            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            {
-                throw ApiExceptionDictionary.NoAccount;
-            }
 
-            var permissions = await Repository.GetUserPermissions(userId);
-            return permissions;
+    public async Task<IEnumerable<UserPermissionVm>> GetUserPermissions(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
         }
 
-        public async Task AddUserPermission(string userId, string permissionKey)
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
         {
-            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            {
-                throw ApiExceptionDictionary.NoAccount;
-            }
-            
-            if (RequestUser.Id.Equals(userId))
-            {
-                throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
-            }
-
-            var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
-            if (userHasPermission != null)
-            {
-                throw ApiExceptionDictionary.BadRequest("User already has this permission.");
-            }
-
-            var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
-            if (permission == null)
-            {
-                throw ApiExceptionDictionary.NotFound("Permission");
-            }
-
-            var entity = new UserPermission
-            {
-                UserId = userId,
-                AccountId = RequestUser.AccountId,
-                Permission = permission
-            };
-
-            _userRepository.Add(entity);
-            await _userRepository.SaveChangesAsync();
+            throw ApiExceptionDictionary.NotFound("User");
         }
 
-        public async Task RemoveUserPermission(string userId, string permissionKey)
+        var permissions = await Repository.GetUserPermissions(userId);
+        return permissions;
+    }
+
+    public async Task AddUserPermission(string userId, string permissionKey)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
-            if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            {
-                throw ApiExceptionDictionary.NoAccount;
-            }
-
-            var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
-            if (userPermission == null)
-            {
-                throw ApiExceptionDictionary.NotFound("User Permission");
-            }
-
-            _userRepository.Delete(userPermission);
-            await _userRepository.SaveChangesAsync();
+            throw ApiExceptionDictionary.NoAccount;
         }
-    
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
+
+        if (RequestUser.Id.Equals(userId))
+        {
+            throw ApiExceptionDictionary.BadRequest("You cannot change your own permissions.");
+        }
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        var userHasPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+        if (userHasPermission != null)
+        {
+            throw ApiExceptionDictionary.BadRequest("User already has this permission.");
+        }
+
+        var permission = await _permissionRepository.GetPermissionByKey(permissionKey);
+        if (permission == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Permission");
+        }
+
+        if (permission.Key == PermissionKey.PlanarianAdmin)
+        {
+            throw ApiExceptionDictionary.BadRequest("Planarian Admin cannot be assigned from account user management.");
+        }
+
+        if (permission.PermissionType != PermissionType.User)
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid permission type.");
+        }
+
+        var entity = new UserPermission
+        {
+            UserId = userId,
+            AccountId = RequestUser.AccountId,
+            Permission = permission
+        };
+
+        _userRepository.Add(entity);
+        await _userRepository.SaveChangesAsync();
+    }
+
+    public async Task RemoveUserPermission(string userId, string permissionKey)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Admin);
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        var userPermission = await _userRepository.GetUserPermission(userId, permissionKey);
+        if (userPermission == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User Permission");
+        }
+
+        _userRepository.Delete(userPermission);
+        await _userRepository.SaveChangesAsync();
+    }
 }
