@@ -45,11 +45,12 @@ public static class RequestThrottleKeyHelper
         ApplicationEventType eventType,
         RequestThrottleKeyType scope,
         string partition,
-        DateTime windowStartedOn)
+        DateTime windowStartedOn,
+        ApplicationEventScope? eventScope = null)
     {
         return CreateKey(
             RequestThrottleKeyType.ApplicationEventLog,
-            [eventType.ToString(), scope.ToString(), partition, windowStartedOn.ToString("O")]);
+            [eventType.ToString(), eventScope?.ToString(), scope.ToString(), partition, windowStartedOn.ToString("O")]);
     }
 
     private static string? NormalizeIpAddress(IPAddress? ipAddress)
@@ -67,6 +68,7 @@ public enum RequestThrottleKeyType
 {
     ApplicationEventLog,
     EndpointRateLimit,
+    FileAccess,
     LoginIp,
     LoginEmail,
     PasswordResetIp,

@@ -36,13 +36,19 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (user == null)
         {
-            await _requestThrottleService.RecordLoginFailure(email, LoginFailureReason.EmailDoesNotExist);
+            await _requestThrottleService.CountAttempts(
+                RequestThrottleService.ThrottleOperation.Login,
+                ApplicationEventScope.LoginFailureEmailDoesNotExist,
+                email);
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         
         if (user.EmailConfirmedOn == null)
         {
-            await _requestThrottleService.RecordLoginFailure(email, LoginFailureReason.UnconfirmedEmail);
+            await _requestThrottleService.CountAttempts(
+                RequestThrottleService.ThrottleOperation.Login,
+                ApplicationEventScope.LoginFailureUnconfirmedEmail,
+                email);
             await Repository.SaveChangesAsync();
             if (user.EmailConfirmationCode != null)
                 await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
@@ -54,14 +60,20 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (string.IsNullOrWhiteSpace(user.HashedPassword))
         {
-            await _requestThrottleService.RecordLoginFailure(email, LoginFailureReason.InvalidPassword);
+            await _requestThrottleService.CountAttempts(
+                RequestThrottleService.ThrottleOperation.Login,
+                ApplicationEventScope.LoginFailureInvalidPassword,
+                email);
             throw ApiExceptionDictionary.InvalidPassword;
         }
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
         if (!isValid)
         {
-            await _requestThrottleService.RecordLoginFailure(email, LoginFailureReason.InvalidPassword);
+            await _requestThrottleService.CountAttempts(
+                RequestThrottleService.ThrottleOperation.Login,
+                ApplicationEventScope.LoginFailureInvalidPassword,
+                email);
             throw ApiExceptionDictionary.InvalidPassword;
         }
 

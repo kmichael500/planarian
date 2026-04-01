@@ -182,7 +182,10 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByEmail(email);
         if (user == null)
         {
-            await _requestThrottleService.RecordPasswordResetRequested(email, "Email does not exist");
+            await _requestThrottleService.CountAttempts(
+                RequestThrottleService.ThrottleOperation.PasswordReset,
+                ApplicationEventScope.PasswordResetRequested,
+                email);
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
 
@@ -192,7 +195,10 @@ public class UserService : ServiceBase<UserRepository>
         user.PasswordResetCodeExpiration = expiresOn;
 
         await Repository.SaveChangesAsync();
-        await _requestThrottleService.RecordPasswordResetRequested(email, "Password reset requested");
+        await _requestThrottleService.CountAttempts(
+            RequestThrottleService.ThrottleOperation.PasswordReset,
+            ApplicationEventScope.PasswordResetRequested,
+            email);
 
         await _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }

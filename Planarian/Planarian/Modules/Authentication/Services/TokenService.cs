@@ -12,7 +12,9 @@ namespace Planarian.Modules.Authentication.Services;
 public class TokenService
 {
     private const double ExpiryDurationMinutes = 43200;
+    private const double FileAccessTicketExpiryDurationSeconds = 15;
     public static readonly string UserIdClaimType = nameof(UserToken.Id).ToCamelCase();
+    private const string FileAccessFileIdClaimType = "file_id";
     private readonly AuthOptions _authOptions;
 
     public TokenService(AuthOptions authOptions)
@@ -35,6 +37,20 @@ public class TokenService
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
         var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims,
             expires: DateTime.UtcNow.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);
+        return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+    }
+
+    public string BuildFileAccessToken(string fileId)
+    {
+        var claims = new List<Claim>
+        {
+            new(FileAccessFileIdClaimType, fileId)
+        };
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
+        var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims,
+            expires: DateTime.UtcNow.AddSeconds(FileAccessTicketExpiryDurationSeconds), signingCredentials: credentials);
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
     }
 
@@ -84,4 +100,22 @@ public class TokenService
     {
         return principal.FindFirst(UserIdClaimType)?.Value;
     }
+
+    public FileAccessTokenPayload ReadFileAccessToken(string token)
+    {
+        if (!IsTokenValid(token))
+            throw new SecurityTokenException("Invalid token");
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var jwtToken = tokenHandler.ReadJwtToken(token);
+
+        var fileId = jwtToken.Claims.FirstOrDefault(claim => claim.Type == FileAccessFileIdClaimType)?.Value;
+
+        if (string.IsNullOrWhiteSpace(fileId))
+            throw new SecurityTokenException("Invalid token");
+
+        return new FileAccessTokenPayload(fileId);
+    }
 }
+
+public sealed record FileAccessTokenPayload(string FileId);

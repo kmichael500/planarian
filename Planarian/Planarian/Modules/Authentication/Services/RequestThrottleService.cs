@@ -43,37 +43,16 @@ public class RequestThrottleService
 
     public async Task EnsureLoginAllowed(string? email)
     {
-        var normalizedEmail = NormalizeEmail(email);
-        await EnsureAllowed(
-            ThrottleOperation.Login,
-            normalizedEmail,
-            ApplicationEventType.LoginThrottled);
-    }
-
-    public async Task RecordLoginFailure(string? email, LoginFailureReason reason)
-    {
-        var normalizedEmail = NormalizeEmail(email);
-        var message = reason switch
-        {
-            LoginFailureReason.EmailDoesNotExist => "Email does not exist",
-            LoginFailureReason.InvalidPassword => "Password is invalid",
-            LoginFailureReason.UnconfirmedEmail => "Email is not confirmed",
-            _ => "Login failed"
-        };
-
-        await RecordFailure(
-            ThrottleOperation.Login,
-            normalizedEmail,
-            ApplicationEventType.LoginFailure,
-            message,
-            new LoginFailureEventData(reason));
+        await EnsureAllowed(ThrottleOperation.Login, ApplicationEventScope.LoginThrottled, email);
     }
 
     public void ClearLoginFailures(string? email)
     {
-        var normalizedEmail = NormalizeEmail(email);
-
-        _cache.Remove(RequestThrottleKeyHelper.CreateKey(RequestThrottleKeyType.LoginEmail, [normalizedEmail]));
+        Clear(
+            ThrottleOperation.Login,
+            ApplicationEventScope.LoginThrottled,
+            email,
+            [RequestThrottleKeyType.LoginEmail]);
     }
 
     #endregion
@@ -82,19 +61,42 @@ public class RequestThrottleService
 
     public async Task EnsurePasswordResetAllowed(string? email)
     {
-        await EnsureAllowed(
-            ThrottleOperation.PasswordReset,
-            NormalizeEmail(email),
-            ApplicationEventType.PasswordResetThrottled);
+        await EnsureAllowed(ThrottleOperation.PasswordReset, ApplicationEventScope.PasswordResetThrottled, email);
     }
 
-    public async Task RecordPasswordResetRequested(string? email, string message)
+    #endregion
+
+    #region File Access Throttling
+
+    public async Task EnsureFileAccessAllowed(string fileId)
     {
-        await RecordFailure(
-            ThrottleOperation.PasswordReset,
-            NormalizeEmail(email),
-            ApplicationEventType.PasswordResetRequested,
-            message);
+        await EnsureAllowed(
+            ThrottleOperation.FileAccess,
+            ApplicationEventScope.FileAccessThrottled,
+            fileId,
+            countAttemptOnSuccess: true);
+    }
+
+    #endregion
+
+    #region Counted Events
+
+    internal async Task CountAttempts(
+        ThrottleOperation operation,
+        ApplicationEventScope scope,
+        string? identifier,
+        object? data = null)
+    {
+        foreach (var rule in GetRules(operation, scope, identifier))
+        {
+            var state = GetState(RequestThrottleKeyHelper.CreateKey(rule.KeyType, rule.KeyParts), rule.Window);
+            lock (state.SyncRoot)
+            {
+                state.Count++;
+            }
+
+            await AggregateEventAsync(rule, state, data);
+        }
     }
 
     #endregion
@@ -130,7 +132,8 @@ public class RequestThrottleService
             ApplicationEventType.EndpointRateLimitThrottled,
             RequestThrottleKeyType.EndpointRateLimit,
             partitionKey,
-            window.StartedOn);
+            window.StartedOn,
+            ApplicationEventScope.EndpointRateLimitThrottled);
 
         await _applicationEventLogService.UpsertAsync(
             ApplicationEventCategory.Security,
@@ -138,7 +141,7 @@ public class RequestThrottleService
             aggregationKey,
             window.StartedOn,
             window.EndsOn,
-            message: "Rate limit exceeded. Please try again later.");
+            ApplicationEventScope.EndpointRateLimitThrottled);
     }
 
     private int GetEndpointRequestsPerMinute(Endpoint? endpoint)
@@ -169,10 +172,11 @@ public class RequestThrottleService
 
     private async Task EnsureAllowed(
         ThrottleOperation operation,
-        string normalizedIdentifier,
-        ApplicationEventType eventType)
+        ApplicationEventScope scope,
+        string? identifier,
+        bool countAttemptOnSuccess = false)
     {
-        foreach (var rule in GetRules(operation, normalizedIdentifier))
+        foreach (var rule in GetRules(operation, scope, identifier))
         {
             if (rule.Limit <= 0)
             {
@@ -188,6 +192,10 @@ public class RequestThrottleService
                 {
                     retryAfter = Math.Max(1, (int)Math.Ceiling((state.ExpiresOn - DateTimeOffset.UtcNow).TotalSeconds));
                 }
+                else if (countAttemptOnSuccess)
+                {
+                    state.Count++;
+                }
             }
 
             if (retryAfter == null)
@@ -195,65 +203,112 @@ public class RequestThrottleService
                 continue;
             }
 
-            await AggregateEventAsync(rule, state, eventType, normalizedIdentifier, rule.Message);
+            await AggregateEventAsync(rule, state);
 
-            throw ApiExceptionDictionary.TooManyRequests(rule.Message, retryAfter.Value);
+            throw ApiExceptionDictionary.TooManyRequests(rule.TooManyRequestsMessage, retryAfter.Value);
         }
     }
 
-    private async Task RecordFailure(
+    private void Clear(
         ThrottleOperation operation,
-        string normalizedIdentifier,
-        ApplicationEventType eventType,
-        string message,
-        object? data = null)
+        ApplicationEventScope scope,
+        string? identifier,
+        IEnumerable<RequestThrottleKeyType>? keyTypes = null)
     {
-        foreach (var rule in GetRules(operation, normalizedIdentifier))
+        HashSet<RequestThrottleKeyType>? filter = keyTypes?.ToHashSet();
+
+        foreach (var rule in GetRules(operation, scope, identifier))
         {
-            var state = GetState(RequestThrottleKeyHelper.CreateKey(rule.KeyType, rule.KeyParts), rule.Window);
-            lock (state.SyncRoot)
+            if (filter != null && !filter.Contains(rule.KeyType))
             {
-                state.Count++;
+                continue;
             }
 
-            await AggregateEventAsync(rule, state, eventType, normalizedIdentifier, message, data);
-        }
-    }
-
-    private void Clear(ThrottleOperation operation, string normalizedIdentifier)
-    {
-        foreach (var rule in GetRules(operation, normalizedIdentifier))
-        {
             _cache.Remove(RequestThrottleKeyHelper.CreateKey(rule.KeyType, rule.KeyParts));
         }
     }
 
-    private IReadOnlyList<ThrottleRule> GetRules(ThrottleOperation operation, string normalizedIdentifier)
+    private IReadOnlyList<ThrottleRule> GetRules(
+        ThrottleOperation operation,
+        ApplicationEventScope scope,
+        string? identifier)
     {
+        var normalizedIdentifier = NormalizeIdentifier(operation, identifier);
         var ipAddress = RequestThrottleKeyHelper.GetClientIpAddress(_httpContextAccessor.HttpContext);
 
-        return operation switch
+        IReadOnlyList<ThrottleRule> rules = (operation, scope) switch
         {
-            ThrottleOperation.Login =>
+            (ThrottleOperation.Login, ApplicationEventScope.LoginFailureEmailDoesNotExist) =>
             [
-                new ThrottleRule(RequestThrottleKeyType.LoginIp, _options.LoginIpLimit,
-                    TimeSpan.FromMinutes(_options.LoginWindowMinutes),
-                    "Too many login attempts from this IP address.", [ipAddress]),
-                new ThrottleRule(RequestThrottleKeyType.LoginEmail, _options.LoginEmailLimit,
-                    TimeSpan.FromMinutes(_options.LoginWindowMinutes),
-                    "Too many login attempts for this email address.", [normalizedIdentifier])
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureEmailDoesNotExist,
+                    RequestThrottleKeyType.LoginIp, _options.LoginIpLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureEmailDoesNotExist,
+                    RequestThrottleKeyType.LoginEmail, _options.LoginEmailLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
             ],
-            ThrottleOperation.PasswordReset =>
+            (ThrottleOperation.Login, ApplicationEventScope.LoginFailureInvalidPassword) =>
             [
-                new ThrottleRule(RequestThrottleKeyType.PasswordResetIp, _options.PasswordResetIpLimit,
-                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes),
-                    "Too many password reset requests from this IP address.", [ipAddress]),
-                new ThrottleRule(RequestThrottleKeyType.PasswordResetEmail, _options.PasswordResetEmailLimit,
-                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes),
-                    "Too many password reset requests for this email address.", [normalizedIdentifier])
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureInvalidPassword,
+                    RequestThrottleKeyType.LoginIp, _options.LoginIpLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureInvalidPassword,
+                    RequestThrottleKeyType.LoginEmail, _options.LoginEmailLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
             ],
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
+            (ThrottleOperation.Login, ApplicationEventScope.LoginFailureUnconfirmedEmail) =>
+            [
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureUnconfirmedEmail,
+                    RequestThrottleKeyType.LoginIp, _options.LoginIpLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.LoginFailure, ApplicationEventScope.LoginFailureUnconfirmedEmail,
+                    RequestThrottleKeyType.LoginEmail, _options.LoginEmailLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
+            ],
+            (ThrottleOperation.Login, ApplicationEventScope.LoginThrottled) =>
+            [
+                new(operation, ApplicationEventType.LoginThrottled, ApplicationEventScope.LoginThrottled,
+                    RequestThrottleKeyType.LoginIp, _options.LoginIpLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.LoginThrottled, ApplicationEventScope.LoginThrottled,
+                    RequestThrottleKeyType.LoginEmail, _options.LoginEmailLimit,
+                    TimeSpan.FromMinutes(_options.LoginWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
+            ],
+            (ThrottleOperation.PasswordReset, ApplicationEventScope.PasswordResetRequested) =>
+            [
+                new(operation, ApplicationEventType.PasswordResetRequested, ApplicationEventScope.PasswordResetRequested,
+                    RequestThrottleKeyType.PasswordResetIp, _options.PasswordResetIpLimit,
+                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.PasswordResetRequested, ApplicationEventScope.PasswordResetRequested,
+                    RequestThrottleKeyType.PasswordResetEmail, _options.PasswordResetEmailLimit,
+                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
+            ],
+            (ThrottleOperation.PasswordReset, ApplicationEventScope.PasswordResetThrottled) =>
+            [
+                new(operation, ApplicationEventType.PasswordResetThrottled, ApplicationEventScope.PasswordResetThrottled,
+                    RequestThrottleKeyType.PasswordResetIp, _options.PasswordResetIpLimit,
+                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes), normalizedIdentifier, [ipAddress]),
+                new(operation, ApplicationEventType.PasswordResetThrottled, ApplicationEventScope.PasswordResetThrottled,
+                    RequestThrottleKeyType.PasswordResetEmail, _options.PasswordResetEmailLimit,
+                    TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
+            ],
+            (ThrottleOperation.FileAccess, ApplicationEventScope.FileAccessThrottled) =>
+            [
+                new(operation, ApplicationEventType.FileAccessThrottled, ApplicationEventScope.FileAccessThrottled,
+                    RequestThrottleKeyType.FileAccess, _options.FileAccessPerUserPerFileLimit,
+                    TimeSpan.FromMinutes(_options.FileAccessWindowMinutes), normalizedIdentifier,
+                    [$"user:{_requestUser.Id}", $"file:{normalizedIdentifier}"])
+            ],
+            _ => []
         };
+
+        if (rules.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No throttle rules are defined for operation '{operation}' and scope '{scope}'.");
+        }
+
+        return rules;
     }
 
     #endregion
@@ -278,26 +333,24 @@ public class RequestThrottleService
     private async Task AggregateEventAsync(
         ThrottleRule rule,
         CounterState state,
-        ApplicationEventType eventType,
-        string normalizedIdentifier,
-        string message,
         object? data = null)
     {
         var partition = RequestThrottleKeyHelper.CreateKeyValue(rule.KeyParts);
         var aggregationKey = RequestThrottleKeyHelper.CreateAggregationKey(
-            eventType,
+            rule.EventType,
             rule.KeyType,
             partition,
-            state.StartedOn);
+            state.StartedOn,
+            rule.Scope);
 
         await _applicationEventLogService.UpsertAsync(
             ApplicationEventCategory.Security,
-            eventType,
+            rule.EventType,
             aggregationKey,
             state.StartedOn,
             state.ExpiresOn.UtcDateTime,
-            normalizedIdentifier,
-            message,
+            rule.Scope,
+            rule.NormalizedIdentifier,
             SerializeData(data));
     }
 
@@ -305,9 +358,14 @@ public class RequestThrottleService
 
     #region Helpers
 
-    private static string NormalizeEmail(string? email)
+    private static string NormalizeIdentifier(ThrottleOperation operation, string? identifier)
     {
-        return email?.Trim().ToLowerInvariant() ?? string.Empty;
+        return operation switch
+        {
+            ThrottleOperation.Login or ThrottleOperation.PasswordReset => identifier?.Trim().ToLowerInvariant() ?? string.Empty,
+            ThrottleOperation.FileAccess => identifier?.Trim() ?? string.Empty,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
+        };
     }
 
     private static WindowRange GetWindow(DateTime utcNow, TimeSpan window)
@@ -343,19 +401,49 @@ public class RequestThrottleService
 
     #region Nested Types
 
-    private enum ThrottleOperation
+    internal enum ThrottleOperation
     {
         Login,
-        PasswordReset
+        PasswordReset,
+        FileAccess
     }
 
     private sealed record ThrottleRule(
+        ThrottleOperation Operation,
+        ApplicationEventType EventType,
+        ApplicationEventScope Scope,
         RequestThrottleKeyType KeyType,
         int Limit,
         TimeSpan Window,
-        string Message,
-        string?[] KeyParts);
-    private sealed record LoginFailureEventData(LoginFailureReason Reason);
+        string NormalizedIdentifier,
+        string?[] KeyParts)
+    {
+        public string TooManyRequestsMessage =>
+            $"Too many attempts. Limit is {Limit} per {GetWindowDescription(Window)}.";
 
+        private static string GetWindowDescription(TimeSpan window)
+        {
+            if (window.TotalDays >= 1 && window.TotalDays == Math.Truncate(window.TotalDays))
+            {
+                var days = (int)window.TotalDays;
+                return days == 1 ? "1 day" : $"{days} days";
+            }
+
+            if (window.TotalHours >= 1 && window.TotalHours == Math.Truncate(window.TotalHours))
+            {
+                var hours = (int)window.TotalHours;
+                return hours == 1 ? "1 hour" : $"{hours} hours";
+            }
+
+            if (window.TotalMinutes >= 1 && window.TotalMinutes == Math.Truncate(window.TotalMinutes))
+            {
+                var minutes = (int)window.TotalMinutes;
+                return minutes == 1 ? "1 minute" : $"{minutes} minutes";
+            }
+
+            var seconds = Math.Max(1, (int)Math.Ceiling(window.TotalSeconds));
+            return seconds == 1 ? "1 second" : $"{seconds} seconds";
+        }
+    }
     #endregion
 }

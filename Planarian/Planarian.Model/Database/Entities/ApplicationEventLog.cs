@@ -8,6 +8,7 @@ public class ApplicationEventLog : EntityBase
 {
     public ApplicationEventCategory Category { get; set; }
     public ApplicationEventType EventType { get; set; }
+    public ApplicationEventScope? Scope { get; set; }
 
     [Required]
     public DateTime OccurredOn { get; set; }
@@ -38,9 +39,6 @@ public class ApplicationEventLog : EntityBase
     public string Path { get; set; } = string.Empty;
 
     [MaxLength(PropertyLength.Max)]
-    public string? Message { get; set; }
-
-    [MaxLength(PropertyLength.Max)]
     public string? DataJson { get; set; }
 }
 
@@ -51,6 +49,7 @@ public class ApplicationEventLogConfiguration : BaseEntityTypeConfiguration<Appl
         base.Configure(builder);
         ConfigureEnum(builder, e => e.Category);
         ConfigureEnum(builder, e => e.EventType);
+        ConfigureEnum(builder, e => e.Scope);
         builder.HasIndex(e => e.AggregationKey).IsUnique();
     }
 }
@@ -66,12 +65,18 @@ public enum ApplicationEventType
     LoginThrottled,
     PasswordResetRequested,
     PasswordResetThrottled,
-    EndpointRateLimitThrottled
+    EndpointRateLimitThrottled,
+    FileAccessThrottled
 }
 
-public enum LoginFailureReason
+public enum ApplicationEventScope
 {
-    EmailDoesNotExist,
-    InvalidPassword,
-    UnconfirmedEmail
+    LoginFailureEmailDoesNotExist,
+    LoginFailureInvalidPassword,
+    LoginFailureUnconfirmedEmail,
+    LoginThrottled,
+    PasswordResetRequested,
+    PasswordResetThrottled,
+    FileAccessThrottled,
+    EndpointRateLimitThrottled
 }

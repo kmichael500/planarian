@@ -31,18 +31,16 @@ namespace Planarian.Modules.Caves.Services;
 public class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
-    private readonly FileRepository _fileRepository;
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ServerOptions _serverOptions;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, TagRepository tagRepository,
+        TagRepository tagRepository,
         FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
-        _fileRepository = fileRepository;
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _serverOptions = serverOptions;
@@ -815,18 +813,6 @@ public class CaveService : ServiceBase<CaveRepository>
         var cave = await Repository.GetCave(caveId);
 
         if (cave == null) throw ApiExceptionDictionary.NotFound("Cave");
-
-        foreach (var file in cave.Files)
-        {
-            var fileProperties = await _fileRepository.GetFileBlobProperties(file.Id);
-            if (fileProperties == null || string.IsNullOrWhiteSpace(fileProperties.BlobKey) ||
-                string.IsNullOrWhiteSpace(fileProperties.ContainerName)) continue;
-
-            file.EmbedUrl =
-                await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName, file.FileName);
-            file.DownloadUrl = await _fileService.GetLink(fileProperties.BlobKey, fileProperties.ContainerName,
-                file.FileName, true);
-        }
 
         return cave;
     }

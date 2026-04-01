@@ -5,5 +5,5 @@ public class FileOptions
     public const string Key = "File";
 
     public string ConnectionString { get; set; } = null!;
-    public int SasLinkExpirationMinutes { get; set; } = 5;
+    public int SasLinkExpirationSeconds { get; set; } = 15;
 }

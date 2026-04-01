@@ -36,4 +36,14 @@ public class RequestThrottleOptions
     /// Maximum number of password reset requests allowed for a single email address within the password reset throttling window.
     /// </summary>
     public int PasswordResetEmailLimit { get; set; } = 12;
+
+    /// <summary>
+    /// Length of the throttling window, in minutes, for repeated file access tracked by user and file.
+    /// </summary>
+    public int FileAccessWindowMinutes { get; set; } = 1;
+
+    /// <summary>
+    /// Maximum number of times a single user can request access to the same file within the file access window.
+    /// </summary>
+    public int FileAccessPerUserPerFileLimit { get; set; } = 10;
 }

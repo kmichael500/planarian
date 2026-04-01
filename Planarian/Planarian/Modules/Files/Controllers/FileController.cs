@@ -17,6 +17,32 @@ public class FileController : PlanarianControllerBase<FileService>
     {
     }
 
+    [Authorize]
+    [HttpPost("{fileId:length(10)}/access-ticket")]
+    public async Task<ActionResult<FileAccessTicketVm>> CreateAccessTicket(
+        string fileId,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.CreateAccessTicket(fileId, cancellationToken);
+        return new JsonResult(result);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{fileId:length(10)}/view")]
+    public async Task<IActionResult> ViewFile(string fileId, [FromQuery] string? ticket, CancellationToken cancellationToken)
+    {
+        var redirectUrl = await Service.GetSasUrl(fileId, false, ticket, cancellationToken);
+        return Redirect(redirectUrl);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("{fileId:length(10)}/download")]
+    public async Task<IActionResult> DownloadFile(string fileId, [FromQuery] string? ticket, CancellationToken cancellationToken)
+    {
+        var redirectUrl = await Service.GetSasUrl(fileId, true, ticket, cancellationToken);
+        return Redirect(redirectUrl);
+    }
+
     [HttpPut("multiple")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<IActionResult> UpdateFilesMetadata([FromBody] IEnumerable<EditFileMetadataVm> values,
@@ -32,4 +58,9 @@ public class EditFileMetadataVm
     public string Id { get; set; }
     public string DisplayName { get; set; }
     public string FileTypeTagId { get; set; }
+}
+
+public class FileAccessTicketVm
+{
+    public string Ticket { get; set; } = null!;
 }

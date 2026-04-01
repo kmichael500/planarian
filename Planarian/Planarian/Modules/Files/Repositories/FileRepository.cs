@@ -35,6 +35,27 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public sealed record FileAccessInfoResult(
+        string Id,
+        string FileName,
+        string? BlobKey,
+        string? ContainerName,
+        string? CaveId,
+        string? CountyId);
+
+    public async Task<FileAccessInfoResult?> GetFileAccessInfo(string id, bool checkRequestUserAccountId = true)
+    {
+        return await DbContext.Files
+            .Where(e => e.Id == id && (!checkRequestUserAccountId || e.AccountId == RequestUser.AccountId))
+            .Select(e => new FileAccessInfoResult(
+                e.Id,
+                e.FileName,
+                e.BlobKey,
+                e.BlobContainer,
+                e.CaveId,
+                e.Cave != null ? e.Cave.CountyId : null))
+            .FirstOrDefaultAsync();
+    }
 
     public sealed record GetFileBlobPropertiesResult(string? BlobKey, string? ContainerName);
 

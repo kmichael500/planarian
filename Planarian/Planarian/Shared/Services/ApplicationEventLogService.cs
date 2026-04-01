@@ -29,8 +29,8 @@ public class ApplicationEventLogService
     public async Task WriteAsync(
         ApplicationEventCategory category,
         ApplicationEventType eventType,
+        ApplicationEventScope? scope = null,
         string? identifier = null,
-        string? message = null,
         string? dataJson = null,
         CancellationToken cancellationToken = default)
     {
@@ -38,18 +38,18 @@ public class ApplicationEventLogService
         {
             Category = category,
             EventType = eventType,
+            Scope = scope,
             OccurredOn = DateTime.UtcNow,
             UserId = _requestUser.IsAuthenticated ? _requestUser.Id : null,
             AccountId = _requestUser.IsAuthenticated ? _requestUser.AccountId : null,
             IpAddress = RequestThrottleKeyHelper.GetClientIpAddress(_httpContextAccessor.HttpContext),
             NormalizedIdentifier = identifier,
             Path = GetRequestPath(),
-            Message = message,
             DataJson = dataJson
         };
 
-        using var scope = _serviceScopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<PlanarianDbContext>();
+        using var serviceScope = _serviceScopeFactory.CreateScope();
+        var dbContext = serviceScope.ServiceProvider.GetRequiredService<PlanarianDbContext>();
         dbContext.ApplicationEventLogs.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -60,8 +60,8 @@ public class ApplicationEventLogService
         string aggregationKey,
         DateTime windowStartedOn,
         DateTime windowEndsOn,
+        ApplicationEventScope? scope = null,
         string? identifier = null,
-        string? message = null,
         string? dataJson = null,
         CancellationToken cancellationToken = default)
     {
@@ -70,8 +70,8 @@ public class ApplicationEventLogService
 
         try
         {
-            using var scope = _serviceScopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<PlanarianDbContext>();
+            using var serviceScope = _serviceScopeFactory.CreateScope();
+            var dbContext = serviceScope.ServiceProvider.GetRequiredService<PlanarianDbContext>();
             var accountId = _requestUser.IsAuthenticated ? _requestUser.AccountId : null;
             var userId = _requestUser.IsAuthenticated ? _requestUser.Id : null;
             var ipAddress = RequestThrottleKeyHelper.GetClientIpAddress(_httpContextAccessor.HttpContext);
@@ -86,6 +86,7 @@ public class ApplicationEventLogService
                 {
                     Category = category,
                     EventType = eventType,
+                    Scope = scope,
                     OccurredOn = DateTime.UtcNow,
                     AttemptCount = 1,
                     WindowStartedOn = windowStartedOn,
@@ -96,7 +97,6 @@ public class ApplicationEventLogService
                     NormalizedIdentifier = identifier,
                     AggregationKey = aggregationKey,
                     Path = path,
-                    Message = message,
                     DataJson = dataJson
                 };
 
@@ -106,7 +106,7 @@ public class ApplicationEventLogService
             {
                 entity.AttemptCount += 1;
                 entity.OccurredOn = DateTime.UtcNow;
-                entity.Message = message;
+                entity.Scope = scope;
                 entity.DataJson = dataJson;
                 entity.Path = path;
                 entity.IpAddress = ipAddress;
