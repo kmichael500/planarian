@@ -252,14 +252,16 @@ public class FileService : ServiceBase<FileRepository>
         // Get the MIME type of the file
         var mimeType = MimeTypes.GetMimeType(fileExtension);
 
-        // Generate a SAS token for the blob with read permissions that expires in 1 hour
+        var sasExpirationMinutes = Math.Max(1, _fileOptions.SasLinkExpirationMinutes);
+
+        // Generate a SAS token for the blob with read permissions that expires quickly
         var sasBuilder = new BlobSasBuilder()
         {
             BlobContainerName = blobClient.BlobContainerName,
             BlobName = blobClient.Name,
             Resource = "b", // "b" for blob
             StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(sasExpirationMinutes),
             ContentDisposition = download
                 ? $"attachment; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}"
                 : $"inline; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}",

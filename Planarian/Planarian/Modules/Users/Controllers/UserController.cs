@@ -4,6 +4,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Services;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Users.Controllers;
@@ -88,6 +89,7 @@ public class UserController : PlanarianControllerBase<UserService>
 
     [AllowAnonymous]
     [HttpPost("reset-password/email/{email}")]
+    [RateLimit(10)]
     public async Task<ActionResult> SendPasswordReset(string email)
     {
         await Service.SendResetPasswordEmail(email);

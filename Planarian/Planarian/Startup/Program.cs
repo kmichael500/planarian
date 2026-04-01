@@ -1,20 +1,22 @@
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
+using System.Threading.RateLimiting;
 using System.Text;
 using System.Text.Json.Serialization;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
@@ -49,6 +51,7 @@ using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Modules.Users.Services;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
@@ -153,6 +156,15 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
+var rateLimitOptions = builder.Configuration.GetSection(RateLimitOptions.Key).Get<RateLimitOptions>() ??
+                       new RateLimitOptions();
+builder.Services.AddSingleton(rateLimitOptions);
+
+var requestThrottleOptions =
+    builder.Configuration.GetSection(RequestThrottleOptions.Key).Get<RequestThrottleOptions>() ??
+    new RequestThrottleOptions();
+builder.Services.AddSingleton(requestThrottleOptions);
+
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
@@ -164,11 +176,13 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<ApplicationEventLogService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
@@ -223,6 +237,7 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddSignalR();
+builder.Services.AddHttpContextAccessor();
 
 #endregion
 
@@ -342,6 +357,38 @@ builder.Services.AddAuthorization(options =>
 
 #endregion
 
+#region Rate Limiting
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var requestThrottleService =
+            context.HttpContext.RequestServices.GetRequiredService<RequestThrottleService>();
+
+        await requestThrottleService.RecordEndpointRateLimitHit(context.HttpContext);
+
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            headers["Retry-After"] = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+
+        await HttpResponseExceptionMiddleware.WriteErrorResponseAsync(
+            context.HttpContext,
+            StatusCodes.Status429TooManyRequests,
+            "Rate limit exceeded. Please try again later.",
+            ApiExceptionType.TooManyRequests,
+            headers: headers);
+    };
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        httpContext.RequestServices.GetRequiredService<RequestThrottleService>()
+            .GetEndpointRateLimitPartition(httpContext));
+});
+
+#endregion
+
 #region Compression
 
 builder.Services.AddResponseCompression(options =>
@@ -376,7 +423,7 @@ if (false)
 
     var dbContext = services.GetRequiredService<PlanarianDbContext>();
     var dataGenerator = new DataGenerator(dbContext);
-    
+
     await dataGenerator.AddOrUpdateDefaultData();
 }
 
@@ -401,6 +448,7 @@ app.UseCors(x =>
 
 app.UseAuthentication();
 app.UseMiddleware<RequestUserMiddleware>();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 

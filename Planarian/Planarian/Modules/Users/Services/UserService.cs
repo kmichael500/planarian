@@ -19,14 +19,16 @@ public class UserService : ServiceBase<UserRepository>
 {
     private const int PasswordResetExpirationMinutes = 30;
     private readonly EmailService _emailService;
+    private readonly RequestThrottleService _requestThrottleService;
     private readonly ServerOptions _serverOptions;
 
     public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService,
-        ServerOptions serverOptions) : base(repository,
+        ServerOptions serverOptions, RequestThrottleService requestThrottleService) : base(repository,
         requestUser)
     {
         _emailService = emailService;
         _serverOptions = serverOptions;
+        _requestThrottleService = requestThrottleService;
     }
 
     public async Task UpdateCurrentUser(UserVm user)
@@ -175,8 +177,14 @@ public class UserService : ServiceBase<UserRepository>
 
     public async Task SendResetPasswordEmail(string email)
     {
+        await _requestThrottleService.EnsurePasswordResetAllowed(email);
+
         var user = await Repository.GetUserByEmail(email);
-        if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
+        if (user == null)
+        {
+            await _requestThrottleService.RecordPasswordResetRequested(email, "Email does not exist");
+            throw ApiExceptionDictionary.EmailDoesNotExist;
+        }
 
         var resetCode = PasswordService.GenerateResetCode();
         var expiresOn = DateTime.UtcNow.AddMinutes(PasswordResetExpirationMinutes);
@@ -184,6 +192,7 @@ public class UserService : ServiceBase<UserRepository>
         user.PasswordResetCodeExpiration = expiresOn;
 
         await Repository.SaveChangesAsync();
+        await _requestThrottleService.RecordPasswordResetRequested(email, "Password reset requested");
 
         await _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }
