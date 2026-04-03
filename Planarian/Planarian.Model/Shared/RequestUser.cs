@@ -35,7 +35,7 @@ public class RequestUser
                 e.FirstName,
                 e.LastName,
                 e.LastActiveOn,
-                AccountIds = e.AccountUsers.Select(accountUser => accountUser.AccountId).ToList()
+                IsValidAccountId = e.AccountUsers.Any(au => au.AccountId == accountId)
             })
             .FirstOrDefaultAsync();
 
@@ -45,7 +45,7 @@ public class RequestUser
             return;
         }
 
-        var isValidAccountId = user.AccountIds.Contains(accountId);
+        var isValidAccountId = user.IsValidAccountId;
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
         {
