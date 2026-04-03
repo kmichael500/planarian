@@ -7,4 +7,6 @@ public class ServerOptions
     public string ClientBaseUrl { get; set; } = null!;
     public string ServerBaseUrl { get; set; } = null!;
     public string AllowedCorsOrigins { get; set; } = string.Empty;
+    public string SupportName { get; set; } = "Planarian Support";
+    public string SupportEmail { get; set; } = "support@planarian.app";
 }
