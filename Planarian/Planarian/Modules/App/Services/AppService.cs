@@ -30,12 +30,12 @@ public class AppService : ServiceBase<AppRepository>
         if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result; // if not authenticated
 
         var accountIds = await Repository.GetAccountIds();
-        
+        result.AccountIds = accountIds;
+
         if(string.IsNullOrWhiteSpace(RequestUser.AccountId)) return result;
         
         var permissions = await _userRepository.GetPermissions(RequestUser.Id, RequestUser.AccountId);
         
-        result.AccountIds = accountIds;
         result.Permissions = permissions;
         return result;
     }
