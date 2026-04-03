@@ -12,6 +12,7 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
+using Planarian.Shared.Throttling;
 
 namespace Planarian.Modules.Users.Services;
 
@@ -177,15 +178,11 @@ public class UserService : ServiceBase<UserRepository>
 
     public async Task SendResetPasswordEmail(string email)
     {
-        await _requestThrottleService.EnsurePasswordResetAllowed(email);
+        await _requestThrottleService.CountAttempt(ThrottleProfile.PasswordReset, email);
 
         var user = await Repository.GetUserByEmail(email);
         if (user == null)
         {
-            await _requestThrottleService.CountAttempts(
-                RequestThrottleService.ThrottleOperation.PasswordReset,
-                ApplicationEventScope.PasswordResetRequested,
-                email);
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
 
@@ -195,10 +192,6 @@ public class UserService : ServiceBase<UserRepository>
         user.PasswordResetCodeExpiration = expiresOn;
 
         await Repository.SaveChangesAsync();
-        await _requestThrottleService.CountAttempts(
-            RequestThrottleService.ThrottleOperation.PasswordReset,
-            ApplicationEventScope.PasswordResetRequested,
-            email);
 
         await _emailService.SendPasswordResetEmail(user.EmailAddress, user.FullName, resetCode);
     }

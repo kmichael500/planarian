@@ -2,7 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using Newtonsoft.Json;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Modules.Authentication.Models;
@@ -11,10 +11,7 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class TokenService
 {
-    private const double ExpiryDurationMinutes = 43200;
-    private const double FileAccessTicketExpiryDurationSeconds = 15;
     public static readonly string UserIdClaimType = nameof(UserToken.Id).ToCamelCase();
-    private const string FileAccessFileIdClaimType = "file_id";
     private readonly AuthOptions _authOptions;
 
     public TokenService(AuthOptions authOptions)
@@ -33,50 +30,17 @@ public class TokenService
         if (!string.IsNullOrWhiteSpace(user.CurrentAccountId))
             claims.Add(new Claim(nameof(user.CurrentAccountId).ToCamelCase(), user.CurrentAccountId));
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
-        var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims,
-            expires: DateTime.UtcNow.AddMinutes(ExpiryDurationMinutes), signingCredentials: credentials);
-        return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
-    }
-
-    public string BuildFileAccessToken(string fileId)
-    {
-        var claims = new List<Claim>
-        {
-            new(FileAccessFileIdClaimType, fileId)
-        };
-
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
-        var tokenDescriptor = new JwtSecurityToken(_authOptions.JwtIssuer, _authOptions.JwtIssuer, claims,
-            expires: DateTime.UtcNow.AddSeconds(FileAccessTicketExpiryDurationSeconds), signingCredentials: credentials);
-        return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+        return BuildToken(
+            _authOptions.JwtSecret,
+            claims,
+            _authOptions.JwtExpiryDurationSeconds);
     }
 
     public bool IsTokenValid(string token)
     {
-        var key = _authOptions.JwtSecret;
-        var issuer = _authOptions.JwtIssuer;
-
-        var mySecret = Encoding.UTF8.GetBytes(key);
-        var mySecurityKey = new SymmetricSecurityKey(mySecret);
-        var tokenHandler = new JwtSecurityTokenHandler();
-
         try
         {
-            tokenHandler.ValidateToken(token,
-                new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidIssuer = issuer,
-                    ValidAudience = issuer,
-                    IssuerSigningKey = mySecurityKey,
-                    ClockSkew = TimeSpan.Zero
-                }, out var validatedToken);
+            ValidateToken(token, _authOptions.JwtSecret);
         }
         catch
         {
@@ -101,21 +65,47 @@ public class TokenService
         return principal.FindFirst(UserIdClaimType)?.Value;
     }
 
-    public FileAccessTokenPayload ReadFileAccessToken(string token)
+    private string BuildToken(string secret, IEnumerable<Claim> claims, double expiryDurationSeconds)
     {
-        if (!IsTokenValid(token))
-            throw new SecurityTokenException("Invalid token");
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw ApiExceptionDictionary.InternalServerError(
+                "JWT signing secret is not configured.");
+        }
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
+        var tokenDescriptor = new JwtSecurityToken(
+            _authOptions.JwtIssuer,
+            _authOptions.JwtIssuer,
+            claims,
+            expires: DateTime.UtcNow.AddSeconds(expiryDurationSeconds),
+            signingCredentials: credentials);
+        return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+    }
+
+    private JwtSecurityToken ValidateToken(string token, string secret)
+    {
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw ApiExceptionDictionary.InternalServerError(
+                "JWT signing secret is not configured.");
+        }
 
         var tokenHandler = new JwtSecurityTokenHandler();
-        var jwtToken = tokenHandler.ReadJwtToken(token);
+        tokenHandler.ValidateToken(token,
+            new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidIssuer = _authOptions.JwtIssuer,
+                ValidAudience = _authOptions.JwtIssuer,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
+                ClockSkew = TimeSpan.Zero
+            }, out _);
 
-        var fileId = jwtToken.Claims.FirstOrDefault(claim => claim.Type == FileAccessFileIdClaimType)?.Value;
-
-        if (string.IsNullOrWhiteSpace(fileId))
-            throw new SecurityTokenException("Invalid token");
-
-        return new FileAccessTokenPayload(fileId);
+        return tokenHandler.ReadJwtToken(token);
     }
 }
-
-public sealed record FileAccessTokenPayload(string FileId);

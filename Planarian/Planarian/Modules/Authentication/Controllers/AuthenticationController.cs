@@ -21,7 +21,7 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
 
     [AllowAnonymous]
     [HttpPost("login")]
-    [RateLimit(20)]
+    [Throttle]
     public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values, CancellationToken cancellationToken)
     {
         var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password);

@@ -89,7 +89,7 @@ public class UserController : PlanarianControllerBase<UserService>
 
     [AllowAnonymous]
     [HttpPost("reset-password/email/{email}")]
-    [RateLimit(10)]
+    [Throttle]
     public async Task<ActionResult> SendPasswordReset(string email)
     {
         await Service.SendResetPasswordEmail(email);

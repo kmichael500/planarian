@@ -16,7 +16,6 @@ using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
-using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
@@ -177,12 +176,12 @@ builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
+builder.Services.AddScoped<ThrottleEventLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<ApplicationEventLogService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
@@ -244,6 +243,11 @@ builder.Services.AddHttpContextAccessor();
 #region Database
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
+{
+    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+});
+
+builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
 {
     options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
 });
@@ -367,13 +371,15 @@ builder.Services.AddRateLimiter(options =>
         var requestThrottleService =
             context.HttpContext.RequestServices.GetRequiredService<RequestThrottleService>();
 
-        await requestThrottleService.RecordEndpointRateLimitHit(context.HttpContext);
-
+        int? retryAfterSeconds = null;
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {
-            headers["Retry-After"] = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+            retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            headers["Retry-After"] = retryAfterSeconds.Value.ToString();
         }
+
+        await requestThrottleService.RecordEndpointRateLimitHit(context.HttpContext, retryAfterSeconds, cancellationToken);
 
         await HttpResponseExceptionMiddleware.WriteErrorResponseAsync(
             context.HttpContext,

@@ -1,12 +1,12 @@
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
-using Planarian.Model.Database.Entities;
 using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
+using Planarian.Shared.Throttling;
 
 namespace Planarian.Modules.Authentication.Services;
 
@@ -30,25 +30,17 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
     public async Task<string> AuthenticateEmailPassword(string email, string password)
     {
-        await _requestThrottleService.EnsureLoginAllowed(email);
+        await _requestThrottleService.CountAttempt(ThrottleProfile.Login, email);
 
         var user = await _userRepository.GetUserByEmail(email);
 
         if (user == null)
         {
-            await _requestThrottleService.CountAttempts(
-                RequestThrottleService.ThrottleOperation.Login,
-                ApplicationEventScope.LoginFailureEmailDoesNotExist,
-                email);
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         
         if (user.EmailConfirmedOn == null)
         {
-            await _requestThrottleService.CountAttempts(
-                RequestThrottleService.ThrottleOperation.Login,
-                ApplicationEventScope.LoginFailureUnconfirmedEmail,
-                email);
             await Repository.SaveChangesAsync();
             if (user.EmailConfirmationCode != null)
                 await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
@@ -60,20 +52,12 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (string.IsNullOrWhiteSpace(user.HashedPassword))
         {
-            await _requestThrottleService.CountAttempts(
-                RequestThrottleService.ThrottleOperation.Login,
-                ApplicationEventScope.LoginFailureInvalidPassword,
-                email);
             throw ApiExceptionDictionary.InvalidPassword;
         }
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
         if (!isValid)
         {
-            await _requestThrottleService.CountAttempts(
-                RequestThrottleService.ThrottleOperation.Login,
-                ApplicationEventScope.LoginFailureInvalidPassword,
-                email);
             throw ApiExceptionDictionary.InvalidPassword;
         }
 
@@ -83,7 +67,6 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         var userForToken = new UserToken(user.FullName, user.Id, accountId);
 
         var token = _tokenService.BuildToken(userForToken);
-        _requestThrottleService.ClearLoginFailures(email);
 
         return token;
     }

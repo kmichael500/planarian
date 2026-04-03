@@ -47,7 +47,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [HttpGet("export/gpx")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize(Policy = PermissionPolicyKey.Export)]
-    [RateLimit(5)]
+    [Throttle(RequestsPerMinute = 5)]
     public async Task<ActionResult> ExportCavesGpx([FromQuery] FilterQuery query,
         [FromQuery] string? permissionKey = null)
     {
@@ -60,7 +60,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [HttpGet("export/csv")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize(Policy = PermissionPolicyKey.Export)]
-    [RateLimit(5)]
+    [Throttle(RequestsPerMinute = 5)]
     public async Task<ActionResult> ExportCavesCsv([FromQuery] FilterQuery query,
         [FromQuery] string? permissionKey = null)
     {

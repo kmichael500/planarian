@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Services;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Files.Controllers;
@@ -17,30 +19,22 @@ public class FileController : PlanarianControllerBase<FileService>
     {
     }
 
-    [Authorize]
-    [HttpPost("{fileId:length(10)}/access-ticket")]
-    public async Task<ActionResult<FileAccessTicketVm>> CreateAccessTicket(
+    [HttpPost("{fileId:length(10)}/view")]
+    [Throttle]
+    public async Task<ActionResult<FileAccessUrlVm>> ViewFile(
         string fileId,
         CancellationToken cancellationToken)
     {
-        var result = await Service.CreateAccessTicket(fileId, cancellationToken);
+        var result = await Service.CreateAccessUrl(fileId, false, cancellationToken);
         return new JsonResult(result);
     }
 
-    [AllowAnonymous]
-    [HttpGet("{fileId:length(10)}/view")]
-    public async Task<IActionResult> ViewFile(string fileId, [FromQuery] string? ticket, CancellationToken cancellationToken)
+    [HttpPost("{fileId:length(10)}/download")]
+    [Throttle]
+    public async Task<ActionResult<FileAccessUrlVm>> DownloadFile(string fileId, CancellationToken cancellationToken)
     {
-        var redirectUrl = await Service.GetSasUrl(fileId, false, ticket, cancellationToken);
-        return Redirect(redirectUrl);
-    }
-
-    [AllowAnonymous]
-    [HttpGet("{fileId:length(10)}/download")]
-    public async Task<IActionResult> DownloadFile(string fileId, [FromQuery] string? ticket, CancellationToken cancellationToken)
-    {
-        var redirectUrl = await Service.GetSasUrl(fileId, true, ticket, cancellationToken);
-        return Redirect(redirectUrl);
+        var result = await Service.CreateAccessUrl(fileId, true, cancellationToken);
+        return new JsonResult(result);
     }
 
     [HttpPut("multiple")]
@@ -58,9 +52,4 @@ public class EditFileMetadataVm
     public string Id { get; set; }
     public string DisplayName { get; set; }
     public string FileTypeTagId { get; set; }
-}
-
-public class FileAccessTicketVm
-{
-    public string Ticket { get; set; } = null!;
 }

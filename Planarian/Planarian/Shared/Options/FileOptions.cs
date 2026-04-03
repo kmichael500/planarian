@@ -6,4 +6,6 @@ public class FileOptions
 
     public string ConnectionString { get; set; } = null!;
     public int SasLinkExpirationSeconds { get; set; } = 15;
+    public ICollection<string> ViewSasExtendedFileTypes { get; set; } = [".pdf"];
+    public int ViewSasExtendedExpirationSeconds { get; set; } = 300;
 }

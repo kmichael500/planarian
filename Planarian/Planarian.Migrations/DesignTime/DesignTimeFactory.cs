@@ -19,7 +19,7 @@ public class DbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlanarianD
 
         var connectionString = configurator.GetConnectionString("default");
 
-        var optionsBuilder = new DbContextOptionsBuilder<PlanarianDbContextBase>();
+        var optionsBuilder = new DbContextOptionsBuilder<PlanarianDbContext>();
         optionsBuilder.UseNpgsql(connectionString, o =>
         {
             o.MigrationsAssembly("Planarian.Migrations");

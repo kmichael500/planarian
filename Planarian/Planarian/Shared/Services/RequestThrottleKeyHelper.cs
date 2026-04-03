@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using Planarian.Model.Database.Entities;
 using System.Net;
 
 namespace Planarian.Shared.Services;
@@ -41,18 +40,6 @@ public static class RequestThrottleKeyHelper
         return string.Join("::", keyParts.Select(part => part?.Trim().ToLowerInvariant() ?? string.Empty));
     }
 
-    public static string CreateAggregationKey(
-        ApplicationEventType eventType,
-        RequestThrottleKeyType scope,
-        string partition,
-        DateTime windowStartedOn,
-        ApplicationEventScope? eventScope = null)
-    {
-        return CreateKey(
-            RequestThrottleKeyType.ApplicationEventLog,
-            [eventType.ToString(), eventScope?.ToString(), scope.ToString(), partition, windowStartedOn.ToString("O")]);
-    }
-
     private static string? NormalizeIpAddress(IPAddress? ipAddress)
     {
         if (ipAddress == null)
@@ -66,7 +53,6 @@ public static class RequestThrottleKeyHelper
 
 public enum RequestThrottleKeyType
 {
-    ApplicationEventLog,
     EndpointRateLimit,
     FileAccess,
     LoginIp,

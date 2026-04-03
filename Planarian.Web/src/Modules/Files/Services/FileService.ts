@@ -1,4 +1,4 @@
-import { HttpClient, baseUrl as apiBaseUrl } from "../../..";
+import { HttpClient } from "../../..";
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 
 const filesBaseUrl = "api/files";
@@ -16,17 +16,10 @@ const FileService = {
     fileId: string,
     action: FileAccessAction
   ): Promise<string> {
-    const response = await HttpClient.post<FileAccessTicketVm>(
-      `${filesBaseUrl}/${fileId}/access-ticket`
+    const response = await HttpClient.post<FileAccessUrlVm>(
+      `${filesBaseUrl}/${fileId}/${action}`
     );
-
-    const ticketizedUrl = new URL(
-      `${filesBaseUrl}/${fileId}/${action}`,
-      apiBaseUrl
-    );
-    ticketizedUrl.searchParams.set("ticket", response.data.ticket);
-
-    return ticketizedUrl.toString();
+    return response.data.url;
   },
 
   async startFileDownload(fileId: string): Promise<void> {
@@ -50,6 +43,6 @@ export interface FileInformation {
   DisplayName?: string;
 }
 
-export interface FileAccessTicketVm {
-  ticket: string;
+export interface FileAccessUrlVm {
+  url: string;
 }
