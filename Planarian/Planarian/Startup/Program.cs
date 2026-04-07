@@ -76,7 +76,7 @@ builder.Configuration.AddAzureAppConfiguration(options =>
     options.Connect(appConfigConnectionString)
         .Select(KeyFilter.Any, LabelFilter.Null)
         .Select(KeyFilter.Any,
-            "Production");
+            isDevelopment ? "Development" : "Production");
 });
 
 #if DEBUG
