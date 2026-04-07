@@ -168,7 +168,7 @@ builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<SettingsService>();
-builder.Services.AddScoped<BlobService>();
+builder.Services.AddSingleton<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
@@ -185,6 +185,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
+builder.Services.AddHostedService<TemporaryBackupCleanupService>();
 
 builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 

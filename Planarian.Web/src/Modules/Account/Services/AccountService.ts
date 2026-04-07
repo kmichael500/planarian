@@ -16,6 +16,7 @@ import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { BackupDownloadVm } from "../Models/BackupDownloadVm";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -39,33 +40,13 @@ const AccountService = {
     return response.data;
   },
 
-  async DownloadBackup(
-    uuid?: string,
-    onProgress?: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<{ blob: Blob; fileName: string }> {
+  async DownloadBackup(uuid?: string): Promise<BackupDownloadVm> {
     const requestUrl = !isNullOrWhiteSpace(uuid)
       ? `${baseUrl}/backup?uuid=${encodeURIComponent(uuid)}`
       : `${baseUrl}/backup`;
 
-    const response = await HttpClient.get<Blob>(requestUrl, {
-      responseType: "blob",
-      onDownloadProgress: onProgress,
-    });
-
-    const disposition = response.headers["content-disposition"];
-    const matchedFileName = disposition?.match(
-      /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i
-    )?.[1];
-    const fileName = matchedFileName
-      ? decodeURIComponent(matchedFileName)
-      : `${AuthenticationService.GetAccountName() || "Account"} Backup ${new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")}.zip`;
-
-    return {
-      blob: response.data,
-      fileName,
-    };
+    const response = await HttpClient.get<BackupDownloadVm>(requestUrl);
+    return response.data;
   },
 
   //#region Import

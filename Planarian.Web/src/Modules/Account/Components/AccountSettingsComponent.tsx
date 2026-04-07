@@ -14,7 +14,7 @@ import { EnabledFieldsComponent } from "./EnabledFieldsComponent";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { DownloadBackupCardComponent } from "./DownloadBackupCardComponent";
+import { ArchiveCardComponent } from "./DownloadBackupCardComponent";
 
 const AccountSettingsComponent = () => {
   const { useBreakpoint } = Grid;
@@ -180,7 +180,7 @@ const AccountSettingsComponent = () => {
           </Tabs>
         </Card>
 
-        <DownloadBackupCardComponent />
+        <ArchiveCardComponent />
 
         <ResetAccountComponent />
       </Space>

@@ -897,7 +897,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 Id = file.Id,
                 FileName = file.FileName,
                 BlobKey = file.BlobKey,
-                BlobContainer = file.BlobContainer,
                 FileTypeDisplayName = file.FileTypeTag.Name
             })
             .ToListAsyncEF(cancellationToken);

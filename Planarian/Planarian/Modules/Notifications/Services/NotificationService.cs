@@ -12,7 +12,7 @@ public class NotificationService
         _hubContext = hubContext;
     }
 
-    public async Task SendNotificationToGroupAsync(string groupName, string message)
+    public async Task SendNotificationToGroupAsync(string groupName, object message)
     {
         await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", message);
     }

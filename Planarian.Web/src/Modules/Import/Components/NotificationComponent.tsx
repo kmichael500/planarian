@@ -4,14 +4,39 @@ import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { Alert, Badge, Space, Typography } from "antd";
 
+const getNotificationMessage = (notification: unknown) => {
+  if (typeof notification === "string") {
+    return notification;
+  }
+
+  if (notification && typeof notification === "object") {
+    const statusMessage = (notification as { statusMessage?: unknown })
+      .statusMessage;
+    if (typeof statusMessage === "string") {
+      return statusMessage;
+    }
+
+    const message = (notification as { message?: unknown }).message;
+    if (typeof message === "string") {
+      return message;
+    }
+  }
+
+  return "Progress update";
+};
+
 function NotificationComponent({
   groupName,
   isLoading,
   onConnected,
+  onNotification,
+  hideNotifications,
 }: {
   groupName: string;
   isLoading: boolean;
   onConnected?: () => void | Promise<void>;
+  onNotification?: (notification: unknown) => void;
+  hideNotifications?: boolean;
 }) {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(
     null
@@ -54,8 +79,10 @@ function NotificationComponent({
     }
 
     let isDisposed = false;
-    const receiveNotificationHandler = (message: string) => {
-      console.log("Received:", message);
+    const receiveNotificationHandler = (notification: unknown) => {
+      console.log("Received:", notification);
+      onNotification?.(notification);
+      const message = getNotificationMessage(notification);
       setNotifications((prev) => {
         const newArray = [...prev, message];
         if (newArray.length > 3) newArray.shift();
@@ -101,6 +128,10 @@ function NotificationComponent({
   const latestNotification =
     notifications.length > 0 ? notifications[notifications.length - 1] : null;
   const previousNotifications = notifications.slice(0, -1).reverse();
+
+  if (hideNotifications) {
+    return null;
+  }
 
   if (!latestNotification && !isLoading) {
     return null;

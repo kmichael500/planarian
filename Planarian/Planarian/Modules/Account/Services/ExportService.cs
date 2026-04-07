@@ -108,15 +108,8 @@ public class ExportService
                     cancellationToken);
             }
 
-            await ReportStatus(reportStatus, "Cleaning up temporary files...");
-            if (!string.IsNullOrWhiteSpace(stagingDirectory))
-            {
-                TryDeleteDirectory(stagingDirectory);
-            }
-
             outputStream.Position = 0;
             await ReportProgress(reportProgress, totalCaves, totalCaves);
-            await ReportStatus(reportStatus, "Archive ready. Starting download...");
             return outputStream;
         }
         catch
@@ -128,6 +121,12 @@ public class ExportService
         finally
         {
             stagingCancellationTokenSource.Cancel();
+
+            if (!string.IsNullOrWhiteSpace(stagingDirectory))
+            {
+                TryDeleteDirectory(stagingDirectory);
+            }
+
             stagingCancellationTokenSource.Dispose();
         }
     }
@@ -577,75 +576,4 @@ public class ExportService
         string EntryPath,
         string BlobKey,
         string ErrorCode);
-}
-
-internal static class AccountBackupArchivePaths
-{
-    public static string BuildCaveFolder(AccountBackupCaveDto cave)
-    {
-        var stateFolder = SanitizePathSegment(cave.State, "Unknown State");
-        var countyFolder = SanitizePathSegment($"{cave.CountyCode} {cave.CountyName}", cave.CountyCode);
-        var caveDisplayId = $"{cave.CountyCode}{cave.CountyIdDelimiter}{cave.CountyCaveNumber}";
-        var caveFolder = SanitizePathSegment($"{caveDisplayId} {cave.CaveName}", caveDisplayId);
-
-        return $"{stateFolder}/{countyFolder}/{caveFolder}";
-    }
-
-    public static string CreateUniqueEntryPath(string desiredPath, ISet<string> existingPaths)
-    {
-        if (existingPaths.Add(desiredPath))
-        {
-            return desiredPath;
-        }
-
-        var extension = Path.GetExtension(desiredPath);
-        var directory = Path.GetDirectoryName(desiredPath)?.Replace('\\', '/');
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(desiredPath);
-        var suffix = 2;
-
-        while (true)
-        {
-            var candidateFileName = $"{fileNameWithoutExtension} ({suffix}){extension}";
-            var candidatePath = string.IsNullOrWhiteSpace(directory)
-                ? candidateFileName
-                : $"{directory}/{candidateFileName}";
-
-            if (existingPaths.Add(candidatePath))
-            {
-                return candidatePath;
-            }
-
-            suffix++;
-        }
-    }
-
-    public static string EnsureGeoJsonFileName(string? fileName)
-    {
-        var normalizedFileName = string.IsNullOrWhiteSpace(fileName) ? "Line Plot" : fileName.Trim();
-        return Path.HasExtension(normalizedFileName)
-            ? normalizedFileName
-            : $"{normalizedFileName}.geojson";
-    }
-
-    public static string SanitizeFileName(string? value, string fallback)
-    {
-        return SanitizePathSegment(value, fallback);
-    }
-
-    public static string SanitizePathSegment(string? value, string fallback)
-    {
-        var workingValue = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        var invalidCharacters = Path.GetInvalidFileNameChars()
-            .Concat(['/', '\\'])
-            .Distinct()
-            .ToHashSet();
-        var sanitizedCharacters = workingValue
-            .Select(character => invalidCharacters.Contains(character) ? ' ' : character)
-            .ToArray();
-        var sanitized = string.Join(
-            " ",
-            new string(sanitizedCharacters).Split(' ', StringSplitOptions.RemoveEmptyEntries));
-
-        return string.IsNullOrWhiteSpace(sanitized) ? fallback : sanitized;
-    }
 }

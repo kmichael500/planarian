@@ -16,6 +16,7 @@ using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Options;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -29,9 +30,11 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
     private readonly ExportService _exportService;
+    private readonly BlobService _blobService;
+    private readonly BackupOptions _backupOptions;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, BackupOptions backupOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -41,6 +44,8 @@ public class AccountService : ServiceBase<AccountRepository>
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
         _exportService = exportService;
+        _blobService = blobService;
+        _backupOptions = backupOptions;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -402,30 +407,31 @@ public class AccountService : ServiceBase<AccountRepository>
         return $"{AccountBackupArchivePaths.SanitizePathSegment(accountName, "Account")} Backup {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
     }
 
-    public async Task<Stream> BuildBackup(string? uuid, CancellationToken cancellationToken)
+    public async Task<AccountBackupDownloadVm> BuildBackup(string? uuid, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        await SendBackupProgress(uuid, "Preparing backup data...");
+        var fileName = await GetBackupFileName(cancellationToken);
 
-        await SendBackupProgress(uuid, "Preparing backup data (1 of 4): loading caves...");
+        await SendBackupProgress(uuid, "Gathering cave data...");
+
         var caves = await Repository.GetBackupCavesBase(cancellationToken);
 
-        await SendBackupProgress(uuid, "Preparing backup data (2 of 4): loading entrances...");
+        await SendBackupProgress(uuid, "Gathering entrance data...");
         var entrances = await Repository.GetBackupEntrances(cancellationToken);
 
-        await SendBackupProgress(uuid, "Preparing backup data (3 of 4): loading files...");
+        await SendBackupProgress(uuid, "Gathering file data...");
         var files = await Repository.GetBackupFiles(cancellationToken);
 
-        await SendBackupProgress(uuid, "Preparing backup data (4 of 4): loading map data...");
+        await SendBackupProgress(uuid, "Gathering map data...");
         var geoJsons = await Repository.GetBackupGeoJsons(cancellationToken);
 
-        await SendBackupProgress(uuid, "Building archive...");
+        await SendBackupProgress(uuid, "Creating archive...");
 
-        return await _exportService.ExportAccount(
+        await using var archiveStream = await _exportService.ExportAccount(
             caves,
             entrances,
             files,
@@ -433,22 +439,45 @@ public class AccountService : ServiceBase<AccountRepository>
             (processed, total) => SendCaveProgress(uuid, processed, total),
             message => SendBackupProgress(uuid, message),
             cancellationToken);
+
+        await SendBackupProgress(uuid, "Preparing your download...");
+        var blobKey = await _blobService.AddTemporaryBackupArchive(
+            RequestUser.AccountId,
+            archiveStream,
+            cancellationToken);
+
+        var downloadUrl = _blobService.GetTemporaryBackupDownloadUrl(
+            blobKey,
+            fileName,
+            _backupOptions.TempBlobExpirationHours);
+
+        await SendBackupProgress(uuid, "Starting download...");
+
+        return new AccountBackupDownloadVm
+        {
+            FileName = fileName,
+            DownloadUrl = downloadUrl
+        };
     }
 
-    private async Task SendBackupProgress(string? uuid, string message)
+    private async Task SendBackupProgress(string? uuid, string statusMessage, int? processedCaves = null, int? totalCaves = null)
     {
         if (string.IsNullOrWhiteSpace(uuid))
         {
             return;
         }
 
-        await _notificationService.SendNotificationToGroupAsync(uuid, message);
+        await _notificationService.SendNotificationToGroupAsync(uuid, new
+        {
+            statusMessage,
+            processedCaves,
+            totalCaves
+        });
     }
 
     private async Task SendCaveProgress(string? uuid, int processed, int total)
     {
-        var remaining = Math.Max(total - processed, 0);
-        await SendBackupProgress(uuid, $"Processed {processed} of {total} caves. {remaining} remaining.");
+        await SendBackupProgress(uuid, $"Processed {processed} of {total} caves.", processed, total);
     }
 
     #endregion
