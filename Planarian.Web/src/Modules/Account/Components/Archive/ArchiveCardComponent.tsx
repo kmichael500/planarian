@@ -6,6 +6,7 @@ import { ShouldDisplay } from "../../../../Shared/Permissioning/Components/Shoul
 import { NotificationComponent } from "../../../Import/Components/NotificationComponent";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
+import { AuthenticationService } from "../../../Authentication/Services/AuthenticationService";
 import { AccountService } from "../../Services/AccountService";
 import { BackupProgressVm } from "../../Models/Archive/BackupProgressVm";
 
@@ -15,7 +16,61 @@ const initialBackupProgress: BackupProgressVm = {
     totalCaves: 0,
 };
 
+const MAX_ARCHIVES_PER_DAY = 2;
+const ARCHIVE_USAGE_STORAGE_KEY_PREFIX = "planarian.account.archive.daily-usage";
+
+interface ArchiveUsageRecord {
+    dayKey: string;
+    count: number;
+}
+
+const getTodayKey = () => new Date().toISOString().slice(0, 10);
+
+const getArchiveUsageStorageKey = (userId: string, accountId: string) => {
+    return `${ARCHIVE_USAGE_STORAGE_KEY_PREFIX}.${userId}.${accountId}`;
+};
+
+const readArchiveUsageCount = (storageKey: string): number => {
+    try {
+        const storedValue = window.localStorage.getItem(storageKey);
+        if (!storedValue) {
+            return 0;
+        }
+
+        const parsedValue = JSON.parse(storedValue) as ArchiveUsageRecord;
+        if (parsedValue.dayKey !== getTodayKey()) {
+            return 0;
+        }
+
+        return Number.isFinite(parsedValue.count) ? parsedValue.count : 0;
+    } catch {
+        return 0;
+    }
+};
+
+const incrementArchiveUsageCount = (storageKey: string): number => {
+    const nextCount = readArchiveUsageCount(storageKey) + 1;
+    const nextUsageRecord: ArchiveUsageRecord = {
+        dayKey: getTodayKey(),
+        count: nextCount,
+    };
+
+    try {
+        window.localStorage.setItem(storageKey, JSON.stringify(nextUsageRecord));
+    } catch {
+    }
+
+    return nextCount;
+};
+
 const ArchiveCardComponent: React.FC = () => {
+    const userId = AuthenticationService.GetUserId();
+    const accountId = AuthenticationService.GetAccountId();
+
+    const archiveUsageStorageKey = getArchiveUsageStorageKey(
+        userId!,
+        accountId!
+    );
     const [isPreparingBackup, setIsPreparingBackup] = useState<boolean>(false);
     const [backupProgressGroupName, setBackupProgressGroupName] = useState<string | null>(null);
     const [hasStartedBackupRequest, setHasStartedBackupRequest] = useState<boolean>(false);
@@ -23,7 +78,11 @@ const ArchiveCardComponent: React.FC = () => {
     const [backupDownloadSucceeded, setBackupDownloadSucceeded] = useState<boolean>(false);
     const [backupFileName, setBackupFileName] = useState<string | null>(null);
     const [backupProgress, setBackupProgress] = useState<BackupProgressVm>(initialBackupProgress);
+    const [dailyArchiveCount, setDailyArchiveCount] = useState<number>(() => readArchiveUsageCount(archiveUsageStorageKey));
     const downloadFrameRef = useRef<HTMLIFrameElement | null>(null);
+
+    const hasReachedDailyArchiveLimit = dailyArchiveCount >= MAX_ARCHIVES_PER_DAY;
+    const remainingArchivesToday = Math.max(0, MAX_ARCHIVES_PER_DAY - dailyArchiveCount);
 
     useEffect(() => {
         return () => {
@@ -86,6 +145,7 @@ const ArchiveCardComponent: React.FC = () => {
             const { downloadUrl, fileName } = await AccountService.DownloadBackup(
                 backupProgressGroupName
             );
+            setDailyArchiveCount(incrementArchiveUsageCount(archiveUsageStorageKey));
             setHasCompletedBackupProcessing(true);
             setBackupFileName(fileName);
             setBackupDownloadSucceeded(true);
@@ -103,11 +163,17 @@ const ArchiveCardComponent: React.FC = () => {
         backupProgressGroupName,
         hasStartedBackupRequest,
         isPreparingBackup,
+        archiveUsageStorageKey,
         startBrowserDownload,
     ]);
 
     const onDownloadBackup = () => {
         if (isPreparingBackup) {
+            return;
+        }
+
+        if (hasReachedDailyArchiveLimit) {
+            message.warning(`You can create up to ${MAX_ARCHIVES_PER_DAY} archives per day.`);
             return;
         }
 
@@ -133,6 +199,13 @@ const ArchiveCardComponent: React.FC = () => {
                         including caves, entrances, files, and line plots.
                     </Typography.Paragraph>
 
+                    <Typography.Text type="secondary">
+                        {dailyArchiveCount} of {MAX_ARCHIVES_PER_DAY} archives used today.
+                        {remainingArchivesToday > 0
+                            ? ` ${remainingArchivesToday} remaining.`
+                            : " Daily limit reached."}
+                    </Typography.Text>
+
                     {backupDownloadSucceeded && !isPreparingBackup && (
                         <Alert
                             message="Archive download started successfully"
@@ -148,6 +221,7 @@ const ArchiveCardComponent: React.FC = () => {
                         <PlanarianButton
                             icon={<DownloadOutlined />}
                             onClick={onDownloadBackup}
+                            disabled={hasReachedDailyArchiveLimit}
                         >
                             Create Archive
                         </PlanarianButton>

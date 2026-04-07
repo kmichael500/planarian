@@ -7,11 +7,11 @@ public sealed class CaveCsvModelMap : ClassMap<CaveCsvModel>
     public CaveCsvModelMap()
     {
         Map(m => m.CaveName);
-        Map(m => m.AlternateNames);
-        Map(m => m.State);
-        Map(m => m.CountyCode);
         Map(m => m.CountyName);
+        Map(m => m.CountyCode);
         Map(m => m.CountyCaveNumber);
+        Map(m => m.State);
+        Map(m => m.AlternateNames);
         Map(m => m.MapStatuses);
         Map(m => m.CartographerNames);
         Map(m => m.CaveLengthFt).Default(0.0);
