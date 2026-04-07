@@ -4,6 +4,8 @@ using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Backup.Models;
+using Planarian.Modules.Account.Backup.Services;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
@@ -29,12 +31,12 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
-    private readonly ExportService _exportService;
+    private readonly AccountBackupExportService _accountBackupExportService;
     private readonly BlobService _blobService;
     private readonly BackupOptions _backupOptions;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, BackupOptions backupOptions) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, AccountBackupExportService accountBackupExportService, BlobService blobService, BackupOptions backupOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -43,7 +45,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
-        _exportService = exportService;
+        _accountBackupExportService = accountBackupExportService;
         _blobService = blobService;
         _backupOptions = backupOptions;
     }
@@ -431,7 +433,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         await SendBackupProgress(uuid, "Creating archive...");
 
-        await using var archiveStream = await _exportService.ExportAccount(
+        await using var archiveStream = await _accountBackupExportService.ExportAccount(
             caves,
             entrances,
             files,

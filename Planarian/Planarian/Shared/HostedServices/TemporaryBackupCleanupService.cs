@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Planarian.Shared.Options;
+using Planarian.Shared.Services;
 
-namespace Planarian.Shared.Services;
+namespace Planarian.Shared.HostedServices;
 
 public sealed class TemporaryBackupCleanupService : BackgroundService
 {

@@ -1,13 +1,13 @@
 import { DownloadOutlined } from "@ant-design/icons";
 import { Alert, Card, Progress, Space, Typography, message } from "antd";
-import { useCallback, useState } from "react";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
-import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
-import { NotificationComponent } from "../../Import/Components/NotificationComponent";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { AccountService } from "../Services/AccountService";
-import { BackupProgressVm } from "../Models/BackupProgressVm";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PermissionKey } from "../../../Authentication/Models/PermissionKey";
+import { ShouldDisplay } from "../../../../Shared/Permissioning/Components/ShouldDisplay";
+import { NotificationComponent } from "../../../Import/Components/NotificationComponent";
+import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
+import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
+import { AccountService } from "../../Services/AccountService";
+import { BackupProgressVm } from "../../Models/Archive/BackupProgressVm";
 
 const initialBackupProgress: BackupProgressVm = {
     statusMessage: "Gathering cave data...",
@@ -19,10 +19,20 @@ const ArchiveCardComponent: React.FC = () => {
     const [isPreparingBackup, setIsPreparingBackup] = useState<boolean>(false);
     const [backupProgressGroupName, setBackupProgressGroupName] = useState<string | null>(null);
     const [hasStartedBackupRequest, setHasStartedBackupRequest] = useState<boolean>(false);
-    const [hasClickedDownloadBackup, setHasClickedDownloadBackup] = useState<boolean>(false);
+    const [hasCompletedBackupProcessing, setHasCompletedBackupProcessing] = useState<boolean>(false);
     const [backupDownloadSucceeded, setBackupDownloadSucceeded] = useState<boolean>(false);
     const [backupFileName, setBackupFileName] = useState<string | null>(null);
     const [backupProgress, setBackupProgress] = useState<BackupProgressVm>(initialBackupProgress);
+    const downloadFrameRef = useRef<HTMLIFrameElement | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (downloadFrameRef.current) {
+                downloadFrameRef.current.remove();
+                downloadFrameRef.current = null;
+            }
+        };
+    }, []);
 
     const onBackupProgress = useCallback((notification: unknown) => {
         if (!notification || typeof notification !== "object") {
@@ -38,13 +48,28 @@ const ArchiveCardComponent: React.FC = () => {
     }, []);
 
     const startBrowserDownload = useCallback((downloadUrl: string) => {
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        try {
+            if (downloadFrameRef.current) {
+                downloadFrameRef.current.remove();
+                downloadFrameRef.current = null;
+            }
+
+            const frame = document.createElement("iframe");
+            frame.style.display = "none";
+            frame.setAttribute("aria-hidden", "true");
+            frame.src = downloadUrl;
+            document.body.appendChild(frame);
+            downloadFrameRef.current = frame;
+
+            window.setTimeout(() => {
+                if (downloadFrameRef.current === frame) {
+                    frame.remove();
+                    downloadFrameRef.current = null;
+                }
+            }, 60_000);
+        } catch {
+            window.location.assign(downloadUrl);
+        }
     }, []);
 
     const startBackupDownload = useCallback(async () => {
@@ -61,11 +86,13 @@ const ArchiveCardComponent: React.FC = () => {
             const { downloadUrl, fileName } = await AccountService.DownloadBackup(
                 backupProgressGroupName
             );
+            setHasCompletedBackupProcessing(true);
             setBackupFileName(fileName);
             setBackupDownloadSucceeded(true);
             startBrowserDownload(downloadUrl);
         } catch (err) {
             const error = err as ApiErrorResponse;
+            setHasCompletedBackupProcessing(false);
             message.error(error.message);
         } finally {
             setIsPreparingBackup(false);
@@ -84,8 +111,8 @@ const ArchiveCardComponent: React.FC = () => {
             return;
         }
 
-        setHasClickedDownloadBackup(true);
         setIsPreparingBackup(true);
+        setHasCompletedBackupProcessing(false);
         setHasStartedBackupRequest(false);
         setBackupDownloadSucceeded(false);
         setBackupFileName(null);
@@ -117,7 +144,7 @@ const ArchiveCardComponent: React.FC = () => {
                         />
                     )}
 
-                    {!hasClickedDownloadBackup && (
+                    {!isPreparingBackup && !hasCompletedBackupProcessing && (
                         <PlanarianButton
                             icon={<DownloadOutlined />}
                             onClick={onDownloadBackup}

@@ -16,7 +16,7 @@ import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { BackupDownloadVm } from "../Models/BackupDownloadVm";
+import { BackupDownloadVm } from "../Models/Archive/BackupDownloadVm";
 
 const baseUrl = "api/account";
 const AccountService = {

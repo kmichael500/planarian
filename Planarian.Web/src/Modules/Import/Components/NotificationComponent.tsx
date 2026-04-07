@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { HubConnectionBuilder } from "@microsoft/signalr";
+import { HubConnectionBuilder, HubConnectionState } from "@microsoft/signalr";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { Alert, Badge, Space, Typography } from "antd";
@@ -110,7 +110,11 @@ function NotificationComponent({
 
     return () => {
       isDisposed = true;
-      if (groupName && hasJoinedGroupRef.current === groupName) {
+      if (
+        groupName &&
+        hasJoinedGroupRef.current === groupName &&
+        connection.state === HubConnectionState.Connected
+      ) {
         connection
           .invoke("LeaveGroup", groupName)
           .catch((e) => console.error("Error leaving group: ", e));

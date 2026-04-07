@@ -9,6 +9,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
+using Planarian.Modules.Account.Backup.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -42,7 +43,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance status tags.");
         } while (deletedCount == batchSize);
-        
+
         deletedCount = 0;
         totalDeleted = 0;
 
@@ -292,14 +293,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         int deletedCount;
         var totalDeleted = 0;
 
-        
+
         // Batch delete for TagTypes
         var tagTypesCount =
             await AsyncExtensions.CountAsync(DbContext.TagTypes,
                 e => e.AccountId == RequestUser.AccountId && e.IsDefault == false &&
                      !string.IsNullOrWhiteSpace(e.AccountId),
                 cancellationToken);
-        
+
         do
         {
             deletedCount = await DbContext.TagTypes
@@ -320,7 +321,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         await DbContext.Counties.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
     }
-    
+
     // deletes all cave permissions except view all
     public async Task DeleteAllCavePermissions()
     {
@@ -417,7 +418,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .DeleteAsync(cancellationToken);
 
             await SaveChangesAsync(cancellationToken);
-            
+
             await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
@@ -453,20 +454,20 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             foreach (var sourceTagTypeId in tagTypeIds)
             {
                 if (sourceTagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
-                
+
                 var sourceTagType = await DbContext.TagTypes
                     .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
                     .FirstOrDefaultAsyncEF(cancellationToken);
-                
+
                 if (sourceTagType == null)
                 {
                     throw ApiExceptionDictionary.NotFound("Source tag type");
                 }
-                
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 #region Cave Tags
-                
+
                 if (TagTypeKeyConstant.Archeology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.ArcheologyTags, tag => tag.TagTypeId,
@@ -486,13 +487,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.CartographerNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId, 
+
+                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId, 
+
+                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
+
                     await MergeTags<CartographerNameTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
                     await MergeTags<CaveReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
@@ -759,7 +760,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return await DbContext.Caves
             .Where(e => e.AccountId == RequestUser.AccountId)
             .Take(cavesBatchSize)
-            .Select(e=>e.Id)
+            .Select(e => e.Id)
             .ToListAsyncEF(cancellationToken);
     }
 
@@ -931,7 +932,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     public async Task<bool> GetDefaultViewAccess()
     {
-        return await DbContext.Accounts.Where(e=>e.Id == RequestUser.AccountId)
+        return await DbContext.Accounts.Where(e => e.Id == RequestUser.AccountId)
             .Select(e => e.DefaultViewAccessAllCaves)
             .FirstOrDefaultAsyncEF();
     }

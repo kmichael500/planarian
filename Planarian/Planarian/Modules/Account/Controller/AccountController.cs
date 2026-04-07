@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Backup.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
