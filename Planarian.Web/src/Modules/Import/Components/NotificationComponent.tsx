@@ -1,21 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HubConnectionBuilder } from "@microsoft/signalr";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
-import { Alert, List, Space, Spin, Typography } from "antd";
-import { group } from "console";
+import { Alert, Badge, Space, Typography } from "antd";
 
 function NotificationComponent({
   groupName,
   isLoading,
+  onConnected,
 }: {
   groupName: string;
   isLoading: boolean;
+  onConnected?: () => void | Promise<void>;
 }) {
   const [connection, setConnection] = useState<signalR.HubConnection | null>(
     null
   );
   const [notifications, setNotifications] = useState<string[]>([]);
+  const hasJoinedGroupRef = useRef<string | null>(null);
+  const onConnectedRef = useRef<typeof onConnected>(onConnected);
+
+  useEffect(() => {
+    onConnectedRef.current = onConnected;
+  }, [onConnected]);
+
+  useEffect(() => {
+    setNotifications([]);
+  }, [groupName]);
 
   useEffect(() => {
     // Build the connection
@@ -38,61 +49,115 @@ function NotificationComponent({
   }, []);
 
   useEffect(() => {
-    if (connection) {
-      connection
-        .start()
-        .then(() => {
-          console.log("Connection started!");
-          if (groupName) {
-            connection
-              .invoke("JoinGroup", groupName)
-              .catch((err) => console.error(err));
-          }
-          // Registering the ReceiveNotification method to get notifications
-          connection.on("ReceiveNotification", (message) => {
-            console.log("Received:", message);
-            setNotifications((prev) => {
-              // Maintaining only the last 3 notifications
-              const newArray = [...prev, message];
-              if (newArray.length > 3) newArray.shift();
-              return newArray;
-            });
-          });
-        })
-        .catch((e) => console.error("Connection failed: ", e));
+    if (!connection) {
+      return;
     }
 
-    // Clean up the connection on component unmount
+    let isDisposed = false;
+    const receiveNotificationHandler = (message: string) => {
+      console.log("Received:", message);
+      setNotifications((prev) => {
+        const newArray = [...prev, message];
+        if (newArray.length > 3) newArray.shift();
+        return newArray;
+      });
+    };
+
+    connection.on("ReceiveNotification", receiveNotificationHandler);
+    connection
+      .start()
+      .then(async () => {
+        if (isDisposed) {
+          return;
+        }
+
+        console.log("Connection started!");
+        if (groupName) {
+          await connection.invoke("JoinGroup", groupName);
+          hasJoinedGroupRef.current = groupName;
+        }
+
+        await onConnectedRef.current?.();
+      })
+      .catch((e) => console.error("Connection failed: ", e));
+
     return () => {
-      if (connection) {
+      isDisposed = true;
+      if (groupName && hasJoinedGroupRef.current === groupName) {
         connection
-          .stop()
-          .then(() => console.log("Connection stopped!"))
-          .catch((e) => console.error("Error stopping the connection: ", e));
+          .invoke("LeaveGroup", groupName)
+          .catch((e) => console.error("Error leaving group: ", e));
+        hasJoinedGroupRef.current = null;
       }
+
+      connection.off("ReceiveNotification", receiveNotificationHandler);
+      connection
+        .stop()
+        .then(() => console.log("Connection stopped!"))
+        .catch((e) => console.error("Error stopping the connection: ", e));
     };
   }, [connection, groupName]);
 
+  const latestNotification =
+    notifications.length > 0 ? notifications[notifications.length - 1] : null;
+  const previousNotifications = notifications.slice(0, -1).reverse();
+
+  if (!latestNotification && !isLoading) {
+    return null;
+  }
+
   return (
-    <div>
-      <Spin spinning={isLoading} />
-      <Space style={{ width: "100%" }} direction="vertical" size="large">
-        {notifications.map((notification, index) => (
-          <Alert
-            key={index}
-            message={notification}
-            type="info"
-            style={{
-              width: "100%",
-              ...(index === notifications.length - 1
-                ? { backgroundColor: "#e6f7ff", fontWeight: "bold" }
-                : {}),
-            }}
-            showIcon
-          />
-        ))}
-      </Space>
-    </div>
+    <Space style={{ width: "100%" }} direction="vertical" size="middle">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          width: "100%",
+        }}
+      >
+        <Typography.Text strong>Progress Updates</Typography.Text>
+        <Badge
+          status={isLoading ? "processing" : "success"}
+          text={isLoading ? "In progress" : "Complete"}
+        />
+      </div>
+
+      {latestNotification && (
+        <Alert
+          message={latestNotification}
+          type="info"
+          style={{
+            width: "100%",
+            borderRadius: 14,
+            borderWidth: 1,
+            backgroundColor: "#eef6ff",
+            boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
+          }}
+          showIcon
+        />
+      )}
+
+      {previousNotifications.length > 0 && (
+        <Space style={{ width: "100%" }} direction="vertical" size="small">
+          {previousNotifications.map((notification, index) => (
+            <Alert
+              key={`${notification}-${index}`}
+              message={notification}
+              type="info"
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                backgroundColor: "#f8fbff",
+                opacity: 0.92,
+              }}
+              showIcon
+            />
+          ))}
+        </Space>
+      )}
+    </Space>
   );
 }
 

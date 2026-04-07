@@ -39,6 +39,35 @@ const AccountService = {
     return response.data;
   },
 
+  async DownloadBackup(
+    uuid?: string,
+    onProgress?: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<{ blob: Blob; fileName: string }> {
+    const requestUrl = !isNullOrWhiteSpace(uuid)
+      ? `${baseUrl}/backup?uuid=${encodeURIComponent(uuid)}`
+      : `${baseUrl}/backup`;
+
+    const response = await HttpClient.get<Blob>(requestUrl, {
+      responseType: "blob",
+      onDownloadProgress: onProgress,
+    });
+
+    const disposition = response.headers["content-disposition"];
+    const matchedFileName = disposition?.match(
+      /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i
+    )?.[1];
+    const fileName = matchedFileName
+      ? decodeURIComponent(matchedFileName)
+      : `${AuthenticationService.GetAccountName() || "Account"} Backup ${new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")}.zip`;
+
+    return {
+      blob: response.data,
+      fileName,
+    };
+  },
+
   //#region Import
   async ImportCavesFile(
     file: string | Blob | RcFile,

@@ -11,9 +11,11 @@ using Planarian.Modules.Caves.Services;
 using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Import.Models;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -26,9 +28,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
+    private readonly ExportService _exportService;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -37,6 +40,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
+        _exportService = exportService;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -44,7 +48,7 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             Name = account.Name,
         };
-        
+
         foreach (var key in Enum.GetValues<FeatureKey>())
         {
             var isEnabled = key switch
@@ -65,7 +69,7 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             UserId = RequestUser.Id,
         });
-        
+
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync(cancellationToken);
@@ -76,49 +80,49 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task ResetAccount(CancellationToken cancellationToken)
     {
         var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        
-            var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Getting associated files.");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Done getting associated files.");
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleted 0 of 0 caves.");
+        var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Getting associated files.");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
-            await Repository.DeleteAllCavePermissions();
-            
-            async void DeleteCavesProgressHandler(string message)
-            {
-                await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
-            }
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Done getting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleted 0 of 0 caves.");
 
-            await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
-                cancellationToken);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
+        await Repository.DeleteAllCavePermissions();
 
-            await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
+        async void DeleteCavesProgressHandler(string message)
+        {
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
+        }
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated counties");
-            await Repository.DeleteAllCounties();
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Finished deleting associated counties");
+        await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
+            cancellationToken);
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated states");
-            await Repository.DeleteAllAccountStates();
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Finished deleting associated states");
+        await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated files.");
-            await _fileService.DeleteContainer(RequestUser.AccountContainerName);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated counties");
+        await Repository.DeleteAllCounties();
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Finished deleting associated counties");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Done deleting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated states");
+        await Repository.DeleteAllAccountStates();
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Finished deleting associated states");
 
-            await dbTransaction.CommitAsync(cancellationToken);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated files.");
+        await _fileService.DeleteContainer(RequestUser.AccountContainerName);
+
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Done deleting associated files.");
+
+        await dbTransaction.CommitAsync(cancellationToken);
     }
 
     #region Tags
@@ -178,7 +182,7 @@ public class AccountService : ServiceBase<AccountRepository>
     {
         await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId, cancellationToken);
     }
-    
+
 
     #endregion
 
@@ -251,7 +255,7 @@ public class AccountService : ServiceBase<AccountRepository>
                     throw ApiExceptionDictionary.BadRequest("Cannot delete county because it is in use.");
                 }
 
-                Repository.Delete(new County { Id = countyId, AccountId = RequestUser.AccountId});
+                Repository.Delete(new County { Id = countyId, AccountId = RequestUser.AccountId });
             }
 
             await Repository.SaveChangesAsync(cancellationToken);
@@ -274,15 +278,15 @@ public class AccountService : ServiceBase<AccountRepository>
             await Repository.MergeCounties(countyIds, destinationCountyId);
         }
     }
-    
+
     #endregion
 
     #region Settings
-    
+
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
         var featureSettings = (await _featureSettingRepository.GetFeatureSettings(cancellationToken)).ToList();
-        
+
         return featureSettings;
     }
 
@@ -332,13 +336,13 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             account.Name = values.AccountName;
             account.CountyIdDelimiter = values.CountyIdDelimiter;
-            
+
             account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
             account.ExportEnabled = values.ExportEnabled;
 
             // check which states are missing
             var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
-            
+
             // check which states are new
             var deletedStateIds = account.AccountStates.Select(x => x.StateId).Except(values.StateIds).ToList();
 
@@ -357,7 +361,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 {
                     throw ApiExceptionDictionary.NotFound("Account State");
                 }
-                
+
                 Repository.Delete(accountState);
                 await Repository.SaveChangesAsync(cancellationToken);
             }
@@ -375,7 +379,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            
+
             return account.Id;
         }
         catch (Exception)
@@ -384,6 +388,70 @@ public class AccountService : ServiceBase<AccountRepository>
             throw;
         }
     }
-    
+
+    #region Backup
+
+    public async Task<string> GetBackupFileName(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var accountName = await Repository.GetAccountName(RequestUser.AccountId) ?? "Account";
+        return $"{AccountBackupArchivePaths.SanitizePathSegment(accountName, "Account")} Backup {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
+    }
+
+    public async Task<Stream> BuildBackup(string? uuid, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        await SendBackupProgress(uuid, "Preparing backup data...");
+
+        await SendBackupProgress(uuid, "Preparing backup data (1 of 4): loading caves...");
+        var caves = await Repository.GetBackupCavesBase(cancellationToken);
+
+        await SendBackupProgress(uuid, "Preparing backup data (2 of 4): loading entrances...");
+        var entrances = await Repository.GetBackupEntrances(cancellationToken);
+
+        await SendBackupProgress(uuid, "Preparing backup data (3 of 4): loading files...");
+        var files = await Repository.GetBackupFiles(cancellationToken);
+
+        await SendBackupProgress(uuid, "Preparing backup data (4 of 4): loading map data...");
+        var geoJsons = await Repository.GetBackupGeoJsons(cancellationToken);
+
+        await SendBackupProgress(uuid, "Building archive...");
+
+        return await _exportService.ExportAccount(
+            caves,
+            entrances,
+            files,
+            geoJsons,
+            (processed, total) => SendCaveProgress(uuid, processed, total),
+            message => SendBackupProgress(uuid, message),
+            cancellationToken);
+    }
+
+    private async Task SendBackupProgress(string? uuid, string message)
+    {
+        if (string.IsNullOrWhiteSpace(uuid))
+        {
+            return;
+        }
+
+        await _notificationService.SendNotificationToGroupAsync(uuid, message);
+    }
+
+    private async Task SendCaveProgress(string? uuid, int processed, int total)
+    {
+        var remaining = Math.Max(total - processed, 0);
+        await SendBackupProgress(uuid, $"Processed {processed} of {total} caves. {remaining} remaining.");
+    }
+
+    #endregion
+
     #endregion
 }

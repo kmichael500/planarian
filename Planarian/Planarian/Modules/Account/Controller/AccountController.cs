@@ -45,6 +45,19 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return Ok("Account reset finished.");
     }
 
+    #region Backup
+
+    [HttpGet("backup")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult> DownloadBackup(string? uuid, CancellationToken cancellationToken)
+    {
+        var fileName = await Service.GetBackupFileName(cancellationToken);
+        var stream = await Service.BuildBackup(uuid, cancellationToken);
+        return File(stream, "application/zip", fileName);
+    }
+
+    #endregion
+
     #region Misc Settings
     
     [HttpGet("settings")]

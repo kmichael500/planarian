@@ -173,14 +173,35 @@ public class FileService : ServiceBase<FileRepository>
         await blobClient.UploadAsync(stream, true, cancellationToken);
     }
 
-    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
+    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName, bool createIfNotExists = true)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
-        await containerClient.CreateIfNotExistsAsync();
+        if (createIfNotExists)
+        {
+            await containerClient.CreateIfNotExistsAsync();
+        }
 
         return containerClient;
+    }
+
+    public async Task<BlobContainerClient> GetAccountBlobContainerClient()
+    {
+        if (RequestUser.AccountId == null)
+            throw ApiExceptionDictionary.BadRequest("Account Id is null");
+
+        return await GetBlobContainerClient(RequestUser.AccountContainerName, createIfNotExists: false);
+    }
+
+    public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
     }
 
     #endregion
@@ -316,8 +337,13 @@ public class FileService : ServiceBase<FileRepository>
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
             throw ApiExceptionDictionary.NotFound("File");
 
-        var client = await GetBlobContainerClient(blobProperties.ContainerName);
-        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        return await GetBlobStream(blobProperties.ContainerName, blobProperties.BlobKey);
+    }
+
+    public async Task<Stream> GetBlobStream(string containerName, string blobKey)
+    {
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
 
         var stream = new MemoryStream();
         await blobClient.DownloadToAsync(stream);

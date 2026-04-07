@@ -74,7 +74,7 @@ builder.Configuration.AddAzureAppConfiguration(options =>
     options.Connect(appConfigConnectionString)
         .Select(KeyFilter.Any, LabelFilter.Null)
         .Select(KeyFilter.Any,
-            isDevelopment ? "Development" : "Production");
+            "Production");
 });
 
 #if DEBUG
@@ -153,6 +153,9 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
+var backupOptions = builder.Configuration.GetSection(BackupOptions.Key).Get<BackupOptions>() ?? new BackupOptions();
+builder.Services.AddSingleton(backupOptions);
+
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
@@ -170,6 +173,7 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -376,7 +380,7 @@ if (false)
 
     var dbContext = services.GetRequiredService<PlanarianDbContext>();
     var dataGenerator = new DataGenerator(dbContext);
-    
+
     await dataGenerator.AddOrUpdateDefaultData();
 }
 

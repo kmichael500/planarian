@@ -18,7 +18,6 @@ public sealed class CaveCsvModelMap : ClassMap<CaveCsvModel>
         Map(m => m.CaveDepthFt).Default(0.0);
         Map(m => m.MaxPitDepthFt).Default(0.0);
         Map(m => m.NumberOfPits);
-        Map(m => m.Narrative);
         Map(m => m.Geology);
         Map(m => m.GeologicAges);
         Map(m => m.PhysiographicProvinces);
@@ -28,5 +27,6 @@ public sealed class CaveCsvModelMap : ClassMap<CaveCsvModel>
         Map(m => m.ReportedByNames);
         Map(m => m.IsArchived);
         Map(m => m.OtherTags);
+        Map(m => m.Narrative);
     }
 }

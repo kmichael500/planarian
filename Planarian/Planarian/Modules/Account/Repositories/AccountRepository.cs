@@ -778,6 +778,151 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .FirstOrDefaultAsyncEF();
     }
 
+    #region Backup
+
+    public async Task<List<AccountBackupCaveDto>> GetBackupCavesBase(CancellationToken cancellationToken)
+    {
+        return await DbContext.Caves
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .OrderBy(e => e.State.Name)
+            .ThenBy(e => e.County.DisplayId)
+            .ThenBy(e => e.CountyNumber)
+            .ThenBy(e => e.Name)
+            .Select(e => new AccountBackupCaveDto
+            {
+                PlanarianId = e.Id,
+                CaveName = e.Name,
+                AlternateNames = string.Join(", ", e.AlternateNamesList),
+                State = e.State.Abbreviation,
+                CountyName = e.County.Name,
+                CountyCode = e.County.DisplayId,
+                CountyIdDelimiter = e.Account.CountyIdDelimiter,
+                CountyCaveNumber = e.CountyNumber,
+                CaveLengthFt = e.LengthFeet,
+                CaveDepthFt = e.DepthFeet,
+                MaxPitDepthFt = e.MaxPitDepthFeet,
+                NumberOfPits = e.NumberOfPits,
+                Narrative = e.Narrative,
+                Geology = string.Join(", ", e.GeologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                GeologicAges = string.Join(", ", e.GeologicAgeTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                PhysiographicProvinces = string.Join(", ", e.PhysiographicProvinceTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                Archeology = string.Join(", ", e.ArcheologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                Biology = string.Join(", ", e.BiologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                ReportedOnDate = e.ReportedOn.HasValue ? e.ReportedOn.Value.ToString("yyyy-MM-dd") : null,
+                ReportedByNames = string.Join(", ", e.CaveReportedByNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                IsArchived = e.IsArchived,
+                OtherTags = string.Join(", ", e.CaveOtherTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                MapStatuses = string.Join(", ", e.MapStatusTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                CartographerNames = string.Join(", ", e.CartographerNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupEntranceByCaveDto>> GetBackupEntrances(CancellationToken cancellationToken)
+    {
+        return await DbContext.Entrances
+            .AsNoTracking()
+            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+            .OrderBy(e => e.Cave.State.Name)
+            .ThenBy(e => e.Cave.County.DisplayId)
+            .ThenBy(e => e.Cave.CountyNumber)
+            .ThenByDescending(e => e.IsPrimary)
+            .ThenBy(e => e.ReportedOn)
+            .ThenBy(e => e.Name)
+            .Select(entrance => new AccountBackupEntranceByCaveDto
+            {
+                CavePlanarianId = entrance.CaveId,
+                CountyCode = entrance.Cave.County.DisplayId,
+                CountyCaveNumber = entrance.Cave.CountyNumber.ToString(),
+                EntranceName = entrance.Name,
+                DecimalLatitude = entrance.Location.Y,
+                DecimalLongitude = entrance.Location.X,
+                EntranceElevationFt = entrance.Location.Z,
+                LocationQuality = entrance.LocationQualityTag.Name,
+                EntranceDescription = entrance.Description,
+                EntrancePitDepth = entrance.PitDepthFeet,
+                EntranceStatuses = string.Join(", ", entrance.EntranceStatusTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                EntranceHydrology = string.Join(", ", entrance.EntranceHydrologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                FieldIndication = string.Join(", ", entrance.FieldIndicationTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                ReportedOnDate = entrance.ReportedOn.HasValue
+                    ? entrance.ReportedOn.Value.ToString("yyyy-MM-dd")
+                    : null,
+                ReportedByNames = string.Join(", ", entrance.EntranceReportedByNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                IsPrimaryEntrance = entrance.IsPrimary
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupFileByCaveDto>> GetBackupFiles(CancellationToken cancellationToken)
+    {
+        return await DbContext.Files
+            .AsNoTracking()
+            .Where(file => file.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(file.CaveId))
+            .OrderBy(file => file.Cave.State.Name)
+            .ThenBy(file => file.Cave.County.DisplayId)
+            .ThenBy(file => file.Cave.CountyNumber)
+            .ThenBy(file => file.FileTypeTag.Name)
+            .ThenBy(file => file.FileName)
+            .Select(file => new AccountBackupFileByCaveDto
+            {
+                CavePlanarianId = file.CaveId!,
+                Id = file.Id,
+                FileName = file.FileName,
+                BlobKey = file.BlobKey,
+                BlobContainer = file.BlobContainer,
+                FileTypeDisplayName = file.FileTypeTag.Name
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupGeoJsonByCaveDto>> GetBackupGeoJsons(CancellationToken cancellationToken)
+    {
+        return await DbContext.CaveGeoJsons
+            .AsNoTracking()
+            .Where(geoJson => geoJson.Cave.AccountId == RequestUser.AccountId)
+            .OrderBy(geoJson => geoJson.Cave.State.Name)
+            .ThenBy(geoJson => geoJson.Cave.County.DisplayId)
+            .ThenBy(geoJson => geoJson.Cave.CountyNumber)
+            .ThenBy(geoJson => geoJson.Name)
+            .Select(geoJson => new AccountBackupGeoJsonByCaveDto
+            {
+                CavePlanarianId = geoJson.CaveId,
+                Name = geoJson.Name,
+                GeoJson = geoJson.GeoJson
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    #endregion
+
     public async Task<AccountUser?> GetAccountUser(string userId, string accountId)
     {
         return await DbContext.AccountUsers
