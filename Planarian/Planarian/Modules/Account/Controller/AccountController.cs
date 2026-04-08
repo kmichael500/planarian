@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Planarian.Library.Extensions.String;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Backup.Models;
@@ -17,14 +19,18 @@ namespace Planarian.Modules.Account.Controller;
 public class AccountController : PlanarianControllerBase<AccountService>
 {
     private const string Route = "api/account";
+    private const int MaxBackupRequestsPerDay = 10;
+    private static readonly TimeSpan BackupRequestWindow = TimeSpan.FromDays(1);
 
     private readonly ImportService _importService;
+    private readonly MemoryCache _cache;
 
     public AccountController(RequestUser requestUser, TokenService tokenService, AccountService service,
-        CaveService caveService, ImportService importService) : base(
+        CaveService caveService, ImportService importService, MemoryCache cache) : base(
         requestUser, tokenService, service)
     {
         _importService = importService;
+        _cache = cache;
     }
 
     [HttpPost]
@@ -52,8 +58,34 @@ public class AccountController : PlanarianControllerBase<AccountService>
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<AccountBackupDownloadVm>> DownloadBackup(string? uuid, CancellationToken cancellationToken)
     {
+        var cacheKey = GetBackupRateLimitKey();
+        var rateLimitState = _cache.GetOrCreate(cacheKey, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = BackupRequestWindow;
+            return new BackupRateLimitState();
+        })!;
+
+        lock (rateLimitState.SyncRoot)
+        {
+            if (rateLimitState.Attempts >= MaxBackupRequestsPerDay)
+                throw ApiExceptionDictionary.TooManyRequests("Too many backup requests. Try again tomorrow.");
+
+            rateLimitState.Attempts++;
+        }
+
         var result = await Service.BuildBackup(uuid, cancellationToken);
         return Ok(result);
+    }
+
+    private string GetBackupRateLimitKey()
+    {
+        return $"backup-rate-limit:{RequestUser.Id}";
+    }
+
+    private sealed class BackupRateLimitState
+    {
+        public int Attempts { get; set; }
+        public object SyncRoot { get; } = new();
     }
 
     #endregion

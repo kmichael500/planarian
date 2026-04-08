@@ -8,8 +8,8 @@ internal static class AccountBackupArchivePaths
         .Concat(['"', '*', '/', ':', '<', '>', '?', '\\', '|'])
         .ToHashSet();
 
-    private static readonly HashSet<string> WindowsReservedPathSegmentNames =
-    [
+    private static readonly HashSet<string> WindowsReservedPathSegmentNames = new(StringComparer.OrdinalIgnoreCase)
+    {
         "CON",
         "PRN",
         "AUX",
@@ -32,7 +32,7 @@ internal static class AccountBackupArchivePaths
         "LPT7",
         "LPT8",
         "LPT9"
-    ];
+    };
 
     public static string BuildCaveFolder(AccountBackupCaveDto cave)
     {

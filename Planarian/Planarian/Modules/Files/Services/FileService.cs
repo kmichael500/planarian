@@ -342,11 +342,23 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task<Stream> GetBlobStream(string containerName, string blobKey)
     {
+        if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
         var client = await GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient(blobKey);
 
         var stream = new MemoryStream();
-        await blobClient.DownloadToAsync(stream);
+        try
+        {
+            await blobClient.DownloadToAsync(stream);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            await stream.DisposeAsync();
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+
         stream.Position = 0;
         return stream;
     }

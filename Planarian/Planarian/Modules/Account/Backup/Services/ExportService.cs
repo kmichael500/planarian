@@ -98,27 +98,48 @@ public class ExportService
             {
                 var existingEntryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                await WriteCsvEntry(
+                await WriteCsvEntry<CaveCsvModel, CaveCsvModelMap>(
                     archive,
                     "caves.csv",
                     BuildCaveCsvRows(caves),
-                    new CaveCsvModelMap(),
                     cancellationToken);
                 existingEntryPaths.Add("caves.csv");
 
-                await WriteCsvEntry(
+                await WriteCsvEntry<EntranceCsvModel, EntranceCsvModelMap>(
                     archive,
                     "entrances.csv",
                     BuildEntranceCsvRows(entrances),
-                    new EntranceCsvModelMap(),
                     cancellationToken);
                 existingEntryPaths.Add("entrances.csv");
 
                 var geoJsonsByCaveId = geoJsons.ToLookup(geoJson => geoJson.CavePlanarianId);
                 var fileWorkItemsByCaveId = BuildFileWorkItems(caves, files, existingEntryPaths);
-                var accountBlobContainerClient = files.Count > 0
-                    ? await _fileService.GetAccountBlobContainerClient()
-                    : null;
+                BlobContainerClient? accountBlobContainerClient = null;
+
+                if (files.Count > 0)
+                {
+                    var candidateContainerClient = await _fileService.GetAccountBlobContainerClient();
+
+                    try
+                    {
+                        var containerExists = await candidateContainerClient.ExistsAsync(cancellationToken);
+                        if (containerExists.Value)
+                        {
+                            accountBlobContainerClient = candidateContainerClient;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException(
+                                $"The account file container '{candidateContainerClient.Name}' does not exist.");
+                        }
+                    }
+                    catch (RequestFailedException ex) when (ex.Status == 404 || string.Equals(ex.ErrorCode, BlobErrorCode.ContainerNotFound.ToString(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"The account file container '{candidateContainerClient.Name}' does not exist.",
+                            ex);
+                    }
+                }
 
                 await WriteCaveEntries(
                     archive,
@@ -546,14 +567,13 @@ public class ExportService
         ZipArchive archive,
         string entryName,
         IEnumerable<TRecord> records,
-        TMap classMap,
         CancellationToken cancellationToken) where TMap : class
     {
         var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
         await using var entryStream = entry.Open();
         await using var writer = new StreamWriter(entryStream, new UTF8Encoding(false));
         await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
-        csv.Context.RegisterClassMap(classMap.GetType());
+        csv.Context.RegisterClassMap<TMap>();
         csv.WriteRecords(records);
         await writer.FlushAsync(cancellationToken);
     }
