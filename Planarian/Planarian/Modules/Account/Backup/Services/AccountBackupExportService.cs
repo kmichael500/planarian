@@ -158,36 +158,46 @@ public class AccountBackupExportService
         var total = files.Count;
         var processed = 0;
 
-        var semaphore = new SemaphoreSlim(_backupOptions.BlobDownloadTransferConcurrency);
-        var tasks = files.Select(async file =>
-        {
-            await semaphore.WaitAsync(cancellationToken);
-            try
+        // ZipArchive is not thread-safe for concurrent writes; download blobs in parallel
+        // into memory buffers first, then write to the archive sequentially.
+        var concurrency = Math.Max(1, _backupOptions.BlobDownloadTransferConcurrency);
+        var semaphore = new SemaphoreSlim(concurrency);
+        var throttledTasks = files
+            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey))
+            .Select(async file =>
             {
-                if (string.IsNullOrWhiteSpace(file.BlobKey))
+                await semaphore.WaitAsync(cancellationToken);
+                try
                 {
-                    return;
+                    var blobClient = containerClient.GetBlobClient(file.BlobKey!);
+                    var buffer = new MemoryStream();
+                    await blobClient.DownloadToAsync(buffer, cancellationToken);
+                    buffer.Position = 0;
+                    return (file, buffer);
                 }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
 
-                var blobClient = containerClient.GetBlobClient(file.BlobKey);
-                var caveDirName = AccountBackupArchivePaths.SanitizePathSegment(file.CavePlanarianId, "unknown");
-                var safeFileName = AccountBackupArchivePaths.SanitizePathSegment(file.FileName, file.Id);
-                var entryPath = $"files/{caveDirName}/{safeFileName}";
+        var downloadResults = await Task.WhenAll(throttledTasks);
 
-                var entry = archive.CreateEntry(entryPath);
-                await using var entryStream = entry.Open();
-                await blobClient.DownloadToAsync(entryStream, cancellationToken);
+        foreach (var (file, buffer) in downloadResults)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var caveDirName = AccountBackupArchivePaths.SanitizePathSegment(file.CavePlanarianId, "unknown");
+            var safeFileName = AccountBackupArchivePaths.SanitizePathSegment(file.FileName, file.Id);
+            var entryPath = $"files/{caveDirName}/{safeFileName}";
 
-                var current = Interlocked.Increment(ref processed);
-                await onCaveProgress(current, total);
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        }).ToList();
+            var entry = archive.CreateEntry(entryPath);
+            await using var entryStream = entry.Open();
+            await buffer.CopyToAsync(entryStream, cancellationToken);
+            await buffer.DisposeAsync();
 
-        await Task.WhenAll(tasks);
+            processed++;
+            await onCaveProgress(processed, total);
+        }
     }
 
     private static string CsvEscape(string? value)

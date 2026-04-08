@@ -47,10 +47,10 @@ public class AccountBackupTempStorageService
 
             try
             {
-                var lastWrite = System.IO.File.GetLastWriteTimeUtc(file);
+                var lastWrite = File.GetLastWriteTimeUtc(file);
                 if (lastWrite <= cutoff)
                 {
-                    System.IO.File.Delete(file);
+                    File.Delete(file);
                     result.DeletedFiles++;
                 }
             }
