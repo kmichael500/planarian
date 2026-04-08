@@ -6,6 +6,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Planarian.Modules.Account.Backup.Models;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
@@ -567,7 +568,7 @@ public class ExportService
         ZipArchive archive,
         string entryName,
         IEnumerable<TRecord> records,
-        CancellationToken cancellationToken) where TMap : class
+        CancellationToken cancellationToken) where TMap : ClassMap
     {
         var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
         await using var entryStream = entry.Open();
