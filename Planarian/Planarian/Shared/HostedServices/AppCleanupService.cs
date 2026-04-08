@@ -3,25 +3,29 @@ using Microsoft.Extensions.Logging;
 using Planarian.Modules.Account.Backup.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
+using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Shared.HostedServices;
 
-public sealed class TemporaryBackupCleanupService : BackgroundService
+public sealed class AppCleanupService : BackgroundService
 {
     private readonly AccountBackupTempStorageService _accountBackupTempStorageService;
     private readonly BlobService _blobService;
     private readonly BackupOptions _backupOptions;
-    private readonly ILogger<TemporaryBackupCleanupService> _logger;
+    private readonly FileOptions _fileOptions;
+    private readonly ILogger<AppCleanupService> _logger;
 
-    public TemporaryBackupCleanupService(
+    public AppCleanupService(
         AccountBackupTempStorageService accountBackupTempStorageService,
         BlobService blobService,
         BackupOptions backupOptions,
-        ILogger<TemporaryBackupCleanupService> logger)
+        FileOptions fileOptions,
+        ILogger<AppCleanupService> logger)
     {
         _accountBackupTempStorageService = accountBackupTempStorageService;
         _blobService = blobService;
         _backupOptions = backupOptions;
+        _fileOptions = fileOptions;
         _logger = logger;
     }
 
@@ -41,7 +45,7 @@ public sealed class TemporaryBackupCleanupService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to run temporary backup cleanup pass.");
+                _logger.LogError(ex, "Failed to run app cleanup pass.");
             }
 
             try
@@ -60,7 +64,7 @@ public sealed class TemporaryBackupCleanupService : BackgroundService
         try
         {
             var cleanupResult = _accountBackupTempStorageService.DeleteExpiredArtifacts(
-                _backupOptions.TempBlobExpirationHours,
+                _fileOptions.TempExpirationHours,
                 stoppingToken);
 
             if (cleanupResult.DeletedFiles > 0 || cleanupResult.DeletedDirectories > 0)
@@ -86,13 +90,13 @@ public sealed class TemporaryBackupCleanupService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to clean up expired local backup temp files.");
+            _logger.LogError(ex, "Failed to clean up expired local backup temp files during app cleanup.");
         }
 
         try
         {
             await _blobService.DeleteExpiredTemporaryBackupBlobs(
-                _backupOptions.TempBlobExpirationHours,
+            _fileOptions.TempExpirationHours,
                 stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -101,7 +105,7 @@ public sealed class TemporaryBackupCleanupService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to clean up expired temporary backup blobs.");
+            _logger.LogError(ex, "Failed to clean up expired temporary backup blobs during app cleanup.");
         }
     }
 }

@@ -7,6 +7,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using CsvHelper;
 using Planarian.Modules.Account.Backup.Models;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
 using Planarian.Shared.Options;
@@ -15,21 +16,52 @@ namespace Planarian.Modules.Account.Backup.Services;
 
 public class ExportService
 {
+    private readonly AccountRepository _accountRepository;
     private readonly FileService _fileService;
     private readonly BackupOptions _backupOptions;
     private readonly AccountBackupTempStorageService _accountBackupTempStorageService;
 
     public ExportService(
+        AccountRepository accountRepository,
         FileService fileService,
         BackupOptions backupOptions,
         AccountBackupTempStorageService accountBackupTempStorageService)
     {
+        _accountRepository = accountRepository;
         _fileService = fileService;
         _backupOptions = backupOptions;
         _accountBackupTempStorageService = accountBackupTempStorageService;
     }
 
     public async Task<Stream> ExportAccount(
+        Func<int, int, Task>? reportProgress,
+        Func<string, Task>? reportStatus,
+        CancellationToken cancellationToken)
+    {
+        await ReportStatus(reportStatus, "Gathering cave data...");
+        var caves = await _accountRepository.GetBackupCavesBase(cancellationToken);
+
+        await ReportStatus(reportStatus, "Gathering entrance data...");
+        var entrances = await _accountRepository.GetBackupEntrances(cancellationToken);
+
+        await ReportStatus(reportStatus, "Gathering file data...");
+        var files = await _accountRepository.GetBackupFiles(cancellationToken);
+
+        await ReportStatus(reportStatus, "Gathering map data...");
+        var geoJsons = await _accountRepository.GetBackupGeoJsons(cancellationToken);
+
+        await ReportStatus(reportStatus, "Creating archive...");
+        return await ExportAccount(
+            caves,
+            entrances,
+            files,
+            geoJsons,
+            reportProgress,
+            reportStatus,
+            cancellationToken);
+    }
+
+    private async Task<Stream> ExportAccount(
         IReadOnlyList<AccountBackupCaveDto> caves,
         IReadOnlyList<AccountBackupEntranceByCaveDto> entrances,
         IReadOnlyList<AccountBackupFileByCaveDto> files,

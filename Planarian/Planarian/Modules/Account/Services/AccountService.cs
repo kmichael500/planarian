@@ -19,6 +19,7 @@ using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
+using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -33,10 +34,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly CaveService _caveService;
     private readonly ExportService _exportService;
     private readonly BlobService _blobService;
-    private readonly BackupOptions _backupOptions;
+    private readonly FileOptions _fileOptions;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, BackupOptions backupOptions) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, FileOptions fileOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -47,7 +48,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _caveService = caveService;
         _exportService = exportService;
         _blobService = blobService;
-        _backupOptions = backupOptions;
+        _fileOptions = fileOptions;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -418,26 +419,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         var fileName = await GetBackupFileName(cancellationToken);
 
-        await SendBackupProgress(uuid, "Gathering cave data...");
-
-        var caves = await Repository.GetBackupCavesBase(cancellationToken);
-
-        await SendBackupProgress(uuid, "Gathering entrance data...");
-        var entrances = await Repository.GetBackupEntrances(cancellationToken);
-
-        await SendBackupProgress(uuid, "Gathering file data...");
-        var files = await Repository.GetBackupFiles(cancellationToken);
-
-        await SendBackupProgress(uuid, "Gathering map data...");
-        var geoJsons = await Repository.GetBackupGeoJsons(cancellationToken);
-
-        await SendBackupProgress(uuid, "Creating archive...");
-
         await using var archiveStream = await _exportService.ExportAccount(
-            caves,
-            entrances,
-            files,
-            geoJsons,
             (processed, total) => SendCaveProgress(uuid, processed, total),
             message => SendBackupProgress(uuid, message),
             cancellationToken);
@@ -451,7 +433,7 @@ public class AccountService : ServiceBase<AccountRepository>
         var downloadUrl = _blobService.GetTemporaryBackupDownloadUrl(
             blobKey,
             fileName,
-            _backupOptions.TempBlobExpirationHours);
+            _fileOptions.TempExpirationHours);
 
         await SendBackupProgress(uuid, "Starting download...");
 

@@ -188,7 +188,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
-builder.Services.AddHostedService<TemporaryBackupCleanupService>();
+builder.Services.AddHostedService<AppCleanupService>();
 
 builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 

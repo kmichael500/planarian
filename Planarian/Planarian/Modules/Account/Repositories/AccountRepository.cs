@@ -784,7 +784,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     public async Task<List<AccountBackupCaveDto>> GetBackupCavesBase(CancellationToken cancellationToken)
     {
         return await DbContext.Caves
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(e => e.AccountId == RequestUser.AccountId)
             .OrderBy(e => e.State.Name)
