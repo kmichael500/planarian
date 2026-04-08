@@ -175,7 +175,7 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
-builder.Services.AddScoped<AccountBackupExportService>();
+builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<AccountBackupTempStorageService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();

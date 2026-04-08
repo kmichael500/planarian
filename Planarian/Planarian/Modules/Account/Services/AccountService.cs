@@ -31,12 +31,12 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
-    private readonly AccountBackupExportService _accountBackupExportService;
+    private readonly ExportService _exportService;
     private readonly BlobService _blobService;
     private readonly BackupOptions _backupOptions;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, AccountBackupExportService accountBackupExportService, BlobService blobService, BackupOptions backupOptions) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, BackupOptions backupOptions) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -45,7 +45,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
-        _accountBackupExportService = accountBackupExportService;
+        _exportService = exportService;
         _blobService = blobService;
         _backupOptions = backupOptions;
     }
@@ -433,7 +433,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         await SendBackupProgress(uuid, "Creating archive...");
 
-        await using var archiveStream = await _accountBackupExportService.ExportAccount(
+        await using var archiveStream = await _exportService.ExportAccount(
             caves,
             entrances,
             files,

@@ -13,13 +13,13 @@ using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Account.Backup.Services;
 
-public class AccountBackupExportService
+public class ExportService
 {
     private readonly FileService _fileService;
     private readonly BackupOptions _backupOptions;
     private readonly AccountBackupTempStorageService _accountBackupTempStorageService;
 
-    public AccountBackupExportService(
+    public ExportService(
         FileService fileService,
         BackupOptions backupOptions,
         AccountBackupTempStorageService accountBackupTempStorageService)
