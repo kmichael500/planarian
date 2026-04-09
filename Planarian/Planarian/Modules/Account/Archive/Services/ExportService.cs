@@ -7,6 +7,7 @@ using Azure.Storage.Blobs.Models;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Planarian.Library.Constants;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
