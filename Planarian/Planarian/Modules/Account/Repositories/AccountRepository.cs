@@ -785,6 +785,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Caves
             .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
             .Where(e => e.AccountId == RequestUser.AccountId)
             .OrderBy(e => e.State.Name)
             .ThenBy(e => e.County.DisplayId)
@@ -842,6 +844,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Entrances
             .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
             .Where(e => e.Cave.AccountId == RequestUser.AccountId)
             .OrderBy(e => e.Cave.State.Name)
             .ThenBy(e => e.Cave.County.DisplayId)
@@ -885,6 +889,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Files
             .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
             .Where(file => file.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(file.CaveId))
             .OrderBy(file => file.Cave.State.Name)
             .ThenBy(file => file.Cave.County.DisplayId)
@@ -906,6 +912,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.CaveGeoJsons
             .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
             .Where(geoJson => geoJson.Cave.AccountId == RequestUser.AccountId)
             .OrderBy(geoJson => geoJson.Cave.State.Name)
             .ThenBy(geoJson => geoJson.Cave.County.DisplayId)
