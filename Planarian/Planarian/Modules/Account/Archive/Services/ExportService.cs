@@ -6,24 +6,29 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using CsvHelper;
 using CsvHelper.Configuration;
+using Planarian.Library.Constants;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
+using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Account.Archive.Services;
 
-public class ArchiveExportService
+public class ExportService
 {
     private readonly AccountRepository _accountRepository;
     private readonly FileService _fileService;
+    private readonly RequestUser _requestUser;
 
-    public ArchiveExportService(
+    public ExportService(
         AccountRepository accountRepository,
-        FileService fileService)
+        FileService fileService,
+        RequestUser requestUser)
     {
         _accountRepository = accountRepository;
         _fileService = fileService;
+        _requestUser = requestUser;
     }
 
     public async Task<Stream> ExportArchive(
@@ -31,6 +36,8 @@ public class ArchiveExportService
         Func<string, Task>? reportStatus,
         CancellationToken cancellationToken)
     {
+        await _requestUser.HasCavePermission(PermissionPolicyKey.Admin);
+
         await ReportStatus(reportStatus, "Gathering cave data...");
         var caves = await _accountRepository.GetArchiveCaves(cancellationToken);
 

@@ -28,10 +28,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
-    private readonly ArchiveExportService _archiveExportService;
+    private readonly ExportService _exportService;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ArchiveExportService archiveExportService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -40,7 +40,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
-        _archiveExportService = archiveExportService;
+        _exportService = exportService;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -412,7 +412,7 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        return await _archiveExportService.ExportArchive(
+        return await _exportService.ExportArchive(
             (processed, total) => SendArchiveCaveProgress(uuid, processed, total),
             message => SendArchiveProgress(uuid, message),
             cancellationToken);
