@@ -78,18 +78,30 @@ public class ArchiveExportService
 
                 if (files.Count > 0)
                 {
-                    var candidateContainerClient = await _fileService.GetAccountBlobContainerClient();
-
                     try
                     {
+                        var candidateContainerClient = await _fileService.GetAccountBlobContainerClient();
                         var containerExists = await candidateContainerClient.ExistsAsync(cancellationToken);
                         if (containerExists.Value)
                         {
                             accountBlobContainerClient = candidateContainerClient;
                         }
+                        else
+                        {
+                            AddMissingFiles(
+                                missingFiles,
+                                caves,
+                                files,
+                                "Container not found");
+                        }
                     }
-                    catch (RequestFailedException ex) when (ex.Status == 404 || string.Equals(ex.ErrorCode, BlobErrorCode.ContainerNotFound.ToString(), StringComparison.OrdinalIgnoreCase))
+                    catch (Exception ex)
                     {
+                        AddMissingFiles(
+                            missingFiles,
+                            caves,
+                            files,
+                            ex.Message);
                     }
                 }
 
@@ -141,6 +153,7 @@ public class ArchiveExportService
             {
                 await WriteCaveFileEntries(
                     archive,
+                    cave,
                     caveFolder,
                     filesByCaveId[cave.PlanarianId],
                     accountBlobContainerClient,
@@ -167,6 +180,7 @@ public class ArchiveExportService
 
     private async Task WriteCaveFileEntries(
         ZipArchive archive,
+        ArchiveCaveCsvModel cave,
         string caveFolder,
         IEnumerable<ArchiveFileByCaveModel> files,
         BlobContainerClient accountBlobContainerClient,
@@ -196,12 +210,13 @@ public class ArchiveExportService
                 await using var entryStream = entry.Open();
                 await blobStream.CopyToAsync(entryStream, cancellationToken);
             }
-            catch (RequestFailedException ex) when (ex.Status == 404 || string.Equals(ex.ErrorCode, BlobErrorCode.BlobNotFound.ToString(), StringComparison.OrdinalIgnoreCase))
+            catch (Exception ex)
             {
-                missingFiles.Add(new MissingArchiveFile(
+                missingFiles.Add(BuildMissingArchiveFile(
+                    cave,
                     entryPath,
                     file.BlobKey,
-                    ex.ErrorCode ?? BlobErrorCode.BlobNotFound.ToString()));
+                    ex.Message));
             }
         }
     }
@@ -219,16 +234,18 @@ public class ArchiveExportService
         var entry = archive.CreateEntry("missing-files.csv", CompressionLevel.Fastest);
         await using var entryStream = entry.Open();
         await using var writer = new StreamWriter(entryStream, new UTF8Encoding(false));
-        await writer.WriteLineAsync("EntryPath,BlobKey,ErrorCode");
+        await writer.WriteLineAsync("CaveDisplayId,CaveName,EntryPath,BlobKey,Reason");
 
         foreach (var missingFile in missingFiles.OrderBy(file => file.EntryPath, StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             await writer.WriteLineAsync(string.Join(",",
+                EscapeCsv(missingFile.CaveDisplayId),
+                EscapeCsv(missingFile.CaveName),
                 EscapeCsv(missingFile.EntryPath),
                 EscapeCsv(missingFile.BlobKey),
-                EscapeCsv(missingFile.ErrorCode)));
+                EscapeCsv(missingFile.Reason)));
         }
 
         await writer.FlushAsync(cancellationToken);
@@ -255,6 +272,44 @@ public class ArchiveExportService
         var caveDisplayId = $"{cave.CountyCode}{cave.CountyIdDelimiter}{cave.CountyCaveNumber}";
         var caveFolder = NormalizePathSegment($"{caveDisplayId} {cave.CaveName}", caveDisplayId);
         return $"{stateFolder}/{countyFolder}/{caveFolder}";
+    }
+
+    private static MissingArchiveFile BuildMissingArchiveFile(
+        ArchiveCaveCsvModel cave,
+        string entryPath,
+        string blobKey,
+        string reason)
+    {
+        return new MissingArchiveFile(
+            $"{cave.CountyCode}{cave.CountyIdDelimiter}{cave.CountyCaveNumber}",
+            cave.CaveName,
+            entryPath,
+            blobKey,
+            reason);
+    }
+
+    private static void AddMissingFiles(
+        ICollection<MissingArchiveFile> missingFiles,
+        IEnumerable<ArchiveCaveCsvModel> caves,
+        IEnumerable<ArchiveFileByCaveModel> files,
+        string reason)
+    {
+        var cavesById = caves.ToDictionary(cave => cave.PlanarianId);
+
+        foreach (var file in files)
+        {
+            if (string.IsNullOrWhiteSpace(file.BlobKey) ||
+                !cavesById.TryGetValue(file.CavePlanarianId, out var cave))
+            {
+                continue;
+            }
+
+            var caveFolder = BuildCaveFolder(cave);
+            var fileTagFolder = NormalizePathSegment(file.FileTypeDisplayName, FileTypeTagName.Other);
+            var fileNameInArchive = NormalizePathSegment(file.FileName, $"file-{file.Id}");
+            var entryPath = $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}";
+            missingFiles.Add(BuildMissingArchiveFile(cave, entryPath, file.BlobKey, reason));
+        }
     }
 
     private static string EnsureGeoJsonFileName(string? fileName)
@@ -371,7 +426,9 @@ public class ArchiveExportService
     }
 
     private sealed record MissingArchiveFile(
+        string CaveDisplayId,
+        string CaveName,
         string EntryPath,
         string BlobKey,
-        string ErrorCode);
+        string Reason);
 }
