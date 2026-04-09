@@ -4,8 +4,7 @@ using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
-using Planarian.Modules.Account.Backup.Models;
-using Planarian.Modules.Account.Backup.Services;
+using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
@@ -17,9 +16,6 @@ using Planarian.Modules.Import.Models;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Options;
-using Planarian.Shared.Services;
-using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -32,12 +28,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
-    private readonly ExportService _exportService;
-    private readonly BlobService _blobService;
-    private readonly FileOptions _fileOptions;
+    private readonly ArchiveExportService _archiveExportService;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService, BlobService blobService, FileOptions fileOptions) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ArchiveExportService archiveExportService) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -46,9 +40,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
-        _exportService = exportService;
-        _blobService = blobService;
-        _fileOptions = fileOptions;
+        _archiveExportService = archiveExportService;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -397,9 +389,9 @@ public class AccountService : ServiceBase<AccountRepository>
         }
     }
 
-    #region Backup
+    #region Archive
 
-    public async Task<string> GetBackupFileName(CancellationToken cancellationToken)
+    public async Task<string> GetArchiveFileName(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -407,44 +399,26 @@ public class AccountService : ServiceBase<AccountRepository>
         }
 
         var accountName = await Repository.GetAccountName(RequestUser.AccountId) ?? "Account";
-        return $"{AccountBackupArchivePaths.SanitizePathSegment(accountName, "Account")} Backup {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
+        var normalizedAccountName = string.IsNullOrWhiteSpace(accountName)
+            ? "Account"
+            : accountName.Replace('/', '-').Replace('\\', '-').Trim();
+        return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
     }
 
-    public async Task<AccountBackupDownloadVm> BuildBackup(string? uuid, CancellationToken cancellationToken)
+    public async Task<Stream> BuildArchive(string? uuid, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var fileName = await GetBackupFileName(cancellationToken);
-
-        await using var archiveStream = await _exportService.ExportAccount(
-            (processed, total) => SendCaveProgress(uuid, processed, total),
-            message => SendBackupProgress(uuid, message),
+        return await _archiveExportService.ExportArchive(
+            (processed, total) => SendArchiveCaveProgress(uuid, processed, total),
+            message => SendArchiveProgress(uuid, message),
             cancellationToken);
-
-        await SendBackupProgress(uuid, "Preparing your download...");
-        var blobKey = await _blobService.AddTemporaryBackupArchive(
-            RequestUser.AccountId,
-            archiveStream,
-            cancellationToken);
-
-        var downloadUrl = _blobService.GetTemporaryBackupDownloadUrl(
-            blobKey,
-            fileName,
-            _fileOptions.TempExpirationHours);
-
-        await SendBackupProgress(uuid, "Starting download...");
-
-        return new AccountBackupDownloadVm
-        {
-            FileName = fileName,
-            DownloadUrl = downloadUrl
-        };
     }
 
-    private async Task SendBackupProgress(string? uuid, string statusMessage, int? processedCaves = null, int? totalCaves = null)
+    private async Task SendArchiveProgress(string? uuid, string statusMessage, int? processedCaves = null, int? totalCaves = null)
     {
         if (string.IsNullOrWhiteSpace(uuid))
         {
@@ -459,9 +433,9 @@ public class AccountService : ServiceBase<AccountRepository>
         });
     }
 
-    private async Task SendCaveProgress(string? uuid, int processed, int total)
+    private async Task SendArchiveCaveProgress(string? uuid, int processed, int total)
     {
-        await SendBackupProgress(uuid, $"Processed {processed} of {total} caves.", processed, total);
+        await SendArchiveProgress(uuid, $"Processed {processed} of {total} caves.", processed, total);
     }
 
     #endregion

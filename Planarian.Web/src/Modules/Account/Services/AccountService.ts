@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
+import { AxiosProgressEvent, AxiosRequestConfig, AxiosResponse } from "axios";
 import { HttpClient } from "../../..";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
@@ -16,7 +16,6 @@ import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { BackupDownloadVm } from "../Models/Archive/BackupDownloadVm";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -40,13 +39,14 @@ const AccountService = {
     return response.data;
   },
 
-  async DownloadBackup(uuid?: string): Promise<BackupDownloadVm> {
+  async DownloadArchive(uuid?: string): Promise<AxiosResponse<Blob>> {
     const requestUrl = !isNullOrWhiteSpace(uuid)
-      ? `${baseUrl}/backup?uuid=${encodeURIComponent(uuid)}`
-      : `${baseUrl}/backup`;
+      ? `${baseUrl}/archive?uuid=${encodeURIComponent(uuid)}`
+      : `${baseUrl}/archive`;
 
-    const response = await HttpClient.get<BackupDownloadVm>(requestUrl);
-    return response.data;
+    return await HttpClient.get<Blob>(requestUrl, {
+      responseType: "blob",
+    });
   },
 
   //#region Import

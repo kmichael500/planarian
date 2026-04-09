@@ -1,193 +1,114 @@
 import { DownloadOutlined } from "@ant-design/icons";
 import { Alert, Card, Progress, Space, Typography, message } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { PermissionKey } from "../../../Authentication/Models/PermissionKey";
 import { ShouldDisplay } from "../../../../Shared/Permissioning/Components/ShouldDisplay";
-import { NotificationComponent } from "../../../Import/Components/NotificationComponent";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
 import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
-import { AuthenticationService } from "../../../Authentication/Services/AuthenticationService";
+import { SignalRProgressComponent } from "../../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
+import { ProgressVm } from "../../../../Shared/Models/ProgressVm";
 import { AccountService } from "../../Services/AccountService";
-import { BackupProgressVm } from "../../Models/Archive/BackupProgressVm";
 
-const initialBackupProgress: BackupProgressVm = {
-    statusMessage: "Gathering cave data...",
+const initialArchiveProgress: ProgressVm = {
+    statusMessage: "Preparing archive...",
     processedCaves: 0,
     totalCaves: 0,
 };
 
-const MAX_ARCHIVES_PER_DAY = 2;
-const ARCHIVE_USAGE_STORAGE_KEY_PREFIX = "planarian.account.archive.daily-usage";
-
-interface ArchiveUsageRecord {
-    dayKey: string;
-    count: number;
-}
-
-const getTodayKey = () => new Date().toISOString().slice(0, 10);
-
-const getArchiveUsageStorageKey = (userId: string, accountId: string) => {
-    return `${ARCHIVE_USAGE_STORAGE_KEY_PREFIX}.${userId}.${accountId}`;
-};
-
-const readArchiveUsageCount = (storageKey: string): number => {
-    try {
-        const storedValue = window.localStorage.getItem(storageKey);
-        if (!storedValue) {
-            return 0;
-        }
-
-        const parsedValue = JSON.parse(storedValue) as ArchiveUsageRecord;
-        if (parsedValue.dayKey !== getTodayKey()) {
-            return 0;
-        }
-
-        return Number.isFinite(parsedValue.count) ? parsedValue.count : 0;
-    } catch {
-        return 0;
-    }
-};
-
-const incrementArchiveUsageCount = (storageKey: string): number => {
-    const nextCount = readArchiveUsageCount(storageKey) + 1;
-    const nextUsageRecord: ArchiveUsageRecord = {
-        dayKey: getTodayKey(),
-        count: nextCount,
-    };
-
-    try {
-        window.localStorage.setItem(storageKey, JSON.stringify(nextUsageRecord));
-    } catch {
+const getFileNameFromContentDisposition = (contentDisposition?: string) => {
+    if (!contentDisposition) {
+        return "account-archive.zip";
     }
 
-    return nextCount;
+    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+        return decodeURIComponent(utf8Match[1]);
+    }
+
+    const fileNameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+    return fileNameMatch?.[1] || "account-archive.zip";
+};
+
+const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
 };
 
 const ArchiveCardComponent: React.FC = () => {
-    const userId = AuthenticationService.GetUserId();
-    const accountId = AuthenticationService.GetAccountId();
+    const [isPreparingArchive, setIsPreparingArchive] = useState<boolean>(false);
+    const [archiveDownloadSucceeded, setArchiveDownloadSucceeded] = useState<boolean>(false);
+    const [archiveFileName, setArchiveFileName] = useState<string | null>(null);
+    const [archiveProgress, setArchiveProgress] = useState<ProgressVm>(initialArchiveProgress);
+    const [archiveProgressGroupName, setArchiveProgressGroupName] = useState<string | null>(null);
+    const [hasStartedArchiveRequest, setHasStartedArchiveRequest] = useState<boolean>(false);
 
-    const archiveUsageStorageKey = getArchiveUsageStorageKey(
-        userId!,
-        accountId!
-    );
-    const [isPreparingBackup, setIsPreparingBackup] = useState<boolean>(false);
-    const [backupProgressGroupName, setBackupProgressGroupName] = useState<string | null>(null);
-    const [hasStartedBackupRequest, setHasStartedBackupRequest] = useState<boolean>(false);
-    const [hasCompletedBackupProcessing, setHasCompletedBackupProcessing] = useState<boolean>(false);
-    const [backupDownloadSucceeded, setBackupDownloadSucceeded] = useState<boolean>(false);
-    const [backupFileName, setBackupFileName] = useState<string | null>(null);
-    const [backupProgress, setBackupProgress] = useState<BackupProgressVm>(initialBackupProgress);
-    const [dailyArchiveCount, setDailyArchiveCount] = useState<number>(() => readArchiveUsageCount(archiveUsageStorageKey));
-    const downloadFrameRef = useRef<HTMLIFrameElement | null>(null);
-
-    const hasReachedDailyArchiveLimit = dailyArchiveCount >= MAX_ARCHIVES_PER_DAY;
-    const remainingArchivesToday = Math.max(0, MAX_ARCHIVES_PER_DAY - dailyArchiveCount);
-
-    useEffect(() => {
-        return () => {
-            if (downloadFrameRef.current) {
-                downloadFrameRef.current.remove();
-                downloadFrameRef.current = null;
-            }
-        };
-    }, []);
-
-    const onBackupProgress = useCallback((notification: unknown) => {
+    const onArchiveProgress = useCallback((notification: unknown) => {
         if (!notification || typeof notification !== "object") {
             return;
         }
 
-        const nextProgress = notification as BackupProgressVm;
-        setBackupProgress((currentProgress) => ({
+        const nextProgress = notification as ProgressVm;
+        setArchiveProgress((currentProgress) => ({
             statusMessage: nextProgress.statusMessage || currentProgress.statusMessage,
             processedCaves: nextProgress.processedCaves ?? currentProgress.processedCaves,
             totalCaves: nextProgress.totalCaves ?? currentProgress.totalCaves,
         }));
     }, []);
 
-    const startBrowserDownload = useCallback((downloadUrl: string) => {
-        try {
-            if (downloadFrameRef.current) {
-                downloadFrameRef.current.remove();
-                downloadFrameRef.current = null;
-            }
-
-            const frame = document.createElement("iframe");
-            frame.style.display = "none";
-            frame.setAttribute("aria-hidden", "true");
-            frame.src = downloadUrl;
-            document.body.appendChild(frame);
-            downloadFrameRef.current = frame;
-
-            window.setTimeout(() => {
-                if (downloadFrameRef.current === frame) {
-                    frame.remove();
-                    downloadFrameRef.current = null;
-                }
-            }, 60_000);
-        } catch {
-            window.location.assign(downloadUrl);
-        }
-    }, []);
-
-    const startBackupDownload = useCallback(async () => {
-        if (
-            !backupProgressGroupName ||
-            hasStartedBackupRequest ||
-            !isPreparingBackup
-        ) {
+    const startArchiveDownload = useCallback(async () => {
+        if (isPreparingArchive) {
             return;
         }
 
+        const uuid = crypto.randomUUID();
+        setIsPreparingArchive(true);
+        setArchiveDownloadSucceeded(false);
+        setArchiveFileName(null);
+        setArchiveProgress(initialArchiveProgress);
+        setArchiveProgressGroupName(uuid);
+        setHasStartedArchiveRequest(false);
+    }, [isPreparingArchive]);
+
+    const onConnected = useCallback(async () => {
+        if (!archiveProgressGroupName || hasStartedArchiveRequest) {
+            return;
+        }
+
+        setHasStartedArchiveRequest(true);
         try {
-            setHasStartedBackupRequest(true);
-            const { downloadUrl, fileName } = await AccountService.DownloadBackup(
-                backupProgressGroupName
+            const response = await AccountService.DownloadArchive(archiveProgressGroupName);
+            const fileName = getFileNameFromContentDisposition(
+                response.headers["content-disposition"]
             );
-            setDailyArchiveCount(incrementArchiveUsageCount(archiveUsageStorageKey));
-            setHasCompletedBackupProcessing(true);
-            setBackupFileName(fileName);
-            setBackupDownloadSucceeded(true);
-            startBrowserDownload(downloadUrl);
+
+            setArchiveFileName(fileName);
+            setArchiveDownloadSucceeded(true);
+            downloadBlob(response.data, fileName);
         } catch (err) {
             const error = err as ApiErrorResponse;
-            setHasCompletedBackupProcessing(false);
             message.error(error.message);
         } finally {
-            setIsPreparingBackup(false);
-            setHasStartedBackupRequest(false);
-            setBackupProgressGroupName(null);
+            setIsPreparingArchive(false);
+            setHasStartedArchiveRequest(false);
+            setArchiveProgressGroupName(null);
         }
-    }, [
-        backupProgressGroupName,
-        hasStartedBackupRequest,
-        isPreparingBackup,
-        archiveUsageStorageKey,
-        startBrowserDownload,
-    ]);
+    }, [archiveProgressGroupName, hasStartedArchiveRequest]);
 
-    const onDownloadBackup = () => {
-        if (isPreparingBackup) {
-            return;
-        }
-
-        if (hasReachedDailyArchiveLimit) {
-            message.warning(`You can create up to ${MAX_ARCHIVES_PER_DAY} archives per day.`);
-            return;
-        }
-
-        setIsPreparingBackup(true);
-        setHasCompletedBackupProcessing(false);
-        setHasStartedBackupRequest(false);
-        setBackupDownloadSucceeded(false);
-        setBackupFileName(null);
-        setBackupProgress(initialBackupProgress);
-        setBackupProgressGroupName(crypto.randomUUID());
-    };
-
-    const backupProgressPercent = (backupProgress.totalCaves ?? 0) > 0
-        ? Math.min(100, Math.round(((backupProgress.processedCaves ?? 0) / (backupProgress.totalCaves ?? 0)) * 100))
+    const archiveProgressPercent = (archiveProgress.totalCaves ?? 0) > 0
+        ? Math.min(
+            100,
+            Math.round(
+                ((archiveProgress.processedCaves ?? 0) /
+                    (archiveProgress.totalCaves ?? 0)) *
+                    100
+            )
+        )
         : 0;
 
     return (
@@ -199,54 +120,47 @@ const ArchiveCardComponent: React.FC = () => {
                         including caves, entrances, files, and line plots.
                     </Typography.Paragraph>
 
-                    <Typography.Text type="secondary">
-                        {dailyArchiveCount} of {MAX_ARCHIVES_PER_DAY} archives used today.
-                        {remainingArchivesToday > 0
-                            ? ` ${remainingArchivesToday} remaining.`
-                            : " Daily limit reached."}
-                    </Typography.Text>
-
-                    {backupDownloadSucceeded && !isPreparingBackup && (
+                    {archiveDownloadSucceeded && !isPreparingArchive && (
                         <Alert
                             message="Archive download started successfully"
-                            description={backupFileName
-                                ? `${backupFileName} should begin downloading in your browser shortly.`
+                            description={archiveFileName
+                                ? `${archiveFileName} should begin downloading in your browser shortly.`
                                 : "Your browser download should begin shortly."}
                             type="success"
                             showIcon
                         />
                     )}
 
-                    {!isPreparingBackup && !hasCompletedBackupProcessing && (
+                    {!archiveProgressGroupName && (
                         <PlanarianButton
                             icon={<DownloadOutlined />}
-                            onClick={onDownloadBackup}
-                            disabled={hasReachedDailyArchiveLimit}
+                            onClick={startArchiveDownload}
+                            loading={isPreparingArchive}
                         >
                             Create Archive
                         </PlanarianButton>
                     )}
 
-                    {backupProgressGroupName && (
+                    {archiveProgressGroupName && (
                         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                             <Space direction="vertical" size="small" style={{ width: "100%" }}>
                                 <Typography.Text strong>
                                     Creating Archive
                                 </Typography.Text>
                                 <Progress
-                                    percent={backupProgressPercent}
-                                    status={isPreparingBackup ? "active" : "normal"}
+                                    percent={archiveProgressPercent}
+                                    status={isPreparingArchive ? "active" : "normal"}
                                     showInfo={false}
                                 />
                                 <Typography.Text type="secondary">
-                                    {backupProgress.statusMessage}
+                                    {archiveProgress.statusMessage}
                                 </Typography.Text>
                             </Space>
-                            <NotificationComponent
-                                groupName={backupProgressGroupName}
-                                isLoading={isPreparingBackup}
-                                onConnected={startBackupDownload}
-                                onNotification={onBackupProgress}
+                            <SignalRProgressComponent
+                                groupName={archiveProgressGroupName}
+                                isLoading={isPreparingArchive}
+                                onConnected={onConnected}
+                                onNotification={onArchiveProgress}
                                 hideNotifications={true}
                             />
                         </Space>

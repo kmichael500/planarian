@@ -1,6 +1,6 @@
-namespace Planarian.Modules.Account.Backup.Models;
+namespace Planarian.Modules.Account.Archive.Models;
 
-public class AccountBackupFileDto
+public class ArchiveFileModel
 {
     public string Id { get; set; } = null!;
     public string FileName { get; set; } = null!;

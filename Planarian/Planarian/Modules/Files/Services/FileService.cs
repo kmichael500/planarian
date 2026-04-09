@@ -245,26 +245,6 @@ public class FileService : ServiceBase<FileRepository>
         await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
-    // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
-    // {
-    //     // Generate a SAS token for the blob with read permissions that expires in 1 hour
-    //     BlobSasBuilder sasBuilder = new BlobSasBuilder()
-    //     {
-    //         BlobContainerName = blobClient.BlobContainerName,
-    //         BlobName = blobClient.Name,
-    //         Resource = "b", // "b" for blob
-    //         StartsOn = DateTimeOffset.UtcNow,
-    //         ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-    //         ContentDisposition = "attachment; filename=\"" + $"{fileName}" + "\"; filename*=UTF-8''" + Uri.EscapeDataString($"{fileName}")
-    //     };
-    //     sasBuilder.SetPermissions(BlobSasPermissions.Read);
-    //
-    //     var sasUri = blobClient.GenerateSasUri(sasBuilder);
-    //
-    //     var sasUrl = $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
-    //
-    //     return sasUrl;
-    // }
     private string GetSasLink(BlobClient blobClient, string fileName, bool download = false)
     {
         // Get the file extension
@@ -340,7 +320,7 @@ public class FileService : ServiceBase<FileRepository>
         return await GetBlobStream(blobProperties.ContainerName, blobProperties.BlobKey);
     }
 
-    public async Task<Stream> GetBlobStream(string containerName, string blobKey)
+    private async Task<Stream> GetBlobStream(string containerName, string blobKey)
     {
         if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobKey))
             throw ApiExceptionDictionary.NotFound("File");

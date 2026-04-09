@@ -4,7 +4,7 @@ import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/Delete
 import { AccountService } from "../Services/AccountService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
-import { NotificationComponent } from "../../Import/Components/NotificationComponent";
+import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 
 const ResetAccountComponent = () => {
@@ -39,10 +39,10 @@ const ResetAccountComponent = () => {
         onOkClickRender={
           <>
             <Card>
-              <NotificationComponent
+              <SignalRProgressComponent
                 groupName={`${userGroupPrefix}-DeleteAllCaves`}
                 isLoading={true}
-              ></NotificationComponent>
+              ></SignalRProgressComponent>
             </Card>
           </>
         }

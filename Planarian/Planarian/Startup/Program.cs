@@ -18,7 +18,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
-using Planarian.Modules.Account.Backup.Services;
+using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
@@ -51,7 +51,6 @@ using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Modules.Users.Services;
 using Planarian.Shared.Email.Services;
-using Planarian.Shared.HostedServices;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
@@ -155,9 +154,6 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
-var backupOptions = builder.Configuration.GetSection(BackupOptions.Key).Get<BackupOptions>() ?? new BackupOptions();
-builder.Services.AddSingleton(backupOptions);
-
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 
@@ -170,13 +166,12 @@ builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<SettingsService>();
-builder.Services.AddSingleton<BlobService>();
+builder.Services.AddScoped<BlobService>();
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
-builder.Services.AddScoped<ExportService>();
-builder.Services.AddSingleton<AccountBackupTempStorageService>();
+builder.Services.AddScoped<ArchiveExportService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -188,7 +183,6 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
-builder.Services.AddHostedService<AppCleanupService>();
 
 builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 
@@ -405,6 +399,7 @@ app.UseCors(x =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()
+        .WithExposedHeaders("Content-Disposition")
 );
 
 app.UseAuthentication();
