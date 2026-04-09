@@ -26,6 +26,11 @@ public class HttpResponseExceptionMiddleware
         }
         catch (ApiException e)
         {
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
             var error = new ApiErrorResponse(e.Message, e.ErrorCode)
             {
                 Data = e.Data
@@ -38,6 +43,11 @@ public class HttpResponseExceptionMiddleware
         }
         catch (Exception e)
         {
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
             var error = new ApiErrorResponse(
                 $"There was an unexpected issue! This is likely a bug with Planarian. Please contact {_serverOptions.SupportName} at {_serverOptions.SupportEmail}.",
                 ApiExceptionType.UnexpectedIssue);

@@ -9,6 +9,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
+using Planarian.Modules.Account.Backup.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
@@ -42,7 +43,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance status tags.");
         } while (deletedCount == batchSize);
-        
+
         deletedCount = 0;
         totalDeleted = 0;
 
@@ -292,14 +293,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         int deletedCount;
         var totalDeleted = 0;
 
-        
+
         // Batch delete for TagTypes
         var tagTypesCount =
             await AsyncExtensions.CountAsync(DbContext.TagTypes,
                 e => e.AccountId == RequestUser.AccountId && e.IsDefault == false &&
                      !string.IsNullOrWhiteSpace(e.AccountId),
                 cancellationToken);
-        
+
         do
         {
             deletedCount = await DbContext.TagTypes
@@ -320,7 +321,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         await DbContext.Counties.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
     }
-    
+
     // deletes all cave permissions except view all
     public async Task DeleteAllCavePermissions()
     {
@@ -417,7 +418,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .DeleteAsync(cancellationToken);
 
             await SaveChangesAsync(cancellationToken);
-            
+
             await transaction.CommitAsync(cancellationToken);
         }
         catch (Exception)
@@ -453,20 +454,20 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             foreach (var sourceTagTypeId in tagTypeIds)
             {
                 if (sourceTagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
-                
+
                 var sourceTagType = await DbContext.TagTypes
                     .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
                     .FirstOrDefaultAsyncEF(cancellationToken);
-                
+
                 if (sourceTagType == null)
                 {
                     throw ApiExceptionDictionary.NotFound("Source tag type");
                 }
-                
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 #region Cave Tags
-                
+
                 if (TagTypeKeyConstant.Archeology.Equals(destinationTagTypeKey))
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.ArcheologyTags, tag => tag.TagTypeId,
@@ -486,13 +487,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 {
                     await DeleteDuplicateTags(cavesParentSet, e => e.CartographerNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId, 
+
+                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId, 
+
+                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId,
                         sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    
+
                     await MergeTags<CartographerNameTag>(sourceTagTypeId, destinationTagTypeId,
                         e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
                     await MergeTags<CaveReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
@@ -759,7 +760,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return await DbContext.Caves
             .Where(e => e.AccountId == RequestUser.AccountId)
             .Take(cavesBatchSize)
-            .Select(e=>e.Id)
+            .Select(e => e.Id)
             .ToListAsyncEF(cancellationToken);
     }
 
@@ -778,6 +779,157 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .FirstOrDefaultAsyncEF();
     }
 
+    #region Backup
+
+    public async Task<List<AccountBackupCaveDto>> GetBackupCavesBase(CancellationToken cancellationToken)
+    {
+        return await DbContext.Caves
+            .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .OrderBy(e => e.State.Name)
+            .ThenBy(e => e.County.DisplayId)
+            .ThenBy(e => e.CountyNumber)
+            .ThenBy(e => e.Name)
+            .Select(e => new AccountBackupCaveDto
+            {
+                PlanarianId = e.Id,
+                CaveName = e.Name,
+                AlternateNames = string.Join(", ", e.AlternateNamesList),
+                State = e.State.Abbreviation,
+                CountyName = e.County.Name,
+                CountyCode = e.County.DisplayId,
+                CountyIdDelimiter = e.Account.CountyIdDelimiter,
+                CountyCaveNumber = e.CountyNumber,
+                CaveLengthFt = e.LengthFeet,
+                CaveDepthFt = e.DepthFeet,
+                MaxPitDepthFt = e.MaxPitDepthFeet,
+                NumberOfPits = e.NumberOfPits,
+                Narrative = e.Narrative,
+                Geology = string.Join(", ", e.GeologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                GeologicAges = string.Join(", ", e.GeologicAgeTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                PhysiographicProvinces = string.Join(", ", e.PhysiographicProvinceTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                Archeology = string.Join(", ", e.ArcheologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                Biology = string.Join(", ", e.BiologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                ReportedOnDate = e.ReportedOn.HasValue ? e.ReportedOn.Value.ToString("yyyy-MM-dd") : null,
+                ReportedByNames = string.Join(", ", e.CaveReportedByNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                IsArchived = e.IsArchived,
+                OtherTags = string.Join(", ", e.CaveOtherTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                MapStatuses = string.Join(", ", e.MapStatusTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                CartographerNames = string.Join(", ", e.CartographerNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupEntranceByCaveDto>> GetBackupEntrances(CancellationToken cancellationToken)
+    {
+        return await DbContext.Entrances
+            .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
+            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+            .OrderBy(e => e.Cave.State.Name)
+            .ThenBy(e => e.Cave.County.DisplayId)
+            .ThenBy(e => e.Cave.CountyNumber)
+            .ThenByDescending(e => e.IsPrimary)
+            .ThenBy(e => e.ReportedOn)
+            .ThenBy(e => e.Name)
+            .Select(entrance => new AccountBackupEntranceByCaveDto
+            {
+                CavePlanarianId = entrance.CaveId,
+                CountyCode = entrance.Cave.County.DisplayId,
+                CountyCaveNumber = entrance.Cave.CountyNumber.ToString(),
+                EntranceName = entrance.Name,
+                DecimalLatitude = entrance.Location.Y,
+                DecimalLongitude = entrance.Location.X,
+                EntranceElevationFt = entrance.Location.Z,
+                LocationQuality = entrance.LocationQualityTag.Name,
+                EntranceDescription = entrance.Description,
+                EntrancePitDepth = entrance.PitDepthFeet,
+                EntranceStatuses = string.Join(", ", entrance.EntranceStatusTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                EntranceHydrology = string.Join(", ", entrance.EntranceHydrologyTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                FieldIndication = string.Join(", ", entrance.FieldIndicationTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                ReportedOnDate = entrance.ReportedOn.HasValue
+                    ? entrance.ReportedOn.Value.ToString("yyyy-MM-dd")
+                    : null,
+                ReportedByNames = string.Join(", ", entrance.EntranceReportedByNameTags
+                    .OrderBy(tag => tag.TagType.Name)
+                    .Select(tag => tag.TagType.Name)),
+                IsPrimaryEntrance = entrance.IsPrimary
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupFileByCaveDto>> GetBackupFiles(CancellationToken cancellationToken)
+    {
+        return await DbContext.Files
+            .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
+            .Where(file => file.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(file.CaveId))
+            .OrderBy(file => file.Cave.State.Name)
+            .ThenBy(file => file.Cave.County.DisplayId)
+            .ThenBy(file => file.Cave.CountyNumber)
+            .ThenBy(file => file.FileTypeTag.Name)
+            .ThenBy(file => file.FileName)
+            .Select(file => new AccountBackupFileByCaveDto
+            {
+                CavePlanarianId = file.CaveId!,
+                Id = file.Id,
+                FileName = file.FileName,
+                BlobKey = file.BlobKey,
+                FileTypeDisplayName = file.FileTypeTag.Name
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    public async Task<List<AccountBackupGeoJsonByCaveDto>> GetBackupGeoJsons(CancellationToken cancellationToken)
+    {
+        return await DbContext.CaveGeoJsons
+            .AsNoTracking()
+            // Backup exports are full account exports and must not depend on cave visibility filters.
+            .IgnoreQueryFilters()
+            .Where(geoJson => geoJson.Cave.AccountId == RequestUser.AccountId)
+            .OrderBy(geoJson => geoJson.Cave.State.Name)
+            .ThenBy(geoJson => geoJson.Cave.County.DisplayId)
+            .ThenBy(geoJson => geoJson.Cave.CountyNumber)
+            .ThenBy(geoJson => geoJson.Name)
+            .Select(geoJson => new AccountBackupGeoJsonByCaveDto
+            {
+                CavePlanarianId = geoJson.CaveId,
+                Name = geoJson.Name,
+                GeoJson = geoJson.GeoJson
+            })
+            .ToListAsyncEF(cancellationToken);
+    }
+
+    #endregion
+
     public async Task<AccountUser?> GetAccountUser(string userId, string accountId)
     {
         return await DbContext.AccountUsers
@@ -787,7 +939,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     public async Task<bool> GetDefaultViewAccess()
     {
-        return await DbContext.Accounts.Where(e=>e.Id == RequestUser.AccountId)
+        return await DbContext.Accounts.Where(e => e.Id == RequestUser.AccountId)
             .Select(e => e.DefaultViewAccessAllCaves)
             .FirstOrDefaultAsyncEF();
     }

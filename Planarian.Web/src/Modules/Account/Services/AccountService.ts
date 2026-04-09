@@ -16,6 +16,7 @@ import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { BackupDownloadVm } from "../Models/Archive/BackupDownloadVm";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -36,6 +37,15 @@ const AccountService = {
       `${baseUrl}/settings`,
       settings
     );
+    return response.data;
+  },
+
+  async DownloadBackup(uuid?: string): Promise<BackupDownloadVm> {
+    const requestUrl = !isNullOrWhiteSpace(uuid)
+      ? `${baseUrl}/backup?uuid=${encodeURIComponent(uuid)}`
+      : `${baseUrl}/backup`;
+
+    const response = await HttpClient.get<BackupDownloadVm>(requestUrl);
     return response.data;
   },
 

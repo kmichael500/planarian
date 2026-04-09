@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Planarian.Library.Extensions.String;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Backup.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
@@ -16,14 +19,18 @@ namespace Planarian.Modules.Account.Controller;
 public class AccountController : PlanarianControllerBase<AccountService>
 {
     private const string Route = "api/account";
+    private const int MaxBackupRequestsPerDay = 10;
+    private static readonly TimeSpan BackupRequestWindow = TimeSpan.FromDays(1);
 
     private readonly ImportService _importService;
+    private readonly MemoryCache _cache;
 
     public AccountController(RequestUser requestUser, TokenService tokenService, AccountService service,
-        CaveService caveService, ImportService importService) : base(
+        CaveService caveService, ImportService importService, MemoryCache cache) : base(
         requestUser, tokenService, service)
     {
         _importService = importService;
+        _cache = cache;
     }
 
     [HttpPost]
@@ -45,15 +52,53 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return Ok("Account reset finished.");
     }
 
+    #region Backup
+
+    [HttpGet("backup")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<AccountBackupDownloadVm>> DownloadBackup(string? uuid, CancellationToken cancellationToken)
+    {
+        var cacheKey = GetBackupRateLimitKey();
+        var rateLimitState = _cache.GetOrCreate(cacheKey, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = BackupRequestWindow;
+            return new BackupRateLimitState();
+        })!;
+
+        lock (rateLimitState.SyncRoot)
+        {
+            if (rateLimitState.Attempts >= MaxBackupRequestsPerDay)
+                throw ApiExceptionDictionary.TooManyRequests("Too many backup requests. Try again tomorrow.");
+
+            rateLimitState.Attempts++;
+        }
+
+        var result = await Service.BuildBackup(uuid, cancellationToken);
+        return Ok(result);
+    }
+
+    private string GetBackupRateLimitKey()
+    {
+        return $"backup-rate-limit:{RequestUser.Id}";
+    }
+
+    private sealed class BackupRateLimitState
+    {
+        public int Attempts { get; set; }
+        public object SyncRoot { get; } = new();
+    }
+
+    #endregion
+
     #region Misc Settings
-    
+
     [HttpGet("settings")]
     public async Task<ActionResult<MiscAccountSettingsVm?>> GetSettings(CancellationToken cancellationToken)
     {
         var result = await Service.GetMiscAccountSettingsVm(cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpPut("settings")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<MiscAccountSettingsVm>> UpdateSettings([FromBody] MiscAccountSettingsVm settings,
@@ -62,7 +107,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.UpdateMiscAccountSettingsVm(settings, cancellationToken);
         return Ok(result);
     }
-    
+
     // [HttpPost("settings")]
     // public async Task<ActionResult<MiscAccountSettingsVm>> CreateSettings([FromBody] MiscAccountSettingsVm settings,
     //     CancellationToken cancellationToken)
@@ -71,7 +116,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     //     return Ok(result);
     // }
 
-    
+
 
     #endregion
 
@@ -151,7 +196,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetTagsForTable(key, cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpGet("counties-table/{stateId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<IEnumerable<TagTypeTableCountyVm>>> GetCountiesForTable(string stateId, CancellationToken cancellationToken)
@@ -159,7 +204,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetCountiesForTable(stateId, cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpGet("feature-settings")]
     public async Task<ActionResult<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
@@ -167,7 +212,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
         return new JsonResult(featureSettings);
     }
-    
+
     [HttpPost("feature-settings/{key}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<FeatureSettingVm>> UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)
