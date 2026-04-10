@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
+import { AxiosProgressEvent, AxiosRequestConfig, AxiosResponse } from "axios";
 import { HttpClient } from "../../..";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
@@ -37,6 +37,16 @@ const AccountService = {
       settings
     );
     return response.data;
+  },
+
+  async DownloadArchive(uuid?: string): Promise<AxiosResponse<Blob>> {
+    const requestUrl = !isNullOrWhiteSpace(uuid)
+      ? `${baseUrl}/archive?uuid=${encodeURIComponent(uuid)}`
+      : `${baseUrl}/archive`;
+
+    return await HttpClient.get<Blob>(requestUrl, {
+      responseType: "blob",
+    });
   },
 
   //#region Import

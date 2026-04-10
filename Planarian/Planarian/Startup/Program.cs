@@ -18,6 +18,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
@@ -170,6 +171,7 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -376,7 +378,7 @@ if (false)
 
     var dbContext = services.GetRequiredService<PlanarianDbContext>();
     var dataGenerator = new DataGenerator(dbContext);
-    
+
     await dataGenerator.AddOrUpdateDefaultData();
 }
 
@@ -397,6 +399,7 @@ app.UseCors(x =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()
+        .WithExposedHeaders("Content-Disposition")
 );
 
 app.UseAuthentication();

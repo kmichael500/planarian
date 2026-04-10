@@ -1,7 +1,7 @@
+using Azure;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
-using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -173,14 +173,35 @@ public class FileService : ServiceBase<FileRepository>
         await blobClient.UploadAsync(stream, true, cancellationToken);
     }
 
-    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
+    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName, bool createIfNotExists = true)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
-        await containerClient.CreateIfNotExistsAsync();
+        if (createIfNotExists)
+        {
+            await containerClient.CreateIfNotExistsAsync();
+        }
 
         return containerClient;
+    }
+
+    public async Task<BlobContainerClient> GetAccountBlobContainerClient()
+    {
+        if (RequestUser.AccountId == null)
+            throw ApiExceptionDictionary.BadRequest("Account Id is null");
+
+        return await GetBlobContainerClient(RequestUser.AccountContainerName, createIfNotExists: false);
+    }
+
+    public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
     }
 
     #endregion
@@ -224,26 +245,6 @@ public class FileService : ServiceBase<FileRepository>
         await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
-    // private async Task<string> GetSasLink(BlobClient blobClient, string fileName)
-    // {
-    //     // Generate a SAS token for the blob with read permissions that expires in 1 hour
-    //     BlobSasBuilder sasBuilder = new BlobSasBuilder()
-    //     {
-    //         BlobContainerName = blobClient.BlobContainerName,
-    //         BlobName = blobClient.Name,
-    //         Resource = "b", // "b" for blob
-    //         StartsOn = DateTimeOffset.UtcNow,
-    //         ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-    //         ContentDisposition = "attachment; filename=\"" + $"{fileName}" + "\"; filename*=UTF-8''" + Uri.EscapeDataString($"{fileName}")
-    //     };
-    //     sasBuilder.SetPermissions(BlobSasPermissions.Read);
-    //
-    //     var sasUri = blobClient.GenerateSasUri(sasBuilder);
-    //
-    //     var sasUrl = $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
-    //
-    //     return sasUrl;
-    // }
     private string GetSasLink(BlobClient blobClient, string fileName, bool download = false)
     {
         // Get the file extension
@@ -316,11 +317,28 @@ public class FileService : ServiceBase<FileRepository>
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
             throw ApiExceptionDictionary.NotFound("File");
 
-        var client = await GetBlobContainerClient(blobProperties.ContainerName);
-        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        return await GetBlobStream(blobProperties.ContainerName, blobProperties.BlobKey);
+    }
+
+    private async Task<Stream> GetBlobStream(string containerName, string blobKey)
+    {
+        if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
 
         var stream = new MemoryStream();
-        await blobClient.DownloadToAsync(stream);
+        try
+        {
+            await blobClient.DownloadToAsync(stream);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            await stream.DisposeAsync();
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+
         stream.Position = 0;
         return stream;
     }

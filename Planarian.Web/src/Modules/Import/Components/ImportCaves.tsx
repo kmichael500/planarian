@@ -20,7 +20,7 @@ import { FileVm } from "../../Files/Models/FileVm";
 // Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { NotificationComponent } from "./NotificationComponent";
+import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
 import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";
@@ -239,7 +239,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
             title="Processing..."
             subTitle="Please wait while your data is being processed."
             extra={[
-              <NotificationComponent
+              <SignalRProgressComponent
                 groupName={uploadResult?.id as string}
                 isLoading={isProcessing}
               />,
