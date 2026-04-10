@@ -1,13 +1,13 @@
 import { DownloadOutlined } from "@ant-design/icons";
 import { Alert, Card, Progress, Space, Typography, message } from "antd";
 import { useCallback, useState } from "react";
-import { PermissionKey } from "../../../Authentication/Models/PermissionKey";
-import { ShouldDisplay } from "../../../../Shared/Permissioning/Components/ShouldDisplay";
-import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
-import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
-import { SignalRProgressComponent } from "../../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
-import { ProgressVm } from "../../../../Shared/Models/ProgressVm";
-import { AccountService } from "../../Services/AccountService";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
+import { ProgressVm } from "../../../Shared/Models/ProgressVm";
+import { AccountService } from "../Services/AccountService";
 
 const initialArchiveProgress: ProgressVm = {
     statusMessage: "Preparing archive...",
@@ -106,7 +106,7 @@ const ArchiveCardComponent: React.FC = () => {
             Math.round(
                 ((archiveProgress.processedCaves ?? 0) /
                     (archiveProgress.totalCaves ?? 0)) *
-                    100
+                100
             )
         )
         : 0;

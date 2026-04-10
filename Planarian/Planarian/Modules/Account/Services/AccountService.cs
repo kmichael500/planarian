@@ -401,7 +401,7 @@ public class AccountService : ServiceBase<AccountRepository>
         var accountName = await Repository.GetAccountName(RequestUser.AccountId) ?? "Account";
         var normalizedAccountName = string.IsNullOrWhiteSpace(accountName)
             ? "Account"
-            : accountName.Replace('/', '-').Replace('\\', '-').Trim();
+            : NormalizeArchiveFileNameSegment(accountName);
         return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
     }
 
@@ -436,6 +436,19 @@ public class AccountService : ServiceBase<AccountRepository>
     private async Task SendArchiveCaveProgress(string? uuid, int processed, int total)
     {
         await SendArchiveProgress(uuid, $"Processed {processed} of {total} caves.", processed, total);
+    }
+
+    private static string NormalizeArchiveFileNameSegment(string value)
+    {
+        var normalizedValue = value.Trim();
+
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        {
+            normalizedValue = normalizedValue.Replace(invalidCharacter, '-');
+        }
+
+        normalizedValue = normalizedValue.Trim().TrimEnd('.', ' ');
+        return string.IsNullOrWhiteSpace(normalizedValue) ? "Account" : normalizedValue;
     }
 
     #endregion
