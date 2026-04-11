@@ -17,6 +17,8 @@ namespace Planarian.Modules.Account.Archive.Services;
 
 public class ExportService
 {
+    private const int BlobPrefetchWindow = 4;
+
     private readonly AccountRepository _accountRepository;
     private readonly FileService _fileService;
     private readonly RequestUser _requestUser;
@@ -155,7 +157,7 @@ public class ExportService
             if (accountBlobContainerClient != null &&
                 filesByCaveId.Contains(cave.PlanarianId))
             {
-                processedFiles += await WriteCaveFileEntries(
+                processedFiles = await WriteCaveFileEntries(
                     archive,
                     cave,
                     caveFolder,
@@ -163,8 +165,10 @@ public class ExportService
                     accountBlobContainerClient,
                     missingFiles,
                     reservedEntryPaths,
+                    processedFiles,
+                    totalFiles,
+                    reportFileProgress,
                     cancellationToken);
-                await ReportProgress(reportFileProgress, processedFiles, totalFiles);
             }
 
             foreach (var geoJson in geoJsonsByCaveId[cave.PlanarianId])
@@ -194,9 +198,12 @@ public class ExportService
         BlobContainerClient accountBlobContainerClient,
         ICollection<MissingArchiveFile> missingFiles,
         ISet<string> reservedEntryPaths,
+        int processedFiles,
+        int totalFiles,
+        Func<int, int, Task>? reportFileProgress,
         CancellationToken cancellationToken)
     {
-        var processedFiles = 0;
+        var pendingFiles = new Queue<Task<PrefetchedArchiveFile>>();
 
         foreach (var file in files)
         {
@@ -214,30 +221,99 @@ public class ExportService
                 missingFiles,
                 $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}");
 
-            try
+            pendingFiles.Enqueue(PrefetchArchiveFile(
+                cave,
+                file.BlobKey,
+                entryPath,
+                accountBlobContainerClient,
+                cancellationToken));
+
+            if (pendingFiles.Count >= BlobPrefetchWindow)
             {
-                await using var blobStream = await _fileService.OpenBlobReadStream(
-                    accountBlobContainerClient,
-                    file.BlobKey,
+                processedFiles = await WritePrefetchedArchiveFile(
+                    archive,
+                    pendingFiles.Dequeue(),
+                    missingFiles,
+                    processedFiles,
+                    totalFiles,
+                    reportFileProgress,
                     cancellationToken);
-                var entry = CreateFileEntry(
-                    entryPath,
-                    blobStream,
-                    DateTimeOffset.UtcNow);
-                await archive.WriteEntryAsync(entry, cancellationToken);
             }
-            catch (Exception ex)
-            {
-                missingFiles.Add(BuildMissingArchiveFile(
-                    cave,
-                    entryPath,
-                    file.BlobKey,
-                    ex.Message));
-            }
-            processedFiles++;
+        }
+
+        while (pendingFiles.Count > 0)
+        {
+            processedFiles = await WritePrefetchedArchiveFile(
+                archive,
+                pendingFiles.Dequeue(),
+                missingFiles,
+                processedFiles,
+                totalFiles,
+                reportFileProgress,
+                cancellationToken);
         }
 
         return processedFiles;
+    }
+
+    private async Task<int> WritePrefetchedArchiveFile(
+        TarWriter archive,
+        Task<PrefetchedArchiveFile> prefetchedFileTask,
+        ICollection<MissingArchiveFile> missingFiles,
+        int processedFiles,
+        int totalFiles,
+        Func<int, int, Task>? reportFileProgress,
+        CancellationToken cancellationToken)
+    {
+        var prefetchedFile = await prefetchedFileTask;
+
+        if (prefetchedFile.DataStream != null)
+        {
+            await using (prefetchedFile.DataStream)
+            {
+                prefetchedFile.DataStream.Position = 0;
+                await WriteStreamEntry(
+                    archive,
+                    prefetchedFile.EntryPath,
+                    prefetchedFile.DataStream,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
+            }
+        }
+        else if (prefetchedFile.MissingFile != null)
+        {
+            missingFiles.Add(prefetchedFile.MissingFile);
+        }
+
+        processedFiles++;
+        await ReportProgress(reportFileProgress, processedFiles, totalFiles);
+        return processedFiles;
+    }
+
+    private async Task<PrefetchedArchiveFile> PrefetchArchiveFile(
+        ArchiveCaveCsvModel cave,
+        string blobKey,
+        string entryPath,
+        BlobContainerClient accountBlobContainerClient,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var blobStream = await _fileService.OpenBlobReadStream(
+                accountBlobContainerClient,
+                blobKey,
+                cancellationToken);
+            var bufferedStream = new MemoryStream();
+            await blobStream.CopyToAsync(bufferedStream, cancellationToken);
+            return new PrefetchedArchiveFile(entryPath, bufferedStream, null);
+        }
+        catch (Exception ex)
+        {
+            return new PrefetchedArchiveFile(
+                entryPath,
+                null,
+                BuildMissingArchiveFile(cave, entryPath, blobKey, ex.Message));
+        }
     }
 
     private static async Task WriteMissingFilesEntry(
@@ -508,4 +584,9 @@ public class ExportService
     {
         return string.IsNullOrWhiteSpace(value) ? null : value;
     }
+
+    private sealed record PrefetchedArchiveFile(
+        string EntryPath,
+        MemoryStream? DataStream,
+        MissingArchiveFile? MissingFile);
 }
