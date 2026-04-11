@@ -405,18 +405,47 @@ public class AccountService : ServiceBase<AccountRepository>
         return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.tar.gz";
     }
 
-    public async Task WriteArchive(Stream outputStream, string? uuid, CancellationToken cancellationToken)
+    public async Task<ArchiveDownloadVm> CreateArchive(string? uuid, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        await _exportService.WriteArchive(
-            outputStream,
-            (processed, total) => SendArchiveFileProgress(uuid, processed, total),
-            message => SendArchiveProgress(uuid, message),
-            cancellationToken);
+        var fileName = await GetArchiveFileName(cancellationToken);
+        var archiveBlobKey = $"archives/{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.tar.gz";
+
+        try
+        {
+            var accountBlobContainerClient = await _fileService.GetAccountBlobContainerClient(createIfNotExists: true);
+            await using var outputStream = await _fileService.OpenBlobWriteStream(
+                accountBlobContainerClient,
+                archiveBlobKey,
+                cancellationToken);
+
+            await _exportService.WriteArchive(
+                outputStream,
+                (processed, total) => SendArchiveFileProgress(uuid, processed, total),
+                message => SendArchiveProgress(uuid, message),
+                cancellationToken);
+
+            var downloadUrl = await _fileService.GetLink(
+                archiveBlobKey,
+                RequestUser.AccountContainerName,
+                fileName,
+                isDownload: true);
+
+            return new ArchiveDownloadVm
+            {
+                FileName = fileName,
+                DownloadUrl = downloadUrl
+            };
+        }
+        catch
+        {
+            await _fileService.DeleteFile(archiveBlobKey, RequestUser.AccountContainerName);
+            throw;
+        }
     }
 
     private async Task SendArchiveProgress(

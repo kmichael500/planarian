@@ -186,12 +186,12 @@ public class FileService : ServiceBase<FileRepository>
         return containerClient;
     }
 
-    public async Task<BlobContainerClient> GetAccountBlobContainerClient()
+    public async Task<BlobContainerClient> GetAccountBlobContainerClient(bool createIfNotExists = false)
     {
         if (RequestUser.AccountId == null)
             throw ApiExceptionDictionary.BadRequest("Account Id is null");
 
-        return await GetBlobContainerClient(RequestUser.AccountContainerName, createIfNotExists: false);
+        return await GetBlobContainerClient(RequestUser.AccountContainerName, createIfNotExists);
     }
 
     public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
@@ -202,6 +202,16 @@ public class FileService : ServiceBase<FileRepository>
 
         var blobClient = containerClient.GetBlobClient(blobKey);
         return await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task<Stream> OpenBlobWriteStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenWriteAsync(overwrite: true, cancellationToken: cancellationToken);
     }
 
     #endregion

@@ -47,15 +47,12 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     #region Archive
 
-    [HttpGet("archive")]
+    [HttpPost("archive")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> DownloadArchive(string? uuid, CancellationToken cancellationToken)
+    public async Task<ActionResult<ArchiveDownloadVm>> DownloadArchive(string? uuid, CancellationToken cancellationToken)
     {
-        var fileName = await Service.GetArchiveFileName(cancellationToken);
-        Response.ContentType = "application/gzip";
-        Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
-        await Service.WriteArchive(Response.Body, uuid, cancellationToken);
-        return new EmptyResult();
+        var result = await Service.CreateArchive(uuid, cancellationToken);
+        return Ok(result);
     }
 
     #endregion

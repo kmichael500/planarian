@@ -15,29 +15,13 @@ const initialArchiveProgress: ProgressVm = {
     totalCount: 0,
 };
 
-const getFileNameFromContentDisposition = (contentDisposition?: string) => {
-    if (!contentDisposition) {
-        return "account-archive.zip";
-    }
-
-    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8Match?.[1]) {
-        return decodeURIComponent(utf8Match[1]);
-    }
-
-    const fileNameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
-    return fileNameMatch?.[1] || "account-archive.zip";
-};
-
-const downloadBlob = (blob: Blob, fileName: string) => {
-    const url = window.URL.createObjectURL(blob);
+const startBrowserDownload = (downloadUrl: string) => {
     const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
+    link.href = downloadUrl;
+    link.rel = "noopener noreferrer";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
 };
 
 const ArchiveCardComponent: React.FC = () => {
@@ -82,14 +66,10 @@ const ArchiveCardComponent: React.FC = () => {
 
         setHasStartedArchiveRequest(true);
         try {
-            const response = await AccountService.DownloadArchive(archiveProgressGroupName);
-            const fileName = getFileNameFromContentDisposition(
-                response.headers["content-disposition"]
-            );
-
-            setArchiveFileName(fileName);
+            const response = await AccountService.CreateArchive(archiveProgressGroupName);
+            setArchiveFileName(response.fileName);
             setArchiveDownloadSucceeded(true);
-            downloadBlob(response.data, fileName);
+            startBrowserDownload(response.downloadUrl);
         } catch (err) {
             const error = err as ApiErrorResponse;
             message.error(error.message);
