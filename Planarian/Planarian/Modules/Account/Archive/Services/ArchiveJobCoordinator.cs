@@ -11,6 +11,8 @@ namespace Planarian.Modules.Account.Archive.Services;
 public class ArchiveJobCoordinator
 {
     public const int MaxRetainedArchives = 5;
+    public const string ArchivePrefix = "archives/";
+    public const string TempArchivePrefix = "archives/temp/";
 
     private readonly ConcurrentDictionary<string, ArchiveJobHandle> _jobs = new();
     private readonly IServiceScopeFactory _scopeFactory;
@@ -89,62 +91,72 @@ public class ArchiveJobCoordinator
 
             var groupName = GetGroupName(jobHandle.AccountId);
             var fileName = await BuildArchiveFileName(accountRepository, jobHandle.AccountId);
-            jobHandle.ArchiveBlobKey = $"archives/{fileName}";
+            var finalArchiveBlobKey = $"{ArchivePrefix}{fileName}";
+            jobHandle.ArchiveBlobKey = $"{TempArchivePrefix}{fileName}";
             jobHandle.ContainerName = requestUser.AccountContainerName;
-
-            var accountBlobContainerClient = await fileService.GetAccountBlobContainerClient(createIfNotExists: true);
-            await using var outputStream = await fileService.OpenBlobWriteStream(
-                accountBlobContainerClient,
-                jobHandle.ArchiveBlobKey,
-                jobHandle.CancellationTokenSource.Token);
 
             var processedCount = 0;
             var totalCount = 0;
+            var accountBlobContainerClient = await fileService.GetAccountBlobContainerClient(createIfNotExists: true);
+            await using (var outputStream = await fileService.OpenBlobWriteStream(
+                             accountBlobContainerClient,
+                             jobHandle.ArchiveBlobKey,
+                             jobHandle.CancellationTokenSource.Token))
+            {
+                await exportService.WriteArchive(
+                    outputStream,
+                    async (processed, total) =>
+                    {
+                        lock (jobHandle.SyncRoot)
+                        {
+                            jobHandle.StatusMessage = $"Exported {processed} of {total} files...";
+                            jobHandle.ProcessedCount = processed;
+                            jobHandle.TotalCount = total;
+                        }
 
-            await exportService.WriteArchive(
-                outputStream,
-                async (processed, total) =>
-                {
-                    lock (jobHandle.SyncRoot)
+                        processedCount = processed;
+                        totalCount = total;
+                        await notificationService.SendNotificationToGroupAsync(groupName, new
+                        {
+                            statusMessage = $"Exported {processed} of {total} files...",
+                            processedCount = processed,
+                            totalCount = total
+                        });
+                    },
+                    async message =>
                     {
-                        jobHandle.StatusMessage = $"Exported {processed} of {total} files...";
-                        jobHandle.ProcessedCount = processed;
-                        jobHandle.TotalCount = total;
-                    }
+                        lock (jobHandle.SyncRoot)
+                        {
+                            jobHandle.StatusMessage = message;
+                            jobHandle.ProcessedCount = processedCount;
+                            jobHandle.TotalCount = totalCount;
+                        }
 
-                    processedCount = processed;
-                    totalCount = total;
-                    await notificationService.SendNotificationToGroupAsync(groupName, new
-                    {
-                        statusMessage = $"Exported {processed} of {total} files...",
-                        processedCount = processed,
-                        totalCount = total
-                    });
-                },
-                async message =>
-                {
-                    lock (jobHandle.SyncRoot)
-                    {
-                        jobHandle.StatusMessage = message;
-                        jobHandle.ProcessedCount = processedCount;
-                        jobHandle.TotalCount = totalCount;
-                    }
+                        await notificationService.SendNotificationToGroupAsync(groupName, new
+                        {
+                            statusMessage = message,
+                            processedCount,
+                            totalCount
+                        });
+                    },
+                    jobHandle.CancellationTokenSource.Token);
+            }
 
-                    await notificationService.SendNotificationToGroupAsync(groupName, new
-                    {
-                        statusMessage = message,
-                        processedCount,
-                        totalCount
-                    });
-                },
-                jobHandle.CancellationTokenSource.Token);
+            jobHandle.CancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+            await PublishArchive(
+                accountBlobContainerClient,
+                jobHandle.ArchiveBlobKey,
+                finalArchiveBlobKey,
+                CancellationToken.None);
+            jobHandle.ArchiveBlobKey = null;
 
             await PruneOldArchives(
                 fileService,
                 accountBlobContainerClient,
                 requestUser.AccountContainerName,
-                jobHandle.ArchiveBlobKey,
-                jobHandle.CancellationTokenSource.Token);
+                finalArchiveBlobKey,
+                CancellationToken.None);
 
             await notificationService.SendNotificationToGroupAsync(groupName, new
             {
@@ -205,6 +217,11 @@ public class ArchiveJobCoordinator
                 continue;
             }
 
+            if (blobItem.Name.StartsWith(TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             if (!blobItem.Properties.LastModified.HasValue)
             {
                 continue;
@@ -222,6 +239,22 @@ public class ArchiveJobCoordinator
         {
             await fileService.DeleteFile(archiveToDelete.BlobKey, accountContainerName);
         }
+    }
+
+    private static async Task PublishArchive(
+        Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
+        string tempArchiveBlobKey,
+        string finalArchiveBlobKey,
+        CancellationToken cancellationToken)
+    {
+        var tempBlobClient = accountBlobContainerClient.GetBlobClient(tempArchiveBlobKey);
+        var finalBlobClient = accountBlobContainerClient.GetBlobClient(finalArchiveBlobKey);
+
+        var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
+            tempBlobClient.Uri,
+            cancellationToken: cancellationToken);
+        await copyOperation.WaitForCompletionAsync(cancellationToken);
+        await tempBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
     private async Task CleanupPartialArchive(ArchiveJobHandle jobHandle)

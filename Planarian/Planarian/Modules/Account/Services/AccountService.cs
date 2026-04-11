@@ -443,6 +443,11 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(prefix: "archives/", cancellationToken: cancellationToken))
             {
+                if (blobItem.Name.StartsWith(ArchiveJobCoordinator.TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (string.Equals(blobItem.Name, activeArchiveBlobKey, StringComparison.Ordinal))
                 {
                     continue;
@@ -495,7 +500,9 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        if (string.IsNullOrWhiteSpace(blobKey) || !blobKey.StartsWith("archives/", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(blobKey) ||
+            !blobKey.StartsWith(ArchiveJobCoordinator.ArchivePrefix, StringComparison.OrdinalIgnoreCase) ||
+            blobKey.StartsWith(ArchiveJobCoordinator.TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw ApiExceptionDictionary.BadRequest("Invalid archive.");
         }
