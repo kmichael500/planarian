@@ -190,6 +190,9 @@ const ArchiveCardComponent: React.FC = () => {
                         Create and download a ZIP archive of your account data,
                         including caves, entrances, files, and line plots.
                     </Typography.Paragraph>
+                    <Typography.Text type="secondary">
+                        Only the 5 most recent archives are kept. Older archives are automatically deleted after a new archive is created.
+                    </Typography.Text>
 
                     {latestArchiveFileName && !isPreparingArchive && (
                         <Alert

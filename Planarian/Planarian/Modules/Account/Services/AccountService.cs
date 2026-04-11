@@ -463,7 +463,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         var recentArchives = archiveBlobs
             .OrderByDescending(x => x.CreatedAt)
-            .Take(10)
+            .Take(ArchiveJobCoordinator.MaxRetainedArchives)
             .ToList();
 
         var result = new List<ArchiveListItemVm>(recentArchives.Count);

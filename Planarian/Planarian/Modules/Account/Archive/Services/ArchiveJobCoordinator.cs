@@ -10,6 +10,8 @@ namespace Planarian.Modules.Account.Archive.Services;
 
 public class ArchiveJobCoordinator
 {
+    public const int MaxRetainedArchives = 5;
+
     private readonly ConcurrentDictionary<string, ArchiveJobHandle> _jobs = new();
     private readonly IServiceScopeFactory _scopeFactory;
 
@@ -137,6 +139,13 @@ public class ArchiveJobCoordinator
                 },
                 jobHandle.CancellationTokenSource.Token);
 
+            await PruneOldArchives(
+                fileService,
+                accountBlobContainerClient,
+                requestUser.AccountContainerName,
+                jobHandle.ArchiveBlobKey,
+                jobHandle.CancellationTokenSource.Token);
+
             await notificationService.SendNotificationToGroupAsync(groupName, new
             {
                 statusMessage = "Archive ready.",
@@ -177,6 +186,41 @@ public class ArchiveJobCoordinator
         {
             _jobs.TryRemove(jobHandle.AccountId, out _);
             jobHandle.CancellationTokenSource.Dispose();
+        }
+    }
+
+    private static async Task PruneOldArchives(
+        FileService fileService,
+        Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
+        string accountContainerName,
+        string currentArchiveBlobKey,
+        CancellationToken cancellationToken)
+    {
+        var existingArchives = new List<(string BlobKey, DateTimeOffset LastModified)>();
+
+        await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(prefix: "archives/", cancellationToken: cancellationToken))
+        {
+            if (string.Equals(blobItem.Name, currentArchiveBlobKey, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!blobItem.Properties.LastModified.HasValue)
+            {
+                continue;
+            }
+
+            existingArchives.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
+        }
+
+        var archivesToDelete = existingArchives
+            .OrderByDescending(x => x.LastModified)
+            .Skip(MaxRetainedArchives - 1)
+            .ToList();
+
+        foreach (var archiveToDelete in archivesToDelete)
+        {
+            await fileService.DeleteFile(archiveToDelete.BlobKey, accountContainerName);
         }
     }
 
