@@ -33,7 +33,7 @@ public class ExportService
 
     public async Task WriteArchive(
         Stream outputStream,
-        Func<int, int, Task>? reportProgress,
+        Func<int, int, Task>? reportFileProgress,
         Func<string, Task>? reportStatus,
         CancellationToken cancellationToken)
     {
@@ -47,6 +47,7 @@ public class ExportService
 
         await ReportStatus(reportStatus, "Gathering file data...");
         var files = await _accountRepository.GetArchiveFiles(cancellationToken);
+        var totalFiles = files.Count(file => !string.IsNullOrWhiteSpace(file.BlobKey));
 
         await ReportStatus(reportStatus, "Gathering map data...");
         var geoJsons = await _accountRepository.GetArchiveGeoJsons(cancellationToken);
@@ -74,7 +75,7 @@ public class ExportService
         var filesByCaveId = files.ToLookup(file => file.CavePlanarianId);
         BlobContainerClient? accountBlobContainerClient = null;
 
-        if (files.Count > 0)
+        if (totalFiles > 0)
         {
             try
             {
@@ -92,6 +93,7 @@ public class ExportService
                         files,
                         reservedEntryPaths,
                         "Container not found");
+                    await ReportProgress(reportFileProgress, totalFiles, totalFiles);
                 }
             }
             catch (Exception ex)
@@ -102,7 +104,12 @@ public class ExportService
                     files,
                     reservedEntryPaths,
                     ex.Message);
+                await ReportProgress(reportFileProgress, totalFiles, totalFiles);
             }
+        }
+        else
+        {
+            await ReportProgress(reportFileProgress, 0, 0);
         }
 
         await WriteCaveEntries(
@@ -113,7 +120,8 @@ public class ExportService
             accountBlobContainerClient,
             missingFiles,
             reservedEntryPaths,
-            reportProgress,
+            reportFileProgress,
+            totalFiles,
             cancellationToken);
 
         await ReportStatus(reportStatus, "Finalizing archive...");
@@ -130,10 +138,12 @@ public class ExportService
         BlobContainerClient? accountBlobContainerClient,
         ICollection<MissingArchiveFile> missingFiles,
         ISet<string> reservedEntryPaths,
-        Func<int, int, Task>? reportProgress,
+        Func<int, int, Task>? reportFileProgress,
+        int totalFiles,
         CancellationToken cancellationToken)
     {
-        await ReportProgress(reportProgress, 0, caves.Count);
+        var processedFiles = accountBlobContainerClient == null ? totalFiles : 0;
+        await ReportProgress(reportFileProgress, processedFiles, totalFiles);
 
         for (var index = 0; index < caves.Count; index++)
         {
@@ -145,7 +155,7 @@ public class ExportService
             if (accountBlobContainerClient != null &&
                 filesByCaveId.Contains(cave.PlanarianId))
             {
-                await WriteCaveFileEntries(
+                processedFiles += await WriteCaveFileEntries(
                     archive,
                     cave,
                     caveFolder,
@@ -154,6 +164,7 @@ public class ExportService
                     missingFiles,
                     reservedEntryPaths,
                     cancellationToken);
+                await ReportProgress(reportFileProgress, processedFiles, totalFiles);
             }
 
             foreach (var geoJson in geoJsonsByCaveId[cave.PlanarianId])
@@ -172,11 +183,10 @@ public class ExportService
                     cancellationToken);
             }
 
-            await ReportProgress(reportProgress, index + 1, caves.Count);
         }
     }
 
-    private async Task WriteCaveFileEntries(
+    private async Task<int> WriteCaveFileEntries(
         TarWriter archive,
         ArchiveCaveCsvModel cave,
         string caveFolder,
@@ -186,6 +196,8 @@ public class ExportService
         ISet<string> reservedEntryPaths,
         CancellationToken cancellationToken)
     {
+        var processedFiles = 0;
+
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -204,8 +216,6 @@ public class ExportService
 
             try
             {
-                var blobClient = accountBlobContainerClient.GetBlobClient(file.BlobKey);
-                var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
                 await using var blobStream = await _fileService.OpenBlobReadStream(
                     accountBlobContainerClient,
                     file.BlobKey,
@@ -213,7 +223,7 @@ public class ExportService
                 var entry = CreateFileEntry(
                     entryPath,
                     blobStream,
-                    properties.Value.LastModified);
+                    DateTimeOffset.UtcNow);
                 await archive.WriteEntryAsync(entry, cancellationToken);
             }
             catch (Exception ex)
@@ -224,7 +234,10 @@ public class ExportService
                     file.BlobKey,
                     ex.Message));
             }
+            processedFiles++;
         }
+
+        return processedFiles;
     }
 
     private static async Task WriteMissingFilesEntry(

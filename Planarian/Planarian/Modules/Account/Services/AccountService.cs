@@ -414,12 +414,16 @@ public class AccountService : ServiceBase<AccountRepository>
 
         await _exportService.WriteArchive(
             outputStream,
-            (processed, total) => SendArchiveCaveProgress(uuid, processed, total),
+            (processed, total) => SendArchiveFileProgress(uuid, processed, total),
             message => SendArchiveProgress(uuid, message),
             cancellationToken);
     }
 
-    private async Task SendArchiveProgress(string? uuid, string statusMessage, int? processedCaves = null, int? totalCaves = null)
+    private async Task SendArchiveProgress(
+        string? uuid,
+        string statusMessage,
+        int? processedCount = null,
+        int? totalCount = null)
     {
         if (string.IsNullOrWhiteSpace(uuid))
         {
@@ -429,14 +433,18 @@ public class AccountService : ServiceBase<AccountRepository>
         await _notificationService.SendNotificationToGroupAsync(uuid, new
         {
             statusMessage,
-            processedCaves,
-            totalCaves
+            processedCount,
+            totalCount
         });
     }
 
-    private async Task SendArchiveCaveProgress(string? uuid, int processed, int total)
+    private async Task SendArchiveFileProgress(string? uuid, int processed, int total)
     {
-        await SendArchiveProgress(uuid, $"Processed {processed} of {total} caves.", processed, total);
+        await SendArchiveProgress(
+            uuid,
+            $"Exported {processed} of {total} files...",
+            processedCount: processed,
+            totalCount: total);
     }
 
     private static string NormalizeArchiveFileNameSegment(string value)

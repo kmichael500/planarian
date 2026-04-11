@@ -11,8 +11,8 @@ import { AccountService } from "../Services/AccountService";
 
 const initialArchiveProgress: ProgressVm = {
     statusMessage: "Preparing archive...",
-    processedCaves: 0,
-    totalCaves: 0,
+    processedCount: 0,
+    totalCount: 0,
 };
 
 const getFileNameFromContentDisposition = (contentDisposition?: string) => {
@@ -56,8 +56,8 @@ const ArchiveCardComponent: React.FC = () => {
         const nextProgress = notification as ProgressVm;
         setArchiveProgress((currentProgress) => ({
             statusMessage: nextProgress.statusMessage || currentProgress.statusMessage,
-            processedCaves: nextProgress.processedCaves ?? currentProgress.processedCaves,
-            totalCaves: nextProgress.totalCaves ?? currentProgress.totalCaves,
+            processedCount: nextProgress.processedCount ?? currentProgress.processedCount,
+            totalCount: nextProgress.totalCount ?? currentProgress.totalCount,
         }));
     }, []);
 
@@ -100,12 +100,15 @@ const ArchiveCardComponent: React.FC = () => {
         }
     }, [archiveProgressGroupName, hasStartedArchiveRequest]);
 
-    const archiveProgressPercent = (archiveProgress.totalCaves ?? 0) > 0
+    const archiveProgressTotal = archiveProgress.totalCount ?? 0;
+    const archiveProgressProcessed = archiveProgress.processedCount ?? 0;
+
+    const archiveProgressPercent = archiveProgressTotal > 0
         ? Math.min(
             100,
             Math.round(
-                ((archiveProgress.processedCaves ?? 0) /
-                    (archiveProgress.totalCaves ?? 0)) *
+                (archiveProgressProcessed /
+                    archiveProgressTotal) *
                 100
             )
         )
