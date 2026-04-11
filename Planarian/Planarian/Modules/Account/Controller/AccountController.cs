@@ -52,8 +52,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
     public async Task<IActionResult> DownloadArchive(string? uuid, CancellationToken cancellationToken)
     {
         var fileName = await Service.GetArchiveFileName(cancellationToken);
-        var archiveStream = await Service.BuildArchive(uuid, cancellationToken);
-        return File(archiveStream, "application/zip", fileName);
+        Response.ContentType = "application/gzip";
+        Response.Headers.ContentDisposition = $"attachment; filename=\"{fileName}\"";
+        await Service.WriteArchive(Response.Body, uuid, cancellationToken);
+        return new EmptyResult();
     }
 
     #endregion

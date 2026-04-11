@@ -402,17 +402,18 @@ public class AccountService : ServiceBase<AccountRepository>
         var normalizedAccountName = string.IsNullOrWhiteSpace(accountName)
             ? "Account"
             : NormalizeArchiveFileNameSegment(accountName);
-        return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.zip";
+        return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.tar.gz";
     }
 
-    public async Task<Stream> BuildArchive(string? uuid, CancellationToken cancellationToken)
+    public async Task WriteArchive(Stream outputStream, string? uuid, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        return await _exportService.ExportArchive(
+        await _exportService.WriteArchive(
+            outputStream,
             (processed, total) => SendArchiveCaveProgress(uuid, processed, total),
             message => SendArchiveProgress(uuid, message),
             cancellationToken);
