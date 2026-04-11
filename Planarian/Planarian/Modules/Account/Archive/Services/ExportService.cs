@@ -100,6 +100,7 @@ public class ExportService
                                 missingFiles,
                                 caves,
                                 files,
+                                archive,
                                 "Container not found");
                         }
                     }
@@ -109,6 +110,7 @@ public class ExportService
                             missingFiles,
                             caves,
                             files,
+                            archive,
                             ex.Message);
                     }
                 }
@@ -174,9 +176,13 @@ public class ExportService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var geoJsonName = EnsureGeoJsonFileName(geoJson.Name);
+                var entryPath = ReserveArchiveEntryPath(
+                    archive,
+                    missingFiles,
+                    $"files/{caveFolder}/Line Plots/{geoJsonName}");
                 await WriteTextEntry(
                     archive,
-                    $"files/{caveFolder}/Line Plots/{geoJsonName}",
+                    entryPath,
                     geoJson.GeoJson,
                     CompressionLevel.Fastest,
                     cancellationToken);
@@ -206,7 +212,10 @@ public class ExportService
 
             var fileTagFolder = NormalizePathSegment(file.FileTypeDisplayName, FileTypeTagName.Other);
             var fileNameInArchive = NormalizePathSegment(file.FileName, $"file-{file.Id}");
-            var entryPath = $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}";
+            var entryPath = ReserveArchiveEntryPath(
+                archive,
+                missingFiles,
+                $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}");
 
             try
             {
@@ -300,6 +309,7 @@ public class ExportService
         ICollection<MissingArchiveFile> missingFiles,
         IEnumerable<ArchiveCaveCsvModel> caves,
         IEnumerable<ArchiveFileByCaveModel> files,
+        ZipArchive archive,
         string reason)
     {
         var cavesById = caves.ToDictionary(cave => cave.PlanarianId);
@@ -315,7 +325,10 @@ public class ExportService
             var caveFolder = BuildCaveFolder(cave);
             var fileTagFolder = NormalizePathSegment(file.FileTypeDisplayName, FileTypeTagName.Other);
             var fileNameInArchive = NormalizePathSegment(file.FileName, $"file-{file.Id}");
-            var entryPath = $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}";
+            var entryPath = ReserveArchiveEntryPath(
+                archive,
+                missingFiles,
+                $"files/{caveFolder}/{fileTagFolder}/{fileNameInArchive}");
             missingFiles.Add(BuildMissingArchiveFile(cave, entryPath, file.BlobKey, reason));
         }
     }
@@ -333,6 +346,43 @@ public class ExportService
         var normalizedValue = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         normalizedValue = normalizedValue.Replace('/', '-').Replace('\\', '-');
         return string.IsNullOrWhiteSpace(normalizedValue) ? fallback : normalizedValue;
+    }
+
+    private static string ReserveArchiveEntryPath(
+        ZipArchive archive,
+        IEnumerable<MissingArchiveFile> missingFiles,
+        string entryPath)
+    {
+        if (IsArchiveEntryPathAvailable(archive, missingFiles, entryPath))
+        {
+            return entryPath;
+        }
+
+        var directory = Path.GetDirectoryName(entryPath)?.Replace('\\', '/');
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(entryPath);
+        var extension = Path.GetExtension(entryPath);
+
+        for (var duplicateNumber = 2; ; duplicateNumber++)
+        {
+            var candidateFileName = $"{fileNameWithoutExtension} ({duplicateNumber}){extension}";
+            var candidateEntryPath = string.IsNullOrWhiteSpace(directory)
+                ? candidateFileName
+                : $"{directory}/{candidateFileName}";
+
+            if (IsArchiveEntryPathAvailable(archive, missingFiles, candidateEntryPath))
+            {
+                return candidateEntryPath;
+            }
+        }
+    }
+
+    private static bool IsArchiveEntryPathAvailable(
+        ZipArchive archive,
+        IEnumerable<MissingArchiveFile> missingFiles,
+        string entryPath)
+    {
+        return archive.GetEntry(entryPath) == null &&
+               !missingFiles.Any(file => string.Equals(file.EntryPath, entryPath, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task ReportProgress(Func<int, int, Task>? reportProgress, int processed, int total)
