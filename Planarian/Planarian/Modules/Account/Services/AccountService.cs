@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Azure;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -28,10 +29,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
-    private readonly ExportService _exportService;
+    private readonly ArchiveJobCoordinator _archiveJobCoordinator;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ExportService exportService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ArchiveJobCoordinator archiveJobCoordinator) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -40,7 +41,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
-        _exportService = exportService;
+        _archiveJobCoordinator = archiveJobCoordinator;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -391,104 +392,122 @@ public class AccountService : ServiceBase<AccountRepository>
 
     #region Archive
 
-    public async Task<string> GetArchiveFileName(CancellationToken cancellationToken)
+    public async Task StartArchive(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var accountName = await Repository.GetAccountName(RequestUser.AccountId) ?? "Account";
-        var normalizedAccountName = string.IsNullOrWhiteSpace(accountName)
-            ? "Account"
-            : NormalizeArchiveFileNameSegment(accountName);
-        return $"{normalizedAccountName} Archive {DateTime.UtcNow:yyyyMMddHHmmss}.tar.gz";
+        var started = _archiveJobCoordinator.StartArchiveJob(RequestUser.AccountId, RequestUser.Id);
+        if (!started)
+        {
+            throw ApiExceptionDictionary.BadRequest("An archive is already running for this account.");
+        }
+
+        await Task.CompletedTask;
     }
 
-    public async Task<ArchiveDownloadVm> CreateArchive(string? uuid, CancellationToken cancellationToken)
+    public async Task CancelArchive(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var fileName = await GetArchiveFileName(cancellationToken);
-        var archiveBlobKey = $"archives/{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.tar.gz";
+        await _archiveJobCoordinator.CancelArchiveJob(RequestUser.AccountId);
+    }
+
+    public Task<ArchiveStatusVm?> GetArchiveStatus(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        return Task.FromResult(_archiveJobCoordinator.GetArchiveStatus(RequestUser.AccountId));
+    }
+
+    public async Task<IEnumerable<ArchiveListItemVm>> GetRecentArchives(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var accountBlobContainerClient = await _fileService.GetAccountBlobContainerClient();
+        var archiveBlobs = new List<(string BlobKey, DateTimeOffset CreatedAt)>();
+        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
 
         try
         {
-            var accountBlobContainerClient = await _fileService.GetAccountBlobContainerClient(createIfNotExists: true);
-            await using var outputStream = await _fileService.OpenBlobWriteStream(
-                accountBlobContainerClient,
-                archiveBlobKey,
-                cancellationToken);
+            await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(prefix: "archives/", cancellationToken: cancellationToken))
+            {
+                if (string.Equals(blobItem.Name, activeArchiveBlobKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-            await _exportService.WriteArchive(
-                outputStream,
-                (processed, total) => SendArchiveFileProgress(uuid, processed, total),
-                message => SendArchiveProgress(uuid, message),
-                cancellationToken);
+                if (!blobItem.Properties.LastModified.HasValue)
+                {
+                    continue;
+                }
 
+                archiveBlobs.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
+            }
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return [];
+        }
+
+        var recentArchives = archiveBlobs
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(10)
+            .ToList();
+
+        var result = new List<ArchiveListItemVm>(recentArchives.Count);
+        foreach (var archiveBlob in recentArchives)
+        {
+            var fileName = Path.GetFileName(archiveBlob.BlobKey);
             var downloadUrl = await _fileService.GetLink(
-                archiveBlobKey,
+                archiveBlob.BlobKey,
                 RequestUser.AccountContainerName,
                 fileName,
                 isDownload: true);
 
-            return new ArchiveDownloadVm
+            result.Add(new ArchiveListItemVm
             {
+                BlobKey = archiveBlob.BlobKey,
                 FileName = fileName,
+                CreatedAt = archiveBlob.CreatedAt,
                 DownloadUrl = downloadUrl
-            };
+            });
         }
-        catch
-        {
-            await _fileService.DeleteFile(archiveBlobKey, RequestUser.AccountContainerName);
-            throw;
-        }
+
+        return result;
     }
 
-    private async Task SendArchiveProgress(
-        string? uuid,
-        string statusMessage,
-        int? processedCount = null,
-        int? totalCount = null)
+    public async Task DeleteArchive(string blobKey, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(uuid))
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
-            return;
+            throw ApiExceptionDictionary.NoAccount;
         }
 
-        await _notificationService.SendNotificationToGroupAsync(uuid, new
+        if (string.IsNullOrWhiteSpace(blobKey) || !blobKey.StartsWith("archives/", StringComparison.OrdinalIgnoreCase))
         {
-            statusMessage,
-            processedCount,
-            totalCount
-        });
-    }
-
-    private async Task SendArchiveFileProgress(string? uuid, int processed, int total)
-    {
-        await SendArchiveProgress(
-            uuid,
-            $"Exported {processed} of {total} files...",
-            processedCount: processed,
-            totalCount: total);
-    }
-
-    private static string NormalizeArchiveFileNameSegment(string value)
-    {
-        var normalizedValue = value.Trim();
-
-        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
-        {
-            normalizedValue = normalizedValue.Replace(invalidCharacter, '-');
+            throw ApiExceptionDictionary.BadRequest("Invalid archive.");
         }
 
-        normalizedValue = normalizedValue.Trim().TrimEnd('.', ' ');
-        return string.IsNullOrWhiteSpace(normalizedValue) ? "Account" : normalizedValue;
-    }
+        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
+        if (string.Equals(blobKey, activeArchiveBlobKey, StringComparison.Ordinal))
+        {
+            throw ApiExceptionDictionary.BadRequest("Cannot delete an archive while it is still running.");
+        }
 
+        await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
+    }
     #endregion
 
     #endregion

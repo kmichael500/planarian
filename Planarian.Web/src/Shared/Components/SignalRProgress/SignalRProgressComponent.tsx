@@ -42,12 +42,17 @@ function SignalRProgressComponent({
     null
   );
   const [notifications, setNotifications] = useState<string[]>([]);
+  const groupNameRef = useRef<string>(groupName);
   const hasJoinedGroupRef = useRef<string | null>(null);
   const onConnectedRef = useRef<typeof onConnected>(onConnected);
 
   useEffect(() => {
     onConnectedRef.current = onConnected;
   }, [onConnected]);
+
+  useEffect(() => {
+    groupNameRef.current = groupName;
+  }, [groupName]);
 
   useEffect(() => {
     setNotifications([]);
@@ -68,6 +73,16 @@ function SignalRProgressComponent({
       })
       .withAutomaticReconnect()
       .build();
+
+    newConnection.onreconnected(async () => {
+      const currentGroupName = groupNameRef.current;
+      if (!currentGroupName) {
+        return;
+      }
+
+      await newConnection.invoke("JoinGroup", currentGroupName);
+      hasJoinedGroupRef.current = currentGroupName;
+    });
 
     setConnection(newConnection);
   }, []);

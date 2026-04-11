@@ -15,8 +15,9 @@ import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
+import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
+import { ArchiveStatusVm } from "../Models/Archive/ArchiveStatusVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { ArchiveDownloadVm } from "../Models/Archive/ArchiveDownloadVm";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -40,13 +41,30 @@ const AccountService = {
     return response.data;
   },
 
-  async CreateArchive(uuid?: string): Promise<ArchiveDownloadVm> {
-    const requestUrl = !isNullOrWhiteSpace(uuid)
-      ? `${baseUrl}/archive?uuid=${encodeURIComponent(uuid)}`
-      : `${baseUrl}/archive`;
+  async CreateArchive(): Promise<void> {
+    await HttpClient.post(`${baseUrl}/archive`, {});
+  },
 
-    const response = await HttpClient.post<ArchiveDownloadVm>(requestUrl, {});
+  async CancelArchive(): Promise<void> {
+    await HttpClient.post(`${baseUrl}/archive/cancel`, {});
+  },
+
+  async GetArchiveStatus(): Promise<ArchiveStatusVm | null> {
+    const response = await HttpClient.get<ArchiveStatusVm | null>(
+      `${baseUrl}/archive/status`
+    );
     return response.data;
+  },
+
+  async GetRecentArchives(): Promise<ArchiveListItemVm[]> {
+    const response = await HttpClient.get<ArchiveListItemVm[]>(
+      `${baseUrl}/archive/list`
+    );
+    return response.data;
+  },
+
+  async DeleteArchive(blobKey: string): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/archive?blobKey=${encodeURIComponent(blobKey)}`);
   },
 
   //#region Import
