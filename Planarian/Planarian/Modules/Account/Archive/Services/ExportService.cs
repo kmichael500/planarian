@@ -17,7 +17,7 @@ namespace Planarian.Modules.Account.Archive.Services;
 
 public class ExportService
 {
-    private const int BlobPrefetchWindow = 4;
+    private const int BlobPrefetchWindow = 8;
 
     private readonly AccountRepository _accountRepository;
     private readonly FileService _fileService;
