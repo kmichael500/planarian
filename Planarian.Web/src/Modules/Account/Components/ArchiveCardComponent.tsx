@@ -26,6 +26,7 @@ const ArchiveCardComponent: React.FC = () => {
     const [isArchiveRunning, setIsArchiveRunning] = useState<boolean>(false);
     const [isCancelingArchive, setIsCancelingArchive] = useState<boolean>(false);
     const [deletingArchiveBlobKey, setDeletingArchiveBlobKey] = useState<string | null>(null);
+    const [downloadingArchiveBlobKey, setDownloadingArchiveBlobKey] = useState<string | null>(null);
     const [isLoadingArchiveState, setIsLoadingArchiveState] = useState<boolean>(true);
     const [archiveProgress, setArchiveProgress] = useState<ArchiveProgressVm>(initialArchiveProgress);
     const [recentArchives, setRecentArchives] = useState<ArchiveListItemVm[]>([]);
@@ -165,6 +166,22 @@ const ArchiveCardComponent: React.FC = () => {
         }
     }, [deletingArchiveBlobKey]);
 
+    const downloadArchive = useCallback(async (archive: ArchiveListItemVm) => {
+        if (downloadingArchiveBlobKey || deletingArchiveBlobKey === archive.blobKey) {
+            return;
+        }
+
+        try {
+            setDownloadingArchiveBlobKey(archive.blobKey);
+            await AccountService.StartArchiveDownload(archive.blobKey);
+        } catch (err) {
+            const error = err as ApiErrorResponse;
+            message.error(error.message);
+        } finally {
+            setDownloadingArchiveBlobKey(null);
+        }
+    }, [deletingArchiveBlobKey, downloadingArchiveBlobKey]);
+
     useEffect(() => {
         if (!archiveProgressGroupName) {
             return;
@@ -279,10 +296,15 @@ const ArchiveCardComponent: React.FC = () => {
                                     >
                                         Delete
                                     </DeleteButtonComponent>
-                                    <Typography.Link href={archive.downloadUrl}>
-                                        <DownloadOutlined />{" "}
+                                    <PlanarianButton
+                                        type="link"
+                                        icon={<DownloadOutlined />}
+                                        onClick={() => downloadArchive(archive)}
+                                        loading={downloadingArchiveBlobKey === archive.blobKey}
+                                        disabled={deletingArchiveBlobKey === archive.blobKey}
+                                    >
                                         Download
-                                    </Typography.Link>
+                                    </PlanarianButton>
                                 </Space>
                             </Space>
                         ))}

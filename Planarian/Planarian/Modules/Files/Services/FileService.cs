@@ -267,6 +267,23 @@ public class FileService : ServiceBase<FileRepository>
         };
     }
 
+    public async Task<FileAccessUrlVm> CreateBlobAccessUrl(
+        string blobKey,
+        string containerName,
+        string fileName,
+        bool isDownload = false)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(containerName))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
+        return new FileAccessUrlVm
+        {
+            Url = CreateSasUrl(blobClient, fileName, isDownload)
+        };
+    }
+
     private async Task EnsureFileManagerAccess(string fileId)
     {
         var fileContext = await Repository.GetFileAuthorizationContext(fileId);
@@ -337,11 +354,7 @@ public class FileService : ServiceBase<FileRepository>
     }
 
     public async Task<string> GetLink(string blobKey, string containerName, string fileName, bool isDownload = false)
-    {
-        var client = await GetBlobContainerClient(containerName);
-        var blobClient = client.GetBlobClient(blobKey);
-        return CreateSasUrl(blobClient, fileName, isDownload);
-    }
+        => (await CreateBlobAccessUrl(blobKey, containerName, fileName, isDownload)).Url;
 
     private static bool ShouldRenderInline(string fileName, bool download)
     {

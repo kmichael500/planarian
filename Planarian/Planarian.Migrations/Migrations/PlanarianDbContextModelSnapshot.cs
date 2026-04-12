@@ -59,7 +59,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("LeadTags");
+                    b.ToTable("LeadTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
@@ -113,7 +113,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TripId");
 
-                    b.ToTable("Leads");
+                    b.ToTable("Leads", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Member", b =>
@@ -157,7 +157,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Members");
+                    b.ToTable("Members", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLog", b =>
@@ -218,7 +218,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("MessageLogs");
+                    b.ToTable("MessageLogs", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.MessageType", b =>
@@ -285,7 +285,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("MessageTypes");
+                    b.ToTable("MessageTypes", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Photo", b =>
@@ -335,7 +335,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TripId");
 
-                    b.ToTable("Photos");
+                    b.ToTable("Photos", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Projects.Project", b =>
@@ -369,7 +369,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("Projects");
+                    b.ToTable("Projects", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Account", b =>
@@ -409,7 +409,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Accounts");
+                    b.ToTable("Accounts", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountState", b =>
@@ -444,7 +444,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("StateId");
 
-                    b.ToTable("AccountStates");
+                    b.ToTable("AccountStates", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountUser", b =>
@@ -489,7 +489,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AccountUsers");
+                    b.ToTable("AccountUsers", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.ArcheologyTag", b =>
@@ -528,7 +528,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("ArcheologyTags");
+                    b.ToTable("ArcheologyTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.BiologyTag", b =>
@@ -567,7 +567,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("BiologyTags");
+                    b.ToTable("BiologyTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CartographerNameTag", b =>
@@ -606,7 +606,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("CartographerNameTags");
+                    b.ToTable("CartographerNameTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>
@@ -714,7 +714,7 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("CountyNumber", "CountyId")
                         .IsUnique();
 
-                    b.ToTable("Caves");
+                    b.ToTable("Caves", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveGeoJson", b =>
@@ -756,7 +756,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("CaveId");
 
-                    b.ToTable("CaveGeoJsons");
+                    b.ToTable("CaveGeoJsons", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveOtherTag", b =>
@@ -795,7 +795,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("CaveOtherTags");
+                    b.ToTable("CaveOtherTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CavePermission", b =>
@@ -909,7 +909,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("CaveReportedByNameTags");
+                    b.ToTable("CaveReportedByNameTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.County", b =>
@@ -959,7 +959,7 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("AccountId", "StateId", "DisplayId")
                         .IsUnique();
 
-                    b.ToTable("Counties");
+                    b.ToTable("Counties", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Entrance", b =>
@@ -1028,7 +1028,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ReportedByUserId");
 
-                    b.ToTable("Entrances");
+                    b.ToTable("Entrances", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceHydrologyTag", b =>
@@ -1067,7 +1067,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("EntranceHydrologyTags");
+                    b.ToTable("EntranceHydrologyTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceOtherTag", b =>
@@ -1106,7 +1106,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("EntranceOtherTag");
+                    b.ToTable("EntranceOtherTag", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceReportedByNameTag", b =>
@@ -1145,7 +1145,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("EntranceReportedByNameTags");
+                    b.ToTable("EntranceReportedByNameTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.EntranceStatusTag", b =>
@@ -1184,7 +1184,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("EntranceStatusTags");
+                    b.ToTable("EntranceStatusTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Favorite", b =>
@@ -1230,7 +1230,7 @@ namespace Planarian.Migrations.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Favorite_UserId_CaveId_AccountId");
 
-                    b.ToTable("Favorites");
+                    b.ToTable("Favorites", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.FeatureSetting", b =>
@@ -1276,7 +1276,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("FeatureSettings");
+                    b.ToTable("FeatureSettings", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.FieldIndicationTag", b =>
@@ -1315,7 +1315,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("FieldIndicationTags");
+                    b.ToTable("FieldIndicationTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.File", b =>
@@ -1379,7 +1379,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("FileTypeTagId");
 
-                    b.ToTable("Files");
+                    b.ToTable("Files", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologicAgeTag", b =>
@@ -1418,7 +1418,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("GeologicAgeTags");
+                    b.ToTable("GeologicAgeTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologyTag", b =>
@@ -1457,7 +1457,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("GeologyTags");
+                    b.ToTable("GeologyTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.MapStatusTag", b =>
@@ -1496,7 +1496,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("MapStatusTags");
+                    b.ToTable("MapStatusTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Permission", b =>
@@ -1555,7 +1555,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("PermissionType", "Key");
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.PhysiographicProvinceTag", b =>
@@ -1594,7 +1594,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("PhysiographicProvinceTags");
+                    b.ToTable("PhysiographicProvinceTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
@@ -1632,7 +1632,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
-                    b.ToTable("States");
+                    b.ToTable("States", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.UserPermission", b =>
@@ -1683,7 +1683,7 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("UserId", "PermissionId", "AccountId")
                         .IsUnique();
 
-                    b.ToTable("UserPermissions");
+                    b.ToTable("UserPermissions", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Views.UserCavePermissionsView", b =>
@@ -1780,7 +1780,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("TagTypes");
+                    b.ToTable("TagTypes", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TripTag", b =>
@@ -1813,7 +1813,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TripId");
 
-                    b.ToTable("TripTags");
+                    b.ToTable("TripTags", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Trips.Trip", b =>
@@ -1866,7 +1866,7 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("TagTypeId");
 
-                    b.ToTable("Trips");
+                    b.ToTable("Trips", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
@@ -1942,7 +1942,7 @@ namespace Planarian.Migrations.Migrations
                         .IsUnique()
                         .HasFilter("\"IsTemporary\" = false");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.LeadTag", b =>
