@@ -40,10 +40,15 @@ public class RequestThrottleOptions
     /// <summary>
     /// Length of the throttling window, in minutes, for repeated file access tracked by user and file.
     /// </summary>
-    public int FileAccessWindowMinutes { get; set; } = 1;
+    public int FileAccessWindowMinutes { get; set; } = 10;
+
+    /// <summary>
+    /// Maximum number of file or archive access requests a single user can make across all files within the file access window.
+    /// </summary>
+    public int FileAccessPerUserLimit { get; set; } = 30;
 
     /// <summary>
     /// Maximum number of times a single user can request access to the same file within the file access window.
     /// </summary>
-    public int FileAccessPerUserPerFileLimit { get; set; } = 10;
+    public int FileAccessPerUserPerFileLimit { get; set; } = 5;
 }

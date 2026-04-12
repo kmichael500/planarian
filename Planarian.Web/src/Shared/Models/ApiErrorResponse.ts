@@ -16,6 +16,7 @@ export enum ApiExceptionType {
   Forbidden = "Forbidden",
   NotFound = "NotFound",
   Conflict = "Conflict",
+  TooManyRequests = "TooManyRequests",
   InternalServerError = "InternalServerError",
   EmailAlreadyExists = "EmailAlreadyExists",
   InvalidPasswordComplexity = "InvalidPasswordComplexity",

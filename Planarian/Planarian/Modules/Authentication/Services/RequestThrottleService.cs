@@ -121,31 +121,30 @@ public class RequestThrottleService
         EnsureEndpointIsThrottleMarked(profile);
 
         ExceededThrottleResult? exceededThrottle = null;
+        var resolvedRules = GetRules(profile, identifier)
+            .Where(rule => rule.Limit > 0)
+            .Select(rule =>
+            {
+                var cacheKey = RequestThrottleKeyHelper.CreateKey(rule.KeyType, rule.KeyParts);
+                return new ResolvedThrottleRule(rule, cacheKey, GetState(cacheKey, rule.Window));
+            })
+            .ToList();
 
-        foreach (var rule in GetRules(profile, identifier))
+        ExecuteWithLocks(resolvedRules, () =>
         {
-            if (rule.Limit <= 0)
+            var exceededRule = resolvedRules.FirstOrDefault(rule => rule.State.Count + 1 > rule.Rule.Limit);
+            if (exceededRule != null)
             {
-                continue;
+                var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling((exceededRule.State.ExpiresOn - DateTimeOffset.UtcNow).TotalSeconds));
+                exceededThrottle = new ExceededThrottleResult(exceededRule.Rule, retryAfterSeconds);
+                return;
             }
 
-            var state = GetState(RequestThrottleKeyHelper.CreateKey(rule.KeyType, rule.KeyParts), rule.Window);
-            int count;
-
-            lock (state.SyncRoot)
+            foreach (var rule in resolvedRules)
             {
-                state.Count++;
-                count = state.Count;
+                rule.State.Count++;
             }
-
-            if (count <= rule.Limit || exceededThrottle != null)
-            {
-                continue;
-            }
-
-            var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling((state.ExpiresOn - DateTimeOffset.UtcNow).TotalSeconds));
-            exceededThrottle = new ExceededThrottleResult(rule, retryAfterSeconds);
-        }
+        });
 
         if (exceededThrottle != null)
         {
@@ -163,6 +162,33 @@ public class RequestThrottleService
         }
 
         return;
+    }
+
+    private static void ExecuteWithLocks(
+        IReadOnlyCollection<ResolvedThrottleRule> resolvedRules,
+        Action action)
+    {
+        var acquiredLocks = new Stack<object>();
+
+        try
+        {
+            foreach (var state in resolvedRules
+                         .OrderBy(rule => rule.CacheKey, StringComparer.Ordinal)
+                         .Select(rule => rule.State))
+            {
+                Monitor.Enter(state.SyncRoot);
+                acquiredLocks.Push(state.SyncRoot);
+            }
+
+            action();
+        }
+        finally
+        {
+            while (acquiredLocks.Count > 0)
+            {
+                Monitor.Exit(acquiredLocks.Pop());
+            }
+        }
     }
 
     private void EnsureEndpointIsThrottleMarked(ThrottleProfile expectedProfile)
@@ -220,10 +246,17 @@ public class RequestThrottleService
             ThrottleProfile.FileAccess =>
             [
                 new(profile,
+                    RequestThrottleKeyType.FileAccessUser, _options.FileAccessPerUserLimit,
+                    TimeSpan.FromMinutes(_options.FileAccessWindowMinutes),
+                    normalizedIdentifier,
+                    [$"user:{_requestUser.Id}"],
+                    "Too many file access attempts. Limit is {limit} across all files per {window}."),
+                new(profile,
                     RequestThrottleKeyType.FileAccess, _options.FileAccessPerUserPerFileLimit,
                     TimeSpan.FromMinutes(_options.FileAccessWindowMinutes),
                     normalizedIdentifier,
-                    [$"user:{_requestUser.Id}", $"file:{normalizedIdentifier}"])
+                    [$"user:{_requestUser.Id}", $"file:{normalizedIdentifier}"],
+                    "Too many file access attempts. Limit is {limit} for the same file per {window}.")
             ],
             _ => []
         };
@@ -282,6 +315,7 @@ public class RequestThrottleService
     #region Types
 
     private sealed record ExceededThrottleResult(ThrottleRule Rule, int RetryAfterSeconds);
+    private sealed record ResolvedThrottleRule(ThrottleRule Rule, string CacheKey, CounterState State);
 
     private sealed record ThrottleRule(
         ThrottleProfile Profile,
@@ -289,10 +323,14 @@ public class RequestThrottleService
         int Limit,
         TimeSpan Window,
         string? NormalizedIdentifier,
-        string?[] KeyParts)
+        string?[] KeyParts,
+        string? TooManyRequestsMessageTemplate = null)
     {
         public string TooManyRequestsMessage =>
-            $"Too many attempts. Limit is {Limit} per {GetWindowDescription(Window)}.";
+            TooManyRequestsMessageTemplate?
+                .Replace("{limit}", Limit.ToString())
+                .Replace("{window}", GetWindowDescription(Window))
+            ?? $"Too many attempts. Limit is {Limit} per {GetWindowDescription(Window)}.";
 
         private static string GetWindowDescription(TimeSpan window)
         {
