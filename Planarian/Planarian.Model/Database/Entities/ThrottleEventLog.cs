@@ -9,11 +9,11 @@ public class ThrottleEventLog : EntityBase
 {
     [Required]
     [MaxLength(PropertyLength.Key)]
-    public string OperationName { get; set; } = null!;
+    public ThrottleProfile OperationName { get; set; }
 
     [Required]
     [MaxLength(PropertyLength.Key)]
-    public string LimiterKeyType { get; set; } = null!;
+    public RequestThrottleKeyType LimiterKeyType { get; set; }
 
     [Required]
     [MaxLength(PropertyLength.MediumText)]
@@ -44,6 +44,8 @@ public class ThrottleEventLogConfiguration : BaseEntityTypeConfiguration<Throttl
     public override void Configure(EntityTypeBuilder<ThrottleEventLog> builder)
     {
         base.Configure(builder);
+        ConfigureEnum(builder, e => e.OperationName);
+        ConfigureEnum(builder, e => e.LimiterKeyType);
         builder.HasIndex(e => e.OccurredOn);
     }
 }

@@ -13,7 +13,6 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Throttling;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 

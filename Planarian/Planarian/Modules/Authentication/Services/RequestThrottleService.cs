@@ -6,7 +6,6 @@ using Planarian.Library.Exceptions;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
-using Planarian.Shared.Throttling;
 
 namespace Planarian.Modules.Authentication.Services;
 
@@ -70,11 +69,10 @@ public class RequestThrottleService
     public Task RecordEndpointRateLimitHit(HttpContext httpContext, int? retryAfterSeconds = null, CancellationToken cancellationToken = default)
     {
         var endpoint = httpContext.GetEndpoint();
-        var limiterKeyType = _requestUser.IsAuthenticated ? "user" : "ip";
 
         return _throttleEventLogService.TryWriteAsync(
-            "endpoint-rate-limit",
-            limiterKeyType,
+            ThrottleProfile.EndpointRateLimit,
+            RequestThrottleKeyType.EndpointRateLimit,
             null,
             GetEndpointRequestsPerMinute(endpoint) ?? _rateLimitOptions.DefaultRequestsPerMinute,
             TimeSpan.FromMinutes(1),
@@ -152,8 +150,8 @@ public class RequestThrottleService
         if (exceededThrottle != null)
         {
             await _throttleEventLogService.TryWriteAsync(
-                exceededThrottle.Rule.OperationName,
-                exceededThrottle.Rule.LimiterKeyName,
+                exceededThrottle.Rule.Profile,
+                exceededThrottle.Rule.KeyType,
                 exceededThrottle.Rule.NormalizedIdentifier,
                 exceededThrottle.Rule.Limit,
                 exceededThrottle.Rule.Window,
@@ -295,17 +293,6 @@ public class RequestThrottleService
     {
         public string TooManyRequestsMessage =>
             $"Too many attempts. Limit is {Limit} per {GetWindowDescription(Window)}.";
-
-        public string OperationName => Profile.ToString();
-
-        public string LimiterKeyName => KeyType switch
-        {
-            RequestThrottleKeyType.LoginIp or RequestThrottleKeyType.PasswordResetIp => "ip",
-            RequestThrottleKeyType.LoginEmail or RequestThrottleKeyType.PasswordResetEmail => "email",
-            RequestThrottleKeyType.FileAccess => "user-file",
-            RequestThrottleKeyType.EndpointRateLimit => "endpoint",
-            _ => KeyType.ToString().ToLowerInvariant()
-        };
 
         private static string GetWindowDescription(TimeSpan window)
         {

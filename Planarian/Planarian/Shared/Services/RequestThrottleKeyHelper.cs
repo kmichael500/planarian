@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using System.Net;
+using Planarian.Model.Shared;
 
 namespace Planarian.Shared.Services;
 
@@ -49,14 +50,4 @@ public static class RequestThrottleKeyHelper
 
         return (ipAddress.IsIPv4MappedToIPv6 ? ipAddress.MapToIPv4() : ipAddress).ToString();
     }
-}
-
-public enum RequestThrottleKeyType
-{
-    EndpointRateLimit,
-    FileAccess,
-    LoginIp,
-    LoginEmail,
-    PasswordResetIp,
-    PasswordResetEmail
 }

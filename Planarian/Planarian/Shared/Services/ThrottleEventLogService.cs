@@ -37,8 +37,8 @@ public class ThrottleEventLogService
     }
 
     public async Task TryWriteAsync(
-        string operationName,
-        string limiterKeyType,
+        ThrottleProfile operationName,
+        RequestThrottleKeyType limiterKeyType,
         string? normalizedIdentifier,
         int limit,
         TimeSpan window,

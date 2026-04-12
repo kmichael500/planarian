@@ -12,7 +12,6 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
-using Planarian.Shared.Throttling;
 
 namespace Planarian.Modules.Users.Services;
 
