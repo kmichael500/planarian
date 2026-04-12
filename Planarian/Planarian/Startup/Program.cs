@@ -257,7 +257,7 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
 builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
 {
     options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
-});
+}, ServiceLifetime.Scoped);
 
 builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
 {
