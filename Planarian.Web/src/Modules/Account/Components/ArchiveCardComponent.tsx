@@ -292,6 +292,7 @@ const ArchiveCardComponent: React.FC = () => {
                         <SignalRProgressComponent
                             groupName={archiveProgressGroupName}
                             isLoading={isPreparingArchive}
+                            onConnected={loadArchiveState}
                             onNotification={onArchiveProgress}
                             hideNotifications={true}
                         />

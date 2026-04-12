@@ -77,11 +77,13 @@ function SignalRProgressComponent({
     newConnection.onreconnected(async () => {
       const currentGroupName = groupNameRef.current;
       if (!currentGroupName) {
+        await onConnectedRef.current?.();
         return;
       }
 
       await newConnection.invoke("JoinGroup", currentGroupName);
       hasJoinedGroupRef.current = currentGroupName;
+      await onConnectedRef.current?.();
     });
 
     setConnection(newConnection);
