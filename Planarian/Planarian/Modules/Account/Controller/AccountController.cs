@@ -45,15 +45,59 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return Ok("Account reset finished.");
     }
 
+    #region Archive
+
+    [HttpPost("archive")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public IActionResult StartArchive()
+    {
+        Service.StartArchive();
+        return Ok();
+    }
+
+    [HttpPost("archive/cancel")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public IActionResult CancelArchive()
+    {
+        Service.CancelArchive();
+        return Ok();
+    }
+
+    [HttpGet("archive/status")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public ActionResult<ArchiveProgressVm?> GetArchiveStatus()
+    {
+        var result = Service.GetArchiveStatus();
+        return Ok(result);
+    }
+
+    [HttpGet("archive/list")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<IEnumerable<ArchiveListItemVm>>> GetRecentArchives(CancellationToken cancellationToken)
+    {
+        var result = await Service.GetRecentArchives(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("archive")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> DeleteArchive(string blobKey, CancellationToken cancellationToken)
+    {
+        await Service.DeleteArchive(blobKey, cancellationToken);
+        return Ok();
+    }
+
+    #endregion
+
     #region Misc Settings
-    
+
     [HttpGet("settings")]
     public async Task<ActionResult<MiscAccountSettingsVm?>> GetSettings(CancellationToken cancellationToken)
     {
         var result = await Service.GetMiscAccountSettingsVm(cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpPut("settings")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<MiscAccountSettingsVm>> UpdateSettings([FromBody] MiscAccountSettingsVm settings,
@@ -62,7 +106,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.UpdateMiscAccountSettingsVm(settings, cancellationToken);
         return Ok(result);
     }
-    
+
     // [HttpPost("settings")]
     // public async Task<ActionResult<MiscAccountSettingsVm>> CreateSettings([FromBody] MiscAccountSettingsVm settings,
     //     CancellationToken cancellationToken)
@@ -71,7 +115,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
     //     return Ok(result);
     // }
 
-    
+
 
     #endregion
 
@@ -151,7 +195,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetTagsForTable(key, cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpGet("counties-table/{stateId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<IEnumerable<TagTypeTableCountyVm>>> GetCountiesForTable(string stateId, CancellationToken cancellationToken)
@@ -159,7 +203,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetCountiesForTable(stateId, cancellationToken);
         return Ok(result);
     }
-    
+
     [HttpGet("feature-settings")]
     public async Task<ActionResult<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
@@ -167,7 +211,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
         return new JsonResult(featureSettings);
     }
-    
+
     [HttpPost("feature-settings/{key}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<FeatureSettingVm>> UpdateFeatureSetting(FeatureKey key, bool isEnabled, CancellationToken cancellationToken)

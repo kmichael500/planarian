@@ -8,6 +8,7 @@ namespace Planarian.Model.Shared;
 
 public class RequestUser
 {
+    private static readonly TimeSpan LastActiveOnUpdateInterval = TimeSpan.FromMinutes(10);
     private readonly PlanarianDbContext _dbContext;
 
     public RequestUser(PlanarianDbContext dbContext)
@@ -25,14 +26,26 @@ public class RequestUser
 
     public async Task Initialize(string? accountId, string? userId)
     {
-        var user = await _dbContext.Users.Include(e => e.AccountUsers).FirstOrDefaultAsync(e => e.Id == userId);
+        var user = await _dbContext.Users
+            .AsNoTracking()
+            .Where(e => e.Id == userId)
+            .Select(e => new
+            {
+                e.Id,
+                e.FirstName,
+                e.LastName,
+                e.LastActiveOn,
+                IsValidAccountId = e.AccountUsers.Any(au => au.AccountId == accountId)
+            })
+            .FirstOrDefaultAsync();
+
         if (user == null)
         {
             IsAuthenticated = false;
             return;
         }
 
-        var isValidAccountId = user.AccountUsers.Select(e => e.AccountId).Contains(accountId);
+        var isValidAccountId = user.IsValidAccountId;
 
         if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
         {
@@ -49,10 +62,18 @@ public class RequestUser
         {
             AccountId = accountId;
             UserGroupPrefix = $"{userId}-{AccountId}";
-        } 
-        
-        user.LastActiveOn = DateTime.UtcNow;
-        await _dbContext.SaveChangesAsync();
+        }
+
+        var utcNow = DateTime.UtcNow;
+        var lastActiveThreshold = utcNow.Subtract(LastActiveOnUpdateInterval);
+
+        if (user.LastActiveOn == null || user.LastActiveOn < lastActiveThreshold)
+        {
+            await _dbContext.Users
+                .Where(e => e.Id == user.Id && (e.LastActiveOn == null || e.LastActiveOn < lastActiveThreshold))
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(e => e.LastActiveOn, utcNow));
+        }
 
 
     }

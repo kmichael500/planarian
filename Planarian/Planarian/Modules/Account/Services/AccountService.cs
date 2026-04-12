@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Azure;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
@@ -11,6 +13,7 @@ using Planarian.Modules.Caves.Services;
 using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Import.Models;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
@@ -26,9 +29,10 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
+    private readonly ArchiveJobCoordinator _archiveJobCoordinator;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ArchiveJobCoordinator archiveJobCoordinator) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -37,6 +41,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
+        _archiveJobCoordinator = archiveJobCoordinator;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -44,7 +49,7 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             Name = account.Name,
         };
-        
+
         foreach (var key in Enum.GetValues<FeatureKey>())
         {
             var isEnabled = key switch
@@ -65,7 +70,7 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             UserId = RequestUser.Id,
         });
-        
+
 
         Repository.Add(entity);
         await Repository.SaveChangesAsync(cancellationToken);
@@ -76,49 +81,49 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task ResetAccount(CancellationToken cancellationToken)
     {
         var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        
-            var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Getting associated files.");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Done getting associated files.");
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleted 0 of 0 caves.");
+        var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Getting associated files.");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
-            await Repository.DeleteAllCavePermissions();
-            
-            async void DeleteCavesProgressHandler(string message)
-            {
-                await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
-            }
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Done getting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleted 0 of 0 caves.");
 
-            await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
-                cancellationToken);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
+        await Repository.DeleteAllCavePermissions();
 
-            await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
+        async void DeleteCavesProgressHandler(string message)
+        {
+            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
+        }
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated counties");
-            await Repository.DeleteAllCounties();
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Finished deleting associated counties");
+        await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
+            cancellationToken);
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated states");
-            await Repository.DeleteAllAccountStates();
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Finished deleting associated states");
+        await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Deleting associated files.");
-            await _fileService.DeleteContainer(RequestUser.AccountContainerName);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated counties");
+        await Repository.DeleteAllCounties();
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Finished deleting associated counties");
 
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-                "Done deleting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated states");
+        await Repository.DeleteAllAccountStates();
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Finished deleting associated states");
 
-            await dbTransaction.CommitAsync(cancellationToken);
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Deleting associated files.");
+        await _fileService.DeleteContainer(RequestUser.AccountContainerName);
+
+        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
+            "Done deleting associated files.");
+
+        await dbTransaction.CommitAsync(cancellationToken);
     }
 
     #region Tags
@@ -178,7 +183,7 @@ public class AccountService : ServiceBase<AccountRepository>
     {
         await Repository.MergeTagTypes(tagTypeIds, destinationTagTypeId, cancellationToken);
     }
-    
+
 
     #endregion
 
@@ -251,7 +256,7 @@ public class AccountService : ServiceBase<AccountRepository>
                     throw ApiExceptionDictionary.BadRequest("Cannot delete county because it is in use.");
                 }
 
-                Repository.Delete(new County { Id = countyId, AccountId = RequestUser.AccountId});
+                Repository.Delete(new County { Id = countyId, AccountId = RequestUser.AccountId });
             }
 
             await Repository.SaveChangesAsync(cancellationToken);
@@ -274,15 +279,15 @@ public class AccountService : ServiceBase<AccountRepository>
             await Repository.MergeCounties(countyIds, destinationCountyId);
         }
     }
-    
+
     #endregion
 
     #region Settings
-    
+
     public async Task<IEnumerable<FeatureSettingVm>> GetFeatureSettings(CancellationToken cancellationToken)
     {
         var featureSettings = (await _featureSettingRepository.GetFeatureSettings(cancellationToken)).ToList();
-        
+
         return featureSettings;
     }
 
@@ -332,13 +337,13 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             account.Name = values.AccountName;
             account.CountyIdDelimiter = values.CountyIdDelimiter;
-            
+
             account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
             account.ExportEnabled = values.ExportEnabled;
 
             // check which states are missing
             var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
-            
+
             // check which states are new
             var deletedStateIds = account.AccountStates.Select(x => x.StateId).Except(values.StateIds).ToList();
 
@@ -357,7 +362,7 @@ public class AccountService : ServiceBase<AccountRepository>
                 {
                     throw ApiExceptionDictionary.NotFound("Account State");
                 }
-                
+
                 Repository.Delete(accountState);
                 await Repository.SaveChangesAsync(cancellationToken);
             }
@@ -375,7 +380,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            
+
             return account.Id;
         }
         catch (Exception)
@@ -384,6 +389,131 @@ public class AccountService : ServiceBase<AccountRepository>
             throw;
         }
     }
-    
+
+    #region Archive
+
+    public void StartArchive()
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var started = _archiveJobCoordinator.StartArchiveJob(RequestUser.AccountId, RequestUser.AccountContainerName);
+        if (!started)
+        {
+            throw ApiExceptionDictionary.BadRequest("An archive is already running for this account.");
+        }
+    }
+
+    public void CancelArchive()
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        _archiveJobCoordinator.CancelArchiveJob(RequestUser.AccountId);
+    }
+
+    public ArchiveProgressVm? GetArchiveStatus()
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        return _archiveJobCoordinator.GetArchiveStatus(RequestUser.AccountId);
+    }
+
+    public async Task<IEnumerable<ArchiveListItemVm>> GetRecentArchives(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(RequestUser.AccountContainerName);
+        var archiveBlobs = new List<(string BlobKey, DateTimeOffset CreatedAt)>();
+        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
+
+        try
+        {
+            await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(prefix: "archives/", cancellationToken: cancellationToken))
+            {
+                if (blobItem.Name.StartsWith(ArchiveJobCoordinator.TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (string.Equals(blobItem.Name, activeArchiveBlobKey, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!blobItem.Properties.LastModified.HasValue)
+                {
+                    continue;
+                }
+
+                archiveBlobs.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
+            }
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return [];
+        }
+
+        var recentArchives = archiveBlobs
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(ArchiveJobCoordinator.MaxRetainedArchives)
+            .ToList();
+
+        var result = new List<ArchiveListItemVm>(recentArchives.Count);
+        foreach (var archiveBlob in recentArchives)
+        {
+            var fileName = Path.GetFileName(archiveBlob.BlobKey);
+            var downloadUrl = await _fileService.GetLink(
+                archiveBlob.BlobKey,
+                RequestUser.AccountContainerName,
+                fileName,
+                isDownload: true);
+
+            result.Add(new ArchiveListItemVm
+            {
+                BlobKey = archiveBlob.BlobKey,
+                FileName = fileName,
+                CreatedAt = archiveBlob.CreatedAt,
+                DownloadUrl = downloadUrl
+            });
+        }
+
+        return result;
+    }
+
+    public async Task DeleteArchive(string blobKey, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        if (string.IsNullOrWhiteSpace(blobKey) ||
+            !blobKey.StartsWith(ArchiveJobCoordinator.ArchivePrefix, StringComparison.OrdinalIgnoreCase) ||
+            blobKey.StartsWith(ArchiveJobCoordinator.TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw ApiExceptionDictionary.BadRequest("Invalid archive.");
+        }
+
+        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
+        if (string.Equals(blobKey, activeArchiveBlobKey, StringComparison.Ordinal))
+        {
+            throw ApiExceptionDictionary.BadRequest("Cannot delete an archive while it is still running.");
+        }
+
+        await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
+    }
+    #endregion
+
     #endregion
 }

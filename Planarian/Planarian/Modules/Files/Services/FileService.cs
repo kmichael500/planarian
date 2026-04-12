@@ -1,7 +1,7 @@
+using Azure;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
-using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -193,12 +193,35 @@ public class FileService : ServiceBase<FileRepository>
         await blobClient.UploadAsync(stream, true, cancellationToken);
     }
 
-    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName)
+    public async Task<BlobContainerClient> GetBlobContainerClient(string containerName, bool createIfNotExists = true)
     {
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
-        await containerClient.CreateIfNotExistsAsync();
-
+        if (createIfNotExists)
+        {
+            await containerClient.CreateIfNotExistsAsync();
+        }
+        
         return containerClient;
+    }
+
+    public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task<Stream> OpenBlobWriteStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenWriteAsync(overwrite: true, cancellationToken: cancellationToken);
     }
 
     #endregion
@@ -313,6 +336,13 @@ public class FileService : ServiceBase<FileRepository>
         return $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
     }
 
+    public async Task<string> GetLink(string blobKey, string containerName, string fileName, bool isDownload = false)
+    {
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
+        return CreateSasUrl(blobClient, fileName, isDownload);
+    }
+
     private static bool ShouldRenderInline(string fileName, bool download)
     {
         if (download)
@@ -336,9 +366,6 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task DeleteContainer(string containerName)
     {
-        if (RequestUser.AccountId == null)
-            throw ApiExceptionDictionary.BadRequest("Account Id is null");
-
         // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
             _fileOptions.ConnectionString,
@@ -357,11 +384,28 @@ public class FileService : ServiceBase<FileRepository>
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
             throw ApiExceptionDictionary.NotFound("File");
 
-        var client = await GetBlobContainerClient(blobProperties.ContainerName);
-        var blobClient = client.GetBlobClient(blobProperties.BlobKey);
+        return await GetBlobStream(blobProperties.ContainerName, blobProperties.BlobKey);
+    }
+
+    private async Task<Stream> GetBlobStream(string containerName, string blobKey)
+    {
+        if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
 
         var stream = new MemoryStream();
-        await blobClient.DownloadToAsync(stream);
+        try
+        {
+            await blobClient.DownloadToAsync(stream);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            await stream.DisposeAsync();
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+
         stream.Position = 0;
         return stream;
     }

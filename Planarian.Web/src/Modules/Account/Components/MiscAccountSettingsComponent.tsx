@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Checkbox, Form, Input, Select, message } from "antd";
+import { Card, Checkbox, Form, Input, Select, Space, message } from "antd";
 import { AccountService } from "../Services/AccountService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
@@ -107,9 +107,9 @@ const MiscAccountSettings = ({
             filterOption={(input, option) =>
               option && option.children
                 ? option.children
-                    .toString()
-                    .toLowerCase()
-                    .includes(input.toLowerCase())
+                  .toString()
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
                 : false
             }
           >
@@ -138,9 +138,11 @@ const MiscAccountSettings = ({
         </Form.Item>
 
         <Form.Item>
-          <SaveButtonComponent type="primary" htmlType="submit">
-            Save
-          </SaveButtonComponent>
+          <Space wrap>
+            <SaveButtonComponent type="primary" htmlType="submit">
+              Save
+            </SaveButtonComponent>
+          </Space>
         </Form.Item>
       </Form>
     </Card>

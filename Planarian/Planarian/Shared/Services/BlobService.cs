@@ -43,7 +43,7 @@ public class BlobService
 
     public Uri? GetSasUrl(string blobKey, int expiresInHours = 48)
     {
-        var exists = _cache.TryGetValue(blobKey, out Uri uri);
+        var exists = _cache.TryGetValue(blobKey, out Uri? uri);
         if (exists) return uri;
 
         var blobClient = _containerClient.GetBlobClient(blobKey);

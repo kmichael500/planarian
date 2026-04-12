@@ -19,7 +19,7 @@ import { FileVm } from "../../Files/Models/FileVm";
 // Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { NotificationComponent } from "./NotificationComponent";
+import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
 import { Link } from "react-router-dom";
 import { AccountService } from "../../Account/Services/AccountService";
 import { EntranceCsvModel } from "../Models/EntranceCsvModel";
@@ -247,7 +247,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             title="Processing..."
             subTitle="Please wait while your data is being processed."
             extra={[
-              <NotificationComponent
+              <SignalRProgressComponent
                 groupName={uploadResult?.id as string}
                 isLoading={isProcessing}
               />,

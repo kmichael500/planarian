@@ -1,20 +1,19 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Options;
 
 namespace Planarian.Shared.Services;
 
 public class HttpResponseExceptionMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ServerOptions _serverOptions;
 
-    public HttpResponseExceptionMiddleware(bool isDevelopment)
-    {
-    }
-
-    public HttpResponseExceptionMiddleware(RequestDelegate next)
+    public HttpResponseExceptionMiddleware(RequestDelegate next, ServerOptions serverOptions)
     {
         _next = next;
+        _serverOptions = serverOptions;
     }
 
     public async Task Invoke(HttpContext context)
@@ -25,11 +24,22 @@ public class HttpResponseExceptionMiddleware
         }
         catch (ApiException e)
         {
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
             await WriteErrorResponseAsync(context, e.StatusCode, e.Message, e.ErrorCode, e.Data, e.Headers);
         }
         catch (Exception e)
         {
-            var error = new ApiErrorResponse("There was an unexpected issue! Please try again or contact support!",
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
+            var error = new ApiErrorResponse(
+                $"There was an unexpected issue! This is likely a bug with Planarian. Please contact {_serverOptions.SupportName} at {_serverOptions.SupportEmail}.",
                 ApiExceptionType.UnexpectedIssue);
 
 #if DEBUG
