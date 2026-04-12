@@ -7,13 +7,13 @@ import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDi
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
-import { ProgressVm } from "../../../Shared/Models/ProgressVm";
+import { useSignalRGroup } from "../../../Shared/Components/SignalRProgress/useSignalRGroup";
+import { ProgressState } from "../../../Shared/Models/ProgressState";
 import { AccountService } from "../Services/AccountService";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 
-const initialArchiveProgress: ProgressVm = {
+const initialArchiveProgress: ArchiveProgressVm = {
     statusMessage: "Preparing archive...",
     processedCount: 0,
     totalCount: 0,
@@ -23,14 +23,13 @@ const ArchiveCardComponent: React.FC = () => {
     const accountId = AuthenticationService.GetAccountId();
     const archiveProgressGroupName = accountId ? `archive-${accountId}` : null;
 
-    const [isPreparingArchive, setIsPreparingArchive] = useState<boolean>(false);
+    const [isArchiveRunning, setIsArchiveRunning] = useState<boolean>(false);
     const [isCancelingArchive, setIsCancelingArchive] = useState<boolean>(false);
     const [deletingArchiveBlobKey, setDeletingArchiveBlobKey] = useState<string | null>(null);
     const [isLoadingArchiveState, setIsLoadingArchiveState] = useState<boolean>(true);
-    const [isArchiveActive, setIsArchiveActive] = useState<boolean>(false);
-    const [latestArchiveFileName, setLatestArchiveFileName] = useState<string | null>(null);
-    const [archiveProgress, setArchiveProgress] = useState<ProgressVm>(initialArchiveProgress);
+    const [archiveProgress, setArchiveProgress] = useState<ArchiveProgressVm>(initialArchiveProgress);
     const [recentArchives, setRecentArchives] = useState<ArchiveListItemVm[]>([]);
+    const [completedArchiveFileName, setCompletedArchiveFileName] = useState<string | null>(null);
 
     const loadArchiveState = useCallback(async (showLoadingState: boolean = false) => {
         if (showLoadingState) {
@@ -45,22 +44,13 @@ const ArchiveCardComponent: React.FC = () => {
 
             setRecentArchives(archives);
 
-            if (archiveStatus?.isActive) {
-                setArchiveProgress({
-                    statusMessage: archiveStatus.statusMessage,
-                    processedCount: archiveStatus.processedCount,
-                    totalCount: archiveStatus.totalCount,
-                    message: archiveStatus.message,
-                    isError: archiveStatus.isError,
-                    isCanceled: archiveStatus.isCanceled,
-                });
-                setIsArchiveActive(true);
-                setIsPreparingArchive(true);
+            if (archiveStatus) {
+                setArchiveProgress(archiveStatus);
+                setIsArchiveRunning(archiveStatus.state === ProgressState.Running);
                 return;
             }
 
-            setIsArchiveActive(false);
-            setIsPreparingArchive(false);
+            setIsArchiveRunning(false);
             setArchiveProgress(initialArchiveProgress);
         } catch (err) {
             const error = err as ApiErrorResponse;
@@ -82,55 +72,65 @@ const ArchiveCardComponent: React.FC = () => {
             statusMessage: nextProgress.statusMessage || currentProgress.statusMessage,
             processedCount: nextProgress.processedCount ?? currentProgress.processedCount,
             totalCount: nextProgress.totalCount ?? currentProgress.totalCount,
-            message: nextProgress.message ?? currentProgress.message,
-            isError: nextProgress.isError ?? currentProgress.isError,
-            isCanceled: nextProgress.isCanceled ?? currentProgress.isCanceled,
+            state: nextProgress.state ?? currentProgress.state,
         }));
 
-        if (nextProgress.isComplete) {
-            if (nextProgress.isError) {
-                message.error(nextProgress.message || nextProgress.statusMessage);
-            } else if (nextProgress.isCanceled) {
-                message.info(nextProgress.statusMessage || "Archive canceled.");
-            } else {
-                setLatestArchiveFileName(nextProgress.fileName ?? null);
-                message.success(nextProgress.fileName
-                    ? `${nextProgress.fileName} is ready to download below.`
-                    : "Archive is ready to download below.");
-            }
-
-            setIsArchiveActive(false);
-            setIsPreparingArchive(false);
+        if (nextProgress.state === ProgressState.Completed) {
+            setCompletedArchiveFileName(nextProgress.fileName ?? "Archive Ready");
+            message.success(nextProgress.fileName
+                ? `${nextProgress.fileName} is ready to download below.`
+                : "Archive is ready to download below.");
+            setIsArchiveRunning(false);
             setArchiveProgress(initialArchiveProgress);
-            void AccountService.GetRecentArchives().then(setRecentArchives);
+            void loadArchiveState();
             return;
         }
 
-        setIsArchiveActive(true);
-        setIsPreparingArchive(true);
-    }, []);
+        if (nextProgress.state === ProgressState.Failed) {
+            message.error(nextProgress.statusMessage);
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+            void loadArchiveState();
+            return;
+        }
+
+        if (nextProgress.state === ProgressState.Canceled) {
+            message.info(nextProgress.statusMessage || "Archive canceled.");
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+            void loadArchiveState();
+            return;
+        }
+
+        setIsArchiveRunning(true);
+    }, [loadArchiveState]);
+
+    useSignalRGroup({
+        groupName: archiveProgressGroupName,
+        onConnected: loadArchiveState,
+        onNotification: onArchiveProgress,
+    });
 
     const startArchiveDownload = useCallback(async () => {
-        if (isPreparingArchive || isCancelingArchive) {
+        if (isArchiveRunning || isCancelingArchive) {
             return;
         }
 
         try {
-            setLatestArchiveFileName(null);
-            setIsPreparingArchive(true);
-            setIsArchiveActive(true);
+            setIsArchiveRunning(true);
             setArchiveProgress(initialArchiveProgress);
             await AccountService.CreateArchive();
             await loadArchiveState();
         } catch (err) {
             const error = err as ApiErrorResponse;
             message.error(error.message);
+            setIsArchiveRunning(false);
             await loadArchiveState();
         }
-    }, [isPreparingArchive, isCancelingArchive, loadArchiveState]);
+    }, [isArchiveRunning, isCancelingArchive, loadArchiveState]);
 
     const cancelArchive = useCallback(async () => {
-        if (!isArchiveActive || isCancelingArchive) {
+        if (!isArchiveRunning || isCancelingArchive) {
             return;
         }
 
@@ -143,7 +143,7 @@ const ArchiveCardComponent: React.FC = () => {
         } finally {
             setIsCancelingArchive(false);
         }
-    }, [isArchiveActive, isCancelingArchive]);
+    }, [isArchiveRunning, isCancelingArchive]);
 
     const deleteArchive = useCallback(async (archive: ArchiveListItemVm) => {
         if (deletingArchiveBlobKey) {
@@ -156,9 +156,6 @@ const ArchiveCardComponent: React.FC = () => {
             setRecentArchives((currentArchives) =>
                 currentArchives.filter((currentArchive) => currentArchive.blobKey !== archive.blobKey)
             );
-            if (latestArchiveFileName === archive.fileName) {
-                setLatestArchiveFileName(null);
-            }
             message.success(`${archive.fileName} deleted.`);
         } catch (err) {
             const error = err as ApiErrorResponse;
@@ -166,7 +163,7 @@ const ArchiveCardComponent: React.FC = () => {
         } finally {
             setDeletingArchiveBlobKey(null);
         }
-    }, [deletingArchiveBlobKey, latestArchiveFileName]);
+    }, [deletingArchiveBlobKey]);
 
     useEffect(() => {
         if (!archiveProgressGroupName) {
@@ -184,36 +181,37 @@ const ArchiveCardComponent: React.FC = () => {
 
     return (
         <ShouldDisplay permissionKey={PermissionKey.Admin}>
-            <Card title="Archive">
+            <Card
+                title="Archive"
+                extra={isArchiveRunning ? (
+                    <PlanarianButton icon={<CloseOutlined />} onClick={cancelArchive} loading={isCancelingArchive}>
+                        Cancel Export
+                    </PlanarianButton>
+                ) : !completedArchiveFileName && !isLoadingArchiveState ? (
+                    <PlanarianButton
+                        icon={<DownloadOutlined />}
+                        onClick={startArchiveDownload}
+                    >
+                        Create Archive
+                    </PlanarianButton>
+                ) : null}
+            >
                 <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                     <Typography.Paragraph>
-                        Create and download a ZIP archive of your account data,
+                        Create and download an archive of your account data,
                         including caves, entrances, files, and line plots.
                     </Typography.Paragraph>
-                    <Typography.Text type="secondary">
-                        Only the 5 most recent archives are kept. Older archives are automatically deleted after a new archive is created.
-                    </Typography.Text>
 
-                    {latestArchiveFileName && !isPreparingArchive && (
+                    {completedArchiveFileName && !isArchiveRunning && (
                         <Alert
-                            message="Archive ready"
-                            description={`${latestArchiveFileName} is available in the recent archives list below.`}
+                            message="Archive Ready"
+                            description={`${completedArchiveFileName} is available in the recent archives list below.`}
                             type="success"
                             showIcon
                         />
                     )}
 
-                    {!isArchiveActive && !isLoadingArchiveState && (
-                        <PlanarianButton
-                            icon={<DownloadOutlined />}
-                            onClick={startArchiveDownload}
-                            loading={isPreparingArchive}
-                        >
-                            Create Archive
-                        </PlanarianButton>
-                    )}
-
-                    {isArchiveActive && (
+                    {isArchiveRunning && (
                         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                             <Space direction="vertical" size="small" style={{ width: "100%" }}>
                                 <Typography.Text strong>
@@ -221,20 +219,17 @@ const ArchiveCardComponent: React.FC = () => {
                                 </Typography.Text>
                                 <Progress
                                     percent={archiveProgressPercent}
-                                    status={isPreparingArchive ? "active" : "normal"}
+                                    status={isArchiveRunning ? "active" : "normal"}
                                     showInfo={false}
                                 />
                                 <Typography.Text type="secondary">
                                     {archiveProgress.statusMessage}
                                 </Typography.Text>
                             </Space>
-                            <PlanarianButton icon={<CloseOutlined />} onClick={cancelArchive} loading={isCancelingArchive}>
-                                Cancel Export
-                            </PlanarianButton>
                         </Space>
                     )}
 
-                    {isLoadingArchiveState && !isArchiveActive && (
+                    {isLoadingArchiveState && !isArchiveRunning && (
                         <Space direction="vertical" size="small" style={{ width: "100%" }}>
                             <Typography.Text strong>
                                 Loading Archive Status
@@ -246,6 +241,9 @@ const ArchiveCardComponent: React.FC = () => {
                     <Space direction="vertical" size="small" style={{ width: "100%" }}>
                         <Typography.Text strong>
                             Recent Archives
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                            Only the 5 most recent archives are kept. Older archives are automatically deleted after a new archive is created.
                         </Typography.Text>
                         {isLoadingArchiveState && (
                             <Typography.Text type="secondary">
@@ -287,16 +285,6 @@ const ArchiveCardComponent: React.FC = () => {
                             </Space>
                         ))}
                     </Space>
-
-                    {archiveProgressGroupName && (
-                        <SignalRProgressComponent
-                            groupName={archiveProgressGroupName}
-                            isLoading={isPreparingArchive}
-                            onConnected={loadArchiveState}
-                            onNotification={onArchiveProgress}
-                            hideNotifications={true}
-                        />
-                    )}
                 </Space>
             </Card>
         </ShouldDisplay>

@@ -392,7 +392,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
     #region Archive
 
-    public async Task StartArchive(CancellationToken cancellationToken)
+    public void StartArchive()
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -404,28 +404,26 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             throw ApiExceptionDictionary.BadRequest("An archive is already running for this account.");
         }
-
-        await Task.CompletedTask;
     }
 
-    public async Task CancelArchive(CancellationToken cancellationToken)
+    public void CancelArchive()
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        await _archiveJobCoordinator.CancelArchiveJob(RequestUser.AccountId);
+        _archiveJobCoordinator.CancelArchiveJob(RequestUser.AccountId);
     }
 
-    public Task<ArchiveStatusVm?> GetArchiveStatus(CancellationToken cancellationToken)
+    public ArchiveProgressVm? GetArchiveStatus()
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        return Task.FromResult(_archiveJobCoordinator.GetArchiveStatus(RequestUser.AccountId));
+        return _archiveJobCoordinator.GetArchiveStatus(RequestUser.AccountId);
     }
 
     public async Task<IEnumerable<ArchiveListItemVm>> GetRecentArchives(CancellationToken cancellationToken)

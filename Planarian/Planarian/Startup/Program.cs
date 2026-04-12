@@ -225,7 +225,11 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 #endregion
 
 builder.Services.AddScoped<RequestUser>();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 #endregion
 

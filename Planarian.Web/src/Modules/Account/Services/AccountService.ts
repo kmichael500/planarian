@@ -16,7 +16,7 @@ import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
-import { ArchiveStatusVm } from "../Models/Archive/ArchiveStatusVm";
+import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const baseUrl = "api/account";
@@ -49,8 +49,8 @@ const AccountService = {
     await HttpClient.post(`${baseUrl}/archive/cancel`, {});
   },
 
-  async GetArchiveStatus(): Promise<ArchiveStatusVm | null> {
-    const response = await HttpClient.get<ArchiveStatusVm | null>(
+  async GetArchiveStatus(): Promise<ArchiveProgressVm | null> {
+    const response = await HttpClient.get<ArchiveProgressVm | null>(
       `${baseUrl}/archive/status`
     );
     return response.data;

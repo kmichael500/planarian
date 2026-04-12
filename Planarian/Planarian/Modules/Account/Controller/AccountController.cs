@@ -49,25 +49,25 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpPost("archive")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> StartArchive(CancellationToken cancellationToken)
+    public IActionResult StartArchive()
     {
-        await Service.StartArchive(cancellationToken);
+        Service.StartArchive();
         return Ok();
     }
 
     [HttpPost("archive/cancel")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> CancelArchive(CancellationToken cancellationToken)
+    public IActionResult CancelArchive()
     {
-        await Service.CancelArchive(cancellationToken);
+        Service.CancelArchive();
         return Ok();
     }
 
     [HttpGet("archive/status")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<ArchiveStatusVm?>> GetArchiveStatus(CancellationToken cancellationToken)
+    public ActionResult<ArchiveProgressVm?> GetArchiveStatus()
     {
-        var result = await Service.GetArchiveStatus(cancellationToken);
+        var result = Service.GetArchiveStatus();
         return Ok(result);
     }
 

@@ -5,6 +5,7 @@ using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
+using Planarian.Shared.Models;
 
 namespace Planarian.Modules.Account.Archive.Services;
 
@@ -40,17 +41,15 @@ public class ArchiveJobCoordinator
         return true;
     }
 
-    public Task CancelArchiveJob(string accountId)
+    public void CancelArchiveJob(string accountId)
     {
         if (_jobs.TryGetValue(accountId, out var jobHandle))
         {
             jobHandle.CancellationTokenSource.Cancel();
         }
-
-        return Task.CompletedTask;
     }
 
-    public ArchiveStatusVm? GetArchiveStatus(string accountId)
+    public ArchiveProgressVm? GetArchiveStatus(string accountId)
     {
         if (!_jobs.TryGetValue(accountId, out var jobHandle))
         {
@@ -59,7 +58,7 @@ public class ArchiveJobCoordinator
 
         lock (jobHandle.SyncRoot)
         {
-            return jobHandle.ToStatusVm();
+            return jobHandle.ToProgressVm();
         }
     }
 
@@ -116,11 +115,12 @@ public class ArchiveJobCoordinator
 
                         processedCount = processed;
                         totalCount = total;
-                        await notificationService.SendNotificationToGroupAsync(groupName, new
+                        await notificationService.SendNotificationToGroupAsync(groupName, new ArchiveProgressVm
                         {
-                            statusMessage = $"Exported {processed} of {total} files...",
-                            processedCount = processed,
-                            totalCount = total
+                            State = ProgressState.Running,
+                            StatusMessage = $"Exported {processed} of {total} files...",
+                            ProcessedCount = processed,
+                            TotalCount = total
                         });
                     },
                     async message =>
@@ -132,11 +132,12 @@ public class ArchiveJobCoordinator
                             jobHandle.TotalCount = totalCount;
                         }
 
-                        await notificationService.SendNotificationToGroupAsync(groupName, new
+                        await notificationService.SendNotificationToGroupAsync(groupName, new ArchiveProgressVm
                         {
-                            statusMessage = message,
-                            processedCount,
-                            totalCount
+                            State = ProgressState.Running,
+                            StatusMessage = message,
+                            ProcessedCount = processedCount,
+                            TotalCount = totalCount
                         });
                     },
                     jobHandle.CancellationTokenSource.Token);
@@ -158,13 +159,13 @@ public class ArchiveJobCoordinator
                 finalArchiveBlobKey,
                 CancellationToken.None);
 
-            await notificationService.SendNotificationToGroupAsync(groupName, new
+            await notificationService.SendNotificationToGroupAsync(groupName, new ArchiveProgressVm
             {
-                statusMessage = "Archive ready.",
-                processedCount,
-                totalCount,
-                fileName,
-                isComplete = true
+                State = ProgressState.Completed,
+                StatusMessage = "Archive ready.",
+                ProcessedCount = processedCount,
+                TotalCount = totalCount,
+                FileName = fileName
             });
         }
         catch (OperationCanceledException)
@@ -173,11 +174,10 @@ public class ArchiveJobCoordinator
 
             using var scope = _scopeFactory.CreateScope();
             var notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
-            await notificationService.SendNotificationToGroupAsync(GetGroupName(jobHandle.AccountId), new
+            await notificationService.SendNotificationToGroupAsync(GetGroupName(jobHandle.AccountId), new ArchiveProgressVm
             {
-                statusMessage = "Archive canceled.",
-                isComplete = true,
-                isCanceled = true
+                State = ProgressState.Canceled,
+                StatusMessage = "Archive canceled."
             });
         }
         catch (Exception ex)
@@ -186,12 +186,10 @@ public class ArchiveJobCoordinator
 
             using var scope = _scopeFactory.CreateScope();
             var notificationService = scope.ServiceProvider.GetRequiredService<NotificationService>();
-            await notificationService.SendNotificationToGroupAsync(GetGroupName(jobHandle.AccountId), new
+            await notificationService.SendNotificationToGroupAsync(GetGroupName(jobHandle.AccountId), new ArchiveProgressVm
             {
-                statusMessage = "Archive failed.",
-                message = ex.Message,
-                isComplete = true,
-                isError = true
+                State = ProgressState.Failed,
+                StatusMessage = $"Archive failed. {ex.Message}"
             });
         }
         finally
@@ -316,21 +314,14 @@ public class ArchiveJobCoordinator
         public string StatusMessage { get; set; } = string.Empty;
         public int? ProcessedCount { get; set; }
         public int? TotalCount { get; set; }
-        public string? Message { get; set; }
-        public bool? IsError { get; set; }
-        public bool? IsCanceled { get; set; }
-
-        public ArchiveStatusVm ToStatusVm()
+        public ArchiveProgressVm ToProgressVm()
         {
-            return new ArchiveStatusVm
+            return new ArchiveProgressVm
             {
-                IsActive = true,
+                State = ProgressState.Running,
                 StatusMessage = StatusMessage,
                 ProcessedCount = ProcessedCount,
-                TotalCount = TotalCount,
-                Message = Message,
-                IsError = IsError,
-                IsCanceled = IsCanceled
+                TotalCount = TotalCount
             };
         }
     }
