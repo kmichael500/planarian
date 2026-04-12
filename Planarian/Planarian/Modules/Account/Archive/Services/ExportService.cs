@@ -11,7 +11,6 @@ using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
-using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Account.Archive.Services;
 
@@ -21,38 +20,35 @@ public class ExportService
 
     private readonly AccountRepository _accountRepository;
     private readonly FileService _fileService;
-    private readonly RequestUser _requestUser;
 
     public ExportService(
         AccountRepository accountRepository,
-        FileService fileService,
-        RequestUser requestUser)
+        FileService fileService)
     {
         _accountRepository = accountRepository;
         _fileService = fileService;
-        _requestUser = requestUser;
     }
 
     public async Task WriteArchive(
         Stream outputStream,
+        string accountId,
+        string accountContainerName,
         Func<int, int, Task>? reportFileProgress,
         Func<string, Task>? reportStatus,
         CancellationToken cancellationToken)
     {
-        await _requestUser.HasCavePermission(PermissionPolicyKey.Admin);
-
         await ReportStatus(reportStatus, "Gathering cave data...");
-        var caves = await _accountRepository.GetArchiveCaves(cancellationToken);
+        var caves = await _accountRepository.GetArchiveCaves(accountId, cancellationToken);
 
         await ReportStatus(reportStatus, "Gathering entrance data...");
-        var entrances = await _accountRepository.GetArchiveEntrances(cancellationToken);
+        var entrances = await _accountRepository.GetArchiveEntrances(accountId, cancellationToken);
 
         await ReportStatus(reportStatus, "Gathering file data...");
-        var files = await _accountRepository.GetArchiveFiles(cancellationToken);
+        var files = await _accountRepository.GetArchiveFiles(accountId, cancellationToken);
         var totalFiles = files.Count(file => !string.IsNullOrWhiteSpace(file.BlobKey));
 
         await ReportStatus(reportStatus, "Gathering map data...");
-        var geoJsons = await _accountRepository.GetArchiveGeoJsons(cancellationToken);
+        var geoJsons = await _accountRepository.GetArchiveGeoJsons(accountId, cancellationToken);
 
         await ReportStatus(reportStatus, "Creating archive...");
 
@@ -81,7 +77,7 @@ public class ExportService
         {
             try
             {
-                var candidateContainerClient = await _fileService.GetAccountBlobContainerClient();
+                var candidateContainerClient = await _fileService.GetBlobContainerClient(accountContainerName);
                 var containerExists = await candidateContainerClient.ExistsAsync(cancellationToken);
                 if (containerExists.Value)
                 {

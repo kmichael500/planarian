@@ -399,7 +399,7 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var started = _archiveJobCoordinator.StartArchiveJob(RequestUser.AccountId, RequestUser.Id);
+        var started = _archiveJobCoordinator.StartArchiveJob(RequestUser.AccountId, RequestUser.AccountContainerName);
         if (!started)
         {
             throw ApiExceptionDictionary.BadRequest("An archive is already running for this account.");
@@ -433,7 +433,7 @@ public class AccountService : ServiceBase<AccountRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var accountBlobContainerClient = await _fileService.GetAccountBlobContainerClient();
+        var accountBlobContainerClient = await _fileService.GetBlobContainerClient(RequestUser.AccountContainerName);
         var archiveBlobs = new List<(string BlobKey, DateTimeOffset CreatedAt)>();
         var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
 

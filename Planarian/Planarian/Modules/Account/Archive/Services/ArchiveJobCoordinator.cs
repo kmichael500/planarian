@@ -25,9 +25,9 @@ public class ArchiveJobCoordinator
 
     public static string GetGroupName(string accountId) => $"archive-{accountId}";
 
-    public bool StartArchiveJob(string accountId, string userId)
+    public bool StartArchiveJob(string accountId, string accountContainerName)
     {
-        var jobHandle = new ArchiveJobHandle(accountId, new CancellationTokenSource())
+        var jobHandle = new ArchiveJobHandle(accountId, accountContainerName, new CancellationTokenSource())
         {
             StatusMessage = "Preparing archive..."
         };
@@ -37,7 +37,7 @@ public class ArchiveJobCoordinator
             return false;
         }
 
-        _ = Task.Run(() => RunArchiveJob(userId, jobHandle), CancellationToken.None);
+        _ = Task.Run(() => RunArchiveJob(jobHandle), CancellationToken.None);
         return true;
     }
 
@@ -75,14 +75,11 @@ public class ArchiveJobCoordinator
         }
     }
 
-    private async Task RunArchiveJob(string userId, ArchiveJobHandle jobHandle)
+    private async Task RunArchiveJob(ArchiveJobHandle jobHandle)
     {
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var requestUser = scope.ServiceProvider.GetRequiredService<RequestUser>();
-            await requestUser.Initialize(jobHandle.AccountId, userId);
-
             var accountRepository = scope.ServiceProvider.GetRequiredService<AccountRepository>();
             var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
             var exportService = scope.ServiceProvider.GetRequiredService<ExportService>();
@@ -92,11 +89,13 @@ public class ArchiveJobCoordinator
             var fileName = await BuildArchiveFileName(accountRepository, jobHandle.AccountId);
             var finalArchiveBlobKey = $"{ArchivePrefix}{fileName}";
             jobHandle.ArchiveBlobKey = $"{TempArchivePrefix}{fileName}";
-            jobHandle.ContainerName = requestUser.AccountContainerName;
+            jobHandle.ContainerName = jobHandle.AccountContainerName;
 
             var processedCount = 0;
             var totalCount = 0;
-            var accountBlobContainerClient = await fileService.GetAccountBlobContainerClient(createIfNotExists: true);
+            var accountBlobContainerClient = await fileService.GetBlobContainerClient(
+                jobHandle.AccountContainerName,
+                createIfNotExists: true);
             await using (var outputStream = await fileService.OpenBlobWriteStream(
                              accountBlobContainerClient,
                              jobHandle.ArchiveBlobKey,
@@ -104,6 +103,8 @@ public class ArchiveJobCoordinator
             {
                 await exportService.WriteArchive(
                     outputStream,
+                    jobHandle.AccountId,
+                    jobHandle.AccountContainerName,
                     async (processed, total) =>
                     {
                         lock (jobHandle.SyncRoot)
@@ -155,7 +156,7 @@ public class ArchiveJobCoordinator
             await PruneOldArchives(
                 fileService,
                 accountBlobContainerClient,
-                requestUser.AccountContainerName,
+                jobHandle.AccountContainerName,
                 finalArchiveBlobKey,
                 CancellationToken.None);
 
@@ -263,8 +264,6 @@ public class ArchiveJobCoordinator
         }
 
         using var scope = _scopeFactory.CreateScope();
-        var requestUser = scope.ServiceProvider.GetRequiredService<RequestUser>();
-        requestUser.AccountId = ExtractAccountIdFromContainerName(jobHandle.ContainerName);
         var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
         await fileService.DeleteFile(jobHandle.ArchiveBlobKey, jobHandle.ContainerName);
     }
@@ -291,23 +290,18 @@ public class ArchiveJobCoordinator
         return string.IsNullOrWhiteSpace(normalizedValue) ? "Account" : normalizedValue;
     }
 
-    private static string ExtractAccountIdFromContainerName(string containerName)
-    {
-        return containerName.StartsWith("account-", StringComparison.OrdinalIgnoreCase)
-            ? containerName["account-".Length..]
-            : containerName;
-    }
-
     private sealed class ArchiveJobHandle
     {
-        public ArchiveJobHandle(string accountId, CancellationTokenSource cancellationTokenSource)
+        public ArchiveJobHandle(string accountId, string accountContainerName, CancellationTokenSource cancellationTokenSource)
         {
             AccountId = accountId;
+            AccountContainerName = accountContainerName;
             CancellationTokenSource = cancellationTokenSource;
         }
 
         public object SyncRoot { get; } = new();
         public string AccountId { get; }
+        public string AccountContainerName { get; }
         public CancellationTokenSource CancellationTokenSource { get; }
         public string? ArchiveBlobKey { get; set; }
         public string? ContainerName { get; set; }
