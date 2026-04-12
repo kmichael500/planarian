@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { HubConnectionBuilder, HubConnectionState } from "@microsoft/signalr";
-import { AppOptions } from "../../Services/AppService";
-import { AuthenticationService } from "../../../Modules/Authentication/Services/AuthenticationService";
+import { useEffect, useState } from "react";
 import { Alert, Space, Spin } from "antd";
+import { useSignalRGroup } from "./useSignalRGroup";
 
 const getNotificationMessage = (notification: unknown) => {
   if (typeof notification === "string") {
@@ -32,103 +30,34 @@ function SignalRProgressComponent({
   onNotification,
   hideNotifications,
 }: {
-  groupName: string;
+  groupName: string | null;
   isLoading: boolean;
   onConnected?: () => void | Promise<void>;
   onNotification?: (notification: unknown) => void;
   hideNotifications?: boolean;
 }) {
-  const [connection, setConnection] = useState<signalR.HubConnection | null>(
-    null
-  );
   const [notifications, setNotifications] = useState<string[]>([]);
-  const hasJoinedGroupRef = useRef<string | null>(null);
-  const onConnectedRef = useRef<typeof onConnected>(onConnected);
-
-  useEffect(() => {
-    onConnectedRef.current = onConnected;
-  }, [onConnected]);
 
   useEffect(() => {
     setNotifications([]);
   }, [groupName]);
 
-  useEffect(() => {
-    const newConnection = new HubConnectionBuilder()
-      .withUrl(AppOptions.signalrBaseUrl, {
-        accessTokenFactory: () => {
-          if (AuthenticationService.IsAuthenticated()) {
-            var token = AuthenticationService.GetToken();
-            if (token) {
-              return token;
-            }
-          }
-          throw new Error("No access token found");
-        },
-      })
-      .withAutomaticReconnect()
-      .build();
-
-    setConnection(newConnection);
-  }, []);
-
-  useEffect(() => {
-    if (connection) {
-      let isDisposed = false;
-
-      const receiveNotificationHandler = (notification: unknown) => {
-        onNotification?.(notification);
-        const message = getNotificationMessage(notification);
-        setNotifications((prev) => {
-          const newArray = [...prev, message];
-          if (newArray.length > 3) newArray.shift();
-          return newArray;
-        });
-      };
-
-      connection.on("ReceiveNotification", receiveNotificationHandler);
-      connection
-        .start()
-        .then(async () => {
-          if (isDisposed) {
-            return;
-          }
-
-          console.log("Connection started!");
-          if (groupName) {
-            await connection.invoke("JoinGroup", groupName);
-            hasJoinedGroupRef.current = groupName;
-          }
-
-          await onConnectedRef.current?.();
-        })
-        .catch(async (e) => {
-          console.error("Connection failed: ", e);
-          await onConnectedRef.current?.();
-        });
-
-      return () => {
-        isDisposed = true;
-
-        if (
-          groupName &&
-          hasJoinedGroupRef.current === groupName &&
-          connection.state === HubConnectionState.Connected
-        ) {
-          connection
-            .invoke("LeaveGroup", groupName)
-            .catch((e) => console.error("Error leaving group: ", e));
-          hasJoinedGroupRef.current = null;
+  useSignalRGroup({
+    groupName,
+    onConnected,
+    onNotification: (notification) => {
+      onNotification?.(notification);
+      const message = getNotificationMessage(notification);
+      setNotifications((prev) => {
+        const newArray = [...prev, message];
+        if (newArray.length > 3) {
+          newArray.shift();
         }
 
-        connection.off("ReceiveNotification", receiveNotificationHandler);
-        connection
-          .stop()
-          .then(() => console.log("Connection stopped!"))
-          .catch((e) => console.error("Error stopping the connection: ", e));
-      };
-    }
-  }, [connection, groupName]);
+        return newArray;
+      });
+    },
+  });
 
   if (hideNotifications) {
     return null;

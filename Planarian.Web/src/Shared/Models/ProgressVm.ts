@@ -1,5 +1,8 @@
+import { ProgressState } from "./ProgressState";
+
 export interface ProgressVm {
   statusMessage: string;
-  processedCaves?: number;
-  totalCaves?: number;
+  processedCount?: number;
+  totalCount?: number;
+  state?: ProgressState;
 }

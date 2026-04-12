@@ -16,8 +16,8 @@ const DeleteButtonComponent: React.FC<DeleteButtonComponentType> = (props) => {
     <Popconfirm {...props}>
       <PlanarianButton
         {...props}
-        danger
-        type="primary"
+        danger={props.danger ?? true}
+        type={props.type ?? "primary"}
         icon={<DeleteOutlined />}
       >
         {props.children || "Delete"}

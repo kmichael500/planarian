@@ -781,13 +781,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     #region Archive
 
-    public async Task<List<ArchiveCaveCsvModel>> GetArchiveCaves(CancellationToken cancellationToken)
+    public async Task<List<ArchiveCaveCsvModel>> GetArchiveCaves(string accountId, CancellationToken cancellationToken)
     {
         return await DbContext.Caves
             .AsNoTracking()
             // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
-            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Where(e => e.AccountId == accountId)
             .OrderBy(e => e.State.Name)
             .ThenBy(e => e.County.DisplayId)
             .ThenBy(e => e.CountyNumber)
@@ -840,13 +840,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ToListAsyncEF(cancellationToken);
     }
 
-    public async Task<List<ArchiveEntranceByCaveCsvModel>> GetArchiveEntrances(CancellationToken cancellationToken)
+    public async Task<List<ArchiveEntranceByCaveCsvModel>> GetArchiveEntrances(string accountId, CancellationToken cancellationToken)
     {
         return await DbContext.Entrances
             .AsNoTracking()
             // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
-            .Where(e => e.Cave.AccountId == RequestUser.AccountId)
+            .Where(e => e.Cave.AccountId == accountId)
             .OrderBy(e => e.Cave.State.Name)
             .ThenBy(e => e.Cave.County.DisplayId)
             .ThenBy(e => e.Cave.CountyNumber)
@@ -885,13 +885,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ToListAsyncEF(cancellationToken);
     }
 
-    public async Task<List<ArchiveFileByCaveModel>> GetArchiveFiles(CancellationToken cancellationToken)
+    public async Task<List<ArchiveFileByCaveModel>> GetArchiveFiles(string accountId, CancellationToken cancellationToken)
     {
         return await DbContext.Files
             .AsNoTracking()
             // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
-            .Where(file => file.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(file.CaveId))
+            .Where(file => file.AccountId == accountId && !string.IsNullOrWhiteSpace(file.CaveId))
             .OrderBy(file => file.Cave.State.Name)
             .ThenBy(file => file.Cave.County.DisplayId)
             .ThenBy(file => file.Cave.CountyNumber)
@@ -908,13 +908,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ToListAsyncEF(cancellationToken);
     }
 
-    public async Task<List<ArchiveGeoJsonByCaveModel>> GetArchiveGeoJsons(CancellationToken cancellationToken)
+    public async Task<List<ArchiveGeoJsonByCaveModel>> GetArchiveGeoJsons(string accountId, CancellationToken cancellationToken)
     {
         return await DbContext.CaveGeoJsons
             .AsNoTracking()
             // Archive exports are full account exports and must not depend on cave visibility filters.
             .IgnoreQueryFilters()
-            .Where(geoJson => geoJson.Cave.AccountId == RequestUser.AccountId)
+            .Where(geoJson => geoJson.Cave.AccountId == accountId)
             .OrderBy(geoJson => geoJson.Cave.State.Name)
             .ThenBy(geoJson => geoJson.Cave.County.DisplayId)
             .ThenBy(geoJson => geoJson.Cave.CountyNumber)

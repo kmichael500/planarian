@@ -47,13 +47,44 @@ public class AccountController : PlanarianControllerBase<AccountService>
 
     #region Archive
 
-    [HttpGet("archive")]
+    [HttpPost("archive")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> DownloadArchive(string? uuid, CancellationToken cancellationToken)
+    public IActionResult StartArchive()
     {
-        var fileName = await Service.GetArchiveFileName(cancellationToken);
-        var archiveStream = await Service.BuildArchive(uuid, cancellationToken);
-        return File(archiveStream, "application/zip", fileName);
+        Service.StartArchive();
+        return Ok();
+    }
+
+    [HttpPost("archive/cancel")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public IActionResult CancelArchive()
+    {
+        Service.CancelArchive();
+        return Ok();
+    }
+
+    [HttpGet("archive/status")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public ActionResult<ArchiveProgressVm?> GetArchiveStatus()
+    {
+        var result = Service.GetArchiveStatus();
+        return Ok(result);
+    }
+
+    [HttpGet("archive/list")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<IEnumerable<ArchiveListItemVm>>> GetRecentArchives(CancellationToken cancellationToken)
+    {
+        var result = await Service.GetRecentArchives(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("archive")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> DeleteArchive(string blobKey, CancellationToken cancellationToken)
+    {
+        await Service.DeleteArchive(blobKey, cancellationToken);
+        return Ok();
     }
 
     #endregion

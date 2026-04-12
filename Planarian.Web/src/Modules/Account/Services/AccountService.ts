@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { AxiosProgressEvent, AxiosRequestConfig, AxiosResponse } from "axios";
+import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
 import { HttpClient } from "../../..";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
@@ -15,6 +15,8 @@ import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
+import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
+import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 
 const baseUrl = "api/account";
@@ -39,14 +41,30 @@ const AccountService = {
     return response.data;
   },
 
-  async DownloadArchive(uuid?: string): Promise<AxiosResponse<Blob>> {
-    const requestUrl = !isNullOrWhiteSpace(uuid)
-      ? `${baseUrl}/archive?uuid=${encodeURIComponent(uuid)}`
-      : `${baseUrl}/archive`;
+  async CreateArchive(): Promise<void> {
+    await HttpClient.post(`${baseUrl}/archive`, {});
+  },
 
-    return await HttpClient.get<Blob>(requestUrl, {
-      responseType: "blob",
-    });
+  async CancelArchive(): Promise<void> {
+    await HttpClient.post(`${baseUrl}/archive/cancel`, {});
+  },
+
+  async GetArchiveStatus(): Promise<ArchiveProgressVm | null> {
+    const response = await HttpClient.get<ArchiveProgressVm | null>(
+      `${baseUrl}/archive/status`
+    );
+    return response.data;
+  },
+
+  async GetRecentArchives(): Promise<ArchiveListItemVm[]> {
+    const response = await HttpClient.get<ArchiveListItemVm[]>(
+      `${baseUrl}/archive/list`
+    );
+    return response.data;
+  },
+
+  async DeleteArchive(blobKey: string): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/archive?blobKey=${encodeURIComponent(blobKey)}`);
   },
 
   //#region Import

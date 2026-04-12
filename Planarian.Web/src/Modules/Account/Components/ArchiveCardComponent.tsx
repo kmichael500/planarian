@@ -1,147 +1,219 @@
-import { DownloadOutlined } from "@ant-design/icons";
-import { Alert, Card, Progress, Space, Typography, message } from "antd";
-import { useCallback, useState } from "react";
+import { CloseOutlined, DownloadOutlined } from "@ant-design/icons";
+import { Alert, Card, Progress, Space, Spin, Typography, message } from "antd";
+import { useCallback, useEffect, useState } from "react";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
-import { ProgressVm } from "../../../Shared/Models/ProgressVm";
+import { useSignalRGroup } from "../../../Shared/Components/SignalRProgress/useSignalRGroup";
+import { ProgressState } from "../../../Shared/Models/ProgressState";
 import { AccountService } from "../Services/AccountService";
+import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
+import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 
-const initialArchiveProgress: ProgressVm = {
+const initialArchiveProgress: ArchiveProgressVm = {
     statusMessage: "Preparing archive...",
-    processedCaves: 0,
-    totalCaves: 0,
-};
-
-const getFileNameFromContentDisposition = (contentDisposition?: string) => {
-    if (!contentDisposition) {
-        return "account-archive.zip";
-    }
-
-    const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8Match?.[1]) {
-        return decodeURIComponent(utf8Match[1]);
-    }
-
-    const fileNameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
-    return fileNameMatch?.[1] || "account-archive.zip";
-};
-
-const downloadBlob = (blob: Blob, fileName: string) => {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    processedCount: 0,
+    totalCount: 0,
 };
 
 const ArchiveCardComponent: React.FC = () => {
-    const [isPreparingArchive, setIsPreparingArchive] = useState<boolean>(false);
-    const [archiveDownloadSucceeded, setArchiveDownloadSucceeded] = useState<boolean>(false);
-    const [archiveFileName, setArchiveFileName] = useState<string | null>(null);
-    const [archiveProgress, setArchiveProgress] = useState<ProgressVm>(initialArchiveProgress);
-    const [archiveProgressGroupName, setArchiveProgressGroupName] = useState<string | null>(null);
-    const [hasStartedArchiveRequest, setHasStartedArchiveRequest] = useState<boolean>(false);
+    const accountId = AuthenticationService.GetAccountId();
+    const archiveProgressGroupName = accountId ? `archive-${accountId}` : null;
+
+    const [isArchiveRunning, setIsArchiveRunning] = useState<boolean>(false);
+    const [isCancelingArchive, setIsCancelingArchive] = useState<boolean>(false);
+    const [deletingArchiveBlobKey, setDeletingArchiveBlobKey] = useState<string | null>(null);
+    const [isLoadingArchiveState, setIsLoadingArchiveState] = useState<boolean>(true);
+    const [archiveProgress, setArchiveProgress] = useState<ArchiveProgressVm>(initialArchiveProgress);
+    const [recentArchives, setRecentArchives] = useState<ArchiveListItemVm[]>([]);
+    const [completedArchiveFileName, setCompletedArchiveFileName] = useState<string | null>(null);
+
+    const loadArchiveState = useCallback(async (showLoadingState: boolean = false) => {
+        if (showLoadingState) {
+            setIsLoadingArchiveState(true);
+        }
+
+        try {
+            const [archiveStatus, archives] = await Promise.all([
+                AccountService.GetArchiveStatus(),
+                AccountService.GetRecentArchives(),
+            ]);
+
+            setRecentArchives(archives);
+
+            if (archiveStatus) {
+                setArchiveProgress(archiveStatus);
+                setIsArchiveRunning(archiveStatus.state === ProgressState.Running);
+                return;
+            }
+
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+        } catch (err) {
+            const error = err as ApiErrorResponse;
+            message.error(error.message);
+        } finally {
+            if (showLoadingState) {
+                setIsLoadingArchiveState(false);
+            }
+        }
+    }, []);
 
     const onArchiveProgress = useCallback((notification: unknown) => {
         if (!notification || typeof notification !== "object") {
             return;
         }
 
-        const nextProgress = notification as ProgressVm;
+        const nextProgress = notification as ArchiveProgressVm;
         setArchiveProgress((currentProgress) => ({
             statusMessage: nextProgress.statusMessage || currentProgress.statusMessage,
-            processedCaves: nextProgress.processedCaves ?? currentProgress.processedCaves,
-            totalCaves: nextProgress.totalCaves ?? currentProgress.totalCaves,
+            processedCount: nextProgress.processedCount ?? currentProgress.processedCount,
+            totalCount: nextProgress.totalCount ?? currentProgress.totalCount,
+            state: nextProgress.state ?? currentProgress.state,
         }));
-    }, []);
+
+        if (nextProgress.state === ProgressState.Completed) {
+            setCompletedArchiveFileName(nextProgress.fileName ?? "Archive Ready");
+            message.success(nextProgress.fileName
+                ? `${nextProgress.fileName} is ready to download below.`
+                : "Archive is ready to download below.");
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+            void loadArchiveState();
+            return;
+        }
+
+        if (nextProgress.state === ProgressState.Failed) {
+            message.error(nextProgress.statusMessage);
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+            void loadArchiveState();
+            return;
+        }
+
+        if (nextProgress.state === ProgressState.Canceled) {
+            message.info(nextProgress.statusMessage || "Archive canceled.");
+            setIsArchiveRunning(false);
+            setArchiveProgress(initialArchiveProgress);
+            void loadArchiveState();
+            return;
+        }
+
+        setIsArchiveRunning(true);
+    }, [loadArchiveState]);
+
+    useSignalRGroup({
+        groupName: archiveProgressGroupName,
+        onConnected: loadArchiveState,
+        onNotification: onArchiveProgress,
+    });
 
     const startArchiveDownload = useCallback(async () => {
-        if (isPreparingArchive) {
+        if (isArchiveRunning || isCancelingArchive) {
             return;
         }
 
-        const uuid = crypto.randomUUID();
-        setIsPreparingArchive(true);
-        setArchiveDownloadSucceeded(false);
-        setArchiveFileName(null);
-        setArchiveProgress(initialArchiveProgress);
-        setArchiveProgressGroupName(uuid);
-        setHasStartedArchiveRequest(false);
-    }, [isPreparingArchive]);
-
-    const onConnected = useCallback(async () => {
-        if (!archiveProgressGroupName || hasStartedArchiveRequest) {
-            return;
-        }
-
-        setHasStartedArchiveRequest(true);
         try {
-            const response = await AccountService.DownloadArchive(archiveProgressGroupName);
-            const fileName = getFileNameFromContentDisposition(
-                response.headers["content-disposition"]
-            );
+            setIsArchiveRunning(true);
+            setArchiveProgress(initialArchiveProgress);
+            await AccountService.CreateArchive();
+            await loadArchiveState();
+        } catch (err) {
+            const error = err as ApiErrorResponse;
+            message.error(error.message);
+            setIsArchiveRunning(false);
+            await loadArchiveState();
+        }
+    }, [isArchiveRunning, isCancelingArchive, loadArchiveState]);
 
-            setArchiveFileName(fileName);
-            setArchiveDownloadSucceeded(true);
-            downloadBlob(response.data, fileName);
+    const cancelArchive = useCallback(async () => {
+        if (!isArchiveRunning || isCancelingArchive) {
+            return;
+        }
+
+        try {
+            setIsCancelingArchive(true);
+            await AccountService.CancelArchive();
         } catch (err) {
             const error = err as ApiErrorResponse;
             message.error(error.message);
         } finally {
-            setIsPreparingArchive(false);
-            setHasStartedArchiveRequest(false);
-            setArchiveProgressGroupName(null);
+            setIsCancelingArchive(false);
         }
-    }, [archiveProgressGroupName, hasStartedArchiveRequest]);
+    }, [isArchiveRunning, isCancelingArchive]);
 
-    const archiveProgressPercent = (archiveProgress.totalCaves ?? 0) > 0
-        ? Math.min(
-            100,
-            Math.round(
-                ((archiveProgress.processedCaves ?? 0) /
-                    (archiveProgress.totalCaves ?? 0)) *
-                100
-            )
-        )
+    const deleteArchive = useCallback(async (archive: ArchiveListItemVm) => {
+        if (deletingArchiveBlobKey) {
+            return;
+        }
+
+        try {
+            setDeletingArchiveBlobKey(archive.blobKey);
+            await AccountService.DeleteArchive(archive.blobKey);
+            setRecentArchives((currentArchives) =>
+                currentArchives.filter((currentArchive) => currentArchive.blobKey !== archive.blobKey)
+            );
+            message.success(`${archive.fileName} deleted.`);
+        } catch (err) {
+            const error = err as ApiErrorResponse;
+            message.error(error.message);
+        } finally {
+            setDeletingArchiveBlobKey(null);
+        }
+    }, [deletingArchiveBlobKey]);
+
+    useEffect(() => {
+        if (!archiveProgressGroupName) {
+            return;
+        }
+
+        void loadArchiveState(true);
+    }, [archiveProgressGroupName, loadArchiveState]);
+
+    const archiveProgressTotal = archiveProgress.totalCount ?? 0;
+    const archiveProgressProcessed = archiveProgress.processedCount ?? 0;
+    const archiveProgressPercent = archiveProgressTotal > 0
+        ? Math.min(100, Math.round((archiveProgressProcessed / archiveProgressTotal) * 100))
         : 0;
 
     return (
         <ShouldDisplay permissionKey={PermissionKey.Admin}>
-            <Card title="Archive">
+            <Card
+                title="Archive"
+                extra={isArchiveRunning ? (
+                    <PlanarianButton icon={<CloseOutlined />} onClick={cancelArchive} loading={isCancelingArchive}>
+                        Cancel Export
+                    </PlanarianButton>
+                ) : !completedArchiveFileName && !isLoadingArchiveState ? (
+                    <PlanarianButton
+                        icon={<DownloadOutlined />}
+                        onClick={startArchiveDownload}
+                    >
+                        Create Archive
+                    </PlanarianButton>
+                ) : null}
+            >
                 <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                    {/* Intentional: after a successful archive completes, keep the success state visible
+                        and hide the create action until the page is reloaded. */}
                     <Typography.Paragraph>
-                        Create and download a ZIP archive of your account data,
+                        Create and download an archive of your account data,
                         including caves, entrances, files, and line plots.
                     </Typography.Paragraph>
 
-                    {archiveDownloadSucceeded && !isPreparingArchive && (
+                    {completedArchiveFileName && !isArchiveRunning && (
                         <Alert
-                            message="Archive download started successfully"
-                            description={archiveFileName
-                                ? `${archiveFileName} should begin downloading in your browser shortly.`
-                                : "Your browser download should begin shortly."}
+                            message="Archive Ready"
+                            description={`${completedArchiveFileName} is available in the recent archives list below.`}
                             type="success"
                             showIcon
                         />
                     )}
 
-                    {!archiveProgressGroupName && (
-                        <PlanarianButton
-                            icon={<DownloadOutlined />}
-                            onClick={startArchiveDownload}
-                            loading={isPreparingArchive}
-                        >
-                            Create Archive
-                        </PlanarianButton>
-                    )}
-
-                    {archiveProgressGroupName && (
+                    {isArchiveRunning && (
                         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
                             <Space direction="vertical" size="small" style={{ width: "100%" }}>
                                 <Typography.Text strong>
@@ -149,22 +221,72 @@ const ArchiveCardComponent: React.FC = () => {
                                 </Typography.Text>
                                 <Progress
                                     percent={archiveProgressPercent}
-                                    status={isPreparingArchive ? "active" : "normal"}
+                                    status={isArchiveRunning ? "active" : "normal"}
                                     showInfo={false}
                                 />
                                 <Typography.Text type="secondary">
                                     {archiveProgress.statusMessage}
                                 </Typography.Text>
                             </Space>
-                            <SignalRProgressComponent
-                                groupName={archiveProgressGroupName}
-                                isLoading={isPreparingArchive}
-                                onConnected={onConnected}
-                                onNotification={onArchiveProgress}
-                                hideNotifications={true}
-                            />
                         </Space>
                     )}
+
+                    {isLoadingArchiveState && !isArchiveRunning && (
+                        <Space direction="vertical" size="small" style={{ width: "100%" }}>
+                            <Typography.Text strong>
+                                Loading Archive Status
+                            </Typography.Text>
+                            <Spin />
+                        </Space>
+                    )}
+
+                    <Space direction="vertical" size="small" style={{ width: "100%" }}>
+                        <Typography.Text strong>
+                            Recent Archives
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                            Only the 5 most recent archives are kept. Older archives are automatically deleted after a new archive is created.
+                        </Typography.Text>
+                        {isLoadingArchiveState && (
+                            <Typography.Text type="secondary">
+                                Loading recent archives...
+                            </Typography.Text>
+                        )}
+                        {!isLoadingArchiveState && recentArchives.length === 0 && (
+                            <Typography.Text type="secondary">
+                                No archives available yet.
+                            </Typography.Text>
+                        )}
+                        {recentArchives.map((archive) => (
+                            <Space
+                                key={archive.blobKey}
+                                style={{ width: "100%", justifyContent: "space-between" }}
+                            >
+                                <Space direction="vertical" size={0}>
+                                    <Typography.Text>{archive.fileName}</Typography.Text>
+                                    <Typography.Text type="secondary">
+                                        {new Date(archive.createdAt).toLocaleString()}
+                                    </Typography.Text>
+                                </Space>
+                                <Space>
+                                    <DeleteButtonComponent
+                                        type="link"
+                                        danger={false}
+                                        title="Delete archive"
+                                        description={`Delete ${archive.fileName}?`}
+                                        onConfirm={() => deleteArchive(archive)}
+                                        loading={deletingArchiveBlobKey === archive.blobKey}
+                                    >
+                                        Delete
+                                    </DeleteButtonComponent>
+                                    <Typography.Link href={archive.downloadUrl}>
+                                        <DownloadOutlined />{" "}
+                                        Download
+                                    </Typography.Link>
+                                </Space>
+                            </Space>
+                        ))}
+                    </Space>
                 </Space>
             </Card>
         </ShouldDisplay>

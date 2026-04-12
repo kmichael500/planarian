@@ -173,25 +173,15 @@ public class FileService : ServiceBase<FileRepository>
         await blobClient.UploadAsync(stream, true, cancellationToken);
     }
 
-    private async Task<BlobContainerClient> GetBlobContainerClient(string containerName, bool createIfNotExists = true)
+    public async Task<BlobContainerClient> GetBlobContainerClient(string containerName, bool createIfNotExists = true)
     {
-        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");
-
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
         if (createIfNotExists)
         {
             await containerClient.CreateIfNotExistsAsync();
         }
-
+        
         return containerClient;
-    }
-
-    public async Task<BlobContainerClient> GetAccountBlobContainerClient()
-    {
-        if (RequestUser.AccountId == null)
-            throw ApiExceptionDictionary.BadRequest("Account Id is null");
-
-        return await GetBlobContainerClient(RequestUser.AccountContainerName, createIfNotExists: false);
     }
 
     public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,
@@ -202,6 +192,16 @@ public class FileService : ServiceBase<FileRepository>
 
         var blobClient = containerClient.GetBlobClient(blobKey);
         return await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+    }
+
+    public async Task<Stream> OpenBlobWriteStream(BlobContainerClient containerClient, string blobKey,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var blobClient = containerClient.GetBlobClient(blobKey);
+        return await blobClient.OpenWriteAsync(overwrite: true, cancellationToken: cancellationToken);
     }
 
     #endregion
@@ -296,9 +296,6 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task DeleteContainer(string containerName)
     {
-        if (RequestUser.AccountId == null)
-            throw ApiExceptionDictionary.BadRequest("Account Id is null");
-
         // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
             _fileOptions.ConnectionString,

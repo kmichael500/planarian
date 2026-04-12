@@ -172,6 +172,7 @@ builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<ExportService>();
+builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
@@ -224,7 +225,11 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 #endregion
 
 builder.Services.AddScoped<RequestUser>();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 #endregion
 
