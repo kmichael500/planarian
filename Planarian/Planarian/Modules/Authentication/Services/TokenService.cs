@@ -37,24 +37,6 @@ public class TokenService
             _authOptions.JwtExpiryDurationSeconds);
     }
 
-    public bool IsTokenValid(string token)
-    {
-        try
-        {
-            ValidateToken(token);
-        }
-        catch (SecurityTokenException)
-        {
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     public string? GetUserId(ClaimsPrincipal principal)
     {
         return principal.FindFirst(UserIdClaimType)?.Value;
