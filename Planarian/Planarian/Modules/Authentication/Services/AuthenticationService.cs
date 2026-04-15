@@ -70,14 +70,6 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         return token;
     }
 
-    public bool ValidateToken(string token)
-    {
-        var isValid = _tokenService.IsTokenValid(token);
-
-        return isValid;
-    }
-
-
     public async Task Logout(HttpContext httpContext)
     {
     }

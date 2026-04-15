@@ -15,21 +15,18 @@ public class RequestThrottleService
 
     private readonly MemoryCache _cache;
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly RateLimitOptions _rateLimitOptions;
     private readonly RequestThrottleOptions _options;
     private readonly RequestUser _requestUser;
     private readonly ThrottleEventLogService _throttleEventLogService;
 
     public RequestThrottleService(
         MemoryCache cache,
-        RateLimitOptions rateLimitOptions,
         RequestThrottleOptions options,
         IHttpContextAccessor httpContextAccessor,
         RequestUser requestUser,
         ThrottleEventLogService throttleEventLogService)
     {
         _cache = cache;
-        _rateLimitOptions = rateLimitOptions;
         _options = options;
         _httpContextAccessor = httpContextAccessor;
         _requestUser = requestUser;
@@ -74,7 +71,7 @@ public class RequestThrottleService
             ThrottleProfile.EndpointRateLimit,
             RequestThrottleKeyType.EndpointRateLimit,
             null,
-            GetEndpointRequestsPerMinute(endpoint) ?? _rateLimitOptions.DefaultRequestsPerMinute,
+            GetEndpointRequestsPerMinute(endpoint) ?? _options.DefaultRequestsPerMinute,
             TimeSpan.FromMinutes(1),
             retryAfterSeconds ?? 60,
             httpContext,
@@ -86,7 +83,7 @@ public class RequestThrottleService
         var throttleAttribute = endpoint?.Metadata.GetMetadata<ThrottleAttribute>();
         if (throttleAttribute == null)
         {
-            return _rateLimitOptions.DefaultRequestsPerMinute;
+            return _options.DefaultRequestsPerMinute;
         }
 
         return throttleAttribute.RequestsPerMinute > 0

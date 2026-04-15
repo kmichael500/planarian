@@ -13,6 +13,7 @@ public class TokenService
 {
     public static readonly string UserIdClaimType = nameof(UserToken.Id).ToCamelCase();
     private readonly AuthOptions _authOptions;
+    private readonly JwtSecurityTokenHandler _tokenHandler = new();
 
     public TokenService(AuthOptions authOptions)
     {
@@ -40,9 +41,13 @@ public class TokenService
     {
         try
         {
-            ValidateToken(token, _authOptions.JwtSecret);
+            ValidateToken(token);
         }
-        catch
+        catch (SecurityTokenException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
         {
             return false;
         }
@@ -50,19 +55,31 @@ public class TokenService
         return true;
     }
 
-    public string GetUserIdFromToken(string token)
-    {
-        if (!IsTokenValid(token))
-            throw new SecurityTokenException("Invalid token");
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var jwtToken = tokenHandler.ReadJwtToken(token);
-        return jwtToken.Claims.First(claim => claim.Type == UserIdClaimType).Value;
-    }
-
     public string? GetUserId(ClaimsPrincipal principal)
     {
         return principal.FindFirst(UserIdClaimType)?.Value;
+    }
+
+    public TokenValidationParameters GetTokenValidationParameters()
+    {
+        var secret = _authOptions.JwtSecret;
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw ApiExceptionDictionary.InternalServerError(
+                "JWT signing secret is not configured.");
+        }
+
+        return new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidIssuer = _authOptions.JwtIssuer,
+            ValidAudience = _authOptions.JwtIssuer,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
+            ClockSkew = TimeSpan.Zero
+        };
     }
 
     private string BuildToken(string secret, IEnumerable<Claim> claims, double expiryDurationSeconds)
@@ -84,28 +101,9 @@ public class TokenService
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
     }
 
-    private JwtSecurityToken ValidateToken(string token, string secret)
+    private JwtSecurityToken ValidateToken(string token)
     {
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            throw ApiExceptionDictionary.InternalServerError(
-                "JWT signing secret is not configured.");
-        }
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        tokenHandler.ValidateToken(token,
-            new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidIssuer = _authOptions.JwtIssuer,
-                ValidAudience = _authOptions.JwtIssuer,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
-                ClockSkew = TimeSpan.Zero
-            }, out _);
-
-        return tokenHandler.ReadJwtToken(token);
+        _tokenHandler.ValidateToken(token, GetTokenValidationParameters(), out _);
+        return _tokenHandler.ReadJwtToken(token);
     }
 }

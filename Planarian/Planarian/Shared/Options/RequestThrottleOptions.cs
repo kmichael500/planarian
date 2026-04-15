@@ -8,6 +8,11 @@ public class RequestThrottleOptions
     public const string Key = "RequestThrottle";
 
     /// <summary>
+    /// Default endpoint requests per minute limit applied to endpoints that do not declare <c>[Throttle]</c>.
+    /// </summary>
+    public int DefaultRequestsPerMinute { get; set; } = 240;
+
+    /// <summary>
     /// Length of the throttling window, in minutes, for login attempts tracked by IP address and email address.
     /// </summary>
     public int LoginWindowMinutes { get; set; } = 15;

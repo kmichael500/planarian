@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
-using System.Text;
 using System.Text.Json.Serialization;
 using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -10,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
@@ -156,10 +154,6 @@ var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOpti
 if (fileOptions == null) throw new Exception("Email options not found");
 builder.Services.AddSingleton(fileOptions);
 
-var rateLimitOptions = builder.Configuration.GetSection(RateLimitOptions.Key).Get<RateLimitOptions>() ??
-                       new RateLimitOptions();
-builder.Services.AddSingleton(rateLimitOptions);
-
 var requestThrottleOptions =
     builder.Configuration.GetSection(RequestThrottleOptions.Key).Get<RequestThrottleOptions>() ??
     new RequestThrottleOptions();
@@ -174,7 +168,7 @@ builder.Services.AddSingleton(emailOptions);
 
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<TripService>();
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<ThrottleEventLogService>();
@@ -282,33 +276,6 @@ LinqToDBForEFTools.Initialize();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
-    var tokenValidationParameters = new TokenValidationParameters
-    {
-        // The signing key must match!
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(authOptions.JwtSecret)),
-        // Validate the JWT Issuer (iss) claim
-        ValidateIssuer = true,
-        ValidIssuer = authOptions.JwtIssuer,
-        // Validate the JWT Audience (aud) claim
-        ValidateAudience = true,
-        ValidAudience = authOptions.JwtIssuer,
-        // Validate the token expiry
-        ValidateLifetime = true,
-        // If you want to allow a certain amount of clock drift, set that here:
-        ClockSkew = TimeSpan.Zero
-    };
-
-    options.TokenValidationParameters = tokenValidationParameters;
-
-    // Required if using custom token handler
-    // options.SecurityTokenValidators.Clear();
-    //
-    // options.TokenValidationParameters = tokenValidationParameters;
-    // options.SecurityTokenValidators.Clear();
-    //
-    // options.SecurityTokenValidators.Add(new CustomJwtSecurityTokenHandler());
-
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -324,6 +291,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         }
     };
 });
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<TokenService>((options, tokenService) =>
+    {
+        options.TokenValidationParameters = tokenService.GetTokenValidationParameters();
+    });
 
 builder.Services.AddMvc().AddSessionStateTempDataProvider();
 builder.Services.AddSession();
