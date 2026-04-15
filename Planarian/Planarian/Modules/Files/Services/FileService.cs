@@ -251,12 +251,13 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task<FileAccessUrlVm> CreateAccessUrl(string fileId, bool isDownload, CancellationToken cancellationToken)
     {
+        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, fileId);
+
         var file = await Repository.GetFileAccessInfo(fileId);
         if (file == null || string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
             throw ApiExceptionDictionary.NotFound("File");
 
         await EnsureFileViewAccess(file.Id, file.CaveId, file.CountyId);
-        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, file.Id);
 
         var client = await GetBlobContainerClient(file.ContainerName);
         var blobClient = client.GetBlobClient(file.BlobKey);
