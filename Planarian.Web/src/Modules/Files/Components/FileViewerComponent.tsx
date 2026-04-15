@@ -283,7 +283,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 >
                   <iframe
                     key={fileEmbedUrl || undefined}
-                    src={fileEmbedUrl}
+                    src={`https://docs.google.com/gview?url=${encodeURIComponent(
+                      fileEmbedUrl
+                    )}&embedded=true`}
                     style={{
                       width: "100%",
                       height: "100%",
