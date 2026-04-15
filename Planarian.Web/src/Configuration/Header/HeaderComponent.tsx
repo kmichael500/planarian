@@ -1,51 +1,32 @@
 import { Col, Drawer, Grid, Row, Spin, Tag, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
-import {
-  StringHelpers,
-  isNullOrWhiteSpace,
-} from "../../Shared/Helpers/StringHelpers";
+import { StringHelpers, isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
 import { ProfileMenu } from "../Menu/ProfileMenuComponent";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
-import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { useSideBarMenuItems } from "../Menu/SidebarMenuItems";
 
 const { useBreakpoint } = Grid;
 
 const HeaderComponent = () => {
-  const { headerTitle, headerButtons } = useContext(AppContext);
-  const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
-
-  const isAuthenticated = AuthenticationService.IsAuthenticated();
-  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
+  const { currentAccountId, currentAccountName, headerTitle, headerButtons, isAuthenticated } =
+    useContext(AppContext);
+  const menuItems = useSideBarMenuItems();
+  const hasAccount = !isNullOrWhiteSpace(currentAccountId);
+  const hasHeaderButons = headerButtons.length > 0;
 
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
 
-  useEffect(() => {
-    if (headerButtons.length === 0) {
-      setHasHeaderButons(false);
-    } else {
-      setHasHeaderButons(true);
-    }
-  }, [headerButtons]);
-
-  const [navigationTitle, setNavigationTitle] = useState("");
-  useEffect(() => {
-    if (headerTitle[1]) {
-      setNavigationTitle(headerTitle[1]);
-    } else if (typeof headerTitle[0] === "string") {
-      setNavigationTitle(headerTitle[0]);
-    } else {
-      setNavigationTitle("Planarian");
-    }
-  }, [headerTitle]);
+  const navigationTitle =
+    headerTitle[1] ??
+    (typeof headerTitle[0] === "string" ? headerTitle[0] : "Planarian");
 
   const [visible, setVisible] = useState(false);
 
@@ -102,7 +83,7 @@ const HeaderComponent = () => {
                   onMenuItemClick={() => {
                     setVisible(false);
                   }}
-                  menuItems={[...SideBarMenuItems()]}
+                  menuItems={menuItems}
                 />
               </Drawer>
             </Col>
@@ -116,7 +97,7 @@ const HeaderComponent = () => {
               >
                 {typeof headerTitle[0] === "string" ? (
                   <Typography.Title level={4} style={{ margin: 0 }}>
-                    {headerTitle}
+                    {headerTitle[0]}
                   </Typography.Title>
                 ) : (
                   <Typography.Title level={4}>
@@ -128,7 +109,7 @@ const HeaderComponent = () => {
 
             {hasAccount && (
               <Col style={{ flexShrink: 0 }}>
-                <AccountNameTag />
+                <AccountNameTag accountName={currentAccountName} />
               </Col>
             )}
             {headerButtons.map((button, index) => (
@@ -142,10 +123,7 @@ const HeaderComponent = () => {
   );
 };
 
-const AccountNameTag = () => {
-  let accountName = "";
-  let accountNameAbbreviation = "";
-
+const AccountNameTag = ({ accountName }: { accountName: string | null }) => {
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
@@ -155,8 +133,11 @@ const AccountNameTag = () => {
     ([key, value]) => value && key !== "xs"
   );
 
-  accountName = AuthenticationService.GetAccountName();
-  accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
+  if (isNullOrWhiteSpace(accountName)) {
+    return null;
+  }
+
+  const accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
 
   return (
     <>

@@ -4,13 +4,14 @@ import { Link } from "react-router-dom";
 import { LogoIcon } from "./AppIcon";
 import "./SidebarComponent.scss";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
-import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
+import { useSideBarMenuItems } from "../Menu/SidebarMenuItems";
 
 const { Sider } = Layout;
 const { useBreakpoint } = Grid;
 
 const SideBarComponent: React.FC = () => {
   const [userCollapsed, setUserCollapsed] = useState(false);
+  const menuItems = useSideBarMenuItems();
   const screens = useBreakpoint();
   const isLargeScreen = !!screens.lg;
   const collapsed = isLargeScreen ? userCollapsed : true;
@@ -55,7 +56,7 @@ const SideBarComponent: React.FC = () => {
       >
         <Typography.Text>Planarian</Typography.Text>
       </Space>
-      <PlanarianMenuComponent menuItems={[...SideBarMenuItems()]} />
+      <PlanarianMenuComponent menuItems={menuItems} />
     </Sider>
   );
 };

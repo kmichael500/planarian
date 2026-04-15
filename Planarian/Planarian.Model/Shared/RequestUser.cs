@@ -24,7 +24,7 @@ public class RequestUser
     public string FullName => $"{FirstName} {LastName}";
     public bool IsAuthenticated { get; private set; }
 
-    public async Task Initialize(string? accountId, string? userId)
+    public async Task Initialize(string? accountId, string? userId, bool throwOnInvalidAccountId = true)
     {
         var user = await _dbContext.Users
             .AsNoTracking()
@@ -47,8 +47,10 @@ public class RequestUser
 
         var isValidAccountId = user.IsValidAccountId;
 
-        if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId))
+        if (!isValidAccountId && !string.IsNullOrWhiteSpace(accountId) && throwOnInvalidAccountId)
         {
+            // Intentionally return 401 here so the client clears stale account selection state
+            // and forces a fresh login/session bootstrap instead of continuing with a bad account.
             throw ApiExceptionDictionary.Unauthorized("the accountId doesn't exist or is invalid for this user");
         }
 
@@ -99,7 +101,7 @@ public class RequestUser
                 && (e.AccountId == AccountId || e.AccountId == null)
             )
             .Select(e => e.Permission!.Key).ToListAsync();
-    
+
         var hasUserPermission = permissionKey switch
         {
             PermissionKey.View => userPermissions.Contains(PermissionPolicyKey.View) ||
@@ -114,23 +116,23 @@ public class RequestUser
             PermissionKey.PlanarianAdmin => userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
             _ => false
         };
-    
+
         if (permissionKey == PermissionPolicyKey.AdminManager)
         {
             hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
                                 userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
-            
-         
+
+
             if (!hasUserPermission)
             {
                 hasUserPermission = await _dbContext.CavePermissions
                     .AnyAsync(e =>
-                        string.IsNullOrWhiteSpace(e.CaveId) 
+                        string.IsNullOrWhiteSpace(e.CaveId)
                         && string.IsNullOrWhiteSpace(e.CountyId)
                         && e.UserId == Id
                         && e.AccountId == AccountId
                         && e.Permission!.Key == permissionKey
-                    );            
+                    );
             }
         }
 
@@ -155,12 +157,12 @@ public class RequestUser
                 && e.UserId == Id
                 && permissionKey == e.Permission!.Key
             );
-                
+
         if (!hasCavePermission && @throw)
         {
-            throw ApiExceptionDictionary.Unauthorized("You don't have permission to perform this action");
+            throw ApiExceptionDictionary.Forbidden("You don't have permission to perform this action");
         }
-        
+
         return hasCavePermission;
     }
 
@@ -174,7 +176,7 @@ public class RequestUser
         {
             hasPermission = await _dbContext.CavePermissions
                 .AnyAsync(e =>
-                    string.IsNullOrWhiteSpace(e.CaveId) 
+                    string.IsNullOrWhiteSpace(e.CaveId)
                     && string.IsNullOrWhiteSpace(e.CountyId)
                     && e.UserId == Id
                     && e.AccountId == AccountId
@@ -195,14 +197,14 @@ public class RequestUser
                     && (e.CaveId == caveId || e.CountyId == countyId)
                 );
         }
-        
+
 
         if (!hasPermission && @throw)
         {
-            throw ApiExceptionDictionary.Unauthorized("You don't have permission to perform this action");
+            throw ApiExceptionDictionary.Forbidden("You don't have permission to perform this action");
         }
 
         return hasPermission;
     }
-    
+
 }

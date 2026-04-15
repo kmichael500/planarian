@@ -10,7 +10,6 @@ import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
@@ -177,8 +176,11 @@ const AccountService = {
   },
   //#endregion
 
-  async GetFeatureSettings(resetCache: boolean = false) {
-    const cacheKey = `${AuthenticationService.GetAccountId}-featureSettings`;
+  async GetFeatureSettings(
+    resetCache: boolean = false,
+    accountId?: string | null
+  ) {
+    const cacheKey = `${accountId ?? "anonymous"}-featureSettings`;
 
     const cachedData = CacheService.get<FeatureSettingVm[]>(cacheKey);
     if (!resetCache && cachedData) {
@@ -186,7 +188,12 @@ const AccountService = {
     }
 
     const response = await HttpClient.get<FeatureSettingVm[]>(
-      `${baseUrl}/feature-settings`
+      `${baseUrl}/feature-settings`,
+      {
+        headers: !isNullOrWhiteSpace(accountId)
+          ? { "x-account": accountId }
+          : undefined,
+      }
     );
 
     CacheService.set(cacheKey, response.data);
@@ -194,11 +201,22 @@ const AccountService = {
     return response.data;
   },
 
-  async CreateOrUpdateFeatureSetting(key: FeatureKey, isEnabled: boolean) {
+  async CreateOrUpdateFeatureSetting(
+    key: FeatureKey,
+    isEnabled: boolean,
+    accountId?: string | null
+  ) {
     const response = await HttpClient.post<FeatureSettingVm[]>(
       `${baseUrl}/feature-settings/${key}?isEnabled=${isEnabled}`,
-      {}
+      {},
+      {
+        headers: !isNullOrWhiteSpace(accountId)
+          ? { "x-account": accountId }
+          : undefined,
+      }
     );
+    const cacheKey = `${accountId ?? "anonymous"}-featureSettings`;
+    CacheService.set(cacheKey, response.data);
     return response.data;
   },
 

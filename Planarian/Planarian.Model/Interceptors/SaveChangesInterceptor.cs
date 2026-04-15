@@ -138,7 +138,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 if (!canModify)
                 {
-                    throw ApiExceptionDictionary.Unauthorized(
+                    throw ApiExceptionDictionary.Forbidden(
                         "You do not have permission to modify this entity.");
                 }
 
@@ -293,7 +293,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 ValidateAccount(physiographicProvinceTagAccountId, requestUserAccountId);
                 break;
             case nameof(State):
-                throw ApiExceptionDictionary.Unauthorized("You do not have permission to modify this entity.");
+                throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
 
         }
     }
@@ -304,7 +304,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
         if ((!string.IsNullOrWhiteSpace(requestUserAccountId) && requestUserAccountId != entityAccountId) ||
             !string.IsNullOrWhiteSpace(entityAccountId) && entityAccountId != requestUserAccountId)
         {
-            throw ApiExceptionDictionary.Unauthorized("You do not have permission to modify this entity.");
+            throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
         }
     }
 
@@ -320,4 +320,3 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
         return Task.CompletedTask;
     }
 }
-

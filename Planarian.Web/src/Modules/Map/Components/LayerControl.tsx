@@ -1,5 +1,5 @@
 import { Checkbox, InputNumber, Slider, Space } from "antd";
-import React, { useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
 import styled from "styled-components";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -10,8 +10,8 @@ import type {
 } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 interface PlanarianMapLayer {
   displayName: string;
@@ -412,7 +412,7 @@ const LAYERS: PlanarianMapLayer[] = [
 const LayerControl: React.FC<{
   position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
 }> = ({ position }) => {
-  const accountId = AuthenticationService.GetAccountId();
+  const { currentAccountId: accountId } = useContext(AppContext);
   const LOCAL_STORAGE_LAYER_STATES_KEY = `planarianMapLayerStates-${accountId}`;
   const LOCAL_STORAGE_PREV_GROUP_MEMBERS_KEY = `planarianPrevGroupMembers-${accountId}`;
   const LOCAL_STORAGE_MACROSTRAT_DISCLAIMER_KEY = `planarianMacrostratDisclaimerShown-${accountId}`;

@@ -14,14 +14,12 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
-import { UserLoginVm } from "../Models/UserLoginVm";
-import { AuthenticationService } from "../Services/AuthenticationService";
+import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
 
 const LoginPage: React.FC = () => {
-  const [form] = Form.useForm<UserLoginVm>();
-  const { setIsAuthenticated, setHeaderTitle, setHeaderButtons } =
-    useContext(AppContext);
+  const [form] = Form.useForm<BrowserLoginVm>();
+  const { login, setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const [isLoggingIn, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -44,11 +42,10 @@ const LoginPage: React.FC = () => {
   const queryParams = new URLSearchParams(location.search);
   const invitationCode = queryParams.get("invitationCode") || undefined;
 
-  const onSubmit = async (values: UserLoginVm) => {
+  const onSubmit = async (values: BrowserLoginVm) => {
     try {
       setIsLoading(true);
-      await AuthenticationService.Login(values, invitationCode);
-      setIsAuthenticated(true);
+      await login(values, invitationCode);
 
       if (!isNullOrWhiteSpace(invitationCode)) {
         navigate(`/user/invitations/${invitationCode}`);
@@ -58,6 +55,7 @@ const LoginPage: React.FC = () => {
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -112,7 +110,7 @@ const LoginPage: React.FC = () => {
       >
         <Form.Item
           label="Email Address"
-          name={nameof<UserLoginVm>("emailAddress")}
+          name={nameof<BrowserLoginVm>("emailAddress")}
           rules={[
             { required: true, message: "Please enter your email address!" },
           ]}
@@ -122,7 +120,7 @@ const LoginPage: React.FC = () => {
 
         <Form.Item
           label="Password"
-          name={nameof<UserLoginVm>("password")}
+          name={nameof<BrowserLoginVm>("password")}
           rules={[{ required: true, message: "Please enter your password!" }]}
         >
           <Input.Password />

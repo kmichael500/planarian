@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Button, ButtonProps, Grid, Tooltip } from "antd";
-import { AppService } from "../../Services/AppService";
 import { PermissionKey } from "../../../Modules/Authentication/Models/PermissionKey";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 interface PlanarianButtonProps {
   icon: React.ReactNode;
@@ -31,8 +31,9 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
   } = props;
 
   const screens = useBreakpoint();
+  const { hasPermission } = useContext(AppContext);
   const permissionDisabled =
-    permissionKey && !AppService.HasPermission(permissionKey);
+    permissionKey && !hasPermission(permissionKey);
 
   const disabled = rest.disabled;
 

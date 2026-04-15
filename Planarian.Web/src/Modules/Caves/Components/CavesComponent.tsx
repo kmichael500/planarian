@@ -1,5 +1,5 @@
 import { Typography, Form, Space, message, Tag, Spin } from "antd";
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -33,7 +33,6 @@ import {
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import FavoriteCave from "./FavoriteCave";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
@@ -44,6 +43,7 @@ import {
   EntranceLocationFilter,
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 
@@ -66,7 +66,7 @@ const CavesComponent: React.FC = () => {
     Record<string, boolean>
   >({});
 
-  const accountId = AuthenticationService.GetAccountId();
+  const { currentAccountId: accountId } = useContext(AppContext);
   const featureStorageKey = accountId
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";

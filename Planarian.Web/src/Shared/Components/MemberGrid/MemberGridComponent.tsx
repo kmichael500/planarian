@@ -1,6 +1,6 @@
 import { Card, Space, Table } from "antd";
 import { ColumnsType } from "antd/lib/table";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TripService } from "../../../Modules/Trip/Services/TripService";
 import { ProjectService } from "../../../Modules/Project/Services/ProjectService";
 import { nameof } from "../../Helpers/StringHelpers";
@@ -18,16 +18,7 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
   const [teamMemberData, setTeamMemberData] = useState<UserTableColumn[]>();
   const [teamMembersLoading, setTeamMembersLoading] = useState(true);
 
-  useEffect(() => {
-    if (teamMemberData === undefined) {
-      const getTripName = async () => {
-        await refreshData();
-      };
-      getTripName();
-    }
-  });
-
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     const getTripName = async () => {
       let members = [] as SelectListItem<string>[];
       switch (props.type) {
@@ -48,8 +39,14 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
       );
       setTeamMembersLoading(false);
     };
-    getTripName();
-  };
+    await getTripName();
+  }, [props.projectId, props.tripId, props.type]);
+
+  useEffect(() => {
+    if (teamMemberData === undefined) {
+      void refreshData();
+    }
+  }, [refreshData, teamMemberData]);
 
   const handleDelete = async (userId: string) => {
     try {

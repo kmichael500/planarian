@@ -1,17 +1,38 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
-import { AppService } from "../../Shared/Services/AppService";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
+import { BrowserLoginVm } from "../../Modules/Authentication/Models/BrowserLoginVm";
+import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import {
+  AppInitializeCurrentUserVm,
+  AppInitializeVm,
+  AppService,
+} from "../../Shared/Services/AppService";
 import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
+import { SelectListItem } from "../../Shared/Models/SelectListItem";
+import { hasPermission } from "../../Shared/Permissioning/PermissionHelpers";
 
-interface Permissions {
+interface FeaturePermissions {
   visibleFields: FeatureSettingVm[];
 }
 
 interface AppContextProps {
   isAuthenticated: boolean;
-  setIsAuthenticated: (isAuthenticated: boolean) => void;
+  currentUser: AppInitializeCurrentUserVm | null;
+  currentAccountId: string | null;
+  currentAccountName: string | null;
+  userGroupPrefix: string | null;
+  accountIds: SelectListItem<string>[];
+  hasPermission: (permission: PermissionKey) => boolean;
+  permissions: FeaturePermissions;
+  setPermissions: (permissions: FeaturePermissions) => void;
   headerTitle: [React.ReactElement | string, string?];
   setHeaderTitle: (
     title: [React.ReactElement | string, string?],
@@ -21,35 +42,55 @@ interface AppContextProps {
   setHeaderButtons: (buttons: React.ReactElement[]) => void;
   hideBodyPadding: boolean;
   setHideBodyPadding: (value: boolean) => void;
-  permissions: Permissions;
-  setPermissions: (permissions: Permissions) => void;
   isInitialized: boolean;
   isLoading: boolean;
   initializedError: ApiErrorResponse | null;
+  refreshSession: (selectedAccountId?: string | null) => Promise<void>;
+  login: (
+    values: BrowserLoginVm,
+    invitationCode?: string | null
+  ) => Promise<void>;
+  logout: () => Promise<void>;
+  switchAccount: (accountId: string, redirectPath?: string | null) => void;
   defaultContentStyle: React.CSSProperties;
   contentStyle: React.CSSProperties | null;
   setContentStyle: (style: React.CSSProperties) => void;
 }
 
+const defaultContentStyle = {
+  margin: "16px",
+} as React.CSSProperties;
+
+const defaultFeaturePermissions: FeaturePermissions = {
+  visibleFields: [],
+};
+
 export const AppContext = createContext<AppContextProps>({
-  isAuthenticated: AuthenticationService.IsAuthenticated(),
-  setIsAuthenticated: () => {},
-  setHeaderTitle: () => {},
+  isAuthenticated: false,
+  currentUser: null,
+  currentAccountId: null,
+  currentAccountName: null,
+  userGroupPrefix: null,
+  accountIds: [],
+  hasPermission: () => false,
+  permissions: defaultFeaturePermissions,
+  setPermissions: () => { },
+  setHeaderTitle: () => { },
   headerTitle: ["", ""],
   headerButtons: [],
-  setHeaderButtons: () => {},
+  setHeaderButtons: () => { },
   hideBodyPadding: false,
-  setHideBodyPadding: () => {},
-  permissions: { visibleFields: [] },
-  setPermissions: () => {},
+  setHideBodyPadding: () => { },
   isInitialized: false,
   isLoading: true,
   initializedError: null,
-  defaultContentStyle: {
-    margin: "16px",
-  },
+  refreshSession: async () => { },
+  login: async () => { },
+  logout: async () => { },
+  switchAccount: () => { },
+  defaultContentStyle,
   contentStyle: null,
-  setContentStyle: () => {},
+  setContentStyle: () => { },
 });
 
 interface AppProviderProps {
@@ -57,78 +98,228 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = (props) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    AuthenticationService.IsAuthenticated()
-  );
   const [headerTitle, setHeaderTitle] = useState<
     [React.ReactElement | string, string?]
   >(["", ""]);
   const [headerButtons, setHeaderButtons] = useState<React.ReactElement[]>([]);
   const [hideBodyPadding, setHideBodyPadding] = useState<boolean>(false);
-  const [permissions, setPermissions] = useState<Permissions>({
-    visibleFields: [],
-  });
+  const [permissions, setPermissions] =
+    useState<FeaturePermissions>(defaultFeaturePermissions);
+  const [permissionKeys, setPermissionKeys] = useState<PermissionKey[]>([]);
+  const [currentUser, setCurrentUser] =
+    useState<AppInitializeCurrentUserVm | null>(null);
+  const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
+  const [accountIds, setAccountIds] = useState<SelectListItem<string>[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
     useState<ApiErrorResponse | null>(null);
-
-  const defaultContentStyle = {
-    margin: "16px",
-  } as React.CSSProperties;
-
   const [contentStyle, setContentStyle] = useState<React.CSSProperties | null>(
     defaultContentStyle
   );
 
-  const initializeApp = async () => {
-    try {
-      setIsLoading(true);
-      await AppService.InitializeApp();
-      if (AuthenticationService.IsAuthenticated()) {
-        const response = await AccountService.GetFeatureSettings();
-        setPermissions({ visibleFields: response });
-      }
-      setIsInitialized(true);
-      setInitializedError(null);
-    } catch (e) {
-      const error = e as ApiErrorResponse;
-      setInitializedError(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    initializeApp();
+  const clearSessionState = useCallback(() => {
+    setCurrentUser(null);
+    setCurrentAccountId(null);
+    setAccountIds([]);
+    setPermissionKeys([]);
+    setPermissions(defaultFeaturePermissions);
+    AuthenticationService.ClearRuntimeSession();
   }, []);
 
+  const loadSession = useCallback(
+    async (selectedAccountId?: string | null): Promise<AppInitializeVm> => {
+      const appOptions = await AppService.InitializeApp(selectedAccountId);
+
+      if (selectedAccountId !== undefined || !appOptions.currentUser?.id) {
+        return appOptions;
+      }
+
+      const storedAccountId = AuthenticationService.GetStoredAccountId(
+        appOptions.currentUser.id
+      );
+      const hasStoredAccount =
+        storedAccountId != null &&
+        appOptions.accountIds.some((account) => account.value === storedAccountId);
+
+      if (
+        !hasStoredAccount ||
+        storedAccountId === appOptions.currentUser.currentAccountId
+      ) {
+        return appOptions;
+      }
+
+      return await AppService.InitializeApp(storedAccountId);
+    },
+    []
+  );
+
+  const applySessionState = useCallback(
+    async (appOptions: AppInitializeVm): Promise<AppInitializeVm> => {
+      const isAuthenticated = appOptions.currentUser != null;
+      const resolvedCurrentAccountId =
+        appOptions.currentUser?.currentAccountId ?? null;
+
+      const featureSettings = isAuthenticated
+        ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
+        : [];
+
+      AuthenticationService.SyncSession(appOptions.currentUser);
+      setCurrentUser(appOptions.currentUser);
+      setCurrentAccountId(resolvedCurrentAccountId);
+      setAccountIds(appOptions.accountIds);
+      setPermissionKeys(appOptions.permissions);
+      setPermissions({ visibleFields: featureSettings });
+      setInitializedError(null);
+      setIsInitialized(true);
+
+      return appOptions;
+    },
+    []
+  );
+
+  const refreshSession = useCallback(
+    async (selectedAccountId?: string | null): Promise<void> => {
+      try {
+        setIsLoading(true);
+        const resolvedAccountId =
+          selectedAccountId !== undefined
+            ? selectedAccountId
+            : AuthenticationService.GetAccountId() ?? undefined;
+
+        const appOptions = await loadSession(resolvedAccountId);
+        await applySessionState(appOptions);
+      } catch (e) {
+        const error = e as ApiErrorResponse;
+        setInitializedError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [applySessionState, loadSession]
+  );
+
+  const login = useCallback(
+    async (
+      values: BrowserLoginVm,
+      invitationCode?: string | null
+    ): Promise<void> => {
+      await AuthenticationService.Login(values, invitationCode);
+      await refreshSession();
+    },
+    [refreshSession]
+  );
+
+  const logout = useCallback(async () => {
+    await AuthenticationService.Logout();
+    clearSessionState();
+    await refreshSession(null);
+  }, [clearSessionState, refreshSession]);
+
+  const switchAccount = useCallback(
+    (accountId: string, redirectPath?: string | null) => {
+      if (!currentUser?.id) {
+        return;
+      }
+
+      AuthenticationService.SetStoredAccountId(currentUser.id, accountId);
+
+      if (redirectPath) {
+        window.location.assign(redirectPath);
+        return;
+      }
+
+      window.location.reload();
+    },
+    [currentUser]
+  );
+
   useEffect(() => {
-    if (isAuthenticated) {
-      setIsInitialized(false);
-      initializeApp();
+    const unregister = AuthenticationService.RegisterUnauthorizedHandler(() => {
+      AuthenticationService.ResetAccountId();
+
+      clearSessionState();
+      setInitializedError(null);
+      setIsInitialized(true);
+      setIsLoading(false);
+
+      const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const isLoginPage = window.location.pathname.startsWith("/login");
+
+      if (!isLoginPage) {
+        window.location.assign(
+          `/login?redirectUrl=${encodeURIComponent(redirectPath)}`
+        );
+      } else {
+        AuthenticationService.ResetUnauthorizedHandling();
+      }
+    });
+
+    return () => {
+      unregister();
+      AuthenticationService.ResetUnauthorizedHandling();
+    };
+  }, [clearSessionState]);
+
+  useEffect(() => {
+    void refreshSession().catch(() => { });
+  }, [refreshSession]);
+
+  const currentAccountName = useMemo(() => {
+    if (!currentAccountId) {
+      return null;
     }
-  }, [isAuthenticated]);
+
+    return (
+      accountIds.find((account) => account.value === currentAccountId)?.display ??
+      null
+    );
+  }, [accountIds, currentAccountId]);
+
+  const userGroupPrefix = useMemo(() => {
+    if (!currentUser?.id || !currentAccountId) {
+      return null;
+    }
+
+    return `${currentUser.id}-${currentAccountId}`;
+  }, [currentAccountId, currentUser]);
+
+  const hasCurrentPermission = useCallback(
+    (permission: PermissionKey) => hasPermission(permissionKeys, permission),
+    [permissionKeys]
+  );
+
+  const isAuthenticated = currentUser != null;
 
   return (
     <AppContext.Provider
       value={{
-        isAuthenticated: isAuthenticated,
-        setIsAuthenticated: setIsAuthenticated,
-        headerTitle: headerTitle,
-        setHeaderTitle: setHeaderTitle,
-        headerButtons: headerButtons,
-        setHeaderButtons: setHeaderButtons,
-        hideBodyPadding: hideBodyPadding,
-        setHideBodyPadding: setHideBodyPadding,
-        permissions: permissions,
-        setPermissions: setPermissions,
-        isInitialized: isInitialized,
-        isLoading: isLoading,
-        initializedError: initializedError,
-        contentStyle: contentStyle,
-        setContentStyle: setContentStyle,
-        defaultContentStyle: defaultContentStyle,
+        isAuthenticated,
+        currentUser,
+        currentAccountId,
+        currentAccountName,
+        userGroupPrefix,
+        accountIds,
+        hasPermission: hasCurrentPermission,
+        permissions,
+        setPermissions,
+        headerTitle,
+        setHeaderTitle,
+        headerButtons,
+        setHeaderButtons,
+        hideBodyPadding,
+        setHideBodyPadding,
+        isInitialized,
+        isLoading,
+        initializedError,
+        refreshSession,
+        login,
+        logout,
+        switchAccount,
+        contentStyle,
+        setContentStyle,
+        defaultContentStyle,
       }}
     >
       {props.children}

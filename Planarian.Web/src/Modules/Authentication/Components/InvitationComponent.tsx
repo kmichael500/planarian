@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Card, Typography, Button, Space, Tag, message } from "antd";
 import {
   CheckCircleOutlined,
@@ -8,14 +8,13 @@ import {
   EnvironmentOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"; // Add this import for navigation
-import { AuthenticationService } from "../Services/AuthenticationService";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserService } from "../../User/UserService";
 import { SwitchAccountComponent } from "./SwitchAccountComponent";
-import { AppService } from "../../../Shared/Services/AppService";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Title, Text } = Typography;
 
@@ -35,7 +34,7 @@ const InvitationComponent = ({
   const [status, setStatus] = useState<"pending" | "accepted" | "declined">(
     "pending"
   );
-  const isLoggedIn = AuthenticationService.IsAuthenticated();
+  const { isAuthenticated, switchAccount } = useContext(AppContext);
 
   const navigate = useNavigate();
 
@@ -52,12 +51,7 @@ const InvitationComponent = ({
       setStatus("accepted");
       message.success("You have accepted the invitation.");
 
-      await AppService.InitializeApp();
-      AuthenticationService.SwitchAccountFull(
-        invitation?.accountId,
-        navigate,
-        "/caves"
-      );
+      switchAccount(invitation.accountId, "/caves");
     } catch (error) {
       const err = error as ApiErrorResponse;
       message.error(err.message);
@@ -88,7 +82,7 @@ const InvitationComponent = ({
   let invitationMessage = `You’ve been invited to access ${invitation?.accountName} data on
   Planarian.`;
 
-  if (isLoggedIn) {
+  if (isAuthenticated) {
     invitationMessage += " Accept the invitation to continue!";
   } else {
     invitationMessage +=
@@ -136,7 +130,7 @@ const InvitationComponent = ({
             </div>
           </div>
 
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             <Space style={{ marginTop: 20 }}>
               <Button
                 type="primary"

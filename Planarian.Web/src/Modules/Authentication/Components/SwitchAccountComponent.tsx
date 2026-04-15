@@ -1,12 +1,7 @@
-import { Modal, Button, Form, List, message, Divider } from "antd";
-import { AppOptions, AppService } from "../../../Shared/Services/AppService";
-import { AuthenticationService } from "../Services/AuthenticationService";
-import React, { useEffect, useState } from "react";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { List, Form, Modal } from "antd";
+import React, { useContext, useMemo } from "react";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-import { SwapOutlined } from "@ant-design/icons";
-import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { useLocation, useNavigate } from "react-router-dom";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -17,41 +12,17 @@ const SwitchAccountComponent = ({
   isVisible: isOpen,
   handleCancel: onCancel,
 }: SwitchAccountComponentProps) => {
-  const currentAccountId = AuthenticationService.GetAccountId();
-  const currentAccountName = AuthenticationService.GetAccountName();
+  const { accountIds, currentAccountId, currentAccountName, switchAccount } =
+    useContext(AppContext);
 
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
-
-  useEffect(() => {
-    async function initialize() {
-      await AppService.InitializeApp();
-      if (!accountList) {
-        const result = AppOptions.accountIds.filter(
-          (item) => item.value !== currentAccountId
-        );
-        setAccountList(result);
-      }
-    }
-
-    initialize();
-
-    const unsubscribe = AuthenticationService.onAuthChange(() => {
-      const result = AppOptions.accountIds.filter(
-        (item) => item.value !== currentAccountId
-      );
-      setAccountList(result);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [isOpen]);
+  const accountList = useMemo(
+    () => accountIds.filter((item) => item.value !== currentAccountId),
+    [accountIds, currentAccountId]
+  );
 
   const handleSwitch = async (accountId: string) => {
-    AuthenticationService.SwitchAccountFull(accountId, navigate);
+    onCancel();
+    switchAccount(accountId);
   };
 
   return (
@@ -61,14 +32,9 @@ const SwitchAccountComponent = ({
       onCancel={onCancel}
       footer={[<CancelButtonComponent key="cancel" onClick={onCancel} />]}
     >
-      <Form
-        id="switchAccountForm"
-        onFinish={(values) => handleSwitch(values.account)}
-      >
-        {/* Display the current account */}
+      <Form id="switchAccountForm">
         <div
           style={{
-            // fontWeight: "bold",
             backgroundColor: "#f0f2f5",
             padding: "10px",
           }}
@@ -84,10 +50,7 @@ const SwitchAccountComponent = ({
         >
           Please select one of the accounts below to switch to:
         </div>
-        <Form.Item
-          name="account"
-          rules={[{ required: true, message: "Please select an account!" }]}
-        >
+        <Form.Item name="account">
           <List
             dataSource={accountList}
             renderItem={(item) => (
@@ -98,9 +61,9 @@ const SwitchAccountComponent = ({
                   cursor: "pointer",
                   transition: "background-color 0.3s, border-color 0.3s",
                   padding: "10px",
-                  border: "1px solid #d9d9d9", // Adding a border
-                  borderRadius: "4px", // Optional: to give rounded corners
-                  marginBottom: "10px", // Optional: to space out items
+                  border: "1px solid #d9d9d9",
+                  borderRadius: "4px",
+                  marginBottom: "10px",
                 }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.backgroundColor = "#e6f7ff")

@@ -149,7 +149,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
 
-        if (entity.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
+        if (entity.IsDefault) throw ApiExceptionDictionary.Forbidden("Cannot modify default tag types.");
 
 
         entity.Name = tag.Name;
@@ -304,7 +304,7 @@ public class AccountService : ServiceBase<AccountRepository>
         var isNew = featureSetting == null;
 
         if (!isNew && featureSetting!.IsDefault)
-            throw ApiExceptionDictionary.Unauthorized("Cannot modify default feature settings.");
+            throw ApiExceptionDictionary.Forbidden("Cannot modify default feature settings.");
 
         featureSetting ??= new FeatureSetting
         {

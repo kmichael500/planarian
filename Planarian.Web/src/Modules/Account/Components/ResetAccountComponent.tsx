@@ -1,14 +1,14 @@
-import React from "react";
-import { Card, Button, message, Typography } from "antd";
+import React, { useContext } from "react";
+import { Card, message, Typography } from "antd";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { AccountService } from "../Services/AccountService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
 import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const ResetAccountComponent = () => {
-  var userGroupPrefix = AuthenticationService.GetUserGroupPrefix();
+  const { userGroupPrefix } = useContext(AppContext);
 
   return (
     <Card title="Reset Account">
@@ -40,7 +40,9 @@ const ResetAccountComponent = () => {
           <>
             <Card>
               <SignalRProgressComponent
-                groupName={`${userGroupPrefix}-DeleteAllCaves`}
+                groupName={
+                  userGroupPrefix ? `${userGroupPrefix}-DeleteAllCaves` : null
+                }
                 isLoading={true}
               ></SignalRProgressComponent>
             </Card>

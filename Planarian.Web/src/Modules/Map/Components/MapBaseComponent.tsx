@@ -21,7 +21,6 @@ import type { MapProps } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { message, Spin, Form } from "antd";
 import { AppOptions } from "../../../Shared/Services/AppService";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { LayerControl } from "./LayerControl";
 import { CaveSearchMapControl } from "./CaveSearchMapControl";
@@ -156,7 +155,12 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   additionalInteractiveLayerIds = [],
   reuseMaps = true,
 }) => {
-  const { setHideBodyPadding, hideBodyPadding } = useContext(AppContext);
+  const {
+    currentAccountId,
+    currentAccountName,
+    setHideBodyPadding,
+    hideBodyPadding,
+  } = useContext(AppContext);
   useEffect(() => {
     if (!manageBodyPadding) {
       return;
@@ -621,18 +625,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const zoomControlPosition = "top-left";
   const scaleControlPosition = "bottom-left"; // Define position for scale control
-  const accountName = AuthenticationService.GetAccountName();
+  const accountName = currentAccountName;
 
   const entrancesTileParams = useMemo(() => {
     const params = new URLSearchParams();
-    const token = AuthenticationService.GetToken();
-    const accountId = AuthenticationService.GetAccountId();
 
-    if (token) {
-      params.set("access_token", token);
-    }
-    if (accountId) {
-      params.set("account_id", accountId);
+    if (currentAccountId) {
+      params.set("account_id", currentAccountId);
     }
 
     if (mapFiltersQueryString) {
@@ -642,7 +641,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       });
     }
     return params.toString();
-  }, [mapFiltersQueryString]);
+  }, [currentAccountId, mapFiltersQueryString]);
 
   const entranceTiles = useMemo(() => {
     if (!AppOptions.serverBaseUrl) {
@@ -652,6 +651,20 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       `${AppOptions.serverBaseUrl}/api/map/{z}/{x}/{y}.mvt?${entrancesTileParams}`,
     ];
   }, [entrancesTileParams]);
+
+  const transformMapRequest = useCallback<NonNullable<MapProps["transformRequest"]>>(
+    (url) => {
+      if (AppOptions.serverBaseUrl && url.startsWith(AppOptions.serverBaseUrl)) {
+        return {
+          url,
+          credentials: "include",
+        };
+      }
+
+      return { url };
+    },
+    []
+  );
 
   const entrancesSourceKey = useMemo(
     () => hashString(`${mapFiltersVersion}-${mapFiltersQueryString}`),
@@ -854,6 +867,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
               onClick={handleMapClick}
               mapStyle={mapStyle}
               onMoveEnd={handleMoveEnd}
+              transformRequest={transformMapRequest}
               id="map-container"
             >
               {showSearchBar && (

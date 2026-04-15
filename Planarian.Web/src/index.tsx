@@ -4,13 +4,14 @@ import { message } from "antd";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
-import axios, { AxiosRequestTransformer } from "axios";
+import axios, { AxiosHeaders } from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
+import { AppService } from "./Shared/Services/AppService";
 
 import utc from "dayjs/plugin/utc";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -72,34 +73,40 @@ if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = "https://wa-planarian.azurewebsites.net";
 }
 
-// using tranform request instead of interceptors because
-// it's not clearing  the headers when the user logs out and we call delete on the token
-const setAuthHeaders: AxiosRequestTransformer = (data: any, headers) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-    const accountId = AuthenticationService.GetAccountId();
-    if (accountId) {
-      headers["x-account"] = accountId;
-    }
-  } else {
-    delete headers["Authorization"];
-    delete headers["x-account"];
-  }
-
-  return data;
-};
-
-if (!Array.isArray(axios.defaults.transformRequest)) {
-  axios.defaults.transformRequest = [];
-}
-
-axios.defaults.transformRequest = [setAuthHeaders].concat(
-  axios.defaults.transformRequest
-);
-
 const HttpClient = axios.create({
   baseURL: baseUrl,
+  withCredentials: true,
+});
+
+HttpClient.interceptors.request.use((config) => {
+  const headers =
+    config.headers instanceof AxiosHeaders
+      ? config.headers
+      : AxiosHeaders.from(config.headers);
+  const accountId = AuthenticationService.GetAccountId();
+
+  if (!headers.has("x-account")) {
+    if (accountId) {
+      headers.set("x-account", accountId);
+    } else {
+      headers.delete("x-account");
+    }
+  }
+
+  const method = config.method?.toUpperCase();
+  const requiresAntiforgery =
+    method != null &&
+    !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method);
+
+  if (requiresAntiforgery) {
+    const antiforgeryRequestToken = AppService.GetAntiforgeryRequestToken();
+    if (antiforgeryRequestToken) {
+      headers.set("X-XSRF-TOKEN", antiforgeryRequestToken);
+    }
+  }
+
+  config.headers = headers;
+  return config;
 });
 
 // Override default axios error handler to throw custom error data
@@ -109,23 +116,39 @@ HttpClient.interceptors.response.use(
   },
   function (error) {
     if (error.response) {
+      const statusCode = error.response.status;
+
       if (error.response.data) {
         const apiError = error.response.data as ApiErrorResponse;
         if (apiError?.errorCode === ApiExceptionType.TooManyRequests) {
           message.error(apiError.message);
         }
 
+        if (
+          statusCode === 401 ||
+          apiError?.errorCode === ApiExceptionType.Unauthorized
+        ) {
+          AuthenticationService.HandleUnauthorized();
+        }
+
         return Promise.reject(error.response.data);
       }
 
-      if (error.response.status === 401 || error.response.status === 403) {
-        // Create a custom unauthorized error object
-        const unauthorizedError: ApiErrorResponse = {
-          message: "Unauthorized",
-          errorCode: ApiExceptionType.Unauthorized,
+      if (statusCode === 401 || statusCode === 403) {
+        const apiError: ApiErrorResponse = {
+          message: statusCode === 403 ? "Forbidden" : "Unauthorized",
+          errorCode:
+            statusCode === 403
+              ? ApiExceptionType.Forbidden
+              : ApiExceptionType.Unauthorized,
           data: null,
         };
-        return Promise.reject(unauthorizedError);
+
+        if (statusCode === 401) {
+          AuthenticationService.HandleUnauthorized();
+        }
+
+        return Promise.reject(apiError);
       }
     }
     return Promise.reject(error);
