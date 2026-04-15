@@ -12,23 +12,31 @@ namespace Planarian.Modules.Authentication.Services;
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
     private readonly EmailService _emailService;
+    private readonly RequestThrottleService _requestThrottleService;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
-        TokenService tokenService, UserRepository userRepository, EmailService emailService) :
+        TokenService tokenService, UserRepository userRepository, EmailService emailService,
+        RequestThrottleService requestThrottleService) :
         base(repository, requestUser)
     {
         _tokenService = tokenService;
         _userRepository = userRepository;
         _emailService = emailService;
+        _requestThrottleService = requestThrottleService;
     }
 
     public async Task<string> AuthenticateEmailPassword(string email, string password)
     {
+        await _requestThrottleService.CountAttempt(ThrottleProfile.Login, email);
+
         var user = await _userRepository.GetUserByEmail(email);
 
-        if (user == null) throw ApiExceptionDictionary.EmailDoesNotExist;
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.EmailDoesNotExist;
+        }
         
         if (user.EmailConfirmedOn == null)
         {
@@ -41,10 +49,16 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw ApiExceptionDictionary.EmailNotConfirmed;
         }
 
-        if (string.IsNullOrWhiteSpace(user.HashedPassword)) throw ApiExceptionDictionary.InvalidPassword;
+        if (string.IsNullOrWhiteSpace(user.HashedPassword))
+        {
+            throw ApiExceptionDictionary.InvalidPassword;
+        }
 
         var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
-        if (!isValid) throw ApiExceptionDictionary.InvalidPassword;
+        if (!isValid)
+        {
+            throw ApiExceptionDictionary.InvalidPassword;
+        }
 
         var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();
         var accountId = accounts.FirstOrDefault();
@@ -56,15 +70,8 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         return token;
     }
 
-    public bool ValidateToken(string token)
-    {
-        var isValid = _tokenService.IsTokenValid(token);
-
-        return isValid;
-    }
-
-
     public async Task Logout(HttpContext httpContext)
     {
     }
+
 }

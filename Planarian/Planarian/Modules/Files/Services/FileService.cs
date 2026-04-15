@@ -5,8 +5,10 @@ using Azure.Storage.Sas;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Controllers;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
@@ -18,19 +20,36 @@ namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
 {
+    private static readonly HashSet<string> InlinePreviewExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".avif",
+        ".bmp",
+        ".gif",
+        ".jpeg",
+        ".jpg",
+        ".pdf",
+        ".png",
+        ".tif",
+        ".tiff",
+        ".webp"
+    };
+
     private readonly TagRepository _tagRepository;
     private readonly FileOptions _fileOptions;
+    private readonly RequestThrottleService _requestThrottleService;
     private readonly SettingsRepository _settingsRepository;
     private readonly CaveRepository _caveRepository;
 
     public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
-        FileOptions fileOptions, SettingsRepository settingsRepository, CaveRepository caveRepository) : base(
+        FileOptions fileOptions, SettingsRepository settingsRepository, CaveRepository caveRepository,
+        RequestThrottleService requestThrottleService) : base(
         repository, requestUser)
     {
         _tagRepository = tagRepository;
         _fileOptions = fileOptions;
         _settingsRepository = settingsRepository;
         _caveRepository = caveRepository;
+        _requestThrottleService = requestThrottleService;
     }
 
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
@@ -230,6 +249,41 @@ public class FileService : ServiceBase<FileRepository>
         await transaction.CommitAsync();
     }
 
+    public async Task<FileAccessUrlVm> CreateAccessUrl(string fileId, bool isDownload, CancellationToken cancellationToken)
+    {
+        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, fileId);
+
+        var file = await Repository.GetFileAccessInfo(fileId);
+        if (file == null || string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        await EnsureFileViewAccess(file.Id, file.CaveId, file.CountyId);
+
+        var client = await GetBlobContainerClient(file.ContainerName);
+        var blobClient = client.GetBlobClient(file.BlobKey);
+        return new FileAccessUrlVm
+        {
+            Url = CreateSasUrl(blobClient, file.FileName, isDownload)
+        };
+    }
+
+    public async Task<FileAccessUrlVm> CreateBlobAccessUrl(
+        string blobKey,
+        string containerName,
+        string fileName,
+        bool isDownload = false)
+    {
+        if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(containerName))
+            throw ApiExceptionDictionary.NotFound("File");
+
+        var client = await GetBlobContainerClient(containerName);
+        var blobClient = client.GetBlobClient(blobKey);
+        return new FileAccessUrlVm
+        {
+            Url = CreateSasUrl(blobClient, fileName, isDownload)
+        };
+    }
+
     private async Task EnsureFileManagerAccess(string fileId)
     {
         var fileContext = await Repository.GetFileAuthorizationContext(fileId);
@@ -245,43 +299,72 @@ public class FileService : ServiceBase<FileRepository>
         await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
-    private string GetSasLink(BlobClient blobClient, string fileName, bool download = false)
+    private async Task EnsureFileViewAccess(string fileId, string? caveId, string? countyId)
     {
-        // Get the file extension
+        if (!string.IsNullOrWhiteSpace(caveId) || !string.IsNullOrWhiteSpace(countyId))
+        {
+            await RequestUser.HasCavePermission(PermissionKey.View, caveId, countyId);
+            return;
+        }
+
+        var fileContext = await Repository.GetFileAuthorizationContext(fileId);
+        if (fileContext == null)
+            throw ApiExceptionDictionary.NotFound("File");
+
+        await RequestUser.HasCavePermission(PermissionKey.Manager);
+    }
+
+    private string CreateSasUrl(BlobClient blobClient, string fileName, bool download = false)
+    {
         var fileExtension = Path.GetExtension(fileName);
-
-        // Get the MIME type of the file
         var mimeType = MimeTypes.GetMimeType(fileExtension);
+        var contentDisposition = ShouldRenderInline(fileName, download)
+            ? $"inline; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}"
+            : $"attachment; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
+        var hasExtendedViewSas = !download &&
+                                 !string.IsNullOrWhiteSpace(fileExtension) &&
+                                 (_fileOptions.ViewSasExtendedFileTypes?.Contains(fileExtension, StringComparer.OrdinalIgnoreCase) ?? false);
+        var expiresInSeconds = hasExtendedViewSas
+            ? _fileOptions.ViewSasExtendedExpirationSeconds
+            : _fileOptions.SasLinkExpirationSeconds;
 
-        // Generate a SAS token for the blob with read permissions that expires in 1 hour
+        if (expiresInSeconds <= 0)
+        {
+            var optionName = hasExtendedViewSas
+                ? nameof(FileOptions.ViewSasExtendedExpirationSeconds)
+                : nameof(FileOptions.SasLinkExpirationSeconds);
+            throw new InvalidOperationException(
+                $"{FileOptions.Key}:{optionName} must be greater than zero.");
+        }
+
         var sasBuilder = new BlobSasBuilder()
         {
             BlobContainerName = blobClient.BlobContainerName,
             BlobName = blobClient.Name,
-            Resource = "b", // "b" for blob
+            Resource = "b",
             StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
-            ContentDisposition = download
-                ? $"attachment; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}"
-                : $"inline; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}",
+            ExpiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds),
+            ContentDisposition = contentDisposition,
             ContentType = mimeType
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Read);
 
         var sasUri = blobClient.GenerateSasUri(sasBuilder);
-
-        var sasUrl = $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
-
-        return sasUrl;
+        return $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
     }
 
     public async Task<string> GetLink(string blobKey, string containerName, string fileName, bool isDownload = false)
-    {
-        var client = await GetBlobContainerClient(containerName);
-        var blobClient = client.GetBlobClient(blobKey);
+        => (await CreateBlobAccessUrl(blobKey, containerName, fileName, isDownload)).Url;
 
-        var sasLink = GetSasLink(blobClient, fileName, isDownload);
-        return sasLink;
+    private static bool ShouldRenderInline(string fileName, bool download)
+    {
+        if (download)
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(fileName);
+        return InlinePreviewExtensions.Contains(extension);
     }
 
     public async Task DeleteFile(string? blobKey, string? blobContainer)
@@ -354,6 +437,4 @@ public class FileVm
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
     public string? Uuid { get; set; }
-    public string? EmbedUrl { get; set; }
-    public string? DownloadUrl { get; set; }
 }

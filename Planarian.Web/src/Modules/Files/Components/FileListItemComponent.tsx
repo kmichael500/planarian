@@ -1,6 +1,7 @@
 import { List, Tag, Typography } from "antd";
 import { FileVm } from "../Models/FileVm";
 import { getFileType } from "../Services/FileHelpers";
+import { FileService } from "../Services/FileService";
 
 interface FileListItemComponentProps {
   file: FileVm;
@@ -17,7 +18,13 @@ const FileListItemComponent = ({
     <List.Item
       actions={[
         <Typography.Link onClick={() => onView(file)}>View</Typography.Link>,
-        <Typography.Link href={file.downloadUrl}>Download</Typography.Link>,
+        <Typography.Link
+          onClick={async () => {
+            await FileService.startFileDownload(file.id);
+          }}
+        >
+          Download
+        </Typography.Link>,
       ]}
     >
       <Typography.Text>

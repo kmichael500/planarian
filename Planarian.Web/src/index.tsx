@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { message } from "antd";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
@@ -109,6 +110,11 @@ HttpClient.interceptors.response.use(
   function (error) {
     if (error.response) {
       if (error.response.data) {
+        const apiError = error.response.data as ApiErrorResponse;
+        if (apiError?.errorCode === ApiExceptionType.TooManyRequests) {
+          message.error(apiError.message);
+        }
+
         return Promise.reject(error.response.data);
       }
 

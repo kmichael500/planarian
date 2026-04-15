@@ -8,6 +8,7 @@ using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Caves.Controllers;
@@ -46,6 +47,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [HttpGet("export/gpx")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize(Policy = PermissionPolicyKey.Export)]
+    [Throttle(RequestsPerMinute = 5)]
     public async Task<ActionResult> ExportCavesGpx([FromQuery] FilterQuery query,
         [FromQuery] string? permissionKey = null)
     {
@@ -58,6 +60,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [HttpGet("export/csv")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [Authorize(Policy = PermissionPolicyKey.Export)]
+    [Throttle(RequestsPerMinute = 5)]
     public async Task<ActionResult> ExportCavesCsv([FromQuery] FilterQuery query,
         [FromQuery] string? permissionKey = null)
     {

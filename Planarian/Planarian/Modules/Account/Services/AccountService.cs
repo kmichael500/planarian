@@ -8,9 +8,11 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.FeatureSettings.Repositories;
+using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
@@ -30,9 +32,12 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly CaveService _caveService;
     private readonly ArchiveJobCoordinator _archiveJobCoordinator;
+    private readonly RequestThrottleService _requestThrottleService;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository, FeatureSettingRepository featureSettingRepository, CaveService caveService, ArchiveJobCoordinator archiveJobCoordinator) : base(
+        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository,
+        FeatureSettingRepository featureSettingRepository, CaveService caveService,
+        ArchiveJobCoordinator archiveJobCoordinator, RequestThrottleService requestThrottleService) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -42,6 +47,7 @@ public class AccountService : ServiceBase<AccountRepository>
         _featureSettingRepository = featureSettingRepository;
         _caveService = caveService;
         _archiveJobCoordinator = archiveJobCoordinator;
+        _requestThrottleService = requestThrottleService;
     }
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
@@ -472,26 +478,40 @@ public class AccountService : ServiceBase<AccountRepository>
         var result = new List<ArchiveListItemVm>(recentArchives.Count);
         foreach (var archiveBlob in recentArchives)
         {
-            var fileName = Path.GetFileName(archiveBlob.BlobKey);
-            var downloadUrl = await _fileService.GetLink(
-                archiveBlob.BlobKey,
-                RequestUser.AccountContainerName,
-                fileName,
-                isDownload: true);
-
             result.Add(new ArchiveListItemVm
             {
                 BlobKey = archiveBlob.BlobKey,
-                FileName = fileName,
-                CreatedAt = archiveBlob.CreatedAt,
-                DownloadUrl = downloadUrl
+                FileName = Path.GetFileName(archiveBlob.BlobKey),
+                CreatedAt = archiveBlob.CreatedAt
             });
         }
 
         return result;
     }
 
+    public async Task<FileAccessUrlVm> CreateArchiveDownloadUrl(string blobKey, CancellationToken cancellationToken)
+    {
+        EnsureValidArchiveBlobKey(blobKey);
+        EnsureArchiveBlobIsNotActive(blobKey, "Archive is not available while it is still running.");
+
+        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, blobKey);
+
+        return await _fileService.CreateBlobAccessUrl(
+            blobKey,
+            RequestUser.AccountContainerName,
+            Path.GetFileName(blobKey),
+            isDownload: true);
+    }
+
     public async Task DeleteArchive(string blobKey, CancellationToken cancellationToken)
+    {
+        EnsureValidArchiveBlobKey(blobKey);
+        EnsureArchiveBlobIsNotActive(blobKey, "Cannot delete an archive while it is still running.");
+
+        await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
+    }
+
+    private void EnsureValidArchiveBlobKey(string blobKey)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -504,14 +524,15 @@ public class AccountService : ServiceBase<AccountRepository>
         {
             throw ApiExceptionDictionary.BadRequest("Invalid archive.");
         }
+    }
 
-        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId);
+    private void EnsureArchiveBlobIsNotActive(string blobKey, string activeArchiveMessage)
+    {
+        var activeArchiveBlobKey = _archiveJobCoordinator.GetActiveArchiveBlobKey(RequestUser.AccountId!);
         if (string.Equals(blobKey, activeArchiveBlobKey, StringComparison.Ordinal))
         {
-            throw ApiExceptionDictionary.BadRequest("Cannot delete an archive while it is still running.");
+            throw ApiExceptionDictionary.BadRequest(activeArchiveMessage);
         }
-
-        await _fileService.DeleteFile(blobKey, RequestUser.AccountContainerName);
     }
     #endregion
 

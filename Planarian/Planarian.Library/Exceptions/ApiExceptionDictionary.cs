@@ -36,6 +36,13 @@ public static class ApiExceptionDictionary
         return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message);
     }
 
+    public static ApiException TooManyRequests(string message, int retryAfterSeconds)
+    {
+        var exception = TooManyRequests(message);
+        exception.Headers["Retry-After"] = retryAfterSeconds.ToString();
+        return exception;
+    }
+
     public static ApiException InternalServerError(string message)
     {
         return new ApiException(500, ApiExceptionType.InternalServerError, message);

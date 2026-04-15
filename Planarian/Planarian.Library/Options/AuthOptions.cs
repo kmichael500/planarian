@@ -5,4 +5,5 @@ public class AuthOptions
     public const string Key = "Auth";
     public string JwtSecret { get; set; } = null!;
     public string JwtIssuer { get; set; } = null!;
+    public int JwtExpiryDurationSeconds { get; set; } = 2592000;
 }

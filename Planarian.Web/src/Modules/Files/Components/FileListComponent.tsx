@@ -179,8 +179,7 @@ export const FileListComponent = ({
       <FileViewer
         open={viewerIsOpen}
         onCancel={closeViewer}
-        embedUrl={activeFile?.embedUrl}
-        downloadUrl={activeFile?.downloadUrl}
+        fileId={activeFile?.id}
         displayName={activeFile?.displayName}
         fileType={viewerFileType}
         onPrevious={goToPrevious}

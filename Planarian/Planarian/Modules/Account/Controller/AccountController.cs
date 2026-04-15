@@ -7,6 +7,8 @@ using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Files.Models;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Account.Controller;
@@ -77,6 +79,17 @@ public class AccountController : PlanarianControllerBase<AccountService>
     {
         var result = await Service.GetRecentArchives(cancellationToken);
         return Ok(result);
+    }
+
+    [HttpPost("archive/download")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    [Throttle]
+    public async Task<ActionResult<FileAccessUrlVm>> DownloadArchive(
+        [FromQuery] string blobKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await Service.CreateArchiveDownloadUrl(blobKey, cancellationToken);
+        return new JsonResult(result);
     }
 
     [HttpDelete("archive")]

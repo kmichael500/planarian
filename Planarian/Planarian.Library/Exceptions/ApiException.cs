@@ -11,5 +11,6 @@ public class ApiException : Exception
 
     public int StatusCode { get; }
     public ApiExceptionType ErrorCode { get; }
-    public object? Data { get; set; }
+    public new object? Data { get; set; }
+    public IDictionary<string, string> Headers { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 }

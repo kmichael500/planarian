@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Query.Models;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Map.Controllers;
@@ -26,6 +27,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("center")]
+    [Throttle(RequestsPerMinute = 60)]
     public async Task<ActionResult<object>> GetMapCenter()
     {
         CoordinateDto data = await Service.GetMapCenter();
@@ -33,6 +35,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
+    [Throttle(RequestsPerMinute = 600)]
     public async Task<IActionResult> GetTile(int z, int x, int y, [FromQuery] FilterQuery query, CancellationToken cancellationToken)
     {
         var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, query, cancellationToken);
@@ -46,6 +49,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("lineplots/ids")]
+    [Throttle(RequestsPerMinute = 120)]
     public async Task<IActionResult> GetLinePlotIds(
         [FromQuery] double north,
         [FromQuery] double south,
@@ -60,6 +64,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("lineplots/{plotId}")]
+    [Throttle(RequestsPerMinute = 240)]
     public async Task<IActionResult> GetLinePlotById(
         [FromRoute] string plotId,
         CancellationToken cancellationToken)
@@ -74,6 +79,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
     
     [HttpGet("geologic-maps")]
+    [Throttle(RequestsPerMinute = 60)]
     public async Task<ActionResult<object>> GetMapCenter(
         [FromQuery] double latitude,
         [FromQuery] double longitude,

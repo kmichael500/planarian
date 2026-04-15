@@ -17,7 +17,7 @@ public class PlanarianDbContextBase : DbContext
     protected readonly SaveChangesInterceptor ChangesInterceptor = new();
     public RequestUser RequestUser = null!;
 
-    public PlanarianDbContextBase(DbContextOptions<PlanarianDbContextBase> contextOptions) : base(contextOptions)
+    public PlanarianDbContextBase(DbContextOptions contextOptions) : base(contextOptions)
     {
     }
 
@@ -135,11 +135,17 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<MessageLog> MessageLogs { get; set; } = null!;
 
     #endregion
+
+    #region Throttling
+
+    public DbSet<ThrottleEventLog> ThrottleEventLogs { get; set; } = null!;
+
+    #endregion
 }
 
 public class PlanarianDbContext : PlanarianDbContextBase
 {
-    public PlanarianDbContext(DbContextOptions<PlanarianDbContextBase> contextOptions) : base(contextOptions)
+    public PlanarianDbContext(DbContextOptions<PlanarianDbContext> contextOptions) : base(contextOptions)
     {
     }
 

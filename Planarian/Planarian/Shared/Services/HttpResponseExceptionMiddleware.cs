@@ -1,7 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Http.Json;
-using Microsoft.Extensions.Options;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Options;
 
@@ -31,15 +29,7 @@ public class HttpResponseExceptionMiddleware
                 throw;
             }
 
-            var error = new ApiErrorResponse(e.Message, e.ErrorCode)
-            {
-                Data = e.Data
-            };
-
-            context.Response.StatusCode = e.StatusCode;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(error,
-                JsonSerializationOptions));
+            await WriteErrorResponseAsync(context, e.StatusCode, e.Message, e.ErrorCode, e.Data, e.Headers);
         }
         catch (Exception e)
         {
@@ -60,17 +50,40 @@ public class HttpResponseExceptionMiddleware
 #endif
 
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            context.Response.ContentType = "application/json";
-
-            await context.Response.WriteAsync(JsonSerializer.Serialize(error,
-                JsonSerializationOptions));
+            await WriteErrorResponseAsync(context, context.Response.StatusCode, error.Message, error.ErrorCode, error.Data);
         }
     }
 
-    public JsonSerializerOptions JsonSerializationOptions => new(JsonSerializerDefaults.Web)
+    public static JsonSerializerOptions JsonSerializationOptions { get; } = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
     };
+
+    public static async Task WriteErrorResponseAsync(
+        HttpContext context,
+        int statusCode,
+        string message,
+        ApiExceptionType errorCode,
+        object? data = null,
+        IEnumerable<KeyValuePair<string, string>>? headers = null)
+    {
+        var error = new ApiErrorResponse(message, errorCode)
+        {
+            Data = data
+        };
+
+        if (headers != null)
+        {
+            foreach (var header in headers)
+            {
+                context.Response.Headers[header.Key] = header.Value;
+            }
+        }
+
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(error, JsonSerializationOptions));
+    }
 }
 
 public class ApiErrorResponse(string message, ApiExceptionType errorCode)

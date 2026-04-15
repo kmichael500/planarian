@@ -23,10 +23,10 @@ import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { GpxViewer } from "./GpxViewer";
 import { VectorDatasetViewer } from "./VectorDatasetViewer";
 import { PltViewer } from "./PltViewer";
+import { FileAccessAction, FileService } from "../Services/FileService";
 
 interface FileViewerProps {
-  embedUrl: string | null | undefined;
-  downloadUrl?: string | null | undefined;
+  fileId?: string | null;
   displayName?: string | null;
   fileType?: string | null;
   open: boolean;
@@ -38,8 +38,7 @@ interface FileViewerProps {
 }
 
 const FileViewer: React.FC<FileViewerProps> = ({
-  embedUrl,
-  downloadUrl,
+  fileId,
   displayName,
   fileType,
   open,
@@ -62,23 +61,80 @@ const FileViewer: React.FC<FileViewerProps> = ({
     </>
   );
 
-  const downloadButton = downloadUrl ? (
-    <PlanarianButton href={downloadUrl || ""} icon={<CloudDownloadOutlined />}>
+  const downloadButton = fileId ? (
+    <PlanarianButton
+      icon={<CloudDownloadOutlined />}
+      onClick={async () => {
+        await FileService.startFileDownload(fileId);
+      }}
+    >
       Download
     </PlanarianButton>
   ) : null;
 
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [fileEmbedUrl, setFileEmbedUrl] = useState<string | undefined>(undefined);
+  const [fileAccessError, setFileAccessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setFileEmbedUrl(undefined);
+      setFileAccessError(null);
       return;
     }
 
-    if (!embedUrl) {
+    if (!fileId) {
+      setFileEmbedUrl(undefined);
+      setFileAccessError(null);
       setFileContent(null);
       setIsLoading(false);
+      return;
+    }
+
+    setFileContent(null);
+    setFileEmbedUrl(undefined);
+    setFileAccessError(null);
+    setIsLoading(true);
+
+    let isCancelled = false;
+    const loadFileSasLink = async () => {
+      try {
+        const sasLink = await FileService.createFileSasLink(
+          fileId,
+          FileAccessAction.View
+        );
+        if (isCancelled) {
+          return;
+        }
+
+        setFileEmbedUrl(sasLink);
+        if (!isTextFileType(fileType) && !isCsvFileType(fileType)) {
+          setIsLoading(false);
+        }
+      } catch {
+        if (isCancelled) {
+          return;
+        }
+
+        setFileAccessError("Unable to load file.");
+        setIsLoading(false);
+      }
+    };
+
+    loadFileSasLink();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open, fileId, fileType]);
+
+  useEffect(() => {
+    if (!open || !fileEmbedUrl) {
+      return;
+    }
+
+    if (fileAccessError) {
       return;
     }
 
@@ -87,9 +143,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
       setIsLoading(true);
       setFileContent(null);
 
-      fetch(embedUrl)
-        .then((response) => response.text())
-        .then((data) => {
+      const loadFileContent = async () => {
+        try {
+          const response = await fetch(fileEmbedUrl);
+          if (!response.ok) {
+            throw new Error("Unable to load file.");
+          }
+
+          const data = await response.text();
           if (isCancelled) {
             return;
           }
@@ -99,22 +160,21 @@ const FileViewer: React.FC<FileViewerProps> = ({
           }
 
           setIsLoading(false);
-        })
-        .catch(() => {
+        } catch {
           if (!isCancelled) {
+            setFileAccessError("Unable to load file.");
             setIsLoading(false);
           }
-        });
+        }
+      };
+
+      loadFileContent();
 
       return () => {
         isCancelled = true;
       };
     }
-
-    // For all other file types (including GPX) we do not fetch here.
-    setFileContent(null);
-    setIsLoading(false);
-  }, [open, embedUrl, fileType]);
+  }, [open, fileEmbedUrl, fileType, fileAccessError]);
 
   const hasPrevious = typeof onPrevious === "function";
   const hasNext = typeof onNext === "function";
@@ -191,7 +251,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
         }}
       >
         <Spin spinning={isLoading}>
-          {isSupported ? (
+          {fileAccessError && !isLoading ? (
+            <Result status="warning" title={fileAccessError} extra={downloadButton} />
+          ) : !fileAccessError && isSupported ? (
             <>
               {isImage && (
                 <div
@@ -203,13 +265,13 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   }}
                 >
                   <img
-                    src={embedUrl || ""}
+                    src={fileEmbedUrl}
                     alt="file"
                     style={{ maxHeight: "100%" }}
                   />
                 </div>
               )}
-              {isPdf && !isNullOrWhiteSpace(embedUrl) && (
+              {isPdf && !isNullOrWhiteSpace(fileEmbedUrl) && (
                 <div
                   style={{
                     width: "100%",
@@ -220,9 +282,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   }}
                 >
                   <iframe
-                    key={embedUrl || undefined}
+                    key={fileEmbedUrl || undefined}
                     src={`https://docs.google.com/gview?url=${encodeURIComponent(
-                      embedUrl
+                      fileEmbedUrl
                     )}&embedded=true`}
                     style={{
                       width: "100%",
@@ -250,27 +312,27 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   {isLoading ? <Spin /> : fileContent}
                 </pre>
               )}
-              {isVectorDataset && embedUrl && (
+              {isVectorDataset && fileEmbedUrl && (
                 <VectorDatasetViewer
-                  embedUrl={embedUrl}
+                  embedUrl={fileEmbedUrl}
                   fileType={fileType}
                   downloadButton={downloadButton}
                 />
               )}
-              {isPlt && embedUrl && (
-                <PltViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              {isPlt && fileEmbedUrl && (
+                <PltViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />
               )}
-              {isGpx && embedUrl && (
-                <GpxViewer embedUrl={embedUrl} downloadButton={downloadButton} />
+              {isGpx && fileEmbedUrl && (
+                <GpxViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />
               )}
             </>
-          ) : (
+          ) : !fileAccessError ? (
             <Result
               status="warning"
               title={`The filetype '${fileType}' is not currently supported.`}
               extra={downloadButton}
             />
-          )}
+          ) : null}
         </Spin>
       </PlanarianModal>
     </>

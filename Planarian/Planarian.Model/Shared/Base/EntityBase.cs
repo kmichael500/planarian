@@ -53,8 +53,22 @@ public abstract class BaseEntityTypeConfiguration<T> : IEntityTypeConfiguration<
     protected void ConfigureEnum<TEnum>(EntityTypeBuilder<T> builder, Expression<Func<T, TEnum>> propertyExpression)
         where TEnum : struct, Enum
     {
+        ConfigureEnum(builder, ToNullableExpression(propertyExpression));
+    }
+
+    protected void ConfigureEnum<TEnum>(EntityTypeBuilder<T> builder, Expression<Func<T, TEnum?>> propertyExpression)
+        where TEnum : struct, Enum
+    {
         builder.Property(propertyExpression)
             .HasConversion<string>()
             .HasMaxLength(PropertyLength.Key);
+    }
+
+    private static Expression<Func<T, TEnum?>> ToNullableExpression<TEnum>(Expression<Func<T, TEnum>> propertyExpression)
+        where TEnum : struct, Enum
+    {
+        var parameter = propertyExpression.Parameters[0];
+        var convertedBody = Expression.Convert(propertyExpression.Body, typeof(TEnum?));
+        return Expression.Lambda<Func<T, TEnum?>>(convertedBody, parameter);
     }
 }
