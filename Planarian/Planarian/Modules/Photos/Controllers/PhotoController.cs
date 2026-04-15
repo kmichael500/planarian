@@ -26,5 +26,12 @@ public class PhotoController : PlanarianControllerBase<PhotoService>
         return new OkResult();
     }
 
+    [HttpGet("{photoId:length(10)}/content")]
+    public async Task<IActionResult> GetPhotoContent(string photoId, CancellationToken cancellationToken)
+    {
+        var result = await Service.GetPhotoResponse(photoId, cancellationToken);
+        return CreateFileResult(result);
+    }
+
     #endregion
 }

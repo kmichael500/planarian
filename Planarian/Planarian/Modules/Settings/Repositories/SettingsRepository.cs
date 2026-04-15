@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
-using Planarian.Modules.Settings.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Settings.Repositories;
@@ -20,12 +19,6 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
             .FirstAsync();
     }
 
-    public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)
-    {
-        return await DbContext.Users.Where(e => e.Id == userId)
-            .Select(e => new NameProfilePhotoVm(e.FullName, e.ProfilePhotoBlobKey)).FirstAsync();
-    }
-
     public async Task<IEnumerable<SelectListItem<string>>> GetUsers()
     {
         return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
@@ -33,7 +26,7 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
-        return await DbContext.AccountStates.Where(e=>e.AccountId == RequestUser.AccountId)
+        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(accountState => new SelectListItem<string>(accountState.State!.Name, accountState.State.Id))
             .ToListAsync();
     }

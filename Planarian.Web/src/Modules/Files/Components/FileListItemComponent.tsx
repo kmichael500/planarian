@@ -20,7 +20,7 @@ const FileListItemComponent = ({
         <Typography.Link onClick={() => onView(file)}>View</Typography.Link>,
         <Typography.Link
           onClick={async () => {
-            await FileService.startFileDownload(file.id);
+            FileService.startFileDownload(file.id);
           }}
         >
           Download

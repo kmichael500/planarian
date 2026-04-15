@@ -65,7 +65,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     <PlanarianButton
       icon={<CloudDownloadOutlined />}
       onClick={async () => {
-        await FileService.startFileDownload(fileId);
+        FileService.startFileDownload(fileId);
       }}
     >
       Download
@@ -98,17 +98,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
     setIsLoading(true);
 
     let isCancelled = false;
-    const loadFileSasLink = async () => {
+    const loadFileAccessUrl = async () => {
       try {
-        const sasLink = await FileService.createFileSasLink(
-          fileId,
-          FileAccessAction.View
-        );
+        const accessUrl = FileService.getFileAccessUrl(fileId, FileAccessAction.View);
         if (isCancelled) {
           return;
         }
 
-        setFileEmbedUrl(sasLink);
+        setFileEmbedUrl(accessUrl);
         if (!isTextFileType(fileType) && !isCsvFileType(fileType)) {
           setIsLoading(false);
         }
@@ -122,7 +119,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
       }
     };
 
-    loadFileSasLink();
+    loadFileAccessUrl();
 
     return () => {
       isCancelled = true;
@@ -145,7 +142,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
       const loadFileContent = async () => {
         try {
-          const response = await fetch(fileEmbedUrl);
+          const response = await fetch(fileEmbedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to load file.");
           }

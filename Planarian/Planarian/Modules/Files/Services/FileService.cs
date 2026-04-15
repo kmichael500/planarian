@@ -1,18 +1,17 @@
-using Azure;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
-using Azure.Storage.Sas;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Controllers;
-using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Models;
+using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
@@ -20,20 +19,6 @@ namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
 {
-    private static readonly HashSet<string> InlinePreviewExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".avif",
-        ".bmp",
-        ".gif",
-        ".jpeg",
-        ".jpg",
-        ".pdf",
-        ".png",
-        ".tif",
-        ".tiff",
-        ".webp"
-    };
-
     private readonly TagRepository _tagRepository;
     private readonly FileOptions _fileOptions;
     private readonly RequestThrottleService _requestThrottleService;
@@ -199,7 +184,7 @@ public class FileService : ServiceBase<FileRepository>
         {
             await containerClient.CreateIfNotExistsAsync();
         }
-        
+
         return containerClient;
     }
 
@@ -249,7 +234,8 @@ public class FileService : ServiceBase<FileRepository>
         await transaction.CommitAsync();
     }
 
-    public async Task<FileAccessUrlVm> CreateAccessUrl(string fileId, bool isDownload, CancellationToken cancellationToken)
+    public async Task<AuthenticatedFileResponse> CreateFileResponse(string fileId, bool isDownload,
+        CancellationToken cancellationToken)
     {
         await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, fileId);
 
@@ -259,29 +245,27 @@ public class FileService : ServiceBase<FileRepository>
 
         await EnsureFileViewAccess(file.Id, file.CaveId, file.CountyId);
 
-        var client = await GetBlobContainerClient(file.ContainerName);
-        var blobClient = client.GetBlobClient(file.BlobKey);
-        return new FileAccessUrlVm
-        {
-            Url = CreateSasUrl(blobClient, file.FileName, isDownload)
-        };
+        return await CreateBlobResponse(file.BlobKey, file.ContainerName, file.FileName, isDownload, cancellationToken);
     }
 
-    public async Task<FileAccessUrlVm> CreateBlobAccessUrl(
+    public async Task<AuthenticatedFileResponse> CreateBlobResponse(
         string blobKey,
         string containerName,
         string fileName,
-        bool isDownload = false)
+        bool isDownload,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(containerName))
             throw ApiExceptionDictionary.NotFound("File");
 
-        var client = await GetBlobContainerClient(containerName);
+        var client = await GetBlobContainerClient(containerName, createIfNotExists: false);
         var blobClient = client.GetBlobClient(blobKey);
-        return new FileAccessUrlVm
-        {
-            Url = CreateSasUrl(blobClient, fileName, isDownload)
-        };
+        return await BlobService.CreateBlobResponse(
+            blobClient,
+            fileName,
+            isDownload,
+            cancellationToken,
+            MimeTypes.GetMimeType(Path.GetExtension(fileName)));
     }
 
     private async Task EnsureFileManagerAccess(string fileId)
@@ -314,59 +298,6 @@ public class FileService : ServiceBase<FileRepository>
         await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
-    private string CreateSasUrl(BlobClient blobClient, string fileName, bool download = false)
-    {
-        var fileExtension = Path.GetExtension(fileName);
-        var mimeType = MimeTypes.GetMimeType(fileExtension);
-        var contentDisposition = ShouldRenderInline(fileName, download)
-            ? $"inline; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}"
-            : $"attachment; filename=\"{fileName}\"; filename*=UTF-8''{Uri.EscapeDataString(fileName)}";
-        var hasExtendedViewSas = !download &&
-                                 !string.IsNullOrWhiteSpace(fileExtension) &&
-                                 (_fileOptions.ViewSasExtendedFileTypes?.Contains(fileExtension, StringComparer.OrdinalIgnoreCase) ?? false);
-        var expiresInSeconds = hasExtendedViewSas
-            ? _fileOptions.ViewSasExtendedExpirationSeconds
-            : _fileOptions.SasLinkExpirationSeconds;
-
-        if (expiresInSeconds <= 0)
-        {
-            var optionName = hasExtendedViewSas
-                ? nameof(FileOptions.ViewSasExtendedExpirationSeconds)
-                : nameof(FileOptions.SasLinkExpirationSeconds);
-            throw new InvalidOperationException(
-                $"{FileOptions.Key}:{optionName} must be greater than zero.");
-        }
-
-        var sasBuilder = new BlobSasBuilder()
-        {
-            BlobContainerName = blobClient.BlobContainerName,
-            BlobName = blobClient.Name,
-            Resource = "b",
-            StartsOn = DateTimeOffset.UtcNow,
-            ExpiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds),
-            ContentDisposition = contentDisposition,
-            ContentType = mimeType
-        };
-        sasBuilder.SetPermissions(BlobSasPermissions.Read);
-
-        var sasUri = blobClient.GenerateSasUri(sasBuilder);
-        return $"{sasUri}&metadata=filename={Uri.EscapeDataString(fileName)}";
-    }
-
-    public async Task<string> GetLink(string blobKey, string containerName, string fileName, bool isDownload = false)
-        => (await CreateBlobAccessUrl(blobKey, containerName, fileName, isDownload)).Url;
-
-    private static bool ShouldRenderInline(string fileName, bool download)
-    {
-        if (download)
-        {
-            return false;
-        }
-
-        var extension = Path.GetExtension(fileName);
-        return InlinePreviewExtensions.Contains(extension);
-    }
-
     public async Task DeleteFile(string? blobKey, string? blobContainer)
     {
         if (string.IsNullOrWhiteSpace(blobKey) || string.IsNullOrWhiteSpace(blobContainer))
@@ -397,30 +328,9 @@ public class FileService : ServiceBase<FileRepository>
             string.IsNullOrWhiteSpace(blobProperties.BlobKey))
             throw ApiExceptionDictionary.NotFound("File");
 
-        return await GetBlobStream(blobProperties.ContainerName, blobProperties.BlobKey);
-    }
-
-    private async Task<Stream> GetBlobStream(string containerName, string blobKey)
-    {
-        if (string.IsNullOrWhiteSpace(containerName) || string.IsNullOrWhiteSpace(blobKey))
-            throw ApiExceptionDictionary.NotFound("File");
-
-        var client = await GetBlobContainerClient(containerName);
-        var blobClient = client.GetBlobClient(blobKey);
-
-        var stream = new MemoryStream();
-        try
-        {
-            await blobClient.DownloadToAsync(stream);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            await stream.DisposeAsync();
-            throw ApiExceptionDictionary.NotFound("File");
-        }
-
-        stream.Position = 0;
-        return stream;
+        var response = await CreateBlobResponse(blobProperties.BlobKey, blobProperties.ContainerName, file.FileName,
+            false, CancellationToken.None);
+        return response.Stream;
     }
 }
 

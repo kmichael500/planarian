@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Net.Http.Headers;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Shared.Models;
 
 namespace Planarian.Shared.Base;
 
@@ -39,6 +41,21 @@ public abstract class PlanarianControllerBase : ControllerBase
     //
     //     await next();
     // }
+
+    protected FileStreamResult CreateFileResult(AuthenticatedFileResponse response,
+        string cacheControl = "private, max-age=900")
+    {
+        Response.Headers[HeaderNames.CacheControl] = cacheControl;
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+        var result = response.Download && !string.IsNullOrWhiteSpace(response.FileName)
+            ? File(response.Stream, response.ContentType, response.FileName)
+            : File(response.Stream, response.ContentType);
+
+        result.EntityTag = response.EntityTag;
+        result.LastModified = response.LastModified;
+        return result;
+    }
 }
 
 public abstract class PlanarianControllerBase<TService> : PlanarianControllerBase

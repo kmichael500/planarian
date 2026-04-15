@@ -40,6 +40,20 @@ public class UserController : PlanarianControllerBase<UserService>
         return new JsonResult(user);
     }
 
+    [HttpGet("{userId:length(10)}")]
+    public async Task<ActionResult<NameProfilePhotoVm>> GetUserDisplayInfo(string userId)
+    {
+        var user = await Service.GetUserDisplayInfo(userId);
+        return new JsonResult(user);
+    }
+
+    [HttpGet("{userId:length(10)}/photo")]
+    public async Task<IActionResult> GetUserProfilePhoto(string userId, CancellationToken cancellationToken)
+    {
+        var result = await Service.GetUserProfilePhotoResponse(userId, cancellationToken);
+        return CreateFileResult(result);
+    }
+
     [HttpPut("current")]
     public async Task<ActionResult> UpdateCurrentUser([FromBody] UserVm user)
     {

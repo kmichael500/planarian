@@ -12,6 +12,9 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Services;
+using Planarian.Shared.Helpers;
+using Planarian.Shared.Models;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Users.Services;
 
@@ -21,14 +24,16 @@ public class UserService : ServiceBase<UserRepository>
     private readonly EmailService _emailService;
     private readonly RequestThrottleService _requestThrottleService;
     private readonly ServerOptions _serverOptions;
+    private readonly BlobService _blobService;
 
     public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService,
-        ServerOptions serverOptions, RequestThrottleService requestThrottleService) : base(repository,
+        ServerOptions serverOptions, RequestThrottleService requestThrottleService, BlobService blobService) : base(repository,
         requestUser)
     {
         _emailService = emailService;
         _serverOptions = serverOptions;
         _requestThrottleService = requestThrottleService;
+        _blobService = blobService;
     }
 
     public async Task UpdateCurrentUser(UserVm user)
@@ -54,6 +59,34 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserVm(id);
 
         return user;
+    }
+
+    public async Task<NameProfilePhotoVm> GetUserDisplayInfo(string userId)
+    {
+        var user = await Repository.GetUserDisplayInfo(userId);
+
+        if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
+
+        user.ProfilePhotoUrl = UrlHelper.Build(
+            _serverOptions.ServerBaseUrl,
+            $"/api/users/{userId}/photo",
+            RequestUser.AccountId);
+        return user;
+    }
+
+    public async Task<AuthenticatedFileResponse> GetUserProfilePhotoResponse(string userId,
+        CancellationToken cancellationToken)
+    {
+        var blobKey = await Repository.GetUserProfilePhotoBlobKey(userId);
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("Profile photo");
+
+        return await _blobService.CreateBlobResponse(
+            blobKey,
+            $"user-{userId}-profile-photo",
+            false,
+            cancellationToken,
+            fallbackContentType: "image/jpeg");
     }
 
     public async Task UpdateCurrentUserPassword(string password)

@@ -17,7 +17,7 @@ import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
-import { FileAccessUrlVm } from "../../Files/Services/FileService";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -64,11 +64,9 @@ const AccountService = {
   },
 
   async StartArchiveDownload(blobKey: string): Promise<void> {
-    const response = await HttpClient.post<FileAccessUrlVm>(
-      `${baseUrl}/archive/download?blobKey=${encodeURIComponent(blobKey)}`,
-      {}
+    HttpHelpers.NavigateToApiUrl(
+      `${baseUrl}/archive/download?blobKey=${encodeURIComponent(blobKey)}`
     );
-    window.location.assign(response.data.url);
   },
 
   async DeleteArchive(blobKey: string): Promise<void> {

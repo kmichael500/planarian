@@ -4,7 +4,6 @@ import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { CacheService } from "../../../Shared/Services/CacheService";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { TagType } from "../../Tag/Models/TagType";
-import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
 
 const baseUrl = "api/settings";
 const SettingsService = {
@@ -65,12 +64,6 @@ const SettingsService = {
     }
     const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
     CacheService.set(cacheKey, response.data);
-    return response.data;
-  },
-  async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {
-    const response = await HttpClient.get<NameProfilePhotoVm>(
-      `${baseUrl}/users/${userId}`
-    );
     return response.data;
   },
   async GetUsers(): Promise<SelectListItem<string>[]> {

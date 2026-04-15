@@ -1,11 +1,18 @@
 import { HttpClient } from "../..";
 import { AcceptInvitationVm } from "./Models/AcceptInvitationVm";
+import { NameProfilePhotoVm } from "./Models/NameProfilePhotoVm";
 import { UserVm } from "./Models/UserVm";
 
 const baseUrl = "api/users";
 const UserService = {
   async GetCurrentUser(): Promise<UserVm> {
     const response = await HttpClient.get<UserVm>(`${baseUrl}/current`);
+    return response.data;
+  },
+  async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {
+    const response = await HttpClient.get<NameProfilePhotoVm>(
+      `${baseUrl}/${userId}`
+    );
     return response.data;
   },
   async UpdateCurrentUser(user: UserVm): Promise<void> {
