@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from "react";
-import { Spin, Tag, Typography } from "antd";
+import { Spin, Typography } from "antd";
 import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 const { Text } = Typography;
 
@@ -193,7 +194,7 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
       </div>
 
       <div>
-        {access && <Tag color={access.color}>{access.label}</Tag>}{" "}
+        {access && <PlanarianTag color={access.color}>{access.label}</PlanarianTag>}{" "}
         <Text type="secondary">{access?.description || "No description"}</Text>
       </div>
 
@@ -201,13 +202,13 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
         <>
           <div>
             <Text>GAP Status:</Text>{" "}
-            {gap && <Tag color={gap.color}>{gap.label}</Tag>}{" "}
+            {gap && <PlanarianTag color={gap.color}>{gap.label}</PlanarianTag>}{" "}
             <Text type="secondary">{gap?.description || "No description"}</Text>
           </div>
 
           <div>
             <Text>IUCN Category:</Text>{" "}
-            {iucn && <Tag color={iucn.color}>{iucn.label}</Tag>}{" "}
+            {iucn && <PlanarianTag color={iucn.color}>{iucn.label}</PlanarianTag>}{" "}
             <Text type="secondary">
               {iucn?.description || "No description"}
             </Text>

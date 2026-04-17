@@ -1,0 +1,24 @@
+body[data-theme-effective="light"] .planarian-file-list-item,
+body[data-theme-effective="light"] .planarian-file-list-item:hover {
+  background: transparent !important;
+}
+
+.planarian-file-list-item {
+  background: transparent !important;
+  padding-inline: 0 !important;
+}
+
+.planarian-file-list-item .ant-typography,
+.planarian-file-list-item .ant-list-item-action a {
+  color: var(--text-color) !important;
+}
+
+.planarian-file-list-item .ant-list-item-action {
+  margin-inline-start: 16px;
+}
+
+.planarian-file-list-item .ant-tag {
+  background: var(--surface-elevated-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}

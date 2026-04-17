@@ -1,0 +1,94 @@
+.themed-mask-input {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 11px;
+  line-height: 1.5715;
+}
+
+.sidebar.ant-layout-sider,
+.sidebar.ant-layout-sider-dark,
+.sidebar .ant-layout-sider-children,
+.sidebar .ant-layout-sider-trigger,
+.sidebar .ant-menu,
+.sidebar .ant-menu.ant-menu-dark,
+.sidebar .ant-menu-sub,
+.sidebar .ant-menu-dark,
+.sidebar .ant-space,
+.sidebar .ant-typography {
+  background: var(--background-color) !important;
+  color: var(--text-color) !important;
+}
+
+.sidebar.ant-layout-sider,
+.sidebar.ant-layout-sider-dark {
+  border-right: 1px solid var(--border-color) !important;
+}
+
+.sidebar .ant-layout-sider-trigger {
+  border-top: 1px solid var(--border-color);
+}
+
+.sidebar .ant-menu {
+  border-inline-end: none !important;
+}
+
+.sidebar .ant-menu-item,
+.sidebar .ant-menu-submenu-title,
+.sidebar .ant-menu-item a,
+.sidebar .ant-menu-title-content,
+.sidebar .ant-menu-title-content a,
+.sidebar .ant-menu-item-icon,
+.sidebar .anticon,
+.sidebar .ant-typography {
+  color: var(--text-color) !important;
+}
+
+.sidebar .ant-menu-item:hover,
+.sidebar .ant-menu-submenu-title:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.sidebar .ant-menu-item-selected,
+.sidebar .ant-menu-light .ant-menu-item-selected,
+.sidebar .ant-menu-dark .ant-menu-item-selected {
+  background: var(--surface-elevated-color) !important;
+}
+
+.planarian-modal::backdrop {
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+.maplibregl-popup-content,
+.maplibregl-ctrl,
+.maplibregl-ctrl-group {
+  background: var(--map-control-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--map-control-background) !important;
+  border-bottom-color: var(--map-control-background) !important;
+}
+
+.maplibregl-ctrl button {
+  background: transparent !important;
+}
+
+.maplibregl-ctrl button:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: none;
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon,
+.maplibregl-ctrl button .maplibregl-ctrl-icon::before {
+  opacity: 1 !important;
+}
+
+.dark .maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.35) contrast(1.15);
+}

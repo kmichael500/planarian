@@ -12,6 +12,7 @@ import {
   Result,
   Row,
 } from "antd";
+import "./ImportComponent.scss";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { FileVm } from "../../Files/Models/FileVm";
 import { getFileType } from "../../Files/Services/FileHelpers";
@@ -206,6 +207,7 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
     <>
       {!uploaded ? (
         <Card
+          className="planarian-upload-card"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           style={{
@@ -215,7 +217,6 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
             justifyContent: "center",
             width: "100%",
             marginBottom: "20px",
-            border: "2px dashed #ccc",
             padding: "20px",
             textAlign: "center",
             cursor: "pointer",
@@ -244,12 +245,12 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
             <>
               {/* Display remaining files indicator */}
               <div
+                className="planarian-upload-status"
                 style={{
                   width: "100%",
                   textAlign: "right",
                   marginBottom: "5px",
                   fontSize: "12px",
-                  color: "#888",
                 }}
               >
                 {remainingFiles} of {totalFiles} actively uploading
@@ -289,7 +290,7 @@ export const UploadComponent: React.FC<UploadComponentProps> = ({
           </Space>
         </Card>
       ) : (
-        <Card style={{ textAlign: "center", marginBottom: "20px" }}>
+        <Card className="planarian-import-result-card" style={{ textAlign: "center", marginBottom: "20px" }}>
           <Typography.Title level={3}>Upload Complete!</Typography.Title>
           <Button type="primary" onClick={onClose}>
             Close
@@ -393,7 +394,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   return (
     <>
       {!inputsConfirmed && (
-        <Card style={{ width: "100%", marginBottom: "20px" }}>
+        <Card className="planarian-import-info-card" style={{ width: "100%", marginBottom: "20px" }}>
           <Typography.Title level={4}>File Import Settings</Typography.Title>
           <Typography.Paragraph>
             A <strong>delimiter</strong> is a character that separates the
@@ -472,7 +473,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         />
       )}
       {isUploaded && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Successfully Uploaded!"
@@ -504,7 +505,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
       {partialUpload && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#FFA500" }} />}
             title="Partially Uploaded!"
@@ -536,7 +537,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         </Card>
       )}
       {uploadFailed && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             status="error"
             title="Upload Failed"

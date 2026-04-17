@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Select, Spin, Tag } from "antd";
+import { Select, Spin } from "antd";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { StateCountyValue } from "../../Account/Models/UserLocationPermissionsVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 const { Option } = Select;
 
@@ -282,12 +283,12 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
                     (cty) => cty.value === value
                   )?.display;
                   return (
-                    <Tag
+                    <PlanarianTag
                       closable={isPermitted ? closable : false}
                       onClose={isPermitted ? onClose : undefined}
                     >
                       {displayValue}
-                    </Tag>
+                    </PlanarianTag>
                   );
                 }}
               >

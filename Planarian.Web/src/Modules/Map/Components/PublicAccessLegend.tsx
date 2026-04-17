@@ -1,7 +1,8 @@
 import { FC } from "react";
-import { Tag, Typography } from "antd";
+import { Typography } from "antd";
 import styled from "styled-components";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 const { Text } = Typography;
 
@@ -20,13 +21,13 @@ export const PublicAccessLegend: FC = () => {
       </Text>
       <LegendContent>
         {Object.entries(PUBLIC_ACCESS_INFO).map(([code, info]) => (
-          <Tag
+          <PlanarianTag
             key={code}
             color={info.color}
             style={{ margin: 0, padding: "0 4px" }}
           >
             {info.label}
-          </Tag>
+          </PlanarianTag>
         ))}
       </LegendContent>
       <Text

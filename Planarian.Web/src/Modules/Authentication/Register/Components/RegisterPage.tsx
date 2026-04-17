@@ -198,6 +198,7 @@ const RegisterPage: React.FC = () => {
                 ]}
               >
                 <MaskedInput
+                  className="themed-mask-input"
                   name={nameof<RegisterUserVm>("phoneNumber")}
                   mask={"+1 (000) 000-0000"}
                 />

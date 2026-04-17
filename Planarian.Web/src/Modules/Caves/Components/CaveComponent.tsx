@@ -10,13 +10,13 @@ import {
   Grid,
   Row,
   Space,
-  Tag,
   Tooltip,
   Select,
   DatePicker,
   InputNumber,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import {
   defaultIfEmpty,
   DistanceFormat,
@@ -142,7 +142,7 @@ const CaveComponent = ({
           )}
           {cave?.alternateNames.map((name) => (
             <Col key={name}>
-              <Tag>{name}</Tag>
+              <PlanarianTag>{name}</PlanarianTag>
             </Col>
           ))}
         </Row>
@@ -361,7 +361,7 @@ const CaveComponent = ({
                       {entrance.isPrimary && (
                         <>
                           <Col flex="auto"></Col>
-                          <Tag>Primary</Tag>
+                          <PlanarianTag>Primary</PlanarianTag>
                         </>
                       )}
                     </Row>

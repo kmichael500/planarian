@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Select, Spin, Tag, Tooltip } from "antd";
+import { Select, Spin, Tooltip } from "antd";
 import { TripService } from "../Services/TripService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 export interface TripTagComponentProps {
   tripId: string;
@@ -81,9 +82,9 @@ const TripTagComponent = (props: TripTagComponentProps) => {
       {tags.map((tag, index) => {
         const isLongTag = tag.display.length > 20;
         const tagElem = (
-          <Tag key={tag.value} closable={true} onClose={() => handleClose(tag)}>
+          <PlanarianTag key={tag.value} closable={true} onClose={() => handleClose(tag)}>
             {isLongTag ? `${tag.display.slice(0, 20)}...` : tag.display}
-          </Tag>
+          </PlanarianTag>
         );
         return isLongTag ? (
           <Tooltip title={tag.display} key={tag.value}>

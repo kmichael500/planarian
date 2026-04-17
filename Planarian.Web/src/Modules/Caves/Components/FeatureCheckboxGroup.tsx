@@ -14,8 +14,8 @@ interface FeatureCheckboxGroupProps<
 const containerStyle: CSSProperties = {
   borderRadius: "2px",
   padding: "10px",
-  border: "1px solid #d9d9d9",
-  backgroundColor: "white",
+  border: "1px solid var(--header-border-color, #d9d9d9)",
+  backgroundColor: "var(--background-color)",
 };
 
 const FeatureCheckboxGroup = <TValue extends string | number | boolean>({

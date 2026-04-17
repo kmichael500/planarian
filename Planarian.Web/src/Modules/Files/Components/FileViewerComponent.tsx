@@ -1,4 +1,4 @@
-import { Tag, Spin, Result } from "antd";
+import { Spin, Result } from "antd";
 import { useState, useEffect } from "react";
 import {
   CloudDownloadOutlined,
@@ -6,6 +6,7 @@ import {
   RightOutlined,
 } from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import "./FileViewerComponent.scss";
 import {
   isImageFileType,
@@ -57,7 +58,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const headerTitle = (
     <>
       {displayName}
-      {fileType && <Tag style={{ marginLeft: "0.5rem" }}>{fileType}</Tag>}
+      {fileType && <PlanarianTag style={{ marginLeft: "0.5rem" }}>{fileType}</PlanarianTag>}
     </>
   );
 
@@ -302,11 +303,11 @@ const FileViewer: React.FC<FileViewerProps> = ({
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
               {isTextFileType(fileType) && (
                 <pre
+                  className="file-viewer-text-preview"
                   style={{
                     overflow: "auto",
                     height: "50%",
                     padding: "1rem",
-                    border: "1px solid rgb(240, 240, 240)",
                   }}
                 >
                   {isLoading ? <Spin /> : fileContent}

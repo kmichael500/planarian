@@ -1,12 +1,11 @@
-import { Modal, Button, Form, List, message, Divider } from "antd";
+import { Modal, Form, List } from "antd";
 import { AppOptions, AppService } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
 import React, { useEffect, useState } from "react";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-import { SwapOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import "./SwitchAccountComponent.scss";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -21,8 +20,6 @@ const SwitchAccountComponent = ({
   const currentAccountName = AuthenticationService.GetAccountName();
 
   const navigate = useNavigate();
-  const location = useLocation();
-
   const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
 
   useEffect(() => {
@@ -66,13 +63,7 @@ const SwitchAccountComponent = ({
         onFinish={(values) => handleSwitch(values.account)}
       >
         {/* Display the current account */}
-        <div
-          style={{
-            // fontWeight: "bold",
-            backgroundColor: "#f0f2f5",
-            padding: "10px",
-          }}
-        >
+        <div className="planarian-account-banner">
           Your Current Account: {currentAccountName}
         </div>
         <div
@@ -92,22 +83,14 @@ const SwitchAccountComponent = ({
             dataSource={accountList}
             renderItem={(item) => (
               <List.Item
+                className="planarian-account-option"
                 key={item.value}
                 onClick={() => handleSwitch(item.value)}
                 style={{
                   cursor: "pointer",
-                  transition: "background-color 0.3s, border-color 0.3s",
                   padding: "10px",
-                  border: "1px solid #d9d9d9", // Adding a border
-                  borderRadius: "4px", // Optional: to give rounded corners
-                  marginBottom: "10px", // Optional: to space out items
+                  marginBottom: "10px",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#e6f7ff")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "")
-                }
               >
                 {item.display}
               </List.Item>
