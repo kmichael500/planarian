@@ -366,7 +366,9 @@ builder.Services.AddRateLimiter(options =>
             StatusCodes.Status429TooManyRequests,
             "Rate limit exceeded. Please try again later.",
             ApiExceptionType.TooManyRequests,
-            headers: headers);
+            headers: headers,
+            showContactInfo: true,
+            serverOptions: serverOptions);
     };
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         httpContext.RequestServices.GetRequiredService<RequestThrottleService>()

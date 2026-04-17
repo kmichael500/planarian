@@ -29,7 +29,7 @@ public class HttpResponseExceptionMiddleware
                 throw;
             }
 
-            await WriteErrorResponseAsync(context, e.StatusCode, e.Message, e.ErrorCode, e.Data, e.Headers);
+            await WriteErrorResponseAsync(context, e.StatusCode, e.Message, e.ErrorCode, e.Data, e.Headers, e.ShowContactInfo, _serverOptions);
         }
         catch (Exception e)
         {
@@ -65,11 +65,21 @@ public class HttpResponseExceptionMiddleware
         string message,
         ApiExceptionType errorCode,
         object? data = null,
-        IEnumerable<KeyValuePair<string, string>>? headers = null)
+        IEnumerable<KeyValuePair<string, string>>? headers = null,
+        bool showContactInfo = false,
+        ServerOptions? serverOptions = null)
     {
-        var error = new ApiErrorResponse(message, errorCode)
+        var finalMessage = message;
+        if (showContactInfo && serverOptions != null)
         {
-            Data = data
+            finalMessage =
+                $"{message} If you believe this was in error, please contact {serverOptions.SupportName} at {serverOptions.SupportEmail}.";
+        }
+
+        var error = new ApiErrorResponse(finalMessage, errorCode)
+        {
+            Data = data,
+            ShowContactInfo = showContactInfo
         };
 
         if (headers != null)
@@ -91,4 +101,5 @@ public class ApiErrorResponse(string message, ApiExceptionType errorCode)
     public string Message { get; } = message;
     public ApiExceptionType ErrorCode { get; } = errorCode;
     public object? Data { get; set; }
+    public bool ShowContactInfo { get; set; }
 }

@@ -86,6 +86,8 @@ export { AppService, AppOptions };
 export interface AppInitializeVm {
   serverBaseUrl: string;
   signalrBaseUrl: string;
+  supportName: string;
+  supportEmail: string;
   accountIds: SelectListItem<string>[];
   permissions: PermissionKey[];
 }
