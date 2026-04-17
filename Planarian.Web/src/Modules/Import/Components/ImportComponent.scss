@@ -7,6 +7,9 @@
 
 .ant-upload.ant-upload-drag {
   height: 100%;
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
 }
 
 #step-wrapper-container > span {
@@ -18,4 +21,24 @@
   &:hover {
     text-decoration: underline;
   }
+}
+
+.planarian-upload-card,
+.planarian-import-info-card,
+.planarian-import-result-card {
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.planarian-upload-card {
+  border: 2px dashed var(--border-color) !important;
+}
+
+.planarian-template-code {
+  background: var(--code-background-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
 }

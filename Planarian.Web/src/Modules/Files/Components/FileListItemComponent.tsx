@@ -3,6 +3,7 @@ import { FileVm } from "../Models/FileVm";
 import { getFileType } from "../Services/FileHelpers";
 import { FileService } from "../Services/FileService";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
+import "./FileListItemComponent.scss";
 
 interface FileListItemComponentProps {
   file: FileVm;

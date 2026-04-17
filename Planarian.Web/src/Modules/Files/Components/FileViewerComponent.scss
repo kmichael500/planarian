@@ -13,3 +13,10 @@
 .ant-table {
   height: 100%;
 }
+
+.file-viewer-text-preview {
+  background: var(--surface-elevated-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}

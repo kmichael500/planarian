@@ -6,47 +6,6 @@
   line-height: 1.5715;
 }
 
-.ant-upload.ant-upload-drag,
-.planarian-upload-card,
-.planarian-import-info-card,
-.planarian-import-result-card {
-  background: var(--surface-color) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-color) !important;
-}
-
-.ant-upload.ant-upload-drag,
-.planarian-upload-card {
-  border: 2px dashed var(--border-color) !important;
-}
-
-.planarian-template-code {
-  background: var(--code-background-color);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.15rem 0.4rem;
-}
-
-.planarian-account-banner {
-  background: var(--surface-elevated-color);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-color);
-  padding: 10px;
-}
-
-.planarian-account-option {
-  background: var(--surface-color);
-  border: 1px solid var(--border-color) !important;
-  border-radius: 4px;
-  transition: background-color 0.3s, border-color 0.3s;
-}
-
-.planarian-account-option:hover {
-  background: var(--hover-surface-color) !important;
-}
-
 .sidebar.ant-layout-sider,
 .sidebar.ant-layout-sider-dark,
 .sidebar .ant-layout-sider-children,
@@ -100,13 +59,6 @@
   background: rgba(0, 0, 0, 0.55) !important;
 }
 
-.file-viewer-text-preview {
-  background: var(--surface-elevated-color);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-
 .maplibregl-popup-content,
 .maplibregl-ctrl,
 .maplibregl-ctrl-group {
@@ -139,29 +91,4 @@
 
 .dark .maplibregl-ctrl button .maplibregl-ctrl-icon {
   filter: invert(1) brightness(1.35) contrast(1.15);
-}
-
-body[data-theme-effective="light"] .planarian-file-list-item,
-body[data-theme-effective="light"] .planarian-file-list-item:hover {
-  background: transparent !important;
-}
-
-.planarian-file-list-item {
-  background: transparent !important;
-  padding-inline: 0 !important;
-}
-
-.planarian-file-list-item .ant-typography,
-.planarian-file-list-item .ant-list-item-action a {
-  color: var(--text-color) !important;
-}
-
-.planarian-file-list-item .ant-list-item-action {
-  margin-inline-start: 16px;
-}
-
-.planarian-file-list-item .ant-tag {
-  background: var(--surface-elevated-color) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-color) !important;
 }

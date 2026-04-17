@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { useNavigate } from "react-router-dom";
+import "./SwitchAccountComponent.scss";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -62,9 +63,7 @@ const SwitchAccountComponent = ({
         onFinish={(values) => handleSwitch(values.account)}
       >
         {/* Display the current account */}
-        <div
-          className="planarian-account-banner"
-        >
+        <div className="planarian-account-banner">
           Your Current Account: {currentAccountName}
         </div>
         <div

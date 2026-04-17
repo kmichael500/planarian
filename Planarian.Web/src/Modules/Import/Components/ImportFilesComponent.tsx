@@ -12,6 +12,7 @@ import {
   Result,
   Row,
 } from "antd";
+import "./ImportComponent.scss";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { FileVm } from "../../Files/Models/FileVm";
 import { getFileType } from "../../Files/Services/FileHelpers";
