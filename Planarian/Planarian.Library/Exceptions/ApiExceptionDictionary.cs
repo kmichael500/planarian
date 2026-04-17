@@ -33,7 +33,10 @@ public static class ApiExceptionDictionary
 
     public static ApiException TooManyRequests(string message)
     {
-        return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message);
+        return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message)
+        {
+            ShowContactInfo = true
+        };
     }
 
     public static ApiException TooManyRequests(string message, int retryAfterSeconds)
