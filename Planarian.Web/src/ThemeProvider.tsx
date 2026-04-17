@@ -56,8 +56,14 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const update = () => setSystemDark(mq.matches);
       update();
-      mq.addEventListener("change", update);
-      return () => mq.removeEventListener("change", update);
+
+      if (typeof mq.addEventListener === "function") {
+        mq.addEventListener("change", update);
+        return () => mq.removeEventListener("change", update);
+      }
+
+      mq.addListener(update);
+      return () => mq.removeListener(update);
     }
   }, []);
 
