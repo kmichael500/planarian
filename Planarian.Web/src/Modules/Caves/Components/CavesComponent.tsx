@@ -1,8 +1,9 @@
-import { Typography, Form, Space, message, Tag, Spin } from "antd";
+import { Typography, Form, Space, message, Spin } from "antd";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
 
@@ -519,19 +520,23 @@ const CavesComponent: React.FC = () => {
         ) : (
           caves && (
             <>
-              {hasAppliedFilters ? (
-                <Tag color="#F8DB6A" style={{ color: "black" }}>
-                  <Typography.Text style={{ color: "black" }}>
-                    Filtered: {formatNumber(caves.totalCount)} results found
-                  </Typography.Text>
-                </Tag>
-              ) : (
-                <Tag>
-                  <Typography.Text>
-                    {formatNumber(caves.totalCount)} results found
-                  </Typography.Text>
-                </Tag>
-              )}
+              {(() => {
+                const resultText = hasAppliedFilters
+                  ? `Filtered: ${formatNumber(caves.totalCount)} results found`
+                  : `${formatNumber(caves.totalCount)} results found`;
+
+                return (
+                  <PlanarianTag
+                    style={{
+                      background: "#F8DB6A",
+                      color: "#222",
+                      borderColor: "#F8DB6A",
+                    }}
+                  >
+                    {resultText}
+                  </PlanarianTag>
+                );
+              })()}
             </>
           )
         )}

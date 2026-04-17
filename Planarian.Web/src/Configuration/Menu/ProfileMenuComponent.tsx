@@ -1,6 +1,11 @@
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { Dropdown, Avatar } from "antd";
-import { UserOutlined, SwapOutlined, LogoutOutlined } from "@ant-design/icons";
+import {
+  UserOutlined,
+  SwapOutlined,
+  LogoutOutlined,
+  BgColorsOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import {
@@ -14,8 +19,10 @@ import {
   StringHelpers,
   isNullOrWhiteSpace,
 } from "../../Shared/Helpers/StringHelpers";
+import { useTheme } from "../../ThemeProvider";
 
 function ProfileMenu() {
+  const { modeLabel, cycleMode } = useTheme();
   const getUserInitials = () => {
     const name = AuthenticationService.GetName();
     return `${StringHelpers.GenerateAbbreviation(name ?? "")}`;
@@ -27,6 +34,8 @@ function ProfileMenu() {
   const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const keepDropdownOpenRef = useRef(false);
 
   const menuItems = [
     {
@@ -34,6 +43,15 @@ function ProfileMenu() {
       icon: <UserOutlined />,
       label: "Profile",
       requiresAuthentication: true,
+    },
+    {
+      key: "theme",
+      icon: <BgColorsOutlined />,
+      label: `Theme: ${modeLabel}`,
+      requiresAuthentication: true,
+      action: () => {
+        cycleMode();
+      },
     },
     {
       key: "switch-account",
@@ -70,8 +88,29 @@ function ProfileMenu() {
       )}
       {isAuthenticated && (
         <Dropdown
+          open={isDropdownOpen}
+          onOpenChange={(open) => {
+            if (!open && keepDropdownOpenRef.current) {
+              keepDropdownOpenRef.current = false;
+              return;
+            }
+
+            setIsDropdownOpen(open);
+          }}
           overlay={
-            <PlanarianMenuComponent mode="vertical" menuItems={menuItems} />
+            <PlanarianMenuComponent
+              mode="vertical"
+              menuItems={menuItems}
+              onMenuItemClick={(key) => {
+                if (key === "theme") {
+                  keepDropdownOpenRef.current = true;
+                  setIsDropdownOpen(true);
+                  return;
+                }
+
+                setIsDropdownOpen(false);
+              }}
+            />
           }
           trigger={["click"]}
         >

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Typography, Button, Space, Tag, message } from "antd";
+import { Card, Typography, Button, Space, message } from "antd";
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -7,6 +7,7 @@ import {
   LoginOutlined,
   EnvironmentOutlined,
 } from "@ant-design/icons";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import { useNavigate } from "react-router-dom"; // Add this import for navigation
 import { AuthenticationService } from "../Services/AuthenticationService";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
@@ -124,14 +125,14 @@ const InvitationComponent = ({
             <Text strong>Regions:</Text>
             <div style={styles.tags}>
               {invitation?.regions.map((region) => (
-                <Tag
+                <PlanarianTag
                   key={region}
                   color="blue"
                   icon={<EnvironmentOutlined />}
                   style={styles.tag}
                 >
                   {region}
-                </Tag>
+                </PlanarianTag>
               ))}
             </div>
           </div>

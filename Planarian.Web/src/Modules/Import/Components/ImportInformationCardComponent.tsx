@@ -383,6 +383,7 @@ const ImportInformationCardComponent = () => {
   return (
     <>
       <Card
+        className="planarian-import-info-card"
         bordered={false}
         style={{
           // boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
@@ -437,7 +438,7 @@ const ImportInformationCardComponent = () => {
                     key={item.value}
                   >
                     <span>
-                      <code style={{ whiteSpace: "normal" }}>{item.value}</code>
+                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
                     </span>
                   </Tooltip>
                 ))}
@@ -460,7 +461,7 @@ const ImportInformationCardComponent = () => {
                     key={item.value}
                   >
                     <span>
-                      <code style={{ whiteSpace: "normal" }}>{item.value}</code>
+                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
                     </span>
                   </Tooltip>
                 ))}
@@ -503,7 +504,7 @@ const ImportInformationCardComponent = () => {
                     key={item.value}
                   >
                     <span>
-                      <code style={{ whiteSpace: "normal" }}>{item.value}</code>
+                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
                     </span>
                   </Tooltip>
                 ))}
@@ -526,7 +527,7 @@ const ImportInformationCardComponent = () => {
                     key={item.value}
                   >
                     <span>
-                      <code style={{ whiteSpace: "normal" }}>{item.value}</code>
+                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
                     </span>
                   </Tooltip>
                 ))}

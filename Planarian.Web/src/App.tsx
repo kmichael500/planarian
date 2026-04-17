@@ -1,9 +1,12 @@
-import { Col, Layout, Row, Spin } from "antd";
+import { Col, Layout, Row, Spin, ConfigProvider } from "antd";
+import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { SyncfusionThemeManager } from "./SyncfusionThemeManager";
+import { theme as antdTheme } from "antd";
 import React from "react";
 import "./App.css";
 import { AppRouting } from "./Configuration/Routing/App.routing";
 import { Helmet } from "react-helmet";
-import { BrowserRouter, useNavigate } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
@@ -15,13 +18,15 @@ import { AuthenticationService } from "./Modules/Authentication/Services/Authent
 
 const { Content } = Layout;
 
-const App: React.FC = () => {
+
+const AppContent: React.FC = () => {
   return (
     <>
       <Helmet>
         <title>Planarian</title>
         <meta name="description" content="Cave project management" />
       </Helmet>
+      <SyncfusionThemeManager />
       <BrowserRouter>
         <AppProvider>
           <AppContext.Consumer>
@@ -59,19 +64,19 @@ const App: React.FC = () => {
                     <Col span={24}>{initializedError?.message}</Col>
                     {initializedError?.errorCode ===
                       ApiExceptionType.Unauthorized && (
-                      <Col span={24}>
-                        <PlanarianButton
-                          icon={<RedoOutlined />}
-                          onClick={() => {
-                            AuthenticationService.ResetAccountId();
-                            AuthenticationService.Logout();
-                            window.location.reload();
-                          }}
-                        >
-                          Login
-                        </PlanarianButton>{" "}
-                      </Col>
-                    )}
+                        <Col span={24}>
+                          <PlanarianButton
+                            icon={<RedoOutlined />}
+                            onClick={() => {
+                              AuthenticationService.ResetAccountId();
+                              AuthenticationService.Logout();
+                              window.location.reload();
+                            }}
+                          >
+                            Login
+                          </PlanarianButton>{" "}
+                        </Col>
+                      )}
                   </Row>
                 </div>
               )
@@ -80,6 +85,23 @@ const App: React.FC = () => {
         </AppProvider>
       </BrowserRouter>
     </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <ThemeConsumerWrapper />
+    </ThemeProvider>
+  );
+};
+
+const ThemeConsumerWrapper: React.FC = () => {
+  const { effectiveMode } = useTheme();
+  return (
+    <ConfigProvider theme={{ algorithm: effectiveMode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+      <AppContent />
+    </ConfigProvider>
   );
 };
 

@@ -127,7 +127,9 @@ const mapControlSelector = Object.values(mapControlContainerIds)
 
 const FloatingPanel = styled.div`
   position: absolute;
-  background: #fff;
+  background: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px;
   margin: 20px;
@@ -831,7 +833,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   fontSize: "1.3rem",
                   fontWeight: "bold",
                   color: "#0078ff",
-                  textShadow: "1px 1px 2px #fff",
+                  textShadow: "1px 1px 2px rgba(15, 23, 32, 0.35)",
                 }}
               >
                 Drop your Shapefile (zip) here!
@@ -910,7 +912,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                         8,
                       ],
                       "circle-opacity": ["step", ["zoom"], 0, 16, 0.8],
-                      "circle-stroke-color": "#fff",
+                      "circle-stroke-color": "#0f1720",
                       "circle-stroke-width": ["step", ["zoom"], 0, 16, 0.5],
                     };
                     break;
@@ -1126,7 +1128,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     "text-allow-overlap": false, // This will prevent text from overlapping, reducing clutter
                   }}
                   paint={{
-                    "text-color": "#000", // Set text color to black
+                    "text-color": "#0f1720",
                     "text-opacity": [
                       "step", // Change interpolation type to 'step'
                       ["zoom"],

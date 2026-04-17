@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Modal, message, Spin } from "antd";
+import { Card, Result, Button, message, Spin } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -160,7 +160,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       )}
 
       {uploadFailed && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             status="error"
             title="Upload Failed"
@@ -184,7 +184,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
         !isProcessing &&
         processError === null &&
         !isDryRunComplete && (
-          <Card style={{ width: "100%" }}>
+          <Card className="planarian-import-result-card" style={{ width: "100%" }}>
             <Result
               icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
               title="Successfully Uploaded!"
@@ -207,7 +207,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
         )}
 
       {isDryRunComplete && !isProcessing && !isProcessed && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Dry Run Complete!"
@@ -233,7 +233,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       )}
 
       {isProcessing && (
-        <Card style={{ width: "100%" }}>
+        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
           <Result
             icon={<DeliveredProcedureOutlined style={{ color: "#1890ff" }} />}
             title="Processing..."

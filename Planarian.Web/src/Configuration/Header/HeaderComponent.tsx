@@ -1,8 +1,9 @@
-import { Col, Drawer, Grid, Row, Spin, Tag, Typography } from "antd";
+import { Col, Drawer, Grid, Row, Spin, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
 import { useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
+import { PlanarianTag } from "../../Shared/Components/Display/PlanarianTag";
 import {
   StringHelpers,
   isNullOrWhiteSpace,
@@ -60,17 +61,17 @@ const HeaderComponent = () => {
           paddingTop:
             hasHeaderButons || (!hasHeaderButons && !isLargeScreenSize)
               ? "4px"
-              : "4px", // this used to be 16px but caused a bug in the header with the position of the icons
+              : "4px",
           paddingBottom: "4px",
           paddingRight: "16px",
           paddingLeft: "16px",
           height: "70px",
-          background: "white",
+          background: "var(--background-color)",
           position: "sticky",
           top: 0,
           zIndex: 1000,
           width: "100%",
-          border: "1px solid #f0f0f0",
+          border: "1px solid var(--header-border-color, #f0f0f0)",
         }}
       >
         <Spin
@@ -161,9 +162,9 @@ const AccountNameTag = () => {
   return (
     <>
       {isNotXs && (
-        <Tag style={{ whiteSpace: "nowrap" }}>
+        <PlanarianTag style={{ whiteSpace: "nowrap" }}>
           {isLargeScreenSize ? accountName : accountNameAbbreviation}
-        </Tag>
+        </PlanarianTag>
       )}
     </>
   );

@@ -230,6 +230,7 @@ const UserUpdateComponent: React.FC = () => {
                   ]}
                 >
                   <MaskedInput
+                    className="themed-mask-input"
                     name={nameof<UserVm>("phoneNumber")}
                     mask={"+1 (000) 000-0000"}
                   ></MaskedInput>
