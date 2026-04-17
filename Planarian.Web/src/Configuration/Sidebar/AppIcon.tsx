@@ -1,7 +1,14 @@
 import { CSSProperties, HTMLAttributes } from "react";
 import { ReactComponent as LogoLightSvg } from "./logo-light.svg";
+import { useTheme } from "../../ThemeProvider";
 
 type LogoIconProps = HTMLAttributes<HTMLSpanElement>;
+type LogoVariant = "light" | "dark";
+
+const LOGO_BY_VARIANT: Record<LogoVariant, typeof LogoLightSvg> = {
+  light: LogoLightSvg,
+  dark: LogoLightSvg,
+};
 
 const scaleSize = (value: CSSProperties["fontSize"], multiplier: number) => {
   if (typeof value === "number") {
@@ -20,7 +27,13 @@ const scaleSize = (value: CSSProperties["fontSize"], multiplier: number) => {
   return value;
 };
 
+const getLogoVariant = (effectiveMode: "light" | "dark"): LogoVariant => {
+  return effectiveMode === "dark" ? "dark" : "light";
+};
+
 export const LogoIcon = ({ style, ...props }: LogoIconProps) => {
+  const { effectiveMode } = useTheme();
+  const LogoSvg = LOGO_BY_VARIANT[getLogoVariant(effectiveMode)];
   const fallbackSize = style?.fontSize ? scaleSize(style.fontSize, 2) : undefined;
 
   const resolvedStyle: CSSProperties = {
@@ -35,7 +48,7 @@ export const LogoIcon = ({ style, ...props }: LogoIconProps) => {
 
   return (
     <span {...props} style={resolvedStyle}>
-      <LogoLightSvg
+      <LogoSvg
         style={{
           display: "block",
           width: "100%",

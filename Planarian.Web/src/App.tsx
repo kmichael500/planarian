@@ -1,23 +1,22 @@
-import { Col, Layout, Row, Spin, ConfigProvider } from "antd";
-import { ThemeProvider, useTheme } from "./ThemeProvider";
-import { SyncfusionThemeManager } from "./SyncfusionThemeManager";
 import { theme as antdTheme } from "antd";
+import { Col, ConfigProvider, Layout, Row, Spin } from "antd";
+import { RedoOutlined } from "@ant-design/icons";
 import React from "react";
-import "./App.css";
-import { AppRouting } from "./Configuration/Routing/App.routing";
 import { Helmet } from "react-helmet";
 import { BrowserRouter } from "react-router-dom";
+import "./App.css";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
-import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
-import { ApiExceptionType } from "./Shared/Models/ApiErrorResponse";
-import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
-import { RedoOutlined } from "@ant-design/icons";
+import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
+import { AppRouting } from "./Configuration/Routing/App.routing";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
+import { SyncfusionThemeManager } from "./SyncfusionThemeManager";
+import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
+import { ApiExceptionType } from "./Shared/Models/ApiErrorResponse";
+import { ThemeProvider, useTheme } from "./ThemeProvider";
 
 const { Content } = Layout;
-
 
 const AppContent: React.FC = () => {
   return (
@@ -98,8 +97,16 @@ const App: React.FC = () => {
 
 const ThemeConsumerWrapper: React.FC = () => {
   const { effectiveMode } = useTheme();
+
   return (
-    <ConfigProvider theme={{ algorithm: effectiveMode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+    <ConfigProvider
+      theme={{
+        algorithm:
+          effectiveMode === "dark"
+            ? antdTheme.darkAlgorithm
+            : antdTheme.defaultAlgorithm,
+      }}
+    >
       <AppContent />
     </ConfigProvider>
   );

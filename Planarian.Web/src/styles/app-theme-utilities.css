@@ -1,0 +1,167 @@
+.themed-mask-input {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 11px;
+  line-height: 1.5715;
+}
+
+.ant-upload.ant-upload-drag,
+.planarian-upload-card,
+.planarian-import-info-card,
+.planarian-import-result-card {
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.ant-upload.ant-upload-drag,
+.planarian-upload-card {
+  border: 2px dashed var(--border-color) !important;
+}
+
+.planarian-template-code {
+  background: var(--code-background-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
+
+.planarian-account-banner {
+  background: var(--surface-elevated-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-color);
+  padding: 10px;
+}
+
+.planarian-account-option {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 4px;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.planarian-account-option:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.sidebar.ant-layout-sider,
+.sidebar.ant-layout-sider-dark,
+.sidebar .ant-layout-sider-children,
+.sidebar .ant-layout-sider-trigger,
+.sidebar .ant-menu,
+.sidebar .ant-menu.ant-menu-dark,
+.sidebar .ant-menu-sub,
+.sidebar .ant-menu-dark,
+.sidebar .ant-space,
+.sidebar .ant-typography {
+  background: var(--background-color) !important;
+  color: var(--text-color) !important;
+}
+
+.sidebar.ant-layout-sider,
+.sidebar.ant-layout-sider-dark {
+  border-right: 1px solid var(--border-color) !important;
+}
+
+.sidebar .ant-layout-sider-trigger {
+  border-top: 1px solid var(--border-color);
+}
+
+.sidebar .ant-menu {
+  border-inline-end: none !important;
+}
+
+.sidebar .ant-menu-item,
+.sidebar .ant-menu-submenu-title,
+.sidebar .ant-menu-item a,
+.sidebar .ant-menu-title-content,
+.sidebar .ant-menu-title-content a,
+.sidebar .ant-menu-item-icon,
+.sidebar .anticon,
+.sidebar .ant-typography {
+  color: var(--text-color) !important;
+}
+
+.sidebar .ant-menu-item:hover,
+.sidebar .ant-menu-submenu-title:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.sidebar .ant-menu-item-selected,
+.sidebar .ant-menu-light .ant-menu-item-selected,
+.sidebar .ant-menu-dark .ant-menu-item-selected {
+  background: var(--surface-elevated-color) !important;
+}
+
+.planarian-modal::backdrop {
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+.file-viewer-text-preview {
+  background: var(--surface-elevated-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.maplibregl-popup-content,
+.maplibregl-ctrl,
+.maplibregl-ctrl-group {
+  background: var(--map-control-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--map-control-background) !important;
+  border-bottom-color: var(--map-control-background) !important;
+}
+
+.maplibregl-ctrl button {
+  background: transparent !important;
+}
+
+.maplibregl-ctrl button:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: none;
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon,
+.maplibregl-ctrl button .maplibregl-ctrl-icon::before {
+  opacity: 1 !important;
+}
+
+.dark .maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.35) contrast(1.15);
+}
+
+body[data-theme-effective="light"] .planarian-file-list-item,
+body[data-theme-effective="light"] .planarian-file-list-item:hover {
+  background: transparent !important;
+}
+
+.planarian-file-list-item {
+  background: transparent !important;
+  padding-inline: 0 !important;
+}
+
+.planarian-file-list-item .ant-typography,
+.planarian-file-list-item .ant-list-item-action a {
+  color: var(--text-color) !important;
+}
+
+.planarian-file-list-item .ant-list-item-action {
+  margin-inline-start: 16px;
+}
+
+.planarian-file-list-item .ant-tag {
+  background: var(--surface-elevated-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}

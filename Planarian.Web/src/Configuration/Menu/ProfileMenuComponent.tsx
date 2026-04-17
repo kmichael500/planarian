@@ -35,7 +35,7 @@ function ProfileMenu() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const keepDropdownOpenRef = useRef(false);
+  const keepThemePreviewOpenRef = useRef(false);
 
   const menuItems = [
     {
@@ -90,8 +90,10 @@ function ProfileMenu() {
         <Dropdown
           open={isDropdownOpen}
           onOpenChange={(open) => {
-            if (!open && keepDropdownOpenRef.current) {
-              keepDropdownOpenRef.current = false;
+            // Keep the menu open while cycling themes so the user can preview
+            // each mode in place without reopening the dropdown.
+            if (!open && keepThemePreviewOpenRef.current) {
+              keepThemePreviewOpenRef.current = false;
               return;
             }
 
@@ -103,7 +105,7 @@ function ProfileMenu() {
               menuItems={menuItems}
               onMenuItemClick={(key) => {
                 if (key === "theme") {
-                  keepDropdownOpenRef.current = true;
+                  keepThemePreviewOpenRef.current = true;
                   setIsDropdownOpen(true);
                   return;
                 }

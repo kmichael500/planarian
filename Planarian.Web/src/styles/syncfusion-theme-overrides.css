@@ -1,0 +1,154 @@
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-gridheader,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-gridcontent,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-headercontent,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-content,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-table,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-items,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pagercontainer {
+  background: var(--surface-color) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-headercell,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-rowcell,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-gridpager,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-left,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-right,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-item,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-parentmsgbar,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-pagerdropdown,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-numericitem,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-navigation,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-filterbarcell,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-recordplusexpand,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-row,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-altrow {
+  background: transparent !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-row:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-altrow:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-item:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-numericitem:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-navigation:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-link,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-numericitem,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-spacing,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-next,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-prev,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-first,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-last,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mnext,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mprev,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mfirst,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mlast {
+  background: transparent !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-link:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-numericitem:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-next:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-prev:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-first:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-last:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mnext:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mprev:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mfirst:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-pager .e-mlast:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-headertext,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-icons,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-item .e-tbar-btn-text,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-input,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid input,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search .e-input-group-icon,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pager .e-icon,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-btn-icon {
+  color: var(--text-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-input-group,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-control.e-input,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-pagerdropdown,
+body[data-syncfusion-theme="dark"] .e-excelfilter,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-dlg-content,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-footer-content,
+body[data-syncfusion-theme="dark"] .e-popup,
+body[data-syncfusion-theme="dark"] .e-dialog.e-popup,
+body[data-syncfusion-theme="dark"] .e-dropdownbase,
+body[data-syncfusion-theme="dark"] .e-dropdownbase .e-list-item,
+body[data-syncfusion-theme="dark"] .e-contextmenu-wrapper,
+body[data-syncfusion-theme="dark"] .e-contextmenu-container,
+body[data-syncfusion-theme="dark"] .e-input-group,
+body[data-syncfusion-theme="dark"] .e-input-group input {
+  background: var(--surface-color) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-item.e-search-wrapper,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-toolbar-item.e-search-wrapper:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search-wrapper,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search-wrapper:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search.planarian-csv-grid,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search.planarian-csv-grid:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-search.planarian-csv-grid.e-input-focus,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-input-group.planarian-csv-grid,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-input-group.planarian-csv-grid:hover,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-input-group.planarian-csv-grid.e-input-focus {
+  background: var(--input-background-color) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid input.e-input::placeholder {
+  color: var(--muted-text-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .e-dropdownbase .e-list-item:hover,
+body[data-syncfusion-theme="dark"] .e-dropdownbase .e-list-item.e-active,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-contextmenu-wrapper ul .e-menu-item:hover,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-contextmenu-container ul .e-menu-item:hover {
+  background: var(--hover-surface-color) !important;
+  color: var(--text-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-checkboxfiltertext,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-btn,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-label,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-menu-item,
+body[data-syncfusion-theme="dark"] .e-excelfilter .e-input,
+body[data-syncfusion-theme="dark"] .e-popup .e-input,
+body[data-syncfusion-theme="dark"] .e-popup .e-input-group-icon,
+body[data-syncfusion-theme="dark"] .e-popup .e-icons,
+body[data-syncfusion-theme="dark"] .e-dialog .e-btn,
+body[data-syncfusion-theme="dark"] .e-dialog .e-dlg-header-content,
+body[data-syncfusion-theme="dark"] .e-dialog .e-dlg-content {
+  color: var(--text-color) !important;
+}
+
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-active,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-currentitem,
+body[data-syncfusion-theme="dark"] .planarian-csv-grid.e-grid .e-currentitem:hover {
+  background: var(--surface-elevated-color) !important;
+  color: var(--text-color) !important;
+}
