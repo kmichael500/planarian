@@ -625,11 +625,15 @@ public class ImportService : ServiceBase
                             allBiologyTags.ToDictionary(e => e.Id, e => e.Name),
                             allOtherTags.ToDictionary(e => e.Id, e => e.Name),
                             allPeopleTags.ToDictionary(e => e.Id, e => e.Name));
-                        caveActionsById[cave.Id] = string.IsNullOrWhiteSpace(changeSummary)
+                        var action = string.IsNullOrWhiteSpace(changeSummary)
                             ? "no change"
                             : "update";
+                        caveActionsById[cave.Id] = action;
                         caveChangeSummariesById[cave.Id] = changeSummary;
-                        cavesForUpdate.Add(cave);
+                        if (action == "update")
+                        {
+                            cavesForUpdate.Add(cave);
+                        }
                     }
                     else if (syncExisting)
                     {
@@ -1492,23 +1496,57 @@ public class ImportService : ServiceBase
                 "Validating there is only one primary entrance per cave");
             var invalidPrimaryEntrance = await _temporaryEntranceRepository.GetInvalidIsPrimaryRecords();
             if (invalidPrimaryEntrance.Any())
+            {
+                var associatedEntrancesById = associatedEntrances.ToDictionary(e => e.Id);
+                var invalidCaveIds = new HashSet<string>();
                 foreach (var tempEntranceId in invalidPrimaryEntrance)
                 {
-                    var tempEntrance = entrances.FirstOrDefault(e => e.Id == tempEntranceId);
-                    if (tempEntrance == null)
+                    if (!associatedEntrancesById.TryGetValue(tempEntranceId, out var associatedEntrance) ||
+                        string.IsNullOrWhiteSpace(associatedEntrance.CaveId))
                         throw ApiExceptionDictionary.InternalServerError(
                             "There was an issue validating primary entrances.");
 
-                    var record = entranceRecords.FirstOrDefault(e => e.EntranceId == tempEntranceId);
+                    if (!invalidCaveIds.Add(associatedEntrance.CaveId))
+                    {
+                        continue;
+                    }
+
+                    var caveEntranceIds = associatedEntrances
+                        .Where(e => e.CaveId == associatedEntrance.CaveId)
+                        .Select(e => e.Id)
+                        .ToHashSet();
+                    var record = entranceRecords.FirstOrDefault(e => caveEntranceIds.Contains(e.EntranceId ?? ""));
                     if (record == null)
                         throw ApiExceptionDictionary.InternalServerError(
                             "There was an issue validating primary entrances.");
 
-                    // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
-                    var calculatedRowNumber = entranceRecords.IndexOf(record) + 2;
-                    failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, calculatedRowNumber,
-                        $"Entrance is marked as primary but there is already a primary entrance for the cave {record.CountyCode}-{record.CountyCaveNumber}"));
+                    var existingPrimaryCount = syncExisting
+                        ? 0
+                        : existingEntranceCounts.GetValueOrDefault(associatedEntrance.CaveId);
+                    var importedPrimaryCount = associatedEntrances
+                        .Count(e => e.CaveId == associatedEntrance.CaveId &&
+                                    entrances.Any(entrance => entrance.Id == e.Id && entrance.IsPrimary));
+                    var finalPrimaryCount = existingPrimaryCount + importedPrimaryCount;
+                    if (finalPrimaryCount == 0)
+                    {
+                        var calculatedRowNumber = entranceRecords.IndexOf(record) + 2;
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(record, calculatedRowNumber,
+                            $"No primary entrance found for cave {record.CountyCode}-{record.CountyCaveNumber}"));
+                        continue;
+                    }
+
+                    var offendingPrimaryRecords = entranceRecords
+                        .Where(e => caveEntranceIds.Contains(e.EntranceId ?? "") && e.IsPrimaryEntrance == true)
+                        .ToList();
+
+                    foreach (var offendingRecord in offendingPrimaryRecords)
+                    {
+                        var calculatedRowNumber = entranceRecords.IndexOf(offendingRecord) + 2;
+                        failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(offendingRecord, calculatedRowNumber,
+                            $"Entrance is marked as primary but there is already a primary entrance for the cave {offendingRecord.CountyCode}-{offendingRecord.CountyCaveNumber}"));
+                    }
                 }
+            }
 
             if (failedRecords.Any())
             {
