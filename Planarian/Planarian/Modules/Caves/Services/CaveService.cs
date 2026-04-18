@@ -818,7 +818,7 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
-        IDbContextTransaction? transaction = null)
+        IDbContextTransaction? transaction = null, List<File>? deferredFileDeletes = null)
     {
         var outsideTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
@@ -831,6 +831,15 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
             await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
+
+            var geoJsons = await Repository.GetCaveGeoJsonsAsync(caveId);
+            foreach (var geoJson in geoJsons)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.RemoveCaveGeoJson(geoJson);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var entrance in entity.Entrances)
             {
@@ -953,6 +962,14 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
+            foreach (var favorite in entity.Favorites)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(favorite);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+
             files = entity.Files.ToList();
 
             Repository.Delete(entity);
@@ -977,7 +994,14 @@ public class CaveService : ServiceBase<CaveRepository>
 
         if (isSuccessful)
         {
-            foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+            if (deferredFileDeletes != null)
+            {
+                deferredFileDeletes.AddRange(files);
+            }
+            else
+            {
+                foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+            }
         }
     }
 

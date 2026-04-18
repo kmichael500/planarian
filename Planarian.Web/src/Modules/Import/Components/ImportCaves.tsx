@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, message, Spin } from "antd";
+import { Card, Result, Button, Radio, message, Spin } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -7,6 +7,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import Papa from "papaparse";
+import { Link } from "react-router-dom";
 
 // Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
@@ -30,6 +31,38 @@ interface ImportCaveComponentProps {
   onUploaded: () => void;
 }
 
+const buildDryRunCsv = (records: CaveDryRunRecord[]): string =>
+  Papa.unparse(
+    records
+      .filter((record) => record.action !== "no change")
+      .map((record) => ({
+        countyCode: record.countyCode,
+        countyCaveNumber: record.countyCaveNumber,
+        caveName: record.caveName,
+        changesSummary: record.changesSummary,
+        action: record.action,
+        state: record.state,
+        countyName: record.countyName,
+        alternateNames: record.alternateNames,
+        caveLengthFeet: record.caveLengthFeet,
+        caveDepthFeet: record.caveDepthFeet,
+        maxPitDepthFeet: record.maxPitDepthFeet,
+        numberOfPits: record.numberOfPits,
+        reportedOnDate: record.reportedOnDate,
+        isArchived: record.isArchived,
+        geology: record.geology,
+        reportedByNames: record.reportedByNames,
+        biology: record.biology,
+        archeology: record.archeology,
+        cartographerNames: record.cartographerNames,
+        geologicAges: record.geologicAges,
+        physiographicProvinces: record.physiographicProvinces,
+        otherTags: record.otherTags,
+        mapStatuses: record.mapStatuses,
+        narrative: record.narrative,
+      }))
+  );
+
 const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   onUploaded,
 }) => {
@@ -47,6 +80,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [dryRunData, setDryRunData] = useState<CaveDryRunRecord[]>([]);
   const [isDryRunComplete, setIsDryRunComplete] = useState(false);
+  const [syncExisting, setSyncExisting] = useState(false);
 
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
@@ -70,9 +104,20 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     try {
       const result = await AccountService.ImportCavesFileProcess(
         uploadResult.id,
-        true
+        true,
+        syncExisting
       );
-      setDryRunData(result);
+      const changedRecords = result.filter(
+        (record) => record.action !== "no change"
+      );
+
+      if (changedRecords.length === 0) {
+        message.info("Dry run found no changes. The import has been reset.");
+        resetStates();
+        return;
+      }
+
+      setDryRunData(changedRecords);
       setIsDryRunComplete(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<CaveCsvModel>;
@@ -93,7 +138,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setIsLoading(true);
     setIsProcessing(true);
     try {
-      await AccountService.ImportCavesFileProcess(uploadResult.id);
+      await AccountService.ImportCavesFileProcess(uploadResult.id, false, syncExisting);
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<CaveCsvModel>;
@@ -119,6 +164,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setUploadResult(undefined);
     setDryRunData([]);
     setIsDryRunComplete(false);
+    setSyncExisting(false);
   };
 
   return (
@@ -188,19 +234,62 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
             <Result
               icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
               title="Successfully Uploaded!"
-              subTitle="Click the dry run button below to preview the changes. If not, no caves will be imported."
+              subTitle="Run a dry run to preview exactly what will happen before applying the cave import."
               extra={[
-                <PlanarianButton
-                  onClick={handleDryRunClick}
-                  icon={<EyeOutlined />}
-                  loading={isLoading}
-                  type="primary"
+                <div
+                  key="sync-actions"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  Dry Run
-                </PlanarianButton>,
-                <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
-                  Reset
-                </PlanarianButton>,
+                  <Radio.Group
+                    value={syncExisting ? "upsert" : "insert"}
+                    onChange={(event) =>
+                      setSyncExisting(event.target.value === "upsert")
+                    }
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="insert">Insert Only</Radio.Button>
+                    <Radio.Button value="upsert">Insert / Update</Radio.Button>
+                  </Radio.Group>
+                  <div
+                    style={{
+                      maxWidth: 560,
+                      textAlign: "center",
+                    }}
+                  >
+                    {syncExisting
+                      ? "Updates the caves in the database to match this CSV. Matching caves will be updated, new caves will be inserted, and caves missing from the CSV will be deleted. Files, favorites, and other related records are only affected if a cave is deleted. "
+                      : "Only new caves will be inserted. The import will fail if the CSV includes a cave that already exists. "}
+                    <strong>It is strongly recommended</strong> to create an
+                    archive before running either mode. You can create one in{" "}
+                    <Link to="/account/settings">Account Settings</Link>.
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <PlanarianButton
+                      onClick={handleDryRunClick}
+                      icon={<EyeOutlined />}
+                      loading={isLoading}
+                      type="primary"
+                    >
+                      Dry Run
+                    </PlanarianButton>
+                    <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
+                      Reset
+                    </PlanarianButton>
+                  </div>
+                </div>,
               ]}
             />
           </Card>
@@ -310,7 +399,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
           onClose={handleOk}
           footer={null}
         >
-          <CSVDisplay data={Papa.unparse(dryRunData)} />
+          <CSVDisplay data={buildDryRunCsv(dryRunData)} />
         </PlanarianModal>
       )}
     </>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, message } from "antd";
+import { Card, Result, Button, Radio, message } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -48,6 +48,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [dryRunData, setDryRunData] = useState<EntranceDryRun[]>([]);
   const [isDryRunComplete, setIsDryRunComplete] = useState(false);
+  const [syncExisting, setSyncExisting] = useState(false);
 
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
@@ -71,7 +72,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     try {
       const result = await AccountService.ImportEntrancesProcess(
         uploadResult.id,
-        true
+        true,
+        syncExisting
       );
       setDryRunData(result);
       setIsDryRunComplete(true);
@@ -93,7 +95,11 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     setIsLoading(true);
     setIsProcessing(true);
     try {
-      await AccountService.ImportEntrancesProcess(uploadResult.id, false);
+      await AccountService.ImportEntrancesProcess(
+        uploadResult.id,
+        false,
+        syncExisting
+      );
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<EntranceCsvModel>;
@@ -118,6 +124,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     setUploadResult(undefined);
     setDryRunData([]);
     setIsDryRunComplete(false);
+    setSyncExisting(false);
   };
 
   return (
@@ -187,19 +194,64 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             <Result
               icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
               title="Successfully Uploaded!"
-              subTitle="Click the dry run button below to preview the changes. If not, no entrances will be imported."
+              subTitle="Run a dry run to preview exactly what will happen before applying the entrance import."
               extra={[
-                <PlanarianButton
-                  onClick={handleDryRunClick}
-                  icon={<EyeOutlined />}
-                  loading={isLoading}
-                  type="primary"
+                <div
+                  key="sync-actions"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  Dry Run
-                </PlanarianButton>,
-                <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                  Reset
-                </Button>,
+                  <Radio.Group
+                    value={syncExisting ? "replace" : "insert"}
+                    onChange={(event) =>
+                      setSyncExisting(event.target.value === "replace")
+                    }
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="insert">Insert Only</Radio.Button>
+                    <Radio.Button value="replace">
+                      Replace Existing
+                    </Radio.Button>
+                  </Radio.Group>
+                  <div
+                    style={{
+                      maxWidth: 560,
+                      textAlign: "center",
+                    }}
+                  >
+                    {syncExisting
+                      ? "For caves included in this CSV, existing entrances will be deleted and replaced with the entrances in the file. "
+                      : "Only new entrances will be inserted. Existing entrances are left unchanged. "}
+                    <strong>It is strongly recommended</strong> to create an
+                    archive before running either mode. You can create one in{" "}
+                    <Link to="/account/settings">Account Settings</Link>.
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <PlanarianButton
+                      onClick={handleDryRunClick}
+                      icon={<EyeOutlined />}
+                      loading={isLoading}
+                      type="primary"
+                    >
+                      Dry Run
+                    </PlanarianButton>
+                    <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                      Reset
+                    </Button>
+                  </div>
+                </div>,
               ]}
             />
           </Card>
@@ -210,7 +262,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Dry Run Complete!"
-            subTitle="Review the changes below. If everything looks good, proceed with processing."
+            subTitle="Review the changes below. A count change of 0 means the number of entrances is unchanged, not that the entrance data itself is unchanged."
             extra={[
               <PlanarianButton
                 alwaysShowChildren
