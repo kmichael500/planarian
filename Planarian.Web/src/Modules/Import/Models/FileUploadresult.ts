@@ -3,4 +3,7 @@ export interface FileImportResult {
   isSuccessful: boolean;
   associatedCave: string;
   message: string;
+  failureCode?: string | null;
+  isRetryable?: boolean;
+  requestId?: string | null;
 }

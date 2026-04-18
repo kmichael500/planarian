@@ -79,7 +79,8 @@ public class HttpResponseExceptionMiddleware
         var error = new ApiErrorResponse(finalMessage, errorCode)
         {
             Data = data,
-            ShowContactInfo = showContactInfo
+            ShowContactInfo = showContactInfo,
+            RequestId = context.TraceIdentifier
         };
 
         if (headers != null)
@@ -102,4 +103,5 @@ public class ApiErrorResponse(string message, ApiExceptionType errorCode)
     public ApiExceptionType ErrorCode { get; } = errorCode;
     public object? Data { get; set; }
     public bool ShowContactInfo { get; set; }
+    public string? RequestId { get; set; }
 }

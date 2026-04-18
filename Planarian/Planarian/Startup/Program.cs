@@ -171,6 +171,7 @@ builder.Services.AddScoped<TripService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
+builder.Services.AddSingleton<ImportUploadAdmissionService>();
 builder.Services.AddScoped<ThrottleEventLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();

@@ -4,6 +4,9 @@ export interface ApiErrorResponse {
   message: string;
   errorCode: ApiExceptionType;
   data?: any;
+  requestId?: string;
+  statusCode?: number;
+  retryAfterSeconds?: number;
 }
 
 export interface ImportApiErrorResponse<TRecord> extends ApiErrorResponse {

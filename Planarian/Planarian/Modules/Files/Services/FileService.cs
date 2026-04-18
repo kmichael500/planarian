@@ -1,4 +1,5 @@
 using Azure;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
@@ -20,6 +21,9 @@ namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
 {
+    private static readonly ConcurrentDictionary<string, Task> ContainerInitializationTasks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly HashSet<string> InlinePreviewExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".avif",
@@ -197,10 +201,28 @@ public class FileService : ServiceBase<FileRepository>
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
         if (createIfNotExists)
         {
-            await containerClient.CreateIfNotExistsAsync();
+            await EnsureContainerExists(containerClient);
         }
         
         return containerClient;
+    }
+
+    private static async Task EnsureContainerExists(BlobContainerClient containerClient)
+    {
+        var containerName = containerClient.Name;
+        var initializationTask = ContainerInitializationTasks.GetOrAdd(
+            containerName,
+            _ => containerClient.CreateIfNotExistsAsync());
+
+        try
+        {
+            await initializationTask;
+        }
+        catch
+        {
+            ContainerInitializationTasks.TryRemove(containerName, out _);
+            throw;
+        }
     }
 
     public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,

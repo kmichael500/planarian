@@ -172,7 +172,8 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return new JsonResult(result);
     }
 
-    [DisableRequestSizeLimit] //TODO
+    [RequestSizeLimit(500 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 500 * 1024 * 1024, MemoryBufferThreshold = 64 * 1024)]
     [HttpPost("import/file")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string idRegex, IFormFile file,
@@ -182,6 +183,7 @@ public class AccountController : PlanarianControllerBase<AccountService>
         var result =
             await _importService.AddFileForImport(stream, file.FileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
                 cancellationToken);
+        result.RequestId = HttpContext.TraceIdentifier;
 
         return new JsonResult(result);
     }

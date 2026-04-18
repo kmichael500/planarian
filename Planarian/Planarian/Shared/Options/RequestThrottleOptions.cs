@@ -56,4 +56,14 @@ public class RequestThrottleOptions
     /// Maximum number of times a single user can request access to the same file within the file access window.
     /// </summary>
     public int FileAccessPerUserPerFileLimit { get; set; } = 5;
+
+    /// <summary>
+    /// Maximum number of concurrent import file uploads this app instance will actively process.
+    /// </summary>
+    public int ImportFileConcurrentUploadsPerInstance { get; set; } = 1;
+
+    /// <summary>
+    /// Retry-after hint, in seconds, returned when import file upload admission is saturated.
+    /// </summary>
+    public int ImportFileBusyRetryAfterSeconds { get; set; } = 15;
 }

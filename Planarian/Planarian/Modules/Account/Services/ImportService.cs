@@ -40,6 +40,7 @@ public class ImportService : ServiceBase
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
+    private readonly ImportUploadAdmissionService _importUploadAdmissionService;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
@@ -48,7 +49,8 @@ public class ImportService : ServiceBase
         NotificationService notificationService,
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
-        FileRepository<PlanarianDbContextBase> fileRepository) : base(requestUser)
+        FileRepository<PlanarianDbContextBase> fileRepository,
+        ImportUploadAdmissionService importUploadAdmissionService) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -58,6 +60,7 @@ public class ImportService : ServiceBase
         _accountRepository = accountRepository;
         _repository = caveRepository;
         _fileRepository = fileRepository;
+        _importUploadAdmissionService = importUploadAdmissionService;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -1898,10 +1901,16 @@ public class ImportService : ServiceBase
     public async Task<FileImportResult> AddFileForImport(Stream stream, string fileName, string idRegex,
         string delimiterRegex, bool ignoreDuplicates, string? uuid, CancellationToken cancellationToken)
     {
+        await using var admission = await _importUploadAdmissionService.AcquireAsync(
+            uuid ?? Guid.NewGuid().ToString("N"),
+            cancellationToken);
+
         var result = new FileImportResult
         {
             FileName = fileName,
             IsSuccessful = true,
+            IsRetryable = false,
+            RequestId = uuid,
         };
 
         CountyCaveInfo parsed;
@@ -1913,6 +1922,7 @@ public class ImportService : ServiceBase
         {
             result.Message = e.Message;
             result.IsSuccessful = false;
+            result.FailureCode = e.ErrorCode.ToString();
             return result;
         }
 
@@ -1925,6 +1935,7 @@ public class ImportService : ServiceBase
             result.Message =
                 $"Cave with county code {parsed.CountyCode} and number {parsed.CountyCaveNumber} does not exist for file '{fileName}'.";
             result.IsSuccessful = false;
+            result.FailureCode = ApiExceptionType.NotFound.ToString();
             return result;
         }
         result.AssociatedCave = caveInformation.CaveName;
@@ -1936,6 +1947,7 @@ public class ImportService : ServiceBase
             {
                 result.Message = $"File already exists for cave '{caveInformation.CaveName}'.";
                 result.IsSuccessful = false;
+                result.FailureCode = ApiExceptionType.Conflict.ToString();
                 return result;
             }
         }
