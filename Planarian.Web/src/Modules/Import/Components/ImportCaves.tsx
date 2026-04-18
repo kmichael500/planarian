@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Checkbox, message, Spin } from "antd";
+import { Card, Result, Button, Radio, message, Spin } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -7,6 +7,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import Papa from "papaparse";
+import { Link } from "react-router-dom";
 
 // Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
@@ -233,25 +234,62 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
             <Result
               icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
               title="Successfully Uploaded!"
-              subTitle="Click the dry run button below to preview the changes. If not, no caves will be imported."
+              subTitle="Run a dry run to preview exactly what will happen before applying the cave import."
               extra={[
-                <Checkbox
-                  checked={syncExisting}
-                  onChange={(event) => setSyncExisting(event.target.checked)}
+                <div
+                  key="sync-actions"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  Update existing caves and delete caves missing from the CSV
-                </Checkbox>,
-                <PlanarianButton
-                  onClick={handleDryRunClick}
-                  icon={<EyeOutlined />}
-                  loading={isLoading}
-                  type="primary"
-                >
-                  Dry Run
-                </PlanarianButton>,
-                <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
-                  Reset
-                </PlanarianButton>,
+                  <Radio.Group
+                    value={syncExisting ? "upsert" : "insert"}
+                    onChange={(event) =>
+                      setSyncExisting(event.target.value === "upsert")
+                    }
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="insert">Insert Only</Radio.Button>
+                    <Radio.Button value="upsert">Insert / Update</Radio.Button>
+                  </Radio.Group>
+                  <div
+                    style={{
+                      maxWidth: 560,
+                      textAlign: "center",
+                    }}
+                  >
+                    {syncExisting
+                      ? "Updates the caves in the database to match this CSV. Matching caves will be updated, new caves will be inserted, and caves missing from the CSV will be deleted. Files, favorites, and other related records are only affected if a cave is deleted. "
+                      : "Only new caves will be inserted. The import will fail if the CSV includes a cave that already exists. "}
+                    <strong>It is strongly recommended</strong> to create an
+                    archive before running either mode. You can create one in{" "}
+                    <Link to="/account/settings">Account Settings</Link>.
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <PlanarianButton
+                      onClick={handleDryRunClick}
+                      icon={<EyeOutlined />}
+                      loading={isLoading}
+                      type="primary"
+                    >
+                      Dry Run
+                    </PlanarianButton>
+                    <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
+                      Reset
+                    </PlanarianButton>
+                  </div>
+                </div>,
               ]}
             />
           </Card>

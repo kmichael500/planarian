@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Checkbox, message } from "antd";
+import { Card, Result, Button, Radio, message } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -194,25 +194,64 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
             <Result
               icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
               title="Successfully Uploaded!"
-              subTitle="Click the dry run button below to preview the changes. If not, no entrances will be imported."
+              subTitle="Run a dry run to preview exactly what will happen before applying the entrance import."
               extra={[
-                <Checkbox
-                  checked={syncExisting}
-                  onChange={(event) => setSyncExisting(event.target.checked)}
+                <div
+                  key="sync-actions"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  Update existing entrances and delete entrances missing from the CSV
-                </Checkbox>,
-                <PlanarianButton
-                  onClick={handleDryRunClick}
-                  icon={<EyeOutlined />}
-                  loading={isLoading}
-                  type="primary"
-                >
-                  Dry Run
-                </PlanarianButton>,
-                <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                  Reset
-                </Button>,
+                  <Radio.Group
+                    value={syncExisting ? "replace" : "insert"}
+                    onChange={(event) =>
+                      setSyncExisting(event.target.value === "replace")
+                    }
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="insert">Insert Only</Radio.Button>
+                    <Radio.Button value="replace">
+                      Replace Existing
+                    </Radio.Button>
+                  </Radio.Group>
+                  <div
+                    style={{
+                      maxWidth: 560,
+                      textAlign: "center",
+                    }}
+                  >
+                    {syncExisting
+                      ? "For caves included in this CSV, existing entrances will be deleted and replaced with the entrances in the file. "
+                      : "Only new entrances will be inserted. Existing entrances are left unchanged. "}
+                    <strong>It is strongly recommended</strong> to create an
+                    archive before running either mode. You can create one in{" "}
+                    <Link to="/account/settings">Account Settings</Link>.
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <PlanarianButton
+                      onClick={handleDryRunClick}
+                      icon={<EyeOutlined />}
+                      loading={isLoading}
+                      type="primary"
+                    >
+                      Dry Run
+                    </PlanarianButton>
+                    <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                      Reset
+                    </Button>
+                  </div>
+                </div>,
               ]}
             />
           </Card>
