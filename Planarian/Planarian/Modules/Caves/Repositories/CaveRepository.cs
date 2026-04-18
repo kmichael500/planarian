@@ -1142,6 +1142,62 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ExecuteDeleteAsync(cancellationToken);
     }
 
+    public async Task DeleteImportSyncCave(string caveId,
+        List<Planarian.Model.Database.Entities.RidgeWalker.File> deferredFileDeletes,
+        CancellationToken cancellationToken)
+    {
+        var cave = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
+            .Include(e => e.Files)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (cave == null) throw ApiExceptionDictionary.NotFound(nameof(cave.Id));
+
+        var entranceIds = await DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => e.CaveId == caveId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        await DbContext.CaveGeoJsons
+            .Where(e => e.CaveId == caveId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (entranceIds.Any())
+        {
+            await DbContext.EntranceStatusTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceHydrologyTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.FieldIndicationTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceReportedByNameTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceOtherTag
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.Entrances
+                .IgnoreQueryFilters()
+                .Where(e => entranceIds.Contains(e.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        await DeleteImportSyncCaveTags([caveId], cancellationToken);
+        await DbContext.Favorites
+            .Where(e => e.CaveId == caveId && e.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        deferredFileDeletes.AddRange(cave.Files);
+
+        DbContext.Caves.Remove(cave);
+        await DbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);
 
     public async Task<GetCaveForFileImportByCountyCodeNumberResult?> GetCaveForFileImportByCountyCodeNumber(

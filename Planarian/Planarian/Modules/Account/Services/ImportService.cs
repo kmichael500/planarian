@@ -19,7 +19,6 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
-using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
@@ -41,7 +40,6 @@ public class ImportService : ServiceBase
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
-    private readonly CaveService _caveService;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
@@ -50,8 +48,7 @@ public class ImportService : ServiceBase
         NotificationService notificationService,
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
-        FileRepository<PlanarianDbContextBase> fileRepository,
-        CaveService caveService) : base(requestUser)
+        FileRepository<PlanarianDbContextBase> fileRepository) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -61,7 +58,6 @@ public class ImportService : ServiceBase
         _accountRepository = accountRepository;
         _repository = caveRepository;
         _fileRepository = fileRepository;
-        _caveService = caveService;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -820,7 +816,9 @@ public class ImportService : ServiceBase
                 foreach (var caveId in caveIdsToDelete)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await _caveService.DeleteCave(caveId, cancellationToken, transaction, deferredFileDeletes);
+                    var deletedCave = existingCaves.First(e => e.Id == caveId);
+                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, deletedCave.CountyId);
+                    await _repository.DeleteImportSyncCave(caveId, deferredFileDeletes, cancellationToken);
                 }
 
                 await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished deleting missing caves.");
