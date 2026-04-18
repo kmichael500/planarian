@@ -101,10 +101,11 @@ const AccountService = {
   },
   async ImportCavesFileProcess(
     fileId: string,
-    isDryRun = false
+    isDryRun = false,
+    syncExisting = false
   ): Promise<CaveDryRunRecord[]> {
     const response = await HttpClient.post<CaveDryRunRecord[]>(
-      `${baseUrl}/import/caves/process/${fileId}?isDryRun=${isDryRun}`
+      `${baseUrl}/import/caves/process/${fileId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
     );
     return response.data;
   },
@@ -132,10 +133,11 @@ const AccountService = {
   },
   async ImportEntrancesProcess(
     fileId: string,
-    isDryRun: boolean
+    isDryRun: boolean,
+    syncExisting = false
   ): Promise<EntranceDryRun[]> {
     const response = await HttpClient.post<EntranceDryRun[]>(
-      `${baseUrl}/import/entrances/process/${fileId}?isDryRun=${isDryRun}`
+      `${baseUrl}/import/entrances/process/${fileId}?isDryRun=${isDryRun}&syncExisting=${syncExisting}`
     );
     return response.data;
   },

@@ -151,9 +151,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportCavesFileProcess(string fileId,
         bool isDryRun,
+        bool syncExisting,
         CancellationToken cancellationToken)
     {
-        var result = await _importService.ImportCavesFileProcess(fileId, isDryRun, cancellationToken);
+        var result = await _importService.ImportCavesFileProcess(fileId, isDryRun, syncExisting, cancellationToken);
 
         return new JsonResult(result);
     }
@@ -189,9 +190,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
         bool isDryRun,
+        bool syncExisting,
         CancellationToken cancellationToken)
     {
-        var result = await _importService.ImportEntrancesFileProcess(fileId, isDryRun, cancellationToken);
+        var result = await _importService.ImportEntrancesFileProcess(fileId, isDryRun, syncExisting, cancellationToken);
 
         return new JsonResult(result);
     }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, Result, Button, message } from "antd";
+import { Card, Result, Button, Checkbox, message } from "antd";
 import {
   DeliveredProcedureOutlined,
   CheckCircleOutlined,
@@ -48,6 +48,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [dryRunData, setDryRunData] = useState<EntranceDryRun[]>([]);
   const [isDryRunComplete, setIsDryRunComplete] = useState(false);
+  const [syncExisting, setSyncExisting] = useState(false);
 
   // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
@@ -71,7 +72,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     try {
       const result = await AccountService.ImportEntrancesProcess(
         uploadResult.id,
-        true
+        true,
+        syncExisting
       );
       setDryRunData(result);
       setIsDryRunComplete(true);
@@ -93,7 +95,11 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     setIsLoading(true);
     setIsProcessing(true);
     try {
-      await AccountService.ImportEntrancesProcess(uploadResult.id, false);
+      await AccountService.ImportEntrancesProcess(
+        uploadResult.id,
+        false,
+        syncExisting
+      );
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<EntranceCsvModel>;
@@ -118,6 +124,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     setUploadResult(undefined);
     setDryRunData([]);
     setIsDryRunComplete(false);
+    setSyncExisting(false);
   };
 
   return (
@@ -189,6 +196,12 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
               title="Successfully Uploaded!"
               subTitle="Click the dry run button below to preview the changes. If not, no entrances will be imported."
               extra={[
+                <Checkbox
+                  checked={syncExisting}
+                  onChange={(event) => setSyncExisting(event.target.checked)}
+                >
+                  Update existing entrances and delete entrances missing from the CSV
+                </Checkbox>,
                 <PlanarianButton
                   onClick={handleDryRunClick}
                   icon={<EyeOutlined />}
@@ -210,7 +223,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
           <Result
             icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
             title="Dry Run Complete!"
-            subTitle="Review the changes below. If everything looks good, proceed with processing."
+            subTitle="Review the changes below. A count change of 0 means the number of entrances is unchanged, not that the entrance data itself is unchanged."
             extra={[
               <PlanarianButton
                 alwaysShowChildren

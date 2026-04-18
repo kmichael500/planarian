@@ -1,4 +1,6 @@
 export interface CaveDryRunRecord {
+  action: string;
+  changesSummary: string | null;
   state: string;
   countyName: string;
   countyCode: string;

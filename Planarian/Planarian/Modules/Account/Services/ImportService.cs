@@ -19,6 +19,7 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
@@ -40,6 +41,7 @@ public class ImportService : ServiceBase
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
+    private readonly CaveService _caveService;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
@@ -48,7 +50,8 @@ public class ImportService : ServiceBase
         NotificationService notificationService,
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
-        FileRepository<PlanarianDbContextBase> fileRepository) : base(requestUser)
+        FileRepository<PlanarianDbContextBase> fileRepository,
+        CaveService caveService) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -58,6 +61,7 @@ public class ImportService : ServiceBase
         _accountRepository = accountRepository;
         _repository = caveRepository;
         _fileRepository = fileRepository;
+        _caveService = caveService;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -90,6 +94,7 @@ public class ImportService : ServiceBase
     #region Cave Import
 
     public async Task<List<CaveDryRunRecord>> ImportCavesFileProcess(string temporaryFileId, bool isDryRun,
+        bool syncExisting,
         CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
@@ -242,7 +247,17 @@ public class ImportService : ServiceBase
 
             #endregion
 
-
+            var existingCaves = syncExisting ? await _repository.GetImportSyncCaves() : new List<ImportSyncCaveLookup>();
+            var existingByKey = existingCaves.ToDictionary(
+                cave => $"{cave.StateId}:{cave.CountyId}:{cave.CountyNumber}",
+                cave => cave);
+            var caveIdsToDelete = existingCaves.Select(e => e.Id).ToHashSet();
+            var caveActionsById = new Dictionary<string, string>();
+            var caveChangeSummariesById = new Dictionary<string, string?>();
+            var seenCsvKeys = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+            var newCavesForInsert = new List<Cave>();
+            var cavesForUpdate = new List<Cave>();
+            var deferredFileDeletes = new List<Planarian.Model.Database.Entities.RidgeWalker.File>();
             var usedCountyNumbers = await _repository.GetUsedCountyNumbers();
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing caves");
             var rowNumber = 1; // start at 1 to account for header row
@@ -309,11 +324,25 @@ public class ImportService : ServiceBase
                         continue;
                     }
 
+                    ImportSyncCaveLookup? existingCaveLookup = null;
+                    if (syncExisting)
+                    {
+                        var caveKey = $"{state.Id}:{county.Id}:{caveRecord.CountyCaveNumber}";
+                        if (!seenCsvKeys.Add(caveKey))
+                        {
+                            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
+                                $"Duplicate cave key found for {caveRecord.CountyCode}-{caveRecord.CountyCaveNumber}."));
+                            continue;
+                        }
+
+                        existingByKey.TryGetValue(caveKey, out existingCaveLookup);
+                    }
+
                     var isValidReportedOn = DateTime.TryParse(caveRecord.ReportedOnDate, out var reportedOnDate);
                     reportedOnDate = reportedOnDate.ToUtcKind();
                     var cave = new Cave
                     {
-                        Id = IdGenerator.Generate(),
+                        Id = existingCaveLookup?.Id ?? IdGenerator.Generate(),
                         Name = caveRecord.CaveName.Trim(),
                         AccountId = RequestUser.AccountId,
                         LengthFeet = caveRecord.CaveLengthFt,
@@ -547,7 +576,7 @@ public class ImportService : ServiceBase
                             cave.CartographerNameTags.Add(cartographerTag);
                         }
                     }
-                    
+
                     if (caveRecord.ReportedByNames != null)
                     {
                         var reportedByNames = caveRecord.ReportedByNames.SplitAndTrim()
@@ -556,7 +585,7 @@ public class ImportService : ServiceBase
                         {
                             var tag = allPeopleTags.FirstOrDefault(e =>
                                 e.Name.Equals(reportedByName, StringComparison.InvariantCultureIgnoreCase));
-                            
+
                             if (tag == null)
                             {
                                 failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(caveRecord, rowNumber,
@@ -577,13 +606,46 @@ public class ImportService : ServiceBase
                                 CreatedOn = DateTime.UtcNow,
                                 CreatedByUserId = RequestUser.Id
                             };
-                            
+
                             cave.CaveReportedByNameTags.Add(reportedByTag);
                         }
                     }
 
-                    var isValidCave = IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords);
+                    var isValidCave = IsValidCave(cave, usedCountyNumbers, caveRecord, rowNumber, failedRecords,
+                        skipCountyNumberConflictCheck: syncExisting);
                     if (!isValidCave) continue;
+
+                    if (existingCaveLookup != null)
+                    {
+                        caveIdsToDelete.Remove(existingCaveLookup.Id);
+                        var changeSummary = BuildCaveChangeSummary(
+                            existingCaveLookup,
+                            cave,
+                            allGeologyTags.ToDictionary(e => e.Id, e => e.Name),
+                            allGeologicAgeTags.ToDictionary(e => e.Id, e => e.Name),
+                            allMapStatusTags.ToDictionary(e => e.Id, e => e.Name),
+                            allPhysiographicProvincesTags.ToDictionary(e => e.Id, e => e.Name),
+                            allArcheologyTags.ToDictionary(e => e.Id, e => e.Name),
+                            allBiologyTags.ToDictionary(e => e.Id, e => e.Name),
+                            allOtherTags.ToDictionary(e => e.Id, e => e.Name),
+                            allPeopleTags.ToDictionary(e => e.Id, e => e.Name));
+                        caveActionsById[cave.Id] = string.IsNullOrWhiteSpace(changeSummary)
+                            ? "no change"
+                            : "update";
+                        caveChangeSummariesById[cave.Id] = changeSummary;
+                        cavesForUpdate.Add(cave);
+                    }
+                    else if (syncExisting)
+                    {
+                        caveActionsById[cave.Id] = "insert";
+                        caveChangeSummariesById[cave.Id] = null;
+                        newCavesForInsert.Add(cave);
+                    }
+                    else
+                    {
+                        caveActionsById[cave.Id] = "insert";
+                        caveChangeSummariesById[cave.Id] = null;
+                    }
 
                     caves.Add(cave);
                 }
@@ -603,33 +665,44 @@ public class ImportService : ServiceBase
                 throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Cave);
             }
 
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup,
-                "Inserting caves. This may take a while...");
+            if (syncExisting)
+            {
+                var updatedCaveIds = cavesForUpdate.Select(e => e.Id).ToList();
+                await _repository.BulkUpdateImportCaves(cavesForUpdate, cancellationToken);
+                await _repository.DeleteImportSyncCaveTags(updatedCaveIds, cancellationToken);
+            }
+
+            var cavesForInsert = syncExisting ? newCavesForInsert : caves;
+            var cavesForTagInsert = syncExisting ? cavesForUpdate.Concat(cavesForInsert).ToList() : caves;
 
             var config = new BulkConfig
             {
-                // TODO: exclude the generated tsvector column. I feel like this should auto-exclude but it isn't...
                 PropertiesToExclude = new List<string> { nameof(Cave.NarrativeSearchVector) }
             };
-            await _repository.BulkInsertAsync(caves, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken, bulkConfig:config);
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
+            if (cavesForInsert.Any())
+            {
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup,
+                    "Inserting caves. This may take a while...");
+                await _repository.BulkInsertAsync(cavesForInsert, onBatchProcessed: OnBatchProcessed,
+                    cancellationToken: cancellationToken, bulkConfig: config);
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
+            }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geology tags.");
-            var geologyTagsForInsert = caves.SelectMany(e => e.GeologyTags).ToList();
+            var geologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.GeologyTags).ToList();
             await _repository.BulkInsertAsync(geologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting geology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geologic age tags.");
-            var geologicAgeTagsForInsert = caves.SelectMany(e => e.GeologicAgeTags).ToList();
+            var geologicAgeTagsForInsert = cavesForTagInsert.SelectMany(e => e.GeologicAgeTags).ToList();
             await _repository.BulkInsertAsync(geologicAgeTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting geologic age tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting map status tags.");
-            var mapStatusTagsForInsert = caves.SelectMany(e => e.MapStatusTags).ToList();
+            var mapStatusTagsForInsert = cavesForTagInsert.SelectMany(e => e.MapStatusTags).ToList();
             await _repository.BulkInsertAsync(mapStatusTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -637,40 +710,40 @@ public class ImportService : ServiceBase
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting physiographic province tags.");
-            var physiographicProvinceTagsForInsert = caves.SelectMany(e => e.PhysiographicProvinceTags).ToList();
+            var physiographicProvinceTagsForInsert = cavesForTagInsert.SelectMany(e => e.PhysiographicProvinceTags).ToList();
             await _repository.BulkInsertAsync(physiographicProvinceTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting physiographic province tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting archeology tags.");
-            var archeologyTagsForInsert = caves.SelectMany(e => e.ArcheologyTags).ToList();
+            var archeologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.ArcheologyTags).ToList();
             await _repository.BulkInsertAsync(archeologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting archeology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting biology tags.");
-            var biologyTagsForInsert = caves.SelectMany(e => e.BiologyTags).ToList();
+            var biologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.BiologyTags).ToList();
             await _repository.BulkInsertAsync(biologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting biology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting other tags.");
-            var otherTagsForInsert = caves.SelectMany(e => e.CaveOtherTags).ToList();
+            var otherTagsForInsert = cavesForTagInsert.SelectMany(e => e.CaveOtherTags).ToList();
             await _repository.BulkInsertAsync(otherTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting other tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting cartographer tags.");
-            var cartographerTagsForInsert = caves.SelectMany(e => e.CartographerNameTags).ToList();
+            var cartographerTagsForInsert = cavesForTagInsert.SelectMany(e => e.CartographerNameTags).ToList();
             await _repository.BulkInsertAsync(cartographerTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting cartographer tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting reported by tags.");
-            var reportedByTagsForInsert = caves.SelectMany(e => e.CaveReportedByNameTags).ToList();
+            var reportedByTagsForInsert = cavesForTagInsert.SelectMany(e => e.CaveReportedByNameTags).ToList();
             await _repository.BulkInsertAsync(reportedByTagsForInsert, onBatchProcessed: OnBatchProcessed,
                 cancellationToken: cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -680,18 +753,24 @@ public class ImportService : ServiceBase
 
             foreach (var cave in caves)
             {
+                if (isDryRun && caveActionsById[cave.Id] == "no change")
+                {
+                    continue;
+                }
+
                 var record = new CaveDryRunRecord();
-                record.State = stateEntities.First(e => e.Id == cave.StateId).Abbreviation;
-                record.CountyName = allCounties.First(e => e.Id == cave.CountyId).Name;
                 record.CountyCode = allCounties.First(e => e.Id == cave.CountyId).DisplayId;
                 record.CountyCaveNumber = cave.CountyNumber;
                 record.CaveName = cave.Name;
+                record.ChangesSummary = caveChangeSummariesById[cave.Id];
+                record.Action = caveActionsById[cave.Id];
+                record.State = stateEntities.First(e => e.Id == cave.StateId).Abbreviation;
+                record.CountyName = allCounties.First(e => e.Id == cave.CountyId).Name;
                 record.AlternateNames = cave.AlternateNamesList;
                 record.CaveLengthFeet = cave.LengthFeet;
                 record.CaveDepthFeet = cave.DepthFeet;
                 record.MaxPitDepthFeet = cave.MaxPitDepthFeet;
                 record.NumberOfPits = cave.NumberOfPits;
-                record.Narrative = cave.Narrative;
                 record.ReportedOnDate = cave.ReportedOn;
                 record.IsArchived = cave.IsArchived;
                 record.Geology = cave.GeologyTags
@@ -712,13 +791,52 @@ public class ImportService : ServiceBase
                     .Select(e => allOtherTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
                 record.MapStatuses = cave.MapStatusTags
                     .Select(e => allMapStatusTags.First(ee => ee.Id == e.TagTypeId).Name).ToList();
+                record.Narrative = cave.Narrative;
 
                 records.Add(record);
+            }
+
+            if (syncExisting)
+            {
+                foreach (var caveId in caveIdsToDelete)
+                {
+                    var deletedCave = existingCaves.First(e => e.Id == caveId);
+                    records.Add(new CaveDryRunRecord
+                    {
+                        Action = "delete",
+                        ChangesSummary = null,
+                        State = deletedCave.StateAbbreviation,
+                        CountyName = deletedCave.CountyName,
+                        CountyCode = deletedCave.CountyDisplayId,
+                        CountyCaveNumber = deletedCave.CountyNumber,
+                        CaveName = deletedCave.Name
+                    });
+                }
+            }
+
+            if (syncExisting && caveIdsToDelete.Any())
+            {
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Deleting caves missing from the CSV.");
+                foreach (var caveId in caveIdsToDelete)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _caveService.DeleteCave(caveId, cancellationToken, transaction, deferredFileDeletes);
+                }
+
+                await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished deleting missing caves.");
             }
 
             if (!isDryRun)
             {
                 await transaction.CommitAsync(cancellationToken);
+
+                if (syncExisting)
+                {
+                    foreach (var file in deferredFileDeletes)
+                    {
+                        await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+                    }
+                }
             }
             else
             {
@@ -842,7 +960,8 @@ public class ImportService : ServiceBase
     private bool IsValidCave(Cave cave, HashSet<UsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord,
         int currentRowNumber,
-        List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords)
+        List<FailedCaveCsvRecord<CaveCsvModel>> failedRecords,
+        bool skipCountyNumberConflictCheck = false)
     {
         var isValid = true;
         if (cave == null) throw ApiExceptionDictionary.BadRequest("Cave is null");
@@ -865,15 +984,18 @@ public class ImportService : ServiceBase
                 }
             }
 
-        if (usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
+        if (!skipCountyNumberConflictCheck)
         {
-            failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
-                $"County number is already used"));
-            isValid = false;
-        }
-        else
-        {
-            usedCountyNumbers.Add(new UsedCountyNumber(cave.CountyId, cave.CountyNumber));
+            if (usedCountyNumbers.Any(e => e.CountyId == cave.CountyId && e.CountyNumber == cave.CountyNumber))
+            {
+                failedRecords.Add(new FailedCaveCsvRecord<CaveCsvModel>(currentRecord, currentRowNumber,
+                    $"County number is already used"));
+                isValid = false;
+            }
+            else
+            {
+                usedCountyNumbers.Add(new UsedCountyNumber(cave.CountyId, cave.CountyNumber));
+            }
         }
 
         if (cave.CountyId == null)
@@ -914,6 +1036,150 @@ public class ImportService : ServiceBase
         return isValid;
     }
 
+    private static string? BuildCaveChangeSummary(
+        ImportSyncCaveLookup existingCave,
+        Cave importedCave,
+        IReadOnlyDictionary<string, string> geologyNames,
+        IReadOnlyDictionary<string, string> geologicAgeNames,
+        IReadOnlyDictionary<string, string> mapStatusNames,
+        IReadOnlyDictionary<string, string> physiographicProvinceNames,
+        IReadOnlyDictionary<string, string> archeologyNames,
+        IReadOnlyDictionary<string, string> biologyNames,
+        IReadOnlyDictionary<string, string> otherTagNames,
+        IReadOnlyDictionary<string, string> peopleNames)
+    {
+        var changes = new List<string>();
+
+        AddValueChange(changes, "Name", FormatText(existingCave.Name), FormatText(importedCave.Name));
+        AddValueChange(changes, "Alternate names", FormatText(existingCave.AlternateNames), FormatText(importedCave.AlternateNames));
+        AddValueChange(changes, "Length (ft)", FormatNumber(existingCave.LengthFeet), FormatNumber(importedCave.LengthFeet));
+        AddValueChange(changes, "Depth (ft)", FormatNumber(existingCave.DepthFeet), FormatNumber(importedCave.DepthFeet));
+        AddValueChange(changes, "Max pit depth (ft)", FormatNumber(existingCave.MaxPitDepthFeet), FormatNumber(importedCave.MaxPitDepthFeet));
+        AddValueChange(changes, "Number of pits", FormatInt(existingCave.NumberOfPits), FormatInt(importedCave.NumberOfPits));
+        AddNarrativeChange(changes, existingCave.Narrative, importedCave.Narrative);
+        AddValueChange(changes, "Reported on", FormatDate(existingCave.ReportedOn), FormatDate(importedCave.ReportedOn));
+        AddValueChange(changes, "Archived", FormatBool(existingCave.IsArchived), FormatBool(importedCave.IsArchived));
+
+        AddSetChange(changes, "Geology", existingCave.GeologyTagIds, importedCave.GeologyTags.Select(e => e.TagTypeId), geologyNames);
+        AddSetChange(changes, "Geologic ages", existingCave.GeologicAgeTagIds, importedCave.GeologicAgeTags.Select(e => e.TagTypeId), geologicAgeNames);
+        AddSetChange(changes, "Map statuses", existingCave.MapStatusTagIds, importedCave.MapStatusTags.Select(e => e.TagTypeId), mapStatusNames);
+        AddSetChange(changes, "Physiographic provinces", existingCave.PhysiographicProvinceTagIds, importedCave.PhysiographicProvinceTags.Select(e => e.TagTypeId), physiographicProvinceNames);
+        AddSetChange(changes, "Archeology", existingCave.ArcheologyTagIds, importedCave.ArcheologyTags.Select(e => e.TagTypeId), archeologyNames);
+        AddSetChange(changes, "Biology", existingCave.BiologyTagIds, importedCave.BiologyTags.Select(e => e.TagTypeId), biologyNames);
+        AddSetChange(changes, "Other tags", existingCave.OtherTagIds, importedCave.CaveOtherTags.Select(e => e.TagTypeId), otherTagNames);
+        AddSetChange(changes, "Cartographer names", existingCave.CartographerNameTagIds, importedCave.CartographerNameTags.Select(e => e.TagTypeId), peopleNames);
+        AddSetChange(changes, "Reported by names", existingCave.ReportedByNameTagIds, importedCave.CaveReportedByNameTags.Select(e => e.TagTypeId), peopleNames);
+
+        return changes.Any() ? string.Join(" | ", changes) : null;
+    }
+
+    private static bool SetEquals(IEnumerable<string> existingValues, IEnumerable<string> importedValues)
+    {
+        return existingValues.OrderBy(e => e).SequenceEqual(importedValues.OrderBy(e => e));
+    }
+
+    private static void AddValueChange(List<string> changes, string label, string existingValue, string importedValue)
+    {
+        if (existingValue == importedValue) return;
+        changes.Add($"{label} changed from {existingValue} to {importedValue}");
+    }
+
+    private static void AddNarrativeChange(List<string> changes, string? existingValue, string? importedValue)
+    {
+        var existingNarrative = NormalizeOptionalText(existingValue);
+        var importedNarrative = NormalizeOptionalText(importedValue);
+
+        if (existingNarrative == importedNarrative) return;
+
+        if (existingNarrative == null)
+        {
+            changes.Add($"Narrative added ({importedNarrative!.Length} chars)");
+            return;
+        }
+
+        if (importedNarrative == null)
+        {
+            changes.Add("Narrative removed");
+            return;
+        }
+
+        changes.Add(existingNarrative.Length == importedNarrative.Length
+            ? $"Narrative updated ({importedNarrative.Length} chars)"
+            : $"Narrative updated ({existingNarrative.Length} -> {importedNarrative.Length} chars)");
+    }
+
+    private static void AddSetChange(
+        List<string> changes,
+        string label,
+        IEnumerable<string> existingValues,
+        IEnumerable<string> importedValues,
+        IReadOnlyDictionary<string, string> nameLookup)
+    {
+        var existing = existingValues
+            .Select(e => nameLookup.GetValueOrDefault(e, e))
+            .Select(NormalizeOptionalText)
+            .Where(e => e != null)
+            .Distinct()
+            .OrderBy(e => e)
+            .ToList();
+        var imported = importedValues
+            .Select(e => nameLookup.GetValueOrDefault(e, e))
+            .Select(NormalizeOptionalText)
+            .Where(e => e != null)
+            .Distinct()
+            .OrderBy(e => e)
+            .ToList();
+
+        var added = imported.Except(existing).ToList();
+        var removed = existing.Except(imported).ToList();
+
+        if (added.Any())
+        {
+            changes.Add($"Added {label.ToLowerInvariant()}: {string.Join(", ", added)}");
+        }
+
+        if (removed.Any())
+        {
+            changes.Add($"Removed {label.ToLowerInvariant()}: {string.Join(", ", removed)}");
+        }
+    }
+
+    private static string FormatSet(IEnumerable<string> values)
+    {
+        var items = values.Where(e => !string.IsNullOrWhiteSpace(e)).OrderBy(e => e).ToList();
+        return items.Any() ? $"\"{string.Join(", ", items)}\"" : "blank";
+    }
+
+    private static string FormatText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "blank" : $"\"{value}\"";
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string FormatNumber(double? value)
+    {
+        return value?.ToString(CultureInfo.InvariantCulture) ?? "blank";
+    }
+
+    private static string FormatInt(int? value)
+    {
+        return value?.ToString(CultureInfo.InvariantCulture) ?? "blank";
+    }
+
+    private static string FormatDate(DateTime? value)
+    {
+        return value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "blank";
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "Yes" : "No";
+    }
+
     private async Task<List<TagType>> CreateAndProcessCaveTags(
         IEnumerable<CaveCsvModel> caveRecords,
         IEnumerable<TagType> existingTags,
@@ -938,9 +1204,9 @@ public class ImportService : ServiceBase
                 Id = IdGenerator.Generate(),
                 Name = e ?? throw ApiExceptionDictionary.NullValue(nameof(TagType.Name))
             })
-            .OrderBy(e=>e.Name)
+            .OrderBy(e => e.Name)
             .ToList();
-        
+
         // Determine new tags that don't already exist in the system
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
         foreach (var newTag in newTags)
@@ -973,6 +1239,7 @@ public class ImportService : ServiceBase
     #region Entrance Import
 
     public async Task<List<EntranceDryRun>> ImportEntrancesFileProcess(string temporaryFileId, bool isDryRun,
+        bool syncExisting,
         CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
@@ -991,8 +1258,6 @@ public class ImportService : ServiceBase
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started parsing CSV");
             var entranceRecords = await ParseEntranceCsv(stream, failedRecords, cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished parsing CSV");
-
-            var entrances = new List<TemporaryEntrance>();
 
             #region Tags
 
@@ -1028,6 +1293,7 @@ public class ImportService : ServiceBase
 
             #endregion
 
+            var entrances = new List<TemporaryEntrance>();
             var rowNumber = 0;
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing entrances");
             foreach (var entranceRecord in entranceRecords)
@@ -1036,7 +1302,6 @@ public class ImportService : ServiceBase
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-
                     #region Validation
 
                     var isValidReportedOn = DateTime.TryParse(entranceRecord.ReportedOnDate, out var reportedOnDate);
@@ -1107,10 +1372,7 @@ public class ImportService : ServiceBase
                             $"Missing value for {nameof(entranceRecord.CountyCode)}"));
                         continue;
                     }
-
                     #endregion
-
-
                     var entrance = new TemporaryEntrance()
                     {
                         Id = IdGenerator.Generate(),
@@ -1132,9 +1394,7 @@ public class ImportService : ServiceBase
 
                     entranceRecord.EntranceId =
                         entrance.Id; // used to associate with erroneous records after inserting into the db
-
                     #region Tags
-
                     CreateEntranceTags(
                         entranceRecord, entrance.Id,
                         nameof(entranceRecord.EntranceStatuses),
@@ -1162,7 +1422,6 @@ public class ImportService : ServiceBase
                         entranceReportedByNameTags,
                         e => e.ReportedByNames,
                         allPeopleTags);
-
                     #endregion
 
                     var isValid = IsValidEntrance(entrance, entranceRecord, rowNumber, failedRecords);
@@ -1202,7 +1461,6 @@ public class ImportService : ServiceBase
                 var unassociatedRecord = entranceRecords.FirstOrDefault(e => e.EntranceId == unassociatedEntranceId);
                 if (unassociatedRecord == null) continue;
 
-                // calculate row number from the index of the record in the list, +2 because the first row is the header and the index is 0 based
                 var calculatedRowNumber = entranceRecords.IndexOf(unassociatedRecord) + 2;
                 failedRecords.Add(new FailedCaveCsvRecord<EntranceCsvModel>(unassociatedRecord, calculatedRowNumber,
                     $"Entrance could not be associated with the cave {unassociatedRecord.CountyCode}-{unassociatedRecord.CountyCaveNumber}"));
@@ -1212,6 +1470,24 @@ public class ImportService : ServiceBase
             {
                 failedRecords = failedRecords.OrderBy(e => e.RowNumber).ToList();
                 throw ApiExceptionDictionary.InvalidImport(failedRecords, ImportType.Entrance);
+            }
+
+            var importedCaveIds = associatedEntrances
+                .Select(e => e.CaveId)
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Cast<string>()
+                .Distinct()
+                .ToList();
+            var existingEntranceCounts = await _temporaryEntranceRepository.GetExistingEntranceCounts(importedCaveIds,
+                cancellationToken);
+            var importedEntranceCounts = associatedEntrances
+                .Where(e => !string.IsNullOrWhiteSpace(e.CaveId))
+                .GroupBy(e => e.CaveId!)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            if (syncExisting)
+            {
+                await _temporaryEntranceRepository.DeleteExistingEntrancesForImportedCaves(cancellationToken);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
@@ -1268,15 +1544,14 @@ public class ImportService : ServiceBase
                 batchSize: batchSize,
                 cancellationToken: cancellationToken);
 
-
             #endregion
 
             await _temporaryEntranceRepository.DropTable();
-            
+
             var records = new List<EntranceDryRun>();
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started processing result!");
-            
+
             var locationQualityDict = allLocationQualityTags.ToDictionary(e => e.Id, e => e.Name);
             var entranceStatusDict = entranceStatusTags
                 .GroupBy(e => e.EntranceId)
@@ -1307,10 +1582,20 @@ public class ImportService : ServiceBase
             foreach (var entrance in entrances)
             {
                 associatedEntrancesDict.TryGetValue(entrance.Id, out var associatedCave);
+                var existingEntranceCount = associatedCave?.CaveId != null
+                    ? existingEntranceCounts.GetValueOrDefault(associatedCave.CaveId)
+                    : 0;
+                var importedEntranceCount = associatedCave?.CaveId != null
+                    ? importedEntranceCounts.GetValueOrDefault(associatedCave.CaveId)
+                    : 0;
+                var finalEntranceCount = syncExisting
+                    ? importedEntranceCount
+                    : existingEntranceCount + importedEntranceCount;
 
                 var record = new EntranceDryRun
                 {
                     AssociatedCave = $"{associatedCave?.DisplayId} {associatedCave?.CaveName}",
+                    EntranceCountChange = finalEntranceCount - existingEntranceCount,
                     LocationQuality = locationQualityDict[entrance.LocationQualityTagId],
                     IsPrimaryEntrance = entrance.IsPrimary,
                     EntranceName = entrance.Name,
@@ -1336,12 +1621,11 @@ public class ImportService : ServiceBase
                 };
 
                 records.Add(record);
-                
+
                 if (records.Count % 100 == 0)
                 {
                     await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Processing preview of {records.Count} entrances out of {entrances.Count}");
                 }
-                
             }
 
             if (!isDryRun)
@@ -1581,7 +1865,7 @@ public class ImportService : ServiceBase
             FileName = fileName,
             IsSuccessful = true,
         };
-        
+
         CountyCaveInfo parsed;
         try
         {
@@ -1665,7 +1949,7 @@ public class ImportService : ServiceBase
                         $"'{input}' does not contain a valid county cave number.");
 
                 }
-                
+
                 countyCaveNumber = caveNumber;
                 countyCode = parts[0];
             }
@@ -1683,24 +1967,20 @@ public class ImportService : ServiceBase
 
 public class CaveDryRunRecord
 {
-    [MaxLength(PropertyLength.Id)] public string State { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string CountyName { get; set; } = null!;
-
     public string CountyCode { get; set; } = null!;
     public int CountyCaveNumber { get; set; }
-
     [MaxLength(PropertyLength.Name)] public string CaveName { get; set; } = null!;
+    public string? ChangesSummary { get; set; }
+    public string Action { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string State { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string CountyName { get; set; } = null!;
     public IEnumerable<string> AlternateNames { get; set; } = new List<string>();
 
     public double? CaveLengthFeet { get; set; }
     public double? CaveDepthFeet { get; set; }
     public double? MaxPitDepthFeet { get; set; }
     public int? NumberOfPits { get; set; } = 0;
-
-    public string? Narrative { get; set; }
-
     public DateTime? ReportedOnDate { get; set; }
-
     public bool IsArchived { get; set; } = false;
     public IEnumerable<string> Geology { get; set; } = new HashSet<string>();
     public IEnumerable<string> ReportedByNames { get; set; } = new HashSet<string>();
@@ -1711,11 +1991,13 @@ public class CaveDryRunRecord
     public IEnumerable<string> PhysiographicProvinces { get; set; } = new HashSet<string>();
     public IEnumerable<string> OtherTags { get; set; } = new HashSet<string>();
     public IEnumerable<string> MapStatuses { get; set; } = new HashSet<string>();
+    public string? Narrative { get; set; }
 }
 
 public class EntranceDryRun
 {
     public string AssociatedCave { get; set; }
+    public int EntranceCountChange { get; set; }
     [MaxLength(PropertyLength.Id)] public string LocationQuality { get; set; } = null!;
 
     public bool IsPrimaryEntrance { get; set; }
