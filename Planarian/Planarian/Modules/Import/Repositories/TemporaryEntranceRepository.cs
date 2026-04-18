@@ -177,6 +177,28 @@ public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase
             .ToDictionary(x => x.CaveId, x => x.Count);
     }
 
+    public async Task<Dictionary<string, int>> GetExistingPrimaryEntranceCounts(IEnumerable<string> caveIds,
+        CancellationToken cancellationToken)
+    {
+        var caveIdList = caveIds.Distinct().ToList();
+        if (!caveIdList.Any()) return [];
+
+        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caveIdList.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            , cancellationToken);
+
+        if (!scopedCaveIds.Any()) return [];
+
+        return (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => scopedCaveIds.Contains(e.CaveId) && e.IsPrimary)
+            .GroupBy(e => e.CaveId)
+            .Select(g => new { CaveId = g.Key, Count = g.Count() }), cancellationToken))
+            .ToDictionary(x => x.CaveId, x => x.Count);
+    }
+
     public async Task MigrateTemporaryEntrancesAsync()
     {
         var command = $@"

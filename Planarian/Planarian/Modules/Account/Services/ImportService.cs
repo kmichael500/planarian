@@ -1482,6 +1482,8 @@ public class ImportService : ServiceBase
                 .ToList();
             var existingEntranceCounts = await _temporaryEntranceRepository.GetExistingEntranceCounts(importedCaveIds,
                 cancellationToken);
+            var existingPrimaryEntranceCounts = await _temporaryEntranceRepository.GetExistingPrimaryEntranceCounts(
+                importedCaveIds, cancellationToken);
             var importedEntranceCounts = associatedEntrances
                 .Where(e => !string.IsNullOrWhiteSpace(e.CaveId))
                 .GroupBy(e => e.CaveId!)
@@ -1522,7 +1524,7 @@ public class ImportService : ServiceBase
 
                     var existingPrimaryCount = syncExisting
                         ? 0
-                        : existingEntranceCounts.GetValueOrDefault(associatedEntrance.CaveId);
+                        : existingPrimaryEntranceCounts.GetValueOrDefault(associatedEntrance.CaveId);
                     var importedPrimaryCount = associatedEntrances
                         .Count(e => e.CaveId == associatedEntrance.CaveId &&
                                     entrances.Any(entrance => entrance.Id == e.Id && entrance.IsPrimary));
