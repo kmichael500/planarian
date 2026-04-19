@@ -527,11 +527,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       const restoredItems = await Promise.all(
         (persisted.items ?? []).map(async (item) => {
           let file: File | null = null;
-          if (!isTerminalStatus(item.status)) {
+          const shouldRestoreFile = item.status !== "uploaded";
+
+          if (shouldRestoreFile) {
             file = await ImportQueueStorage.getFile(queueStorageKey, item.id);
           }
 
-          if (!file && !isTerminalStatus(item.status)) {
+          if (!file && shouldRestoreFile) {
             return {
               ...item,
               status: "canceled" as const,
