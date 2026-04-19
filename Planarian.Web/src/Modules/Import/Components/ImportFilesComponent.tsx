@@ -7,13 +7,14 @@ import {
   Form,
   Input,
   Row,
-  Space,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 import {
   ClearOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
   DownOutlined,
   EyeOutlined,
   FileAddOutlined,
@@ -21,7 +22,15 @@ import {
   PlayCircleOutlined,
   RedoOutlined,
 } from "@ant-design/icons";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  memo,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
 import Papa from "papaparse";
 import "./ImportComponent.scss";
@@ -36,10 +45,12 @@ import { FileImportResult } from "../Models/FileUploadresult";
 import { ImportQueueStorage } from "../Services/ImportQueueStorage";
 
 const MAX_FILE_SIZE_MB = 500;
-const MAX_UPLOAD_CONCURRENCY_WEIGHT = 3;
+const MAX_UPLOAD_CONCURRENCY_WEIGHT = 4;
 const MAX_RETRY_COUNT = 5;
 const DISPATCH_DELAY_MS = 0;
-const RECENT_ACTIVITY_LIMIT = 12;
+const VIRTUAL_LIST_OVERSCAN = 6;
+const VIRTUAL_QUEUE_ROW_HEIGHT = 132;
+const VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT = 104;
 const FILE_UPLOAD_CHUNK_SIZE = 32 * 1024 * 1024;
 const SMALL_FILE_CONCURRENCY_THRESHOLD_MB = 30;
 const LARGE_FILE_CONCURRENCY_THRESHOLD_MB = 100;
@@ -129,6 +140,116 @@ interface UploadFailureDetails {
   requestId?: string | null;
 }
 
+interface VirtualFileListProps<T extends { id: string }> {
+  items: T[];
+  rowHeight: number;
+  getRowHeight?: (item: T) => number;
+  overscan?: number;
+  className?: string;
+  emptyState: ReactNode;
+  renderItem: (item: T) => ReactNode;
+}
+
+function VirtualFileList<T extends { id: string }>({
+  items,
+  rowHeight,
+  getRowHeight,
+  overscan = VIRTUAL_LIST_OVERSCAN,
+  className,
+  emptyState,
+  renderItem,
+}: VirtualFileListProps<T>) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateViewportHeight = () => {
+      setViewportHeight(container.clientHeight);
+    };
+
+    updateViewportHeight();
+    const resizeObserver = new ResizeObserver(updateViewportHeight);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const rowMetrics = useMemo(() => {
+    let runningTop = 0;
+    const heights = items.map((item) => getRowHeight?.(item) ?? rowHeight);
+    const offsets = heights.map((height) => {
+      const top = runningTop;
+      runningTop += height;
+      return top;
+    });
+
+    return {
+      heights,
+      offsets,
+      totalHeight: runningTop,
+    };
+  }, [getRowHeight, items, rowHeight]);
+
+  const firstVisibleIndex = rowMetrics.offsets.findIndex(
+    (top, index) => top + rowMetrics.heights[index] > scrollTop
+  );
+  const startIndex = Math.max(
+    0,
+    (firstVisibleIndex === -1 ? 0 : firstVisibleIndex) - overscan
+  );
+  const viewportBottom = scrollTop + viewportHeight;
+  let endIndex = startIndex;
+  while (
+    endIndex < items.length &&
+    rowMetrics.offsets[endIndex] < viewportBottom
+  ) {
+    endIndex += 1;
+  }
+  endIndex = Math.min(items.length, endIndex + overscan);
+  const visibleItems = items.slice(startIndex, endIndex);
+
+  if (items.length === 0) {
+    return (
+      <div className={`import-files-dashboard__virtual-list ${className ?? ""}`}>
+        {emptyState}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      className={`import-files-dashboard__virtual-list ${className ?? ""}`}
+      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      tabIndex={0}
+    >
+      <div style={{ height: rowMetrics.totalHeight, position: "relative" }}>
+        <div style={{ height: rowMetrics.offsets[startIndex] ?? 0 }} />
+        {visibleItems.map((item, itemIndex) => (
+          <div
+            key={item.id}
+            className="import-files-dashboard__virtual-row"
+            style={{ height: rowMetrics.heights[startIndex + itemIndex] }}
+          >
+            {renderItem(item)}
+          </div>
+        ))}
+        <div
+          style={{
+            height:
+              rowMetrics.totalHeight -
+              (rowMetrics.offsets[endIndex] ?? rowMetrics.totalHeight),
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 const createQueueItemId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -176,13 +297,6 @@ const getAcknowledgedUploadedBytes = (item: ImportQueueItem) => {
   }
 
   return Math.min(item.uploadedBytes, totalBytes);
-};
-
-const hasPartialUploadProgress = (item: ImportQueueItem) => {
-  const totalBytes = getDisplayTotalBytes(item);
-  const uploadedBytes = getAcknowledgedUploadedBytes(item);
-
-  return totalBytes > 0 && uploadedBytes > 0 && uploadedBytes < totalBytes;
 };
 
 const getStoredVisualUploadedBytes = (item: ImportQueueItem, totalBytes: number) => {
@@ -248,10 +362,6 @@ const getDisplayProgressPercent = (item: ImportQueueItem) => {
   return getUploadDisplayState(item).displayPercent;
 };
 
-const isPausedCurrentSlotItem = (item: ImportQueueItem) =>
-  (item.status === "queued" || item.status === "retry_wait") &&
-  !!item.isCurrentUploadSlot;
-
 const getUploadWeight = (size: number) => {
   const sizeInMb = size / 1024 / 1024;
   if (sizeInMb > LARGE_FILE_CONCURRENCY_THRESHOLD_MB) {
@@ -272,18 +382,6 @@ const sortQueueItemsByAddedOrder = (items: ImportQueueItem[]) =>
       left.id.localeCompare(right.id)
   );
 
-const uniqueQueueItemsById = (items: ImportQueueItem[]) => {
-  const seenIds = new Set<string>();
-  return items.filter((item) => {
-    if (seenIds.has(item.id)) {
-      return false;
-    }
-
-    seenIds.add(item.id);
-    return true;
-  });
-};
-
 const deriveOrderedQueueView = (items: ImportQueueItem[], now: number) => {
   const orderedItems = sortQueueItemsByAddedOrder(items);
   const activeItems = orderedItems.filter((item) => item.status === "uploading");
@@ -296,17 +394,6 @@ const deriveOrderedQueueView = (items: ImportQueueItem[], now: number) => {
     MAX_UPLOAD_CONCURRENCY_WEIGHT - activeWeight
   );
 
-  const pausedResumableItems = orderedItems.filter(
-    (item) =>
-      (item.status === "queued" || item.status === "retry_wait") &&
-      (isPausedCurrentSlotItem(item) || hasPartialUploadProgress(item))
-  );
-  const readyQueuedItems = orderedItems.filter(
-    (item) =>
-      (item.status === "queued" || item.status === "retry_wait") &&
-      !isPausedCurrentSlotItem(item) &&
-      !hasPartialUploadProgress(item)
-  );
   const runnableCandidates = orderedItems.filter(
     (item) =>
       item.status === "queued" ||
@@ -320,7 +407,7 @@ const deriveOrderedQueueView = (items: ImportQueueItem[], now: number) => {
 
     const itemWeight = getUploadWeight(getDisplayTotalBytes(item));
     if (itemWeight > remainingWeightBudget) {
-      break;
+      continue;
     }
 
     runnableItems.push(item);
@@ -331,85 +418,21 @@ const deriveOrderedQueueView = (items: ImportQueueItem[], now: number) => {
     }
   }
 
-  const visibleCurrentReadyItems = readyQueuedItems.slice(0, runnableItems.length);
-  const visibleCurrentItems = uniqueQueueItemsById([
-    ...activeItems,
-    ...pausedResumableItems,
-    ...visibleCurrentReadyItems,
-  ]);
-  const visibleCurrentItemIds = new Set(visibleCurrentItems.map((item) => item.id));
-  const waitingItems = orderedItems.filter(
-    (item) =>
-      (item.status === "queued" || item.status === "retry_wait") &&
-      !visibleCurrentItemIds.has(item.id)
-  );
-
   return {
     orderedItems,
     runnableItems,
     activeItems,
-    pausedResumableItems,
-    readyQueuedItems,
-    currentUploadItems: visibleCurrentItems,
-    waitingUploadItems: waitingItems,
   };
 };
 
-const deriveOrderedQueueDisplayView = (items: ImportQueueItem[]) => {
-  const orderedItems = sortQueueItemsByAddedOrder(items);
-  const activeItems = orderedItems.filter((item) => item.status === "uploading");
-  const pausedResumableItems = orderedItems.filter(
+const getOrderedPendingQueueItems = (items: ImportQueueItem[]) =>
+  sortQueueItemsByAddedOrder(items).filter(
     (item) =>
-      (item.status === "queued" || item.status === "retry_wait") &&
-      (isPausedCurrentSlotItem(item) || hasPartialUploadProgress(item))
-  );
-  const currentSlotWeight = [...activeItems, ...pausedResumableItems].reduce(
-    (sum, item) => sum + getUploadWeight(getDisplayTotalBytes(item)),
-    0
-  );
-  let remainingWeightBudget = Math.max(
-    0,
-    MAX_UPLOAD_CONCURRENCY_WEIGHT - currentSlotWeight
+      item.status === "queued" ||
+      item.status === "retry_wait" ||
+      item.status === "uploading"
   );
 
-  const readyQueuedItems = orderedItems.filter(
-    (item) =>
-      (item.status === "queued" || item.status === "retry_wait") &&
-      !isPausedCurrentSlotItem(item) &&
-      !hasPartialUploadProgress(item)
-  );
-  const visibleCurrentReadyItems: ImportQueueItem[] = [];
-  for (const item of readyQueuedItems) {
-    const itemWeight = getUploadWeight(getDisplayTotalBytes(item));
-    if (itemWeight > remainingWeightBudget) {
-      break;
-    }
-
-    visibleCurrentReadyItems.push(item);
-    remainingWeightBudget -= itemWeight;
-
-    if (remainingWeightBudget <= 0) {
-      break;
-    }
-  }
-
-  const currentUploadItems = uniqueQueueItemsById([
-    ...activeItems,
-    ...pausedResumableItems,
-    ...visibleCurrentReadyItems,
-  ]);
-  const currentItemIds = new Set(currentUploadItems.map((item) => item.id));
-
-  return {
-    orderedItems,
-    currentUploadItems,
-    waitingUploadItems: orderedItems.filter(
-      (item) =>
-        (item.status === "queued" || item.status === "retry_wait") &&
-        !currentItemIds.has(item.id)
-    ),
-  };
-};
 
 const formatFileSize = (bytes: number) =>
   `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -626,6 +649,145 @@ const createCsvRow = (item: ImportQueueItem): FileImportResult => ({
   failureCode: item.failureCode ?? item.result?.failureCode ?? null,
   isRetryable: item.isRetryable,
   requestId: item.requestId ?? item.result?.requestId ?? null,
+});
+
+interface ImportQueueCardProps {
+  item: ImportQueueItem;
+  onRemove: (itemId: string) => void;
+}
+
+const QueueCardHeader = memo(
+  ({ item, onRemove }: ImportQueueCardProps) => (
+    <div className="import-files-dashboard__queue-card-header">
+      <Typography.Text
+        strong
+        ellipsis
+        className="import-files-dashboard__queue-file-name"
+      >
+        {item.fileName}
+      </Typography.Text>
+      <Tooltip title="Remove">
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          aria-label={`Remove ${item.fileName}`}
+          className="import-files-dashboard__queue-remove"
+          onClick={() => onRemove(item.id)}
+        />
+      </Tooltip>
+    </div>
+  )
+);
+
+const CurrentUploadCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
+  const isActive = item.status === "uploading";
+  const displayState = getUploadDisplayState(item);
+  const progressPercent = displayState.displayPercent;
+  const hasDisplayProgress = displayState.hasProgress;
+
+  return (
+    <div className="import-files-dashboard__queue-card">
+      <QueueCardHeader item={item} onRemove={onRemove} />
+      <div
+        className={`import-files-dashboard__queue-progress${isActive
+          ? " import-files-dashboard__queue-progress--active"
+          : ""
+          }`}
+      >
+        {(isActive || hasDisplayProgress) && (
+          <span
+            className="import-files-dashboard__queue-progress-fill"
+            style={{ width: `${progressPercent}%` }}
+          />
+        )}
+        <span className="import-files-dashboard__queue-progress-content">
+          <span>
+            {isActive || hasDisplayProgress
+              ? `${progressPercent}%`
+              : displayState.sizeLabel}
+          </span>
+          {(isActive || hasDisplayProgress) && (
+            <span>{displayState.sizeLabel}</span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+const QueueFileCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
+  const displayState = getUploadDisplayState(item);
+  if (
+    item.status === "uploading" ||
+    (displayState.hasProgress && displayState.displayPercent < 100)
+  ) {
+    return <CurrentUploadCard item={item} onRemove={onRemove} />;
+  }
+
+  const isRetrying = item.status === "retry_wait";
+
+  return (
+    <div className="import-files-dashboard__queue-card">
+      <QueueCardHeader item={item} onRemove={onRemove} />
+      <div className="import-files-dashboard__queue-progress">
+        <span className="import-files-dashboard__queue-progress-content">
+          <span>{displayState.sizeLabel}</span>
+        </span>
+      </div>
+      {isRetrying && item.retryAt && (
+        <Typography.Text
+          type="secondary"
+          ellipsis
+          className="import-files-dashboard__queue-note"
+        >
+          <ClockCircleOutlined /> Trying again at{" "}
+          {new Date(item.retryAt).toLocaleTimeString()}
+        </Typography.Text>
+      )}
+    </div>
+  );
+});
+
+const RecentActivityCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
+  const tooltipLines = [
+    item.associatedCave,
+    item.status === "failed" ? item.lastError : null,
+  ].filter(Boolean);
+  const tooltipTitle =
+    tooltipLines.length > 0 ? (
+      <div>
+        {tooltipLines.map((line) => (
+          <div key={line}>{line}</div>
+        ))}
+      </div>
+    ) : undefined;
+
+  return (
+    <div
+      className={`import-files-dashboard__queue-card import-files-dashboard__queue-card--recent${item.status === "uploaded"
+        ? " import-files-dashboard__queue-card--success"
+        : " import-files-dashboard__queue-card--failure"
+        }`}
+    >
+      <QueueCardHeader item={item} onRemove={onRemove} />
+      <Tooltip title={tooltipTitle}>
+        <div
+          className={`import-files-dashboard__queue-progress${item.status === "uploaded"
+            ? " import-files-dashboard__queue-progress--success"
+            : " import-files-dashboard__queue-progress--failure"
+            }`}
+        >
+          <span className="import-files-dashboard__queue-progress-fill" />
+          <span className="import-files-dashboard__queue-progress-content">
+            <span>{item.status === "uploaded" ? "Uploaded" : "Failed"}</span>
+            <span>{getUploadDisplayState(item).sizeLabel}</span>
+          </span>
+        </div>
+      </Tooltip>
+    </div>
+  );
 });
 
 export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
@@ -1644,28 +1806,9 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     return { uploaded, failed, canceled, uploading, queued, remaining };
   }, [queueItems]);
 
-  const orderedQueueView = useMemo(
-    () => deriveOrderedQueueDisplayView(queueItems),
+  const uploadQueueItems = useMemo(
+    () => getOrderedPendingQueueItems(queueItems),
     [queueItems]
-  );
-
-  const currentUploadItems = useMemo(
-    () => orderedQueueView.currentUploadItems.slice(0, RECENT_ACTIVITY_LIMIT),
-    [orderedQueueView]
-  );
-
-  const waitingUploadItems = useMemo(
-    () =>
-      orderedQueueView.waitingUploadItems.slice(
-        0,
-        Math.max(0, RECENT_ACTIVITY_LIMIT - currentUploadItems.length)
-      ),
-    [currentUploadItems.length, orderedQueueView]
-  );
-
-  const uploadNowItems = useMemo(
-    () => [...currentUploadItems, ...waitingUploadItems],
-    [currentUploadItems, waitingUploadItems]
   );
 
   const failedItems = useMemo(
@@ -1685,7 +1828,6 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             item.status === "failed" ||
             item.status === "canceled"
         )
-        .slice(-RECENT_ACTIVITY_LIMIT)
         .reverse(),
     [queueItems]
   );
@@ -1771,6 +1913,43 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     queueStats.remaining,
     startOrResumeUploads,
   ]);
+
+  const removeQueueItem = useCallback(
+    (itemId: string) => {
+      uploadAbortControllersRef.current.get(itemId)?.abort();
+      uploadAbortControllersRef.current.delete(itemId);
+      startedUploadsRef.current.delete(itemId);
+
+      setQueueItems((items) => items.filter((item) => item.id !== itemId));
+
+      if (queueStorageKey) {
+        void ImportQueueStorage.deleteFile(queueStorageKey, itemId).catch(() => { });
+      }
+    },
+    [queueStorageKey]
+  );
+
+  const renderQueueItem = useCallback(
+    (item: ImportQueueItem) => (
+      <QueueFileCard item={item} onRemove={removeQueueItem} />
+    ),
+    [removeQueueItem]
+  );
+
+  const getQueueRowHeight = useCallback(
+    (item: ImportQueueItem) =>
+      item.status === "retry_wait" && item.retryAt
+        ? VIRTUAL_QUEUE_ROW_HEIGHT
+        : VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
+    []
+  );
+
+  const renderRecentActivityItem = useCallback(
+    (item: ImportQueueItem) => (
+      <RecentActivityCard item={item} onRemove={removeQueueItem} />
+    ),
+    [removeQueueItem]
+  );
 
   return (
     <>
@@ -2056,7 +2235,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               <div className="import-files-dashboard__pane-card import-step-surface">
                 <div className="import-files-dashboard__pane-header">
                   <div className="import-files-dashboard__pane-header-main">
-                    <Typography.Title level={4}>Uploading Now</Typography.Title>
+                    <Typography.Title level={4}>Queue</Typography.Title>
                     <Typography.Text
                       type="secondary"
                       className="import-files-dashboard__queued-count"
@@ -2078,7 +2257,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                   </div>
                 </div>
                 <div className="import-files-dashboard__pane-scroll">
-                  {uploadNowItems.length === 0 ? (
+                  {uploadQueueItems.length === 0 ? (
                     <div className="import-files-dashboard__placeholder-state">
                       <div className="import-files-dashboard__queue-placeholder">
                         <div className="import-files-dashboard__queue-placeholder-line" />
@@ -2092,99 +2271,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                       </Typography.Text>
                     </div>
                   ) : (
-                    <div className="import-files-dashboard__upload-now-content">
-                      <div className="import-files-dashboard__current-list">
-                        {currentUploadItems.map((item) => {
-                          const isActive = item.status === "uploading";
-                          const displayState = getUploadDisplayState(item);
-                          const progressPercent = displayState.displayPercent;
-                          const hasDisplayProgress = displayState.hasProgress;
-
-                          return (
-                            <div
-                              key={item.id}
-                              className={`import-files-dashboard__queue-card import-files-dashboard__queue-card--current${isActive
-                                ? " import-files-dashboard__queue-card--active"
-                                : ""
-                                }`}
-                            >
-                              <Typography.Text
-                                strong
-                                ellipsis
-                                className="import-files-dashboard__queue-file-name"
-                              >
-                                {item.fileName}
-                              </Typography.Text>
-                              <div
-                                className={`import-files-dashboard__queue-progress${isActive
-                                  ? " import-files-dashboard__queue-progress--active"
-                                  : ""
-                                  }`}
-                              >
-                                {(isActive || hasDisplayProgress) && (
-                                  <span
-                                    className="import-files-dashboard__queue-progress-fill"
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
-                                )}
-                                <span className="import-files-dashboard__queue-progress-content">
-                                  <span>
-                                    {isActive || hasDisplayProgress
-                                      ? `${progressPercent}%`
-                                      : displayState.sizeLabel}
-                                  </span>
-                                  {(isActive || hasDisplayProgress) && (
-                                    <span>{displayState.sizeLabel}</span>
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {waitingUploadItems.length > 0 && (
-                        <>
-                          <div className="import-files-dashboard__queue-divider">
-                            Waiting files
-                          </div>
-                          <div className="import-files-dashboard__waiting-list">
-                            {waitingUploadItems.map((item) => {
-                              const isRetrying = item.status === "retry_wait";
-                              const displayState = getUploadDisplayState(item);
-
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="import-files-dashboard__queue-card import-files-dashboard__queue-card--waiting"
-                                >
-                                  <Typography.Text
-                                    strong
-                                    ellipsis
-                                    className="import-files-dashboard__queue-file-name"
-                                  >
-                                    {item.fileName}
-                                  </Typography.Text>
-                                  <div className="import-files-dashboard__queue-progress">
-                                    <span className="import-files-dashboard__queue-progress-content">
-                                      <span>{displayState.sizeLabel}</span>
-                                    </span>
-                                  </div>
-                                  {isRetrying && item.retryAt && (
-                                    <Typography.Text
-                                      type="secondary"
-                                      className="import-files-dashboard__queue-note"
-                                    >
-                                      <ClockCircleOutlined /> Trying again at{" "}
-                                      {new Date(item.retryAt).toLocaleTimeString()}
-                                    </Typography.Text>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    <VirtualFileList
+                      items={uploadQueueItems}
+                      rowHeight={VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT}
+                      getRowHeight={getQueueRowHeight}
+                      renderItem={renderQueueItem}
+                      emptyState={null}
+                    />
                   )}
                 </div>
               </div>
@@ -2192,70 +2285,29 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                 <div className="import-files-dashboard__pane-header">
                   <Typography.Title level={4}>Recent Activity</Typography.Title>
                   <Typography.Text type="secondary">
-                    Last {RECENT_ACTIVITY_LIMIT}
+                    {recentActivity.length} completed
                   </Typography.Text>
                 </div>
                 <div className="import-files-dashboard__pane-scroll">
-                  {recentActivity.length === 0 ? (
-                    <div className="import-files-dashboard__placeholder-state">
-                      <div className="import-files-dashboard__queue-placeholder">
-                        <div className="import-files-dashboard__queue-placeholder-line" />
-                        <div className="import-files-dashboard__queue-progress import-files-dashboard__queue-progress--placeholder" />
-                      </div>
-                      <Typography.Paragraph
-                        type="secondary"
-                        className="import-files-dashboard__queue-placeholder-copy"
-                      >
-                        Finished files and problem files will appear here as the upload runs.
-                      </Typography.Paragraph>
-                    </div>
-                  ) : (
-                    recentActivity.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`import-files-dashboard__queue-card import-files-dashboard__queue-card--recent${item.status === "uploaded"
-                          ? " import-files-dashboard__queue-card--success"
-                          : " import-files-dashboard__queue-card--failure"
-                          }`}
-                      >
-                        <Typography.Text
-                          strong
-                          ellipsis
-                          className="import-files-dashboard__queue-file-name"
-                        >
-                          {item.fileName}
-                        </Typography.Text>
-                        <div
-                          className={`import-files-dashboard__queue-progress${item.status === "uploaded"
-                            ? " import-files-dashboard__queue-progress--success"
-                            : " import-files-dashboard__queue-progress--failure"
-                            }`}
-                        >
-                          <span className="import-files-dashboard__queue-progress-fill" />
-                          <span className="import-files-dashboard__queue-progress-content">
-                            <span>
-                              {item.status === "uploaded" ? "Uploaded" : "Needs attention"}
-                            </span>
-                            <span>{getUploadDisplayState(item).sizeLabel}</span>
-                          </span>
+                  <VirtualFileList
+                    items={recentActivity}
+                    rowHeight={VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT}
+                    renderItem={renderRecentActivityItem}
+                    emptyState={
+                      <div className="import-files-dashboard__placeholder-state">
+                        <div className="import-files-dashboard__queue-placeholder">
+                          <div className="import-files-dashboard__queue-placeholder-line" />
+                          <div className="import-files-dashboard__queue-progress import-files-dashboard__queue-progress--placeholder" />
                         </div>
-                        {item.associatedCave && (
-                          <div>
-                            <Typography.Text type="secondary">
-                              Cave: {item.associatedCave}
-                            </Typography.Text>
-                          </div>
-                        )}
-                        {item.lastError && (
-                          <div>
-                            <Typography.Text type="danger">
-                              {item.lastError}
-                            </Typography.Text>
-                          </div>
-                        )}
+                        <Typography.Paragraph
+                          type="secondary"
+                          className="import-files-dashboard__queue-placeholder-copy"
+                        >
+                          Finished files and problem files will appear here as the upload runs.
+                        </Typography.Paragraph>
                       </div>
-                    ))
-                  )}
+                    }
+                  />
                 </div>
               </div>
             </div>
