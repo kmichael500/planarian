@@ -66,4 +66,14 @@ public class RequestThrottleOptions
     /// Retry-after hint, in seconds, returned when import file upload admission is saturated.
     /// </summary>
     public int ImportFileBusyRetryAfterSeconds { get; set; } = 15;
+
+    /// <summary>
+    /// Maximum total file size, in bytes, accepted by chunked upload sessions.
+    /// </summary>
+    public long ChunkedUploadMaxFileSizeBytes { get; set; } = 550L * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum chunk size, in bytes, accepted by chunked upload requests.
+    /// </summary>
+    public long ChunkedUploadMaxChunkSizeBytes { get; set; } = 64L * 1024 * 1024;
 }

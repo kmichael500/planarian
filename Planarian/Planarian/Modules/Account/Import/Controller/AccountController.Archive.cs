@@ -10,8 +10,6 @@ using Planarian.Shared.Base;
 // ReSharper disable once CheckNamespace ( for partial class compatability )
 namespace Planarian.Modules.Account.Controller;
 
-[Route(Route)]
-[Authorize]
 public partial class AccountController : PlanarianControllerBase<AccountService>
 {
     [HttpPost("archive")]

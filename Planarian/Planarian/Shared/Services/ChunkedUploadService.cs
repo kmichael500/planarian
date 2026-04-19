@@ -19,6 +19,8 @@ public class ChunkedUploadService : ServiceBase
     private static int? ProcessingRetryAfterSeconds;
 
     private readonly FileService _fileService;
+    private readonly long _maxFileSizeBytes;
+    private readonly long _maxChunkSizeBytes;
 
     public ChunkedUploadService(
         RequestUser requestUser,
@@ -26,6 +28,8 @@ public class ChunkedUploadService : ServiceBase
         RequestThrottleOptions requestThrottleOptions) : base(requestUser)
     {
         _fileService = fileService;
+        _maxFileSizeBytes = Math.Max(1, requestThrottleOptions.ChunkedUploadMaxFileSizeBytes);
+        _maxChunkSizeBytes = Math.Max(1, requestThrottleOptions.ChunkedUploadMaxChunkSizeBytes);
         InitializeProcessingAdmission(requestThrottleOptions);
     }
 
@@ -64,6 +68,9 @@ public class ChunkedUploadService : ServiceBase
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
         if (string.IsNullOrWhiteSpace(request.FileName)) throw ApiExceptionDictionary.NullValue(nameof(request.FileName));
         if (request.FileSize <= 0) throw ApiExceptionDictionary.BadRequest("File size must be greater than 0.");
+        if (request.FileSize > _maxFileSizeBytes)
+            throw ApiExceptionDictionary.BadRequest(
+                $"File size must be {FormatBytes(_maxFileSizeBytes)} or less.");
         if (string.IsNullOrWhiteSpace(request.BlobKeyPrefix))
             throw ApiExceptionDictionary.NullValue(nameof(request.BlobKeyPrefix));
 
@@ -108,6 +115,12 @@ public class ChunkedUploadService : ServiceBase
             if (contentLength <= 0)
             {
                 throw ApiExceptionDictionary.BadRequest("Chunk content length must be greater than 0.");
+            }
+
+            if (contentLength > _maxChunkSizeBytes)
+            {
+                throw ApiExceptionDictionary.BadRequest(
+                    $"Chunk size must be {FormatBytes(_maxChunkSizeBytes)} or less.");
             }
 
             if (offset < 0 || offset > session.FileSize)
@@ -331,6 +344,14 @@ public class ChunkedUploadService : ServiceBase
             await seekableChunkStream.DisposeAsync();
             throw;
         }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        var sizeInMb = bytes / 1024d / 1024d;
+        return sizeInMb % 1 == 0
+            ? $"{sizeInMb:0} MB"
+            : $"{sizeInMb:0.#} MB";
     }
 
     private sealed class LengthAwareReadStream : Stream

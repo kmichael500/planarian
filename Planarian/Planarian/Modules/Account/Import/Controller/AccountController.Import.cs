@@ -7,8 +7,6 @@ using Planarian.Modules.Account.Import.Models;
 // ReSharper disable once CheckNamespace ( for partial class compatability )
 namespace Planarian.Modules.Account.Controller;
 
-[Route(Route)]
-[Authorize]
 public partial class AccountController
 {
     private const long ImportUploadRequestSizeLimitBytes = 50 * 1024 * 1024; // 50 MB
@@ -92,7 +90,7 @@ public partial class AccountController
             return Ok(result);
         }
 
-        return StatusCode(GetFileImportFailureStatusCode(result.FailureCode), result);
+        throw ApiExceptionDictionary.FromErrorCode(result.FailureCode, result.Message, result);
     }
 
     [HttpDelete("import/file/session/{sessionId}")]
@@ -101,26 +99,6 @@ public partial class AccountController
     {
         await _importService.CancelFileUploadSession(sessionId, cancellationToken);
         return NoContent();
-    }
-
-    private static int GetFileImportFailureStatusCode(string? failureCode)
-    {
-        if (!Enum.TryParse<ApiExceptionType>(failureCode, out var apiExceptionType))
-        {
-            return StatusCodes.Status400BadRequest;
-        }
-
-        return apiExceptionType switch
-        {
-            ApiExceptionType.BadRequest => StatusCodes.Status400BadRequest,
-            ApiExceptionType.NotFound => StatusCodes.Status404NotFound,
-            ApiExceptionType.Conflict => StatusCodes.Status409Conflict,
-            ApiExceptionType.TooManyRequests => StatusCodes.Status429TooManyRequests,
-            ApiExceptionType.Unauthorized => StatusCodes.Status401Unauthorized,
-            ApiExceptionType.Forbidden => StatusCodes.Status403Forbidden,
-            ApiExceptionType.InternalServerError => StatusCodes.Status500InternalServerError,
-            _ => StatusCodes.Status400BadRequest
-        };
     }
 
     [HttpPost("import/entrances/process/{fileId:length(10)}")]

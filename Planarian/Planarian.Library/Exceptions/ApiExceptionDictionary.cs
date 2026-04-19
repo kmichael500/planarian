@@ -31,6 +31,33 @@ public static class ApiExceptionDictionary
         return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.Conflict, message);
     }
 
+    public static ApiException FromErrorCode(string? errorCode, string message)
+    {
+        return FromErrorCode(errorCode, message, null);
+    }
+
+    public static ApiException FromErrorCode(string? errorCode, string message, object? data)
+    {
+        if (!Enum.TryParse<ApiExceptionType>(errorCode, out var apiExceptionType))
+        {
+            return WithData(BadRequest(message), data);
+        }
+
+        var exception = apiExceptionType switch
+        {
+            ApiExceptionType.BadRequest => BadRequest(message),
+            ApiExceptionType.NotFound => new ApiException(StatusCodes.Status404NotFound, ApiExceptionType.NotFound, message),
+            ApiExceptionType.Conflict => Conflict(message),
+            ApiExceptionType.TooManyRequests => TooManyRequests(message),
+            ApiExceptionType.Unauthorized => Unauthorized(message),
+            ApiExceptionType.Forbidden => Forbidden(message),
+            ApiExceptionType.InternalServerError => InternalServerError(message),
+            _ => new ApiException(StatusCodes.Status400BadRequest, apiExceptionType, message)
+        };
+
+        return WithData(exception, data);
+    }
+
     public static ApiException TooManyRequests(string message)
     {
         return new ApiException(StatusCodes.Status429TooManyRequests, ApiExceptionType.TooManyRequests, message)
@@ -49,6 +76,12 @@ public static class ApiExceptionDictionary
     public static ApiException InternalServerError(string message)
     {
         return new ApiException(500, ApiExceptionType.InternalServerError, message);
+    }
+
+    private static ApiException WithData(ApiException exception, object? data)
+    {
+        exception.Data = data;
+        return exception;
     }
 
     #endregion
