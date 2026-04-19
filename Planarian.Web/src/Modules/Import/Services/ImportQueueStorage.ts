@@ -1,6 +1,7 @@
 const DB_NAME = "planarian-import-queue";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const FILE_STORE = "files";
+const QUEUE_KEY_INDEX = "queueKey";
 
 interface StoredQueueFile {
   id: string;
@@ -9,24 +10,60 @@ interface StoredQueueFile {
   file: File;
 }
 
+interface QueueFileToStore {
+  itemId: string;
+  file: File;
+}
+
 const buildStorageId = (queueKey: string, itemId: string) =>
   `${queueKey}::${itemId}`;
 
+const buildQueueKeyRange = (queueKey: string) =>
+  IDBKeyRange.bound(`${queueKey}::`, `${queueKey}::\uffff`);
+
+let databasePromise: Promise<IDBDatabase> | null = null;
+
 const openDatabase = (): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+  (() => {
+    if (databasePromise) {
+      return databasePromise;
+    }
 
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(FILE_STORE)) {
-        database.createObjectStore(FILE_STORE, { keyPath: "id" });
-      }
-    };
+    databasePromise = new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("Failed to open import queue storage."));
-  });
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        const store = database.objectStoreNames.contains(FILE_STORE)
+          ? request.transaction!.objectStore(FILE_STORE)
+          : database.createObjectStore(FILE_STORE, { keyPath: "id" });
+
+        if (!store.indexNames.contains(QUEUE_KEY_INDEX)) {
+          store.createIndex(QUEUE_KEY_INDEX, "queueKey", { unique: false });
+        }
+      };
+
+      request.onsuccess = () => {
+        const database = request.result;
+        database.onversionchange = () => {
+          database.close();
+          databasePromise = null;
+        };
+        resolve(database);
+      };
+      request.onerror = () => {
+        databasePromise = null;
+        reject(
+          request.error ?? new Error("Failed to open import queue storage.")
+        );
+      };
+      request.onblocked = () => {
+        databasePromise = null;
+      };
+    });
+
+    return databasePromise;
+  })();
 
 const runTransaction = async <T>(
   mode: IDBTransactionMode,
@@ -38,9 +75,7 @@ const runTransaction = async <T>(
     const transaction = database.transaction(FILE_STORE, mode);
     const store = transaction.objectStore(FILE_STORE);
 
-    transaction.oncomplete = () => database.close();
     transaction.onerror = () => {
-      database.close();
       reject(
         transaction.error ?? new Error("Import queue storage transaction failed.")
       );
@@ -51,6 +86,65 @@ const runTransaction = async <T>(
 };
 
 export const ImportQueueStorage = {
+  async putFiles(
+    queueKey: string,
+    files: QueueFileToStore[],
+    onProgress?: (completedCount: number) => void
+  ): Promise<void> {
+    if (files.length === 0) {
+      return;
+    }
+
+    const database = await openDatabase();
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(FILE_STORE, "readwrite");
+      const store = transaction.objectStore(FILE_STORE);
+      let completedCount = 0;
+      let hasFailed = false;
+
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => {
+        reject(
+          transaction.error ??
+            new Error("Import queue storage transaction failed.")
+        );
+      };
+      transaction.onabort = () => {
+        reject(
+          transaction.error ??
+            new Error("Failed to persist import queue files.")
+        );
+      };
+
+      files.forEach(({ itemId, file }) => {
+        const request = store.put({
+          id: buildStorageId(queueKey, itemId),
+          queueKey,
+          itemId,
+          file,
+        } as StoredQueueFile);
+
+        request.onsuccess = () => {
+          completedCount += 1;
+          onProgress?.(completedCount);
+        };
+        request.onerror = () => {
+          if (hasFailed) {
+            return;
+          }
+
+          hasFailed = true;
+          reject(
+            request.error ??
+              new Error("Failed to persist import queue files.")
+          );
+          transaction.abort();
+        };
+      });
+    });
+  },
+
   async putFile(queueKey: string, itemId: string, file: File): Promise<void> {
     await runTransaction<void>("readwrite", (store, resolve, reject) => {
       const request = store.put({
@@ -88,24 +182,17 @@ export const ImportQueueStorage = {
     });
   },
 
-  async clearQueue(queueKey: string): Promise<void> {
+  async clearQueue(
+    queueKey: string,
+    onProgress?: (completedCount: number) => void
+  ): Promise<void> {
     await runTransaction<void>("readwrite", (store, resolve, reject) => {
-      const request = store.openCursor();
+      const request = store.delete(buildQueueKeyRange(queueKey));
 
       request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) {
-          resolve();
-          return;
-        }
-
-        const record = cursor.value as StoredQueueFile;
-        if (record.queueKey === queueKey) {
-          cursor.delete();
-        }
-        cursor.continue();
+        onProgress?.(0);
+        resolve();
       };
-
       request.onerror = () =>
         reject(request.error ?? new Error("Failed to clear import queue files."));
     });
