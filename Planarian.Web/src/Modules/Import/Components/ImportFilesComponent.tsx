@@ -910,6 +910,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
 
   const retryFailed = useCallback(() => {
     hasNotifiedCompletionRef.current = false;
+    setIsPaused(true);
     setQueueItems((items) =>
       items.map((item) =>
         item.status === "failed" || item.status === "canceled"
@@ -1096,7 +1097,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   }, []);
 
   const uploadControl = useMemo(() => {
-    const canPause = queueStats.uploading > 0 && !isPaused;
+    const canPause = !isPaused && queueStats.remaining > 0;
     const canStart = isPaused && queueStats.queued > 0;
     const hasPriorActivity = queueStats.uploaded > 0 || failedItems.length > 0;
 
@@ -1121,8 +1122,8 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     isRestoring,
     pauseUploads,
     queueStats.queued,
+    queueStats.remaining,
     queueStats.uploaded,
-    queueStats.uploading,
   ]);
 
   return (
