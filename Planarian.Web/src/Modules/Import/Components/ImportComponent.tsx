@@ -3,7 +3,6 @@ import "./ImportComponent.scss";
 import { ImportCaveComponent } from "./ImportCaves";
 import { ImportEntrancesComponent } from "./ImportEntrances";
 import { ImportInformationCardComponent } from "./ImportInformationCardComponent";
-import { Button } from "antd";
 import {
   ApartmentOutlined,
   FileImageOutlined,
@@ -14,14 +13,13 @@ import { ImportFilesComponent } from "./ImportFilesComponent";
 
 const ImportComponent = () => {
   const [step, setStep] = useState<number>(1);
-  const totalSteps = 4;
 
   const stepItems = useMemo(
     () => [
       {
         key: 1,
         title: "Templates",
-        shortTitle: "Refs",
+        shortTitle: "Templates",
         icon: <ReadOutlined />,
       },
       {
@@ -109,24 +107,6 @@ const ImportComponent = () => {
       <div className="import-workflow__content">
         <div className="import-workflow__step-scroll">
           <div className="import-workflow__step-panel">{renderActiveStep()}</div>
-        </div>
-      </div>
-
-      <div className="import-workflow__footer">
-        <div className="import-workflow__footer-actions">
-          <Button
-            onClick={() => setStep((prev) => Math.max(1, prev - 1))}
-            disabled={step === 1}
-          >
-            Previous
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => setStep((prev) => Math.min(totalSteps, prev + 1))}
-            disabled={step === totalSteps}
-          >
-            Next
-          </Button>
         </div>
       </div>
     </div>

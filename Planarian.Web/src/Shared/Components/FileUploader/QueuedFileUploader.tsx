@@ -14,6 +14,7 @@ import {
   RedoOutlined,
 } from "@ant-design/icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import "./QueuedFileUploader.scss";
 import {
   getUploadDisplayState,
   VIRTUAL_QUEUE_ROW_HEIGHT,
@@ -330,7 +331,7 @@ export const QueuedFileUploader = <TResult,>({
         }}
       />
 
-      <div className="import-files-dashboard__controls import-step-surface import-step-card">
+      <div className="import-files-dashboard__controls import-files-dashboard__controls-panel">
         <div
           className="import-files-dashboard__controls-actions"
           ref={toolbarContainerRef}
@@ -493,13 +494,13 @@ export const QueuedFileUploader = <TResult,>({
             className="import-files-dashboard__metrics import-files-dashboard__metrics--toolbar"
             ref={toolbarStatsRef}
           >
-            <div className="import-step-surface import-files-dashboard__metric import-files-dashboard__metric--compact">
+            <div className="import-files-dashboard__metric import-files-dashboard__metric--compact">
               <span className="import-files-dashboard__metric-label">Added</span>
               <span className="import-files-dashboard__metric-value">
                 {queue.queueItems.length}
               </span>
             </div>
-            <div className="import-step-surface import-files-dashboard__metric import-files-dashboard__metric--compact">
+            <div className="import-files-dashboard__metric import-files-dashboard__metric--compact">
               <span className="import-files-dashboard__metric-label">
                 Uploaded
               </span>
@@ -507,7 +508,7 @@ export const QueuedFileUploader = <TResult,>({
                 {queue.queueStats.uploaded}
               </span>
             </div>
-            <div className="import-step-surface import-files-dashboard__metric import-files-dashboard__metric--compact">
+            <div className="import-files-dashboard__metric import-files-dashboard__metric--compact">
               <span className="import-files-dashboard__metric-label">Failed</span>
               <span className="import-files-dashboard__metric-value">
                 {queue.failedItems.length}
@@ -519,7 +520,7 @@ export const QueuedFileUploader = <TResult,>({
 
       <div className="import-files-dashboard__body">
         <div className="import-files-dashboard__body-grid">
-          <div className="import-files-dashboard__pane-card import-step-surface">
+          <div className="import-files-dashboard__pane-card">
             <div className="import-files-dashboard__pane-header">
               <div className="import-files-dashboard__pane-header-main">
                 <Typography.Title level={4}>{queueTitle}</Typography.Title>
@@ -568,7 +569,7 @@ export const QueuedFileUploader = <TResult,>({
               )}
             </div>
           </div>
-          <div className="import-files-dashboard__pane-card import-step-surface">
+          <div className="import-files-dashboard__pane-card">
             <div className="import-files-dashboard__pane-header">
               <Typography.Title level={4}>{recentActivityTitle}</Typography.Title>
               <Typography.Text type="secondary">

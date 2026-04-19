@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Button, Radio, Typography, message } from "antd";
+import { Button, Radio, Typography, message } from "antd";
 import {
   ApartmentOutlined,
   CheckCircleOutlined,
@@ -22,8 +22,9 @@ import { EntranceCsvModel } from "../Models/EntranceCsvModel";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { EntranceDryRun } from "../Models/EntranceDryRun";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { AppOptions } from "../../../Shared/Services/AppService";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Paragraph } = Typography;
 
 interface ImportEntrancesComponentProps {
   onUploaded: () => void;
@@ -123,28 +124,33 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
   };
 
   const hasErrors = uploadFailed || errorList.length > 0 || processError !== null;
+  const isInitialUploadState = !isUploaded && !hasErrors;
+  const isAwaitingDryRun =
+    isUploaded && !isProcessing && !isProcessed && !isDryRunComplete && !hasErrors;
+  const isReadyToProcess =
+    isDryRunComplete && !isProcessing && !isProcessed && !hasErrors;
+  const isProcessingState = isProcessing;
+  const isCompleteState = isProcessed && !isProcessing;
+  const isErrorState = hasErrors;
+  const isPostUploadState = !isInitialUploadState;
+  const supportContact =
+    AppOptions?.supportName && AppOptions?.supportEmail
+      ? `${AppOptions.supportName} at ${AppOptions.supportEmail}`
+      : null;
 
   return (
     <>
       <div className="import-step-workspace">
-        {hasErrors && (
-          <Alert
-            className="import-step-banner"
-            type="error"
-            showIcon
-            message={processError ?? "There were errors with this import."}
-            description={
-              errorList.length > 0
-                ? `${errorList.length} row${errorList.length === 1 ? "" : "s"} need attention.`
-                : "Please try uploading the file again."
-            }
-          />
-        )}
-
-        <div className="import-step-layout">
+        <div
+          className={`import-step-layout${
+            isInitialUploadState ? " import-step-layout--upload-focus" : ""
+          }${
+            isPostUploadState ? " import-step-layout--review-focus" : ""
+          }`}
+        >
           <div className="import-step-main">
-            {!isUploaded && !hasErrors && (
-              <div className="import-step-surface import-step-card import-step-panel import-step-upload">
+            {isInitialUploadState && (
+              <div className="import-step-surface import-step-card import-step-card--elevated import-step-panel import-step-upload">
                 <div className="import-step-panel__header">
                   <div>
                     <div className="import-step-kicker">
@@ -152,17 +158,18 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                       Entrance CSV
                     </div>
                     <Title level={4} style={{ margin: 0 }}>
-                      Upload Entrance Data
+                      Entrance Import
                     </Title>
                     <Paragraph style={{ marginBottom: 0 }}>
-                      Import entrances after the cave records are already in
-                      place.
+                      Cave records must be added first before entrance data can
+                      be imported. Upload your entrance CSV to review it with a
+                      dry run before any changes are applied.
                     </Paragraph>
                   </div>
                 </div>
                 <div className="import-step-panel__body import-step-panel__body--plain">
                   <UploadComponent
-                    draggerMessage="Click or drag your entrances CSV file to this area to upload."
+                    draggerMessage="Choose an entrance CSV or drag it here to upload."
                     draggerTitle="Import Entrance File"
                     hideCancelButton
                     singleFile
@@ -198,281 +205,208 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
               </div>
             )}
 
-            {isUploaded &&
-              !isProcessing &&
-              !isProcessed &&
-              !isDryRunComplete &&
-              !hasErrors && (
-                <div className="import-step-surface import-step-card import-step-panel">
-                  <div className="import-step-panel__body import-step-panel__body--plain">
+            {isPostUploadState && (
+              <div className="import-step-surface import-step-card import-step-card--elevated import-step-panel import-step-review-card">
+                <div className="import-step-panel__body import-step-panel__body--plain import-step-review-card__body">
+                  <div className="import-step-review-card__status">
                     <div className="import-step-status">
                       <div className="import-step-status__hero">
-                        <span className="import-step-status__icon import-step-status__icon--success">
-                          <CheckCircleOutlined />
+                        <span
+                          className={`import-step-status__icon ${
+                            isErrorState
+                              ? "import-step-status__icon--error"
+                              : isProcessingState
+                              ? "import-step-status__icon--processing"
+                              : "import-step-status__icon--success"
+                          }`}
+                        >
+                          {isErrorState ? (
+                            <RedoOutlined />
+                          ) : isProcessingState ? (
+                            <DeliveredProcedureOutlined />
+                          ) : isReadyToProcess ? (
+                            <ApartmentOutlined />
+                          ) : (
+                            <CheckCircleOutlined />
+                          )}
                         </span>
                         <div className="import-step-status__copy">
                           <Title level={4} style={{ marginTop: 0 }}>
-                            Entrance CSV uploaded
+                            {isAwaitingDryRun
+                              ? "Entrance CSV uploaded"
+                              : isReadyToProcess
+                              ? "Dry run complete"
+                              : isProcessingState
+                              ? "Processing entrance import"
+                              : isCompleteState
+                              ? "Entrance import complete"
+                              : "Entrance import failed"}
                           </Title>
                           <Paragraph>
-                            Run a dry run before processing so you can preview
-                            entrance changes.
+                            {isAwaitingDryRun
+                              ? "Run a dry run before processing so you can preview entrance changes."
+                              : isReadyToProcess
+                              ? "Review the output, then process the entrance import if the changes look correct."
+                              : isProcessingState
+                              ? "Keep this page open while Planarian applies the entrance data."
+                              : isCompleteState
+                              ? "Your entrance CSV has been processed successfully."
+                              : `Planarian should tell you why a row failed. If it does not, or you need help, contact ${
+                                  supportContact ?? "support"
+                                }.`}
                           </Paragraph>
-                          <Paragraph style={{ marginBottom: 0 }}>
-                            {syncExisting
-                              ? "Replace Existing mode deletes the current entrances for matching caves and replaces them with the CSV."
-                              : "Insert Only mode adds new entrances and leaves existing entrances unchanged."}
-                          </Paragraph>
+                          {(isAwaitingDryRun || isReadyToProcess) && (
+                            <Paragraph style={{ marginBottom: 0 }}>
+                              {isAwaitingDryRun
+                                ? syncExisting
+                                  ? "Replace Existing mode deletes the current entrances for matching caves and replaces them with the CSV."
+                                  : "Insert Only mode adds new entrances and leaves existing entrances unchanged."
+                                : `${dryRunData.length} cave${
+                                    dryRunData.length === 1 ? "" : "s"
+                                  } were included in the dry run.`}
+                            </Paragraph>
+                          )}
+                          {isErrorState && processError && (
+                            <Paragraph style={{ display: "none", marginBottom: 0 }}>
+                              {processError}
+                            </Paragraph>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-            {isDryRunComplete && !isProcessing && !isProcessed && !hasErrors && (
-              <div className="import-step-surface import-step-card import-step-panel">
-                <div className="import-step-panel__body import-step-panel__body--plain">
-                  <div className="import-step-status">
-                    <div className="import-step-status__hero">
-                      <span className="import-step-status__icon import-step-status__icon--success">
-                        <ApartmentOutlined />
-                      </span>
-                      <div className="import-step-status__copy">
-                        <Title level={4} style={{ marginTop: 0 }}>
-                          Dry run complete
-                        </Title>
-                        <Paragraph>
-                          Review the output, then process the entrance import if
-                          the changes look correct.
-                        </Paragraph>
-                        <Paragraph style={{ marginBottom: 0 }}>
-                          {dryRunData.length} cave
-                          {dryRunData.length === 1 ? "" : "s"} were included in
-                          the dry run.
-                        </Paragraph>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isProcessing && (
-              <div className="import-step-surface import-step-card import-step-panel">
-                <div className="import-step-panel__body import-step-panel__body--plain">
-                  <div className="import-step-status">
-                    <div className="import-step-status__hero">
-                      <span className="import-step-status__icon import-step-status__icon--processing">
-                        <DeliveredProcedureOutlined />
-                      </span>
-                      <div className="import-step-status__copy">
-                        <Title level={4} style={{ marginTop: 0 }}>
-                          Processing entrance import
-                        </Title>
-                        <Paragraph>
-                          Keep this page open while Planarian applies the
-                          entrance data.
-                        </Paragraph>
-                      </div>
-                    </div>
-                    <SignalRProgressComponent
-                      groupName={uploadResult?.id as string}
-                      isLoading={isProcessing}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isProcessed && !isProcessing && (
-              <div className="import-step-surface import-step-card import-step-panel">
-                <div className="import-step-panel__body import-step-panel__body--plain">
-                  <div className="import-step-status">
-                    <div className="import-step-status__hero">
-                      <span className="import-step-status__icon import-step-status__icon--success">
-                        <CheckCircleOutlined />
-                      </span>
-                      <div className="import-step-status__copy">
-                        <Title level={4} style={{ marginTop: 0 }}>
-                          Entrance import complete
-                        </Title>
-                        <Paragraph style={{ marginBottom: 0 }}>
-                          Your entrance CSV has been processed successfully.
-                        </Paragraph>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {hasErrors && (
-              <div className="import-step-surface import-step-card import-step-panel">
-                <div className="import-step-panel__body import-step-panel__body--plain">
-                  <div className="import-step-status">
-                    <div className="import-step-status__hero">
-                      <span className="import-step-status__icon import-step-status__icon--error">
-                        <RedoOutlined />
-                      </span>
-                      <div className="import-step-status__copy">
-                        <Title level={4} style={{ marginTop: 0 }}>
-                          Entrance import needs attention
-                        </Title>
-                        <Paragraph style={{ marginBottom: 0 }}>
-                          Review the errors, fix the CSV if needed, and try the
-                          upload again.
-                        </Paragraph>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="import-step-side">
-            <div className="import-step-surface import-step-card import-step-panel">
-              <div className="import-step-panel__header">
-                <div>
-                  <Title level={5} style={{ margin: 0 }}>
-                    {isProcessed
-                      ? "Next step"
-                      : hasErrors
-                      ? "Recovery"
-                      : isProcessing
-                      ? "Progress"
-                      : isDryRunComplete
-                      ? "Review"
-                      : isUploaded
-                      ? "Import mode"
-                      : "Before you upload"}
-                  </Title>
-                </div>
-              </div>
-              <div className="import-step-panel__body">
-                {!isUploaded && !hasErrors && (
-                  <div className="import-step-mode-card">
-                    <Text strong>Suggested order</Text>
-                    <Text>1. Upload entrances</Text>
-                    <Text>2. Dry run the changes</Text>
-                    <Text>3. Process the import</Text>
-                    <Text>4. Review the caves and files</Text>
-                  </div>
-                )}
-
-                {isUploaded &&
-                  !isProcessing &&
-                  !isProcessed &&
-                  !isDryRunComplete &&
-                  !hasErrors && (
-                    <div className="import-step-mode-card">
-                      <Radio.Group
-                        value={syncExisting ? "replace" : "insert"}
-                        onChange={(event) =>
-                          setSyncExisting(event.target.value === "replace")
-                        }
-                        optionType="button"
-                        buttonStyle="solid"
-                      >
-                        <Radio.Button value="insert">Insert Only</Radio.Button>
-                        <Radio.Button value="replace">
-                          Replace Existing
-                        </Radio.Button>
-                      </Radio.Group>
-                      <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
-                        {syncExisting
-                          ? "Existing entrances for included caves will be deleted and replaced with the entrances in this CSV."
-                          : "Only new entrances will be inserted. Existing entrances stay unchanged."}
-                      </Paragraph>
-                      <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
-                        It is strongly recommended to create an archive first in{" "}
-                        <Link to="/account/settings">Account Settings</Link>.
-                      </Paragraph>
-                      <div className="import-step-actions">
-                        <PlanarianButton
-                          onClick={handleDryRunClick}
-                          icon={<EyeOutlined />}
-                          loading={isLoading}
-                          type="primary"
-                        >
-                          Dry Run
-                        </PlanarianButton>
-                        <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                          Reset
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                {isDryRunComplete && !isProcessing && !isProcessed && !hasErrors && (
-                  <div className="import-step-mode-card">
-                    <Paragraph style={{ marginBottom: 0 }}>
-                      A count change of 0 means the number of entrances is
-                      unchanged, not that the entrance data itself is unchanged.
-                    </Paragraph>
-                    <div className="import-step-actions">
-                      <PlanarianButton
-                        alwaysShowChildren
-                        onClick={showCSVModal}
-                        icon={<EyeOutlined />}
-                      >
-                        View Dry Run Data
-                      </PlanarianButton>
-                      <PlanarianButton
-                        alwaysShowChildren
-                        onClick={handleProcessClick}
-                        icon={<DeliveredProcedureOutlined />}
-                        loading={isLoading}
-                        type="primary"
-                      >
-                        Process
-                      </PlanarianButton>
-                      <PlanarianButton
-                        alwaysShowChildren
-                        onClick={tryAgain}
-                        icon={<RedoOutlined />}
-                      >
-                        Reset
-                      </PlanarianButton>
-                    </div>
-                  </div>
-                )}
-
-                {isProcessing && (
-                  <Paragraph style={{ marginBottom: 0 }}>
-                    Progress updates are shown live while the server processes
-                    the entrance import.
-                  </Paragraph>
-                )}
-
-                {isProcessed && !isProcessing && (
-                  <div className="import-step-actions">
-                    <Link to="/caves">
-                      <Button type="primary" onClick={onUploaded}>
-                        View Caves
-                      </Button>
-                    </Link>
-                    <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                      Import Another Entrance File
-                    </Button>
-                  </div>
-                )}
-
-                {hasErrors && (
-                  <div className="import-step-mode-card">
-                    {errorList.length > 0 && (
-                      <Button type="primary" onClick={showCSVModal}>
-                        View Errors
-                      </Button>
+                    {isProcessingState && (
+                      <SignalRProgressComponent
+                        groupName={uploadResult?.id as string}
+                        isLoading={isProcessing}
+                      />
                     )}
-                    <Button danger onClick={tryAgain}>
-                      Try Again
-                    </Button>
                   </div>
-                )}
+
+                  <div className="import-step-review-card__controls">
+                    {isAwaitingDryRun && (
+                      <div className="import-step-mode-card">
+                        <Title level={5} style={{ margin: 0 }}>
+                          Import Mode
+                        </Title>
+                        <Radio.Group
+                          value={syncExisting ? "replace" : "insert"}
+                          onChange={(event) =>
+                            setSyncExisting(event.target.value === "replace")
+                          }
+                          optionType="button"
+                          buttonStyle="solid"
+                        >
+                          <Radio.Button value="insert">Insert Only</Radio.Button>
+                          <Radio.Button value="replace">
+                            Replace Existing
+                          </Radio.Button>
+                        </Radio.Group>
+                        <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
+                          {syncExisting
+                            ? "Existing entrances for included caves will be deleted and replaced with the entrances in this CSV."
+                            : "Only new entrances will be inserted. Existing entrances stay unchanged."}
+                        </Paragraph>
+                        <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
+                          It is <strong>strongly recommended</strong> to create
+                          an archive first in{" "}
+                          <Link to="/account/settings">Account Settings</Link>{" "}
+                          before running this import.
+                        </Paragraph>
+                      </div>
+                    )}
+
+                    {isReadyToProcess && (
+                      <div className="import-step-mode-card">
+                        <Title level={5} style={{ margin: 0 }}>
+                          Next Step
+                        </Title>
+                        <Paragraph style={{ marginBottom: 0 }}>
+                          A count change of 0 means the number of entrances is
+                          unchanged, not that the entrance data itself is unchanged.
+                        </Paragraph>
+                      </div>
+                    )}
+
+                    <div className="import-step-actions import-step-actions--stable">
+                      {isAwaitingDryRun && (
+                        <>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            onClick={handleDryRunClick}
+                            icon={<EyeOutlined />}
+                            loading={isLoading}
+                            type="primary"
+                          >
+                            Dry Run
+                          </PlanarianButton>
+                          <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                            Reset
+                          </Button>
+                        </>
+                      )}
+
+                      {isReadyToProcess && (
+                        <>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            onClick={showCSVModal}
+                            icon={<EyeOutlined />}
+                          >
+                            View Dry Run Data
+                          </PlanarianButton>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            onClick={handleProcessClick}
+                            icon={<DeliveredProcedureOutlined />}
+                            loading={isLoading}
+                            type="primary"
+                          >
+                            Process
+                          </PlanarianButton>
+                          <PlanarianButton
+                            alwaysShowChildren
+                            onClick={tryAgain}
+                            icon={<RedoOutlined />}
+                          >
+                            Reset
+                          </PlanarianButton>
+                        </>
+                      )}
+
+                      {isCompleteState && (
+                        <>
+                          <Link to="/caves">
+                            <Button type="primary" onClick={onUploaded}>
+                              View Caves
+                            </Button>
+                          </Link>
+                          <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                            Import Another Entrance File
+                          </Button>
+                        </>
+                      )}
+
+                      {isErrorState && (
+                        <>
+                          {errorList.length > 0 && (
+                            <Button
+                              type="primary"
+                              onClick={showCSVModal}
+                              icon={<EyeOutlined />}
+                            >
+                              View Errors
+                            </Button>
+                          )}
+                          <Button danger onClick={tryAgain} icon={<RedoOutlined />}>
+                            Reset
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
