@@ -5,7 +5,7 @@ export interface ImportFileUploadSession {
   status: string;
 }
 
-export interface CreateImportFileUploadSessionRequest {
+export interface ImportFileRequest {
   fileName: string;
   fileSize: number;
   delimiterRegex: string;

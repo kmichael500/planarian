@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Map.Models;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;

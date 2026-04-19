@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Account.Services;
+namespace Planarian.Modules.Account.Import.Models;
 
 public class FileImportResult
 {

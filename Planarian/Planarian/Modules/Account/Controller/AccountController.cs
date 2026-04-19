@@ -4,6 +4,9 @@ using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Archive.Models;
+using Planarian.Modules.Account.Import.Models;
+using Planarian.Modules.Account.Import.Services;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
@@ -173,31 +176,10 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return new JsonResult(result);
     }
 
-    [RequestSizeLimit(500 * 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 500 * 1024 * 1024, MemoryBufferThreshold = 64 * 1024)]
-    [HttpPost("import/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string idRegex, IFormFile file,
-        CancellationToken cancellationToken, bool ignoreDuplicates)
-    {
-        await using var stream = file.OpenReadStream();
-        var result =
-            await _importService.AddFileForImport(stream, file.FileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
-                cancellationToken);
-        result.RequestId = HttpContext.TraceIdentifier;
-
-        if (result.IsSuccessful)
-        {
-            return Ok(result);
-        }
-
-        return StatusCode(GetFileImportFailureStatusCode(result.FailureCode), result);
-    }
-
     [HttpPost("import/file/session")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<ImportFileUploadSessionVm>> CreateImportFileUploadSession(
-        [FromBody] CreateImportFileUploadSessionRequest request,
+        [FromBody] ImportFileRequest request,
         CancellationToken cancellationToken)
     {
         var result = await _importService.CreateFileUploadSession(request, cancellationToken);

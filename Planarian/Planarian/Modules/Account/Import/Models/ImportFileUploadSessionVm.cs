@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Account.Model;
+namespace Planarian.Modules.Account.Import.Models;
 
 public class ImportFileUploadSessionVm
 {
