@@ -45,7 +45,7 @@ import { FileImportResult } from "../Models/FileUploadresult";
 import { ImportQueueStorage } from "../Services/ImportQueueStorage";
 
 const MAX_FILE_SIZE_MB = 500;
-const MAX_UPLOAD_CONCURRENCY_WEIGHT = 4;
+const MAX_UPLOAD_CONCURRENCY_WEIGHT = 3;
 const MAX_RETRY_COUNT = 5;
 const DISPATCH_DELAY_MS = 0;
 const VIRTUAL_LIST_OVERSCAN = 6;
@@ -337,7 +337,9 @@ const getUploadDisplayState = (item: ImportQueueItem) => {
   const displayPercent =
     item.status === "uploaded"
       ? 100
-      : displayUploadedBytes > 0
+      : totalBytes > 0 && displayUploadedBytes >= totalBytes
+        ? 100
+        : displayUploadedBytes > 0
         ? Math.min(99, Math.max(1, rawDisplayPercent))
         : 0;
   const hasProgress = displayUploadedBytes > 0 && totalBytes > 0;
@@ -350,6 +352,7 @@ const getUploadDisplayState = (item: ImportQueueItem) => {
     acknowledgedPercent,
     displayPercent,
     hasProgress,
+    hasKnownSize: totalBytes > 0,
     sizeLabel: formatFileSize(totalBytes),
   };
 };
@@ -434,8 +437,26 @@ const getOrderedPendingQueueItems = (items: ImportQueueItem[]) =>
   );
 
 
-const formatFileSize = (bytes: number) =>
-  `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+const formatFileSize = (bytes: number) => {
+  if (bytes <= 0) {
+    return "Unknown size";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = value >= 10 ? 1 : 2;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+};
 
 const buildRetryDelayMs = (
   retryCount: number,
@@ -686,6 +707,7 @@ const CurrentUploadCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
   const displayState = getUploadDisplayState(item);
   const progressPercent = displayState.displayPercent;
   const hasDisplayProgress = displayState.hasProgress;
+  const shouldShowProgress = isActive || hasDisplayProgress;
 
   return (
     <div className="import-files-dashboard__queue-card">
@@ -696,7 +718,7 @@ const CurrentUploadCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
           : ""
           }`}
       >
-        {(isActive || hasDisplayProgress) && (
+        {shouldShowProgress && (
           <span
             className="import-files-dashboard__queue-progress-fill"
             style={{ width: `${progressPercent}%` }}
@@ -704,11 +726,11 @@ const CurrentUploadCard = memo(({ item, onRemove }: ImportQueueCardProps) => {
         )}
         <span className="import-files-dashboard__queue-progress-content">
           <span>
-            {isActive || hasDisplayProgress
+            {shouldShowProgress
               ? `${progressPercent}%`
               : displayState.sizeLabel}
           </span>
-          {(isActive || hasDisplayProgress) && (
+          {(shouldShowProgress || displayState.hasKnownSize) && (
             <span>{displayState.sizeLabel}</span>
           )}
         </span>
@@ -1839,11 +1861,16 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       (sum, item) => sum + getUploadDisplayState(item).totalBytes,
       0
     );
-    if (totalBytes === 0) return 0;
+    if (totalBytes === 0) {
+      return queueItems.every((item) => isTerminalStatus(item.status)) ? 100 : 0;
+    }
 
     const completedBytes = queueItems.reduce((sum, item) => {
       const displayState = getUploadDisplayState(item);
-      return sum + displayState.displayUploadedBytes;
+      const completedItemBytes = isTerminalStatus(item.status)
+        ? displayState.totalBytes
+        : displayState.displayUploadedBytes;
+      return sum + completedItemBytes;
     }, 0);
 
     if (completedBytes <= 0) {
