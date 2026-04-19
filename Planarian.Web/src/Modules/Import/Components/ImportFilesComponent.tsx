@@ -10,6 +10,7 @@ import {
   Space,
   Typography,
   message,
+  Spin,
 } from "antd";
 import {
   ClearOutlined,
@@ -237,6 +238,12 @@ const serializeQueueItem = (
   result: item.result ?? null,
 });
 
+const waitForNextPaint = async () => {
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+};
+
 const createCsvRow = (item: ImportQueueItem): FileImportResult => ({
   fileName: item.fileName,
   isSuccessful: item.status === "uploaded",
@@ -258,6 +265,12 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const [queueItems, setQueueItems] = useState<ImportQueueItem[]>([]);
   const [isPaused, setIsPaused] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false);
+  const [preparingFileCount, setPreparingFileCount] = useState(0);
+  const [preparedFileCount, setPreparedFileCount] = useState(0);
+  const [isResettingQueue, setIsResettingQueue] = useState(false);
+  const [resettingFileCount, setResettingFileCount] = useState(0);
+  const [resetFileProgressCount, setResetFileProgressCount] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [collapsedToolbarActionsCount, setCollapsedToolbarActionsCount] =
@@ -421,20 +434,41 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   }, [queueItems, isPaused, queueStorageKey, isRestoring, persistQueueState]);
 
   const resetQueueState = useCallback(async () => {
-    if (queueStorageKey) {
-      localStorage.removeItem(queueStorageKey);
-      await ImportQueueStorage.clearQueue(queueStorageKey);
-    }
+    const itemsToReset = [...queueItemsRef.current];
+    setResettingFileCount(itemsToReset.length);
+    setResetFileProgressCount(itemsToReset.length > 0 ? 1 : 0);
+    setIsResettingQueue(true);
 
-    startedUploadsRef.current.clear();
-    uploadAbortControllersRef.current.forEach((controller) =>
-      controller.abort()
-    );
-    uploadAbortControllersRef.current.clear();
-    nextDispatchAllowedAtRef.current = 0;
-    setQueueItems([]);
-    setIsPaused(true);
-    hasNotifiedCompletionRef.current = false;
+    try {
+      await waitForNextPaint();
+
+      startedUploadsRef.current.clear();
+      uploadAbortControllersRef.current.forEach((controller) =>
+        controller.abort()
+      );
+      uploadAbortControllersRef.current.clear();
+
+      if (queueStorageKey) {
+        localStorage.removeItem(queueStorageKey);
+
+        for (let index = 0; index < itemsToReset.length; index += 1) {
+          const item = itemsToReset[index];
+          await ImportQueueStorage.deleteFile(queueStorageKey, item.id);
+          setResetFileProgressCount(index + 1);
+        }
+
+        await ImportQueueStorage.clearQueue(queueStorageKey);
+      }
+
+      nextDispatchAllowedAtRef.current = 0;
+      setQueueItems([]);
+      setIsPaused(true);
+      hasNotifiedCompletionRef.current = false;
+    } finally {
+      setIsResettingQueue(false);
+      setResettingFileCount(0);
+      setResetFileProgressCount(0);
+    }
   }, [queueStorageKey]);
 
   const loadPersistedQueue = useCallback(async () => {
@@ -731,89 +765,105 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     async (fileList: FileList) => {
       if (!queueStorageKey) return;
 
-      const validFiles = Array.from(fileList).filter((file) => {
-        const fileType = getFileType(file.name);
-        const fileSizeInMB = file.size / 1024 / 1024;
-
-        if (fileSizeInMB > MAX_FILE_SIZE_MB) {
-          message.error(
-            `${file.name} exceeds the ${MAX_FILE_SIZE_MB} MB upload limit.`
-          );
-          return false;
-        }
-
-        if (!fileType) {
-          message.warning(`${file.name} has no detectable file extension.`);
-        }
-
-        return true;
-      });
-
-      if (validFiles.length === 0) return;
+      const incomingFiles = Array.from(fileList);
+      setPreparingFileCount(incomingFiles.length);
+      setPreparedFileCount(incomingFiles.length > 0 ? 1 : 0);
+      setIsPreparingFiles(true);
 
       try {
-        setIsPaused((current) =>
-          current || queueItemsRef.current.every((item) => isTerminalStatus(item.status))
-            ? true
-            : current
-        );
+        await waitForNextPaint();
 
-        const newItems = validFiles.map<ImportQueueItem>((file) => ({
-          id: createQueueItemId(),
-          fileName: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-          addedOn: new Date().toISOString(),
-          status: "queued",
-          progress: 0,
-          retryCount: 0,
-          retryAt: null,
-          lastError: null,
-          associatedCave: null,
-          failureCode: null,
-          isRetryable: false,
-          requestId: null,
-          result: null,
-          file,
-        }));
+        const validFiles = incomingFiles.filter((file) => {
+          const fileType = getFileType(file.name);
+          const fileSizeInMB = file.size / 1024 / 1024;
 
-        await Promise.all(
-          newItems.map((item) =>
-            ImportQueueStorage.putFile(queueStorageKey, item.id, item.file as File)
-          )
-        );
+          if (fileSizeInMB > MAX_FILE_SIZE_MB) {
+            message.error(
+              `${file.name} exceeds the ${MAX_FILE_SIZE_MB} MB upload limit.`
+            );
+            return false;
+          }
 
-        setQueueItems((items) => [...items, ...newItems]);
-        hasNotifiedCompletionRef.current = false;
-      } catch {
-        setIsPaused((current) =>
-          current || queueItemsRef.current.every((item) => isTerminalStatus(item.status))
-            ? true
-            : current
-        );
+          if (!fileType) {
+            message.warning(`${file.name} has no detectable file extension.`);
+          }
 
-        const fallbackItems = validFiles.map<ImportQueueItem>((file) => ({
-          id: createQueueItemId(),
-          fileName: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified,
-          addedOn: new Date().toISOString(),
-          status: "queued",
-          progress: 0,
-          retryCount: 0,
-          retryAt: null,
-          lastError: null,
-          associatedCave: null,
-          failureCode: null,
-          isRetryable: false,
-          requestId: null,
-          result: null,
-          file,
-        }));
+          return true;
+        });
 
-        setQueueItems((items) => [...items, ...fallbackItems]);
+        if (validFiles.length === 0) return;
+
+        setPreparingFileCount(validFiles.length);
+        setPreparedFileCount(validFiles.length > 0 ? 1 : 0);
+
+        try {
+          setIsPaused((current) =>
+            current || queueItemsRef.current.every((item) => isTerminalStatus(item.status))
+              ? true
+              : current
+          );
+
+          const newItems = validFiles.map<ImportQueueItem>((file) => ({
+            id: createQueueItemId(),
+            fileName: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified,
+            addedOn: new Date().toISOString(),
+            status: "queued",
+            progress: 0,
+            retryCount: 0,
+            retryAt: null,
+            lastError: null,
+            associatedCave: null,
+            failureCode: null,
+            isRetryable: false,
+            requestId: null,
+            result: null,
+            file,
+          }));
+
+          for (let index = 0; index < newItems.length; index += 1) {
+            const item = newItems[index];
+            await ImportQueueStorage.putFile(queueStorageKey, item.id, item.file as File);
+            setPreparedFileCount(index + 1);
+          }
+
+          setQueueItems((items) => [...items, ...newItems]);
+          hasNotifiedCompletionRef.current = false;
+        } catch {
+          setIsPaused((current) =>
+            current || queueItemsRef.current.every((item) => isTerminalStatus(item.status))
+              ? true
+              : current
+          );
+
+          const fallbackItems = validFiles.map<ImportQueueItem>((file) => ({
+            id: createQueueItemId(),
+            fileName: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified,
+            addedOn: new Date().toISOString(),
+            status: "queued",
+            progress: 0,
+            retryCount: 0,
+            retryAt: null,
+            lastError: null,
+            associatedCave: null,
+            failureCode: null,
+            isRetryable: false,
+            requestId: null,
+            result: null,
+            file,
+          }));
+
+          setQueueItems((items) => [...items, ...fallbackItems]);
+        }
+      } finally {
+        setIsPreparingFiles(false);
+        setPreparingFileCount(0);
+        setPreparedFileCount(0);
       }
     },
     [queueStorageKey]
@@ -991,6 +1041,11 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     queueItems.length > 0 &&
     queueItems.every((item) => isTerminalStatus(item.status));
   const hasSuccessfulUploads = queueStats.uploaded > 0;
+  const isBusyOverlay = isPreparingFiles || isResettingQueue;
+  const busyOverlayTitle = isResettingQueue ? "Resetting..." : "Preparing files...";
+  const busyOverlayDetailMessage = isResettingQueue
+    ? `Clearing ${Math.min(resetFileProgressCount, resettingFileCount)} of ${resettingFileCount} files from the queue.`
+    : `Adding ${Math.min(preparedFileCount, preparingFileCount)} of ${preparingFileCount} files to the queue.`;
   useEffect(() => {
     if (!allWorkComplete || !hasSuccessfulUploads || hasNotifiedCompletionRef.current) {
       return;
@@ -1114,6 +1169,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         <div
           className={`import-files-dashboard ${isDragActive ? "import-files-dashboard--drag-active" : ""
             }`}
+          style={{ position: "relative" }}
           onDrop={(event) => {
             void handleDrop(event);
           }}
@@ -1126,10 +1182,65 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             type="file"
             multiple
             style={{ display: "none" }}
+            disabled={isBusyOverlay}
             onChange={(event) => {
               void handleFileSelect(event);
             }}
           />
+
+          {isBusyOverlay && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(245, 245, 245, 0.72)",
+                backdropFilter: "blur(1px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 5,
+                pointerEvents: "all",
+              }}
+            >
+              <div
+                className="import-step-surface"
+                style={{
+                  padding: "20px 24px",
+                  borderRadius: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: 12,
+                  width: 360,
+                  maxWidth: "calc(100% - 32px)",
+                  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Typography.Text strong>{busyOverlayTitle}</Typography.Text>
+                  <Spin size="small" />
+                </div>
+                <Typography.Text
+                  type="secondary"
+                  style={{
+                    display: "block",
+                    textAlign: "center",
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {busyOverlayDetailMessage}
+                </Typography.Text>
+              </div>
+            </div>
+          )}
 
           <div className="import-files-dashboard__controls import-step-surface import-step-card">
             <div
@@ -1155,7 +1266,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                   data-toolbar-action-index="1"
                   icon={uploadControl.icon}
                   onClick={uploadControl.onClick}
-                  disabled={uploadControl.disabled}
+                  disabled={uploadControl.disabled || isBusyOverlay}
                 >
                   {uploadControl.label}
                 </Button>
@@ -1164,7 +1275,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                   data-toolbar-action-index="2"
                   icon={<RedoOutlined />}
                   onClick={retryFailed}
-                  disabled={isRestoring || failedItems.length === 0}
+                  disabled={isRestoring || isBusyOverlay || failedItems.length === 0}
                 >
                   Retry Failed
                 </Button>
@@ -1173,7 +1284,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                   data-toolbar-action-index="3"
                   icon={<EyeOutlined />}
                   onClick={() => setIsModalOpen(true)}
-                  disabled={fileResults.length === 0}
+                  disabled={isBusyOverlay || fileResults.length === 0}
                 >
                   View Results
                 </Button>
@@ -1182,6 +1293,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                   data-toolbar-action-index="4"
                   icon={<ClearOutlined />}
                   onClick={() => void handleResetSettings()}
+                  disabled={isRestoring || isBusyOverlay}
                 >
                   Reset
                 </Button>
@@ -1197,7 +1309,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             key: "add",
                             icon: <FileAddOutlined />,
                             label: "Add Files",
-                            disabled: isRestoring,
+                            disabled: isRestoring || isBusyOverlay,
                           },
                         ]
                         : []),
@@ -1207,7 +1319,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             key: "upload-control",
                             icon: uploadControl.icon,
                             label: uploadControl.label,
-                            disabled: uploadControl.disabled,
+                            disabled: uploadControl.disabled || isBusyOverlay,
                           },
                         ]
                         : []),
@@ -1217,7 +1329,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             key: "retry",
                             icon: <RedoOutlined />,
                             label: "Retry Failed",
-                            disabled: isRestoring || failedItems.length === 0,
+                            disabled: isRestoring || isBusyOverlay || failedItems.length === 0,
                           },
                         ]
                         : []),
@@ -1227,7 +1339,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             key: "results",
                             icon: <EyeOutlined />,
                             label: "View Results",
-                            disabled: fileResults.length === 0,
+                            disabled: isBusyOverlay || fileResults.length === 0,
                           },
                         ]
                         : []),
@@ -1237,12 +1349,16 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             key: "reset",
                             icon: <ClearOutlined />,
                             label: "Reset",
-                            disabled: isRestoring,
+                            disabled: isRestoring || isBusyOverlay,
                           },
                         ]
                         : []),
                     ],
                     onClick: ({ key }) => {
+                      if (isBusyOverlay) {
+                        return;
+                      }
+
                       if (key === "add") {
                         document.getElementById("import-files-input")?.click();
                         return;
