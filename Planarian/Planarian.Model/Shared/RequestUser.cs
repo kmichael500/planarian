@@ -78,8 +78,10 @@ public class RequestUser
 
     }
 
-    public string AccountContainerName =>
+    public string AccountUploadFileChunkName =>
         $"account-{AccountId?.ToLower() ?? throw new NullReferenceException($" {nameof(AccountId)} is null")}";
+    
+    public string AccountContainerName => AccountUploadFileChunkName;
 
     /// <summary>
     /// Determines if the user has a specific permission, but not if they have permission for a specific cave, county, or all

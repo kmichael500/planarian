@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Account.Model;
+namespace Planarian.Modules.Account.Archive.Models;
 
 public class ArchiveListItemVm
 {

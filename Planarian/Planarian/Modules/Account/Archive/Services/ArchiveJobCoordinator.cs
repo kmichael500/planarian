@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;

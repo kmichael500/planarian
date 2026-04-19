@@ -5,7 +5,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
 
-namespace Planarian.Modules.FeatureSettings.Repositories;
+namespace Planarian.Modules.Account.Repositories;
 
 public class FeatureSettingRepository : RepositoryBase
 {

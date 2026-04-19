@@ -1,4 +1,4 @@
-import { Card, Typography, Space, Tooltip, Row, Col } from "antd";
+import { Typography, Tooltip, Tabs } from "antd";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import {
   downloadFile,
@@ -379,172 +379,119 @@ const entranceImportHeadersData = [
   },
 ];
 
+const renderFieldChips = (
+  items: typeof caveImportHeadersData | typeof entranceImportHeadersData
+) =>
+  items.map((item) => (
+    <Tooltip
+      title={
+        <>
+          <b>Description:</b> {item.data.description}
+          <br />
+          <b>Example:</b> {item.data.example}
+        </>
+      }
+      key={item.value}
+    >
+      <span>
+        <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>
+          {item.value}
+        </code>
+      </span>
+    </Tooltip>
+  ));
+
+const buildTemplatePanel = (
+  fileName: string,
+  items: typeof caveImportHeadersData | typeof entranceImportHeadersData
+) => {
+  const requiredItems = items.filter((item) => item.data.isRequired);
+  const optionalItems = items.filter((item) => !item.data.isRequired);
+
+  return (
+    <div className="import-templates__tab-panel">
+      <div className="import-templates__panel-intro">
+        <Paragraph style={{ marginBottom: 0 }}>
+          Split your import into a cave CSV and an entrance CSV. The files link
+          by county code and county cave number, and caves must exist before
+          entrances can be imported.
+        </Paragraph>
+      </div>
+
+      <div className="import-templates__tab-content">
+        <div className="import-step-surface import-step-card import-step-card--elevated import-templates__actions">
+          <Title level={5} style={{ margin: 0 }}>
+            Download Templates
+          </Title>
+          <Paragraph style={{ marginBottom: 0 }}>
+            Download the template, fill the fields you need, then return to the
+            upload steps.
+          </Paragraph>
+          <PlanarianButton
+            type="primary"
+            alwaysShowChildren
+            icon={<CloudDownloadOutlined />}
+            onClick={() => {
+              const headers = items.map((item) => item.value);
+              downloadFile(fileName, createCsvWithHeaders(headers));
+            }}
+          >
+            Download Template
+          </PlanarianButton>
+        </div>
+
+        <div className="import-templates__fields">
+          <div className="import-step-surface import-step-card import-step-card--elevated import-templates__field-group">
+            <Title level={5} style={{ margin: 0 }}>
+              Required Columns
+            </Title>
+            <div className="import-templates__chips">
+              {renderFieldChips(requiredItems)}
+            </div>
+          </div>
+          <div className="import-step-surface import-step-card import-step-card--elevated import-templates__field-group import-templates__field-group--optional">
+            <Title level={5} style={{ margin: 0 }}>
+              Optional Columns
+            </Title>
+            <div className="import-templates__chips">
+              {renderFieldChips(optionalItems)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ImportInformationCardComponent = () => {
   return (
-    <>
-      <Card
-        className="planarian-import-info-card"
-        bordered={false}
-        style={{
-          // boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
-          // borderRadius: "8px",
-          height: "100%",
-        }}
-      >
-        <Typography>
-          <Title level={4}>Templates</Title>
-          <Paragraph>
-            You will need to split your data into two files. A file containing
-            entrance data and a file containing cave data. You will find a
-            sample template to download for each file as well as descriptions
-            and examples (on hover) . The two files will be merged using the
-            county code and county cave number. The cave record must exist
-            before an entrance record can be imported.
-          </Paragraph>
-          <Row gutter={10}>
-            <Col>
-              <Title level={4}>Cave Data Template</Title>
-            </Col>
-            <Col>
-              <PlanarianButton
-                icon={<CloudDownloadOutlined />}
-                onClick={() => {
-                  const caveHeaders = caveImportHeadersData.map(
-                    (item) => item.value
-                  );
-                  downloadFile(
-                    "cave_import.csv",
-                    createCsvWithHeaders(caveHeaders)
-                  );
-                }}
-              ></PlanarianButton>
-            </Col>
-          </Row>
-
-          <Paragraph>
-            Required Columns{" "}
-            <Space wrap>
-              {caveImportHeadersData
-                .filter((item) => item.data.isRequired)
-                .map((item) => (
-                  <Tooltip
-                    title={
-                      <>
-                        <b>Description:</b> {item.data.description}
-                        <br />
-                        <b>Example:</b> {item.data.example}
-                      </>
-                    }
-                    key={item.value}
-                  >
-                    <span>
-                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
-                    </span>
-                  </Tooltip>
-                ))}
-            </Space>
-          </Paragraph>
-          <Paragraph>
-            Optional Columns:{" "}
-            <Space wrap>
-              {caveImportHeadersData
-                .filter((item) => !item.data.isRequired)
-                .map((item) => (
-                  <Tooltip
-                    title={
-                      <>
-                        <b>Description:</b> {item.data.description}
-                        <br />
-                        <b>Example:</b> {item.data.example}
-                      </>
-                    }
-                    key={item.value}
-                  >
-                    <span>
-                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
-                    </span>
-                  </Tooltip>
-                ))}
-            </Space>
-          </Paragraph>
-
-          <Row gutter={10}>
-            <Col>
-              <Title level={4}>Cave Entrance Template</Title>
-            </Col>
-            <Col>
-              <PlanarianButton
-                icon={<CloudDownloadOutlined />}
-                onClick={() => {
-                  const entranceHeaders = entranceImportHeadersData.map(
-                    (item) => item.value
-                  );
-                  downloadFile(
-                    "entrance_import.csv",
-                    createCsvWithHeaders(entranceHeaders)
-                  );
-                }}
-              ></PlanarianButton>
-            </Col>
-          </Row>
-          <Paragraph>
-            Required Columns:{" "}
-            <Space wrap>
-              {entranceImportHeadersData
-                .filter((item) => item.data.isRequired)
-                .map((item) => (
-                  <Tooltip
-                    title={
-                      <>
-                        <b>Description:</b> {item.data.description}
-                        <br />
-                        <b>Example:</b> {item.data.example}
-                      </>
-                    }
-                    key={item.value}
-                  >
-                    <span>
-                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
-                    </span>
-                  </Tooltip>
-                ))}
-            </Space>
-          </Paragraph>
-          <Paragraph>
-            Optional Columns:{" "}
-            <Space wrap>
-              {entranceImportHeadersData
-                .filter((item) => !item.data.isRequired)
-                .map((item) => (
-                  <Tooltip
-                    title={
-                      <>
-                        <b>Description:</b> {item.data.description}
-                        <br />
-                        <b>Example:</b> {item.data.example}
-                      </>
-                    }
-                    key={item.value}
-                  >
-                    <span>
-                      <code className="planarian-template-code" style={{ whiteSpace: "normal" }}>{item.value}</code>
-                    </span>
-                  </Tooltip>
-                ))}
-            </Space>
-          </Paragraph>
-
-          <Paragraph>
-            <span style={{ fontWeight: "bold" }}>Note:</span> Please remain
-            patient during the upload (particularly with large datasets). The
-            upload and processing might take a bit and it's crucial that you do
-            not refresh the page or navigate away during this time. If any
-            errors occur during the upload, the process will fail and provide
-            reasons for each record's failure, and data will not be saved.
-          </Paragraph>
-        </Typography>
-      </Card>
-    </>
+    <div className="import-templates">
+      <div className="import-step-surface import-step-card import-templates__shell">
+        <Tabs
+          className="import-templates__tabs"
+          defaultActiveKey="caves"
+          destroyInactiveTabPane={false}
+          items={[
+            {
+              key: "caves",
+              label: "Cave Template",
+              children: buildTemplatePanel(
+                "cave_import.csv",
+                caveImportHeadersData
+              ),
+            },
+            {
+              key: "entrances",
+              label: "Entrance Template",
+              children: buildTemplatePanel(
+                "entrance_import.csv",
+                entranceImportHeadersData
+              ),
+            },
+          ]}
+        />
+      </div>
+    </div>
   );
 };
 

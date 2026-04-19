@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Planarian.Model.Shared;
+using Planarian.Modules.Map.Models;
 using Planarian.Modules.Map.Services;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;

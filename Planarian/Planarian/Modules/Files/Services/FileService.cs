@@ -1,4 +1,5 @@
 using Azure;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
@@ -20,6 +21,9 @@ namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
 {
+    private static readonly ConcurrentDictionary<string, Task> ContainerInitializationTasks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly HashSet<string> InlinePreviewExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".avif",
@@ -98,6 +102,70 @@ public class FileService : ServiceBase<FileRepository>
 
         stream.Position = 0;
         await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
+
+        entity.BlobKey = blobKey;
+        entity.BlobContainer = RequestUser.AccountContainerName;
+        await Repository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var fileInformation = new FileVm
+        {
+            Id = entity.Id,
+            FileName = entity.FileName,
+            DisplayName = entity.DisplayName,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid
+        };
+        return fileInformation;
+    }
+
+    public async Task<FileVm> PublishStagedCaveFile(string sourceBlobKey, string caveId, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+
+        var caveEntity = await _caveRepository.GetCave(caveId);
+        if (caveEntity == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Cave");
+        }
+
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
+        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
+
+        var autoTagType =
+            allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
+
+        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
+
+        if (tagTypeId == null)
+            throw ApiExceptionDictionary.NotFound("File type");
+
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+        var entity = new File
+        {
+            CaveId = caveId,
+            FileName = fileName,
+            DisplayName = fileNameWithoutExtension,
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId
+        };
+
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync(cancellationToken);
+
+        var fileExtension = Path.GetExtension(fileName);
+        var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
+        var client = await GetBlobContainerClient(RequestUser.AccountContainerName);
+        var sourceBlobClient = client.GetBlobClient(sourceBlobKey);
+        var finalBlobClient = client.GetBlobClient(blobKey);
+
+        var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
+            sourceBlobClient.Uri,
+            cancellationToken: cancellationToken);
+        await copyOperation.WaitForCompletionAsync(cancellationToken);
 
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
@@ -197,10 +265,28 @@ public class FileService : ServiceBase<FileRepository>
         var containerClient = new BlobContainerClient(_fileOptions.ConnectionString, containerName.ToLowerInvariant());
         if (createIfNotExists)
         {
-            await containerClient.CreateIfNotExistsAsync();
+            await EnsureContainerExists(containerClient);
         }
         
         return containerClient;
+    }
+
+    private static async Task EnsureContainerExists(BlobContainerClient containerClient)
+    {
+        var containerName = containerClient.Name;
+        var initializationTask = ContainerInitializationTasks.GetOrAdd(
+            containerName,
+            _ => containerClient.CreateIfNotExistsAsync());
+
+        try
+        {
+            await initializationTask;
+        }
+        catch
+        {
+            ContainerInitializationTasks.TryRemove(containerName, out _);
+            throw;
+        }
     }
 
     public async Task<Stream> OpenBlobReadStream(BlobContainerClient containerClient, string blobKey,

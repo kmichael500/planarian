@@ -111,6 +111,19 @@ HttpClient.interceptors.response.use(
     if (error.response) {
       if (error.response.data) {
         const apiError = error.response.data as ApiErrorResponse;
+        const retryAfterHeader = error.response.headers?.["retry-after"];
+        apiError.statusCode = error.response.status;
+        apiError.requestId =
+          apiError.requestId ??
+          error.response.headers?.["x-request-id"] ??
+          error.response.headers?.["request-id"];
+        if (retryAfterHeader) {
+          const retryAfterSeconds = parseInt(retryAfterHeader, 10);
+          if (!Number.isNaN(retryAfterSeconds)) {
+            apiError.retryAfterSeconds = retryAfterSeconds;
+          }
+        }
+
         if (apiError?.errorCode === ApiExceptionType.TooManyRequests) {
           message.error(apiError.message);
         }
@@ -124,6 +137,7 @@ HttpClient.interceptors.response.use(
           message: "Unauthorized",
           errorCode: ApiExceptionType.Unauthorized,
           data: null,
+          statusCode: error.response.status,
         };
         return Promise.reject(unauthorizedError);
       }

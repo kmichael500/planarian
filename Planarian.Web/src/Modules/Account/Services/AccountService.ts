@@ -17,8 +17,11 @@ import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FileAccessUrlVm } from "../../Files/Services/FileService";
+import {
+  ImportFileRequest,
+  ImportFileUploadSession,
+} from "../../Import/Models/ImportFileUploadSession";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -142,40 +145,51 @@ const AccountService = {
     return response.data;
   },
 
-  async ImportFile(
-    file: string | Blob | RcFile,
-    uuid: string,
-    delmiterRegex: string,
-    idRegex: string,
-    ignoreDuplicates: boolean = false,
-    onProgress: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<FileImportResult> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const config: AxiosRequestConfig = {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      onUploadProgress: onProgress, // Set the onUploadProgress callback
-    };
-
-    let regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(
-      delmiterRegex
-    )}&idRegex=${encodeURIComponent(
-      idRegex
-    )}&ignoreDuplicates=${ignoreDuplicates}`;
-
-    if (!isNullOrWhiteSpace(uuid)) {
-      regexQueryStringUrlSafe += `&uuid=${encodeURIComponent(uuid)}`;
-    }
-
-    const response = await HttpClient.post<FileImportResult>(
-      `${baseUrl}/import/file?${regexQueryStringUrlSafe}`,
-      formData,
-      config
+  async CreateImportFileUploadSession(
+    request: ImportFileRequest
+  ): Promise<ImportFileUploadSession> {
+    const response = await HttpClient.post<ImportFileUploadSession>(
+      `${baseUrl}/import/file/session`,
+      request
     );
     return response.data;
+  },
+  async UploadImportFileChunk(
+    sessionId: string,
+    chunk: Blob,
+    chunkIndex: number,
+    offset: number,
+    onProgress: (progressEvent: AxiosProgressEvent) => void,
+    signal?: AbortSignal
+  ): Promise<ImportFileUploadSession> {
+    const response = await HttpClient.put<ImportFileUploadSession>(
+      `${baseUrl}/import/file/session/${sessionId}?chunkIndex=${chunkIndex}&offset=${offset}`,
+      chunk,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        onUploadProgress: onProgress,
+        signal,
+      }
+    );
+    return response.data;
+  },
+  async FinalizeImportFileUploadSession(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<FileImportResult> {
+    const response = await HttpClient.post<FileImportResult>(
+      `${baseUrl}/import/file/session/${sessionId}/finalize`,
+      {},
+      {
+        signal,
+      }
+    );
+    return response.data;
+  },
+  async CancelImportFileUploadSession(sessionId: string): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/import/file/session/${sessionId}`);
   },
   //#endregion
 
