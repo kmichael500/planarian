@@ -1,8 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using System.Text;
-using Azure.Storage.Blobs.Specialized;
 using CsvHelper;
 using CsvHelper.Configuration;
 using EFCore.BulkExtensions;
@@ -30,6 +28,7 @@ using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -43,8 +42,7 @@ public class ImportService : ServiceBase
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
-    private readonly ImportUploadAdmissionService _importUploadAdmissionService;
-    private readonly ImportFileUploadSessionService _importFileUploadSessionService;
+    private readonly ChunkedUploadService _chunkedUploadService;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
@@ -54,8 +52,7 @@ public class ImportService : ServiceBase
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
         FileRepository<PlanarianDbContextBase> fileRepository,
-        ImportUploadAdmissionService importUploadAdmissionService,
-        ImportFileUploadSessionService importFileUploadSessionService) : base(requestUser)
+        ChunkedUploadService chunkedUploadService) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -65,8 +62,7 @@ public class ImportService : ServiceBase
         _accountRepository = accountRepository;
         _repository = caveRepository;
         _fileRepository = fileRepository;
-        _importUploadAdmissionService = importUploadAdmissionService;
-        _importFileUploadSessionService = importFileUploadSessionService;
+        _chunkedUploadService = chunkedUploadService;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -1907,7 +1903,7 @@ public class ImportService : ServiceBase
     public async Task<FileImportResult> AddFileForImport(Stream stream, string fileName, string idRegex,
         string delimiterRegex, bool ignoreDuplicates, string? uuid, CancellationToken cancellationToken)
     {
-        await using var admission = await _importUploadAdmissionService.AcquireAsync(
+        await using var admission = await _chunkedUploadService.AcquireProcessingSlot(
             uuid ?? Guid.NewGuid().ToString("N"),
             cancellationToken);
 
@@ -1921,16 +1917,24 @@ public class ImportService : ServiceBase
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
-        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
-        if (string.IsNullOrWhiteSpace(request.FileName)) throw ApiExceptionDictionary.NullValue(nameof(request.FileName));
-        if (request.FileSize <= 0) throw ApiExceptionDictionary.BadRequest("File size must be greater than 0.");
+        var session = await _chunkedUploadService.CreateSession(
+            new ChunkedUploadSessionCreateRequest
+            {
+                FileName = request.FileName,
+                FileSize = request.FileSize,
+                BlobKeyPrefix = "temp/import/file-upload-sessions",
+                RequestId = request.RequestId,
+                Metadata = new ImportFileUploadSessionMetadata
+                {
+                    DelimiterRegex = request.DelimiterRegex,
+                    IdRegex = request.IdRegex,
+                    IgnoreDuplicates = request.IgnoreDuplicates,
+                    CompletionRequestId = request.RequestId,
+                },
+            },
+            cancellationToken);
 
-        var session = _importFileUploadSessionService.CreateSession(
-            RequestUser.AccountId,
-            RequestUser.AccountContainerName,
-            request);
-
-        return session.ToVm();
+        return ToImportFileUploadSessionVm(session);
     }
 
     public async Task<ImportFileUploadSessionVm> UploadFileChunk(
@@ -1943,141 +1947,61 @@ public class ImportService : ServiceBase
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
-        var session = await GetRequiredUploadSession(sessionId);
-        await session.Gate.WaitAsync(cancellationToken);
-        try
+        var importSession = GetRequiredImportUploadSession(sessionId);
+        if (importSession.CompletionResult != null)
         {
-            if (session.CompletionResult != null)
-            {
-                return session.ToVm();
-            }
-
-            if (contentLength <= 0)
-            {
-                throw ApiExceptionDictionary.BadRequest("Chunk content length must be greater than 0.");
-            }
-
-            if (offset < 0 || offset > session.FileSize)
-            {
-                throw ApiExceptionDictionary.BadRequest("Chunk offset is invalid.");
-            }
-
-            if (offset + contentLength > session.FileSize)
-            {
-                throw ApiExceptionDictionary.BadRequest("Chunk exceeds the expected file size.");
-            }
-
-            if (session.UploadedChunks.TryGetValue(chunkIndex, out var existingChunk))
-            {
-                if (existingChunk.Offset != offset || existingChunk.Length != contentLength)
-                {
-                    throw ApiExceptionDictionary.Conflict("Chunk metadata does not match the current upload session state.");
-                }
-
-                return session.ToVm();
-            }
-
-            if (chunkIndex != session.NextChunkIndex || offset != session.UploadedBytes)
-            {
-                throw ApiExceptionDictionary.Conflict("Chunk order does not match the current upload session state.");
-            }
-
-            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
-            var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
-            var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(chunkIndex.ToString("D8")));
-            await using var lengthAwareChunkStream = new LengthAwareReadStream(chunkStream, contentLength);
-            try
-            {
-                await blockBlobClient.StageBlockAsync(
-                    blockId,
-                    lengthAwareChunkStream,
-                    cancellationToken: cancellationToken);
-            }
-            catch (IOException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException(cancellationToken);
-            }
-
-            session.UploadedChunks[chunkIndex] = new ImportFileUploadChunkState
-            {
-                Offset = offset,
-                Length = contentLength,
-                BlockId = blockId,
-            };
-            session.UploadedBytes += contentLength;
-            session.NextChunkIndex += 1;
-            session.Status = session.UploadedBytes >= session.FileSize
-                ? ImportFileUploadSessionStatus.Uploaded
-                : ImportFileUploadSessionStatus.Uploading;
-            session.ExpiresOn = DateTimeOffset.UtcNow.AddHours(2);
-
-            return session.ToVm();
+            return ToImportFileUploadSessionVm(_chunkedUploadService.GetRequiredSession(sessionId));
         }
-        finally
-        {
-            session.Gate.Release();
-        }
+
+        var session = await _chunkedUploadService.UploadChunk(
+            sessionId,
+            chunkStream,
+            offset,
+            chunkIndex,
+            contentLength,
+            cancellationToken);
+
+        return ToImportFileUploadSessionVm(session);
     }
 
     public async Task<FileImportResult> FinalizeFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
-        var session = await GetRequiredUploadSession(sessionId);
-        await session.Gate.WaitAsync(cancellationToken);
-        try
+        var importSession = GetRequiredImportUploadSession(sessionId);
+        if (importSession.CompletionResult != null)
         {
-            if (session.CompletionResult != null)
-            {
-                return session.CompletionResult;
-            }
-
-            if (session.UploadedBytes != session.FileSize || session.UploadedChunks.Count == 0)
-            {
-                throw ApiExceptionDictionary.BadRequest("The upload session is incomplete and cannot be finalized.");
-            }
-
-            session.Status = ImportFileUploadSessionStatus.Finalizing;
-
-            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
-            var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
-            await blockBlobClient.CommitBlockListAsync(
-                session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
-                cancellationToken: cancellationToken);
-
-            await using var admission = await _importUploadAdmissionService.AcquireAsync(
-                session.RequestId ?? session.SessionId,
-                cancellationToken);
-
-            var result = await ProcessStagedFileImport(
-                session.BlobKey,
-                session.FileName,
-                session.IdRegex,
-                session.DelimiterRegex,
-                session.IgnoreDuplicates,
-                session.RequestId ?? session.SessionId,
-                cancellationToken);
-
-            result.RequestId ??= session.RequestId ?? session.SessionId;
-            session.CompletionResult = result;
-            session.Status = ImportFileUploadSessionStatus.Completed;
-
-            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
-            return result;
+            return importSession.CompletionResult;
         }
-        finally
-        {
-            session.Gate.Release();
-        }
+
+        var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
+
+        await using var admission = await _chunkedUploadService.AcquireProcessingSlot(
+            importSession.CompletionRequestId ?? session.SessionId,
+            cancellationToken);
+
+        var result = await ProcessStagedFileImport(
+            session.BlobKey,
+            session.FileName,
+            importSession.IdRegex,
+            importSession.DelimiterRegex,
+            importSession.IgnoreDuplicates,
+            importSession.CompletionRequestId ?? session.SessionId,
+            cancellationToken);
+
+        result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
+        importSession.CompletionResult = result;
+
+        await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
+        return result;
     }
 
     public async Task CancelFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
-        var session = await GetRequiredUploadSession(sessionId);
-        _importFileUploadSessionService.RemoveSession(sessionId);
-        await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+        GetRequiredImportUploadSession(sessionId);
+        await _chunkedUploadService.CancelSession(sessionId, cancellationToken);
     }
 
     private async Task<FileImportResult> ProcessFileImport(Stream stream, string fileName, string idRegex,
@@ -2174,112 +2098,34 @@ public class ImportService : ServiceBase
         return (result, caveInformation.CaveId);
     }
 
-    private async Task<ImportFileUploadSessionState> GetRequiredUploadSession(string sessionId)
+    private ImportFileUploadSessionMetadata GetRequiredImportUploadSession(string sessionId)
     {
-        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
-        if (string.IsNullOrWhiteSpace(sessionId)) throw ApiExceptionDictionary.NullValue(nameof(sessionId));
-
-        var session = _importFileUploadSessionService.GetSession(sessionId) ??
-                      throw ApiExceptionDictionary.NotFound("Upload session");
-
-        if (!string.Equals(session.AccountId, RequestUser.AccountId, StringComparison.Ordinal))
-        {
-            throw ApiExceptionDictionary.NotFound("Upload session");
-        }
-
-        return session;
+        return _chunkedUploadService.GetRequiredSessionMetadata<ImportFileUploadSessionMetadata>(sessionId);
     }
 
     private async Task CleanupExpiredUploadSessions(CancellationToken cancellationToken)
     {
-        var expiredSessions = _importFileUploadSessionService.RemoveExpiredSessions();
-        foreach (var session in expiredSessions)
-        {
-            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
-        }
+        await _chunkedUploadService.CleanupExpiredSessions(cancellationToken);
     }
 
-    private sealed class LengthAwareReadStream : Stream
+    private static ImportFileUploadSessionVm ToImportFileUploadSessionVm(ChunkedUploadSessionState session)
     {
-        private readonly Stream _inner;
-        private readonly long _length;
-        private long _position;
-
-        public LengthAwareReadStream(Stream inner, long length)
+        return new ImportFileUploadSessionVm
         {
-            _inner = inner;
-            _length = length;
-        }
+            SessionId = session.SessionId,
+            UploadedBytes = session.UploadedBytes,
+            TotalBytes = session.FileSize,
+            Status = session.Status.ToString().ToLowerInvariant(),
+        };
+    }
 
-        public override bool CanRead => _inner.CanRead;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => _length;
-
-        public override long Position
-        {
-            get => _position;
-            set
-            {
-                if (value != _position)
-                {
-                    throw new NotSupportedException();
-                }
-            }
-        }
-
-        public override void Flush()
-        {
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var read = _inner.Read(buffer, offset, count);
-            _position += read;
-            return read;
-        }
-
-        public override async ValueTask<int> ReadAsync(
-            Memory<byte> buffer,
-            CancellationToken cancellationToken = default)
-        {
-            var read = await _inner.ReadAsync(buffer, cancellationToken);
-            _position += read;
-            return read;
-        }
-
-        public override Task<int> ReadAsync(
-            byte[] buffer,
-            int offset,
-            int count,
-            CancellationToken cancellationToken)
-        {
-            return ReadAndTrackPositionAsync(buffer, offset, count, cancellationToken);
-        }
-
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-        }
-
-        public override ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-
-        private async Task<int> ReadAndTrackPositionAsync(
-            byte[] buffer,
-            int offset,
-            int count,
-            CancellationToken cancellationToken)
-        {
-            var read = await _inner.ReadAsync(buffer, offset, count, cancellationToken);
-            _position += read;
-            return read;
-        }
+    private sealed class ImportFileUploadSessionMetadata
+    {
+        public string DelimiterRegex { get; set; } = null!;
+        public string IdRegex { get; set; } = null!;
+        public bool IgnoreDuplicates { get; set; }
+        public string? CompletionRequestId { get; set; }
+        public FileImportResult? CompletionResult { get; set; }
     }
 
     public class CountyCaveInfo
