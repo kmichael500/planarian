@@ -194,6 +194,58 @@ public class AccountController : PlanarianControllerBase<AccountService>
         return StatusCode(GetFileImportFailureStatusCode(result.FailureCode), result);
     }
 
+    [HttpPost("import/file/session")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<ImportFileUploadSessionVm>> CreateImportFileUploadSession(
+        [FromBody] CreateImportFileUploadSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _importService.CreateFileUploadSession(request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPut("import/file/session/{sessionId}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<ImportFileUploadSessionVm>> UploadImportFileChunk(
+        string sessionId,
+        long offset,
+        int chunkIndex,
+        CancellationToken cancellationToken)
+    {
+        var contentLength = Request.ContentLength ?? 0;
+        var result = await _importService.UploadFileChunk(
+            sessionId,
+            Request.Body,
+            offset,
+            chunkIndex,
+            contentLength,
+            cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("import/file/session/{sessionId}/finalize")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> FinalizeImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _importService.FinalizeFileUploadSession(sessionId, cancellationToken);
+        result.RequestId = HttpContext.TraceIdentifier;
+
+        if (result.IsSuccessful)
+        {
+            return Ok(result);
+        }
+
+        return StatusCode(GetFileImportFailureStatusCode(result.FailureCode), result);
+    }
+
+    [HttpDelete("import/file/session/{sessionId}")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> CancelImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
+    {
+        await _importService.CancelFileUploadSession(sessionId, cancellationToken);
+        return NoContent();
+    }
+
     private static int GetFileImportFailureStatusCode(string? failureCode)
     {
         if (!Enum.TryParse<ApiExceptionType>(failureCode, out var apiExceptionType))

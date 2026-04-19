@@ -119,6 +119,70 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
+    public async Task<FileVm> PublishStagedCaveFile(string sourceBlobKey, string caveId, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+
+        var caveEntity = await _caveRepository.GetCave(caveId);
+        if (caveEntity == null)
+        {
+            throw ApiExceptionDictionary.NotFound("Cave");
+        }
+
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
+        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
+
+        var autoTagType =
+            allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
+
+        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
+
+        if (tagTypeId == null)
+            throw ApiExceptionDictionary.NotFound("File type");
+
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+        var entity = new File
+        {
+            CaveId = caveId,
+            FileName = fileName,
+            DisplayName = fileNameWithoutExtension,
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId
+        };
+
+        Repository.Add(entity);
+        await Repository.SaveChangesAsync(cancellationToken);
+
+        var fileExtension = Path.GetExtension(fileName);
+        var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
+        var client = await GetBlobContainerClient(RequestUser.AccountContainerName);
+        var sourceBlobClient = client.GetBlobClient(sourceBlobKey);
+        var finalBlobClient = client.GetBlobClient(blobKey);
+
+        var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
+            sourceBlobClient.Uri,
+            cancellationToken: cancellationToken);
+        await copyOperation.WaitForCompletionAsync(cancellationToken);
+
+        entity.BlobKey = blobKey;
+        entity.BlobContainer = RequestUser.AccountContainerName;
+        await Repository.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var fileInformation = new FileVm
+        {
+            Id = entity.Id,
+            FileName = entity.FileName,
+            DisplayName = entity.DisplayName,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid
+        };
+        return fileInformation;
+    }
+
     public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
         CancellationToken cancellationToken,
         string? uuid = null)
