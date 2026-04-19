@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button, Radio, Spin, Typography, message } from "antd";
 import {
   CheckCircleOutlined,
+  CloudDownloadOutlined,
   DeliveredProcedureOutlined,
   EyeOutlined,
   RedoOutlined,
@@ -22,6 +23,7 @@ import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { AppOptions } from "../../../Shared/Services/AppService";
+import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 
 const { Title, Paragraph } = Typography;
 
@@ -178,6 +180,8 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     AppOptions?.supportName && AppOptions?.supportEmail
       ? `${AppOptions.supportName} at ${AppOptions.supportEmail}`
       : null;
+  const errorCsvData = convertErrorListToCsv(errorList);
+  const dryRunCsvData = buildDryRunCsv(dryRunData);
 
   return (
     <>
@@ -443,13 +447,23 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       {(errorList.length > 0 || processError !== null) && (
         <PlanarianModal
           fullScreen
-          header="Import Cave Errors"
+          header={[
+            "Import Cave Errors",
+            <PlanarianButton
+              key="download-cave-errors"
+              alwaysShowChildren
+              icon={<CloudDownloadOutlined />}
+              onClick={() => downloadFile("cave_import_errors.csv", errorCsvData)}
+            >
+              Download CSV
+            </PlanarianButton>,
+          ]}
           open={isModalOpen}
           onClose={handleOk}
           footer={null}
         >
           <Spin spinning={errorList.length === 0}>
-            <CSVDisplay data={convertErrorListToCsv(errorList)} />
+            <CSVDisplay data={errorCsvData} />
           </Spin>
         </PlanarianModal>
       )}
@@ -457,12 +471,22 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
       {dryRunData.length > 0 && (
         <PlanarianModal
           fullScreen
-          header="Dry Run Data"
+          header={[
+            "Dry Run Data",
+            <PlanarianButton
+              key="download-cave-dry-run"
+              alwaysShowChildren
+              icon={<CloudDownloadOutlined />}
+              onClick={() => downloadFile("cave_dry_run.csv", dryRunCsvData)}
+            >
+              Download CSV
+            </PlanarianButton>,
+          ]}
           open={isModalOpen}
           onClose={handleOk}
           footer={null}
         >
-          <CSVDisplay data={buildDryRunCsv(dryRunData)} />
+          <CSVDisplay data={dryRunCsvData} />
         </PlanarianModal>
       )}
     </>

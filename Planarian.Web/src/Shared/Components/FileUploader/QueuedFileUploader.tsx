@@ -144,6 +144,8 @@ const RecentActivityCard = <TResult,>({
       className={`import-files-dashboard__queue-card import-files-dashboard__queue-card--recent${
         item.status === "uploaded"
           ? " import-files-dashboard__queue-card--success"
+          : item.status === "skipped"
+          ? " import-files-dashboard__queue-card--neutral"
           : " import-files-dashboard__queue-card--failure"
       }`}
     >
@@ -153,12 +155,20 @@ const RecentActivityCard = <TResult,>({
           className={`import-files-dashboard__queue-progress${
             item.status === "uploaded"
               ? " import-files-dashboard__queue-progress--success"
+              : item.status === "skipped"
+              ? " import-files-dashboard__queue-progress--neutral"
               : " import-files-dashboard__queue-progress--failure"
           }`}
         >
           <span className="import-files-dashboard__queue-progress-fill" />
           <span className="import-files-dashboard__queue-progress-content">
-            <span>{item.status === "uploaded" ? "Uploaded" : "Failed"}</span>
+            <span>
+              {item.status === "uploaded"
+                ? "Uploaded"
+                : item.status === "skipped"
+                ? "Skipped"
+                : "Failed"}
+            </span>
             <span>{getUploadDisplayState(item).sizeLabel}</span>
           </span>
         </div>

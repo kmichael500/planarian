@@ -3,6 +3,7 @@ import { Button, Radio, Typography, message } from "antd";
 import {
   ApartmentOutlined,
   CheckCircleOutlined,
+  CloudDownloadOutlined,
   DeliveredProcedureOutlined,
   EyeOutlined,
   RedoOutlined,
@@ -23,6 +24,7 @@ import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { EntranceDryRun } from "../Models/EntranceDryRun";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { AppOptions } from "../../../Shared/Services/AppService";
+import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 
 const { Title, Paragraph } = Typography;
 
@@ -137,6 +139,8 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
     AppOptions?.supportName && AppOptions?.supportEmail
       ? `${AppOptions.supportName} at ${AppOptions.supportEmail}`
       : null;
+  const errorCsvData = convertErrorListToCsv(errorList);
+  const dryRunCsvData = Papa.unparse(dryRunData);
 
   return (
     <>
@@ -414,24 +418,48 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
       {(errorList.length > 0 || processError !== null) && (
         <PlanarianModal
           fullScreen
-          header="Import Entrance Errors"
+          header={[
+            "Import Entrance Errors",
+            <PlanarianButton
+              key="download-entrance-errors"
+              alwaysShowChildren
+              icon={<CloudDownloadOutlined />}
+              onClick={() =>
+                downloadFile("entrance_import_errors.csv", errorCsvData)
+              }
+            >
+              Download CSV
+            </PlanarianButton>,
+          ]}
           open={isModalOpen}
           onClose={handleOk}
           footer={null}
         >
-          <CSVDisplay data={convertErrorListToCsv(errorList)} />
+          <CSVDisplay data={errorCsvData} />
         </PlanarianModal>
       )}
 
       {dryRunData.length > 0 && (
         <PlanarianModal
           fullScreen
-          header="Dry Run Data"
+          header={[
+            "Dry Run Data",
+            <PlanarianButton
+              key="download-entrance-dry-run"
+              alwaysShowChildren
+              icon={<CloudDownloadOutlined />}
+              onClick={() =>
+                downloadFile("entrance_dry_run.csv", dryRunCsvData)
+              }
+            >
+              Download CSV
+            </PlanarianButton>,
+          ]}
           open={isModalOpen}
           onClose={handleOk}
           footer={null}
         >
-          <CSVDisplay data={Papa.unparse(dryRunData)} />
+          <CSVDisplay data={dryRunCsvData} />
         </PlanarianModal>
       )}
     </>

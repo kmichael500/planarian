@@ -16,7 +16,10 @@ export const createQueueItemId = () => {
 };
 
 export const isTerminalStatus = (status: QueuedFileUploadStatus) =>
-  status === "uploaded" || status === "failed" || status === "canceled";
+  status === "uploaded" ||
+  status === "skipped" ||
+  status === "failed" ||
+  status === "canceled";
 
 export const getPositiveNumber = (
   ...values: Array<number | undefined | null>
@@ -101,19 +104,21 @@ export const getUploadDisplayState = <TResult,>(
 ) => {
   const totalBytes = getDisplayTotalBytes(item);
   const acknowledgedBytes =
-    item.status === "uploaded" ? totalBytes : getAcknowledgedUploadedBytes(item);
+    item.status === "uploaded" || item.status === "skipped"
+      ? totalBytes
+      : getAcknowledgedUploadedBytes(item);
   const liveUploadedBytes =
-    item.status === "uploaded"
+    item.status === "uploaded" || item.status === "skipped"
       ? totalBytes
       : Math.max(acknowledgedBytes, getStoredVisualUploadedBytes(item, totalBytes));
   const displayUploadedBytes =
-    item.status === "uploaded"
+    item.status === "uploaded" || item.status === "skipped"
       ? totalBytes
       : Math.max(acknowledgedBytes, liveUploadedBytes);
   const acknowledgedPercent = toProgressPercent(acknowledgedBytes, totalBytes);
   const rawDisplayPercent = toProgressPercent(displayUploadedBytes, totalBytes);
   const displayPercent =
-    item.status === "uploaded"
+    item.status === "uploaded" || item.status === "skipped"
       ? 100
       : totalBytes > 0 && displayUploadedBytes >= totalBytes
         ? 100
