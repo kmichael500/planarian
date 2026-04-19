@@ -1,24 +1,19 @@
 import React, { useState } from "react";
-import { Card, Result, Button, Radio, message, Spin } from "antd";
+import { Alert, Button, Radio, Spin, Typography, message } from "antd";
 import {
-  DeliveredProcedureOutlined,
   CheckCircleOutlined,
-  RedoOutlined,
+  DeliveredProcedureOutlined,
   EyeOutlined,
+  RedoOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
-
-// Importing components and services
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
-
-// Importing models
 import { ImportApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveCsvModel } from "../Models/CaveCsvModel";
 import { FileVm } from "../../Files/Models/FileVm";
-
-// Importing styles
 import "./ImportComponent.scss";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { SignalRProgressComponent } from "../../../Shared/Components/SignalRProgress/SignalRProgressComponent";
@@ -26,6 +21,8 @@ import { AccountService } from "../../Account/Services/AccountService";
 import { FailedCsvRecord } from "../Models/FailedCsvRecord";
 import { CaveDryRunRecord } from "../Models/CaveDryRunRecord";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+
+const { Title, Paragraph, Text } = Typography;
 
 interface ImportCaveComponentProps {
   onUploaded: () => void;
@@ -66,7 +63,6 @@ const buildDryRunCsv = (records: CaveDryRunRecord[]): string =>
 const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   onUploaded,
 }) => {
-  // Initializing states
   const [isUploaded, setIsUploaded] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
   const [processError, setProcessError] = useState<string | null>(null);
@@ -82,15 +78,14 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
   const [isDryRunComplete, setIsDryRunComplete] = useState(false);
   const [syncExisting, setSyncExisting] = useState(false);
 
-  // Handlers and functions
   const showCSVModal = () => setIsModalOpen(true);
   const handleOk = () => setIsModalOpen(false);
   const tryAgain = () => resetStates();
   const convertErrorListToCsv = (
-    errorList: FailedCsvRecord<CaveCsvModel>[]
+    failedRecords: FailedCsvRecord<CaveCsvModel>[]
   ): string =>
     Papa.unparse(
-      errorList.map((error) => ({
+      failedRecords.map((error) => ({
         rowNumber: error.rowNumber,
         reason: error.reason,
         ...error.caveCsvModel,
@@ -124,7 +119,6 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
 
       if (error.data) {
         setErrorList(error.data);
-        setErrorList(error.data);
       }
       setProcessError(error.message);
     } finally {
@@ -138,13 +132,16 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setIsLoading(true);
     setIsProcessing(true);
     try {
-      await AccountService.ImportCavesFileProcess(uploadResult.id, false, syncExisting);
+      await AccountService.ImportCavesFileProcess(
+        uploadResult.id,
+        false,
+        syncExisting
+      );
       setIsProcessed(true);
     } catch (e) {
       const error = e as ImportApiErrorResponse<CaveCsvModel>;
 
       if (error.data) {
-        setErrorList(error.data);
         setErrorList(error.data);
       }
       setProcessError(error.message);
@@ -154,7 +151,6 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     }
   };
 
-  // Helper function to reset states
   const resetStates = () => {
     setIsUploaded(false);
     setIsProcessed(false);
@@ -167,228 +163,360 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
     setSyncExisting(false);
   };
 
+  const hasErrors = uploadFailed || errorList.length > 0 || processError !== null;
+
   return (
     <>
-      {!isUploaded && !uploadFailed && errorList.length === 0 && (
-        <UploadComponent
-          draggerMessage="Click or drag your caves CSV file to this area to upload."
-          draggerTitle="Import Cave File"
-          hideCancelButton
-          singleFile
-          allowedFileTypes={[".csv"]}
-          style={{ display: "flex" }}
-          uploadFunction={async (params): Promise<FileVm> => {
-            try {
-              const result = await AccountService.ImportCavesFile(
-                params.file,
-                params.uid,
-                params.onProgress
-              );
-              setUploadResult(result);
-              setIsUploaded(true);
-            } catch (e) {
-              const error = e as ImportApiErrorResponse<CaveCsvModel>;
-
-              if (error.data) {
-                setErrorList(error.data);
-              } else {
-                setUploadFailed(true);
-              }
-
-              message.error(error.message);
+      <div className="import-step-workspace">
+        {hasErrors && (
+          <Alert
+            className="import-step-banner"
+            type="error"
+            showIcon
+            message={processError ?? "There were errors with this import."}
+            description={
+              errorList.length > 0
+                ? `${errorList.length} row${errorList.length === 1 ? "" : "s"} need attention.`
+                : "Please try uploading the file again."
             }
-            return {} as FileVm;
-          }}
-          updateFunction={() => {
-            throw new Error("Function not implemented intentionally.");
-          }}
-        />
-      )}
-
-      {uploadFailed && (
-        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
-          <Result
-            status="error"
-            title="Upload Failed"
-            subTitle="Please try uploading the file again."
-            extra={[
-              <PlanarianButton
-                type="primary"
-                danger
-                onClick={tryAgain}
-                icon={<RedoOutlined />}
-              >
-                Try Again
-              </PlanarianButton>,
-            ]}
           />
-        </Card>
-      )}
-
-      {isUploaded &&
-        !isProcessed &&
-        !isProcessing &&
-        processError === null &&
-        !isDryRunComplete && (
-          <Card className="planarian-import-result-card" style={{ width: "100%" }}>
-            <Result
-              icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-              title="Successfully Uploaded!"
-              subTitle="Run a dry run to preview exactly what will happen before applying the cave import."
-              extra={[
-                <div
-                  key="sync-actions"
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  <Radio.Group
-                    value={syncExisting ? "upsert" : "insert"}
-                    onChange={(event) =>
-                      setSyncExisting(event.target.value === "upsert")
-                    }
-                    optionType="button"
-                    buttonStyle="solid"
-                  >
-                    <Radio.Button value="insert">Insert Only</Radio.Button>
-                    <Radio.Button value="upsert">Insert / Update</Radio.Button>
-                  </Radio.Group>
-                  <div
-                    style={{
-                      maxWidth: 560,
-                      textAlign: "center",
-                    }}
-                  >
-                    {syncExisting
-                      ? "Updates the caves in the database to match this CSV. Matching caves will be updated, new caves will be inserted, and caves missing from the CSV will be deleted. Files, favorites, and other related records are only affected if a cave is deleted. "
-                      : "Only new caves will be inserted. The import will fail if the CSV includes a cave that already exists. "}
-                    <strong>It is strongly recommended</strong> to create an
-                    archive before running either mode. You can create one in{" "}
-                    <Link to="/account/settings">Account Settings</Link>.
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <PlanarianButton
-                      onClick={handleDryRunClick}
-                      icon={<EyeOutlined />}
-                      loading={isLoading}
-                      type="primary"
-                    >
-                      Dry Run
-                    </PlanarianButton>
-                    <PlanarianButton onClick={tryAgain} icon={<RedoOutlined />}>
-                      Reset
-                    </PlanarianButton>
-                  </div>
-                </div>,
-              ]}
-            />
-          </Card>
         )}
 
-      {isDryRunComplete && !isProcessing && !isProcessed && (
-        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
-          <Result
-            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Dry Run Complete!"
-            subTitle="Review the changes below. If everything looks good, proceed with processing."
-            extra={[
-              <Button onClick={showCSVModal} icon={<EyeOutlined />}>
-                View Dry Run Data
-              </Button>,
-              <PlanarianButton
-                onClick={handleProcessClick}
-                icon={<DeliveredProcedureOutlined />}
-                loading={isLoading}
-                type="primary"
-              >
-                Process
-              </PlanarianButton>,
-              <Button onClick={tryAgain} icon={<RedoOutlined />}>
-                Reset
-              </Button>,
-            ]}
-          />
-        </Card>
-      )}
+        <div className="import-step-layout">
+          <div className="import-step-main">
+            {!isUploaded && !hasErrors && (
+              <div className="import-step-surface import-step-card import-step-panel import-step-upload">
+                <div className="import-step-panel__header">
+                  <div>
+                    <div className="import-step-kicker">
+                      <UploadOutlined />
+                      Cave CSV
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                      Upload Cave Data
+                    </Title>
+                    <Paragraph style={{ marginBottom: 0 }}>
+                      Start with the cave file. Entrances depend on these cave
+                      records already existing.
+                    </Paragraph>
+                  </div>
+                </div>
+                <div className="import-step-panel__body import-step-panel__body--plain">
+                  <UploadComponent
+                    draggerMessage="Click or drag your caves CSV file to this area to upload."
+                    draggerTitle="Import Cave File"
+                    hideCancelButton
+                    singleFile
+                    allowedFileTypes={[".csv"]}
+                    style={{ display: "flex", height: "100%" }}
+                    uploadFunction={async (params): Promise<FileVm> => {
+                      try {
+                        const result = await AccountService.ImportCavesFile(
+                          params.file,
+                          params.uid,
+                          params.onProgress
+                        );
+                        setUploadResult(result);
+                        setIsUploaded(true);
+                      } catch (e) {
+                        const error = e as ImportApiErrorResponse<CaveCsvModel>;
 
-      {isProcessing && (
-        <Card className="planarian-import-result-card" style={{ width: "100%" }}>
-          <Result
-            icon={<DeliveredProcedureOutlined style={{ color: "#1890ff" }} />}
-            title="Processing..."
-            subTitle="Please wait while your data is being processed."
-            extra={[
-              <SignalRProgressComponent
-                groupName={uploadResult?.id as string}
-                isLoading={isProcessing}
-              />,
-            ]}
-          />
-        </Card>
-      )}
+                        if (error.data) {
+                          setErrorList(error.data);
+                        } else {
+                          setUploadFailed(true);
+                        }
 
-      {isProcessed && !isProcessing && (
-        <Card style={{ width: "100%" }}>
-          <Result
-            icon={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
-            title="Successfully Processed!"
-            subTitle="Your cave CSV file has been successfully processed."
-            extra={[
-              <Button type="primary" key="console" onClick={onUploaded}>
-                Import Entrances
-              </Button>,
-              <Button key="buy" onClick={tryAgain} icon={<RedoOutlined />}>
-                Import Another Cave File
-              </Button>,
-            ]}
-          />
-        </Card>
-      )}
+                        message.error(error.message);
+                      }
+                      return {} as FileVm;
+                    }}
+                    updateFunction={() => {
+                      throw new Error("Function not implemented intentionally.");
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isUploaded &&
+              !isProcessing &&
+              !isProcessed &&
+              !isDryRunComplete &&
+              !hasErrors && (
+                <div className="import-step-surface import-step-card import-step-panel">
+                  <div className="import-step-panel__body import-step-panel__body--plain">
+                    <div className="import-step-status">
+                      <div className="import-step-status__hero">
+                        <span className="import-step-status__icon import-step-status__icon--success">
+                          <CheckCircleOutlined />
+                        </span>
+                        <div className="import-step-status__copy">
+                          <Title level={4} style={{ marginTop: 0 }}>
+                            Cave CSV uploaded
+                          </Title>
+                          <Paragraph>
+                            Run a dry run before processing so you can review
+                            inserts, updates, and deletes.
+                          </Paragraph>
+                          <Paragraph style={{ marginBottom: 0 }}>
+                            {syncExisting
+                              ? "Insert / Update mode will reconcile the cave records in the database to this CSV."
+                              : "Insert Only mode will add only new caves and fail if a cave already exists."}
+                          </Paragraph>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {isDryRunComplete && !isProcessing && !isProcessed && !hasErrors && (
+              <div className="import-step-surface import-step-card import-step-panel">
+                <div className="import-step-panel__body import-step-panel__body--plain">
+                  <div className="import-step-status">
+                    <div className="import-step-status__hero">
+                      <span className="import-step-status__icon import-step-status__icon--success">
+                        <EyeOutlined />
+                      </span>
+                      <div className="import-step-status__copy">
+                        <Title level={4} style={{ marginTop: 0 }}>
+                          Dry run complete
+                        </Title>
+                        <Paragraph>
+                          Review the dry run output, then process the import if
+                          the changes look correct.
+                        </Paragraph>
+                        <Paragraph style={{ marginBottom: 0 }}>
+                          {dryRunData.length} change
+                          {dryRunData.length === 1 ? "" : "s"} will be applied.
+                        </Paragraph>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isProcessing && (
+              <div className="import-step-surface import-step-card import-step-panel">
+                <div className="import-step-panel__body import-step-panel__body--plain">
+                  <div className="import-step-status">
+                    <div className="import-step-status__hero">
+                      <span className="import-step-status__icon import-step-status__icon--processing">
+                        <DeliveredProcedureOutlined />
+                      </span>
+                      <div className="import-step-status__copy">
+                        <Title level={4} style={{ marginTop: 0 }}>
+                          Processing cave import
+                        </Title>
+                        <Paragraph>
+                          Keep this page open while Planarian processes the
+                          uploaded cave data.
+                        </Paragraph>
+                      </div>
+                    </div>
+                    <SignalRProgressComponent
+                      groupName={uploadResult?.id as string}
+                      isLoading={isProcessing}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isProcessed && !isProcessing && (
+              <div className="import-step-surface import-step-card import-step-panel">
+                <div className="import-step-panel__body import-step-panel__body--plain">
+                  <div className="import-step-status">
+                    <div className="import-step-status__hero">
+                      <span className="import-step-status__icon import-step-status__icon--success">
+                        <CheckCircleOutlined />
+                      </span>
+                      <div className="import-step-status__copy">
+                        <Title level={4} style={{ marginTop: 0 }}>
+                          Cave import complete
+                        </Title>
+                        <Paragraph style={{ marginBottom: 0 }}>
+                          Your cave CSV has been processed successfully. Continue
+                          to the entrance import when you are ready.
+                        </Paragraph>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {hasErrors && (
+              <div className="import-step-surface import-step-card import-step-panel">
+                <div className="import-step-panel__body import-step-panel__body--plain">
+                  <div className="import-step-status">
+                    <div className="import-step-status__hero">
+                      <span className="import-step-status__icon import-step-status__icon--error">
+                        <RedoOutlined />
+                      </span>
+                      <div className="import-step-status__copy">
+                        <Title level={4} style={{ marginTop: 0 }}>
+                          Cave import needs attention
+                        </Title>
+                        <Paragraph style={{ marginBottom: 0 }}>
+                          Review the errors, fix the CSV if needed, and try the
+                          upload again.
+                        </Paragraph>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="import-step-side">
+            <div className="import-step-surface import-step-card import-step-panel">
+              <div className="import-step-panel__header">
+                <div>
+                  <Title level={5} style={{ margin: 0 }}>
+                    {isProcessed
+                      ? "Next step"
+                      : hasErrors
+                      ? "Recovery"
+                      : isProcessing
+                      ? "Progress"
+                      : isDryRunComplete
+                      ? "Review"
+                      : isUploaded
+                      ? "Import mode"
+                      : "Before you upload"}
+                  </Title>
+                </div>
+              </div>
+              <div className="import-step-panel__body">
+                {!isUploaded && !hasErrors && (
+                  <div className="import-step-mode-card">
+                    <Text strong>Suggested order</Text>
+                    <Text>1. Upload caves</Text>
+                    <Text>2. Dry run the changes</Text>
+                    <Text>3. Process the import</Text>
+                    <Text>4. Continue to entrances</Text>
+                  </div>
+                )}
+
+                {isUploaded &&
+                  !isProcessing &&
+                  !isProcessed &&
+                  !isDryRunComplete &&
+                  !hasErrors && (
+                    <div className="import-step-mode-card">
+                      <Radio.Group
+                        value={syncExisting ? "upsert" : "insert"}
+                        onChange={(event) =>
+                          setSyncExisting(event.target.value === "upsert")
+                        }
+                        optionType="button"
+                        buttonStyle="solid"
+                      >
+                        <Radio.Button value="insert">Insert Only</Radio.Button>
+                        <Radio.Button value="upsert">Insert / Update</Radio.Button>
+                      </Radio.Group>
+                      <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
+                        {syncExisting
+                          ? "Matching caves will be updated, new caves inserted, and caves missing from the CSV deleted."
+                          : "Only new caves will be inserted. Existing caves in the CSV will cause the import to fail."}
+                      </Paragraph>
+                      <Paragraph className="import-step-note" style={{ marginBottom: 0 }}>
+                        Create an archive first in{" "}
+                        <Link to="/account/settings">Account Settings</Link>.
+                      </Paragraph>
+                      <div className="import-step-actions">
+                        <PlanarianButton
+                          onClick={handleDryRunClick}
+                          icon={<EyeOutlined />}
+                          loading={isLoading}
+                          type="primary"
+                        >
+                          Dry Run
+                        </PlanarianButton>
+                        <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                {isDryRunComplete && !isProcessing && !isProcessed && !hasErrors && (
+                  <div className="import-step-mode-card">
+                    <Paragraph style={{ marginBottom: 0 }}>
+                      Open the dry run data if you need the full row-by-row
+                      output, then process the import.
+                    </Paragraph>
+                    <div className="import-step-actions">
+                      <Button onClick={showCSVModal} icon={<EyeOutlined />}>
+                        View Dry Run Data
+                      </Button>
+                      <PlanarianButton
+                        onClick={handleProcessClick}
+                        icon={<DeliveredProcedureOutlined />}
+                        loading={isLoading}
+                        type="primary"
+                      >
+                        Process
+                      </PlanarianButton>
+                      <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {isProcessing && (
+                  <Paragraph style={{ marginBottom: 0 }}>
+                    Progress updates are shown live while the server processes
+                    the import.
+                  </Paragraph>
+                )}
+
+                {isProcessed && !isProcessing && (
+                  <div className="import-step-actions">
+                    <Button type="primary" onClick={onUploaded}>
+                      Import Entrances
+                    </Button>
+                    <Button onClick={tryAgain} icon={<RedoOutlined />}>
+                      Import Another Cave File
+                    </Button>
+                  </div>
+                )}
+
+                {hasErrors && (
+                  <div className="import-step-mode-card">
+                    {errorList.length > 0 && (
+                      <Button type="primary" onClick={showCSVModal}>
+                        View Errors
+                      </Button>
+                    )}
+                    <Button danger onClick={tryAgain}>
+                      Try Again
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {(errorList.length > 0 || processError !== null) && (
-        <>
-          <Card style={{ width: "100%" }}>
-            <Result
-              status="error"
-              title="There were errors."
-              subTitle={
-                processError ||
-                "Please click the button below to view the upload errors."
-              }
-              extra={[
-                errorList.length > 0 && (
-                  <Button type="primary" onClick={showCSVModal}>
-                    View Errors
-                  </Button>
-                ),
-                <Button type="primary" danger onClick={tryAgain}>
-                  Try Again
-                </Button>,
-              ]}
-            />
-          </Card>
-          <PlanarianModal
-            fullScreen
-            header="Import Cave Errors"
-            open={isModalOpen}
-            onClose={handleOk}
-            footer={null}
-          >
-            <Spin spinning={errorList.length === 0}>
-              <CSVDisplay data={convertErrorListToCsv(errorList)} />
-            </Spin>
-          </PlanarianModal>
-        </>
+        <PlanarianModal
+          fullScreen
+          header="Import Cave Errors"
+          open={isModalOpen}
+          onClose={handleOk}
+          footer={null}
+        >
+          <Spin spinning={errorList.length === 0}>
+            <CSVDisplay data={convertErrorListToCsv(errorList)} />
+          </Spin>
+        </PlanarianModal>
       )}
 
       {dryRunData.length > 0 && (

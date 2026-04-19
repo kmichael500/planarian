@@ -148,7 +148,8 @@ const AccountService = {
     delmiterRegex: string,
     idRegex: string,
     ignoreDuplicates: boolean = false,
-    onProgress: (progressEvent: AxiosProgressEvent) => void
+    onProgress: (progressEvent: AxiosProgressEvent) => void,
+    signal?: AbortSignal
   ): Promise<FileImportResult> {
     const formData = new FormData();
     formData.append("file", file);
@@ -158,6 +159,7 @@ const AccountService = {
         "Content-Type": "multipart/form-data",
       },
       onUploadProgress: onProgress, // Set the onUploadProgress callback
+      signal,
     };
 
     let regexQueryStringUrlSafe = `delimiterRegex=${encodeURIComponent(

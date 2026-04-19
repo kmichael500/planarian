@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -185,7 +186,32 @@ public class AccountController : PlanarianControllerBase<AccountService>
                 cancellationToken);
         result.RequestId = HttpContext.TraceIdentifier;
 
-        return new JsonResult(result);
+        if (result.IsSuccessful)
+        {
+            return Ok(result);
+        }
+
+        return StatusCode(GetFileImportFailureStatusCode(result.FailureCode), result);
+    }
+
+    private static int GetFileImportFailureStatusCode(string? failureCode)
+    {
+        if (!Enum.TryParse<ApiExceptionType>(failureCode, out var apiExceptionType))
+        {
+            return StatusCodes.Status400BadRequest;
+        }
+
+        return apiExceptionType switch
+        {
+            ApiExceptionType.BadRequest => StatusCodes.Status400BadRequest,
+            ApiExceptionType.NotFound => StatusCodes.Status404NotFound,
+            ApiExceptionType.Conflict => StatusCodes.Status409Conflict,
+            ApiExceptionType.TooManyRequests => StatusCodes.Status429TooManyRequests,
+            ApiExceptionType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ApiExceptionType.Forbidden => StatusCodes.Status403Forbidden,
+            ApiExceptionType.InternalServerError => StatusCodes.Status500InternalServerError,
+            _ => StatusCodes.Status400BadRequest
+        };
     }
 
     [HttpPost("import/entrances/process/{fileId:length(10)}")]
