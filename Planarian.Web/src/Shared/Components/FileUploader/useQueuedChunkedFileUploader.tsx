@@ -654,7 +654,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
         } else {
           updateQueueItem(itemId, (current) => ({
             ...current,
-            status: "failed",
+            status: failure.terminalStatus ?? "failed",
             progress: 0,
             retryAt: null,
             retryCount: current.retryCount + (failure.isRetryable ? 1 : 0),
@@ -918,6 +918,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
 
   const queueStats = useMemo(() => {
     const uploaded = queueItems.filter((item) => item.status === "uploaded").length;
+    const skipped = queueItems.filter((item) => item.status === "skipped").length;
     const failed = queueItems.filter((item) => item.status === "failed").length;
     const canceled = queueItems.filter((item) => item.status === "canceled").length;
     const uploading = queueItems.filter((item) => item.status === "uploading").length;
@@ -926,7 +927,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     ).length;
     const remaining = queued + uploading;
 
-    return { uploaded, failed, canceled, uploading, queued, remaining };
+    return { uploaded, skipped, failed, canceled, uploading, queued, remaining };
   }, [queueItems]);
 
   const uploadQueueItems = useMemo(
@@ -984,7 +985,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
   const allWorkComplete =
     queueItems.length > 0 &&
     queueItems.every((item) => isTerminalStatus(item.status));
-  const hasSuccessfulUploads = queueStats.uploaded > 0;
+  const hasSuccessfulUploads = queueStats.uploaded + queueStats.skipped > 0;
   useEffect(() => {
     if (!allWorkComplete || !hasSuccessfulUploads || hasNotifiedCompletionRef.current) {
       return;

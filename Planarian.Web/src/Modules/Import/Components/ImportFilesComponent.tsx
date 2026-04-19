@@ -136,7 +136,15 @@ const createCsvRow = (
   item: QueuedFileUploadItem<FileImportResult>
 ): FileImportResult => ({
   fileName: item.fileName,
-  isSuccessful: item.status === "uploaded",
+  isSuccessful: item.status === "uploaded" || item.status === "skipped",
+  status:
+    item.status === "uploaded"
+      ? "Uploaded"
+      : item.status === "skipped"
+      ? "Skipped"
+      : item.status === "canceled"
+      ? "Canceled"
+      : "Failed",
   associatedCave: item.result?.associatedCave ?? "",
   message: item.result?.message ?? item.lastError ?? "",
   failureCode: item.failureCode ?? item.result?.failureCode ?? null,
@@ -233,6 +241,24 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     [confirmedSettings]
   );
 
+  const normalizeFileImportError = useCallback(
+    (error: unknown): QueuedFileUploadFailureDetails => {
+      const normalized = normalizeUploadError(error);
+      const shouldSkipDuplicate =
+        confirmedSettings?.ignoreDuplicates === true &&
+        normalized.failureCode === ApiExceptionType.Conflict;
+
+      return shouldSkipDuplicate
+        ? {
+            ...normalized,
+            isRetryable: false,
+            terminalStatus: "skipped",
+          }
+        : normalized;
+    },
+    [confirmedSettings]
+  );
+
   const handleCompleted = useCallback(() => {
     onUploaded();
   }, [onUploaded]);
@@ -240,7 +266,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const queue = useQueuedChunkedFileUploader<FileImportResult>({
     storageKey: queueStorageKey,
     endpoints,
-    normalizeError: normalizeUploadError,
+    normalizeError: normalizeFileImportError,
     isAbortError: isAbortLikeError,
     validateFile,
     onCompleted: handleCompleted,
@@ -263,7 +289,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     (item: QueuedFileUploadItem<FileImportResult>) => {
       const tooltipLines = [
         item.result?.associatedCave,
-        item.status === "failed" || item.status === "canceled"
+        item.status === "failed" || item.status === "canceled" || item.status === "skipped"
           ? item.lastError
           : null,
       ].filter(Boolean);

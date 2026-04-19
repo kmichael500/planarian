@@ -5,6 +5,7 @@ export type QueuedFileUploadStatus =
   | "queued"
   | "uploading"
   | "uploaded"
+  | "skipped"
   | "failed"
   | "retry_wait"
   | "canceled";
@@ -22,6 +23,7 @@ export interface QueuedFileUploadFailureDetails {
   isRetryable: boolean;
   retryAfterSeconds?: number;
   requestId?: string | null;
+  terminalStatus?: "failed" | "skipped";
 }
 
 export interface QueuedFileUploadEndpoints<TResult> {
@@ -74,6 +76,7 @@ export interface QueuedFileUploadItem<TResult> {
 
 export interface QueuedFileUploadStats {
   uploaded: number;
+  skipped: number;
   failed: number;
   canceled: number;
   uploading: number;

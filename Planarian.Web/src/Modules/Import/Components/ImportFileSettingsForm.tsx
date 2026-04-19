@@ -124,9 +124,9 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
                   label="Ignore Duplicates"
                   valuePropName="checked"
                   initialValue={true}
-                  extra="Skip files that already exist on the matched cave."
+                  extra="When enabled, matching filenames on the same cave are skipped. When disabled, matching filenames are overwritten."
                 >
-                  <Checkbox>Enable duplicate filtering</Checkbox>
+                  <Checkbox>Skip duplicate filenames</Checkbox>
                 </Form.Item>
               </div>
             </Col>
