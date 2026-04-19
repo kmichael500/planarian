@@ -1,4 +1,4 @@
-import { Card, Typography, Space, Tooltip, Row, Col, Tabs } from "antd";
+import { Typography, Tooltip, Tabs } from "antd";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import {
   downloadFile,
@@ -402,7 +402,6 @@ const renderFieldChips = (
   ));
 
 const buildTemplatePanel = (
-  title: string,
   fileName: string,
   items: typeof caveImportHeadersData | typeof entranceImportHeadersData
 ) => {
@@ -411,10 +410,18 @@ const buildTemplatePanel = (
 
   return (
     <div className="import-templates__tab-panel">
+      <div className="import-templates__panel-intro">
+        <Paragraph style={{ marginBottom: 0 }}>
+          Split your import into a cave CSV and an entrance CSV. The files link
+          by county code and county cave number, and caves must exist before
+          entrances can be imported.
+        </Paragraph>
+      </div>
+
       <div className="import-templates__tab-content">
-        <div className="import-step-surface import-step-card import-templates__actions">
-          <Title level={4} style={{ margin: 0 }}>
-            {title}
+        <div className="import-step-surface import-step-card import-step-card--elevated import-templates__actions">
+          <Title level={5} style={{ margin: 0 }}>
+            Download Templates
           </Title>
           <Paragraph style={{ marginBottom: 0 }}>
             Download the template, fill the fields you need, then return to the
@@ -422,6 +429,7 @@ const buildTemplatePanel = (
           </Paragraph>
           <PlanarianButton
             type="primary"
+            alwaysShowChildren
             icon={<CloudDownloadOutlined />}
             onClick={() => {
               const headers = items.map((item) => item.value);
@@ -433,7 +441,7 @@ const buildTemplatePanel = (
         </div>
 
         <div className="import-templates__fields">
-          <div className="import-step-surface import-step-card import-templates__field-group">
+          <div className="import-step-surface import-step-card import-step-card--elevated import-templates__field-group">
             <Title level={5} style={{ margin: 0 }}>
               Required Columns
             </Title>
@@ -441,7 +449,7 @@ const buildTemplatePanel = (
               {renderFieldChips(requiredItems)}
             </div>
           </div>
-          <div className="import-step-surface import-step-card import-templates__field-group">
+          <div className="import-step-surface import-step-card import-step-card--elevated import-templates__field-group import-templates__field-group--optional">
             <Title level={5} style={{ margin: 0 }}>
               Optional Columns
             </Title>
@@ -458,25 +466,9 @@ const buildTemplatePanel = (
 const ImportInformationCardComponent = () => {
   return (
     <div className="import-templates">
-      <div className="import-step-surface import-step-card import-templates__intro">
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
-            Import Templates
-          </Title>
-          <Paragraph style={{ marginBottom: 0, marginTop: 8 }}>
-            Split your import into a cave CSV and an entrance CSV. The files
-            link by county code and county cave number, and caves must exist
-            before entrances can be imported.
-          </Paragraph>
-        </div>
-        <Paragraph style={{ marginBottom: 0, maxWidth: 460 }}>
-          Stay on this page while uploads and processing run. Large datasets
-          may take a while, and any errors will be returned with per-row detail.
-        </Paragraph>
-      </div>
-
-      <Card className="planarian-import-info-card" bordered={false} style={{ flex: 1, minHeight: 0 }}>
+      <div className="import-step-surface import-step-card import-templates__shell">
         <Tabs
+          className="import-templates__tabs"
           defaultActiveKey="caves"
           destroyInactiveTabPane={false}
           items={[
@@ -484,7 +476,6 @@ const ImportInformationCardComponent = () => {
               key: "caves",
               label: "Cave Template",
               children: buildTemplatePanel(
-                "Cave Data Template",
                 "cave_import.csv",
                 caveImportHeadersData
               ),
@@ -493,14 +484,13 @@ const ImportInformationCardComponent = () => {
               key: "entrances",
               label: "Entrance Template",
               children: buildTemplatePanel(
-                "Cave Entrance Template",
                 "entrance_import.csv",
                 entranceImportHeadersData
               ),
             },
           ]}
         />
-      </Card>
+      </div>
     </div>
   );
 };
