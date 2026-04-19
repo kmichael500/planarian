@@ -1985,15 +1985,12 @@ public class ImportService : ServiceBase
             var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
             var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
             var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(chunkIndex.ToString("D8")));
-            await using var bufferedChunkStream = new MemoryStream((int)contentLength);
+            await using var lengthAwareChunkStream = new LengthAwareReadStream(chunkStream, contentLength);
             try
             {
-                await chunkStream.CopyToAsync(bufferedChunkStream, cancellationToken);
-                bufferedChunkStream.Position = 0;
-
                 await blockBlobClient.StageBlockAsync(
                     blockId,
-                    bufferedChunkStream,
+                    lengthAwareChunkStream,
                     cancellationToken: cancellationToken);
             }
             catch (IOException) when (cancellationToken.IsCancellationRequested)
@@ -2199,6 +2196,89 @@ public class ImportService : ServiceBase
         foreach (var session in expiredSessions)
         {
             await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+        }
+    }
+
+    private sealed class LengthAwareReadStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly long _length;
+        private long _position;
+
+        public LengthAwareReadStream(Stream inner, long length)
+        {
+            _inner = inner;
+            _length = length;
+        }
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _length;
+
+        public override long Position
+        {
+            get => _position;
+            set
+            {
+                if (value != _position)
+                {
+                    throw new NotSupportedException();
+                }
+            }
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = _inner.Read(buffer, offset, count);
+            _position += read;
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            var read = await _inner.ReadAsync(buffer, cancellationToken);
+            _position += read;
+            return read;
+        }
+
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            return ReadAndTrackPositionAsync(buffer, offset, count, cancellationToken);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+        }
+
+        public override ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        private async Task<int> ReadAndTrackPositionAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            var read = await _inner.ReadAsync(buffer, offset, count, cancellationToken);
+            _position += read;
+            return read;
         }
     }
 
