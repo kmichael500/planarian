@@ -263,6 +263,9 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             });
           }
 
+          // Queue entries survive refresh, but upload sessions do not.
+          // We intentionally clear transient server/session progress here so any
+          // interrupted upload restarts cleanly from byte 0 when resumed.
           return normalizeQueueItem<TResult>({
             ...item,
             queueOrder:
@@ -1040,17 +1043,24 @@ export const useQueuedChunkedFileUploader = <TResult,>({
 
   const removeQueueItem = useCallback(
     (itemId: string) => {
+      const sessionId =
+        queueItemsRef.current.find((item) => item.id === itemId)?.sessionId ?? null;
+
       uploadAbortControllersRef.current.get(itemId)?.abort();
       uploadAbortControllersRef.current.delete(itemId);
       startedUploadsRef.current.delete(itemId);
 
       setQueueItems((items) => items.filter((item) => item.id !== itemId));
 
+      if (sessionId) {
+        void endpoints.cancelSession(sessionId).catch(() => {});
+      }
+
       if (storageKey) {
         void QueuedFileStorage.deleteFile(storageKey, itemId).catch(() => {});
       }
     },
-    [storageKey]
+    [endpoints, storageKey]
   );
 
   return {
