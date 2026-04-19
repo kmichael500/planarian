@@ -19,6 +19,10 @@ import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FileAccessUrlVm } from "../../Files/Services/FileService";
+import {
+  CreateImportFileUploadSessionRequest,
+  ImportFileUploadSession,
+} from "../../Import/Models/ImportFileUploadSession";
 
 const baseUrl = "api/account";
 const AccountService = {
@@ -178,6 +182,52 @@ const AccountService = {
       config
     );
     return response.data;
+  },
+  async CreateImportFileUploadSession(
+    request: CreateImportFileUploadSessionRequest
+  ): Promise<ImportFileUploadSession> {
+    const response = await HttpClient.post<ImportFileUploadSession>(
+      `${baseUrl}/import/file/session`,
+      request
+    );
+    return response.data;
+  },
+  async UploadImportFileChunk(
+    sessionId: string,
+    chunk: Blob,
+    chunkIndex: number,
+    offset: number,
+    onProgress: (progressEvent: AxiosProgressEvent) => void,
+    signal?: AbortSignal
+  ): Promise<ImportFileUploadSession> {
+    const response = await HttpClient.put<ImportFileUploadSession>(
+      `${baseUrl}/import/file/session/${sessionId}?chunkIndex=${chunkIndex}&offset=${offset}`,
+      chunk,
+      {
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+        onUploadProgress: onProgress,
+        signal,
+      }
+    );
+    return response.data;
+  },
+  async FinalizeImportFileUploadSession(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<FileImportResult> {
+    const response = await HttpClient.post<FileImportResult>(
+      `${baseUrl}/import/file/session/${sessionId}/finalize`,
+      {},
+      {
+        signal,
+      }
+    );
+    return response.data;
+  },
+  async CancelImportFileUploadSession(sessionId: string): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/import/file/session/${sessionId}`);
   },
   //#endregion
 

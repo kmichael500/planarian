@@ -22,6 +22,7 @@ import {
   RedoOutlined,
 } from "@ant-design/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import Papa from "papaparse";
 import "./ImportComponent.scss";
 import { CSVDisplay } from "../../Files/Components/CsvDisplayComponent";
@@ -35,10 +36,13 @@ import { FileImportResult } from "../Models/FileUploadresult";
 import { ImportQueueStorage } from "../Services/ImportQueueStorage";
 
 const MAX_FILE_SIZE_MB = 500;
-const DEFAULT_UPLOAD_CONCURRENCY = 1;
+const MAX_UPLOAD_CONCURRENCY_WEIGHT = 3;
 const MAX_RETRY_COUNT = 5;
-const DISPATCH_DELAY_MS = 1000;
+const DISPATCH_DELAY_MS = 0;
 const RECENT_ACTIVITY_LIMIT = 12;
+const FILE_UPLOAD_CHUNK_SIZE = 32 * 1024 * 1024;
+const SMALL_FILE_CONCURRENCY_THRESHOLD_MB = 30;
+const LARGE_FILE_CONCURRENCY_THRESHOLD_MB = 100;
 const FILE_PREPARATION_BATCH_SIZE = 100;
 const FILE_PREPARATION_PROGRESS_STEP = 25;
 const FILE_RESET_PROGRESS_STEP = 25;
@@ -87,14 +91,33 @@ interface ImportQueueItem {
   isRetryable: boolean;
   requestId?: string | null;
   result?: FileImportResult | null;
+  sessionId?: string | null;
+  uploadedBytes?: number;
+  liveUploadedBytes?: number;
+  displayUploadedBytes?: number;
+  totalBytes?: number;
+  isCurrentUploadSlot?: boolean;
+  transportStatus?: "chunk_uploading" | "finalizing" | null;
   file?: File | null;
 }
 
-interface PersistedImportQueueItem extends Omit<ImportQueueItem, "file"> { }
+interface PersistedImportQueueItem
+  extends Omit<
+    ImportQueueItem,
+    | "file"
+    | "sessionId"
+    | "uploadedBytes"
+    | "liveUploadedBytes"
+    | "displayUploadedBytes"
+    | "totalBytes"
+    | "isCurrentUploadSlot"
+    | "transportStatus"
+  > { }
 
 interface PersistedImportQueueState {
   version: number;
   isPaused: boolean;
+  hasStartedUploadRun?: boolean;
   items: PersistedImportQueueItem[];
 }
 
@@ -129,10 +152,264 @@ const createSettingsStorageKey = (accountId: string) =>
 const isTerminalStatus = (status: ImportQueueItemStatus) =>
   status === "uploaded" || status === "failed" || status === "canceled";
 
+const getPositiveNumber = (...values: Array<number | undefined | null>) =>
+  values.find((value): value is number => typeof value === "number" && value > 0) ??
+  0;
+
 const canStartUpload = (item: ImportQueueItem, now: number) =>
   (item.status === "queued" ||
     (item.status === "retry_wait" && (item.retryAt ?? 0) <= now)) &&
   !!item.file;
+
+const getDisplayTotalBytes = (item: ImportQueueItem) => {
+  return getPositiveNumber(item.totalBytes, item.size, item.file?.size);
+};
+
+const getAcknowledgedUploadedBytes = (item: ImportQueueItem) => {
+  const totalBytes = getDisplayTotalBytes(item);
+  if (totalBytes <= 0) {
+    return 0;
+  }
+
+  if (typeof item.uploadedBytes !== "number" || item.uploadedBytes <= 0) {
+    return 0;
+  }
+
+  return Math.min(item.uploadedBytes, totalBytes);
+};
+
+const hasPartialUploadProgress = (item: ImportQueueItem) => {
+  const totalBytes = getDisplayTotalBytes(item);
+  const uploadedBytes = getAcknowledgedUploadedBytes(item);
+
+  return totalBytes > 0 && uploadedBytes > 0 && uploadedBytes < totalBytes;
+};
+
+const getStoredVisualUploadedBytes = (item: ImportQueueItem, totalBytes: number) => {
+  if (totalBytes <= 0) {
+    return 0;
+  }
+
+  const storedDisplayBytes =
+    typeof item.displayUploadedBytes === "number" && item.displayUploadedBytes > 0
+      ? item.displayUploadedBytes
+      : 0;
+  const liveBytes =
+    typeof item.liveUploadedBytes === "number" && item.liveUploadedBytes > 0
+      ? item.liveUploadedBytes
+      : 0;
+  const progressBytes =
+    typeof item.progress === "number" && item.progress > 0
+      ? Math.round((totalBytes * item.progress) / 100)
+      : 0;
+
+  return Math.min(totalBytes, Math.max(storedDisplayBytes, liveBytes, progressBytes));
+};
+
+const getUploadDisplayState = (item: ImportQueueItem) => {
+  const totalBytes = getDisplayTotalBytes(item);
+  const acknowledgedBytes =
+    item.status === "uploaded" ? totalBytes : getAcknowledgedUploadedBytes(item);
+  const liveUploadedBytes =
+    item.status === "uploaded"
+      ? totalBytes
+      : Math.max(acknowledgedBytes, getStoredVisualUploadedBytes(item, totalBytes));
+  const displayUploadedBytes =
+    item.status === "uploaded"
+      ? totalBytes
+      : Math.max(acknowledgedBytes, liveUploadedBytes);
+  const acknowledgedPercent = toProgressPercent(acknowledgedBytes, totalBytes);
+  const rawDisplayPercent = toProgressPercent(displayUploadedBytes, totalBytes);
+  const displayPercent =
+    item.status === "uploaded"
+      ? 100
+      : displayUploadedBytes > 0
+        ? Math.min(99, Math.max(1, rawDisplayPercent))
+        : 0;
+  const hasProgress = displayUploadedBytes > 0 && totalBytes > 0;
+
+  return {
+    totalBytes,
+    acknowledgedBytes,
+    liveUploadedBytes,
+    displayUploadedBytes,
+    acknowledgedPercent,
+    displayPercent,
+    hasProgress,
+    sizeLabel: formatFileSize(totalBytes),
+  };
+};
+
+const getDisplayProgressPercent = (item: ImportQueueItem) => {
+  if (item.status === "uploaded") {
+    return 100;
+  }
+
+  return getUploadDisplayState(item).displayPercent;
+};
+
+const isPausedCurrentSlotItem = (item: ImportQueueItem) =>
+  (item.status === "queued" || item.status === "retry_wait") &&
+  !!item.isCurrentUploadSlot;
+
+const getUploadWeight = (size: number) => {
+  const sizeInMb = size / 1024 / 1024;
+  if (sizeInMb > LARGE_FILE_CONCURRENCY_THRESHOLD_MB) {
+    return 3;
+  }
+
+  if (sizeInMb > SMALL_FILE_CONCURRENCY_THRESHOLD_MB) {
+    return 2;
+  }
+
+  return 1;
+};
+
+const sortQueueItemsByAddedOrder = (items: ImportQueueItem[]) =>
+  [...items].sort(
+    (left, right) =>
+      left.addedOn.localeCompare(right.addedOn) ||
+      left.id.localeCompare(right.id)
+  );
+
+const uniqueQueueItemsById = (items: ImportQueueItem[]) => {
+  const seenIds = new Set<string>();
+  return items.filter((item) => {
+    if (seenIds.has(item.id)) {
+      return false;
+    }
+
+    seenIds.add(item.id);
+    return true;
+  });
+};
+
+const deriveOrderedQueueView = (items: ImportQueueItem[], now: number) => {
+  const orderedItems = sortQueueItemsByAddedOrder(items);
+  const activeItems = orderedItems.filter((item) => item.status === "uploading");
+  const activeWeight = activeItems.reduce(
+    (sum, item) => sum + getUploadWeight(getDisplayTotalBytes(item)),
+    0
+  );
+  let remainingWeightBudget = Math.max(
+    0,
+    MAX_UPLOAD_CONCURRENCY_WEIGHT - activeWeight
+  );
+
+  const pausedResumableItems = orderedItems.filter(
+    (item) =>
+      (item.status === "queued" || item.status === "retry_wait") &&
+      (isPausedCurrentSlotItem(item) || hasPartialUploadProgress(item))
+  );
+  const readyQueuedItems = orderedItems.filter(
+    (item) =>
+      (item.status === "queued" || item.status === "retry_wait") &&
+      !isPausedCurrentSlotItem(item) &&
+      !hasPartialUploadProgress(item)
+  );
+  const runnableCandidates = orderedItems.filter(
+    (item) =>
+      item.status === "queued" ||
+      (item.status === "retry_wait" && (item.retryAt ?? 0) <= now)
+  );
+  const runnableItems: ImportQueueItem[] = [];
+  for (const item of runnableCandidates) {
+    if (!canStartUpload(item, now)) {
+      continue;
+    }
+
+    const itemWeight = getUploadWeight(getDisplayTotalBytes(item));
+    if (itemWeight > remainingWeightBudget) {
+      break;
+    }
+
+    runnableItems.push(item);
+    remainingWeightBudget -= itemWeight;
+
+    if (remainingWeightBudget <= 0) {
+      break;
+    }
+  }
+
+  const visibleCurrentReadyItems = readyQueuedItems.slice(0, runnableItems.length);
+  const visibleCurrentItems = uniqueQueueItemsById([
+    ...activeItems,
+    ...pausedResumableItems,
+    ...visibleCurrentReadyItems,
+  ]);
+  const visibleCurrentItemIds = new Set(visibleCurrentItems.map((item) => item.id));
+  const waitingItems = orderedItems.filter(
+    (item) =>
+      (item.status === "queued" || item.status === "retry_wait") &&
+      !visibleCurrentItemIds.has(item.id)
+  );
+
+  return {
+    orderedItems,
+    runnableItems,
+    activeItems,
+    pausedResumableItems,
+    readyQueuedItems,
+    currentUploadItems: visibleCurrentItems,
+    waitingUploadItems: waitingItems,
+  };
+};
+
+const deriveOrderedQueueDisplayView = (items: ImportQueueItem[]) => {
+  const orderedItems = sortQueueItemsByAddedOrder(items);
+  const activeItems = orderedItems.filter((item) => item.status === "uploading");
+  const pausedResumableItems = orderedItems.filter(
+    (item) =>
+      (item.status === "queued" || item.status === "retry_wait") &&
+      (isPausedCurrentSlotItem(item) || hasPartialUploadProgress(item))
+  );
+  const currentSlotWeight = [...activeItems, ...pausedResumableItems].reduce(
+    (sum, item) => sum + getUploadWeight(getDisplayTotalBytes(item)),
+    0
+  );
+  let remainingWeightBudget = Math.max(
+    0,
+    MAX_UPLOAD_CONCURRENCY_WEIGHT - currentSlotWeight
+  );
+
+  const readyQueuedItems = orderedItems.filter(
+    (item) =>
+      (item.status === "queued" || item.status === "retry_wait") &&
+      !isPausedCurrentSlotItem(item) &&
+      !hasPartialUploadProgress(item)
+  );
+  const visibleCurrentReadyItems: ImportQueueItem[] = [];
+  for (const item of readyQueuedItems) {
+    const itemWeight = getUploadWeight(getDisplayTotalBytes(item));
+    if (itemWeight > remainingWeightBudget) {
+      break;
+    }
+
+    visibleCurrentReadyItems.push(item);
+    remainingWeightBudget -= itemWeight;
+
+    if (remainingWeightBudget <= 0) {
+      break;
+    }
+  }
+
+  const currentUploadItems = uniqueQueueItemsById([
+    ...activeItems,
+    ...pausedResumableItems,
+    ...visibleCurrentReadyItems,
+  ]);
+  const currentItemIds = new Set(currentUploadItems.map((item) => item.id));
+
+  return {
+    orderedItems,
+    currentUploadItems,
+    waitingUploadItems: orderedItems.filter(
+      (item) =>
+        (item.status === "queued" || item.status === "retry_wait") &&
+        !currentItemIds.has(item.id)
+    ),
+  };
+};
 
 const formatFileSize = (bytes: number) =>
   `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -223,6 +500,23 @@ const normalizeUploadError = (error: unknown): UploadFailureDetails => {
   };
 };
 
+const isAbortLikeError = (error: unknown) => {
+  if (axios.isCancel(error)) {
+    return true;
+  }
+
+  const candidate = error as
+    | { code?: string; name?: string; message?: string }
+    | undefined;
+
+  return (
+    candidate?.code === "ERR_CANCELED" ||
+    candidate?.name === "CanceledError" ||
+    candidate?.name === "AbortError" ||
+    candidate?.message === "canceled"
+  );
+};
+
 const serializeQueueItem = (
   item: ImportQueueItem
 ): PersistedImportQueueItem => ({
@@ -233,7 +527,7 @@ const serializeQueueItem = (
   lastModified: item.lastModified,
   addedOn: item.addedOn,
   status: item.status,
-  progress: item.progress,
+  progress: getUploadDisplayState(item).displayPercent,
   retryCount: item.retryCount,
   retryAt: item.retryAt ?? null,
   lastError: item.lastError ?? null,
@@ -248,6 +542,80 @@ const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
   });
+};
+
+const normalizeQueueItem = (item: ImportQueueItem): ImportQueueItem => {
+  const normalizedSize = getPositiveNumber(item.size, item.totalBytes, item.file?.size);
+  const normalizedTotalBytes = getPositiveNumber(
+    item.totalBytes,
+    item.size,
+    item.file?.size
+  );
+  const normalizedUploadedBytes =
+    typeof item.uploadedBytes === "number" && item.uploadedBytes > 0
+      ? Math.min(item.uploadedBytes, normalizedTotalBytes)
+      : 0;
+  const normalizedLiveUploadedBytes =
+    typeof item.liveUploadedBytes === "number" && item.liveUploadedBytes > 0
+      ? Math.min(item.liveUploadedBytes, normalizedTotalBytes)
+      : 0;
+  const normalizedDisplayUploadedBytes =
+    typeof item.displayUploadedBytes === "number" &&
+      item.displayUploadedBytes > 0
+      ? Math.min(item.displayUploadedBytes, normalizedTotalBytes)
+      : 0;
+
+  return {
+    ...item,
+    size: normalizedSize,
+    totalBytes: normalizedTotalBytes,
+    uploadedBytes: normalizedUploadedBytes,
+    liveUploadedBytes: Math.max(normalizedUploadedBytes, normalizedLiveUploadedBytes),
+    displayUploadedBytes: Math.max(
+      normalizedUploadedBytes,
+      normalizedDisplayUploadedBytes
+    ),
+  };
+};
+
+const getSafeTotalBytes = (item: ImportQueueItem, fallbackBytes: number) => {
+  const normalizedBytes = getDisplayTotalBytes(item);
+  if (normalizedBytes > 0) {
+    return normalizedBytes;
+  }
+
+  return Math.max(0, fallbackBytes);
+};
+
+const toProgressPercent = (uploadedBytes: number, totalBytes: number) => {
+  if (totalBytes <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round((100 * uploadedBytes) / totalBytes)));
+};
+
+const getSmoothedDisplayBytes = (
+  currentDisplayBytes: number,
+  targetDisplayBytes: number,
+  totalBytes: number
+) => {
+  if (totalBytes <= 0) {
+    return 0;
+  }
+
+  const safeCurrent = Math.min(totalBytes, Math.max(0, currentDisplayBytes));
+  const safeTarget = Math.min(totalBytes, Math.max(safeCurrent, targetDisplayBytes));
+  const remainingBytes = safeTarget - safeCurrent;
+  if (remainingBytes <= 0) {
+    return safeCurrent;
+  }
+
+  const minimumStepBytes = Math.min(512 * 1024, Math.max(64 * 1024, totalBytes * 0.005));
+  return Math.min(
+    safeTarget,
+    safeCurrent + Math.max(minimumStepBytes, remainingBytes * 0.45)
+  );
 };
 
 const createCsvRow = (item: ImportQueueItem): FileImportResult => ({
@@ -270,6 +638,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const [inputsConfirmed, setInputsConfirmed] = useState(false);
   const [queueItems, setQueueItems] = useState<ImportQueueItem[]>([]);
   const [isPaused, setIsPaused] = useState(true);
+  const [hasStartedUploadRun, setHasStartedUploadRun] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [hasHydratedQueueState, setHasHydratedQueueState] = useState(false);
   const [isResettingQueue, setIsResettingQueue] = useState(false);
@@ -288,6 +657,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const nextDispatchAllowedAtRef = useRef<number>(0);
   const runnerTimerRef = useRef<number | null>(null);
   const hasNotifiedCompletionRef = useRef(false);
+  const isPausedRef = useRef(true);
   const uploadAbortControllersRef = useRef<Map<string, AbortController>>(
     new Map()
   );
@@ -438,6 +808,10 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   }, [queueItems]);
 
   useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
     return () => {
       if (runnerTimerRef.current !== null) {
         window.clearTimeout(runnerTimerRef.current);
@@ -451,12 +825,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   }, []);
 
   const persistQueueState = useCallback(
-    (items: ImportQueueItem[], paused: boolean) => {
+    (items: ImportQueueItem[], paused: boolean, started: boolean) => {
       if (!queueStorageKey) return;
 
       const payload: PersistedImportQueueState = {
         version: LOCAL_STORAGE_VERSION,
         isPaused: paused,
+        hasStartedUploadRun: started,
         items: items.map(serializeQueueItem),
       };
 
@@ -467,9 +842,10 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
 
   useEffect(() => {
     if (!queueStorageKey || isRestoring || !hasHydratedQueueState) return;
-    persistQueueState(queueItems, isPaused);
+    persistQueueState(queueItems, isPaused, hasStartedUploadRun);
   }, [
     hasHydratedQueueState,
+    hasStartedUploadRun,
     isRestoring,
     isPaused,
     persistQueueState,
@@ -484,11 +860,25 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     try {
       await waitForNextPaint();
 
+      const sessionIds = Array.from(
+        new Set(
+          queueItemsRef.current
+            .map((item) => item.sessionId)
+            .filter((sessionId): sessionId is string => !!sessionId)
+        )
+      );
+
       startedUploadsRef.current.clear();
       uploadAbortControllersRef.current.forEach((controller) =>
         controller.abort()
       );
       uploadAbortControllersRef.current.clear();
+
+      await Promise.allSettled(
+        sessionIds.map((sessionId) =>
+          AccountService.CancelImportFileUploadSession(sessionId)
+        )
+      );
 
       if (queueStorageKey) {
         localStorage.removeItem(queueStorageKey);
@@ -499,6 +889,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       nextDispatchAllowedAtRef.current = 0;
       setQueueItems([]);
       setIsPaused(true);
+      setHasStartedUploadRun(false);
       setHasHydratedQueueState(true);
       hasNotifiedCompletionRef.current = false;
       setInputsConfirmed(false);
@@ -520,6 +911,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       if (!serialized) {
         setQueueItems([]);
         setIsPaused(true);
+        setHasStartedUploadRun(false);
         return;
       }
 
@@ -534,7 +926,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           }
 
           if (!file && shouldRestoreFile) {
-            return {
+            return normalizeQueueItem({
               ...item,
               status: "canceled" as const,
               progress: 0,
@@ -544,26 +936,49 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                 "The queued file could not be restored after refresh. Re-add it to continue.",
               isRetryable: false,
               file: null,
-            };
+              sessionId: null,
+              uploadedBytes: 0,
+              liveUploadedBytes: 0,
+              displayUploadedBytes: 0,
+              totalBytes: getPositiveNumber(item.size),
+              isCurrentUploadSlot: false,
+              transportStatus: null,
+            });
           }
 
-          return {
+          return normalizeQueueItem({
             ...item,
             status:
               item.status === "uploading"
                 ? ("queued" as const)
                 : item.status,
+            progress:
+              item.status === "uploading"
+                ? 0
+                : item.progress,
             retryAt: item.retryAt ?? null,
+            sessionId: null,
+            uploadedBytes: 0,
+            liveUploadedBytes: 0,
+            displayUploadedBytes: 0,
+            totalBytes: getPositiveNumber(file?.size, item.size),
+            isCurrentUploadSlot: false,
+            transportStatus: null,
             file,
-          };
+          });
         })
       );
 
       setQueueItems(restoredItems);
       setIsPaused(persisted.isPaused ?? true);
+      setHasStartedUploadRun(
+        persisted.hasStartedUploadRun ??
+        restoredItems.some((item) => item.status !== "queued")
+      );
     } catch {
       setQueueItems([]);
       setIsPaused(true);
+      setHasStartedUploadRun(false);
     } finally {
       setIsRestoring(false);
       setHasHydratedQueueState(true);
@@ -583,7 +998,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       const current = queueItemsRef.current.find((item) => item.id === itemId);
       if (!current) return null;
 
-      const nextItem = update(current);
+      const nextItem = normalizeQueueItem(update(current));
       setQueueItems((items) =>
         items.map((item) => (item.id === itemId ? nextItem : item))
       );
@@ -626,45 +1041,199 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           lastError:
             "The queued file is no longer available. Re-add it to continue.",
           isRetryable: false,
+          isCurrentUploadSlot: false,
           file: null,
         }));
         startedUploadsRef.current.delete(itemId);
         return;
       }
 
+      const fileToUpload = file;
+
       updateQueueItem(itemId, (current) => ({
         ...current,
         status: "uploading",
-        progress: Math.max(current.progress, 1),
+        progress: Math.max(getUploadDisplayState(current).displayPercent, 1),
         retryAt: null,
         lastError: null,
-        file,
+        file: fileToUpload,
+        uploadedBytes: current.uploadedBytes ?? 0,
+        liveUploadedBytes: Math.max(
+          current.uploadedBytes ?? 0,
+          current.liveUploadedBytes ?? 0
+        ),
+        displayUploadedBytes: Math.max(
+          current.uploadedBytes ?? 0,
+          current.displayUploadedBytes ?? 0
+        ),
+        totalBytes: getSafeTotalBytes(current, fileToUpload.size),
+        isCurrentUploadSlot: true,
+        transportStatus: current.transportStatus ?? "chunk_uploading",
       }));
 
-      const fileToUpload = file;
-      const abortController = new AbortController();
-      uploadAbortControllersRef.current.set(itemId, abortController);
-
       try {
-        const result = await AccountService.ImportFile(
-          fileToUpload,
-          itemId,
-          confirmedSettings.delimiter,
-          confirmedSettings.idRegex,
-          confirmedSettings.ignoreDuplicates,
-          (event) => {
-            const totalBytes = event.total || fileToUpload.size || 1;
-            const percent = Math.min(
-              99,
-              Math.max(1, Math.round((100 * event.loaded) / totalBytes))
-            );
+        let currentItem =
+          queueItemsRef.current.find((candidate) => candidate.id === itemId) ??
+          item;
+        let sessionId = currentItem.sessionId ?? null;
+        let uploadedBytes = currentItem.uploadedBytes ?? 0;
 
+        if (!sessionId) {
+          const session = await AccountService.CreateImportFileUploadSession({
+            fileName: fileToUpload.name,
+            fileSize: fileToUpload.size,
+            delimiterRegex: confirmedSettings.delimiter,
+            idRegex: confirmedSettings.idRegex,
+            ignoreDuplicates: confirmedSettings.ignoreDuplicates,
+            requestId: itemId,
+          });
+
+          sessionId = session.sessionId;
+          uploadedBytes = session.uploadedBytes;
+
+          updateQueueItem(itemId, (current) => ({
+            ...current,
+            sessionId,
+            uploadedBytes,
+            liveUploadedBytes: Math.max(uploadedBytes, current.liveUploadedBytes ?? 0),
+            displayUploadedBytes: Math.max(
+              uploadedBytes,
+              current.displayUploadedBytes ?? 0
+            ),
+            totalBytes: session.totalBytes,
+            progress: Math.max(getUploadDisplayState(current).displayPercent, 1),
+            isCurrentUploadSlot: true,
+            transportStatus: "chunk_uploading",
+          }));
+        }
+
+        while (uploadedBytes < fileToUpload.size) {
+          if (isPausedRef.current) {
             updateQueueItem(itemId, (current) => ({
               ...current,
-              progress: percent,
+              status: "queued",
+              progress: getUploadDisplayState(current).displayPercent,
+              isCurrentUploadSlot: true,
+              transportStatus: null,
+              file: fileToUpload,
             }));
-          },
-          abortController.signal
+            return;
+          }
+
+          const offset = uploadedBytes;
+          const chunkIndex = Math.floor(offset / FILE_UPLOAD_CHUNK_SIZE);
+          const chunk = fileToUpload.slice(
+            offset,
+            Math.min(offset + FILE_UPLOAD_CHUNK_SIZE, fileToUpload.size)
+          );
+          let lastProgressUpdateAt = 0;
+          const abortController = new AbortController();
+          uploadAbortControllersRef.current.set(itemId, abortController);
+
+          const chunkResult = await AccountService.UploadImportFileChunk(
+            sessionId,
+            chunk,
+            chunkIndex,
+            offset,
+            (event) => {
+              const now = Date.now();
+              if (
+                event.loaded < chunk.size &&
+                now - lastProgressUpdateAt < 100
+              ) {
+                return;
+              }
+
+              lastProgressUpdateAt = now;
+              const chunkBytes = chunk.size || 1;
+              const loaded = Math.min(event.loaded, chunkBytes);
+              const overallUploaded = Math.min(
+                fileToUpload.size,
+                offset + loaded
+              );
+
+              updateQueueItem(itemId, (current) => ({
+                ...current,
+                ...(() => {
+                  const nextDisplayUploadedBytes = getSmoothedDisplayBytes(
+                    current.displayUploadedBytes ?? current.uploadedBytes ?? 0,
+                    overallUploaded,
+                    fileToUpload.size
+                  );
+
+                  return {
+                    liveUploadedBytes: Math.max(
+                      current.uploadedBytes ?? 0,
+                      overallUploaded
+                    ),
+                    displayUploadedBytes: nextDisplayUploadedBytes,
+                    progress: toProgressPercent(
+                      nextDisplayUploadedBytes,
+                      fileToUpload.size
+                    ),
+                  };
+                })(),
+                totalBytes: getSafeTotalBytes(current, fileToUpload.size),
+                isCurrentUploadSlot: true,
+                transportStatus: "chunk_uploading",
+              }));
+            },
+            abortController.signal
+          );
+
+          uploadedBytes = chunkResult.uploadedBytes;
+          updateQueueItem(itemId, (current) => ({
+            ...current,
+            sessionId: chunkResult.sessionId,
+            uploadedBytes: chunkResult.uploadedBytes,
+            liveUploadedBytes: Math.max(
+              chunkResult.uploadedBytes,
+              current.liveUploadedBytes ?? 0
+            ),
+            displayUploadedBytes: Math.max(
+              chunkResult.uploadedBytes,
+              current.displayUploadedBytes ?? 0
+            ),
+            totalBytes: chunkResult.totalBytes,
+            progress: toProgressPercent(
+              Math.max(chunkResult.uploadedBytes, current.displayUploadedBytes ?? 0),
+              chunkResult.totalBytes
+            ),
+            isCurrentUploadSlot: true,
+            transportStatus: "chunk_uploading",
+          }));
+
+          uploadAbortControllersRef.current.delete(itemId);
+        }
+
+        if (isPausedRef.current) {
+          updateQueueItem(itemId, (current) => ({
+            ...current,
+            status: "queued",
+            progress: getUploadDisplayState(current).displayPercent,
+            isCurrentUploadSlot: true,
+            transportStatus: null,
+            file: fileToUpload,
+          }));
+          return;
+        }
+
+        updateQueueItem(itemId, (current) => ({
+          ...current,
+          transportStatus: "finalizing",
+          uploadedBytes: fileToUpload.size,
+          liveUploadedBytes: fileToUpload.size,
+          displayUploadedBytes: fileToUpload.size,
+          totalBytes: fileToUpload.size,
+          isCurrentUploadSlot: true,
+          progress: 99,
+        }));
+
+        const finalizeAbortController = new AbortController();
+        uploadAbortControllersRef.current.set(itemId, finalizeAbortController);
+        const result = await AccountService.FinalizeImportFileUploadSession(
+          sessionId,
+          finalizeAbortController.signal
         );
 
         await ImportQueueStorage.deleteFile(queueStorageKey, itemId);
@@ -680,10 +1249,61 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           isRetryable: false,
           requestId: result.requestId ?? null,
           result,
+          sessionId: null,
+          uploadedBytes: fileToUpload.size,
+          liveUploadedBytes: fileToUpload.size,
+          displayUploadedBytes: fileToUpload.size,
+          totalBytes: fileToUpload.size,
+          isCurrentUploadSlot: false,
+          transportStatus: null,
           file: null,
         }));
       } catch (error) {
-        if (abortController.signal.aborted) {
+        const currentItem =
+          queueItemsRef.current.find((candidate) => candidate.id === itemId) ??
+          item;
+        const currentSessionId = currentItem.sessionId ?? null;
+
+        if (
+          uploadAbortControllersRef.current.get(itemId)?.signal.aborted ||
+          isAbortLikeError(error)
+        ) {
+          const preservedUploadedBytes = currentItem.uploadedBytes ?? 0;
+          updateQueueItem(itemId, (current) => ({
+            ...current,
+            status: "queued",
+            progress: getUploadDisplayState(current).displayPercent,
+            retryAt: null,
+            lastError: null,
+            failureCode: null,
+            isRetryable: false,
+            requestId: null,
+            result: null,
+            sessionId: current.sessionId ?? null,
+            uploadedBytes: preservedUploadedBytes,
+            liveUploadedBytes: Math.max(
+              preservedUploadedBytes,
+              current.liveUploadedBytes ?? 0
+            ),
+            displayUploadedBytes: Math.max(
+              preservedUploadedBytes,
+              current.displayUploadedBytes ?? 0
+            ),
+            totalBytes: getSafeTotalBytes(current, fileToUpload.size),
+            isCurrentUploadSlot: true,
+            transportStatus: null,
+            file: fileToUpload,
+          }));
+          return;
+        }
+
+        const failure = normalizeUploadError(error);
+        const nextRetryCount = currentItem.retryCount + 1;
+
+        if (
+          failure.failureCode === ApiExceptionType.NotFound &&
+          currentSessionId
+        ) {
           updateQueueItem(itemId, (current) => ({
             ...current,
             status: "queued",
@@ -694,16 +1314,17 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             isRetryable: false,
             requestId: null,
             result: null,
+            sessionId: null,
+            uploadedBytes: 0,
+            liveUploadedBytes: 0,
+            displayUploadedBytes: 0,
+            totalBytes: fileToUpload.size,
+            isCurrentUploadSlot: false,
+            transportStatus: null,
             file: fileToUpload,
           }));
           return;
         }
-
-        const failure = normalizeUploadError(error);
-        const currentItem =
-          queueItemsRef.current.find((candidate) => candidate.id === itemId) ??
-          item;
-        const nextRetryCount = currentItem.retryCount + 1;
 
         if (failure.isRetryable && nextRetryCount <= MAX_RETRY_COUNT) {
           const delayMs = buildRetryDelayMs(
@@ -722,6 +1343,19 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             isRetryable: true,
             requestId: failure.requestId ?? null,
             result: null,
+            sessionId: current.sessionId ?? null,
+            uploadedBytes: current.uploadedBytes ?? 0,
+            liveUploadedBytes: Math.max(
+              current.uploadedBytes ?? 0,
+              current.liveUploadedBytes ?? 0
+            ),
+            displayUploadedBytes: Math.max(
+              current.uploadedBytes ?? 0,
+              current.displayUploadedBytes ?? 0
+            ),
+            totalBytes: getSafeTotalBytes(current, fileToUpload.size),
+            isCurrentUploadSlot: false,
+            transportStatus: null,
             file: fileToUpload,
           }));
         } else {
@@ -744,6 +1378,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
               isRetryable: failure.isRetryable,
               requestId: failure.requestId ?? null,
             },
+            sessionId: null,
+            uploadedBytes: 0,
+            liveUploadedBytes: 0,
+            displayUploadedBytes: 0,
+            totalBytes: fileToUpload.size,
+            isCurrentUploadSlot: false,
+            transportStatus: null,
             file: fileToUpload,
           }));
         }
@@ -760,11 +1401,8 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   useEffect(() => {
     if (!queueStorageKey || !confirmedSettings || isPaused || isRestoring) return;
 
-    const activeUploads = queueItems.filter((item) => item.status === "uploading")
-      .length;
-    if (activeUploads >= DEFAULT_UPLOAD_CONCURRENCY) return;
-
     const now = Date.now();
+    const { runnableItems } = deriveOrderedQueueView(queueItems, now);
     const waitForDispatch = nextDispatchAllowedAtRef.current - now;
     if (waitForDispatch > 0) {
       scheduleRunner(waitForDispatch);
@@ -775,10 +1413,6 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       .filter((item) => item.status === "retry_wait" && item.retryAt)
       .map((item) => item.retryAt as number)
       .sort((left, right) => left - right)[0];
-
-    const runnableItems = queueItems
-      .filter((item) => canStartUpload(item, now))
-      .slice(0, DEFAULT_UPLOAD_CONCURRENCY - activeUploads);
 
     if (runnableItems.length === 0) {
       if (nextRetryAt && nextRetryAt > now) {
@@ -832,13 +1466,14 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
           : current
       );
 
-      const newItems = validFiles.map<ImportQueueItem>((file) => ({
+      const addedAt = Date.now();
+      const newItems = validFiles.map<ImportQueueItem>((file, index) => ({
         id: createQueueItemId(),
         fileName: file.name,
         size: file.size,
         type: file.type,
         lastModified: file.lastModified,
-        addedOn: new Date().toISOString(),
+        addedOn: new Date(addedAt + index).toISOString(),
         status: "queued",
         progress: 0,
         retryCount: 0,
@@ -849,6 +1484,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         isRetryable: false,
         requestId: null,
         result: null,
+        sessionId: null,
+        uploadedBytes: 0,
+        liveUploadedBytes: 0,
+        displayUploadedBytes: 0,
+        totalBytes: file.size,
+        isCurrentUploadSlot: false,
+        transportStatus: null,
         file,
       }));
 
@@ -927,6 +1569,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
             isRetryable: false,
             requestId: null,
             result: null,
+            sessionId: null,
+            uploadedBytes: 0,
+            liveUploadedBytes: 0,
+            displayUploadedBytes: 0,
+            totalBytes: getPositiveNumber(item.file?.size, item.size),
+            isCurrentUploadSlot: false,
+            transportStatus: null,
           }
           : item
       )
@@ -995,44 +1644,29 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     return { uploaded, failed, canceled, uploading, queued, remaining };
   }, [queueItems]);
 
-  const activeItems = useMemo(
-    () =>
-      queueItems.filter(
-        (item) => item.status === "uploading" || item.status === "retry_wait"
-      ),
+  const orderedQueueView = useMemo(
+    () => deriveOrderedQueueDisplayView(queueItems),
     [queueItems]
   );
 
-  const uploadNowItems = useMemo(() => {
-    const uploadingItems = queueItems.filter((item) => item.status === "uploading");
-    const queuedItems = queueItems.filter((item) => item.status === "queued");
-    const retryWaitItems = queueItems.filter((item) => item.status === "retry_wait");
+  const currentUploadItems = useMemo(
+    () => orderedQueueView.currentUploadItems.slice(0, RECENT_ACTIVITY_LIMIT),
+    [orderedQueueView]
+  );
 
-    return [...uploadingItems, ...queuedItems, ...retryWaitItems].slice(
-      0,
-      RECENT_ACTIVITY_LIMIT
-    );
-  }, [queueItems]);
+  const waitingUploadItems = useMemo(
+    () =>
+      orderedQueueView.waitingUploadItems.slice(
+        0,
+        Math.max(0, RECENT_ACTIVITY_LIMIT - currentUploadItems.length)
+      ),
+    [currentUploadItems.length, orderedQueueView]
+  );
 
-  const { currentUploadItems, waitingUploadItems } = useMemo(() => {
-    const currentSlotCount = Math.max(
-      DEFAULT_UPLOAD_CONCURRENCY,
-      queueStats.uploading
-    );
-    const currentItems = uploadNowItems.filter(
-      (item, index) =>
-        item.status === "uploading" ||
-        (item.status === "queued" && index < currentSlotCount)
-    );
-    const waitingItems = uploadNowItems.filter(
-      (item) => !currentItems.some((currentItem) => currentItem.id === item.id)
-    );
-
-    return {
-      currentUploadItems: currentItems,
-      waitingUploadItems: waitingItems,
-    };
-  }, [queueStats.uploading, uploadNowItems]);
+  const uploadNowItems = useMemo(
+    () => [...currentUploadItems, ...waitingUploadItems],
+    [currentUploadItems, waitingUploadItems]
+  );
 
   const failedItems = useMemo(
     () =>
@@ -1059,19 +1693,27 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
   const aggregateProgress = useMemo(() => {
     if (queueItems.length === 0) return 0;
 
-    const totalBytes = queueItems.reduce((sum, item) => sum + item.size, 0);
+    const totalBytes = queueItems.reduce(
+      (sum, item) => sum + getUploadDisplayState(item).totalBytes,
+      0
+    );
     if (totalBytes === 0) return 0;
 
     const completedBytes = queueItems.reduce((sum, item) => {
-      if (item.status === "uploaded") return sum + item.size;
-      if (item.status === "uploading") {
-        return sum + (item.size * item.progress) / 100;
-      }
-
-      return sum;
+      const displayState = getUploadDisplayState(item);
+      return sum + displayState.displayUploadedBytes;
     }, 0);
 
-    return Math.min(100, Math.round((100 * completedBytes) / totalBytes));
+    if (completedBytes <= 0) {
+      return 0;
+    }
+
+    const rawPercent = (100 * completedBytes) / totalBytes;
+    if (rawPercent < 1) {
+      return 1;
+    }
+
+    return Math.min(100, Math.round(rawPercent));
   }, [queueItems]);
 
   const allWorkComplete =
@@ -1096,10 +1738,14 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     uploadAbortControllersRef.current.clear();
   }, []);
 
+  const startOrResumeUploads = useCallback(() => {
+    setHasStartedUploadRun(true);
+    setIsPaused(false);
+  }, []);
+
   const uploadControl = useMemo(() => {
     const canPause = !isPaused && queueStats.remaining > 0;
     const canStart = isPaused && queueStats.queued > 0;
-    const hasPriorActivity = queueStats.uploaded > 0 || failedItems.length > 0;
 
     if (canPause) {
       return {
@@ -1111,19 +1757,19 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     }
 
     return {
-      label: hasPriorActivity ? "Resume" : "Start Upload",
+      label: hasStartedUploadRun ? "Resume" : "Start Upload",
       icon: <PlayCircleOutlined />,
       disabled: isRestoring || !canStart,
-      onClick: () => setIsPaused(false),
+      onClick: startOrResumeUploads,
     };
   }, [
-    failedItems.length,
+    hasStartedUploadRun,
     isPaused,
     isRestoring,
     pauseUploads,
     queueStats.queued,
     queueStats.remaining,
-    queueStats.uploaded,
+    startOrResumeUploads,
   ]);
 
   return (
@@ -1450,7 +2096,9 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                       <div className="import-files-dashboard__current-list">
                         {currentUploadItems.map((item) => {
                           const isActive = item.status === "uploading";
-                          const progressPercent = isActive ? item.progress : 0;
+                          const displayState = getUploadDisplayState(item);
+                          const progressPercent = displayState.displayPercent;
+                          const hasDisplayProgress = displayState.hasProgress;
 
                           return (
                             <div
@@ -1473,7 +2121,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                                   : ""
                                   }`}
                               >
-                                {isActive && (
+                                {(isActive || hasDisplayProgress) && (
                                   <span
                                     className="import-files-dashboard__queue-progress-fill"
                                     style={{ width: `${progressPercent}%` }}
@@ -1481,11 +2129,13 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                                 )}
                                 <span className="import-files-dashboard__queue-progress-content">
                                   <span>
-                                    {isActive
+                                    {isActive || hasDisplayProgress
                                       ? `${progressPercent}%`
-                                      : formatFileSize(item.size)}
+                                      : displayState.sizeLabel}
                                   </span>
-                                  {isActive && <span>{formatFileSize(item.size)}</span>}
+                                  {(isActive || hasDisplayProgress) && (
+                                    <span>{displayState.sizeLabel}</span>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1500,6 +2150,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                           <div className="import-files-dashboard__waiting-list">
                             {waitingUploadItems.map((item) => {
                               const isRetrying = item.status === "retry_wait";
+                              const displayState = getUploadDisplayState(item);
 
                               return (
                                 <div
@@ -1515,7 +2166,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                                   </Typography.Text>
                                   <div className="import-files-dashboard__queue-progress">
                                     <span className="import-files-dashboard__queue-progress-content">
-                                      <span>{formatFileSize(item.size)}</span>
+                                      <span>{displayState.sizeLabel}</span>
                                     </span>
                                   </div>
                                   {isRetrying && item.retryAt && (
@@ -1585,7 +2236,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
                             <span>
                               {item.status === "uploaded" ? "Uploaded" : "Needs attention"}
                             </span>
-                            <span>{formatFileSize(item.size)}</span>
+                            <span>{getUploadDisplayState(item).sizeLabel}</span>
                           </span>
                         </div>
                         {item.associatedCave && (

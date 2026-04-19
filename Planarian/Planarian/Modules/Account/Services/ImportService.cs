@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Text;
+using Azure.Storage.Blobs.Specialized;
 using CsvHelper;
 using CsvHelper.Configuration;
 using EFCore.BulkExtensions;
@@ -16,6 +18,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.TemporaryEntities;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
+using Planarian.Modules.Account.Model;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
@@ -41,6 +44,7 @@ public class ImportService : ServiceBase
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
     private readonly ImportUploadAdmissionService _importUploadAdmissionService;
+    private readonly ImportFileUploadSessionService _importFileUploadSessionService;
 
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
@@ -50,7 +54,8 @@ public class ImportService : ServiceBase
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
         FileRepository<PlanarianDbContextBase> fileRepository,
-        ImportUploadAdmissionService importUploadAdmissionService) : base(requestUser)
+        ImportUploadAdmissionService importUploadAdmissionService,
+        ImportFileUploadSessionService importFileUploadSessionService) : base(requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
@@ -61,6 +66,7 @@ public class ImportService : ServiceBase
         _repository = caveRepository;
         _fileRepository = fileRepository;
         _importUploadAdmissionService = importUploadAdmissionService;
+        _importFileUploadSessionService = importFileUploadSessionService;
     }
 
     public async Task<FileVm> AddTemporaryFileForImport(Stream stream, string fileName, string? uuid,
@@ -1905,12 +1911,228 @@ public class ImportService : ServiceBase
             uuid ?? Guid.NewGuid().ToString("N"),
             cancellationToken);
 
+        return await ProcessFileImport(stream, fileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
+            cancellationToken);
+    }
+
+    public async Task<ImportFileUploadSessionVm> CreateFileUploadSession(
+        CreateImportFileUploadSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(request.FileName)) throw ApiExceptionDictionary.NullValue(nameof(request.FileName));
+        if (request.FileSize <= 0) throw ApiExceptionDictionary.BadRequest("File size must be greater than 0.");
+
+        var session = _importFileUploadSessionService.CreateSession(
+            RequestUser.AccountId,
+            RequestUser.AccountContainerName,
+            request);
+
+        return session.ToVm();
+    }
+
+    public async Task<ImportFileUploadSessionVm> UploadFileChunk(
+        string sessionId,
+        Stream chunkStream,
+        long offset,
+        int chunkIndex,
+        long contentLength,
+        CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+
+        var session = await GetRequiredUploadSession(sessionId);
+        await session.Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (session.CompletionResult != null)
+            {
+                return session.ToVm();
+            }
+
+            if (contentLength <= 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("Chunk content length must be greater than 0.");
+            }
+
+            if (offset < 0 || offset > session.FileSize)
+            {
+                throw ApiExceptionDictionary.BadRequest("Chunk offset is invalid.");
+            }
+
+            if (offset + contentLength > session.FileSize)
+            {
+                throw ApiExceptionDictionary.BadRequest("Chunk exceeds the expected file size.");
+            }
+
+            if (session.UploadedChunks.TryGetValue(chunkIndex, out var existingChunk))
+            {
+                if (existingChunk.Offset != offset || existingChunk.Length != contentLength)
+                {
+                    throw ApiExceptionDictionary.Conflict("Chunk metadata does not match the current upload session state.");
+                }
+
+                return session.ToVm();
+            }
+
+            if (chunkIndex != session.NextChunkIndex || offset != session.UploadedBytes)
+            {
+                throw ApiExceptionDictionary.Conflict("Chunk order does not match the current upload session state.");
+            }
+
+            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
+            var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
+            var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes(chunkIndex.ToString("D8")));
+            await using var bufferedChunkStream = new MemoryStream((int)contentLength);
+            try
+            {
+                await chunkStream.CopyToAsync(bufferedChunkStream, cancellationToken);
+                bufferedChunkStream.Position = 0;
+
+                await blockBlobClient.StageBlockAsync(
+                    blockId,
+                    bufferedChunkStream,
+                    cancellationToken: cancellationToken);
+            }
+            catch (IOException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            session.UploadedChunks[chunkIndex] = new ImportFileUploadChunkState
+            {
+                Offset = offset,
+                Length = contentLength,
+                BlockId = blockId,
+            };
+            session.UploadedBytes += contentLength;
+            session.NextChunkIndex += 1;
+            session.Status = session.UploadedBytes >= session.FileSize
+                ? ImportFileUploadSessionStatus.Uploaded
+                : ImportFileUploadSessionStatus.Uploading;
+            session.ExpiresOn = DateTimeOffset.UtcNow.AddHours(2);
+
+            return session.ToVm();
+        }
+        finally
+        {
+            session.Gate.Release();
+        }
+    }
+
+    public async Task<FileImportResult> FinalizeFileUploadSession(string sessionId, CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+
+        var session = await GetRequiredUploadSession(sessionId);
+        await session.Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (session.CompletionResult != null)
+            {
+                return session.CompletionResult;
+            }
+
+            if (session.UploadedBytes != session.FileSize || session.UploadedChunks.Count == 0)
+            {
+                throw ApiExceptionDictionary.BadRequest("The upload session is incomplete and cannot be finalized.");
+            }
+
+            session.Status = ImportFileUploadSessionStatus.Finalizing;
+
+            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
+            var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
+            await blockBlobClient.CommitBlockListAsync(
+                session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
+                cancellationToken: cancellationToken);
+
+            await using var admission = await _importUploadAdmissionService.AcquireAsync(
+                session.RequestId ?? session.SessionId,
+                cancellationToken);
+
+            var result = await ProcessStagedFileImport(
+                session.BlobKey,
+                session.FileName,
+                session.IdRegex,
+                session.DelimiterRegex,
+                session.IgnoreDuplicates,
+                session.RequestId ?? session.SessionId,
+                cancellationToken);
+
+            result.RequestId ??= session.RequestId ?? session.SessionId;
+            session.CompletionResult = result;
+            session.Status = ImportFileUploadSessionStatus.Completed;
+
+            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+            return result;
+        }
+        finally
+        {
+            session.Gate.Release();
+        }
+    }
+
+    public async Task CancelFileUploadSession(string sessionId, CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+
+        var session = await GetRequiredUploadSession(sessionId);
+        _importFileUploadSessionService.RemoveSession(sessionId);
+        await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+    }
+
+    private async Task<FileImportResult> ProcessFileImport(Stream stream, string fileName, string idRegex,
+        string delimiterRegex, bool ignoreDuplicates, string? requestId, CancellationToken cancellationToken)
+    {
+        var validation = await ValidateFileImport(
+            fileName,
+            idRegex,
+            delimiterRegex,
+            ignoreDuplicates,
+            requestId,
+            cancellationToken);
+        if (!validation.Result.IsSuccessful || string.IsNullOrWhiteSpace(validation.CaveId))
+        {
+            return validation.Result;
+        }
+
+        await _fileService.UploadCaveFile(stream, validation.CaveId, fileName, cancellationToken, requestId);
+
+        return validation.Result;
+    }
+
+    private async Task<FileImportResult> ProcessStagedFileImport(string stagedBlobKey, string fileName, string idRegex,
+        string delimiterRegex, bool ignoreDuplicates, string? requestId, CancellationToken cancellationToken)
+    {
+        var validation = await ValidateFileImport(
+            fileName,
+            idRegex,
+            delimiterRegex,
+            ignoreDuplicates,
+            requestId,
+            cancellationToken);
+        if (!validation.Result.IsSuccessful || string.IsNullOrWhiteSpace(validation.CaveId))
+        {
+            return validation.Result;
+        }
+
+        await _fileService.PublishStagedCaveFile(stagedBlobKey, validation.CaveId, fileName, cancellationToken,
+            requestId);
+
+        return validation.Result;
+    }
+
+    private async Task<(FileImportResult Result, string? CaveId)> ValidateFileImport(string fileName, string idRegex,
+        string delimiterRegex, bool ignoreDuplicates, string? requestId, CancellationToken cancellationToken)
+    {
         var result = new FileImportResult
         {
             FileName = fileName,
             IsSuccessful = true,
             IsRetryable = false,
-            RequestId = uuid,
+            RequestId = requestId,
         };
 
         CountyCaveInfo parsed;
@@ -1923,7 +2145,7 @@ public class ImportService : ServiceBase
             result.Message = e.Message;
             result.IsSuccessful = false;
             result.FailureCode = e.ErrorCode.ToString();
-            return result;
+            return (result, null);
         }
 
         var caveInformation =
@@ -1936,7 +2158,7 @@ public class ImportService : ServiceBase
                 $"Cave with county code {parsed.CountyCode} and number {parsed.CountyCaveNumber} does not exist for file '{fileName}'.";
             result.IsSuccessful = false;
             result.FailureCode = ApiExceptionType.NotFound.ToString();
-            return result;
+            return (result, null);
         }
         result.AssociatedCave = caveInformation.CaveName;
 
@@ -1948,13 +2170,36 @@ public class ImportService : ServiceBase
                 result.Message = $"File already exists for cave '{caveInformation.CaveName}'.";
                 result.IsSuccessful = false;
                 result.FailureCode = ApiExceptionType.Conflict.ToString();
-                return result;
+                return (result, null);
             }
         }
 
-        await _fileService.UploadCaveFile(stream, caveInformation.CaveId, fileName, cancellationToken, uuid);
+        return (result, caveInformation.CaveId);
+    }
 
-        return result;
+    private async Task<ImportFileUploadSessionState> GetRequiredUploadSession(string sessionId)
+    {
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(sessionId)) throw ApiExceptionDictionary.NullValue(nameof(sessionId));
+
+        var session = _importFileUploadSessionService.GetSession(sessionId) ??
+                      throw ApiExceptionDictionary.NotFound("Upload session");
+
+        if (!string.Equals(session.AccountId, RequestUser.AccountId, StringComparison.Ordinal))
+        {
+            throw ApiExceptionDictionary.NotFound("Upload session");
+        }
+
+        return session;
+    }
+
+    private async Task CleanupExpiredUploadSessions(CancellationToken cancellationToken)
+    {
+        var expiredSessions = _importFileUploadSessionService.RemoveExpiredSessions();
+        foreach (var session in expiredSessions)
+        {
+            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+        }
     }
 
     public class CountyCaveInfo
