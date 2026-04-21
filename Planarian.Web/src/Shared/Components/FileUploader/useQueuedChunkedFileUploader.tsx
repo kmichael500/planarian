@@ -38,6 +38,11 @@ interface PersistedQueueItem<TResult>
   extends Omit<
     QueuedFileUploadItem<TResult>,
     | "file"
+    | "sessionId"
+    | "uploadedBytes"
+    | "liveUploadedBytes"
+    | "displayUploadedBytes"
+    | "totalBytes"
     | "isCurrentUploadSlot"
   > {}
 
@@ -66,11 +71,6 @@ const serializeQueueItem = <TResult,>(
   requestId: item.requestId ?? null,
   completedAt: item.completedAt ?? null,
   result: item.result ?? null,
-  sessionId: item.sessionId ?? null,
-  uploadedBytes: item.uploadedBytes ?? 0,
-  liveUploadedBytes: item.liveUploadedBytes ?? 0,
-  displayUploadedBytes: item.displayUploadedBytes ?? 0,
-  totalBytes: item.totalBytes ?? item.size,
   transportStatus: item.transportStatus ?? null,
 });
 
@@ -259,6 +259,21 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     [storageKey]
   );
 
+  const cancelAllKnownSessions = useCallback(async () => {
+    const sessionIds = Array.from(
+      new Set(
+        queueItemsRef.current
+          .map((item) => item.sessionId)
+          .filter((sessionId): sessionId is string => !!sessionId)
+      )
+    );
+
+    await Promise.allSettled(
+      sessionIds.map((sessionId) => endpoints.cancelSession(sessionId))
+    );
+    await endpoints.cancelAllSessions?.();
+  }, [endpoints]);
+
   useEffect(() => {
     if (!storageKey || isRestoring || !hasHydratedQueueState) return;
     persistQueueState(queueItems, isPaused, hasStartedUploadRun);
@@ -325,9 +340,10 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     setIsRestoring(true);
 
     try {
+      await cancelAllKnownSessions();
+
       const serialized = localStorage.getItem(storageKey);
       if (!serialized) {
-        await endpoints.cancelAllSessions?.();
         setQueueItems([]);
         setIsPaused(true);
         setHasStartedUploadRun(false);
@@ -351,10 +367,6 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           }
 
           if (!file && shouldRestoreFile) {
-            if (item.sessionId) {
-              await endpoints.cancelSession(item.sessionId).catch(() => undefined);
-            }
-
             return normalizeQueueItem<TResult>({
               ...item,
               queueOrder:
@@ -376,40 +388,26 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             });
           }
 
-          const restoredSessionId = item.sessionId ?? null;
-          const canResumeSession =
-            !!restoredSessionId &&
-            (restoredStatus === "uploading" || restoredStatus === "queued");
-
+          // Queue entries survive refresh, but upload sessions do not.
+          // We intentionally clear transient server/session progress here so any
+          // interrupted upload restarts cleanly from byte 0 when resumed.
           return normalizeQueueItem<TResult>({
             ...item,
             queueOrder:
               typeof item.queueOrder === "number" ? item.queueOrder : 0,
             status: restoredStatus === "uploading" ? "queued" : item.status,
-            progress:
-              restoredStatus === "uploading" && !canResumeSession
-                ? 0
-                : item.progress,
+            progress: restoredStatus === "uploading" ? 0 : item.progress,
             completedAt:
               restoredStatus === "uploading" || restoredStatus === "queued"
                 ? null
                 : item.completedAt ?? null,
-            sessionId: canResumeSession ? restoredSessionId : null,
-            uploadedBytes: canResumeSession ? item.uploadedBytes ?? 0 : 0,
-            liveUploadedBytes: canResumeSession ? item.liveUploadedBytes ?? 0 : 0,
-            displayUploadedBytes: canResumeSession
-              ? item.displayUploadedBytes ?? item.uploadedBytes ?? 0
-              : 0,
-            totalBytes: getPositiveNumber(
-              canResumeSession ? item.totalBytes : null,
-              file?.size,
-              item.size
-            ),
+            sessionId: null,
+            uploadedBytes: 0,
+            liveUploadedBytes: 0,
+            displayUploadedBytes: 0,
+            totalBytes: getPositiveNumber(file?.size, item.size),
             isCurrentUploadSlot: false,
-            transportStatus:
-              canResumeSession && item.transportStatus === "finalizing"
-                ? "finalizing"
-                : null,
+            transportStatus: null,
             file,
           });
         })
@@ -435,7 +433,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       setIsRestoring(false);
       setHasHydratedQueueState(true);
     }
-  }, [endpoints, storageKey]);
+  }, [cancelAllKnownSessions, storageKey]);
 
   useEffect(() => {
     void loadPersistedQueue();
