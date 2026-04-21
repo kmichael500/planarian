@@ -121,12 +121,11 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
               <div className="import-file-settings__field-card import-file-settings__field-card--toggle">
                 <Form.Item
                   name={nameof<DelimiterFormFields>("ignoreDuplicates")}
-                  label="Ignore Duplicates"
                   valuePropName="checked"
                   initialValue={true}
-                  extra="When enabled, matching filenames on the same cave are skipped. When disabled, matching filenames are overwritten."
+                  extra="If enabled, files with the same name already attached to a cave will be skipped and not imported again. If disabled, files with matching names will overwrite any existing files on that cave."
                 >
-                  <Checkbox>Skip duplicate filenames</Checkbox>
+                  <Checkbox>Skip Duplicates</Checkbox>
                 </Form.Item>
               </div>
             </Col>

@@ -128,14 +128,12 @@ public class ChunkedUploadService : ServiceBase
         await session.Gate.WaitAsync(cancellationToken);
         try
         {
-            if (session.Status == ChunkedUploadSessionStatus.Canceled)
+            switch (session.Status)
             {
-                throw ApiExceptionDictionary.SessionCancelled();
-            }
-
-            if (session.Status == ChunkedUploadSessionStatus.Completed)
-            {
-                return session;
+                case ChunkedUploadSessionStatus.Canceled:
+                    throw ApiExceptionDictionary.SessionCancelled();
+                case ChunkedUploadSessionStatus.Completed:
+                    return session;
             }
 
             if (contentLength <= 0)
