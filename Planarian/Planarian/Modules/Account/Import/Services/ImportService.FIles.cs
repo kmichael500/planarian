@@ -12,6 +12,21 @@ public partial class ImportService
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
+        var validation = await ValidateFileImport(
+            request.FileName,
+            request.IdRegex,
+            request.DelimiterRegex,
+            request.IgnoreDuplicates,
+            request.RequestId,
+            cancellationToken);
+        if (!validation.Result.IsSuccessful)
+        {
+            throw ApiExceptionDictionary.FromErrorCode(
+                validation.Result.FailureCode,
+                validation.Result.Message,
+                validation.Result);
+        }
+
         var session = await _chunkedUploadService.CreateSession(
             new ChunkedUploadSessionCreateRequest
             {
@@ -71,24 +86,42 @@ public partial class ImportService
 
         var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
 
-        await using var admission = await _chunkedUploadService.AcquireProcessingSlot(
-            importSession.CompletionRequestId ?? session.SessionId,
-            cancellationToken);
+        try
+        {
+            var result = await ProcessStagedFileImport(
+                session.BlobKey,
+                session.FileName,
+                importSession.IdRegex,
+                importSession.DelimiterRegex,
+                importSession.IgnoreDuplicates,
+                importSession.CompletionRequestId ?? session.SessionId,
+                cancellationToken);
 
-        var result = await ProcessStagedFileImport(
-            session.BlobKey,
-            session.FileName,
-            importSession.IdRegex,
-            importSession.DelimiterRegex,
-            importSession.IgnoreDuplicates,
-            importSession.CompletionRequestId ?? session.SessionId,
-            cancellationToken);
+            result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
+            importSession.CompletionResult = result;
+            return result;
+        }
+        finally
+        {
+            try
+            {
+                await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
+            }
+            catch
+            {
+                // The file has already been published successfully. Cleanup failures
+                // should not turn the request into a user-visible import failure.
+            }
 
-        result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
-        importSession.CompletionResult = result;
-
-        await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
-        return result;
+            try
+            {
+                _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+            }
+            catch
+            {
+                // The import attempt is finished; treat slot-release cleanup as best effort.
+            }
+        }
     }
 
     public async Task CancelFileUploadSession(string sessionId, CancellationToken cancellationToken)
@@ -97,6 +130,12 @@ public partial class ImportService
 
         GetRequiredImportUploadSession(sessionId);
         await _chunkedUploadService.CancelSession(sessionId, cancellationToken);
+    }
+
+    public async Task CancelActiveFileUploadSessions(CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+        await _chunkedUploadService.CancelActiveSessionsForCurrentUser(cancellationToken);
     }
 
     private async Task<FileImportResult> ProcessFileImport(Stream stream, string fileName, string idRegex,
@@ -161,6 +200,13 @@ public partial class ImportService
             result.Message = e.Message;
             result.IsSuccessful = false;
             result.FailureCode = e.ErrorCode.ToString();
+            return (result, null);
+        }
+        catch (ArgumentException e)
+        {
+            result.Message = e.Message;
+            result.IsSuccessful = false;
+            result.FailureCode = ApiExceptionType.BadRequest.ToString();
             return (result, null);
         }
 

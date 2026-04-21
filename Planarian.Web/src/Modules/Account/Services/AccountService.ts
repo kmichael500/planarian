@@ -191,6 +191,9 @@ const AccountService = {
   async CancelImportFileUploadSession(sessionId: string): Promise<void> {
     await HttpClient.delete(`${baseUrl}/import/file/session/${sessionId}`);
   },
+  async CancelActiveImportFileUploadSessions(): Promise<void> {
+    await HttpClient.delete(`${baseUrl}/import/file/session`);
+  },
   //#endregion
 
   async GetFeatureSettings(resetCache: boolean = false) {

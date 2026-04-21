@@ -70,15 +70,19 @@
   display: none;
 }
 
-.import-files-dashboard__toolbar-actions--collapse-1 .import-files-dashboard__toolbar-secondary--reset,
-.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--reset,
-.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--results,
-.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--reset,
+.import-files-dashboard__toolbar-actions--collapse-1 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--settings,
+.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--settings,
 .import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--results,
-.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--retry,
-.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-primary,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-secondary {
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--settings,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--results,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--retry,
+.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-secondary,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-primary,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-secondary {
   display: none;
 }
 
@@ -86,7 +90,8 @@
 .import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-more,
 .import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-more,
 .import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-more,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-more {
+.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-more,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-more {
   display: inline-flex;
 }
 
@@ -300,7 +305,7 @@
   min-height: 22px;
 }
 
-.import-files-dashboard__queue-remove {
+.import-files-dashboard__queue-action {
   flex: 0 0 auto;
 }
 
@@ -319,6 +324,11 @@
 .import-files-dashboard__queue-progress--active {
   justify-content: stretch;
   background: color-mix(in srgb, var(--primary-color, #1677ff) 12%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress--finalizing {
+  justify-content: stretch;
+  background: color-mix(in srgb, #0f766e 14%, var(--border-color));
 }
 
 .import-files-dashboard__queue-progress--overall {
@@ -343,6 +353,10 @@
   border-radius: inherit;
   background: color-mix(in srgb, var(--primary-color, #1677ff) 76%, transparent);
   transition: width 0.2s ease;
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #0f766e 76%, transparent);
 }
 
 .import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-fill,
@@ -378,6 +392,10 @@
 
 .import-files-dashboard__queue-progress--active .import-files-dashboard__queue-progress-content {
   color: color-mix(in srgb, var(--surface-color) 88%, white);
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-content {
+  color: color-mix(in srgb, var(--surface-color) 90%, white);
 }
 
 .import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-content,

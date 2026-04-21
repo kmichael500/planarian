@@ -1,4 +1,14 @@
-import { Button, Checkbox, Col, Form, Input, Row, Typography } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Checkbox,
+  Col,
+  Form,
+  Input,
+  Row,
+  Tooltip,
+  Typography,
+} from "antd";
 import React from "react";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 
@@ -6,12 +16,14 @@ export interface ImportFileSettings {
   delimiter: string;
   idRegex: string;
   ignoreDuplicates: boolean;
+  pauseOnFailures: boolean;
 }
 
 export interface DelimiterFormFields {
   delimiter: string;
   idRegex: string;
   ignoreDuplicates: boolean;
+  pauseOnFailures: boolean;
 }
 
 interface ImportFileSettingsFormProps {
@@ -33,6 +45,7 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
           delimiter: values.delimiter ?? "",
           idRegex: values.idRegex,
           ignoreDuplicates: values.ignoreDuplicates ?? true,
+          pauseOnFailures: values.pauseOnFailures ?? true,
         });
       }}
     >
@@ -118,15 +131,34 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
               </div>
             </Col>
             <Col xs={24} md={8}>
-              <div className="import-file-settings__field-card import-file-settings__field-card--toggle">
+              <div className="import-file-settings__field-card import-file-settings__field-card--toggle import-file-settings__field-card--toggle-stack">
                 <Form.Item
-                  name={nameof<DelimiterFormFields>("ignoreDuplicates")}
-                  label="Ignore Duplicates"
+                  name={nameof<DelimiterFormFields>("pauseOnFailures")}
                   valuePropName="checked"
                   initialValue={true}
-                  extra="When enabled, matching filenames on the same cave are skipped. When disabled, matching filenames are overwritten."
                 >
-                  <Checkbox>Skip duplicate filenames</Checkbox>
+                  <Checkbox>
+                    <span className="import-file-settings__checkbox-label">
+                      Pause On Failures
+                      <Tooltip title="If enabled, the bulk upload automatically pauses after five failed files complete in a row. Skipped or uploaded files reset the failure streak.">
+                        <InfoCircleOutlined className="import-file-settings__checkbox-info" />
+                      </Tooltip>
+                    </span>
+                  </Checkbox>
+                </Form.Item>
+                <Form.Item
+                  name={nameof<DelimiterFormFields>("ignoreDuplicates")}
+                  valuePropName="checked"
+                  initialValue={true}
+                >
+                  <Checkbox>
+                    <span className="import-file-settings__checkbox-label">
+                      Skip Duplicates
+                      <Tooltip title="If enabled, files with the same name already attached to a cave will be skipped and not imported again. If disabled, files with matching names will overwrite any existing files on that cave.">
+                        <InfoCircleOutlined className="import-file-settings__checkbox-info" />
+                      </Tooltip>
+                    </span>
+                  </Checkbox>
                 </Form.Item>
               </div>
             </Col>

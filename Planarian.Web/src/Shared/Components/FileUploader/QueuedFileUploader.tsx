@@ -6,34 +6,66 @@ import {
 } from "antd";
 import {
   ClearOutlined,
-  ClockCircleOutlined,
   DeleteOutlined,
   DownOutlined,
   EyeOutlined,
   FileAddOutlined,
   RedoOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./QueuedFileUploader.scss";
 import {
   getUploadDisplayState,
-  VIRTUAL_QUEUE_ROW_HEIGHT,
   VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
 } from "./fileUploaderHelpers";
 import { QueuedFileUploadItem, QueuedFileUploaderProps } from "./types";
 import { VirtualFileList } from "./VirtualFileList";
 
+const TOOLBAR_ACTION_COUNT = 6;
+
 interface QueueCardProps<TResult> {
   item: QueuedFileUploadItem<TResult>;
   onRemove: (itemId: string) => void;
+  onRetry?: (itemId: string) => void;
+}
+
+interface RecentActivityCardProps<TResult> extends QueueCardProps<TResult> {
   renderRecentActivityTooltip?: (
     item: QueuedFileUploadItem<TResult>
   ) => React.ReactNode;
 }
 
+const getQueueItemProgressVariantClass = <TResult,>(
+  item: QueuedFileUploadItem<TResult>,
+  isAwaitingFinalize: boolean
+) => {
+  if (item.status === "uploading" || item.transportStatus === "finalizing" || isAwaitingFinalize) {
+    return " import-files-dashboard__queue-progress--active";
+  }
+
+  return "";
+};
+
+const getQueueItemStatusLabel = <TResult,>(
+  item: QueuedFileUploadItem<TResult>,
+  isAwaitingFinalize: boolean
+) => {
+  if (item.transportStatus === "finalizing" || isAwaitingFinalize) {
+    return "Finalizing...";
+  }
+
+  if (item.status === "uploading") {
+    return "Uploading";
+  }
+
+  return null;
+};
+
 const QueueCardHeader = <TResult,>({
   item,
   onRemove,
+  onRetry,
 }: QueueCardProps<TResult>) => (
   <div className="import-files-dashboard__queue-card-header">
     <Typography.Text
@@ -43,6 +75,20 @@ const QueueCardHeader = <TResult,>({
     >
       {item.fileName}
     </Typography.Text>
+    {onRetry &&
+      item.file &&
+      (item.status === "failed" || item.status === "canceled") && (
+        <Tooltip title="Retry">
+          <Button
+            type="text"
+            size="small"
+            icon={<RedoOutlined />}
+            aria-label={`Retry ${item.fileName}`}
+            className="import-files-dashboard__queue-action"
+            onClick={() => onRetry(item.id)}
+          />
+        </Tooltip>
+      )}
     <Tooltip title="Remove">
       <Button
         type="text"
@@ -50,7 +96,7 @@ const QueueCardHeader = <TResult,>({
         size="small"
         icon={<DeleteOutlined />}
         aria-label={`Remove ${item.fileName}`}
-        className="import-files-dashboard__queue-remove"
+        className="import-files-dashboard__queue-action"
         onClick={() => onRemove(item.id)}
       />
     </Tooltip>
@@ -60,20 +106,30 @@ const QueueCardHeader = <TResult,>({
 const CurrentUploadCard = <TResult,>({
   item,
   onRemove,
+  onRetry,
 }: QueueCardProps<TResult>) => {
-  const isActive = item.status === "uploading";
   const displayState = getUploadDisplayState(item);
   const progressPercent = displayState.displayPercent;
   const hasDisplayProgress = displayState.hasProgress;
-  const shouldShowProgress = isActive || hasDisplayProgress;
+  const isAwaitingFinalize =
+    item.status === "queued" &&
+    displayState.totalBytes > 0 &&
+    displayState.acknowledgedBytes >= displayState.totalBytes;
+  const statusLabel = getQueueItemStatusLabel(item, isAwaitingFinalize);
+  const shouldShowProgress = item.status === "uploading" || hasDisplayProgress;
+  const progressLabel =
+    item.transportStatus === "chunk_uploading"
+      ? `${progressPercent}%`
+      : statusLabel ?? `${progressPercent}%`;
 
   return (
     <div className="import-files-dashboard__queue-card">
-      <QueueCardHeader item={item} onRemove={onRemove} />
+      <QueueCardHeader item={item} onRemove={onRemove} onRetry={onRetry} />
       <div
-        className={`import-files-dashboard__queue-progress${
-          isActive ? " import-files-dashboard__queue-progress--active" : ""
-        }`}
+        className={`import-files-dashboard__queue-progress${getQueueItemProgressVariantClass(
+          item,
+          isAwaitingFinalize
+        )}`}
       >
         {shouldShowProgress && (
           <span
@@ -83,9 +139,7 @@ const CurrentUploadCard = <TResult,>({
         )}
         <span className="import-files-dashboard__queue-progress-content">
           <span>
-            {shouldShowProgress
-              ? `${progressPercent}%`
-              : displayState.sizeLabel}
+            {shouldShowProgress ? progressLabel : displayState.sizeLabel}
           </span>
           {(shouldShowProgress || displayState.hasKnownSize) && (
             <span>{displayState.sizeLabel}</span>
@@ -99,35 +153,30 @@ const CurrentUploadCard = <TResult,>({
 const QueueFileCard = <TResult,>({
   item,
   onRemove,
+  onRetry,
 }: QueueCardProps<TResult>) => {
   const displayState = getUploadDisplayState(item);
   if (
     item.status === "uploading" ||
-    (displayState.hasProgress && displayState.displayPercent < 100)
+    displayState.hasProgress
   ) {
-    return <CurrentUploadCard item={item} onRemove={onRemove} />;
+    return (
+      <CurrentUploadCard
+        item={item}
+        onRemove={onRemove}
+        onRetry={onRetry}
+      />
+    );
   }
-
-  const isRetrying = item.status === "retry_wait";
 
   return (
     <div className="import-files-dashboard__queue-card">
-      <QueueCardHeader item={item} onRemove={onRemove} />
+      <QueueCardHeader item={item} onRemove={onRemove} onRetry={onRetry} />
       <div className="import-files-dashboard__queue-progress">
         <span className="import-files-dashboard__queue-progress-content">
           <span>{displayState.sizeLabel}</span>
         </span>
       </div>
-      {isRetrying && item.retryAt && (
-        <Typography.Text
-          type="secondary"
-          ellipsis
-          className="import-files-dashboard__queue-note"
-        >
-          <ClockCircleOutlined /> Trying again at{" "}
-          {new Date(item.retryAt).toLocaleTimeString()}
-        </Typography.Text>
-      )}
     </div>
   );
 };
@@ -135,8 +184,9 @@ const QueueFileCard = <TResult,>({
 const RecentActivityCard = <TResult,>({
   item,
   onRemove,
+  onRetry,
   renderRecentActivityTooltip,
-}: QueueCardProps<TResult>) => {
+}: RecentActivityCardProps<TResult>) => {
   const tooltipTitle = renderRecentActivityTooltip?.(item);
 
   return (
@@ -149,7 +199,7 @@ const RecentActivityCard = <TResult,>({
           : " import-files-dashboard__queue-card--failure"
       }`}
     >
-      <QueueCardHeader item={item} onRemove={onRemove} />
+      <QueueCardHeader item={item} onRemove={onRemove} onRetry={onRetry} />
       <Tooltip title={tooltipTitle}>
         <div
           className={`import-files-dashboard__queue-progress${
@@ -181,6 +231,7 @@ export const QueuedFileUploader = <TResult,>({
   queue,
   copy,
   onViewResults,
+  onEditSettings,
   hasResults = false,
   renderRecentActivityTooltip,
 }: QueuedFileUploaderProps<TResult>) => {
@@ -189,7 +240,7 @@ export const QueuedFileUploader = <TResult,>({
   const toolbarContainerRef = useRef<HTMLDivElement | null>(null);
   const toolbarActionsRef = useRef<HTMLDivElement | null>(null);
   const toolbarStatsRef = useRef<HTMLDivElement | null>(null);
-  const toolbarActionWidthsRef = useRef([0, 0, 0, 0, 0]);
+  const toolbarActionWidthsRef = useRef(Array(TOOLBAR_ACTION_COUNT).fill(0));
   const toolbarMoreWidthRef = useRef(82);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -220,7 +271,11 @@ export const QueuedFileUploader = <TResult,>({
           .querySelectorAll<HTMLElement>("[data-toolbar-action-index]")
           .forEach((element) => {
             const index = Number(element.dataset.toolbarActionIndex);
-            if (index >= 0 && index <= 4 && element.offsetWidth > 0) {
+            if (
+              index >= 0 &&
+              index < TOOLBAR_ACTION_COUNT &&
+              element.offsetWidth > 0
+            ) {
               toolbarActionWidthsRef.current[index] = element.offsetWidth;
             }
           });
@@ -238,11 +293,10 @@ export const QueuedFileUploader = <TResult,>({
         const availableWidth = toolbarContainer.clientWidth;
 
         const getActionsWidth = (collapsedCount: number) => {
-          const visibleActionIndexes = [0, 1, 2, 3, 4].filter(
-            (index) =>
-              (collapsedCount < 5 && index === 0) ||
-              index < 5 - collapsedCount
-          );
+          const visibleActionIndexes = Array.from(
+            { length: TOOLBAR_ACTION_COUNT },
+            (_, index) => index
+          ).filter((index) => index < TOOLBAR_ACTION_COUNT - collapsedCount);
           const visibleActionsWidth = visibleActionIndexes.reduce(
             (total, index) => total + toolbarActionWidthsRef.current[index],
             0
@@ -258,7 +312,7 @@ export const QueuedFileUploader = <TResult,>({
         };
 
         let nextCollapsedCount = 0;
-        for (let count = 0; count <= 5; count += 1) {
+        for (let count = 0; count <= TOOLBAR_ACTION_COUNT; count += 1) {
           const requiredWidth = getActionsWidth(count) + statsWidth + toolbarGap;
           if (requiredWidth <= availableWidth - 2) {
             nextCollapsedCount = count;
@@ -291,16 +345,17 @@ export const QueuedFileUploader = <TResult,>({
 
   const renderQueueItem = useCallback(
     (item: QueuedFileUploadItem<TResult>) => (
-      <QueueFileCard item={item} onRemove={queue.removeQueueItem} />
+      <QueueFileCard
+        item={item}
+        onRemove={queue.removeQueueItem}
+        onRetry={queue.retryQueueItem}
+      />
     ),
     [queue.removeQueueItem]
   );
 
   const getQueueRowHeight = useCallback(
-    (item: QueuedFileUploadItem<TResult>) =>
-      item.status === "retry_wait" && item.retryAt
-        ? VIRTUAL_QUEUE_ROW_HEIGHT
-        : VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
+    () => VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
     []
   );
 
@@ -309,10 +364,11 @@ export const QueuedFileUploader = <TResult,>({
       <RecentActivityCard
         item={item}
         onRemove={queue.removeQueueItem}
+        onRetry={queue.retryQueueItem}
         renderRecentActivityTooltip={renderRecentActivityTooltip}
       />
     ),
-    [queue.removeQueueItem, renderRecentActivityTooltip]
+    [queue.removeQueueItem, queue.retryQueueItem, renderRecentActivityTooltip]
   );
 
   const openFilePicker = () => fileInputRef.current?.click();
@@ -335,7 +391,7 @@ export const QueuedFileUploader = <TResult,>({
         type="file"
         multiple
         style={{ display: "none" }}
-        disabled={queue.isResettingQueue}
+        disabled={queue.isLoadingConfig || queue.isResettingQueue}
         onChange={(event) => {
           void queue.handleFileSelect(event);
         }}
@@ -355,6 +411,7 @@ export const QueuedFileUploader = <TResult,>({
               data-toolbar-action-index="0"
               icon={<FileAddOutlined />}
               onClick={openFilePicker}
+              disabled={queue.isLoadingConfig || queue.isRestoring || queue.isResettingQueue}
             >
               {addFilesLabel}
             </Button>
@@ -390,13 +447,22 @@ export const QueuedFileUploader = <TResult,>({
               View Results
             </Button>
             <Button
-              className="import-files-dashboard__toolbar-secondary import-files-dashboard__toolbar-secondary--reset"
+              className="import-files-dashboard__toolbar-secondary import-files-dashboard__toolbar-secondary--settings"
               data-toolbar-action-index="4"
+              icon={<SettingOutlined />}
+              onClick={onEditSettings}
+              disabled={queue.isResettingQueue || !onEditSettings}
+            >
+              Settings
+            </Button>
+            <Button
+              className="import-files-dashboard__toolbar-secondary import-files-dashboard__toolbar-secondary--clear"
+              data-toolbar-action-index="5"
               icon={<ClearOutlined />}
               onClick={() => void queue.resetQueueState()}
               disabled={queue.isRestoring || queue.isResettingQueue}
             >
-              Reset
+              Clear
             </Button>
             <Dropdown
               className="import-files-dashboard__toolbar-more"
@@ -404,17 +470,20 @@ export const QueuedFileUploader = <TResult,>({
               trigger={["click"]}
               menu={{
                 items: [
-                  ...(collapsedToolbarActionsCount >= 5
+                  ...(collapsedToolbarActionsCount >= 6
                     ? [
                         {
                           key: "add",
                           icon: <FileAddOutlined />,
                           label: addFilesLabel,
-                          disabled: queue.isRestoring || queue.isResettingQueue,
+                          disabled:
+                            queue.isLoadingConfig ||
+                            queue.isRestoring ||
+                            queue.isResettingQueue,
                         },
                       ]
                     : []),
-                  ...(collapsedToolbarActionsCount >= 4
+                  ...(collapsedToolbarActionsCount >= 5
                     ? [
                         {
                           key: "upload-control",
@@ -425,7 +494,7 @@ export const QueuedFileUploader = <TResult,>({
                         },
                       ]
                     : []),
-                  ...(collapsedToolbarActionsCount >= 3
+                  ...(collapsedToolbarActionsCount >= 4
                     ? [
                         {
                           key: "retry",
@@ -438,7 +507,7 @@ export const QueuedFileUploader = <TResult,>({
                         },
                       ]
                     : []),
-                  ...(collapsedToolbarActionsCount >= 2
+                  ...(collapsedToolbarActionsCount >= 3
                     ? [
                         {
                           key: "results",
@@ -449,12 +518,22 @@ export const QueuedFileUploader = <TResult,>({
                         },
                       ]
                     : []),
+                  ...(collapsedToolbarActionsCount >= 2
+                    ? [
+                        {
+                          key: "settings",
+                          icon: <SettingOutlined />,
+                          label: "Settings",
+                          disabled: queue.isResettingQueue || !onEditSettings,
+                        },
+                      ]
+                    : []),
                   ...(collapsedToolbarActionsCount >= 1
                     ? [
                         {
-                          key: "reset",
+                          key: "clear",
                           icon: <ClearOutlined />,
-                          label: "Reset",
+                          label: "Clear",
                           disabled: queue.isRestoring || queue.isResettingQueue,
                         },
                       ]
@@ -485,7 +564,12 @@ export const QueuedFileUploader = <TResult,>({
                     return;
                   }
 
-                  if (key === "reset") {
+                  if (key === "settings") {
+                    onEditSettings?.();
+                    return;
+                  }
+
+                  if (key === "clear") {
                     void queue.resetQueueState();
                   }
                 },
@@ -496,7 +580,7 @@ export const QueuedFileUploader = <TResult,>({
                 icon={<DownOutlined />}
                 aria-label="More file upload actions"
               >
-                {collapsedToolbarActionsCount >= 5 ? "Actions" : "More"}
+                {collapsedToolbarActionsCount >= 6 ? "Actions" : "More"}
               </Button>
             </Dropdown>
           </div>

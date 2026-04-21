@@ -48,6 +48,7 @@ public static class ApiExceptionDictionary
             ApiExceptionType.BadRequest => BadRequest(message),
             ApiExceptionType.NotFound => new ApiException(StatusCodes.Status404NotFound, ApiExceptionType.NotFound, message),
             ApiExceptionType.Conflict => Conflict(message),
+            ApiExceptionType.SessionCancelled => SessionCancelled(message),
             ApiExceptionType.TooManyRequests => TooManyRequests(message),
             ApiExceptionType.Unauthorized => Unauthorized(message),
             ApiExceptionType.Forbidden => Forbidden(message),
@@ -157,6 +158,11 @@ public static class ApiExceptionDictionary
     public static ApiException NullValue(string name)
     {
         return new ApiException(StatusCodes.Status400BadRequest, ApiExceptionType.NullValue, $"Value is missing from '{name}'");
+    }
+
+    public static ApiException SessionCancelled(string message = "Upload session was canceled.")
+    {
+        return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.SessionCancelled, message);
     }
 
     #endregion

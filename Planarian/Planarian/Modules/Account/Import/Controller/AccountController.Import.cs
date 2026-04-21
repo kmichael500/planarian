@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Import.Models;
+using Planarian.Shared.Attributes;
 
 // ReSharper disable once CheckNamespace ( for partial class compatability )
 namespace Planarian.Modules.Account.Controller;
@@ -10,6 +11,7 @@ namespace Planarian.Modules.Account.Controller;
 public partial class AccountController
 {
     private const long ImportUploadRequestSizeLimitBytes = 50 * 1024 * 1024; // 50 MB
+    private const int ImportFileSessionRequestsPerMinute = 6000;
 
     [RequestSizeLimit(ImportUploadRequestSizeLimitBytes)]
     [HttpPost("import/caves/file")]
@@ -50,6 +52,7 @@ public partial class AccountController
     }
 
     [HttpPost("import/file/session")]
+    [Throttle(RequestsPerMinute = ImportFileSessionRequestsPerMinute)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<ImportFileUploadSessionVm>> CreateImportFileUploadSession(
         [FromBody] ImportFileRequest request,
@@ -60,6 +63,7 @@ public partial class AccountController
     }
 
     [HttpPut("import/file/session/{sessionId}")]
+    [Throttle(RequestsPerMinute = ImportFileSessionRequestsPerMinute)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<ImportFileUploadSessionVm>> UploadImportFileChunk(
         string sessionId,
@@ -79,6 +83,7 @@ public partial class AccountController
     }
 
     [HttpPost("import/file/session/{sessionId}/finalize")]
+    [Throttle(RequestsPerMinute = ImportFileSessionRequestsPerMinute)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> FinalizeImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
@@ -94,10 +99,20 @@ public partial class AccountController
     }
 
     [HttpDelete("import/file/session/{sessionId}")]
+    [Throttle(RequestsPerMinute = ImportFileSessionRequestsPerMinute)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> CancelImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
         await _importService.CancelFileUploadSession(sessionId, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("import/file/session")]
+    [Throttle(RequestsPerMinute = ImportFileSessionRequestsPerMinute)]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> CancelActiveImportFileUploadSessions(CancellationToken cancellationToken)
+    {
+        await _importService.CancelActiveFileUploadSessions(cancellationToken);
         return NoContent();
     }
 

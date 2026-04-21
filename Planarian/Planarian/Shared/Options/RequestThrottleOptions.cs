@@ -60,12 +60,7 @@ public class RequestThrottleOptions
     /// <summary>
     /// Maximum number of concurrent import file uploads this app instance will actively process.
     /// </summary>
-    public int ImportFileConcurrentUploadsPerInstance { get; set; } = 3;
-
-    /// <summary>
-    /// Retry-after hint, in seconds, returned when import file upload admission is saturated.
-    /// </summary>
-    public int ImportFileBusyRetryAfterSeconds { get; set; } = 15;
+    public int MaxConcurrentUploads { get; set; } = 3;
 
     /// <summary>
     /// Maximum total file size, in bytes, accepted by chunked upload sessions.

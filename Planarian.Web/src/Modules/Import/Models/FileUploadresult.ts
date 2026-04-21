@@ -5,6 +5,5 @@ export interface FileImportResult {
   associatedCave: string;
   message: string;
   failureCode?: string | null;
-  isRetryable?: boolean;
   requestId?: string | null;
 }

@@ -7,7 +7,6 @@ export type QueuedFileUploadStatus =
   | "uploaded"
   | "skipped"
   | "failed"
-  | "retry_wait"
   | "canceled";
 
 export interface ChunkedUploadSession {
@@ -17,14 +16,26 @@ export interface ChunkedUploadSession {
   status?: string;
 }
 
+export interface ChunkedUploaderConfig {
+  maxConcurrentUploads: number;
+  maxFileSizeBytes: number;
+  chunkSizeBytes: number;
+}
+
 export interface QueuedFileUploadFailureDetails {
   message: string;
   failureCode?: string | null;
-  isRetryable: boolean;
-  retryAfterSeconds?: number;
   requestId?: string | null;
   terminalStatus?: "failed" | "skipped";
 }
+
+export type QueuedFileValidationResult =
+  | boolean
+  | {
+      message: string;
+      failureCode?: string | null;
+      terminalStatus?: "failed";
+    };
 
 export interface QueuedFileUploadEndpoints<TResult> {
   createSession: (
@@ -45,6 +56,7 @@ export interface QueuedFileUploadEndpoints<TResult> {
     signal?: AbortSignal
   ) => Promise<TResult>;
   cancelSession: (sessionId: string) => Promise<void>;
+  cancelAllSessions?: () => Promise<void>;
 }
 
 export interface QueuedFileUploadItem<TResult> {
@@ -58,11 +70,10 @@ export interface QueuedFileUploadItem<TResult> {
   status: QueuedFileUploadStatus;
   progress: number;
   retryCount: number;
-  retryAt?: number | null;
   lastError?: string | null;
   failureCode?: string | null;
-  isRetryable: boolean;
   requestId?: string | null;
+  completedAt?: string | null;
   result?: TResult | null;
   sessionId?: string | null;
   uploadedBytes?: number;
@@ -97,6 +108,7 @@ export interface QueuedFileUploaderProps<TResult> {
   queue: UseQueuedChunkedFileUploaderResult<TResult>;
   copy?: QueuedFileUploaderCopy;
   onViewResults?: () => void;
+  onEditSettings?: () => void;
   hasResults?: boolean;
   renderRecentActivityTooltip?: (
     item: QueuedFileUploadItem<TResult>
@@ -106,17 +118,14 @@ export interface QueuedFileUploaderProps<TResult> {
 export interface UseQueuedChunkedFileUploaderOptions<TResult> {
   storageKey: string | null;
   endpoints: QueuedFileUploadEndpoints<TResult>;
-  normalizeError: (error: unknown) => QueuedFileUploadFailureDetails;
-  isAbortError: (error: unknown) => boolean;
-  validateFile?: (file: File) => boolean;
+  mapFailure?: (
+    failure: QueuedFileUploadFailureDetails,
+    error: unknown
+  ) => QueuedFileUploadFailureDetails;
+  validateFile?: (file: File) => QueuedFileValidationResult;
   onCompleted?: (items: QueuedFileUploadItem<TResult>[]) => void;
-  maxRetryCount?: number;
-  chunkSize?: number;
-  maxConcurrencyWeight?: number;
+  pauseOnFailures?: boolean;
   dispatchDelayMs?: number;
-  smallFileConcurrencyThresholdMb?: number;
-  largeFileConcurrencyThresholdMb?: number;
-  filePreparationBatchSize?: number;
 }
 
 export interface UseQueuedChunkedFileUploaderResult<TResult> {
@@ -128,6 +137,7 @@ export interface UseQueuedChunkedFileUploaderResult<TResult> {
   aggregateProgress: number;
   fileResults: QueuedFileUploadItem<TResult>[];
   isPaused: boolean;
+  isLoadingConfig: boolean;
   hasStartedUploadRun: boolean;
   isRestoring: boolean;
   isResettingQueue: boolean;
@@ -145,6 +155,7 @@ export interface UseQueuedChunkedFileUploaderResult<TResult> {
   handleDragEnter: (event: React.DragEvent<HTMLElement>) => void;
   handleDragLeave: (event: React.DragEvent<HTMLElement>) => void;
   retryFailed: () => void;
+  retryQueueItem: (itemId: string) => void;
   resetQueueState: () => Promise<void>;
   removeQueueItem: (itemId: string) => void;
 }
