@@ -13,6 +13,7 @@ import { ApiExceptionType } from "../../../Shared/Models/ApiErrorResponse";
 import { AccountService } from "../../Account/Services/AccountService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { getFileType } from "../../Files/Services/FileHelpers";
+import { validateImportFileName } from "../Helpers/importFileNameValidation";
 import { FileImportResult } from "../Models/FileUploadresult";
 import {
   DelimiterFormFields,
@@ -35,6 +36,9 @@ const createStorageKey = (accountId: string, settings: ImportFileSettings) =>
     settings.delimiter || "__none__",
     settings.idRegex,
     settings.ignoreDuplicates ? "ignore-duplicates" : "keep-duplicates",
+    settings.pauseOnFailures === false
+      ? "continue-on-failures"
+      : "pause-on-failures",
   ].join("::");
 
 const createSettingsStorageKey = (accountId: string) =>
@@ -93,6 +97,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
         delimiter: persistedSettings.delimiter,
         idRegex: persistedSettings.idRegex,
         ignoreDuplicates: persistedSettings.ignoreDuplicates,
+        pauseOnFailures: persistedSettings.pauseOnFailures ?? true,
       });
     } catch {
       localStorage.removeItem(settingsStorageKey);
@@ -104,18 +109,29 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
       return;
     }
 
-    localStorage.setItem(settingsStorageKey, JSON.stringify(confirmedSettings));
+    try {
+      localStorage.setItem(settingsStorageKey, JSON.stringify(confirmedSettings));
+    } catch {
+      message.warning("Import file settings could not be saved in this browser.");
+    }
   }, [confirmedSettings, inputsConfirmed, settingsStorageKey]);
 
-  const validateFile = useCallback((file: File) => {
-    const fileType = getFileType(file.name);
+  const validateFile = useCallback(
+    (file: File) => {
+      const fileType = getFileType(file.name);
 
-    if (!fileType) {
-      message.warning(`${file.name} has no detectable file extension.`);
-    }
+      if (!fileType) {
+        message.warning(`${file.name} has no detectable file extension.`);
+      }
 
-    return true;
-  }, []);
+      if (!confirmedSettings) {
+        return true;
+      }
+
+      return validateImportFileName(file.name, confirmedSettings);
+    },
+    [confirmedSettings]
+  );
 
   const endpoints = useMemo(
     () => ({
@@ -167,6 +183,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     mapFailure: mapFileImportFailure,
     validateFile,
     onCompleted: handleCompleted,
+    pauseOnFailures: confirmedSettings?.pauseOnFailures ?? true,
   });
 
   const resetQueueAndSettings = useCallback(async () => {

@@ -29,6 +29,14 @@ export interface QueuedFileUploadFailureDetails {
   terminalStatus?: "failed" | "skipped";
 }
 
+export type QueuedFileValidationResult =
+  | boolean
+  | {
+      message: string;
+      failureCode?: string | null;
+      terminalStatus?: "failed";
+    };
+
 export interface QueuedFileUploadEndpoints<TResult> {
   createSession: (
     file: File,
@@ -113,10 +121,10 @@ export interface UseQueuedChunkedFileUploaderOptions<TResult> {
     failure: QueuedFileUploadFailureDetails,
     error: unknown
   ) => QueuedFileUploadFailureDetails;
-  validateFile?: (file: File) => boolean;
+  validateFile?: (file: File) => QueuedFileValidationResult;
   onCompleted?: (items: QueuedFileUploadItem<TResult>[]) => void;
+  pauseOnFailures?: boolean;
   dispatchDelayMs?: number;
-  filePreparationBatchSize?: number;
 }
 
 export interface UseQueuedChunkedFileUploaderResult<TResult> {

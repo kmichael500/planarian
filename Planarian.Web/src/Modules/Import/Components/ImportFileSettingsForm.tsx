@@ -6,12 +6,14 @@ export interface ImportFileSettings {
   delimiter: string;
   idRegex: string;
   ignoreDuplicates: boolean;
+  pauseOnFailures: boolean;
 }
 
 export interface DelimiterFormFields {
   delimiter: string;
   idRegex: string;
   ignoreDuplicates: boolean;
+  pauseOnFailures: boolean;
 }
 
 interface ImportFileSettingsFormProps {
@@ -33,6 +35,7 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
           delimiter: values.delimiter ?? "",
           idRegex: values.idRegex,
           ignoreDuplicates: values.ignoreDuplicates ?? true,
+          pauseOnFailures: values.pauseOnFailures ?? true,
         });
       }}
     >
@@ -126,6 +129,18 @@ export const ImportFileSettingsForm: React.FC<ImportFileSettingsFormProps> = ({
                   extra="If enabled, files with the same name already attached to a cave will be skipped and not imported again. If disabled, files with matching names will overwrite any existing files on that cave."
                 >
                   <Checkbox>Skip Duplicates</Checkbox>
+                </Form.Item>
+              </div>
+            </Col>
+            <Col xs={24} md={8}>
+              <div className="import-file-settings__field-card import-file-settings__field-card--toggle">
+                <Form.Item
+                  name={nameof<DelimiterFormFields>("pauseOnFailures")}
+                  valuePropName="checked"
+                  initialValue={true}
+                  extra="If enabled, the bulk upload will automatically pause after five failed files complete in a row."
+                >
+                  <Checkbox>Pause On Failures</Checkbox>
                 </Form.Item>
               </div>
             </Col>

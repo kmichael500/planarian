@@ -212,6 +212,11 @@ public class ChunkedUploadService : ServiceBase
                 return session;
             }
 
+            if (session.Status == ChunkedUploadSessionStatus.Finalizing)
+            {
+                return session;
+            }
+
             if (session.UploadedBytes != session.FileSize || session.UploadedChunks.Count == 0)
             {
                 throw ApiExceptionDictionary.BadRequest("The upload session is incomplete and cannot be finalized.");
@@ -227,7 +232,6 @@ public class ChunkedUploadService : ServiceBase
                     session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
                     cancellationToken: cancellationToken);
 
-                session.Status = ChunkedUploadSessionStatus.Completed;
                 return session;
             }
             catch
@@ -260,7 +264,12 @@ public class ChunkedUploadService : ServiceBase
     {
         var semaphore = ProcessingSemaphore ?? throw new InvalidOperationException("Upload admission is not initialized.");
 
-        ReleaseProcessingSlotsWithoutSessions();
+        ReleaseInactiveProcessingSlots();
+
+        if (ActiveProcessingRequests.ContainsKey(requestId))
+        {
+            return;
+        }
 
         if (!await semaphore.WaitAsync(TimeSpan.Zero, cancellationToken))
         {
@@ -268,14 +277,18 @@ public class ChunkedUploadService : ServiceBase
                 "Too many file uploads are currently being processed. Please retry shortly.");
         }
 
-        ActiveProcessingRequests[requestId] = 0;
+        if (!ActiveProcessingRequests.TryAdd(requestId, 0))
+        {
+            semaphore.Release();
+        }
     }
 
-    private static void ReleaseProcessingSlotsWithoutSessions()
+    private static void ReleaseInactiveProcessingSlots()
     {
         foreach (var requestId in ActiveProcessingRequests.Keys)
         {
-            if (Sessions.ContainsKey(requestId))
+            if (Sessions.TryGetValue(requestId, out var session) &&
+                session.Status == ChunkedUploadSessionStatus.Finalizing)
             {
                 continue;
             }
@@ -388,6 +401,12 @@ public class ChunkedUploadService : ServiceBase
 
     public void ReleaseReservedProcessingSlot(string sessionId)
     {
+        if (Sessions.TryGetValue(sessionId, out var session) &&
+            session.Status == ChunkedUploadSessionStatus.Finalizing)
+        {
+            session.Status = ChunkedUploadSessionStatus.Completed;
+        }
+
         ReleaseProcessingSlot(sessionId);
     }
 
