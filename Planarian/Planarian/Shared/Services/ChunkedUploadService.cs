@@ -235,15 +235,34 @@ public class ChunkedUploadService : ServiceBase
             }
 
             session.Status = ChunkedUploadSessionStatus.Finalizing;
+            try
+            {
+                var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
+                var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
+                await blockBlobClient.CommitBlockListAsync(
+                    session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
+                    cancellationToken: cancellationToken);
 
-            var containerClient = await _fileService.GetBlobContainerClient(session.ContainerName);
-            var blockBlobClient = containerClient.GetBlockBlobClient(session.BlobKey);
-            await blockBlobClient.CommitBlockListAsync(
-                session.UploadedChunks.OrderBy(e => e.Key).Select(e => e.Value.BlockId),
-                cancellationToken: cancellationToken);
+                session.Status = ChunkedUploadSessionStatus.Completed;
+                return session;
+            }
+            catch
+            {
+                Sessions.TryRemove(session.SessionId, out _);
+                ReleaseProcessingSlot(session.SessionId);
 
-            session.Status = ChunkedUploadSessionStatus.Completed;
-            return session;
+                try
+                {
+                    await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+                }
+                catch
+                {
+                    // The commit failed and the upload attempt is already over.
+                    // A cleanup failure should not hide the original commit error.
+                }
+
+                throw;
+            }
         }
         finally
         {
