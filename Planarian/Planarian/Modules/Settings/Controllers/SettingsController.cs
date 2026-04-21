@@ -70,6 +70,12 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
 
     #region Users
 
+    [HttpGet("chunked-uploader")]
+    public ActionResult<ChunkedUploaderConfigVm> GetChunkedUploaderConfig()
+    {
+        return new JsonResult(Service.GetChunkedUploaderConfig());
+    }
+
     [HttpGet("users/{userId:length(10)}")]
     public async Task<ActionResult<NameProfilePhotoVm>> GetUsersName(string userId)
     {

@@ -16,7 +16,6 @@ public class ChunkedUploadService : ServiceBase
     private static readonly ConcurrentDictionary<string, int> ActiveProcessingRequests = new();
     private static readonly object ProcessingAdmissionLock = new();
     private static SemaphoreSlim? ProcessingSemaphore;
-    private static int? ProcessingRetryAfterSeconds;
 
     private readonly FileService _fileService;
     private readonly long _maxFileSizeBytes;
@@ -53,6 +52,7 @@ public class ChunkedUploadService : ServiceBase
 
         foreach (var session in expired)
         {
+            ReleaseReservedProcessingSlot(session);
             await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
         }
 
@@ -66,6 +66,7 @@ public class ChunkedUploadService : ServiceBase
         await CleanupExpiredSessions(cancellationToken);
 
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(RequestUser.Id)) throw ApiExceptionDictionary.NoAccount;
         if (string.IsNullOrWhiteSpace(request.FileName)) throw ApiExceptionDictionary.NullValue(nameof(request.FileName));
         if (request.FileSize <= 0) throw ApiExceptionDictionary.BadRequest("File size must be greater than 0.");
         if (request.FileSize > _maxFileSizeBytes)
@@ -75,22 +76,42 @@ public class ChunkedUploadService : ServiceBase
             throw ApiExceptionDictionary.NullValue(nameof(request.BlobKeyPrefix));
 
         var sessionId = Guid.NewGuid().ToString("N");
-        var session = new ChunkedUploadSessionState
-        {
-            SessionId = sessionId,
-            AccountId = RequestUser.AccountId,
-            ContainerName = RequestUser.AccountContainerName,
-            FileName = request.FileName,
-            FileSize = request.FileSize,
-            RequestId = request.RequestId,
-            BlobKey = $"{request.BlobKeyPrefix.TrimEnd('/')}/{sessionId}",
-            Metadata = request.Metadata,
-            Status = ChunkedUploadSessionStatus.Created,
-            ExpiresOn = DateTimeOffset.UtcNow.Add(SessionTtl),
-        };
+        var slotReserved = false;
 
-        Sessions[session.SessionId] = session;
-        return session;
+        try
+        {
+            await ReserveProcessingSlot(sessionId, cancellationToken);
+            slotReserved = true;
+
+            var session = new ChunkedUploadSessionState
+            {
+                SessionId = sessionId,
+                AccountId = RequestUser.AccountId,
+                UserId = RequestUser.Id,
+                ContainerName = RequestUser.AccountContainerName,
+                FileName = request.FileName,
+                FileSize = request.FileSize,
+                RequestId = request.RequestId,
+                BlobKey = $"{request.BlobKeyPrefix.TrimEnd('/')}/{sessionId}",
+                Metadata = request.Metadata,
+                Status = ChunkedUploadSessionStatus.Created,
+                ExpiresOn = DateTimeOffset.UtcNow.Add(SessionTtl),
+                HasReservedProcessingSlot = true,
+                ProcessingSlotReservationId = sessionId,
+            };
+
+            Sessions[session.SessionId] = session;
+            return session;
+        }
+        catch
+        {
+            if (slotReserved)
+            {
+                ReleaseProcessingSlot(sessionId);
+            }
+
+            throw;
+        }
     }
 
     public async Task<ChunkedUploadSessionState> UploadChunk(
@@ -224,22 +245,19 @@ public class ChunkedUploadService : ServiceBase
         }
     }
 
-    public async Task<IAsyncDisposable> AcquireProcessingSlot(
+    private async Task ReserveProcessingSlot(
         string requestId,
         CancellationToken cancellationToken)
     {
         var semaphore = ProcessingSemaphore ?? throw new InvalidOperationException("Upload admission is not initialized.");
-        var retryAfterSeconds = ProcessingRetryAfterSeconds ?? 1;
 
-        if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(retryAfterSeconds), cancellationToken))
+        if (!await semaphore.WaitAsync(TimeSpan.Zero, cancellationToken))
         {
             throw ApiExceptionDictionary.TooManyRequests(
-                "Too many file uploads are currently being processed. Please retry shortly.",
-                retryAfterSeconds);
+                "Too many file uploads are currently being processed. Please retry shortly.");
         }
 
         ActiveProcessingRequests[requestId] = Environment.TickCount;
-        return new ProcessingSlotReleaser(semaphore, ActiveProcessingRequests, requestId);
     }
 
     public async Task CancelSession(string sessionId, CancellationToken cancellationToken)
@@ -248,7 +266,39 @@ public class ChunkedUploadService : ServiceBase
 
         var session = GetRequiredSession(sessionId);
         Sessions.TryRemove(sessionId, out _);
+        ReleaseReservedProcessingSlot(session);
         await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+    }
+
+    public async Task CancelActiveSessionsForCurrentUser(CancellationToken cancellationToken)
+    {
+        await CleanupExpiredSessions(cancellationToken);
+
+        if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(RequestUser.Id)) throw ApiExceptionDictionary.NoAccount;
+
+        var activeSessions = new List<ChunkedUploadSessionState>();
+
+        foreach (var (sessionId, session) in Sessions)
+        {
+            if (!string.Equals(session.AccountId, RequestUser.AccountId, StringComparison.Ordinal) ||
+                !string.Equals(session.UserId, RequestUser.Id, StringComparison.Ordinal) ||
+                session.Status == ChunkedUploadSessionStatus.Completed)
+            {
+                continue;
+            }
+
+            if (Sessions.TryRemove(sessionId, out var removed))
+            {
+                activeSessions.Add(removed);
+            }
+        }
+
+        foreach (var session in activeSessions)
+        {
+            ReleaseReservedProcessingSlot(session);
+            await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
+        }
     }
 
     public async Task DeleteCommittedSessionBlob(string sessionId)
@@ -259,12 +309,16 @@ public class ChunkedUploadService : ServiceBase
 
     public void RemoveSession(string sessionId)
     {
-        Sessions.TryRemove(sessionId, out _);
+        if (Sessions.TryRemove(sessionId, out var session))
+        {
+            ReleaseReservedProcessingSlot(session);
+        }
     }
 
     public ChunkedUploadSessionState GetRequiredSession(string sessionId)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;
+        if (string.IsNullOrWhiteSpace(RequestUser.Id)) throw ApiExceptionDictionary.NoAccount;
         if (string.IsNullOrWhiteSpace(sessionId)) throw ApiExceptionDictionary.NullValue(nameof(sessionId));
 
         var session = Sessions.TryGetValue(sessionId, out var found)
@@ -278,6 +332,11 @@ public class ChunkedUploadService : ServiceBase
         }
 
         if (!string.Equals(session.AccountId, RequestUser.AccountId, StringComparison.Ordinal))
+        {
+            throw ApiExceptionDictionary.NotFound("Upload session");
+        }
+
+        if (!string.Equals(session.UserId, RequestUser.Id, StringComparison.Ordinal))
         {
             throw ApiExceptionDictionary.NotFound("Upload session");
         }
@@ -306,11 +365,43 @@ public class ChunkedUploadService : ServiceBase
                 return;
             }
 
-            var maxConcurrency = Math.Max(1, options.ImportFileConcurrentUploadsPerInstance);
-            var retryAfterSeconds = Math.Max(1, options.ImportFileBusyRetryAfterSeconds);
+            var maxConcurrency = Math.Max(1, options.MaxConcurrentUploads);
             ProcessingSemaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
-            ProcessingRetryAfterSeconds = retryAfterSeconds;
         }
+    }
+
+    public void ReleaseReservedProcessingSlot(string sessionId)
+    {
+        var session = GetRequiredSession(sessionId);
+        ReleaseReservedProcessingSlot(session);
+    }
+
+    private static void ReleaseReservedProcessingSlot(ChunkedUploadSessionState session)
+    {
+        if (!session.HasReservedProcessingSlot ||
+            string.IsNullOrWhiteSpace(session.ProcessingSlotReservationId))
+        {
+            return;
+        }
+
+        session.HasReservedProcessingSlot = false;
+        ReleaseProcessingSlot(session.ProcessingSlotReservationId);
+        session.ProcessingSlotReservationId = null;
+    }
+
+    private static void ReleaseProcessingSlot(string requestId)
+    {
+        if (string.IsNullOrWhiteSpace(requestId))
+        {
+            return;
+        }
+
+        if (!ActiveProcessingRequests.TryRemove(requestId, out _))
+        {
+            return;
+        }
+
+        ProcessingSemaphore?.Release();
     }
 
     private static async Task<Stream> CreateSeekableChunkStream(
@@ -437,35 +528,6 @@ public class ChunkedUploadService : ServiceBase
         }
     }
 
-    private sealed class ProcessingSlotReleaser : IAsyncDisposable
-    {
-        private readonly SemaphoreSlim _semaphore;
-        private readonly ConcurrentDictionary<string, int> _activeRequests;
-        private readonly string _requestId;
-        private int _disposed;
-
-        public ProcessingSlotReleaser(
-            SemaphoreSlim semaphore,
-            ConcurrentDictionary<string, int> activeRequests,
-            string requestId)
-        {
-            _semaphore = semaphore;
-            _activeRequests = activeRequests;
-            _requestId = requestId;
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 1)
-            {
-                return ValueTask.CompletedTask;
-            }
-
-            _activeRequests.TryRemove(_requestId, out _);
-            _semaphore.Release();
-            return ValueTask.CompletedTask;
-        }
-    }
 }
 
 public class ChunkedUploadSessionCreateRequest
@@ -481,6 +543,7 @@ public class ChunkedUploadSessionState
 {
     public string SessionId { get; set; } = null!;
     public string AccountId { get; set; } = null!;
+    public string UserId { get; set; } = null!;
     public string ContainerName { get; set; } = null!;
     public string FileName { get; set; } = null!;
     public long FileSize { get; set; }
@@ -491,6 +554,8 @@ public class ChunkedUploadSessionState
     public int NextChunkIndex { get; set; }
     public ChunkedUploadSessionStatus Status { get; set; }
     public DateTimeOffset ExpiresOn { get; set; }
+    public bool HasReservedProcessingSlot { get; set; }
+    public string? ProcessingSlotReservationId { get; set; }
     public SemaphoreSlim Gate { get; } = new(1, 1);
     public SortedDictionary<int, ChunkedUploadChunkState> UploadedChunks { get; } = new();
 }

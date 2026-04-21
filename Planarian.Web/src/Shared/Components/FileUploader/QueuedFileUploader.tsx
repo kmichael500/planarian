@@ -6,7 +6,6 @@ import {
 } from "antd";
 import {
   ClearOutlined,
-  ClockCircleOutlined,
   DeleteOutlined,
   DownOutlined,
   EyeOutlined,
@@ -17,7 +16,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./QueuedFileUploader.scss";
 import {
   getUploadDisplayState,
-  VIRTUAL_QUEUE_ROW_HEIGHT,
   VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
 } from "./fileUploaderHelpers";
 import { QueuedFileUploadItem, QueuedFileUploaderProps } from "./types";
@@ -26,10 +24,39 @@ import { VirtualFileList } from "./VirtualFileList";
 interface QueueCardProps<TResult> {
   item: QueuedFileUploadItem<TResult>;
   onRemove: (itemId: string) => void;
+}
+
+interface RecentActivityCardProps<TResult> extends QueueCardProps<TResult> {
   renderRecentActivityTooltip?: (
     item: QueuedFileUploadItem<TResult>
   ) => React.ReactNode;
 }
+
+const getQueueItemProgressVariantClass = <TResult,>(
+  item: QueuedFileUploadItem<TResult>,
+  isAwaitingFinalize: boolean
+) => {
+  if (item.status === "uploading" || item.transportStatus === "finalizing" || isAwaitingFinalize) {
+    return " import-files-dashboard__queue-progress--active";
+  }
+
+  return "";
+};
+
+const getQueueItemStatusLabel = <TResult,>(
+  item: QueuedFileUploadItem<TResult>,
+  isAwaitingFinalize: boolean
+) => {
+  if (item.transportStatus === "finalizing" || isAwaitingFinalize) {
+    return "Finalizing...";
+  }
+
+  if (item.status === "uploading") {
+    return "Uploading";
+  }
+
+  return null;
+};
 
 const QueueCardHeader = <TResult,>({
   item,
@@ -61,19 +88,28 @@ const CurrentUploadCard = <TResult,>({
   item,
   onRemove,
 }: QueueCardProps<TResult>) => {
-  const isActive = item.status === "uploading";
   const displayState = getUploadDisplayState(item);
   const progressPercent = displayState.displayPercent;
   const hasDisplayProgress = displayState.hasProgress;
-  const shouldShowProgress = isActive || hasDisplayProgress;
+  const isAwaitingFinalize =
+    item.status === "queued" &&
+    displayState.totalBytes > 0 &&
+    displayState.acknowledgedBytes >= displayState.totalBytes;
+  const statusLabel = getQueueItemStatusLabel(item, isAwaitingFinalize);
+  const shouldShowProgress = item.status === "uploading" || hasDisplayProgress;
+  const progressLabel =
+    item.transportStatus === "chunk_uploading"
+      ? `${progressPercent}%`
+      : statusLabel ?? `${progressPercent}%`;
 
   return (
     <div className="import-files-dashboard__queue-card">
       <QueueCardHeader item={item} onRemove={onRemove} />
       <div
-        className={`import-files-dashboard__queue-progress${
-          isActive ? " import-files-dashboard__queue-progress--active" : ""
-        }`}
+        className={`import-files-dashboard__queue-progress${getQueueItemProgressVariantClass(
+          item,
+          isAwaitingFinalize
+        )}`}
       >
         {shouldShowProgress && (
           <span
@@ -83,9 +119,7 @@ const CurrentUploadCard = <TResult,>({
         )}
         <span className="import-files-dashboard__queue-progress-content">
           <span>
-            {shouldShowProgress
-              ? `${progressPercent}%`
-              : displayState.sizeLabel}
+            {shouldShowProgress ? progressLabel : displayState.sizeLabel}
           </span>
           {(shouldShowProgress || displayState.hasKnownSize) && (
             <span>{displayState.sizeLabel}</span>
@@ -103,12 +137,15 @@ const QueueFileCard = <TResult,>({
   const displayState = getUploadDisplayState(item);
   if (
     item.status === "uploading" ||
-    (displayState.hasProgress && displayState.displayPercent < 100)
+    displayState.hasProgress
   ) {
-    return <CurrentUploadCard item={item} onRemove={onRemove} />;
+    return (
+      <CurrentUploadCard
+        item={item}
+        onRemove={onRemove}
+      />
+    );
   }
-
-  const isRetrying = item.status === "retry_wait";
 
   return (
     <div className="import-files-dashboard__queue-card">
@@ -118,16 +155,6 @@ const QueueFileCard = <TResult,>({
           <span>{displayState.sizeLabel}</span>
         </span>
       </div>
-      {isRetrying && item.retryAt && (
-        <Typography.Text
-          type="secondary"
-          ellipsis
-          className="import-files-dashboard__queue-note"
-        >
-          <ClockCircleOutlined /> Trying again at{" "}
-          {new Date(item.retryAt).toLocaleTimeString()}
-        </Typography.Text>
-      )}
     </div>
   );
 };
@@ -136,7 +163,7 @@ const RecentActivityCard = <TResult,>({
   item,
   onRemove,
   renderRecentActivityTooltip,
-}: QueueCardProps<TResult>) => {
+}: RecentActivityCardProps<TResult>) => {
   const tooltipTitle = renderRecentActivityTooltip?.(item);
 
   return (
@@ -291,16 +318,16 @@ export const QueuedFileUploader = <TResult,>({
 
   const renderQueueItem = useCallback(
     (item: QueuedFileUploadItem<TResult>) => (
-      <QueueFileCard item={item} onRemove={queue.removeQueueItem} />
+      <QueueFileCard
+        item={item}
+        onRemove={queue.removeQueueItem}
+      />
     ),
     [queue.removeQueueItem]
   );
 
   const getQueueRowHeight = useCallback(
-    (item: QueuedFileUploadItem<TResult>) =>
-      item.status === "retry_wait" && item.retryAt
-        ? VIRTUAL_QUEUE_ROW_HEIGHT
-        : VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
+    () => VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT,
     []
   );
 
@@ -335,7 +362,7 @@ export const QueuedFileUploader = <TResult,>({
         type="file"
         multiple
         style={{ display: "none" }}
-        disabled={queue.isResettingQueue}
+        disabled={queue.isLoadingConfig || queue.isResettingQueue}
         onChange={(event) => {
           void queue.handleFileSelect(event);
         }}
@@ -355,6 +382,7 @@ export const QueuedFileUploader = <TResult,>({
               data-toolbar-action-index="0"
               icon={<FileAddOutlined />}
               onClick={openFilePicker}
+              disabled={queue.isLoadingConfig || queue.isRestoring || queue.isResettingQueue}
             >
               {addFilesLabel}
             </Button>
@@ -410,7 +438,10 @@ export const QueuedFileUploader = <TResult,>({
                           key: "add",
                           icon: <FileAddOutlined />,
                           label: addFilesLabel,
-                          disabled: queue.isRestoring || queue.isResettingQueue,
+                          disabled:
+                            queue.isLoadingConfig ||
+                            queue.isRestoring ||
+                            queue.isResettingQueue,
                         },
                       ]
                     : []),

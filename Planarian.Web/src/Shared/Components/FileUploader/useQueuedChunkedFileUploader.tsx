@@ -2,12 +2,16 @@ import {
   PauseCircleOutlined,
   PlayCircleOutlined,
 } from "@ant-design/icons";
+import axios from "axios";
+import { message } from "antd";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SettingsService } from "../../../Modules/Setting/Services/SettingsService";
+import { ApiErrorResponse } from "../../Models/ApiErrorResponse";
 import { QueuedFileStorage } from "../../Services/QueuedFileStorage";
 import {
-  buildRetryDelayMs,
   createQueueItemId,
   deriveOrderedQueueView,
+  formatFileSize,
   getOrderedPendingQueueItems,
   getPositiveNumber,
   getSafeTotalBytes,
@@ -19,17 +23,14 @@ import {
   waitForNextPaint,
 } from "./fileUploaderHelpers";
 import {
+  ChunkedUploaderConfig,
+  QueuedFileUploadFailureDetails,
   QueuedFileUploadItem,
   UseQueuedChunkedFileUploaderOptions,
   UseQueuedChunkedFileUploaderResult,
 } from "./types";
 
-const DEFAULT_MAX_RETRY_COUNT = 5;
 const DEFAULT_DISPATCH_DELAY_MS = 0;
-const DEFAULT_FILE_UPLOAD_CHUNK_SIZE = 32 * 1024 * 1024;
-const DEFAULT_MAX_UPLOAD_CONCURRENCY_WEIGHT = 3;
-const DEFAULT_SMALL_FILE_CONCURRENCY_THRESHOLD_MB = 30;
-const DEFAULT_LARGE_FILE_CONCURRENCY_THRESHOLD_MB = 100;
 const DEFAULT_FILE_PREPARATION_BATCH_SIZE = 100;
 const LOCAL_STORAGE_VERSION = 1;
 
@@ -43,7 +44,6 @@ interface PersistedQueueItem<TResult>
     | "displayUploadedBytes"
     | "totalBytes"
     | "isCurrentUploadSlot"
-    | "transportStatus"
   > {}
 
 interface PersistedQueueState<TResult> {
@@ -66,30 +66,28 @@ const serializeQueueItem = <TResult,>(
   status: item.status,
   progress: getUploadDisplayState(item).displayPercent,
   retryCount: item.retryCount,
-  retryAt: item.retryAt ?? null,
   lastError: item.lastError ?? null,
   failureCode: item.failureCode ?? null,
-  isRetryable: item.isRetryable,
   requestId: item.requestId ?? null,
+  completedAt: item.completedAt ?? null,
   result: item.result ?? null,
+  transportStatus: item.transportStatus ?? null,
 });
 
 export const useQueuedChunkedFileUploader = <TResult,>({
   storageKey,
   endpoints,
-  normalizeError,
-  isAbortError,
+  mapFailure,
   validateFile,
   onCompleted,
-  maxRetryCount = DEFAULT_MAX_RETRY_COUNT,
-  chunkSize = DEFAULT_FILE_UPLOAD_CHUNK_SIZE,
-  maxConcurrencyWeight = DEFAULT_MAX_UPLOAD_CONCURRENCY_WEIGHT,
   dispatchDelayMs = DEFAULT_DISPATCH_DELAY_MS,
-  smallFileConcurrencyThresholdMb = DEFAULT_SMALL_FILE_CONCURRENCY_THRESHOLD_MB,
-  largeFileConcurrencyThresholdMb = DEFAULT_LARGE_FILE_CONCURRENCY_THRESHOLD_MB,
   filePreparationBatchSize = DEFAULT_FILE_PREPARATION_BATCH_SIZE,
 }: UseQueuedChunkedFileUploaderOptions<TResult>): UseQueuedChunkedFileUploaderResult<TResult> => {
   const [queueItems, setQueueItems] = useState<QueuedFileUploadItem<TResult>[]>([]);
+  const [uploaderConfig, setUploaderConfig] = useState<ChunkedUploaderConfig | null>(
+    null
+  );
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isPaused, setIsPaused] = useState(true);
   const [hasStartedUploadRun, setHasStartedUploadRun] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -108,6 +106,72 @@ export const useQueuedChunkedFileUploader = <TResult,>({
   );
   const filePreparationSessionRef = useRef(0);
   const nextQueueOrderRef = useRef(0);
+  const uploaderConfigRef = useRef<ChunkedUploaderConfig | null>(null);
+
+  const isAbortLikeError = useCallback((error: unknown) => {
+    if (axios.isCancel(error)) {
+      return true;
+    }
+
+    const candidate = error as
+      | { code?: string; name?: string; message?: string }
+      | undefined;
+
+    return (
+      candidate?.code === "ERR_CANCELED" ||
+      candidate?.name === "CanceledError" ||
+      candidate?.name === "AbortError" ||
+      candidate?.message === "canceled"
+    );
+  }, []);
+
+  const normalizeUploadError = useCallback(
+    (error: unknown): QueuedFileUploadFailureDetails => {
+      const uploadResult = error as
+        | Partial<{
+            isSuccessful: boolean;
+            message: string;
+            failureCode: string | null;
+            requestId: string | null;
+          }>
+        | undefined;
+
+      if (
+        uploadResult?.isSuccessful === false &&
+        typeof uploadResult.message === "string" &&
+        "failureCode" in uploadResult
+      ) {
+        return {
+          message: uploadResult.message ?? "The upload failed.",
+          failureCode:
+            typeof uploadResult.failureCode === "string"
+              ? uploadResult.failureCode
+              : null,
+          requestId:
+            typeof uploadResult.requestId === "string"
+              ? uploadResult.requestId
+              : null,
+        };
+      }
+
+      const apiError = error as Partial<ApiErrorResponse> | undefined;
+      const messageText =
+        typeof apiError?.message === "string" && apiError.message.length > 0
+          ? apiError.message
+          : error instanceof Error
+            ? error.message
+            : "The upload failed.";
+
+      return {
+        message: messageText,
+        failureCode:
+          typeof apiError?.errorCode === "string" ? apiError.errorCode : null,
+        requestId:
+          typeof apiError?.requestId === "string" ? apiError.requestId : null,
+      };
+    },
+    []
+  );
 
   const scheduleRunner = useCallback((delayMs: number) => {
     if (runnerTimerRef.current !== null) {
@@ -127,6 +191,45 @@ export const useQueuedChunkedFileUploader = <TResult,>({
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+
+  useEffect(() => {
+    uploaderConfigRef.current = uploaderConfig;
+  }, [uploaderConfig]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setIsLoadingConfig(true);
+    void (async () => {
+      try {
+        const config = await SettingsService.GetChunkedUploaderConfig();
+        if (!isMounted) {
+          return;
+        }
+
+        setUploaderConfig({
+          maxConcurrentUploads: Math.max(0, config.maxConcurrentUploads),
+          maxFileSizeBytes: Math.max(1, config.maxFileSizeBytes),
+          chunkSizeBytes: Math.max(1, config.chunkSizeBytes),
+        });
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setUploaderConfig(null);
+        message.error("Error fetching upload settings.");
+      } finally {
+        if (isMounted) {
+          setIsLoadingConfig(false);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const abortControllers = uploadAbortControllersRef.current;
@@ -155,6 +258,21 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     },
     [storageKey]
   );
+
+  const cancelAllKnownSessions = useCallback(async () => {
+    const sessionIds = Array.from(
+      new Set(
+        queueItemsRef.current
+          .map((item) => item.sessionId)
+          .filter((sessionId): sessionId is string => !!sessionId)
+      )
+    );
+
+    await Promise.allSettled(
+      sessionIds.map((sessionId) => endpoints.cancelSession(sessionId))
+    );
+    await endpoints.cancelAllSessions?.();
+  }, [endpoints]);
 
   useEffect(() => {
     if (!storageKey || isRestoring || !hasHydratedQueueState) return;
@@ -193,6 +311,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       await Promise.allSettled(
         sessionIds.map((sessionId) => endpoints.cancelSession(sessionId))
       );
+      await endpoints.cancelAllSessions?.();
 
       if (storageKey) {
         localStorage.removeItem(storageKey);
@@ -221,6 +340,8 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     setIsRestoring(true);
 
     try {
+      await cancelAllKnownSessions();
+
       const serialized = localStorage.getItem(storageKey);
       if (!serialized) {
         setQueueItems([]);
@@ -235,9 +356,14 @@ export const useQueuedChunkedFileUploader = <TResult,>({
         (persisted.items ?? []).map(async (item) => {
           let file: File | null = null;
           const shouldRestoreFile = item.status !== "uploaded";
+          const restoredStatus = item.status as string;
 
-          if (shouldRestoreFile) {
-            file = await QueuedFileStorage.getFile(storageKey, item.id);
+          try {
+            if (shouldRestoreFile) {
+              file = await QueuedFileStorage.getFile(storageKey, item.id);
+            }
+          } catch {
+            file = null;
           }
 
           if (!file && shouldRestoreFile) {
@@ -247,11 +373,10 @@ export const useQueuedChunkedFileUploader = <TResult,>({
                 typeof item.queueOrder === "number" ? item.queueOrder : 0,
               status: "canceled",
               progress: 0,
-              retryAt: null,
               lastError:
                 item.lastError ??
                 "The queued file could not be restored after refresh. Re-add it to continue.",
-              isRetryable: false,
+              completedAt: item.completedAt ?? new Date().toISOString(),
               file: null,
               sessionId: null,
               uploadedBytes: 0,
@@ -270,9 +395,12 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             ...item,
             queueOrder:
               typeof item.queueOrder === "number" ? item.queueOrder : 0,
-            status: item.status === "uploading" ? "queued" : item.status,
-            progress: item.status === "uploading" ? 0 : item.progress,
-            retryAt: item.retryAt ?? null,
+            status: restoredStatus === "uploading" ? "queued" : item.status,
+            progress: restoredStatus === "uploading" ? 0 : item.progress,
+            completedAt:
+              restoredStatus === "uploading" || restoredStatus === "queued"
+                ? null
+                : item.completedAt ?? null,
             sessionId: null,
             uploadedBytes: 0,
             liveUploadedBytes: 0,
@@ -305,7 +433,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       setIsRestoring(false);
       setHasHydratedQueueState(true);
     }
-  }, [storageKey]);
+  }, [cancelAllKnownSessions, storageKey]);
 
   useEffect(() => {
     void loadPersistedQueue();
@@ -349,10 +477,9 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           ...current,
           status: "canceled",
           progress: 0,
-          retryAt: null,
           lastError:
             "The queued file is no longer available. Re-add it to continue.",
-          isRetryable: false,
+          completedAt: current.completedAt ?? new Date().toISOString(),
           isCurrentUploadSlot: false,
           file: null,
         }));
@@ -361,12 +488,18 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       }
 
       const fileToUpload = file;
+      const activeUploaderConfig = uploaderConfigRef.current;
+      if (!activeUploaderConfig) {
+        startedUploadsRef.current.delete(itemId);
+        return;
+      }
+      const chunkSizeBytes = activeUploaderConfig.chunkSizeBytes;
 
       updateQueueItem(itemId, (current) => ({
         ...current,
         status: "uploading",
         progress: Math.max(getUploadDisplayState(current).displayPercent, 1),
-        retryAt: null,
+        completedAt: null,
         lastError: null,
         file: fileToUpload,
         uploadedBytes: current.uploadedBytes ?? 0,
@@ -380,7 +513,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
         ),
         totalBytes: getSafeTotalBytes(current, fileToUpload.size),
         isCurrentUploadSlot: true,
-        transportStatus: current.transportStatus ?? "chunk_uploading",
+        transportStatus: "chunk_uploading",
       }));
 
       try {
@@ -420,16 +553,17 @@ export const useQueuedChunkedFileUploader = <TResult,>({
               progress: getUploadDisplayState(current).displayPercent,
               isCurrentUploadSlot: true,
               transportStatus: null,
+              completedAt: null,
               file: fileToUpload,
             }));
             return;
           }
 
           const offset = uploadedBytes;
-          const chunkIndex = Math.floor(offset / chunkSize);
+          const chunkIndex = Math.floor(offset / chunkSizeBytes);
           const chunk = fileToUpload.slice(
             offset,
-            Math.min(offset + chunkSize, fileToUpload.size)
+            Math.min(offset + chunkSizeBytes, fileToUpload.size)
           );
           let lastProgressUpdateAt = 0;
           const abortController = new AbortController();
@@ -513,6 +647,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             progress: getUploadDisplayState(current).displayPercent,
             isCurrentUploadSlot: true,
             transportStatus: null,
+            completedAt: null,
             file: fileToUpload,
           }));
           return;
@@ -542,11 +677,10 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           ...current,
           status: "uploaded",
           progress: 100,
-          retryAt: null,
           lastError: null,
           failureCode: null,
-          isRetryable: false,
           requestId: null,
+          completedAt: new Date().toISOString(),
           result,
           sessionId: null,
           uploadedBytes: fileToUpload.size,
@@ -565,18 +699,17 @@ export const useQueuedChunkedFileUploader = <TResult,>({
 
         if (
           uploadAbortControllersRef.current.get(itemId)?.signal.aborted ||
-          isAbortError(error)
+          isAbortLikeError(error)
         ) {
           const preservedUploadedBytes = currentItem.uploadedBytes ?? 0;
           updateQueueItem(itemId, (current) => ({
             ...current,
             status: "queued",
             progress: getUploadDisplayState(current).displayPercent,
-            retryAt: null,
             lastError: null,
             failureCode: null,
-            isRetryable: false,
             requestId: null,
+            completedAt: null,
             result: null,
             sessionId: current.sessionId ?? null,
             uploadedBytes: preservedUploadedBytes,
@@ -596,19 +729,19 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           return;
         }
 
-        const failure = normalizeError(error);
-        const nextRetryCount = currentItem.retryCount + 1;
+        const failure = mapFailure
+          ? mapFailure(normalizeUploadError(error), error)
+          : normalizeUploadError(error);
 
         if (failure.failureCode === "NotFound" && currentSessionId) {
           updateQueueItem(itemId, (current) => ({
             ...current,
             status: "queued",
             progress: 0,
-            retryAt: null,
             lastError: null,
             failureCode: null,
-            isRetryable: false,
             requestId: null,
+            completedAt: null,
             result: null,
             sessionId: null,
             uploadedBytes: 0,
@@ -622,59 +755,36 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           return;
         }
 
-        if (failure.isRetryable && nextRetryCount <= maxRetryCount) {
-          const delayMs = buildRetryDelayMs(
-            currentItem.retryCount,
-            failure.retryAfterSeconds
-          );
+        const terminalStatus = failure.terminalStatus ?? "failed";
 
-          updateQueueItem(itemId, (current) => ({
-            ...current,
-            status: "retry_wait",
-            progress: 0,
-            retryCount: current.retryCount + 1,
-            retryAt: Date.now() + delayMs,
-            lastError: failure.message,
-            failureCode: failure.failureCode ?? null,
-            isRetryable: true,
-            requestId: failure.requestId ?? null,
-            result: null,
-            sessionId: current.sessionId ?? null,
-            uploadedBytes: current.uploadedBytes ?? 0,
-            liveUploadedBytes: Math.max(
-              current.uploadedBytes ?? 0,
-              current.liveUploadedBytes ?? 0
-            ),
-            displayUploadedBytes: Math.max(
-              current.uploadedBytes ?? 0,
-              current.displayUploadedBytes ?? 0
-            ),
-            totalBytes: getSafeTotalBytes(current, fileToUpload.size),
-            isCurrentUploadSlot: false,
-            transportStatus: null,
-            file: fileToUpload,
-          }));
-        } else {
-          updateQueueItem(itemId, (current) => ({
-            ...current,
-            status: failure.terminalStatus ?? "failed",
-            progress: 0,
-            retryAt: null,
-            retryCount: current.retryCount + (failure.isRetryable ? 1 : 0),
-            lastError: failure.message,
-            failureCode: failure.failureCode ?? null,
-            isRetryable: failure.isRetryable,
-            requestId: failure.requestId ?? null,
-            result: null,
-            sessionId: null,
-            uploadedBytes: 0,
-            liveUploadedBytes: 0,
-            displayUploadedBytes: 0,
-            totalBytes: fileToUpload.size,
-            isCurrentUploadSlot: false,
-            transportStatus: null,
-            file: fileToUpload,
-          }));
+        updateQueueItem(itemId, (current) => ({
+          ...current,
+          status: terminalStatus,
+          progress: 0,
+          retryCount:
+            terminalStatus === "failed" ? current.retryCount + 1 : current.retryCount,
+          lastError: failure.message,
+          failureCode: failure.failureCode ?? null,
+          requestId: failure.requestId ?? null,
+          completedAt: new Date().toISOString(),
+          result: null,
+          sessionId: null,
+          uploadedBytes: 0,
+          liveUploadedBytes: 0,
+          displayUploadedBytes: 0,
+          totalBytes: fileToUpload.size,
+          isCurrentUploadSlot: false,
+          transportStatus: null,
+          file: fileToUpload,
+        }));
+
+        if (terminalStatus !== "skipped") {
+          setIsPaused(true);
+          uploadAbortControllersRef.current.forEach((controller, activeItemId) => {
+            if (activeItemId !== itemId) {
+              controller.abort();
+            }
+          });
         }
       } finally {
         uploadAbortControllersRef.current.delete(itemId);
@@ -684,27 +794,24 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       }
     },
     [
-      chunkSize,
       dispatchDelayMs,
       endpoints,
-      isAbortError,
-      maxRetryCount,
-      normalizeError,
+      isAbortLikeError,
+      mapFailure,
+      normalizeUploadError,
       storageKey,
       updateQueueItem,
     ]
   );
 
   useEffect(() => {
-    if (!storageKey || isPaused || isRestoring) return;
+    if (!storageKey || !uploaderConfig || isPaused || isRestoring) return;
 
     const now = Date.now();
     const { runnableItems } = deriveOrderedQueueView(
       queueItems,
       now,
-      maxConcurrencyWeight,
-      smallFileConcurrencyThresholdMb,
-      largeFileConcurrencyThresholdMb
+      uploaderConfig.maxConcurrentUploads
     );
     const waitForDispatch = nextDispatchAllowedAtRef.current - now;
     if (waitForDispatch > 0) {
@@ -712,15 +819,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
       return;
     }
 
-    const nextRetryAt = queueItems
-      .filter((item) => item.status === "retry_wait" && item.retryAt)
-      .map((item) => item.retryAt as number)
-      .sort((left, right) => left - right)[0];
-
     if (runnableItems.length === 0) {
-      if (nextRetryAt && nextRetryAt > now) {
-        scheduleRunner(nextRetryAt - now);
-      }
       return;
     }
 
@@ -732,21 +831,32 @@ export const useQueuedChunkedFileUploader = <TResult,>({
   }, [
     isPaused,
     isRestoring,
-    largeFileConcurrencyThresholdMb,
-    maxConcurrencyWeight,
     queueItems,
     runnerTick,
     scheduleRunner,
-    smallFileConcurrencyThresholdMb,
     storageKey,
+    uploaderConfig,
     uploadQueueItem,
   ]);
 
   const addFilesToQueue = useCallback(
     async (fileList: FileList) => {
+      const activeUploaderConfig = uploaderConfigRef.current;
+      if (!activeUploaderConfig) {
+        return;
+      }
+
       const validFiles = Array.from(fileList).filter((file) =>
-        validateFile ? validateFile(file) : true
+        file.size <= activeUploaderConfig.maxFileSizeBytes &&
+        (validateFile ? validateFile(file) : true)
       );
+
+      Array.from(fileList).forEach((file) => {
+        if (file.size > activeUploaderConfig.maxFileSizeBytes) {
+          const sizeLabel = formatFileSize(activeUploaderConfig.maxFileSizeBytes);
+          message.error(`${file.name} exceeds the ${sizeLabel} upload limit.`);
+        }
+      });
 
       if (validFiles.length === 0) return;
 
@@ -770,11 +880,10 @@ export const useQueuedChunkedFileUploader = <TResult,>({
           status: "queued",
           progress: 0,
           retryCount: 0,
-          retryAt: null,
           lastError: null,
           failureCode: null,
-          isRetryable: false,
           requestId: null,
+          completedAt: null,
           result: null,
           sessionId: null,
           uploadedBytes: 0,
@@ -808,7 +917,6 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             startIndex += filePreparationBatchSize
           ) {
             if (preparationSession !== filePreparationSessionRef.current) {
-              await QueuedFileStorage.clearQueue(storageKey);
               return;
             }
 
@@ -826,7 +934,6 @@ export const useQueuedChunkedFileUploader = <TResult,>({
             );
 
             if (preparationSession !== filePreparationSessionRef.current) {
-              await QueuedFileStorage.clearQueue(storageKey);
               return;
             }
 
@@ -849,13 +956,12 @@ export const useQueuedChunkedFileUploader = <TResult,>({
               status: item.file ? ("queued" as const) : ("canceled" as const),
               progress: 0,
               retryCount: 0,
-              retryAt: null,
               lastError: item.file
                 ? null
                 : "The queued file is no longer available. Re-add it to continue.",
               failureCode: null,
-              isRetryable: false,
               requestId: null,
+              completedAt: null,
               result: null,
               sessionId: null,
               uploadedBytes: 0,
@@ -925,9 +1031,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     const failed = queueItems.filter((item) => item.status === "failed").length;
     const canceled = queueItems.filter((item) => item.status === "canceled").length;
     const uploading = queueItems.filter((item) => item.status === "uploading").length;
-    const queued = queueItems.filter(
-      (item) => item.status === "queued" || item.status === "retry_wait"
-    ).length;
+    const queued = queueItems.filter((item) => item.status === "queued").length;
     const remaining = queued + uploading;
 
     return { uploaded, skipped, failed, canceled, uploading, queued, remaining };
@@ -948,9 +1052,13 @@ export const useQueuedChunkedFileUploader = <TResult,>({
 
   const recentActivity = useMemo(
     () =>
-      queueItems
+      [...queueItems]
         .filter((item) => isTerminalStatus(item.status))
-        .reverse(),
+        .sort(
+          (left, right) =>
+            (right.completedAt ?? "").localeCompare(left.completedAt ?? "") ||
+            right.queueOrder - left.queueOrder
+        ),
     [queueItems]
   );
 
@@ -1014,7 +1122,11 @@ export const useQueuedChunkedFileUploader = <TResult,>({
 
   const uploadControl = useMemo(() => {
     const canPause = !isPaused && queueStats.remaining > 0;
-    const canStart = isPaused && queueStats.queued > 0;
+    const canStart =
+      isPaused &&
+      queueStats.queued > 0 &&
+      !isLoadingConfig &&
+      (uploaderConfig?.maxConcurrentUploads ?? 0) > 0;
 
     if (canPause) {
       return {
@@ -1034,11 +1146,13 @@ export const useQueuedChunkedFileUploader = <TResult,>({
   }, [
     hasStartedUploadRun,
     isPaused,
+    isLoadingConfig,
     isRestoring,
     pauseUploads,
     queueStats.queued,
     queueStats.remaining,
     startOrResumeUploads,
+    uploaderConfig,
   ]);
 
   const removeQueueItem = useCallback(
@@ -1072,6 +1186,7 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     aggregateProgress,
     fileResults,
     isPaused,
+    isLoadingConfig,
     hasStartedUploadRun,
     isRestoring,
     isResettingQueue,

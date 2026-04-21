@@ -7,7 +7,6 @@ export type QueuedFileUploadStatus =
   | "uploaded"
   | "skipped"
   | "failed"
-  | "retry_wait"
   | "canceled";
 
 export interface ChunkedUploadSession {
@@ -17,11 +16,15 @@ export interface ChunkedUploadSession {
   status?: string;
 }
 
+export interface ChunkedUploaderConfig {
+  maxConcurrentUploads: number;
+  maxFileSizeBytes: number;
+  chunkSizeBytes: number;
+}
+
 export interface QueuedFileUploadFailureDetails {
   message: string;
   failureCode?: string | null;
-  isRetryable: boolean;
-  retryAfterSeconds?: number;
   requestId?: string | null;
   terminalStatus?: "failed" | "skipped";
 }
@@ -45,6 +48,7 @@ export interface QueuedFileUploadEndpoints<TResult> {
     signal?: AbortSignal
   ) => Promise<TResult>;
   cancelSession: (sessionId: string) => Promise<void>;
+  cancelAllSessions?: () => Promise<void>;
 }
 
 export interface QueuedFileUploadItem<TResult> {
@@ -58,11 +62,10 @@ export interface QueuedFileUploadItem<TResult> {
   status: QueuedFileUploadStatus;
   progress: number;
   retryCount: number;
-  retryAt?: number | null;
   lastError?: string | null;
   failureCode?: string | null;
-  isRetryable: boolean;
   requestId?: string | null;
+  completedAt?: string | null;
   result?: TResult | null;
   sessionId?: string | null;
   uploadedBytes?: number;
@@ -106,16 +109,13 @@ export interface QueuedFileUploaderProps<TResult> {
 export interface UseQueuedChunkedFileUploaderOptions<TResult> {
   storageKey: string | null;
   endpoints: QueuedFileUploadEndpoints<TResult>;
-  normalizeError: (error: unknown) => QueuedFileUploadFailureDetails;
-  isAbortError: (error: unknown) => boolean;
+  mapFailure?: (
+    failure: QueuedFileUploadFailureDetails,
+    error: unknown
+  ) => QueuedFileUploadFailureDetails;
   validateFile?: (file: File) => boolean;
   onCompleted?: (items: QueuedFileUploadItem<TResult>[]) => void;
-  maxRetryCount?: number;
-  chunkSize?: number;
-  maxConcurrencyWeight?: number;
   dispatchDelayMs?: number;
-  smallFileConcurrencyThresholdMb?: number;
-  largeFileConcurrencyThresholdMb?: number;
   filePreparationBatchSize?: number;
 }
 
@@ -128,6 +128,7 @@ export interface UseQueuedChunkedFileUploaderResult<TResult> {
   aggregateProgress: number;
   fileResults: QueuedFileUploadItem<TResult>[];
   isPaused: boolean;
+  isLoadingConfig: boolean;
   hasStartedUploadRun: boolean;
   isRestoring: boolean;
   isResettingQueue: boolean;

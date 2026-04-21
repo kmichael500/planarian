@@ -122,7 +122,7 @@ export const getUploadDisplayState = <TResult,>(
       ? 100
       : totalBytes > 0 && displayUploadedBytes >= totalBytes
         ? 100
-        : displayUploadedBytes > 0
+      : displayUploadedBytes > 0
         ? Math.min(99, Math.max(1, rawDisplayPercent))
         : 0;
   const hasProgress = displayUploadedBytes > 0 && totalBytes > 0;
@@ -140,23 +140,6 @@ export const getUploadDisplayState = <TResult,>(
   };
 };
 
-export const getUploadWeight = (
-  size: number,
-  smallFileConcurrencyThresholdMb: number,
-  largeFileConcurrencyThresholdMb: number
-) => {
-  const sizeInMb = size / 1024 / 1024;
-  if (sizeInMb > largeFileConcurrencyThresholdMb) {
-    return 3;
-  }
-
-  if (sizeInMb > smallFileConcurrencyThresholdMb) {
-    return 2;
-  }
-
-  return 1;
-};
-
 export const sortQueueItemsByAddedOrder = <TResult,>(
   items: QueuedFileUploadItem<TResult>[]
 ) =>
@@ -170,56 +153,34 @@ export const sortQueueItemsByAddedOrder = <TResult,>(
 export const canStartUpload = <TResult,>(
   item: QueuedFileUploadItem<TResult>,
   now: number
-) =>
-  (item.status === "queued" ||
-    (item.status === "retry_wait" && (item.retryAt ?? 0) <= now)) &&
-  !!item.file;
+) => item.status === "queued" && !!item.file;
 
 export const deriveOrderedQueueView = <TResult,>(
   items: QueuedFileUploadItem<TResult>[],
   now: number,
-  maxConcurrencyWeight: number,
-  smallFileConcurrencyThresholdMb: number,
-  largeFileConcurrencyThresholdMb: number
+  maxConcurrentUploads: number
 ) => {
   const orderedItems = sortQueueItemsByAddedOrder(items);
   const activeItems = orderedItems.filter((item) => item.status === "uploading");
-  const activeWeight = activeItems.reduce(
-    (sum, item) =>
-      sum +
-      getUploadWeight(
-        getDisplayTotalBytes(item),
-        smallFileConcurrencyThresholdMb,
-        largeFileConcurrencyThresholdMb
-      ),
-    0
-  );
-  let remainingWeightBudget = Math.max(0, maxConcurrencyWeight - activeWeight);
+  const remainingUploadSlots = Math.max(0, maxConcurrentUploads - activeItems.length);
 
-  const runnableCandidates = orderedItems.filter(
-    (item) =>
-      item.status === "queued" ||
-      (item.status === "retry_wait" && (item.retryAt ?? 0) <= now)
-  );
+  const runnableCandidates = orderedItems.filter((item) => item.status === "queued");
   const runnableItems: QueuedFileUploadItem<TResult>[] = [];
+  if (remainingUploadSlots <= 0) {
+    return {
+      orderedItems,
+      runnableItems,
+      activeItems,
+    };
+  }
+
   for (const item of runnableCandidates) {
     if (!canStartUpload(item, now)) {
       continue;
     }
 
-    const itemWeight = getUploadWeight(
-      getDisplayTotalBytes(item),
-      smallFileConcurrencyThresholdMb,
-      largeFileConcurrencyThresholdMb
-    );
-    if (itemWeight > remainingWeightBudget) {
-      continue;
-    }
-
     runnableItems.push(item);
-    remainingWeightBudget -= itemWeight;
-
-    if (remainingWeightBudget <= 0) {
+    if (runnableItems.length >= remainingUploadSlots) {
       break;
     }
   }
@@ -235,24 +196,8 @@ export const getOrderedPendingQueueItems = <TResult,>(
   items: QueuedFileUploadItem<TResult>[]
 ) =>
   sortQueueItemsByAddedOrder(items).filter(
-    (item) =>
-      item.status === "queued" ||
-      item.status === "retry_wait" ||
-      item.status === "uploading"
+    (item) => item.status === "queued" || item.status === "uploading"
   );
-
-export const buildRetryDelayMs = (
-  retryCount: number,
-  retryAfterSeconds?: number
-) => {
-  if (retryAfterSeconds && retryAfterSeconds > 0) {
-    return retryAfterSeconds * 1000;
-  }
-
-  const backoffMs = Math.min(60000, 2000 * 2 ** retryCount);
-  const jitterMs = Math.min(5000, retryCount * 250);
-  return backoffMs + jitterMs;
-};
 
 export const waitForNextPaint = async () => {
   await new Promise<void>((resolve) => {

@@ -12,6 +12,21 @@ public partial class ImportService
     {
         await CleanupExpiredUploadSessions(cancellationToken);
 
+        var validation = await ValidateFileImport(
+            request.FileName,
+            request.IdRegex,
+            request.DelimiterRegex,
+            request.IgnoreDuplicates,
+            request.RequestId,
+            cancellationToken);
+        if (!validation.Result.IsSuccessful)
+        {
+            throw ApiExceptionDictionary.FromErrorCode(
+                validation.Result.FailureCode,
+                validation.Result.Message,
+                validation.Result);
+        }
+
         var session = await _chunkedUploadService.CreateSession(
             new ChunkedUploadSessionCreateRequest
             {
@@ -71,10 +86,6 @@ public partial class ImportService
 
         var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
 
-        await using var admission = await _chunkedUploadService.AcquireProcessingSlot(
-            importSession.CompletionRequestId ?? session.SessionId,
-            cancellationToken);
-
         var result = await ProcessStagedFileImport(
             session.BlobKey,
             session.FileName,
@@ -86,8 +97,15 @@ public partial class ImportService
 
         result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
         importSession.CompletionResult = result;
+        try
+        {
+            await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
+        }
+        finally
+        {
+            _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+        }
 
-        await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
         return result;
     }
 
@@ -97,6 +115,12 @@ public partial class ImportService
 
         GetRequiredImportUploadSession(sessionId);
         await _chunkedUploadService.CancelSession(sessionId, cancellationToken);
+    }
+
+    public async Task CancelActiveFileUploadSessions(CancellationToken cancellationToken)
+    {
+        await CleanupExpiredUploadSessions(cancellationToken);
+        await _chunkedUploadService.CancelActiveSessionsForCurrentUser(cancellationToken);
     }
 
     private async Task<FileImportResult> ProcessFileImport(Stream stream, string fileName, string idRegex,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Import.Models;
+using Planarian.Shared.Attributes;
 
 // ReSharper disable once CheckNamespace ( for partial class compatability )
 namespace Planarian.Modules.Account.Controller;
@@ -50,6 +51,7 @@ public partial class AccountController
     }
 
     [HttpPost("import/file/session")]
+    [Throttle(RequestsPerMinute = 1200)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<ImportFileUploadSessionVm>> CreateImportFileUploadSession(
         [FromBody] ImportFileRequest request,
@@ -60,6 +62,7 @@ public partial class AccountController
     }
 
     [HttpPut("import/file/session/{sessionId}")]
+    [Throttle(RequestsPerMinute = 1200)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<ActionResult<ImportFileUploadSessionVm>> UploadImportFileChunk(
         string sessionId,
@@ -79,6 +82,7 @@ public partial class AccountController
     }
 
     [HttpPost("import/file/session/{sessionId}/finalize")]
+    [Throttle(RequestsPerMinute = 1200)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> FinalizeImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
@@ -94,10 +98,20 @@ public partial class AccountController
     }
 
     [HttpDelete("import/file/session/{sessionId}")]
+    [Throttle(RequestsPerMinute = 1200)]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> CancelImportFileUploadSession(string sessionId, CancellationToken cancellationToken)
     {
         await _importService.CancelFileUploadSession(sessionId, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("import/file/session")]
+    [Throttle(RequestsPerMinute = 1200)]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<IActionResult> CancelActiveImportFileUploadSessions(CancellationToken cancellationToken)
+    {
+        await _importService.CancelActiveFileUploadSessions(cancellationToken);
         return NoContent();
     }
 

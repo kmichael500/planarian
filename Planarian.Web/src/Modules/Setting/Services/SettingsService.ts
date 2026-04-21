@@ -5,9 +5,16 @@ import { CacheService } from "../../../Shared/Services/CacheService";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { TagType } from "../../Tag/Models/TagType";
 import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
+import { ChunkedUploaderConfig } from "../../../Shared/Components/FileUploader/types";
 
 const baseUrl = "api/settings";
 const SettingsService = {
+  async GetChunkedUploaderConfig(): Promise<ChunkedUploaderConfig> {
+    const response = await HttpClient.get<ChunkedUploaderConfig>(
+      `${baseUrl}/chunked-uploader`
+    );
+    return response.data;
+  },
   async GetStates(
     permissionKey: PermissionKey | null = null
   ): Promise<SelectListItem<string>[]> {

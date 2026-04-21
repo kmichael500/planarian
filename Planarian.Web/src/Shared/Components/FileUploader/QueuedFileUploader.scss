@@ -321,6 +321,11 @@
   background: color-mix(in srgb, var(--primary-color, #1677ff) 12%, var(--border-color));
 }
 
+.import-files-dashboard__queue-progress--finalizing {
+  justify-content: stretch;
+  background: color-mix(in srgb, #0f766e 14%, var(--border-color));
+}
+
 .import-files-dashboard__queue-progress--overall {
   min-height: 34px;
 }
@@ -343,6 +348,10 @@
   border-radius: inherit;
   background: color-mix(in srgb, var(--primary-color, #1677ff) 76%, transparent);
   transition: width 0.2s ease;
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #0f766e 76%, transparent);
 }
 
 .import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-fill,
@@ -378,6 +387,10 @@
 
 .import-files-dashboard__queue-progress--active .import-files-dashboard__queue-progress-content {
   color: color-mix(in srgb, var(--surface-color) 88%, white);
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-content {
+  color: color-mix(in srgb, var(--surface-color) 90%, white);
 }
 
 .import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-content,
