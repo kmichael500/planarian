@@ -86,38 +86,42 @@ public partial class ImportService
 
         var session = await _chunkedUploadService.CommitSession(sessionId, cancellationToken);
 
-        var result = await ProcessStagedFileImport(
-            session.BlobKey,
-            session.FileName,
-            importSession.IdRegex,
-            importSession.DelimiterRegex,
-            importSession.IgnoreDuplicates,
-            importSession.CompletionRequestId ?? session.SessionId,
-            cancellationToken);
-
-        result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
-        importSession.CompletionResult = result;
-
         try
         {
-            await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
-        }
-        catch
-        {
-            // The file has already been published successfully. Cleanup failures
-            // should not turn the request into a user-visible import failure.
-        }
+            var result = await ProcessStagedFileImport(
+                session.BlobKey,
+                session.FileName,
+                importSession.IdRegex,
+                importSession.DelimiterRegex,
+                importSession.IgnoreDuplicates,
+                importSession.CompletionRequestId ?? session.SessionId,
+                cancellationToken);
 
-        try
-        {
-            _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+            result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
+            importSession.CompletionResult = result;
+            return result;
         }
-        catch
+        finally
         {
-            // The import succeeded; treat slot-release cleanup as best effort.
-        }
+            try
+            {
+                await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
+            }
+            catch
+            {
+                // The file has already been published successfully. Cleanup failures
+                // should not turn the request into a user-visible import failure.
+            }
 
-        return result;
+            try
+            {
+                _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+            }
+            catch
+            {
+                // The import attempt is finished; treat slot-release cleanup as best effort.
+            }
+        }
     }
 
     public async Task CancelFileUploadSession(string sessionId, CancellationToken cancellationToken)
@@ -196,6 +200,13 @@ public partial class ImportService
             result.Message = e.Message;
             result.IsSuccessful = false;
             result.FailureCode = e.ErrorCode.ToString();
+            return (result, null);
+        }
+        catch (ArgumentException e)
+        {
+            result.Message = e.Message;
+            result.IsSuccessful = false;
+            result.FailureCode = ApiExceptionType.BadRequest.ToString();
             return (result, null);
         }
 
