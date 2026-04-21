@@ -29,17 +29,8 @@ interface ImportCaveComponentProps {
   onUploaded: () => void;
 }
 
-const createStorageKey = (accountId: string, settings: ImportFileSettings) =>
-  [
-    LOCAL_STORAGE_PREFIX,
-    accountId,
-    settings.delimiter || "__none__",
-    settings.idRegex,
-    settings.ignoreDuplicates ? "ignore-duplicates" : "keep-duplicates",
-    settings.pauseOnFailures === false
-      ? "continue-on-failures"
-      : "pause-on-failures",
-  ].join("::");
+const createStorageKey = (accountId: string) =>
+  [LOCAL_STORAGE_PREFIX, accountId].join("::");
 
 const createSettingsStorageKey = (accountId: string) =>
   `${SETTINGS_STORAGE_PREFIX}::${accountId}`;
@@ -78,8 +69,7 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     [accountId]
   );
   const queueStorageKey = useMemo(
-    () =>
-      confirmedSettings ? createStorageKey(accountId, confirmedSettings) : null,
+    () => (confirmedSettings ? createStorageKey(accountId) : null),
     [accountId, confirmedSettings]
   );
 
@@ -186,13 +176,22 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
     pauseOnFailures: confirmedSettings?.pauseOnFailures ?? true,
   });
 
-  const resetQueueAndSettings = useCallback(async () => {
-    await queue.resetQueueState();
-    localStorage.removeItem(settingsStorageKey);
+  const showSettings = useCallback(() => {
+    if (!queue.isPaused) {
+      queue.uploadControl.onClick();
+    }
+
+    if (confirmedSettings) {
+      form.setFieldsValue({
+        delimiter: confirmedSettings.delimiter,
+        idRegex: confirmedSettings.idRegex,
+        ignoreDuplicates: confirmedSettings.ignoreDuplicates,
+        pauseOnFailures: confirmedSettings.pauseOnFailures ?? true,
+      });
+    }
+
     setInputsConfirmed(false);
-    setConfirmedSettings(null);
-    form.resetFields();
-  }, [form, queue, settingsStorageKey]);
+  }, [confirmedSettings, form, queue.isPaused, queue.uploadControl]);
 
   const fileResults = useMemo(
     () => queue.fileResults.map(createCsvRow),
@@ -237,10 +236,8 @@ export const ImportFilesComponent: React.FC<ImportCaveComponentProps> = ({
 
       {inputsConfirmed && (
         <QueuedFileUploader
-          queue={{
-            ...queue,
-            resetQueueState: resetQueueAndSettings,
-          }}
+          queue={queue}
+          onEditSettings={showSettings}
           onViewResults={() => setIsModalOpen(true)}
           hasResults={fileResults.length > 0}
           renderRecentActivityTooltip={renderRecentActivityTooltip}

@@ -70,15 +70,19 @@
   display: none;
 }
 
-.import-files-dashboard__toolbar-actions--collapse-1 .import-files-dashboard__toolbar-secondary--reset,
-.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--reset,
-.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--results,
-.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--reset,
+.import-files-dashboard__toolbar-actions--collapse-1 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-secondary--settings,
+.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--settings,
 .import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--results,
-.import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-secondary--retry,
-.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-primary,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-secondary {
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--clear,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--settings,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--results,
+.import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-secondary--retry,
+.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-secondary,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-primary,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-secondary {
   display: none;
 }
 
@@ -86,7 +90,8 @@
 .import-files-dashboard__toolbar-actions--collapse-2 .import-files-dashboard__toolbar-more,
 .import-files-dashboard__toolbar-actions--collapse-3 .import-files-dashboard__toolbar-more,
 .import-files-dashboard__toolbar-actions--collapse-4 .import-files-dashboard__toolbar-more,
-.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-more {
+.import-files-dashboard__toolbar-actions--collapse-5 .import-files-dashboard__toolbar-more,
+.import-files-dashboard__toolbar-actions--collapse-6 .import-files-dashboard__toolbar-more {
   display: inline-flex;
 }
 
@@ -300,7 +305,7 @@
   min-height: 22px;
 }
 
-.import-files-dashboard__queue-remove {
+.import-files-dashboard__queue-action {
   flex: 0 0 auto;
 }
 

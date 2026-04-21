@@ -108,6 +108,7 @@ export interface QueuedFileUploaderProps<TResult> {
   queue: UseQueuedChunkedFileUploaderResult<TResult>;
   copy?: QueuedFileUploaderCopy;
   onViewResults?: () => void;
+  onEditSettings?: () => void;
   hasResults?: boolean;
   renderRecentActivityTooltip?: (
     item: QueuedFileUploadItem<TResult>
@@ -154,6 +155,7 @@ export interface UseQueuedChunkedFileUploaderResult<TResult> {
   handleDragEnter: (event: React.DragEvent<HTMLElement>) => void;
   handleDragLeave: (event: React.DragEvent<HTMLElement>) => void;
   retryFailed: () => void;
+  retryQueueItem: (itemId: string) => void;
   resetQueueState: () => Promise<void>;
   removeQueueItem: (itemId: string) => void;
 }

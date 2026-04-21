@@ -217,6 +217,25 @@
   align-items: flex-start;
 }
 
+.import-file-settings__field-card--toggle-stack {
+  gap: 8px;
+}
+
+.import-file-settings__field-card--toggle-stack .ant-form-item-control-input {
+  min-height: 24px;
+}
+
+.import-file-settings__checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-file-settings__checkbox-info {
+  color: var(--muted-text-color);
+  font-size: 13px;
+}
+
 .import-file-settings__field-card .ant-input {
   min-height: 40px;
 }
