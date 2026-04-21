@@ -264,8 +264,21 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             progress.Report($"Deleted {totalDeleted} cave other tags.");
         } while (deletedCount == batchSize);
 
-        // Step 4: Delete the cave
         progress.Report("Deleting the cave...");
+
+        deletedCount = 0;
+        totalDeleted = 0;
+        do
+        {
+            deletedCount = await DbContext.Favorites
+                .Where(f => f.Cave.AccountId == RequestUser.AccountId)
+                .Take(batchSize)
+                .IgnoreQueryFilters()
+                .ExecuteDeleteAsync(cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} favorites.");
+        } while (deletedCount == batchSize);
 
         deletedCount = 0;
         totalDeleted = 0;
