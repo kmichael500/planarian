@@ -76,40 +76,23 @@ public class ChunkedUploadService : ServiceBase
             throw ApiExceptionDictionary.NullValue(nameof(request.BlobKeyPrefix));
 
         var sessionId = Guid.NewGuid().ToString("N");
-        var slotReserved = false;
-
-        try
+        var session = new ChunkedUploadSessionState
         {
-            await ReserveProcessingSlot(sessionId, cancellationToken);
-            slotReserved = true;
+            SessionId = sessionId,
+            AccountId = RequestUser.AccountId,
+            UserId = RequestUser.Id,
+            ContainerName = RequestUser.AccountContainerName,
+            FileName = request.FileName,
+            FileSize = request.FileSize,
+            RequestId = request.RequestId,
+            BlobKey = $"{request.BlobKeyPrefix.TrimEnd('/')}/{sessionId}",
+            Metadata = request.Metadata,
+            Status = ChunkedUploadSessionStatus.Created,
+            ExpiresOn = DateTimeOffset.UtcNow.Add(SessionTtl),
+        };
 
-            var session = new ChunkedUploadSessionState
-            {
-                SessionId = sessionId,
-                AccountId = RequestUser.AccountId,
-                UserId = RequestUser.Id,
-                ContainerName = RequestUser.AccountContainerName,
-                FileName = request.FileName,
-                FileSize = request.FileSize,
-                RequestId = request.RequestId,
-                BlobKey = $"{request.BlobKeyPrefix.TrimEnd('/')}/{sessionId}",
-                Metadata = request.Metadata,
-                Status = ChunkedUploadSessionStatus.Created,
-                ExpiresOn = DateTimeOffset.UtcNow.Add(SessionTtl),
-            };
-
-            Sessions[session.SessionId] = session;
-            return session;
-        }
-        catch
-        {
-            if (slotReserved)
-            {
-                ReleaseProcessingSlot(sessionId);
-            }
-
-            throw;
-        }
+        Sessions[session.SessionId] = session;
+        return session;
     }
 
     public async Task<ChunkedUploadSessionState> UploadChunk(
@@ -234,6 +217,7 @@ public class ChunkedUploadService : ServiceBase
                 throw ApiExceptionDictionary.BadRequest("The upload session is incomplete and cannot be finalized.");
             }
 
+            await ReserveProcessingSlot(session.SessionId, cancellationToken);
             session.Status = ChunkedUploadSessionStatus.Finalizing;
             try
             {
@@ -276,6 +260,8 @@ public class ChunkedUploadService : ServiceBase
     {
         var semaphore = ProcessingSemaphore ?? throw new InvalidOperationException("Upload admission is not initialized.");
 
+        ReleaseProcessingSlotsWithoutSessions();
+
         if (!await semaphore.WaitAsync(TimeSpan.Zero, cancellationToken))
         {
             throw ApiExceptionDictionary.TooManyRequests(
@@ -283,6 +269,19 @@ public class ChunkedUploadService : ServiceBase
         }
 
         ActiveProcessingRequests[requestId] = 0;
+    }
+
+    private static void ReleaseProcessingSlotsWithoutSessions()
+    {
+        foreach (var requestId in ActiveProcessingRequests.Keys)
+        {
+            if (Sessions.ContainsKey(requestId))
+            {
+                continue;
+            }
+
+            ReleaseProcessingSlot(requestId);
+        }
     }
 
     public async Task CancelSession(string sessionId, CancellationToken cancellationToken)
