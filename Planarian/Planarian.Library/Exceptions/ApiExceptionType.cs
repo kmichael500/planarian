@@ -24,6 +24,7 @@ public enum ApiExceptionType
     EntranceRequired = 303,
     InvalidImport = 400,
     NullValue = 401,
+    SessionCancelled = 402,
     QueryInvalidValue = 500,
     TooManyRequests = 501,
     UnexpectedIssue = -1,

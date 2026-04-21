@@ -97,13 +97,24 @@ public partial class ImportService
 
         result.RequestId ??= importSession.CompletionRequestId ?? session.SessionId;
         importSession.CompletionResult = result;
+
         try
         {
             await _chunkedUploadService.DeleteCommittedSessionBlob(sessionId);
         }
-        finally
+        catch
+        {
+            // The file has already been published successfully. Cleanup failures
+            // should not turn the request into a user-visible import failure.
+        }
+
+        try
         {
             _chunkedUploadService.ReleaseReservedProcessingSlot(sessionId);
+        }
+        catch
+        {
+            // The import succeeded; treat slot-release cleanup as best effort.
         }
 
         return result;
