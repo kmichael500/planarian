@@ -98,21 +98,21 @@ public partial class Program
     {
         const string filePath = "/Users/michaelketzner/Downloads/TCSnarr.csv";
         var extractedRecords = ReadCavesFromCsv(filePath);
-        
+
         var (caveRecords, entranceRecords) = SplitCaveRecords(extractedRecords);
-        
+
         // cave records contain the primary entrance, the entranceRecords contains the other entrances
         var allEntranceRecords = caveRecords.Concat(entranceRecords);
-        
+
         var planarianCaveRecords = ExtractCaveRecords(caveRecords);
-        
+
         var planarianEntranceRecords = ExtractEntranceRecords(allEntranceRecords);
-        
+
         WriteCsvFile("/Users/michaelketzner/Downloads/planarianCaveRecords.csv", planarianCaveRecords);
         WriteCsvFile("/Users/michaelketzner/Downloads/planarianEntranceRecords.csv", planarianEntranceRecords);
-        
+
     }
-    
+
     private static void WriteCsvFile<T>(string filePath, IEnumerable<T> records)
     {
         using var writer = new StreamWriter(filePath);
@@ -142,13 +142,14 @@ public partial class Program
             var geologyAge = ExtractGeologicAgeTags(cave.GeologicalAge);
 
             var physiographicProvinces = NormalizePhysiographicProvince(cave.PhysiographicProvince);
-            var reportedOnDate = ExtractReportedOnDate(cave.Narrative);
-            var reportedBy = ExtractReportedBy(cave.Narrative);
+            var narrative = TrimBoundaryWhitespace(cave.Narrative);
+            var reportedOnDate = ExtractReportedOnDate(narrative);
+            var reportedBy = ExtractReportedBy(narrative);
 
             #region TCS Specific Tags
 
             var otherTags =
-                ExtractCommaSeparatedTags(("Gear", cave.RequiredGear), ("Entrance Type", cave.EntranceType));
+                ExtractCommaSeparatedTags(("Gear", cave.RequiredGear));
 
             #endregion
 
@@ -166,7 +167,7 @@ public partial class Program
                 CaveDepthFt = cave.DepthFt,
                 MaxPitDepthFt = cave.PitDepthFt,
                 NumberOfPits = cave.NumberOfPits,
-                Narrative = cave.Narrative,
+                Narrative = narrative,
                 Geology = geology,
                 GeologicAges = geologyAge,
                 PhysiographicProvinces = physiographicProvinces,
@@ -201,7 +202,7 @@ public partial class Program
 
             // entrance number will be empty/null if it is the cave record, which is the primary entrance
             var isPrimaryEntrance = string.IsNullOrWhiteSpace(entranceNumberPart);
-           
+
 
             var countyCode = new string(tcsNumber?.TakeWhile(char.IsLetter).ToArray());
             var countyNumberStr = new string(tcsNumber?.SkipWhile(char.IsLetter).ToArray());
@@ -219,7 +220,9 @@ public partial class Program
             var ownershipTags =
                 ExtractCommaSeparatedTags((null, entrance.Ownership));
 
-            var fieldIndicationTags = ExtractCommaSeparatedTags((null, entrance.FieldIndication));
+            var fieldIndicationTags = ExtractCommaSeparatedTags(
+                (null, entrance.FieldIndication),
+                (null, entrance.EntranceType));
 
 
             #endregion
@@ -255,10 +258,15 @@ public partial class Program
     {
         return null;
     }
-    
+
     private static string? ExtractReportedBy(string? narrative)
     {
         return null;
+    }
+
+    private static string? TrimBoundaryWhitespace(string? value)
+    {
+        return value?.Trim();
     }
 
     internal static string ExtractGeologyTags(string? input)
@@ -481,9 +489,9 @@ public partial class Program
         using var reader = new StreamReader(filePath);
         using var csv = new CsvReader(reader, config);
         csv.Context.RegisterClassMap<CaveRecordMap>();
-        return [..csv.GetRecords<CaveRecord>()];
+        return [.. csv.GetRecords<CaveRecord>()];
     }
-    
+
     public static (List<CaveRecord> caveRecords, List<CaveRecord> entranceRecords) SplitCaveRecords(List<CaveRecord> caveRecords)
     {
         var regex = CaveIdRegex();
