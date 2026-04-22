@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Text.Json;
 using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
@@ -127,40 +128,45 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
         });
 
-        var result = filterQuery.SortBy switch
+        var orderedQuery = filterQuery.SortBy switch
         {
-            nameof(CaveSearchVm.Name) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize,
-                e => e.Name, filterQuery.SortDescending),
-            nameof(CaveSearchVm.ReportedOn) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.ReportedOn, filterQuery.SortDescending),
-            nameof(CaveSearchVm.DepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.DepthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.LengthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.MaxPitDepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            nameof(CaveSearchVm.Name) => ApplyStableOrdering(caveSearchQuery, e => e.Name, filterQuery.SortDescending),
+            nameof(CaveSearchVm.ReportedOn) => ApplyStableOrdering(caveSearchQuery, e => e.ReportedOn,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.DepthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.DepthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.LengthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.MaxPitDepthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.MaxPitDepthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.NumberOfPits) => ApplyStableOrdering(caveSearchQuery, e => e.NumberOfPits,
+                filterQuery.SortDescending),
             nameof(CaveSearchVm.DisplayId) => filterQuery.SortDescending
-                ? await caveSearchQuery
+                ? caveSearchQuery
                     .OrderByDescending(e => e.CountyDisplayId)
                     .ThenByDescending(e => e.CountyNumber)
-                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize)
-                : await caveSearchQuery
+                : caveSearchQuery
                     .OrderBy(e => e.CountyDisplayId)
-                    .ThenBy(e => e.CountyNumber)
-                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize),
+                    .ThenBy(e => e.CountyNumber),
             nameof(CaveSearchVm.DistanceMiles) => hasLocationForDistance
-                ? await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                    filterQuery.PageSize, e => e.DistanceMiles, !filterQuery.SortDescending)
-                : await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                    filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
-            _ => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet,
-                filterQuery.SortDescending)
+                ? ApplyStableOrdering(caveSearchQuery, e => e.DistanceMiles, !filterQuery.SortDescending)
+                : ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet, filterQuery.SortDescending),
+            _ => ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet, filterQuery.SortDescending)
         };
 
+        var result = await orderedQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize);
+
         return result;
+    }
+
+    private static IOrderedQueryable<CaveSearchVm> ApplyStableOrdering<TKey>(
+        IQueryable<CaveSearchVm> query,
+        Expression<Func<CaveSearchVm, TKey>> orderingExpression,
+        bool sortDescending)
+    {
+        return sortDescending
+            ? query.OrderByDescendingNullLast(orderingExpression).ThenBy(e => e.Id)
+            : query.OrderBy(orderingExpression).ThenBy(e => e.Id);
     }
 
     public async Task<List<CaveExportDto>> GetCavesForExport(FilterQuery filterQuery, string? permissionKey)
