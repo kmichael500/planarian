@@ -261,7 +261,7 @@ public static class  QueryableExtensions
         return new PagedResult<T>(pageNumber, pageSize, totalCount, results);
     }
     
-    private static IOrderedQueryable<T> OrderByDescendingNullLast<T, TKey>(
+    public static IOrderedQueryable<T> OrderByDescendingNullLast<T, TKey>(
         this IQueryable<T> source,
         Expression<Func<T, TKey>> keySelector)
     {
