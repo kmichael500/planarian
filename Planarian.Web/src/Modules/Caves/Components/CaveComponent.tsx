@@ -70,11 +70,13 @@ const generateTags = (tagIds: string[] | undefined) => {
   if (!tagIds || tagIds.length === 0) {
     return defaultIfEmpty(null);
   }
-  return tagIds.map((tagId) => (
-    <Col key={tagId}>
-      <TagComponent tagId={tagId} />
-    </Col>
-  ));
+  return (
+    <Space size={[8, 8]} wrap>
+      {tagIds.map((tagId) => (
+        <TagComponent key={tagId} tagId={tagId} />
+      ))}
+    </Space>
+  );
 };
 
 const CaveComponent = ({
@@ -187,17 +189,17 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
       <Descriptions.Item label="Reported By" key="reported-by">
-        <Row>{generateTags(cave?.reportedByNameTagIds)}</Row>
+        {generateTags(cave?.reportedByNameTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologyTags) && (
       <Descriptions.Item label="Geology" key="geology">
-        <Row>{generateTags(cave?.geologyTagIds)}</Row>
+        {generateTags(cave?.geologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologicAgeTags) && (
       <Descriptions.Item label="Geologic Age" key="geologic-age">
-        <Row>{generateTags(cave?.geologicAgeTagIds)}</Row>
+        {generateTags(cave?.geologicAgeTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCavePhysiographicProvinceTags) && (
@@ -205,32 +207,32 @@ const CaveComponent = ({
         label="Physiographic Province"
         key="physiographic-province"
       >
-        <Row>{generateTags(cave?.physiographicProvinceTagIds)}</Row>
+        {generateTags(cave?.physiographicProvinceTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveBiologyTags) && (
       <Descriptions.Item label="Biology" key="biology">
-        <Row>{generateTags(cave?.biologyTagIds)}</Row>
+        {generateTags(cave?.biologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && (
       <Descriptions.Item label="Archeology" key="archeology">
-        <Row>{generateTags(cave?.archeologyTagIds)}</Row>
+        {generateTags(cave?.archeologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMapStatusTags) && (
       <Descriptions.Item label="Map Status" key="map-status">
-        <Row>{generateTags(cave?.mapStatusTagIds)}</Row>
+        {generateTags(cave?.mapStatusTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveCartographerNameTags) && (
       <Descriptions.Item label="Cartographers" key="cartographers">
-        <Row>{generateTags(cave?.cartographerNameTagIds)}</Row>
+        {generateTags(cave?.cartographerNameTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveOtherTags) && (
       <Descriptions.Item label="Other" key="other">
-        <Row>{generateTags(cave?.otherTagIds)}</Row>
+        {generateTags(cave?.otherTagIds)}
       </Descriptions.Item>
     ),
   ].filter(Boolean);
@@ -289,7 +291,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && (
         <Descriptions.Item label="Reported By" key="reported-by">
-          <Row>{generateTags(entrance.reportedByNameTagIds)}</Row>
+          {generateTags(entrance.reportedByNameTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
@@ -299,17 +301,17 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
         <Descriptions.Item label="Status" key="status">
-          <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>
+          {generateTags(entrance.entranceStatusTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) && (
         <Descriptions.Item label="Field Indication" key="field-indication">
-          <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>
+          {generateTags(entrance.fieldIndicationTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) && (
         <Descriptions.Item label="Hydrology" key="hydrology">
-          <Row>{generateTags(entrance.entranceHydrologyTagIds)}</Row>
+          {generateTags(entrance.entranceHydrologyTagIds)}
         </Descriptions.Item>
       ),
       <Descriptions.Item label="Land Access" span={3}>
