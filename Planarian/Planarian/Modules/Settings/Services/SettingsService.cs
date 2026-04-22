@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
@@ -41,6 +42,8 @@ public class SettingsService : ServiceBase<SettingsRepository>
     public async Task<NameProfilePhotoVm> GetUsersName(string userId)
     {
         var user = await Repository.GetUserNameProfilePhoto(userId);
+
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
 
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
 

@@ -20,15 +20,22 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
             .FirstAsync();
     }
 
-    public async Task<NameProfilePhotoVm> GetUserNameProfilePhoto(string userId)
+    public async Task<NameProfilePhotoVm?> GetUserNameProfilePhoto(string userId)
     {
-        return await DbContext.Users.Where(e => e.Id == userId)
-            .Select(e => new NameProfilePhotoVm(e.FullName, e.ProfilePhotoBlobKey)).FirstAsync();
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == userId)
+            .Select(e => new NameProfilePhotoVm(e.User!.FullName, e.User.ProfilePhotoBlobKey))
+            .FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetUsers()
     {
-        return await DbContext.Users.Select(e => new SelectListItem<string>(e.FullName, e.Id)).ToListAsync();
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.User != null && !e.User.IsTemporary)
+            .OrderBy(e => e.User!.FirstName)
+            .ThenBy(e => e.User!.LastName)
+            .Select(e => new SelectListItem<string>(e.User!.FullName, e.User.Id))
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
