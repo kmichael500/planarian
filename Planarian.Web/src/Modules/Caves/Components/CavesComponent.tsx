@@ -416,14 +416,13 @@ const CavesComponent: React.FC = () => {
           return defaultIfEmpty(null);
         }
         return (
-          <div style={{ display: "flex", flexWrap: "wrap" }}>
-            {" "}
+          <Space size={[8, 8]} wrap>
             {(cave[featureKey as keyof CaveSearchVm] as string[])?.map(
               (tagId: string) => (
                 <TagComponent key={tagId} tagId={tagId} />
               )
             )}
-          </div>
+          </Space>
         );
       default:
         return null;
