@@ -50,12 +50,12 @@ public class RequestThrottleOptions
     /// <summary>
     /// Maximum number of file or archive access requests a single user can make across all files within the file access window.
     /// </summary>
-    public int FileAccessPerUserLimit { get; set; } = 30;
+    public int FileAccessPerUserLimit { get; set; } = 120;
 
     /// <summary>
     /// Maximum number of times a single user can request access to the same file within the file access window.
     /// </summary>
-    public int FileAccessPerUserPerFileLimit { get; set; } = 5;
+    public int FileAccessPerUserPerFileLimit { get; set; } = 20;
 
     /// <summary>
     /// Maximum number of concurrent import file uploads this app instance will actively process.
