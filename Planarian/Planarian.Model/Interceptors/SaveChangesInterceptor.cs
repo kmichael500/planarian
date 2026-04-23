@@ -114,11 +114,28 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 var user = (User)entity.Entity;
                 if (context?.RequestUser == null || string.IsNullOrWhiteSpace(context.RequestUser.Id))
                 {
-                    // Exit early if RequestUser is null and the only property being modified is related to signing up or user metadata
+                    var modifiedPropertyNames = entity.Properties
+                        .Where(p => p.IsModified)
+                        .Select(p => p.Metadata.Name)
+                        .Where(p => p is not nameof(EntityBase.ModifiedOn) and not nameof(EntityBase.ModifiedByUserId))
+                        .ToHashSet();
+                    
+                    var isEmailConfirmation = modifiedPropertyNames.Count > 0 &&
+                                              modifiedPropertyNames.All(p => p is nameof(User.EmailConfirmedOn)
+                                                  or nameof(User.EmailConfirmationCode));
+                    
+                    var isPasswordResetEmail = modifiedPropertyNames.Count > 0 &&
+                                               modifiedPropertyNames.All(p => p is nameof(User.PasswordResetCode)
+                                                   or nameof(User.PasswordResetCodeExpiration));
+                    
+                    var isPasswordResetCompletion = modifiedPropertyNames.Count > 0 &&
+                                                    modifiedPropertyNames.All(p => p is nameof(User.HashedPassword)
+                                                        or nameof(User.PasswordResetCode)
+                                                        or nameof(User.PasswordResetCodeExpiration)) &&
+                                                    string.IsNullOrWhiteSpace(user.PasswordResetCode) &&
+                                                    user.PasswordResetCodeExpiration == null;
 
-                    var modifiedProperties = entity.Properties.Where(p => p.IsModified);
-                    if (modifiedProperties.All(p => p.Metadata.Name is nameof(User.LastActiveOn)
-                            or nameof(User.EmailConfirmedOn) or nameof(User.EmailConfirmationCode)))
+                    if (isEmailConfirmation || isPasswordResetEmail || isPasswordResetCompletion)
                     {
                         return;
                     }

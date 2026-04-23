@@ -200,7 +200,10 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByPasswordResetCode(code);
         if (user == null) throw ApiExceptionDictionary.InvalidPasswordResetCode;
 
-        if (user.PasswordResetCodeExpiration < DateTime.UtcNow) throw ApiExceptionDictionary.PasswordResetCodeExpired;
+        if (user.PasswordResetCodeExpiration == null || user.PasswordResetCodeExpiration < DateTime.UtcNow)
+        {
+            throw ApiExceptionDictionary.PasswordResetCodeExpired;
+        }
 
         if (!password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
