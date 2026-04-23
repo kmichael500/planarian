@@ -4,7 +4,6 @@ import {
   Switch,
   Button,
   List,
-  Modal,
   Input,
   Typography,
   message,
@@ -41,7 +40,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AppService } from "../../../Shared/Services/AppService";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
 
 interface UserPermissionManagementProps {
   userId: string;
@@ -212,7 +211,8 @@ export const UserPermissionManagement: React.FC<
         disabled={everythingDisabled}
       >
         <Form.Item
-          label={<Text strong>Has access to ALL locations:</Text>}
+          label={<Text strong>1. All Location Access</Text>}
+          extra="Gives the user access to every state, county, and cave."
           name={nameof<CavePermissionManagementVm>("hasAllLocations")}
           valuePropName="checked"
         >
@@ -220,7 +220,20 @@ export const UserPermissionManagement: React.FC<
         </Form.Item>
 
         <Form.Item
-          label={<Text strong>County Access (by State):</Text>}
+          label={<Text strong>2. Regional Access</Text>}
+          extra={
+            <div>
+              <div>Select states or specific counties.</div>
+              <div>
+                If you select a state and do not select any counties in that
+                state, the user will have access to the entire state.
+              </div>
+              <div>
+                If you select one or more counties, the user will have access
+                only to those counties.
+              </div>
+            </div>
+          }
           name={nameof<CavePermissionManagementVm>("stateCountyValues")}
         >
           <StateCountySelect
@@ -230,14 +243,14 @@ export const UserPermissionManagement: React.FC<
         </Form.Item>
 
         <Form.Item
-          label={<Text strong>Individual Caves:</Text>}
+          label={<Text strong>3. Individual Cave Access</Text>}
+          extra="Grant access to specific caves in addition to any state or county access above."
           style={{ marginBottom: 0 }}
         >
           <Form.List
             name={nameof<CavePermissionManagementVm>("cavePermissions")}
           >
             {(fields, { remove }) => {
-              // If there are no caves, show a placeholder
               if (!fields.length) {
                 return <Text type="secondary">No caves selected</Text>;
               }
