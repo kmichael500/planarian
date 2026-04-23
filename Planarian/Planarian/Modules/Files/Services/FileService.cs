@@ -68,7 +68,7 @@ public class FileService : ServiceBase<FileRepository>
             throw ApiExceptionDictionary.NotFound("Cave");
         }
 
-        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId, caveEntity.StateId);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         // check if tag type name exists in the file name
@@ -131,7 +131,7 @@ public class FileService : ServiceBase<FileRepository>
             throw ApiExceptionDictionary.NotFound("Cave");
         }
 
-        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId);
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId,  caveEntity.StateId);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         var autoTagType =
@@ -343,7 +343,7 @@ public class FileService : ServiceBase<FileRepository>
         if (file == null || string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
             throw ApiExceptionDictionary.NotFound("File");
 
-        await EnsureFileViewAccess(file.Id, file.CaveId, file.CountyId);
+        await EnsureFileViewAccess(file.Id, file.CaveId, file.CountyId, file.StateId);
 
         var client = await GetBlobContainerClient(file.ContainerName);
         var blobClient = client.GetBlobClient(file.BlobKey);
@@ -378,18 +378,18 @@ public class FileService : ServiceBase<FileRepository>
 
         if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
         {
-            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId, fileContext.CountyId);
+            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId, fileContext.CountyId, fileContext.StateId);
             return;
         }
 
         await RequestUser.HasCavePermission(PermissionKey.Manager);
     }
 
-    private async Task EnsureFileViewAccess(string fileId, string? caveId, string? countyId)
+    private async Task EnsureFileViewAccess(string fileId, string? caveId, string? countyId, string? stateId)
     {
         if (!string.IsNullOrWhiteSpace(caveId) || !string.IsNullOrWhiteSpace(countyId))
         {
-            await RequestUser.HasCavePermission(PermissionKey.View, caveId, countyId);
+            await RequestUser.HasCavePermission(PermissionKey.View, caveId, countyId, stateId);
             return;
         }
 

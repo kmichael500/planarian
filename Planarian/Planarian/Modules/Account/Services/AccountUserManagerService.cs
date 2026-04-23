@@ -231,17 +231,19 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             // Handle the "all locations" case
             if (vm.HasAllLocations)
             {
-                // Look for an existing "all locations" record (both CountyId and CaveId null)
+                // Look for an existing "all locations" record (all location scopes null)
                 var allLocationPermission = existingPermissions.FirstOrDefault(p =>
-                    string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId));
+                    string.IsNullOrWhiteSpace(p.StateId) && string.IsNullOrWhiteSpace(p.CountyId) &&
+                    string.IsNullOrWhiteSpace(p.CaveId));
                 if (allLocationPermission == null)
                 {
                     // No record exists, so create one
-                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
+                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, null);
                     allLocationPermission = new CavePermission
                     {
                         UserId = userId,
                         AccountId = RequestUser.AccountId,
+                        StateId = null,
                         CountyId = null,
                         CaveId = null,
                         Permission = permission
@@ -249,7 +251,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
                     Repository.Add(allLocationPermission);
 
                     var others = existingPermissions.Where(p =>
-                        !string.IsNullOrWhiteSpace(p.CountyId) || !string.IsNullOrWhiteSpace(p.CaveId));
+                        !string.IsNullOrWhiteSpace(p.StateId) || !string.IsNullOrWhiteSpace(p.CountyId) ||
+                        !string.IsNullOrWhiteSpace(p.CaveId));
                     Repository.DeleteRange(others);
 
                     await Repository.SaveChangesAsync(cancellationToken);
@@ -266,20 +269,56 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             {
                 // Remove any "all locations" if it exists
                 var allLocationPermission = existingPermissions.FirstOrDefault(p =>
-                    string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId));
+                    string.IsNullOrWhiteSpace(p.StateId) && string.IsNullOrWhiteSpace(p.CountyId) &&
+                    string.IsNullOrWhiteSpace(p.CaveId));
 
                 if (allLocationPermission != null)
                 {
-                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null);
+                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, null);
                     Repository.Delete(allLocationPermission);
                 }
 
             }
 
+            // --- Process state-level permissions ---
+            var desiredStateIds = vm.StateIds?.Distinct().ToList() ?? new List<string>();
+            var existingStatePermissions = existingPermissions
+                .Where(p => !string.IsNullOrWhiteSpace(p.StateId) &&
+                            string.IsNullOrWhiteSpace(p.CountyId) &&
+                            string.IsNullOrWhiteSpace(p.CaveId)).ToList();
+
+            var existingStateIds = existingStatePermissions.Select(p => p.StateId).ToList();
+
+            var statesToRemove = existingStateIds.Except(desiredStateIds).ToList();
+            var statesToAdd = desiredStateIds.Except(existingStateIds).ToList();
+
+            foreach (var per in existingStatePermissions.Where(p => statesToRemove.Contains(p.StateId)))
+            {
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, per.StateId);
+                Repository.Delete(per);
+            }
+
+            foreach (var stateId in statesToAdd)
+            {
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, null, stateId);
+                var newStatePerm = new CavePermission
+                {
+                    UserId = userId,
+                    AccountId = RequestUser.AccountId,
+                    StateId = stateId,
+                    CountyId = null,
+                    CaveId = null,
+                    Permission = permission
+                };
+                Repository.Add(newStatePerm);
+            }
+
             // --- Process county-level permissions ---
             var desiredCountyIds = vm.CountyIds?.Distinct().ToList() ?? new List<string>();
             var existingCountyPermissions = existingPermissions
-                .Where(p => !string.IsNullOrWhiteSpace(p.CountyId) && string.IsNullOrWhiteSpace(p.CaveId)).ToList();
+                .Where(p => string.IsNullOrWhiteSpace(p.StateId) &&
+                            !string.IsNullOrWhiteSpace(p.CountyId) &&
+                            string.IsNullOrWhiteSpace(p.CaveId)).ToList();
 
             var existingCountyIds = existingCountyPermissions.Select(p => p.CountyId).ToList();
 
@@ -290,7 +329,7 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             // Remove county permissions that are no longer desired
             foreach (var per in existingCountyPermissions.Where(p => countiesToRemove.Contains(p.CountyId)))
             {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, per.CountyId);
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, per.CountyId, per.StateId);
                 Repository.Delete(per);
             }
 
@@ -298,11 +337,12 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             foreach (var countyId in countiesToAdd)
             {
                 // Ensure the current user has the necessary rights for this county
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, countyId);
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, countyId, null);
                 var newCountyPerm = new CavePermission
                 {
                     UserId = userId,
                     AccountId = RequestUser.AccountId,
+                    StateId = null,
                     CountyId = countyId,
                     CaveId = null,
                     Permission = permission
@@ -314,7 +354,9 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             var desiredCaveIds = vm.CaveIds.Distinct().ToList() ?? [];
             var existingCavePermissions =
                 existingPermissions
-                    .Where(p => !string.IsNullOrWhiteSpace(p.CaveId) && string.IsNullOrWhiteSpace(p.CountyId)).ToList();
+                    .Where(p => string.IsNullOrWhiteSpace(p.StateId) &&
+                                !string.IsNullOrWhiteSpace(p.CaveId) &&
+                                string.IsNullOrWhiteSpace(p.CountyId)).ToList();
             var existingCaveIds = existingCavePermissions.Select(p => p.CaveId).ToList();
 
             // Identify which cave permissions need to be removed and which added
@@ -324,19 +366,20 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             // Remove cave permissions that are no longer desired
             foreach (var perm in existingCavePermissions.Where(p => cavesToRemove.Contains(p.CaveId)))
             {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, perm.CaveId, null);
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, perm.CaveId, null, null);
                 Repository.Delete(perm);
             }
 
             // Add new cave permissions
             foreach (var caveId in cavesToAdd)
             {
-                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, null);
+                await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, null, null);
                 var newCavePerm = new CavePermission
                 {
                     UserId = userId,
                     AccountId = RequestUser.AccountId,
                     CaveId = caveId,
+                    StateId = null,
                     CountyId = null,
                     Permission = permission
                 };

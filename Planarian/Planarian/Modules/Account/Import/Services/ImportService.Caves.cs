@@ -750,8 +750,6 @@ public partial class ImportService
                 foreach (var caveId in caveIdsToDelete)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var deletedCave = existingCaves.First(e => e.Id == caveId);
-                    await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, deletedCave.CountyId);
                     await _repository.DeleteImportSyncCave(caveId, deferredFileDeletes, cancellationToken);
                 }
 

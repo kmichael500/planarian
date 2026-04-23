@@ -25,14 +25,15 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
-    public sealed record FileAuthorizationContextResult(string Id, string? CaveId, string? CountyId);
+    public sealed record FileAuthorizationContextResult(string Id, string? CaveId, string? CountyId, string? StateId);
 
     public async Task<FileAuthorizationContextResult?> GetFileAuthorizationContext(string id)
     {
         return await DbContext.Files
             .Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
-            .Select(e => new FileAuthorizationContextResult(e.Id, e.CaveId, e.Cave != null ? e.Cave.CountyId : null))
-            .FirstOrDefaultAsync();
+            .Select(e => new FileAuthorizationContextResult(e.Id, e.CaveId, e.Cave != null ? e.Cave.CountyId : null,
+                    e.Cave != null ? e.Cave.StateId : null))
+                .FirstOrDefaultAsync();
     }
 
     public sealed record FileAccessInfoResult(
@@ -41,7 +42,9 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         string? BlobKey,
         string? ContainerName,
         string? CaveId,
-        string? CountyId);
+        string? CountyId,
+        string? StateId
+        );
 
     public async Task<FileAccessInfoResult?> GetFileAccessInfo(string id, bool checkRequestUserAccountId = true)
     {
@@ -53,7 +56,9 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 e.BlobKey,
                 e.BlobContainer,
                 e.CaveId,
-                e.Cave != null ? e.Cave.CountyId : null))
+                e.Cave != null ? e.Cave.CountyId : null,
+                e.Cave != null ? e.Cave.StateId : null
+            ))
             .FirstOrDefaultAsync();
     }
 

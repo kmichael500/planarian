@@ -8,8 +8,9 @@ namespace Planarian.Model.Database.Entities.RidgeWalker.Views;
 
 public class UserCavePermissionsView : ViewBase
 {
-    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? CaveId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? CountyId { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? StateId { get; set; }
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string UserId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string PermissionId { get; set; } = null!;
@@ -17,11 +18,12 @@ public class UserCavePermissionsView : ViewBase
     
     [MaxLength(PropertyLength.Key)] public string PermissionKey { get; set; } = null!;
     
-    public virtual Cave Cave { get; set; } = null!;
+    public virtual Cave? Cave { get; set; }
     public virtual Account Account { get; set; } = null!;
     public virtual User User { get; set; } = null!;
     public virtual Permission Permission { get; set; } = null!;
-    public virtual County County { get; set; } = null!;
+    public virtual County? County { get; set; }
+    public virtual State? State { get; set; }
 }
 
 public class UserCavePermissionsViewConfiguration : ViewTypeConfiguration<UserCavePermissionsView>
@@ -47,5 +49,9 @@ public class UserCavePermissionsViewConfiguration : ViewTypeConfiguration<UserCa
         builder.HasOne(e => e.County)
             .WithMany()
             .HasForeignKey(e=>e.CountyId);
+
+        builder.HasOne(e => e.State)
+            .WithMany()
+            .HasForeignKey(e=>e.StateId);
     }
 }
