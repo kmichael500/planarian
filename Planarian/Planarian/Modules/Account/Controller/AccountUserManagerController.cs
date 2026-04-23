@@ -58,9 +58,9 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
     [HttpDelete("{userId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> Revoke(string userId)
+    public async Task<ActionResult> Revoke(string userId, CancellationToken cancellationToken)
     {
-        await Service.RevokeAccess(userId);
+        await Service.RevokeAccess(userId, cancellationToken);
         return Ok();
     }
 

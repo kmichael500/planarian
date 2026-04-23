@@ -19,7 +19,6 @@ const { useBreakpoint } = Grid;
 
 const HeaderComponent = () => {
   const { headerTitle, headerButtons } = useContext(AppContext);
-  const [hasHeaderButons, setHasHeaderButons] = useState<boolean>(false);
 
   const isAuthenticated = AuthenticationService.IsAuthenticated();
   const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
@@ -28,14 +27,6 @@ const HeaderComponent = () => {
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && (key === "lg" || key === "xl")
   );
-
-  useEffect(() => {
-    if (headerButtons.length === 0) {
-      setHasHeaderButons(false);
-    } else {
-      setHasHeaderButons(true);
-    }
-  }, [headerButtons]);
 
   const [navigationTitle, setNavigationTitle] = useState("");
   useEffect(() => {
@@ -58,14 +49,12 @@ const HeaderComponent = () => {
 
       <Header
         style={{
-          paddingTop:
-            hasHeaderButons || (!hasHeaderButons && !isLargeScreenSize)
-              ? "4px"
-              : "4px",
+          paddingTop: "4px",
           paddingBottom: "4px",
           paddingRight: "16px",
           paddingLeft: "16px",
           height: "70px",
+          lineHeight: "normal",
           background: "var(--background-color)",
           position: "sticky",
           top: 0,
@@ -75,13 +64,18 @@ const HeaderComponent = () => {
         }}
       >
         <Spin
+          style={{ width: "100%" }}
           spinning={
             headerTitle[0] == null ||
             (typeof headerTitle[0] === "string" &&
               isNullOrWhiteSpace(headerTitle[0]))
           }
         >
-          <Row align="middle" gutter={10}>
+          <Row
+            align="middle"
+            gutter={10}
+            style={{ minHeight: "60px", width: "100%" }}
+          >
             <Col>
               {!isLargeScreenSize && (
                 <PlanarianButton
@@ -117,10 +111,10 @@ const HeaderComponent = () => {
               >
                 {typeof headerTitle[0] === "string" ? (
                   <Typography.Title level={4} style={{ margin: 0 }}>
-                    {headerTitle}
+                    {headerTitle[0]}
                   </Typography.Title>
                 ) : (
-                  <Typography.Title level={4}>
+                  <Typography.Title level={4} style={{ margin: 0 }}>
                     {headerTitle[0]}
                   </Typography.Title>
                 )}
@@ -135,7 +129,11 @@ const HeaderComponent = () => {
             {headerButtons.map((button, index) => (
               <Col key={index}>{button}</Col>
             ))}
-            {isAuthenticated && <ProfileMenu />}
+            {isAuthenticated && (
+              <Col style={{ flexShrink: 0 }}>
+                <ProfileMenu />
+              </Col>
+            )}
           </Row>
         </Spin>
       </Header>

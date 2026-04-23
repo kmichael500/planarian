@@ -258,11 +258,29 @@ public class UserRepository : RepositoryBase
     }
 
     public async Task<UserPermission?> GetUserPermission(string userId, string permissionKey)
-        {
-            return await DbContext.UserPermissions
-                .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey && e.AccountId == RequestUser.AccountId)
-                .FirstOrDefaultAsync();
-        }
+    {
+        return await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey && e.AccountId == RequestUser.AccountId)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> DeleteAccountUserAccess(string userId, string accountId,
+        CancellationToken cancellationToken = default)
+    {
+        await DbContext.CavePermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var deletedAccountUsers = await DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deletedAccountUsers > 0;
+    }
 
     public async Task<DateTime?> GetLastActiveOn(string userId)
     {

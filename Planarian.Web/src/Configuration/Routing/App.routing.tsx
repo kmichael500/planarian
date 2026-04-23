@@ -20,6 +20,7 @@ import { NotFoundPage } from "../../Shared/Pages/NotFoundPage";
 import { UnauthorizedPage } from "../../Shared/Pages/Unauthorized";
 import { AppRederect } from "./App.routing.redirect";
 import { MapPage } from "../../Modules/Map/Pages/MapPage";
+import { PlanarianSettingsPage } from "../../Modules/PlanarianSettings/Pages/PlanarianSettingsPage";
 import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
 import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptInvitationPage";
 import { UserPage } from "../../Modules/Account/Pages/UserPage";
@@ -75,6 +76,10 @@ export const AppRouting: React.FC = () => {
           }
         >
           <Route path="/projects" element={<ProjectsPage />}></Route>
+          <Route
+            path="/planarian-settings"
+            element={<PlanarianSettingsPage />}
+          ></Route>
           <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
           <Route
             path="/projects/:projectId/trip/:tripId"

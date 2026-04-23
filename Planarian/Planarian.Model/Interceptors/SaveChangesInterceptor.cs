@@ -98,16 +98,29 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
             case nameof(Permission):
                 return;
         }
-
         var requestUserAccountId = context?.RequestUser?.AccountId;
         switch (name)
         {
             case nameof(Account):
                 var account = (Account)entity.Entity;
+                if (entityState == EntityState.Added &&
+                    context.RequestUser != null &&
+                    await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
+                {
+                    return;
+                }
+
                 ValidateAccount(account.Id, requestUserAccountId);
                 break;
             case nameof(AccountState):
                 var accountState = (AccountState)entity.Entity;
+                if (entityState == EntityState.Added &&
+                    context.RequestUser != null &&
+                    await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
+                {
+                    return;
+                }
+
                 ValidateAccount(accountState.AccountId, requestUserAccountId);
                 break;
             case nameof(User):
@@ -276,6 +289,13 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 break;
             case nameof(FeatureSetting):
                 var featureSetting = (FeatureSetting)entity.Entity;
+                if (entityState == EntityState.Added &&
+                    context.RequestUser != null &&
+                    await context.RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
+                {
+                    return;
+                }
+
                 ValidateAccount(featureSetting.AccountId, requestUserAccountId);
                 break;
             case nameof(FieldIndicationTag):

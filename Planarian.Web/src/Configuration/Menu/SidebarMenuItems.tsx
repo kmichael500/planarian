@@ -9,6 +9,7 @@ import {
   ImportOutlined,
   CompassOutlined,
   UserOutlined,
+  ControlOutlined,
 } from "@ant-design/icons";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
@@ -86,6 +87,16 @@ const SideBarMenuItems = () => {
           permissionKey: PermissionKey.Admin,
         },
       ],
+    },
+    {
+      key: "/planarian-settings",
+      icon: (
+        <Link to="/planarian-settings">
+          <ControlOutlined />
+        </Link>
+      ),
+      label: "Planarian Settings",
+      permissionKey: PermissionKey.PlanarianAdmin,
     },
     {
       icon: <Divider />,
