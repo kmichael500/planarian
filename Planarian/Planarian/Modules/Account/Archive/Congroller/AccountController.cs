@@ -28,16 +28,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         _importService = importService;
     }
 
-    [HttpPost]
-    [Authorize(Policy = PermissionPolicyKey.PlanarianAdmin)]
-    public async Task<ActionResult<string>> CreateAccount([FromBody] CreateAccountVm account,
-        CancellationToken cancellationToken)
-    {
-        var result = await Service.CreateAccount(account, cancellationToken);
-
-        return new JsonResult(result);
-    }
-
     // dangerous
     [HttpDelete("reset")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]

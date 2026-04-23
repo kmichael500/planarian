@@ -49,41 +49,6 @@ public class AccountService : ServiceBase<AccountRepository>
         _archiveJobCoordinator = archiveJobCoordinator;
         _requestThrottleService = requestThrottleService;
     }
-    public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
-    {
-        var entity = new Planarian.Model.Database.Entities.RidgeWalker.Account
-        {
-            Name = account.Name,
-        };
-
-        foreach (var key in Enum.GetValues<FeatureKey>())
-        {
-            var isEnabled = key switch
-            {
-                FeatureKey.EnabledFieldCaveGeologicAgeTags => false,
-                _ => true
-            };
-
-            entity.FeatureSettings.Add(new FeatureSetting
-            {
-                AccountId = entity.Id,
-                Key = key,
-                IsEnabled = isEnabled
-            });
-        }
-
-        entity.AccountUsers.Add(new AccountUser
-        {
-            UserId = RequestUser.Id,
-        });
-
-
-        Repository.Add(entity);
-        await Repository.SaveChangesAsync(cancellationToken);
-
-        return entity.Id;
-    }
-
     public async Task ResetAccount(CancellationToken cancellationToken)
     {
         var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
