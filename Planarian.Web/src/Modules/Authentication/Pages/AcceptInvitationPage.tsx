@@ -14,7 +14,12 @@ const AcceptInvitationPage = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const {
+    setHeaderTitle,
+    setHeaderButtons,
+    setContentStyle,
+    defaultContentStyle,
+  } = useContext(AppContext);
   const { invitationCode } = useParams();
 
   useEffect(() => {
@@ -27,7 +32,16 @@ const AcceptInvitationPage = () => {
 
   useEffect(() => {
     setHeaderTitle(["Invitation"]);
-  }, []);
+    setContentStyle({
+      margin: 0,
+      height: "calc((var(--vh, 1vh) * 100) - 70px)",
+      overflow: "hidden",
+    });
+
+    return () => {
+      setContentStyle(defaultContentStyle);
+    };
+  }, [defaultContentStyle, setContentStyle, setHeaderTitle]);
   useEffect(() => {
     const getInvitation = async () => {
       try {
