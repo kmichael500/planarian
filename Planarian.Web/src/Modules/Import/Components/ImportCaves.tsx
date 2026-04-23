@@ -5,6 +5,7 @@ import {
   CloudDownloadOutlined,
   DeliveredProcedureOutlined,
   EyeOutlined,
+  LoadingOutlined,
   RedoOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -268,7 +269,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
                           {isErrorState ? (
                             <RedoOutlined />
                           ) : isProcessingState ? (
-                            <DeliveredProcedureOutlined />
+                            <LoadingOutlined />
                           ) : isReadyToProcess ? (
                             <EyeOutlined />
                           ) : (
@@ -322,7 +323,7 @@ const ImportCaveComponent: React.FC<ImportCaveComponentProps> = ({
                     {isProcessingState && (
                       <SignalRProgressComponent
                         groupName={uploadResult?.id as string}
-                        isLoading={isProcessing}
+                        isLoading={false}
                       />
                     )}
                   </div>

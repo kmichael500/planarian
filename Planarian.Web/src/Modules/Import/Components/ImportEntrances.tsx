@@ -6,6 +6,7 @@ import {
   CloudDownloadOutlined,
   DeliveredProcedureOutlined,
   EyeOutlined,
+  LoadingOutlined,
   RedoOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -227,7 +228,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                           {isErrorState ? (
                             <RedoOutlined />
                           ) : isProcessingState ? (
-                            <DeliveredProcedureOutlined />
+                            <LoadingOutlined />
                           ) : isReadyToProcess ? (
                             <ApartmentOutlined />
                           ) : (
@@ -281,7 +282,7 @@ const ImportEntrancesComponent: React.FC<ImportEntrancesComponentProps> = ({
                     {isProcessingState && (
                       <SignalRProgressComponent
                         groupName={uploadResult?.id as string}
-                        isLoading={isProcessing}
+                        isLoading={false}
                       />
                     )}
                   </div>

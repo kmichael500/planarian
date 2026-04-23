@@ -153,6 +153,16 @@
 
 .import-file-settings__copy .ant-typography {
   margin-bottom: 0;
+  color: var(--text-color);
+}
+
+.import-file-settings__copy p.ant-typography,
+.import-file-settings__copy .import-file-settings__regex-note {
+  color: var(--muted-text-color);
+}
+
+.import-file-settings__copy strong {
+  color: var(--text-color);
 }
 
 .import-file-settings__copy {
@@ -182,6 +192,19 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--surface-color);
+  color: var(--text-color);
+}
+
+.import-file-settings__example .ant-typography {
+  color: var(--text-color);
+}
+
+.import-file-settings__example .ant-typography-secondary {
+  color: var(--muted-text-color);
+}
+
+.import-file-settings__example strong {
+  color: var(--text-color);
 }
 
 .import-file-settings__form {
@@ -194,6 +217,15 @@
 
 .import-file-settings__form .ant-form-item {
   margin-bottom: 0;
+}
+
+.import-file-settings__form .ant-form-item-label > label,
+.import-file-settings__form .ant-checkbox-wrapper {
+  color: var(--text-color);
+}
+
+.import-file-settings__form .ant-form-item-extra {
+  color: var(--muted-text-color);
 }
 
 .import-file-settings__body {
@@ -210,6 +242,7 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface-color) 94%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 40%, transparent);
+  color: var(--text-color);
 }
 
 .import-file-settings__field-card--toggle .ant-form-item-control-input {
@@ -384,6 +417,7 @@
 
 .import-step-panel__header .ant-typography {
   margin-bottom: 0;
+  color: var(--text-color);
 }
 
 .import-step-panel__body {
@@ -403,7 +437,11 @@
 }
 
 .import-step-note {
-  color: var(--text-secondary-color, rgba(0, 0, 0, 0.65));
+  color: var(--muted-text-color);
+}
+
+.import-step-note strong {
+  color: var(--text-color);
 }
 
 .import-step-kicker {
@@ -411,8 +449,12 @@
   align-items: center;
   gap: 6px;
   font-size: 0.875rem;
-  color: var(--text-secondary-color, rgba(0, 0, 0, 0.65));
+  color: var(--muted-text-color);
   margin-bottom: 8px;
+}
+
+.import-step-kicker .anticon {
+  color: var(--primary-color, #1677ff);
 }
 
 .import-step-status {
@@ -438,23 +480,40 @@
   flex: 0 0 auto;
 }
 
+.import-step-status__icon .anticon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+
+.import-step-status__icon .anticon svg {
+  display: block;
+}
+
 .import-step-status__icon--success {
-  background: rgba(82, 196, 26, 0.12);
+  background: color-mix(in srgb, #52c41a 18%, var(--surface-color));
   color: #52c41a;
 }
 
 .import-step-status__icon--processing {
-  background: rgba(24, 144, 255, 0.12);
+  background: color-mix(in srgb, #1890ff 18%, var(--surface-color));
   color: #1890ff;
 }
 
+.import-step-status__icon--processing .anticon {
+  animation: import-status-spin 1s linear infinite;
+}
+
 .import-step-status__icon--error {
-  background: rgba(255, 77, 79, 0.12);
+  background: color-mix(in srgb, #ff4d4f 18%, var(--surface-color));
   color: #ff4d4f;
 }
 
 .import-step-status__icon--neutral {
-  background: rgba(22, 119, 255, 0.12);
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 18%, var(--surface-color));
   color: var(--primary-color, #1677ff);
 }
 
@@ -464,6 +523,11 @@
 
 .import-step-status__copy .ant-typography {
   margin-bottom: 6px;
+  color: var(--text-color);
+}
+
+.import-step-status__copy p.ant-typography {
+  color: var(--muted-text-color);
 }
 
 .import-step-mode-card {
@@ -546,6 +610,10 @@
   text-align: center;
 }
 
+.import-step-mode-card .ant-typography {
+  color: var(--text-color);
+}
+
 .import-step-upload {
   display: flex;
   flex: 1 1 auto;
@@ -563,6 +631,14 @@
   background: var(--surface-color) !important;
   border-color: var(--border-color) !important;
   color: var(--text-color) !important;
+}
+
+.ant-upload.ant-upload-drag .ant-upload-drag-icon .anticon {
+  color: var(--primary-color, #1677ff);
+}
+
+.ant-upload.ant-upload-drag .ant-upload-title {
+  color: var(--text-color);
 }
 
 .import-templates {
@@ -688,6 +764,16 @@
   max-width: 800px;
   white-space: nowrap;
   overflow: scroll;
+}
+
+@keyframes import-status-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 980px) {
