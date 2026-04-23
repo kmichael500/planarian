@@ -246,17 +246,29 @@ builder.Services.AddSignalR()
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 });
 
 builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 }, ServiceLifetime.Scoped);
 
 builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 });
 
 LinqToDBForEFTools.Initialize();
