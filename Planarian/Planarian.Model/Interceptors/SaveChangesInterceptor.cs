@@ -14,7 +14,7 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Interceptors;
 
-public class  SaveChangesInterceptor : ISaveChangesInterceptor
+public class SaveChangesInterceptor : ISaveChangesInterceptor
 {
     public InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -46,13 +46,13 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
     private async Task SavingChangesInternalAsync(DbContextEventData eventData)
     {
         if (eventData.Context == null) return;
-        
+
         var context = (PlanarianDbContextBase)eventData.Context;
         foreach (var entityEntry in eventData.Context.ChangeTracker.Entries())
             if (entityEntry.Entity.GetType().BaseType == typeof(EntityBase) ||
                 entityEntry.Entity.GetType().BaseType == typeof(EntityBaseNameId))
             {
-                var entity = (EntityBase) entityEntry.Entity;
+                var entity = (EntityBase)entityEntry.Entity;
 
                 switch (entityEntry.State)
                 {
@@ -74,7 +74,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                             !string.IsNullOrWhiteSpace(context?.RequestUser?.Id)
                                 ? context.RequestUser.Id
                                 : null;
-                        
+
                         await Validate(context!, entityEntry, entityEntry.State);
                         break;
                     case EntityState.Detached:
@@ -98,8 +98,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
             case nameof(Permission):
                 return;
         }
-        
-        var requestUserAccountId = context.RequestUser?.AccountId;
+        var requestUserAccountId = context?.RequestUser?.AccountId;
         switch (name)
         {
             case nameof(Account):
@@ -128,11 +127,39 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
                 var user = (User)entity.Entity;
                 if (context?.RequestUser == null || string.IsNullOrWhiteSpace(context.RequestUser.Id))
                 {
-                    // Exit early if RequestUser is null and the only property being modified is related to signing up or user metadata
+                    var modifiedPropertyNames = entity.Properties
+                        .Where(p => p.IsModified)
+                        .Select(p => p.Metadata.Name)
+                        .Where(p => p is not nameof(EntityBase.ModifiedOn) and not nameof(EntityBase.ModifiedByUserId))
+                        .ToHashSet();
 
-                    var modifiedProperties = entity.Properties.Where(p => p.IsModified);
-                    if (modifiedProperties.All(p => p.Metadata.Name is nameof(User.LastActiveOn)
-                            or nameof(User.EmailConfirmedOn) or nameof(User.EmailConfirmationCode)))
+                    var isRegistration = entityState == EntityState.Added &&
+                                         !user.IsTemporary &&
+                                         !user.HashedPassword.IsNullOrWhiteSpace() &&
+                                         !user.EmailConfirmationCode.IsNullOrWhiteSpace() &&
+                                         user.EmailConfirmedOn == null &&
+                                         user.PasswordResetCode.IsNullOrWhiteSpace() &&
+                                         user.PasswordResetCodeExpiration == null;
+
+                    var isInvitationCleanup = entityState == EntityState.Deleted && user.IsTemporary;
+
+                    var isEmailConfirmation = modifiedPropertyNames.Count > 0 &&
+                                              modifiedPropertyNames.All(p => p is nameof(User.EmailConfirmedOn)
+                                                  or nameof(User.EmailConfirmationCode));
+
+                    var isPasswordResetEmail = modifiedPropertyNames.Count > 0 &&
+                                               modifiedPropertyNames.All(p => p is nameof(User.PasswordResetCode)
+                                                   or nameof(User.PasswordResetCodeExpiration));
+
+                    var isPasswordResetCompletion = modifiedPropertyNames.Count > 0 &&
+                                                    modifiedPropertyNames.All(p => p is nameof(User.HashedPassword)
+                                                        or nameof(User.PasswordResetCode)
+                                                        or nameof(User.PasswordResetCodeExpiration)) &&
+                                                    string.IsNullOrWhiteSpace(user.PasswordResetCode) &&
+                                                    user.PasswordResetCodeExpiration == null;
+
+                    if (isRegistration || isInvitationCleanup || isEmailConfirmation || isPasswordResetEmail ||
+                        isPasswordResetCompletion)
                     {
                         return;
                     }
@@ -144,7 +171,7 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 var inSameAccount = await context.AccountUsers.AnyAsync(e =>
                     e.UserId == user.Id && e.AccountId == requestUserAccountId);
-            
+
                 var isResetPassword = string.IsNullOrWhiteSpace(requestUserAccountId); // should probably be more thorough in the future
                 var canModify = isResetPassword ||
                                 (user.Id == requestUserId && !string.IsNullOrWhiteSpace(requestUserId)) ||
@@ -158,14 +185,14 @@ public class  SaveChangesInterceptor : ISaveChangesInterceptor
 
                 break;
             case nameof(AccountUser):
-                 var accountUser = (AccountUser)entity.Entity;
-                 var isInvitation = !accountUser.InvitationCode.IsNullOrWhiteSpace();
-                 if (!isInvitation && entityState != EntityState.Added)
-                 {
-                     ValidateAccount(accountUser.AccountId, requestUserAccountId);
-                 }
+                var accountUser = (AccountUser)entity.Entity;
+                var isInvitation = !accountUser.InvitationCode.IsNullOrWhiteSpace();
+                if (!isInvitation && entityState != EntityState.Added)
+                {
+                    ValidateAccount(accountUser.AccountId, requestUserAccountId);
+                }
 
-                 break;
+                break;
             case nameof(TagType):
                 var tagType = (TagType)entity.Entity;
                 if (!tagType.IsDefault || !string.IsNullOrWhiteSpace(tagType.AccountId))
