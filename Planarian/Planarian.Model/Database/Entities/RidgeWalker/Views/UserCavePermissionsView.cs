@@ -24,12 +24,10 @@ public class UserCavePermissionsView : ViewBase
     public virtual County County { get; set; } = null!;
 }
 
-public class UserCavePermissionsViewConfiguration : IEntityTypeConfiguration<UserCavePermissionsView>
+public class UserCavePermissionsViewConfiguration : ViewTypeConfiguration<UserCavePermissionsView>
 {
-    public void Configure(EntityTypeBuilder<UserCavePermissionsView> builder)
+    protected override void ConfigureView(EntityTypeBuilder<UserCavePermissionsView> builder)
     {
-        builder.HasNoKey();
-        builder.ToView("UserCavePermissions");
         builder.HasOne(e => e.Cave)
             .WithMany()
             .HasForeignKey(e => e.CaveId);
