@@ -111,21 +111,29 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         }
     }
 
-    public async Task RevokeAccess(string userId)
+    public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
-        if (accountUser == null)
+        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
+        try
         {
-            throw ApiExceptionDictionary.NotFound("User");
-        }
+            var accessDeleted = await Repository.DeleteAccountUserAccess(userId, RequestUser.AccountId, cancellationToken);
+            if (!accessDeleted)
+            {
+                throw ApiExceptionDictionary.NotFound("User");
+            }
 
-        Repository.Delete(accountUser);
-        await Repository.SaveChangesAsync();
+            await dbTransaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task ResendInvitation(string userId)
