@@ -1,0 +1,32 @@
+.signalr-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.signalr-progress > .ant-spin {
+  align-self: center;
+}
+
+.signalr-progress__notification.ant-alert {
+  background: var(--surface-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.signalr-progress__notification.ant-alert .ant-alert-message,
+.signalr-progress__notification.ant-alert .ant-alert-description {
+  color: var(--text-color);
+}
+
+.signalr-progress__notification.ant-alert .ant-alert-icon {
+  color: var(--primary-color, #1677ff);
+}
+
+.signalr-progress__notification--latest.ant-alert {
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 14%, var(--surface-color));
+  border-color: color-mix(in srgb, var(--primary-color, #1677ff) 38%, var(--border-color));
+  font-weight: 700;
+}

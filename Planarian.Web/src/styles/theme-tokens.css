@@ -2,6 +2,7 @@
   --background-color: #fff;
   --text-color: #222;
   --muted-text-color: #5d6570;
+  --text-secondary-color: #5d6570;
   --link-color: #61dafb;
   --header-border-color: #f0f0f0;
   --border-color: #d9d9d9;
@@ -18,6 +19,7 @@
   --background-color: #181a1b;
   --text-color: #eee;
   --muted-text-color: #adb3bf;
+  --text-secondary-color: #adb3bf;
   --link-color: #8ecfff;
   --header-border-color: #333;
   --border-color: #3a4048;

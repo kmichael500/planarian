@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Space, Spin } from "antd";
 import { useSignalRGroup } from "./useSignalRGroup";
+import "./SignalRProgressComponent.scss";
 
 const getNotificationMessage = (notification: unknown) => {
   if (typeof notification === "string") {
@@ -64,19 +65,21 @@ function SignalRProgressComponent({
   }
 
   return (
-    <div>
+    <div className="signalr-progress">
       <Spin spinning={isLoading} />
       <Space style={{ width: "100%" }} direction="vertical" size="large">
         {notifications.map((notification, index) => (
           <Alert
             key={index}
+            className={
+              index === notifications.length - 1
+                ? "signalr-progress__notification signalr-progress__notification--latest"
+                : "signalr-progress__notification"
+            }
             message={notification}
             type="info"
             style={{
               width: "100%",
-              ...(index === notifications.length - 1
-                ? { backgroundColor: "#e6f7ff", fontWeight: "bold" }
-                : {}),
             }}
             showIcon
           />

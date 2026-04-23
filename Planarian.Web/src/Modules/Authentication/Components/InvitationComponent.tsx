@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Card, Typography, Button, Space, message } from "antd";
 import {
   CheckCircleOutlined,
-  CloseCircleOutlined,
   UserAddOutlined,
   LoginOutlined,
   EnvironmentOutlined,
@@ -99,7 +98,11 @@ const InvitationComponent = ({
   if (!isLoading && !invitation) {
     return (
       <div style={styles.container}>
-        <Card style={styles.card} bordered={false}>
+        <Card
+          style={styles.card}
+          styles={{ body: styles.cardBody }}
+          bordered={false}
+        >
           <Title level={3} style={{ marginBottom: 10 }}>
             Invitation Not Found
           </Title>
@@ -115,7 +118,12 @@ const InvitationComponent = ({
   return (
     <div style={styles.container}>
       {status === "pending" ? (
-        <Card loading={isLoading} style={styles.card} bordered={false}>
+        <Card
+          loading={isLoading}
+          style={styles.card}
+          styles={{ body: styles.cardBody }}
+          bordered={false}
+        >
           <Title level={3} style={{ marginBottom: 10 }}>
             {invitation?.accountName}
           </Title>
@@ -196,7 +204,11 @@ const InvitationComponent = ({
           )}
         </Card>
       ) : (
-        <Card style={styles.card} bordered={false}>
+        <Card
+          style={styles.card}
+          styles={{ body: styles.cardBody }}
+          bordered={false}
+        >
           <Title level={3} style={{ marginBottom: 10 }}>
             {status === "accepted" ? "Access Confirmed" : "Invitation Declined"}
           </Title>
@@ -231,17 +243,25 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    height: "calc(var(--vh, 1vh) * 100)",
-    background: "linear-gradient(135deg, #f0f2f5, #e6f7ff)",
-    padding: 20,
+    boxSizing: "border-box",
+    flex: 1,
+    minHeight: "inherit",
+    background: "var(--background-color)",
+    color: "var(--text-color)",
+    padding: "clamp(16px, 4vh, 32px)",
+    width: "100%",
   },
   card: {
-    width: 420,
+    boxSizing: "border-box",
+    width: "min(420px, 100%)",
     textAlign: "center",
-    padding: 24,
     boxShadow: "0px 6px 12px rgba(0,0,0,0.1)",
-    borderRadius: 10,
-    background: "white",
+    borderRadius: 8,
+    background: "var(--surface-color)",
+    color: "var(--text-color)",
+  },
+  cardBody: {
+    padding: "clamp(16px, 3vh, 24px)",
   },
   section: {
     marginTop: 16,
