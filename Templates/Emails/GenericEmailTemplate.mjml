@@ -1,40 +1,132 @@
 <mjml>
   <mj-head>
+    <mj-title>Planarian</mj-title>
+    <mj-preview>{{header}}</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="Inter, Arial, sans-serif" />
+      <mj-body background-color="#ffffff" width="640px" />
+      <mj-section padding="0" />
+      <mj-column padding="0" />
+      <mj-text
+        color="#27352f"
+        font-size="16px"
+        line-height="25px"
+        padding="0"
+      />
+      <mj-button font-size="16px" font-weight="700" line-height="20px" />
+    </mj-attributes>
     <mj-style inline="inline">
-      .body-container {
-        background-color: #F7F7F7;
-        padding: 20px;
+      .message-card {
+        border: 1px solid #e2e8e4;
+      }
+
+      .footer-link {
+        color: #2f6f96;
+        text-decoration: none;
+      }
+
+      .website-link {
+        color: #6f7f77;
+        text-decoration: none;
       }
     </mj-style>
   </mj-head>
-  <mj-body>
-    <mj-section>
+  <mj-body background-color="#ffffff">
+    <mj-section padding="28px 20px 0">
       <mj-column>
-        <mj-image width="150px" src="https://saplanarian.blob.core.windows.net/public/planarianLogo.png"></mj-image>
-        <mj-text align="center" font-size="20px">Planarian</mj-text>
-      </mj-column>
-    </mj-section>
-    <mj-section>
-      <mj-column>
-        <mj-text font-size="16px">{{header}}</mj-text>
-      </mj-column>
-    </mj-section>
-    <mj-section>
-      <mj-column>
-        <mj-raw>
-          {{#each messages}}
-        </mj-raw>
-        <mj-text>{{this}}</mj-text>
-        <mj-raw>{{/each}}</mj-raw>
-      </mj-column>
-    </mj-section>
-    <mj-raw>{{#if buttonText}}</mj-raw>
-    <mj-section>
-      <mj-column>
-        <mj-button background-color="#1990ff" color="#FFFFFF" padding="10px 25px" border-radius="5px" href="{{buttonUrl}}">{{buttonText}}</mj-button>
+        <mj-wrapper
+          css-class="message-card"
+          background-color="#ffffff"
+          border-radius="8px"
+          padding="0"
+        >
+          <mj-section
+            background-color="rgb(248, 219, 105)"
+            border-radius="8px 8px 0 0"
+            padding="34px 42px 30px"
+          >
+            <mj-column>
+              <mj-text
+                align="center"
+                color="#3c3320"
+                font-size="28px"
+                font-weight="700"
+                line-height="36px"
+                padding="0"
+              >
+                {{header}}
+              </mj-text>
+            </mj-column>
+          </mj-section>
 
+          <mj-section background-color="#ffffff" padding="34px 42px 8px">
+            <mj-column>
+              <mj-raw>{{#each messages}}</mj-raw>
+              <mj-text padding="0 0 18px">
+                {{this}}
+              </mj-text>
+              <mj-raw>{{/each}}</mj-raw>
+            </mj-column>
+          </mj-section>
+
+          <mj-raw>{{#if buttonText}}</mj-raw>
+          <mj-section background-color="#ffffff" padding="6px 42px 20px">
+            <mj-column>
+              <mj-button
+                href="{{buttonUrl}}"
+                align="center"
+                background-color="#2378a8"
+                color="#ffffff"
+                border-radius="6px"
+                inner-padding="15px 26px"
+                padding="0"
+              >
+                {{buttonText}}
+              </mj-button>
+              <mj-text
+                align="center"
+                color="#6f7f77"
+                font-size="13px"
+                line-height="20px"
+                padding="18px 0 0"
+              >
+                If the button does not work, copy and paste this link into your
+                browser:<br />
+                <a class="footer-link" href="{{buttonUrl}}">{{buttonUrl}}</a>
+              </mj-text>
+            </mj-column>
+          </mj-section>
+          <mj-raw>{{/if}}</mj-raw>
+
+          <mj-section background-color="#ffffff" padding="0 42px 20px">
+            <mj-column>
+              <mj-image
+                align="right"
+                width="72px"
+                padding="0"
+                src="https://saplanarian.blob.core.windows.net/public/planarianLogo.png"
+                alt="Planarian"
+              />
+            </mj-column>
+          </mj-section>
+        </mj-wrapper>
       </mj-column>
     </mj-section>
-    <mj-raw>{{/if}}</mj-raw>
+
+    <mj-section padding="20px 28px 36px">
+      <mj-column>
+        <mj-text
+          align="center"
+          color="#6f7f77"
+          font-size="13px"
+          line-height="20px"
+          padding="0"
+        >
+          <a class="website-link" href="https://app.planarian.xyz">
+            https://app.planarian.xyz
+          </a>
+        </mj-text>
+      </mj-column>
+    </mj-section>
   </mj-body>
 </mjml>
