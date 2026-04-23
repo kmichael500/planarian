@@ -158,6 +158,7 @@ internal static class SqlViewScriptGenerator
             return;
         }
 
+        AppendSql(builder, $@"DROP VIEW IF EXISTS ""{viewName}"";", validateCreateView: false, sourceName);
         AppendSql(builder, sql, validateCreateView: true, sourceName);
     }
 

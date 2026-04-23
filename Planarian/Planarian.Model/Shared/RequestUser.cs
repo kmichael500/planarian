@@ -127,7 +127,8 @@ public class RequestUser
             {
                 hasUserPermission = await _dbContext.CavePermissions
                     .AnyAsync(e =>
-                        string.IsNullOrWhiteSpace(e.CaveId) 
+                        string.IsNullOrWhiteSpace(e.StateId)
+                        && string.IsNullOrWhiteSpace(e.CaveId)
                         && string.IsNullOrWhiteSpace(e.CountyId)
                         && e.UserId == Id
                         && e.AccountId == AccountId
@@ -166,17 +167,20 @@ public class RequestUser
         return hasCavePermission;
     }
 
-    public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId, bool @throw = true)
+    public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId, string? stateId,
+        bool @throw = true)
     {
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
             throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated, permissionKey, and AccountId are required");
 
         var hasPermission = false;
-        if (string.IsNullOrWhiteSpace(caveId) && string.IsNullOrWhiteSpace(countyId))
+        if (string.IsNullOrWhiteSpace(caveId) && string.IsNullOrWhiteSpace(countyId) &&
+            string.IsNullOrWhiteSpace(stateId))
         {
             hasPermission = await _dbContext.CavePermissions
                 .AnyAsync(e =>
-                    string.IsNullOrWhiteSpace(e.CaveId) 
+                    string.IsNullOrWhiteSpace(e.StateId)
+                    && string.IsNullOrWhiteSpace(e.CaveId)
                     && string.IsNullOrWhiteSpace(e.CountyId)
                     && e.UserId == Id
                     && e.AccountId == AccountId
@@ -194,7 +198,9 @@ public class RequestUser
                     e.UserId == Id
                     && e.AccountId == AccountId
                     && e.PermissionKey == permissionKey
-                    && (e.CaveId == caveId || e.CountyId == countyId)
+                    && ((!string.IsNullOrWhiteSpace(caveId) && e.CaveId == caveId) ||
+                        (!string.IsNullOrWhiteSpace(countyId) && e.CountyId == countyId) ||
+                        (!string.IsNullOrWhiteSpace(stateId) && e.StateId == stateId))
                 );
         }
         

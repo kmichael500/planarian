@@ -113,10 +113,11 @@ public class UserRepository : RepositoryBase
             CaveCountyId = e.Cave!.CountyId,
             e.CaveId,
             e.CountyId,
-            StateId = e.County!.StateId
+            StateId = e.StateId ?? e.County!.StateId
         }).ToListAsync();
         
-        var hasAllLocations = data.Any(permission => permission.CountyId == null && permission.CaveId == null);
+        var hasAllLocations = data.Any(permission =>
+            permission.StateId == null && permission.CountyId == null && permission.CaveId == null);
 
         var stateCountyValues = new StateCountyValue
         {
@@ -139,7 +140,7 @@ public class UserRepository : RepositoryBase
                     {
                         CountyId = cave.CaveCountyId,
                         RequestUserHasAccess =
-                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, false)
+                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, cave.StateId,false)
                     }
                 }
             );
@@ -185,6 +186,7 @@ public class UserRepository : RepositoryBase
             .Where(e =>
                 e.UserId == userId
                 && e.AccountId == accountId
+                && string.IsNullOrWhiteSpace(e.StateId)
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && e.Permission!.Key == PermissionPolicyKey.Manager

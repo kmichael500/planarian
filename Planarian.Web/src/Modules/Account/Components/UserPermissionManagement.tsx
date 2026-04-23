@@ -111,6 +111,10 @@ export const UserPermissionManagement: React.FC<
   const handleFormSubmit = async (values: CavePermissionManagementVm) => {
     const newPermissions: CreateUserCavePermissionsVm = {
       hasAllLocations: values.hasAllLocations,
+      stateIds: values.stateCountyValues.states.filter(
+        (stateId) =>
+          !values.stateCountyValues.countiesByState[stateId]?.length
+      ),
       countyIds: Object.values(values.stateCountyValues.countiesByState).flat(),
       caveIds: values.cavePermissions.map((cave) => cave.value),
     };

@@ -22,6 +22,7 @@ export interface StateCountyValue {
 
 export interface CreateUserCavePermissionsVm {
   hasAllLocations: boolean;
+  stateIds: string[];
   countyIds: string[];
   caveIds: string[];
 }
