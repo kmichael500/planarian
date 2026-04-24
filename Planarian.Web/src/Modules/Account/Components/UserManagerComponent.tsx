@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Table,
   Modal,
   Form,
   Input,
@@ -8,11 +7,15 @@ import {
   Card,
   Row,
   Col,
-  Space,
-  Grid,
+  Select,
+  Typography,
 } from "antd";
-import { RedoOutlined, UserAddOutlined } from "@ant-design/icons";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  EditOutlined,
+  RedoOutlined,
+  UserAddOutlined,
+} from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
@@ -20,23 +23,41 @@ import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { formatDateTime, nameof } from "../../../Shared/Helpers/StringHelpers";
-import { ColumnsType } from "antd/lib/table";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
+import {
+  GridCard,
+  GridCardAction,
+} from "../../../Shared/Components/CardGrid/GridCard";
+import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { SplitSortControl } from "../../Search/Components/SplitSortControl";
+import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import "./UserManagerComponent.scss";
 
-const { useBreakpoint } = Grid;
+const { Text } = Typography;
+
+type UserStatusFilter = "all" | "accepted" | "pending";
+type UserSortBy =
+  | "fullName"
+  | "emailAddress"
+  | "invitationSentOn"
+  | "invitationAcceptedOn"
+  | "lastActiveOn";
 
 const UserManagerComponent: React.FC = () => {
   const [users, setUsers] = useState<UserManagerGridVm[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [inviteModalVisible, setInviteModalVisible] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
+  const [sortDescending, setSortDescending] = useState(true);
+  const [isGridScrolled, setIsGridScrolled] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
-  const screens = useBreakpoint();
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -100,135 +121,206 @@ const UserManagerComponent: React.FC = () => {
     setIsResending(false);
   };
 
-  const columns: ColumnsType<UserManagerGridVm> = [
-    {
-      title: "Name",
-      dataIndex: nameof<UserManagerGridVm>("fullName"),
-      sorter: (a, b) => a.fullName.localeCompare(b.fullName),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
-    },
-    {
-      title: "Email",
-      dataIndex: nameof<UserManagerGridVm>("emailAddress"),
-      sorter: (a, b) => a.emailAddress.localeCompare(b.emailAddress),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
-    },
-    {
-      title: "Invitation Sent On",
-      dataIndex: nameof<UserManagerGridVm>("invitationSentOn"),
-      sorter: (a, b) =>
-        new Date(a.invitationSentOn ?? 0).getTime() -
-        new Date(b.invitationSentOn ?? 0).getTime(),
-      defaultSortOrder: "descend",
-      render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["md", "lg", "xl"],
-    },
-    {
-      title: "Invitation Accepted On",
-      dataIndex: nameof<UserManagerGridVm>("invitationAcceptedOn"),
-      sorter: (a, b) =>
-        new Date(a.invitationAcceptedOn ?? 0).getTime() -
-        new Date(b.invitationAcceptedOn ?? 0).getTime(),
-      render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["lg", "xl"],
-    },
-    {
-      title: "Last Active",
-      dataIndex: nameof<UserManagerGridVm>("lastActiveOn"),
-      sorter: (a, b) =>
-        new Date(a.lastActiveOn ?? 0).getTime() -
-        new Date(b.lastActiveOn ?? 0).getTime(),
-      render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["lg", "xl"],
-    },
-    {
-      title: "Action",
-      className: "user-manager-actions-column",
-      width: screens.md ? 360 : 180,
-      render: (_: any, record: UserManagerGridVm) => (
-        <Space
-          className="user-manager-actions"
-          direction={screens.md ? "horizontal" : "vertical"}
-          wrap={!!screens.md}
-        >
-          {record.invitationSentOn && !record.invitationAcceptedOn && (
-            <PlanarianButton
-              alwaysShowChildren
-              loading={isResending}
-              permissionKey={PermissionKey.Admin}
-              type="primary"
-              onClick={() => handleResendInvitation(record.userId)}
-              icon={<RedoOutlined />}
-            >
-              Resend Invitation
-            </PlanarianButton>
-          )}
-          <Link to={record.userId}>
-            <EditButtonComponentt alwaysShowChildren />
-          </Link>
-          <DeleteButtonComponent
-            alwaysShowChildren
-            permissionKey={PermissionKey.Admin}
-            loading={isRevoking}
-            title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
-            onConfirm={() => handleRevokeAccess(record.userId)}
-            okText="Yes"
-            cancelText="No"
-          >
-            Remove
-          </DeleteButtonComponent>
-        </Space>
-      ),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
-    },
+  const getUserStatus = (user: UserManagerGridVm): UserStatusFilter =>
+    user.invitationAcceptedOn ? "accepted" : "pending";
+
+  const sortOptions: SelectListItem<string>[] = [
+    { display: "Invitation sent", value: "invitationSentOn" },
+    { display: "Name", value: "fullName" },
+    { display: "Email", value: "emailAddress" },
+    { display: "Invitation accepted", value: "invitationAcceptedOn" },
+    { display: "Last active", value: "lastActiveOn" },
   ];
 
-  // Filter users based on search text (matching full name or email)
-  const filteredUsers = users.filter(
-    (user) =>
-      user.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
-      user.emailAddress.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const compareNullableDates = (
+    a?: string | null,
+    b?: string | null
+  ): number => new Date(a ?? 0).getTime() - new Date(b ?? 0).getTime();
+
+  const filteredUsers = users
+    .filter(
+      (user) =>
+        user.fullName.toLowerCase().includes(searchText.toLowerCase()) ||
+        user.emailAddress.toLowerCase().includes(searchText.toLowerCase())
+    )
+    .filter(
+      (user) => statusFilter === "all" || getUserStatus(user) === statusFilter
+    )
+    .sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "fullName":
+          comparison = a.fullName.localeCompare(b.fullName);
+          break;
+        case "emailAddress":
+          comparison = a.emailAddress.localeCompare(b.emailAddress);
+          break;
+        case "invitationAcceptedOn":
+          comparison = compareNullableDates(
+            a.invitationAcceptedOn,
+            b.invitationAcceptedOn
+          );
+          break;
+        case "lastActiveOn":
+          comparison = compareNullableDates(a.lastActiveOn, b.lastActiveOn);
+          break;
+        case "invitationSentOn":
+        default:
+          comparison = compareNullableDates(
+            a.invitationSentOn,
+            b.invitationSentOn
+          );
+          break;
+      }
+
+      return sortDescending ? -comparison : comparison;
+    });
+
+  const renderDate = (value?: string | null) =>
+    value ? formatDateTime(value) : "Not recorded";
+
+  const renderUserCard = (user: UserManagerGridVm) => {
+    const isPending = user.invitationSentOn && !user.invitationAcceptedOn;
+    const actions: GridCardAction[] = [
+      {
+        key: "edit",
+        label: "Edit",
+        icon: <EditOutlined />,
+        to: user.userId,
+        type: "primary",
+      },
+    ];
+
+    if (isPending) {
+      actions.push({
+        key: "resend",
+        label: "Resend",
+        icon: <RedoOutlined />,
+        loading: isResending,
+        onClick: () => handleResendInvitation(user.userId),
+      });
+    }
+
+    actions.push({
+      key: "remove",
+      label: "Remove",
+      render: (
+        <DeleteButtonComponent
+          alwaysShowChildren
+          permissionKey={PermissionKey.Admin}
+          loading={isRevoking}
+          type="default"
+          title={`Are you sure you want to revoke access for ${user.fullName}? You will need to re-invite them to grant access in the future.`}
+          onConfirm={() => handleRevokeAccess(user.userId)}
+          okText="Yes"
+          cancelText="No"
+        >
+          Remove
+        </DeleteButtonComponent>
+      ),
+    });
+
+    return (
+      <GridCard
+        actions={actions}
+        className="user-manager-grid-card"
+        stickyFooter
+        stickyHeader
+        header={
+          <span>
+            <span className="user-manager-grid-card__name">
+              {user.fullName}
+            </span>
+            <span className="user-manager-grid-card__email">
+              {user.emailAddress}
+            </span>
+          </span>
+        }
+        headerExtra={
+          isPending ? (
+            <span className="user-manager-grid-card__status">Pending</span>
+          ) : null
+        }
+      >
+        <div className="user-manager-grid-card__details">
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Invitation Sent</Text>
+            <span>{renderDate(user.invitationSentOn)}</span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Invitation Accepted</Text>
+            <span>{renderDate(user.invitationAcceptedOn)}</span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Last Active</Text>
+            <span>{renderDate(user.lastActiveOn)}</span>
+          </div>
+        </div>
+      </GridCard>
+    );
+  };
 
   return (
     <>
       <Card className="user-manager-card">
-        <Row
-          className="user-manager-toolbar"
-          align="middle"
-          justify="space-between"
-          gutter={[12, 12]}
-        >
-          <Col xs={24} sm={12}>
-            <PlanarianButton
-              className="user-manager-invite-button"
-              permissionKey={PermissionKey.Admin}
-              icon={<UserAddOutlined />}
-              type="primary"
-              onClick={() => setInviteModalVisible(true)}
-            >
-              Invite User
-            </PlanarianButton>
-          </Col>
-          <Col xs={24} sm={12} className="user-manager-search-column">
-            <Input.Search
-              className="user-manager-search"
-              placeholder="Search users"
-              onSearch={(value) => setSearchText(value)}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
+        <ScrollCollapseSection visible={!isGridScrolled}>
+          <div className="user-manager-toolbar">
+            <div className="user-manager-controls-column">
+              <div className="user-manager-controls">
+                <Input.Search
+                  className="user-manager-search"
+                  placeholder="Search users"
+                  onSearch={(value) => setSearchText(value)}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
+                <Select<UserStatusFilter>
+                  className="user-manager-filter"
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { label: "All statuses", value: "all" },
+                    { label: "Accepted", value: "accepted" },
+                    { label: "Pending", value: "pending" },
+                  ]}
+                />
+                <SplitSortControl
+                  isDescending={sortDescending}
+                  onSelect={(value) => setSortBy(value as UserSortBy)}
+                  onToggleDirection={() =>
+                    setSortDescending((previous) => !previous)
+                  }
+                  selectedValue={sortBy}
+                  sortOptions={sortOptions}
+                />
+              </div>
+            </div>
+            <div className="user-manager-invite-column">
+              <PlanarianButton
+                className="user-manager-invite-button"
+                permissionKey={PermissionKey.Admin}
+                icon={<UserAddOutlined />}
+                type="primary"
+                alwaysShowChildren
+                onClick={() => setInviteModalVisible(true)}
+              >
+                Invite User
+              </PlanarianButton>
+            </div>
+          </div>
+        </ScrollCollapseSection>
+        <div className="user-manager-grid">
+          <SpinnerCardComponent spinning={loading}>
+            <CardGridComponent
+              fillHeight
+              items={filteredUsers}
+              itemKey={(user) => user.userId}
+              noDataDescription="No users found"
+              onScrollStateChange={setIsGridScrolled}
+              renderItem={renderUserCard}
             />
-          </Col>
-        </Row>
-        <div className="user-manager-table">
-          <Table
-            columns={columns}
-            dataSource={filteredUsers}
-            rowKey="userId"
-            loading={loading}
-            pagination={{ position: ["bottomRight"] }}
-            scroll={screens.xs ? undefined : { x: "max-content" }}
-          />
+          </SpinnerCardComponent>
         </div>
       </Card>
 

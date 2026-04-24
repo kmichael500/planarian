@@ -18,116 +18,249 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  gap: 8px;
   min-height: 0;
   min-width: 0;
   width: 100%;
 }
 
 .user-manager-toolbar {
+  align-items: center;
+  display: flex;
   flex: 0 0 auto;
-  margin-bottom: 16px;
+  gap: 8px;
+  justify-content: space-between;
+  margin: 0;
+  min-width: 0;
+  width: 100%;
 }
 
-.user-manager-table {
+.user-manager-controls {
+  align-items: center;
   display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-controls-column {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.user-manager-filter {
+  flex: 0 0 auto;
+  min-width: 160px;
+  width: 160px;
+}
+
+.user-manager-filter.ant-select {
+  align-self: stretch;
+  height: 44px;
+}
+
+.user-manager-filter .ant-select-selector {
+  align-items: center;
+  height: 44px !important;
+  min-height: 44px;
+}
+
+.user-manager-filter .ant-select-selection-item {
+  align-items: center;
+  display: flex;
+  line-height: 1;
+}
+
+.user-manager-grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-grid > * {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+}
+
+.user-manager-grid-card__name {
+  display: block;
+  font-weight: 600;
   overflow: hidden;
-  width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.user-manager-table .ant-table-wrapper {
+.user-manager-grid-card__email {
+  color: var(--muted-text-color);
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-manager-grid-card__status {
+  background: color-mix(in srgb, #faad14 18%, var(--surface-color));
+  border: 1px solid color-mix(in srgb, #faad14 44%, var(--border-color));
+  border-radius: 999px;
+  color: #8a5a00;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.dark .user-manager-grid-card__status {
+  background: color-mix(in srgb, #faad14 18%, var(--surface-elevated-color));
+  color: #ffd666;
+}
+
+.user-manager-grid-card__details {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
+  gap: 8px;
 }
 
-.user-manager-table .ant-spin-nested-loading,
-.user-manager-table .ant-spin-container {
+.user-manager-grid-card__detail {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  min-height: 0;
+  gap: 2px;
   min-width: 0;
 }
 
-.user-manager-table .ant-table {
-  flex: 1 1 auto;
-  min-height: 0;
+.user-manager-grid-card__detail > span:last-child {
+  color: var(--text-color);
+  overflow-wrap: anywhere;
+}
+
+.user-manager-search {
+  flex: 1 1 220px;
+  min-width: 160px;
+  width: auto;
+}
+
+.user-manager-search .ant-input-group {
+  height: 44px;
+}
+
+.user-manager-search .ant-input-affix-wrapper {
+  align-items: center;
+  background: var(--input-background-color) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+  display: flex;
+  height: 44px;
+}
+
+.user-manager-search .ant-input-affix-wrapper:hover,
+.user-manager-search .ant-input-affix-wrapper-focused {
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.user-manager-search .ant-input {
+  background: transparent !important;
+  display: flex;
+  height: 42px;
+  align-items: center;
+}
+
+.user-manager-search .ant-input-group-addon {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.user-manager-search .ant-input-search-button {
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+  border-inline-start-width: 0;
+  box-shadow: none !important;
+  height: 44px;
+}
+
+.user-manager-search .ant-input-search-button:hover,
+.user-manager-search .ant-input-search-button:focus {
+  background: var(--hover-surface-color) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.user-manager-invite-column {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
   min-width: 0;
-  overflow: auto;
-  width: 100%;
 }
 
-.user-manager-table .ant-table-pagination {
-  flex: 0 0 auto;
-  margin: 16px 0 0;
+.user-manager-invite-button.ant-btn {
+  height: 44px;
 }
 
-.user-manager-actions-column {
-  min-width: 180px;
-}
+@media (max-width: 760px) {
+  .user-manager-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
 
-.user-manager-actions {
-  max-width: 100%;
-}
+  .user-manager-controls-column {
+    display: contents;
+    flex-basis: auto !important;
+  }
 
-.user-manager-actions .ant-space-item {
-  flex: 0 0 auto;
-}
+  .user-manager-controls {
+    display: contents;
+  }
 
-@media (max-width: 767px) {
-  .user-manager-actions {
-    align-items: stretch;
+  .user-manager-search {
+    flex: 0 0 100%;
+    min-width: 0;
     width: 100%;
   }
 
-  .user-manager-actions .ant-space-item,
-  .user-manager-actions a,
-  .user-manager-actions button {
-    width: 100%;
+  .user-manager-filter {
+    flex: 0 0 160px;
+    min-width: 160px;
+    width: 160px;
+    order: 2;
   }
 
-  .user-manager-actions button {
+  .user-manager-controls .planarian-split-sort {
+    flex: 0 0 auto;
+    order: 3;
+  }
+
+  .user-manager-invite-column {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    margin-left: auto;
+    min-width: 132px;
+    order: 4;
+  }
+
+  .user-manager-invite-button.ant-btn {
     justify-content: center;
   }
 }
 
-.user-manager-search {
-  width: 280px;
-}
-
-.user-manager-search-column {
-  display: flex;
-  justify-content: flex-end;
-}
-
-@media (max-width: 575px) {
-  .user-manager-invite-button,
-  .user-manager-search,
-  .user-manager-search-column {
+@media (max-width: 545px) {
+  .user-manager-invite-column {
+    flex: 0 0 100%;
+    margin-left: 0;
     width: 100%;
   }
 
-  .user-manager-search-column {
-    justify-content: stretch;
-  }
-
-  .user-manager-table .ant-space {
+  .user-manager-invite-button.ant-btn {
     width: 100%;
   }
-
-  .user-manager-table .ant-table {
-    overflow-x: hidden;
-  }
-
-  .user-manager-table .ant-table-cell {
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
 }

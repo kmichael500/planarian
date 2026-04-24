@@ -9,6 +9,7 @@ import "./GridCard.scss";
 export interface GridCardAction {
   key: string;
   label: React.ReactNode;
+  render?: React.ReactNode;
   icon?: React.ReactNode;
   to?: string;
   href?: string;
@@ -56,6 +57,17 @@ const GridCard: React.FC<GridCardProps> = ({
   const hasFooter = Boolean(footer) || Boolean(actions?.length);
 
   const renderAction = (action: GridCardAction) => {
+    if (action.render) {
+      return (
+        <div
+          className={`planarian-grid-card__action planarian-grid-card__action--${action.key}`}
+          key={action.key}
+        >
+          {action.render}
+        </div>
+      );
+    }
+
     const button = (
       <PlanarianButton
         alwaysShowChildren

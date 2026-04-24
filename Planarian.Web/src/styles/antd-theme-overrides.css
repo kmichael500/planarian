@@ -110,6 +110,23 @@ body,
   color: var(--muted-text-color) !important;
 }
 
+.ant-btn-primary:not(.ant-btn-dangerous) {
+  background: var(--primary-action-background) !important;
+  border-color: var(--primary-action-border-color) !important;
+  color: var(--primary-action-text-color) !important;
+}
+
+.ant-btn-primary:not(.ant-btn-dangerous):hover,
+.ant-btn-primary:not(.ant-btn-dangerous):focus {
+  background: var(--primary-action-hover-background) !important;
+  border-color: var(--primary-action-border-color) !important;
+  color: var(--primary-action-text-color) !important;
+}
+
+.ant-btn-primary:not(.ant-btn-dangerous) .anticon {
+  color: inherit;
+}
+
 .ant-collapse-content-box .ant-list,
 .ant-collapse-content-box .ant-list .ant-spin-container,
 .ant-collapse-content-box .ant-list-items {
