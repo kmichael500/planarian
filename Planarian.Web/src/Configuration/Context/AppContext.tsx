@@ -4,6 +4,8 @@ import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm"
 import { AccountService } from "../../Modules/Account/Services/AccountService";
 import { AppService } from "../../Shared/Services/AppService";
 import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
+import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
+import { UserService } from "../../Modules/User/UserService";
 
 interface Permissions {
   visibleFields: FeatureSettingVm[];
@@ -29,6 +31,8 @@ interface AppContextProps {
   defaultContentStyle: React.CSSProperties;
   contentStyle: React.CSSProperties | null;
   setContentStyle: (style: React.CSSProperties) => void;
+  pendingInvitationCount: number;
+  refreshPendingInvitations: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextProps>({
@@ -50,6 +54,8 @@ export const AppContext = createContext<AppContextProps>({
   },
   contentStyle: null,
   setContentStyle: () => {},
+  pendingInvitationCount: 0,
+  refreshPendingInvitations: async () => {},
 });
 
 interface AppProviderProps {
@@ -72,6 +78,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
     useState<ApiErrorResponse | null>(null);
+  const [pendingInvitationCount, setPendingInvitationCount] =
+    useState<number>(0);
 
   const defaultContentStyle = {
     margin: "16px",
@@ -81,13 +89,32 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     defaultContentStyle
   );
 
+  const refreshPendingInvitations = useCallback(async () => {
+    if (!AuthenticationService.IsAuthenticated()) {
+      setPendingInvitationCount(0);
+      return;
+    }
+
+    const pendingInvitations = await UserService.GetPendingInvitations();
+    setPendingInvitationCount(pendingInvitations.length);
+  }, []);
+
   const initializeApp = async () => {
     try {
       setIsLoading(true);
       await AppService.InitializeApp();
       if (AuthenticationService.IsAuthenticated()) {
-        const response = await AccountService.GetFeatureSettings();
-        setPermissions({ visibleFields: response });
+        await refreshPendingInvitations();
+
+        if (!isNullOrWhiteSpace(AuthenticationService.GetAccountId())) {
+          const response = await AccountService.GetFeatureSettings();
+          setPermissions({ visibleFields: response });
+        } else {
+          setPermissions({ visibleFields: [] });
+        }
+      } else {
+        setPendingInvitationCount(0);
+        setPermissions({ visibleFields: [] });
       }
       setIsInitialized(true);
       setInitializedError(null);
@@ -129,6 +156,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         contentStyle: contentStyle,
         setContentStyle: setContentStyle,
         defaultContentStyle: defaultContentStyle,
+        pendingInvitationCount: pendingInvitationCount,
+        refreshPendingInvitations: refreshPendingInvitations,
       }}
     >
       {props.children}

@@ -23,6 +23,7 @@ import { MapPage } from "../../Modules/Map/Pages/MapPage";
 import { PlanarianSettingsPage } from "../../Modules/PlanarianSettings/Pages/PlanarianSettingsPage";
 import { UserManagerPage } from "../../Modules/Account/Pages/UserManagerPage";
 import { AcceptInvitationPage } from "../../Modules/Authentication/Pages/AcceptInvitationPage";
+import { InvitationsPage } from "../../Modules/Authentication/Pages/InvitationsPage";
 import { UserPage } from "../../Modules/Account/Pages/UserPage";
 import { UserPermissionManagementPage } from "../../Modules/Account/Pages/UserPermissionManagementPage";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
@@ -43,6 +44,7 @@ export const AppRouting: React.FC = () => {
 
       <Route element={<ProtectedRoutesComponent />}>
         <Route path="/" element={<AppRederect />} />
+        <Route path="/user/invitations" element={<InvitationsPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />

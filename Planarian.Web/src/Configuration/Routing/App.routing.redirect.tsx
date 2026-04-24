@@ -7,7 +7,7 @@ const AppRederect = () => {
   if (!isNullOrWhiteSpace(accountId)) {
     return <Navigate replace to="/caves" />;
   } else {
-    return <Navigate replace to="/projects" />;
+    return <Navigate replace to="/user/invitations" />;
   }
 };
 

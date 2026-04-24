@@ -236,6 +236,11 @@ public class UserService : ServiceBase<UserRepository>
         return invitation;
     }
 
+    public async Task<List<AcceptInvitationVm>> GetPendingInvitationsForCurrentUser()
+    {
+        return await Repository.GetPendingInvitationsForCurrentUser();
+    }
+
     public async Task DeclineInvitation(string code)
     {
         var invitation = await Repository.GetInvitationEntities(code);
