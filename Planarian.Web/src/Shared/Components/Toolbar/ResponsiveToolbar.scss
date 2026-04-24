@@ -1,0 +1,115 @@
+.planarian-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.planarian-toolbar__left {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.planarian-toolbar__right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.planarian-toolbar__primary {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.planarian-toolbar__primary .ant-input-search {
+  width: 100%;
+}
+
+.planarian-search-toolbar__primary {
+  flex: 1 1 auto;
+  min-width: 160px;
+  width: 100%;
+}
+
+.planarian-toolbar__persistent {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.planarian-toolbar__actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.planarian-toolbar__action-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.planarian-toolbar__metrics {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 6px;
+  grid-auto-columns: minmax(64px, max-content);
+  grid-auto-flow: column;
+  min-width: 0;
+}
+
+.planarian-toolbar__metric {
+  align-items: center;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.planarian-toolbar__metric-label {
+  color: var(--muted-text-color);
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.planarian-toolbar__metric-value {
+  color: var(--text-color);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.planarian-toolbar__menu .ant-dropdown-menu-item-disabled {
+  opacity: 0.45;
+}
+
+.planarian-toolbar__menu .ant-dropdown-menu-item-disabled .ant-dropdown-menu-title-content,
+.planarian-toolbar__menu .ant-dropdown-menu-item-disabled .ant-dropdown-menu-item-icon {
+  color: var(--muted-text-color);
+}
+
+.planarian-toolbar__measure {
+  left: -9999px;
+  pointer-events: none;
+  position: absolute;
+  top: -9999px;
+  visibility: hidden;
+}

@@ -1,0 +1,79 @@
+.planarian-split-sort {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.planarian-split-sort .ant-btn {
+  align-items: center;
+  border-color: var(--border-color);
+  color: var(--text-color);
+  display: inline-flex;
+  gap: 4px;
+  height: 44px;
+  padding-inline: 6px;
+}
+
+.planarian-split-sort__field {
+  border-end-end-radius: 0;
+  border-start-end-radius: 0;
+  min-width: fit-content;
+  width: auto;
+}
+
+.planarian-split-sort__field-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+}
+
+.planarian-split-sort__field:hover,
+.planarian-split-sort__field:focus {
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.planarian-split-sort__field-label {
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planarian-split-sort__direction {
+  border-inline-start-width: 0;
+  border-end-start-radius: 0;
+  border-start-start-radius: 0;
+  justify-content: center;
+  min-width: 34px;
+  padding-inline: 0;
+  width: 34px;
+}
+
+.planarian-split-sort__field--compact {
+  min-width: fit-content;
+  width: auto;
+}
+
+.planarian-split-sort__direction--compact {
+  min-width: 34px;
+  width: 34px;
+}
+
+.planarian-split-sort__field--compact.ant-btn {
+  height: 44px;
+}
+
+.planarian-split-sort__direction:hover,
+.planarian-split-sort__direction:focus {
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.planarian-split-sort__direction-icon,
+.planarian-split-sort__caret {
+  font-size: 1.2rem;
+}
+
+.planarian-split-sort__caret {
+  font-size: 1.0rem;
+}

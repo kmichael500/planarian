@@ -1,28 +1,31 @@
 import {
   Button,
-  Col,
   Drawer,
   Form,
   FormInstance,
   Input,
-  Row,
-  Select,
   Dropdown,
   MenuProps,
+  Popconfirm,
 } from "antd";
 import { FilterFormProps } from "../Models/NumberComparisonFormItemProps";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { QueryOperator, QueryBuilder } from "../Services/QueryBuilder";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import {
   SlidersOutlined,
   ClearOutlined,
   DownloadOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
+import { SplitSortControl } from "./SplitSortControl";
+import "./AdvancedSearchDrawerComponent.scss";
+
+const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
 
 export interface AdvancedSearchDrawerComponentProps<T extends object>
   extends FilterFormProps<T> {
@@ -36,6 +39,8 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   onExportCsv?: () => Promise<void>;
   onFiltersCleared?: () => void;
   onSortChange?: (sortBy: string) => Promise<void> | void;
+  toolbarMetrics?: ToolbarMetric[];
+  hidePersistentContentOnMobile?: boolean;
   inlineControls?: (
     context: AdvancedSearchInlineControlsContext<T>
   ) => React.ReactNode;
@@ -65,9 +70,28 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   onExportCsv,
   onFiltersCleared,
   onSortChange,
+  toolbarMetrics,
+  hidePersistentContentOnMobile = false,
   inlineControls,
 }: AdvancedSearchDrawerComponentProps<T>) => {
+  const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
+    window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
+  );
+  const [mainSearchValue, setMainSearchValue] = useState(
+    ((queryBuilder.getFieldValue(mainSearchField) as string) ?? "")
+  );
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const updateBreakpoint = () => {
+      setIsBelowToolbarBreakpoint(
+        window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
+      );
+    };
+
+    window.addEventListener("resize", updateBreakpoint);
+    return () => window.removeEventListener("resize", updateBreakpoint);
+  }, []);
   const onClickSearch = async () => {
     setIsAdvancedSearchOpen(false);
     await onSearch();
@@ -75,12 +99,14 @@ const AdvancedSearchDrawerComponent = <T extends object>({
 
   const onClearSearch = async () => {
     queryBuilder.clear();
+    setMainSearchValue("");
     form?.resetFields();
     onFiltersCleared?.();
     await onSearch();
   };
 
   const handleMainSearchChange = (value: string) => {
+    setMainSearchValue(value);
     queryBuilder.filterBy(
       mainSearchField,
       QueryOperator.Contains,
@@ -88,79 +114,119 @@ const AdvancedSearchDrawerComponent = <T extends object>({
     );
   };
 
-  const mainSearchValue =
-    (queryBuilder.getFieldValue(mainSearchField) as string) ?? "";
+  const handleSortOptionChange = async (value: string) => {
+    if (onSortChange) {
+      await onSortChange(value);
+      return;
+    }
+
+    queryBuilder.setSort(value);
+    await onSearch();
+  };
+
+  const handleSortDirectionToggle = async () => {
+    queryBuilder.setSortDescending(!queryBuilder.getSortDescending());
+    await onSearch();
+  };
+
+  const shouldShowPersistentContent =
+    !hidePersistentContentOnMobile || !isBelowToolbarBreakpoint;
 
   const defaultControls = (
-    <Row align="middle" gutter={[16, 10]} style={{ marginBottom: 10 }}>
-      <Col>
-        <Input.Search
-          placeholder={mainSearchFieldLabel}
-          defaultValue={mainSearchValue}
-          onChange={(e) => handleMainSearchChange(e.target.value)}
-          onSearch={onClickSearch}
-        />
-      </Col>
-      <Col>
-        <Row gutter={[8, 8]} align="middle" style={{ flexWrap: "wrap" }}>
-          {sortOptions && (
-            <>
-              <Col style={{ flex: "0 0 auto" }}>
-                <Select
-                  style={{ width: "139px" }}
-                  value={queryBuilder.getSortBy()}
-                  onChange={async (value) => {
-                    if (onSortChange) {
-                      await onSortChange(value);
-                    } else {
-                      queryBuilder.setSort(value);
-                      await onSearch();
-                    }
-                  }}
-                >
-                  {sortOptions.map((option) => (
-                    <Select.Option key={option.value} value={option.value}>
-                      {option.display}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Col>
-              <Col style={{ flex: "0 0 auto" }}>
-                <Select
-                  value={queryBuilder.getSortDescending() ? "desc" : "asc"}
-                  onChange={(value) => {
-                    queryBuilder.setSortDescending(value === "desc");
-                    onSearch();
-                  }}
-                  options={[
-                    { label: "Desc", value: "desc" },
-                    { label: "Asc", value: "asc" },
-                  ]}
-                />
-              </Col>
-            </>
-          )}
-          <Col style={{ flex: "0 0 auto" }}>
-            <PlanarianButton
+    <div className="planarian-search-toolbar">
+      <div className="planarian-search-toolbar__primary">
+        <div className="planarian-search-toolbar__embedded" role="search">
+          <Input
+            bordered={false}
+            className="planarian-search-toolbar__embedded-input"
+            placeholder={mainSearchFieldLabel}
+            value={mainSearchValue}
+            onChange={(e) => handleMainSearchChange(e.target.value)}
+            onPressEnter={() => {
+              void onClickSearch();
+            }}
+          />
+          <div className="planarian-search-toolbar__embedded-actions">
+            <Button
+              aria-label="Search"
+              className="planarian-search-toolbar__embedded-action"
+              icon={<SearchOutlined />}
+              onClick={() => {
+                void onClickSearch();
+              }}
+              title="Search"
+              type="text"
+            >
+              <span className="planarian-search-toolbar__embedded-action-label">
+                Search
+              </span>
+            </Button>
+            <Button
+              aria-label="Advanced search"
+              className="planarian-search-toolbar__embedded-action"
               icon={<SlidersOutlined />}
               onClick={() => setIsAdvancedSearchOpen(true)}
-              collapseOnScreenSize="xs"
+              title="Advanced search"
+              type="text"
             >
-              Advanced
-            </PlanarianButton>
-          </Col>
-          <Col style={{ flex: "0 0 auto" }}>
-            <PlanarianButton
-              collapseOnScreenSize="sm"
-              icon={<ClearOutlined />}
-              onClick={onClearSearch}
+              <span className="planarian-search-toolbar__embedded-action-label">
+                Advanced
+              </span>
+            </Button>
+            <Popconfirm
+              cancelText="Cancel"
+              okText="Clear"
+              onConfirm={() => {
+                void onClearSearch();
+              }}
+              placement="bottomRight"
+              title="Clear all search filters?"
             >
-              Clear
-            </PlanarianButton>
-          </Col>
-        </Row>
-      </Col>
-    </Row>
+              <Button
+                aria-label="Clear search"
+                className="planarian-search-toolbar__embedded-action"
+                icon={<ClearOutlined />}
+                title="Clear search"
+                type="text"
+              >
+                <span className="planarian-search-toolbar__embedded-action-label">
+                  Clear
+                </span>
+              </Button>
+            </Popconfirm>
+          </div>
+        </div>
+      </div>
+      <div className="planarian-search-toolbar__right">
+        {shouldShowPersistentContent && sortOptions?.length ? (
+          <SplitSortControl
+            isDescending={queryBuilder.getSortDescending() ?? false}
+            onSelect={handleSortOptionChange}
+            onToggleDirection={handleSortDirectionToggle}
+            selectedValue={queryBuilder.getSortBy()}
+            sortOptions={sortOptions}
+          />
+        ) : null}
+        {toolbarMetrics?.map((metric) => (
+          <div
+            className={[
+              "planarian-search-toolbar__metric",
+              metric.className,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={metric.key}
+          >
+            <span className="planarian-search-toolbar__metric-label">
+              {metric.label}
+            </span>
+            <span className="planarian-search-toolbar__metric-value">
+              {metric.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 
   const exportMenuItems: MenuProps["items"] = [

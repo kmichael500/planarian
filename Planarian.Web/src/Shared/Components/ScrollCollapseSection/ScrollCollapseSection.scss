@@ -1,0 +1,25 @@
+.planarian-scroll-collapse-section {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  opacity: 1;
+  transform: translateY(0);
+  transform-origin: top;
+  transition:
+    grid-template-rows 420ms ease-in-out,
+    opacity 340ms ease-in-out,
+    transform 420ms ease-in-out;
+  width: 100%;
+}
+
+.planarian-scroll-collapse-section__inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planarian-scroll-collapse-section--hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+}

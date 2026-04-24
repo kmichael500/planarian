@@ -118,7 +118,11 @@ function ProfileMenu() {
         >
           <Avatar
             size={40}
-            style={{ backgroundColor: "#87d068", cursor: "pointer" }}
+            style={{
+              backgroundColor: "rgb(253, 244, 217)",
+              color: "#3b3320",
+              cursor: "pointer",
+            }}
           >
             {getUserInitials()}
           </Avatar>

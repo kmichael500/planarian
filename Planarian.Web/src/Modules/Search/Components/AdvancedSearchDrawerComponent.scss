@@ -1,0 +1,137 @@
+.planarian-search-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.planarian-search-toolbar__primary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.planarian-search-toolbar__embedded {
+  align-items: center;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.planarian-search-toolbar__embedded-input.ant-input {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none;
+  color: var(--text-color);
+  height: 44px;
+  min-width: 0;
+  padding-inline: 11px 8px;
+  transition: background-color 140ms ease;
+}
+
+.planarian-search-toolbar__embedded-input.ant-input::placeholder {
+  color: var(--muted-text-color);
+}
+
+.planarian-search-toolbar__embedded-input.ant-input:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.planarian-search-toolbar__embedded-input.ant-input:focus,
+.planarian-search-toolbar__embedded-input.ant-input-focused {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.planarian-search-toolbar__embedded-actions {
+  align-items: stretch;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.planarian-search-toolbar__embedded-action.ant-btn {
+  border: 0;
+  border-inline-start: 1px solid var(--border-color);
+  border-radius: 0;
+  color: var(--text-color);
+  flex: 0 0 auto;
+  height: 44px;
+  padding-inline: 20px;
+}
+
+.planarian-search-toolbar__embedded-action-label {
+  display: none;
+}
+
+.planarian-search-toolbar__embedded-action.ant-btn .anticon {
+  font-size: 1rem;
+}
+
+.planarian-search-toolbar__embedded-action.ant-btn:hover,
+.planarian-search-toolbar__embedded-action.ant-btn:focus {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-color) !important;
+}
+
+.planarian-search-toolbar__right {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.planarian-search-toolbar__metric {
+  align-items: center;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.planarian-search-toolbar__metric-label {
+  color: var(--muted-text-color);
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.planarian-search-toolbar__metric-value {
+  color: var(--text-color);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (min-width: 720px) {
+  .planarian-search-toolbar__embedded-action.ant-btn {
+    flex-direction: column;
+    gap: 3px;
+    height: 44px;
+    justify-content: center;
+    padding-inline: 14px;
+  }
+
+  .planarian-search-toolbar__embedded-action-label {
+    display: block;
+    color: var(--muted-text-color);
+    font-size: 0.68rem;
+    font-weight: 400;
+    line-height: 1.1;
+    order: -1;
+  }
+
+  .planarian-search-toolbar__embedded-action.ant-btn .anticon {
+    font-size: 0.9rem;
+  }
+}

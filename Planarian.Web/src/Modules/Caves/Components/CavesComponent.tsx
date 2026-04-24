@@ -1,9 +1,7 @@
-import { Typography, Form, Space, message, Spin } from "antd";
+import { Typography, Form, Space, message } from "antd";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
-import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
 
@@ -22,7 +20,10 @@ import {
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
-import { GridCard } from "../../../Shared/Components/CardGrid/GridCard";
+import {
+  GridCard,
+  GridCardAction,
+} from "../../../Shared/Components/CardGrid/GridCard";
 import {
   SelectListItem,
   SelectListItemKey,
@@ -40,13 +41,18 @@ import FavoriteCave from "./FavoriteCave";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
 import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
 import { CaveAdvancedSearchDrawer } from "./CaveAdvancedSearchDrawer";
+import { SplitSortControl } from "../../Search/Components/SplitSortControl";
+import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import {
   applyEntranceLocationFilterToQuery,
   EntranceLocationFilter,
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
+import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
+import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
+const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -66,6 +72,12 @@ const CavesComponent: React.FC = () => {
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
+  const [isDisplayCollapsed, setIsDisplayCollapsed] = useState(false);
+  const [hasAutoCollapsedDisplay, setHasAutoCollapsedDisplay] = useState(false);
+  const [isResultsScrolled, setIsResultsScrolled] = useState(false);
+  const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
+    window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
+  );
 
   const accountId = AuthenticationService.GetAccountId();
   const featureStorageKey = accountId
@@ -94,6 +106,17 @@ const CavesComponent: React.FC = () => {
     );
   const [isFetchingEntranceLocation, setIsFetchingEntranceLocation] =
     useState(false);
+
+  useEffect(() => {
+    const updateBreakpoint = () => {
+      setIsBelowToolbarBreakpoint(
+        window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
+      );
+    };
+
+    window.addEventListener("resize", updateBreakpoint);
+    return () => window.removeEventListener("resize", updateBreakpoint);
+  }, []);
 
 
   const handleSortChange = async (sortValue: string) => {
@@ -416,7 +439,7 @@ const CavesComponent: React.FC = () => {
           return defaultIfEmpty(null);
         }
         return (
-          <Space size={[8, 8]} wrap>
+          <Space size={[3, 3]} className="caves-result-card__tags" wrap>
             {(cave[featureKey as keyof CaveSearchVm] as string[])?.map(
               (tagId: string) => (
                 <TagComponent key={tagId} tagId={tagId} />
@@ -433,15 +456,27 @@ const CavesComponent: React.FC = () => {
     label: feature.display,
     value: feature.value,
   }));
+  const toolbarMetrics: ToolbarMetric[] = [
+    {
+      key: "results",
+      className: "import-files-dashboard__toolbar-metric",
+      label: hasAppliedFilters ? "Filtered" : "Results",
+      value: isCavesLoading ? "..." : formatNumber(caves?.totalCount ?? 0),
+    },
+  ];
+  const isMobile = isBelowToolbarBreakpoint;
+  const showMobileRows = !isResultsScrolled;
+  const mobileResultsMetric = toolbarMetrics[0];
 
   return (
-    <>
+    <div className="caves-component">
       <CaveAdvancedSearchDrawer
         onSearch={onSearch}
         queryBuilder={queryBuilder}
         form={form}
         sortOptions={sortOptions}
         onSortChange={handleSortChange}
+        toolbarMetrics={isMobile ? [] : toolbarMetrics}
         onFiltersCleared={() => {
           applyEntranceLocationFilter({});
           setFilterClearSignal((previous) => previous + 1);
@@ -456,24 +491,155 @@ const CavesComponent: React.FC = () => {
         filterClearSignal={filterClearSignal}
       />
 
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <FeatureCheckboxGroup
-          title="Display"
-          options={displayFeatureOptions}
-          value={selectedFeatures}
-          onChange={async (checkedValues) => {
-            const previousFeatures = selectedFeatures;
-            const isDistanceBeingChecked = checkedValues.includes(
-              "distanceMiles" as NestedKeyOf<CaveSearchVm>
-            ) && !previousFeatures.includes("distanceMiles");
+      <div className="caves-component__results">
+        {isMobile ? (
+          <ScrollCollapseSection visible={showMobileRows}>
+            <div className="caves-mobile-toolbar-section__inner">
+              <FeatureCheckboxGroup
+                collapsible
+                collapsed={isDisplayCollapsed}
+                onCollapsedChange={(collapsed) => {
+                  setIsDisplayCollapsed(collapsed);
+                  if (!collapsed) {
+                    setHasAutoCollapsedDisplay(true);
+                  }
+                }}
+                title="Display Attributes"
+                options={displayFeatureOptions}
+                value={selectedFeatures}
+                onChange={async (checkedValues) => {
+                  const previousFeatures = selectedFeatures;
+                  const isDistanceBeingChecked = checkedValues.includes(
+                    "distanceMiles" as NestedKeyOf<CaveSearchVm>
+                  ) && !previousFeatures.includes("distanceMiles");
 
-            if (isDistanceBeingChecked) {
-              const userLocation = await LocationHelpers.getUsersLocation(message);
-              if (userLocation) {
-                queryBuilder.setUserLocation(
-                  userLocation.latitude,
-                  userLocation.longitude
-                );
+                  if (isDistanceBeingChecked) {
+                    const userLocation = await LocationHelpers.getUsersLocation(message);
+                    if (userLocation) {
+                      queryBuilder.setUserLocation(
+                        userLocation.latitude,
+                        userLocation.longitude
+                      );
+                      setSelectedFeatures(checkedValues);
+                      if (featureStorageKey) {
+                        localStorage.setItem(
+                          featureStorageKey,
+                          JSON.stringify(checkedValues)
+                        );
+                      }
+                      await getCaves();
+                    } else {
+                      const updatedValues = checkedValues.filter(
+                        (value) => value !== "distanceMiles"
+                      );
+                      setSelectedFeatures(updatedValues);
+                      if (featureStorageKey) {
+                        localStorage.setItem(
+                          featureStorageKey,
+                          JSON.stringify(updatedValues)
+                        );
+                      }
+                    }
+                  } else {
+                    queryBuilder.setUserLocation(undefined, undefined);
+                    queryBuilder.buildAsQueryString();
+
+                    setSelectedFeatures(checkedValues);
+                    if (featureStorageKey) {
+                      localStorage.setItem(
+                        featureStorageKey,
+                        JSON.stringify(checkedValues)
+                      );
+                    }
+                  }
+                }}
+              />
+              <div className="caves-mobile-toolbar-row">
+                <div className="caves-mobile-toolbar-row__sort">
+                  <SplitSortControl
+                    compact
+                    isDescending={queryBuilder.getSortDescending() ?? false}
+                    onSelect={handleSortChange}
+                    onToggleDirection={async () => {
+                      queryBuilder.setSortDescending(!queryBuilder.getSortDescending());
+                      await getCaves();
+                    }}
+                    selectedValue={queryBuilder.getSortBy()}
+                    sortOptions={sortOptions}
+                  />
+                </div>
+                {mobileResultsMetric ? (
+                  <div
+                    className={[
+                      "caves-mobile-toolbar-row__metric",
+                      "planarian-search-toolbar__metric",
+                      mobileResultsMetric.className,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <span className="planarian-search-toolbar__metric-label">
+                      {mobileResultsMetric.label}
+                    </span>
+                    <span className="planarian-search-toolbar__metric-value">
+                      {mobileResultsMetric.value}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </ScrollCollapseSection>
+        ) : (
+          <FeatureCheckboxGroup
+            collapsible
+            collapsed={isDisplayCollapsed}
+            onCollapsedChange={(collapsed) => {
+              setIsDisplayCollapsed(collapsed);
+              if (!collapsed) {
+                setHasAutoCollapsedDisplay(true);
+              }
+            }}
+            title="Display Attributes"
+            options={displayFeatureOptions}
+            value={selectedFeatures}
+            onChange={async (checkedValues) => {
+              const previousFeatures = selectedFeatures;
+              const isDistanceBeingChecked = checkedValues.includes(
+                "distanceMiles" as NestedKeyOf<CaveSearchVm>
+              ) && !previousFeatures.includes("distanceMiles");
+
+              if (isDistanceBeingChecked) {
+                const userLocation = await LocationHelpers.getUsersLocation(message);
+                if (userLocation) {
+                  queryBuilder.setUserLocation(
+                    userLocation.latitude,
+                    userLocation.longitude
+                  );
+                  setSelectedFeatures(checkedValues);
+                  if (featureStorageKey) {
+                    localStorage.setItem(
+                      featureStorageKey,
+                      JSON.stringify(checkedValues)
+                    );
+                  }
+                  await getCaves();
+                } else {
+                  // Remove distanceMiles from selection if permission denied
+                  const updatedValues = checkedValues.filter(
+                    (value) => value !== "distanceMiles"
+                  );
+                  setSelectedFeatures(updatedValues);
+                  if (featureStorageKey) {
+                    localStorage.setItem(
+                      featureStorageKey,
+                      JSON.stringify(updatedValues)
+                    );
+                  }
+                }
+              } else {
+                queryBuilder.setUserLocation(undefined, undefined);
+                queryBuilder.buildAsQueryString(); // Clear out user location from URL
+
                 setSelectedFeatures(checkedValues);
                 if (featureStorageKey) {
                   localStorage.setItem(
@@ -481,189 +647,144 @@ const CavesComponent: React.FC = () => {
                     JSON.stringify(checkedValues)
                   );
                 }
-                await getCaves();
-              } else {
-                // Remove distanceMiles from selection if permission denied
-                const updatedValues = checkedValues.filter(
-                  (value) => value !== "distanceMiles"
-                );
-                setSelectedFeatures(updatedValues);
-                if (featureStorageKey) {
-                  localStorage.setItem(
-                    featureStorageKey,
-                    JSON.stringify(updatedValues)
-                  );
-                }
               }
-            } else {
-              queryBuilder.setUserLocation(undefined, undefined);
-              queryBuilder.buildAsQueryString(); // Clear out user location from URL
-
-              setSelectedFeatures(checkedValues);
-              if (featureStorageKey) {
-                localStorage.setItem(
-                  featureStorageKey,
-                  JSON.stringify(checkedValues)
-                );
-              }
-            }
-          }}
-        />
-        {isCavesLoading ? (
-          <Space align="center">
-            <Spin size="small" />
-            <Typography.Text type="secondary">
-              Loading results...
-            </Typography.Text>
-          </Space>
-        ) : (
-          caves && (
-            <>
-              {(() => {
-                const resultText = hasAppliedFilters
-                  ? `Filtered: ${formatNumber(caves.totalCount)} results found`
-                  : `${formatNumber(caves.totalCount)} results found`;
-
-                return (
-                  <PlanarianTag
-                    style={{
-                      background: "#F8DB6A",
-                      color: "#222",
-                      borderColor: "#F8DB6A",
-                    }}
-                  >
-                    {resultText}
-                  </PlanarianTag>
-                );
-              })()}
-            </>
-          )
+            }}
+          />
         )}
         <SpinnerCardComponent spinning={isCavesLoading}>
           <CardGridComponent
+            fillHeight
             noDataDescription={"No caves found"}
             noDataCreateButton={<CaveCreateButtonComponent />}
-            renderItem={(cave) => (
-              <GridCard
-                style={{
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-                title={
-                  <span>
-                    <span style={{ color: '#3874f6', fontWeight: "bold" }}>{cave.displayId}</span>
-                    {" "}{cave.name}
-                  </span>}
-                extra={
-                  <FavoriteCave
-                    initialIsFavorite={cave.isFavorite}
-                    caveId={cave.id}
-                    onlyShowWhenFavorite
-                    disabled
-                  />
-                }
-                actions={[
-                  <Link to={`/caves/${cave.id}`} key="view">
-                    <PlanarianButton
-                      alwaysShowChildren
-                      type="primary"
-                      icon={<EyeOutlined />}
-                    >
-                      View
-                    </PlanarianButton>
-                  </Link>,
-                  cave.primaryEntranceLatitude &&
-                  cave.primaryEntranceLongitude && (
-                    <Link
-                      to={NavigationService.GenerateMapUrl(
-                        cave.primaryEntranceLatitude,
-                        cave.primaryEntranceLongitude,
-                        15
-                      )}
-                      key="map"
-                    >
-                      <PlanarianButton
-                        alwaysShowChildren
-                        icon={<CompassOutlined />}
-                      >
-                        Map
-                      </PlanarianButton>
-                    </Link>
+            renderItem={(cave) => {
+              const actions: GridCardAction[] = [
+                {
+                  key: "view",
+                  label: "View",
+                  icon: <EyeOutlined />,
+                  to: `/caves/${cave.id}`,
+                  type: "primary",
+                },
+              ];
+
+              if (cave.primaryEntranceLatitude && cave.primaryEntranceLongitude) {
+                actions.push({
+                  key: "map",
+                  label: "Map",
+                  icon: <CompassOutlined />,
+                  to: NavigationService.GenerateMapUrl(
+                    cave.primaryEntranceLatitude,
+                    cave.primaryEntranceLongitude,
+                    15
                   ),
-                ]}
-              >
-                <Space direction="vertical">
-                  {selectedFeatures.map((featureKey) => (
-                    <div
-                      key={featureKey}
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Typography.Text
-                        style={{ marginRight: "8px", fontWeight: "bold" }}
+                });
+              }
+
+              return (
+                <GridCard
+                  actions={actions}
+                  className="caves-result-card"
+                  stickyFooter
+                  stickyHeader
+                  header={
+                    <span>
+                      <span className="caves-result-card__display-id">
+                        {cave.displayId}
+                      </span>{" "}
+                      <span className="caves-result-card__name">
+                        {cave.name}
+                      </span>
+                    </span>
+                  }
+                  headerExtra={
+                    <FavoriteCave
+                      initialIsFavorite={cave.isFavorite}
+                      caveId={cave.id}
+                      onlyShowWhenFavorite
+                      disabled
+                    />
+                  }
+                >
+                  <Space direction="vertical" size={3}>
+                    {selectedFeatures.map((featureKey) => (
+                      <div
+                        key={featureKey}
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
                       >
-                        {
-                          possibleFeaturesToRender.find(
-                            (f) => f.value === featureKey
-                          )?.display
-                        }
-                        :
-                      </Typography.Text>
-                      {renderFeature(cave, featureKey)}
-                    </div>
-                  ))}
-                  {cave.narrativeSnippet && (
-                    <>
-                      <Typography.Text
-                        style={{ marginRight: "8px", fontWeight: "bold" }}
-                      >
-                        Narrative:
-                      </Typography.Text>
-                      <Typography.Paragraph style={{ marginBottom: 8 }}>
-                        <span
-                          dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(
-                              expandedNarratives[cave.id] ||
-                                cave.narrativeSnippet.length <= 400
-                                ? cave.narrativeSnippet
-                                : cave.narrativeSnippet.substring(0, 400) + "…",
-                              { ALLOWED_TAGS: ["mark", "br"] }
-                            ),
-                          }}
-                        />
-                      </Typography.Paragraph>
-                      {cave.narrativeSnippet.length > 400 && (
-                        <div style={{ marginBottom: 8 }}>
-                          <PlanarianButton
-                            alwaysShowChildren
-                            type="link"
-                            size="small"
-                            onClick={() => toggleNarrative(cave.id)}
-                            icon={undefined}
-                          >
-                            {expandedNarratives[cave.id]
-                              ? "Show Less"
-                              : "Show More"}
-                          </PlanarianButton>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </Space>
-              </GridCard>
-            )}
+                        <Typography.Text
+                          style={{ marginRight: "8px", fontWeight: "bold" }}
+                        >
+                          {
+                            possibleFeaturesToRender.find(
+                              (f) => f.value === featureKey
+                            )?.display
+                          }
+                          :
+                        </Typography.Text>
+                        {renderFeature(cave, featureKey)}
+                      </div>
+                    ))}
+                    {cave.narrativeSnippet && (
+                      <>
+                        <Typography.Text
+                          style={{ marginRight: "8px", fontWeight: "bold" }}
+                        >
+                          Narrative:
+                        </Typography.Text>
+                        <Typography.Paragraph style={{ marginBottom: 8 }}>
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: DOMPurify.sanitize(
+                                expandedNarratives[cave.id] ||
+                                  cave.narrativeSnippet.length <= 400
+                                  ? cave.narrativeSnippet
+                                  : cave.narrativeSnippet.substring(0, 400) +
+                                  "…",
+                                { ALLOWED_TAGS: ["mark", "br"] }
+                              ),
+                            }}
+                          />
+                        </Typography.Paragraph>
+                        {cave.narrativeSnippet.length > 400 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <PlanarianButton
+                              alwaysShowChildren
+                              type="link"
+                              size="small"
+                              onClick={() => toggleNarrative(cave.id)}
+                              icon={undefined}
+                            >
+                              {expandedNarratives[cave.id]
+                                ? "Show Less"
+                                : "Show More"}
+                            </PlanarianButton>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </Space>
+                </GridCard>
+              );
+            }}
             itemKey={(cave) => cave.id}
             pagedItems={caves}
             queryBuilder={queryBuilder}
             onSearch={onSearch}
+            onScrollStateChange={(isScrolled) => {
+              setIsResultsScrolled(isScrolled);
+              if (!isMobile && isScrolled && !hasAutoCollapsedDisplay) {
+                setIsDisplayCollapsed(true);
+                setHasAutoCollapsedDisplay(true);
+              }
+            }}
           />
         </SpinnerCardComponent>
-      </Space>
-    </>
+      </div>
+    </div>
   );
 };
 

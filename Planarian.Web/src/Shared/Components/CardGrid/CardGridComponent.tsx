@@ -1,8 +1,9 @@
-import { Row, Col, Button, Empty, Card, List } from "antd";
-import Pagination, { PaginationConfig } from "antd/lib/pagination";
-import { Key } from "react";
+import { Empty, Card, List } from "antd";
+import { useRef } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
 import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
+import { CardGridPagination } from "./CardGridPagination";
+import "./CardGridComponent.scss";
 
 interface CardGridComponentProps<
   T extends object,
@@ -17,6 +18,8 @@ interface CardGridComponentProps<
   queryBuilder?: QueryBuilder<TQueryBuilder>;
   onSearch?: () => Promise<void>;
   useList?: boolean;
+  fillHeight?: boolean;
+  onScrollStateChange?: (isScrolled: boolean) => void;
 }
 
 const CardGridComponent = <T extends object, TQueryBuilder extends object>({
@@ -29,7 +32,10 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
   queryBuilder,
   onSearch,
   useList,
+  fillHeight,
+  onScrollStateChange,
 }: CardGridComponentProps<T, TQueryBuilder>) => {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   let data: T[] = [];
 
   if (items) {
@@ -38,59 +44,61 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
     data = pagedItems.results;
   }
 
+  const pagination = pagedItems ? (
+    <div className="planarian-card-grid__pagination">
+      <CardGridPagination
+        pagedItems={pagedItems}
+        onPageChange={async (pageNumber, pageSize) => {
+          if (queryBuilder) {
+            queryBuilder.changePage(pageNumber, pageSize);
+          }
+          if (onSearch) {
+            await onSearch();
+          }
+        }}
+      />
+    </div>
+  ) : null;
+
   return (
-    <>
-      {data.length === 0 && (
-        <Card>
-          <Empty description={<span>{noDataDescription}</span>}>
-            {noDataCreateButton}
-          </Empty>
-        </Card>
-      )}
-      {!useList && (
-        <Row
-          gutter={[
-            { xs: 8, sm: 8, md: 12, lg: 12 },
-            { xs: 8, sm: 8, md: 12, lg: 12 },
-          ]}
-        >
-          {data.map((item, i) => {
-            return (
-              <Col key={itemKey(item)} xs={24} sm={12} md={8} lg={6}>
-                {renderItem(item)}
-              </Col>
-            );
-          })}
-        </Row>
-      )}
-      {useList && (
-        <>
+    <div
+      className={`planarian-card-grid${
+        fillHeight ? " planarian-card-grid--fill-height" : ""
+      }`}
+    >
+      <div
+        className="planarian-card-grid__body"
+        ref={bodyRef}
+        onScroll={(event) => {
+          const body = event.currentTarget;
+          onScrollStateChange?.(body.scrollTop > 0);
+        }}
+      >
+        {data.length === 0 && (
+          <Card>
+            <Empty description={<span>{noDataDescription}</span>}>
+              {noDataCreateButton}
+            </Empty>
+          </Card>
+        )}
+        {!useList && (
+          <div className="planarian-card-grid__items">
+            {data.map((item) => {
+              return (
+                <div className="planarian-card-grid__item" key={itemKey(item)}>
+                  {renderItem(item)}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {useList && (
           <List dataSource={data} renderItem={(item) => renderItem(item)} />
-        </>
-      )}
-      <Row style={{ marginTop: "10px" }}>
-        <Col flex="auto"></Col>
-        <Col>
-          {pagedItems && (
-            <Pagination
-              onChange={async (pageNumber, pageSize) => {
-                if (queryBuilder) {
-                  queryBuilder.changePage(pageNumber, pageSize);
-                }
-                if (onSearch) {
-                  await onSearch();
-                }
-              }}
-              showSizeChanger={false}
-              responsive={true}
-              current={pagedItems?.pageNumber}
-              pageSize={pagedItems?.pageSize}
-              total={pagedItems?.totalCount}
-            />
-          )}
-        </Col>
-      </Row>
-    </>
+        )}
+        {fillHeight && pagination}
+      </div>
+      {!fillHeight && pagination}
+    </div>
   );
 };
 

@@ -35,6 +35,7 @@ const SideBarComponent: React.FC = () => {
         zIndex: 1,
         width: "100%",
         height: "calc(var(--vh, 1vh) * 100)",
+        minHeight: 0,
       }}
     >
       <Space

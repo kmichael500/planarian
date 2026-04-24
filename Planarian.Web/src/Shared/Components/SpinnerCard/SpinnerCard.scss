@@ -1,0 +1,238 @@
+.planarian-spinner-card {
+  display: block;
+  flex: 1 1 auto;
+  height: 100%;
+  position: relative;
+  width: 100%;
+}
+
+.planarian-spinner-card__content {
+  display: block;
+  min-height: 0;
+  min-width: 0;
+  opacity: 1;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  width: 100%;
+}
+
+.planarian-spinner-card__content--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.planarian-spinner-card__content--entering {
+  opacity: 1;
+  transform: scale(0.995);
+}
+
+.planarian-spinner-card__surface {
+  display: block;
+  background: transparent;
+  inset: 0;
+  min-height: 100%;
+  overflow: hidden;
+  position: absolute;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+  width: 100%;
+  z-index: 1;
+}
+
+.planarian-spinner-card__surface--exiting {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.992);
+}
+
+.planarian-spinner-card__grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  inset: 0;
+  min-height: 100%;
+  padding: 0;
+  position: absolute;
+}
+
+.planarian-spinner-card__placeholder-card {
+  background: color-mix(in srgb, var(--surface-color) 98%, white 2%);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.planarian-spinner-card__placeholder-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 18px 18px 14px;
+}
+
+.planarian-spinner-card__placeholder-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  min-width: 0;
+  padding: 10px 18px 18px;
+}
+
+.planarian-spinner-card__placeholder-footer {
+  border-top: 1px solid var(--border-color);
+  display: grid;
+  gap: 0;
+  grid-template-columns: 1fr 1fr;
+  margin-top: auto;
+  min-height: 56px;
+}
+
+.planarian-spinner-card__pulse {
+  border: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.26);
+  filter: saturate(0.96) brightness(0.98);
+  opacity: 0.94;
+  transform: scale(1);
+  transform-origin: center;
+  will-change: filter, opacity, transform;
+  animation: planarian-spinner-card-pulse var(--planarian-spinner-duration) ease-in-out infinite alternate;
+  animation-delay: var(--planarian-spinner-delay);
+}
+
+.planarian-spinner-card__placeholder-title {
+  border-radius: 10px;
+  height: 24px;
+  width: 62%;
+}
+
+.planarian-spinner-card__placeholder-badge {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 18px;
+  width: 18px;
+}
+
+.planarian-spinner-card__placeholder-line {
+  border-radius: 10px;
+  height: 18px;
+  width: 58%;
+}
+
+.planarian-spinner-card__placeholder-line--strong {
+  width: 46%;
+}
+
+.planarian-spinner-card__placeholder-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.planarian-spinner-card__placeholder-tag {
+  border-radius: 999px;
+  height: 28px;
+  width: 140px;
+}
+
+.planarian-spinner-card__placeholder-tag--short {
+  width: 92px;
+}
+
+.planarian-spinner-card__placeholder-button {
+  border-radius: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.planarian-spinner-card__placeholder-button--primary {
+  border-right-width: 0;
+}
+
+.planarian-spinner-card__placeholder-card--rose .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #fde4f4 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #efabd3 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--amber .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #faf0df 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #dec69a 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--leaf .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #e7f2ef 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #adcfc2 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--aqua .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #dff5fb 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #92d2eb 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--violet .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #efe7ff 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #c6b1f8 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--coral .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #fde8e8 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #f5b7b1 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--mint .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #dff7ea 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #8fd2b2 86%, var(--surface-color) 14%);
+}
+
+.planarian-spinner-card__placeholder-card--indigo .planarian-spinner-card__pulse {
+  background: color-mix(in srgb, #e9ecff 84%, var(--surface-color) 16%);
+  border-color: color-mix(in srgb, #b0b8f8 86%, var(--surface-color) 14%);
+}
+
+@keyframes planarian-spinner-card-pulse {
+  0% {
+    filter: saturate(0.95) brightness(0.97);
+    opacity: 0.94;
+    transform: scale(1);
+  }
+
+  50% {
+    filter: saturate(1.08) brightness(var(--planarian-spinner-pulse-brightness));
+    opacity: var(--planarian-spinner-pulse-opacity);
+    transform: scale(var(--planarian-spinner-pulse-scale));
+  }
+
+  100% {
+    filter: saturate(1.01) brightness(1.02);
+    opacity: 0.96;
+    transform: scale(1.01);
+  }
+}
+
+@media (min-width: 576px) {
+  .planarian-spinner-card__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .planarian-spinner-card__grid {
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 992px) {
+  .planarian-spinner-card__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

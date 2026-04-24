@@ -25,6 +25,7 @@ import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/Delete
 import { EditButtonComponentt } from "../../../Shared/Components/Buttons/EditButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import "./UserManagerComponent.scss";
 
 const { useBreakpoint } = Grid;
 
@@ -120,7 +121,7 @@ const UserManagerComponent: React.FC = () => {
         new Date(b.invitationSentOn ?? 0).getTime(),
       defaultSortOrder: "descend",
       render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
+      responsive: ["md", "lg", "xl"],
     },
     {
       title: "Invitation Accepted On",
@@ -129,7 +130,7 @@ const UserManagerComponent: React.FC = () => {
         new Date(a.invitationAcceptedOn ?? 0).getTime() -
         new Date(b.invitationAcceptedOn ?? 0).getTime(),
       render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
+      responsive: ["lg", "xl"],
     },
     {
       title: "Last Active",
@@ -138,14 +139,21 @@ const UserManagerComponent: React.FC = () => {
         new Date(a.lastActiveOn ?? 0).getTime() -
         new Date(b.lastActiveOn ?? 0).getTime(),
       render: (text: string) => (text ? formatDateTime(text) : ""),
-      responsive: ["xs", "sm", "md", "lg", "xl"],
+      responsive: ["lg", "xl"],
     },
     {
       title: "Action",
+      className: "user-manager-actions-column",
+      width: screens.md ? 360 : 180,
       render: (_: any, record: UserManagerGridVm) => (
-        <Space direction={screens.xs ? "vertical" : "horizontal"}>
+        <Space
+          className="user-manager-actions"
+          direction={screens.md ? "horizontal" : "vertical"}
+          wrap={!!screens.md}
+        >
           {record.invitationSentOn && !record.invitationAcceptedOn && (
             <PlanarianButton
+              alwaysShowChildren
               loading={isResending}
               permissionKey={PermissionKey.Admin}
               type="primary"
@@ -156,9 +164,10 @@ const UserManagerComponent: React.FC = () => {
             </PlanarianButton>
           )}
           <Link to={record.userId}>
-            <EditButtonComponentt />
+            <EditButtonComponentt alwaysShowChildren />
           </Link>
           <DeleteButtonComponent
+            alwaysShowChildren
             permissionKey={PermissionKey.Admin}
             loading={isRevoking}
             title={`Are you sure you want to revoke access for ${record.fullName}? You will need to re-invite them to grant access in the future.`}
@@ -183,14 +192,16 @@ const UserManagerComponent: React.FC = () => {
 
   return (
     <>
-      <Card>
+      <Card className="user-manager-card">
         <Row
+          className="user-manager-toolbar"
           align="middle"
           justify="space-between"
-          style={{ flexWrap: "wrap", marginBottom: 16 }}
+          gutter={[12, 12]}
         >
-          <Col>
+          <Col xs={24} sm={12}>
             <PlanarianButton
+              className="user-manager-invite-button"
               permissionKey={PermissionKey.Admin}
               icon={<UserAddOutlined />}
               type="primary"
@@ -199,8 +210,9 @@ const UserManagerComponent: React.FC = () => {
               Invite User
             </PlanarianButton>
           </Col>
-          <Col>
+          <Col xs={24} sm={12} className="user-manager-search-column">
             <Input.Search
+              className="user-manager-search"
               placeholder="Search users"
               onSearch={(value) => setSearchText(value)}
               onChange={(e) => setSearchText(e.target.value)}
@@ -208,13 +220,16 @@ const UserManagerComponent: React.FC = () => {
             />
           </Col>
         </Row>
-        <Table
-          columns={columns}
-          dataSource={filteredUsers}
-          rowKey="userId"
-          loading={loading}
-          scroll={{ x: "max-content" }}
-        />
+        <div className="user-manager-table">
+          <Table
+            columns={columns}
+            dataSource={filteredUsers}
+            rowKey="userId"
+            loading={loading}
+            pagination={{ position: ["bottomRight"] }}
+            scroll={screens.xs ? undefined : { x: "max-content" }}
+          />
+        </div>
       </Card>
 
       <Modal

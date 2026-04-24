@@ -1,0 +1,35 @@
+.caves-page {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.caves-page > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.caves-page__header-add-button.ant-btn.ant-btn-primary {
+  background: var(--primary-action-background);
+  border-color: var(--primary-action-border-color);
+  color: var(--primary-action-text-color);
+}
+
+.caves-page__header-add-button.ant-btn.ant-btn-primary:hover,
+.caves-page__header-add-button.ant-btn.ant-btn-primary:focus {
+  background: var(--primary-action-hover-background);
+  border-color: var(--primary-action-border-color);
+  color: var(--primary-action-text-color) !important;
+}
+
+.dark .caves-page__header-add-button.ant-btn.ant-btn-primary {
+  background: var(--primary-action-background);
+  border-color: var(--primary-action-border-color);
+}
+
+.dark .caves-page__header-add-button.ant-btn.ant-btn-primary:hover,
+.dark .caves-page__header-add-button.ant-btn.ant-btn-primary:focus {
+  background: var(--primary-action-hover-background);
+}

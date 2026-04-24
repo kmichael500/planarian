@@ -80,7 +80,6 @@ const HeaderComponent = () => {
               {!isLargeScreenSize && (
                 <PlanarianButton
                   className="menu"
-                  type="primary"
                   icon={<MenuOutlined />}
                   onClick={() => setVisible(true)}
                 />

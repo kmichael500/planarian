@@ -1,0 +1,133 @@
+.user-manager-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-card {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-card > .ant-card-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-toolbar {
+  flex: 0 0 auto;
+  margin-bottom: 16px;
+}
+
+.user-manager-table {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.user-manager-table .ant-table-wrapper {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.user-manager-table .ant-spin-nested-loading,
+.user-manager-table .ant-spin-container {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.user-manager-table .ant-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  width: 100%;
+}
+
+.user-manager-table .ant-table-pagination {
+  flex: 0 0 auto;
+  margin: 16px 0 0;
+}
+
+.user-manager-actions-column {
+  min-width: 180px;
+}
+
+.user-manager-actions {
+  max-width: 100%;
+}
+
+.user-manager-actions .ant-space-item {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767px) {
+  .user-manager-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .user-manager-actions .ant-space-item,
+  .user-manager-actions a,
+  .user-manager-actions button {
+    width: 100%;
+  }
+
+  .user-manager-actions button {
+    justify-content: center;
+  }
+}
+
+.user-manager-search {
+  width: 280px;
+}
+
+.user-manager-search-column {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 575px) {
+  .user-manager-invite-button,
+  .user-manager-search,
+  .user-manager-search-column {
+    width: 100%;
+  }
+
+  .user-manager-search-column {
+    justify-content: stretch;
+  }
+
+  .user-manager-table .ant-space {
+    width: 100%;
+  }
+
+  .user-manager-table .ant-table {
+    overflow-x: hidden;
+  }
+
+  .user-manager-table .ant-table-cell {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+}
