@@ -1,10 +1,11 @@
 import { useContext, useRef, useState } from "react";
-import { Dropdown, Avatar } from "antd";
+import { Dropdown, Avatar, Badge } from "antd";
 import {
   UserOutlined,
   SwapOutlined,
   LogoutOutlined,
   BgColorsOutlined,
+  MailOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
@@ -31,13 +32,21 @@ function ProfileMenu() {
   const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
 
   const navigate = useNavigate();
-  const { isAuthenticated, setIsAuthenticated } = useContext(AppContext);
+  const { isAuthenticated, setIsAuthenticated, pendingInvitationCount } =
+    useContext(AppContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const keepThemePreviewOpenRef = useRef(false);
 
   const menuItems = [
+    {
+      key: "/user/invitations",
+      icon: <MailOutlined />,
+      label: `Invitations (${pendingInvitationCount})`,
+      requiresAuthentication: true,
+      isVisible: pendingInvitationCount > 0,
+    },
     {
       key: "/user/profile",
       icon: <UserOutlined />,
@@ -116,12 +125,22 @@ function ProfileMenu() {
           }
           trigger={["click"]}
         >
-          <Avatar
-            size={40}
-            style={{ backgroundColor: "#87d068", cursor: "pointer" }}
+          <Badge
+            count={pendingInvitationCount}
+            style={{
+              minWidth: 20,
+              height: 20,
+              lineHeight: "20px",
+              fontSize: 12,
+            }}
           >
-            {getUserInitials()}
-          </Avatar>
+            <Avatar
+              size={40}
+              style={{ backgroundColor: "#87d068", cursor: "pointer" }}
+            >
+              {getUserInitials()}
+            </Avatar>
+          </Badge>
         </Dropdown>
       )}
     </>
