@@ -17,6 +17,7 @@ import {
   AdvancedSearchDrawerComponent,
   AdvancedSearchInlineControlsContext,
 } from "../../Search/Components/AdvancedSearchDrawerComponent";
+import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
 import { QueryBuilder, QueryOperator } from "../../Search/Services/QueryBuilder";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
@@ -55,6 +56,7 @@ export interface CaveAdvancedSearchDrawerProps {
   form?: FormInstance<CaveSearchParamsVm>;
   sortOptions?: SelectListItem<string>[];
   onSortChange?: (sortBy: string) => Promise<void> | void;
+  toolbarMetrics?: ToolbarMetric[];
   inlineControls?: (
     context: AdvancedSearchInlineControlsContext<CaveSearchParamsVm>
   ) => React.ReactNode;
@@ -117,6 +119,7 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
   form,
   sortOptions,
   onSortChange,
+  toolbarMetrics,
   inlineControls,
   entranceLocationFilter,
   isFetchingEntranceLocation,
@@ -253,6 +256,8 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
         form={form}
         sortOptions={sortOptions}
         onSortChange={onSortChange}
+        toolbarMetrics={toolbarMetrics}
+        hidePersistentContentOnMobile
         onExportGpx={onExportGpx}
         onExportCsv={onExportCsv}
         onFiltersCleared={onFiltersCleared}

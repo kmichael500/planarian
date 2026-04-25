@@ -1,0 +1,192 @@
+html.theme-switching *,
+body.theme-switching *,
+html.theme-switching *::before,
+body.theme-switching *::before,
+html.theme-switching *::after,
+body.theme-switching *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.dark .ant-card,
+.dark .ant-card-bordered,
+.dark .ant-card .ant-card-body,
+.dark .ant-card .ant-card-head {
+  background: #23272f !important;
+  color: #eee !important;
+  border-color: #333 !important;
+}
+
+.dark .ant-tag:not(.planarian-tag) {
+  background: #665c1e !important;
+  color: #fff !important;
+  border-color: #665c1e !important;
+}
+
+body,
+.ant-app,
+.ant-layout,
+.ant-layout-content,
+.ant-card,
+.ant-result,
+.ant-typography,
+.ant-descriptions,
+.ant-modal-content,
+.ant-modal-header,
+.ant-modal-body,
+.ant-dropdown .ant-dropdown-menu,
+.ant-drawer-content,
+.ant-drawer-header,
+.ant-drawer-body {
+  color: var(--text-color);
+}
+
+.ant-card,
+.ant-result,
+.ant-modal-content,
+.ant-drawer-content,
+.ant-dropdown .ant-dropdown-menu,
+.ant-menu-submenu-popup .ant-menu,
+.ant-descriptions-bordered .ant-descriptions-view,
+.ant-descriptions-bordered .ant-descriptions-item-label,
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-menu,
+.ant-dropdown .ant-dropdown-menu,
+.ant-menu-submenu-popup .ant-menu {
+  background: var(--background-color) !important;
+}
+
+.ant-menu-item,
+.ant-dropdown .ant-dropdown-menu-item,
+.ant-menu-submenu-title {
+  color: var(--text-color) !important;
+}
+
+.planarian-dropdown--touch {
+  --planarian-dropdown-item-min-height: 48px;
+  --planarian-dropdown-item-padding-block: 10px;
+}
+
+.planarian-dropdown--touch .ant-dropdown-menu-item {
+  align-items: center;
+  display: flex;
+  min-height: var(--planarian-dropdown-item-min-height);
+  padding-block: var(--planarian-dropdown-item-padding-block);
+}
+
+.ant-menu-item:hover,
+.ant-menu-submenu-title:hover,
+.ant-dropdown .ant-dropdown-menu-item:hover {
+  background: var(--hover-surface-color) !important;
+}
+
+.ant-menu-item-selected,
+.ant-menu-light .ant-menu-item-selected,
+.ant-menu-dark .ant-menu-item-selected,
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-selected {
+  background: var(--surface-elevated-color) !important;
+  color: var(--text-color) !important;
+}
+
+.ant-list-item,
+.ant-card-bordered,
+.ant-modal-header,
+.ant-drawer-header,
+.ant-descriptions-bordered .ant-descriptions-row,
+.ant-descriptions-bordered .ant-descriptions-item-label,
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  border-color: var(--border-color) !important;
+}
+
+.ant-input,
+.ant-input-password,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-input-number-input,
+.ant-select-selector,
+.themed-mask-input {
+  background: var(--input-background-color) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-input::placeholder,
+.themed-mask-input::placeholder,
+.ant-upload-text,
+.ant-upload-hint,
+.planarian-upload-status {
+  color: var(--muted-text-color) !important;
+}
+
+.ant-btn-primary:not(.ant-btn-dangerous) {
+  background: var(--primary-action-background) !important;
+  border-color: var(--primary-action-border-color) !important;
+  color: var(--primary-action-text-color) !important;
+}
+
+.ant-btn-primary:not(.ant-btn-dangerous):hover,
+.ant-btn-primary:not(.ant-btn-dangerous):focus {
+  background: var(--primary-action-hover-background) !important;
+  border-color: var(--primary-action-border-color) !important;
+  color: var(--primary-action-text-color) !important;
+}
+
+.ant-btn-primary:not(.ant-btn-dangerous) .anticon {
+  color: inherit;
+}
+
+.ant-collapse-content-box .ant-list,
+.ant-collapse-content-box .ant-list .ant-spin-container,
+.ant-collapse-content-box .ant-list-items {
+  background: transparent !important;
+}
+
+.ant-pagination .ant-pagination-item,
+.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next .ant-pagination-item-link,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-link,
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-link {
+  background: var(--surface-color) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+.ant-pagination .ant-pagination-item a,
+.ant-pagination .ant-pagination-item-link,
+.ant-pagination .ant-pagination-item-link .anticon,
+.ant-pagination .ant-pagination-item-link .anticon svg,
+.ant-pagination .ant-pagination-jump-next .ant-pagination-item-container,
+.ant-pagination .ant-pagination-jump-prev .ant-pagination-item-container,
+.ant-pagination .ant-pagination-item-ellipsis {
+  color: var(--text-color) !important;
+  fill: currentColor !important;
+}
+
+.ant-pagination .ant-pagination-item:hover,
+.ant-pagination .ant-pagination-prev:hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next:hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-jump-next:hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-jump-prev:hover .ant-pagination-item-link {
+  background: var(--hover-surface-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-pagination .ant-pagination-item-active {
+  background: var(--surface-elevated-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-pagination .ant-pagination-item-active a {
+  color: var(--text-color) !important;
+}
+
+.ant-pagination .ant-pagination-disabled .ant-pagination-item-link,
+.ant-pagination .ant-pagination-disabled .ant-pagination-item-link .anticon,
+.ant-pagination .ant-pagination-disabled .ant-pagination-item-link .anticon svg {
+  color: var(--muted-text-color) !important;
+  fill: currentColor !important;
+}

@@ -16,6 +16,7 @@ import {
   MapProvider,
   ViewStateChangeEvent,
   ScaleControl, // Import ScaleControl
+  ErrorEvent,
 } from "react-map-gl/maplibre";
 import type { MapProps } from "react-map-gl/maplibre";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
@@ -46,6 +47,10 @@ import {
   EntranceLocationFilter,
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "../../../Shared/Models/ApiErrorResponse";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -126,7 +131,9 @@ const mapControlSelector = Object.values(mapControlContainerIds)
 
 const FloatingPanel = styled.div`
   position: absolute;
-  background: #fff;
+  background: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px;
   margin: 20px;
@@ -224,6 +231,63 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     useState(false);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(
     queryBuilder.hasFilters()
+  );
+  const hasShownRateLimitErrorRef = React.useRef(false);
+
+  const showGenericMapRequestError = useCallback(
+    (error: unknown, fallbackMessage: string) => {
+      const apiError = error as ApiErrorResponse | undefined;
+      const errorMessage =
+        apiError?.message && apiError.message.trim().length > 0
+          ? apiError.message
+          : fallbackMessage;
+
+      message.error(errorMessage);
+    },
+    []
+  );
+
+  const showTileRateLimitError = useCallback(() => {
+    if (hasShownRateLimitErrorRef.current) {
+      return;
+    }
+
+    hasShownRateLimitErrorRef.current = true;
+
+    const supportName = AppOptions?.supportName;
+    const supportEmail = AppOptions?.supportEmail;
+    const messageText =
+      supportName && supportEmail
+        ? `Rate limit exceeded. Please try again later. If you believe this was in error, please contact ${supportName} at ${supportEmail}.`
+        : "Rate limit exceeded. Please try again later.";
+
+    message.error(messageText);
+  }, []);
+
+  const handleMapError = useCallback(
+    (event: ErrorEvent) => {
+      const error = event.error as
+        | (Error & { status?: number; data?: ApiErrorResponse; message?: string })
+        | undefined;
+
+      const apiError = error?.data;
+      if (apiError?.errorCode === ApiExceptionType.TooManyRequests) {
+        showTileRateLimitError();
+        return;
+      }
+
+      const rawMessage = error?.message ?? "";
+      const isRateLimitedTileRequest =
+        error?.status === 429 ||
+        rawMessage.includes("(429)") ||
+        rawMessage.includes(" 429") ||
+        rawMessage.includes("AJAXError: (429)");
+
+      if (isRateLimitedTileRequest) {
+        showTileRateLimitError();
+      }
+    },
+    [showTileRateLimitError]
   );
 
   useEffect(() => {
@@ -409,9 +473,13 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       try {
         const data = await MapService.getMapCenter();
         setMapCenter([data.latitude, data.longitude]);
-        setIsLoading(false);
       } catch (error) {
         console.error("An error occurred while fetching data", error);
+        if ((error as ApiErrorResponse)?.errorCode !== ApiExceptionType.TooManyRequests) {
+          showGenericMapRequestError(error, "Unable to load the initial map center.");
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
     if (!initialCenter) {
@@ -419,7 +487,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     } else {
       setIsLoading(false);
     }
-  }, [initialCenter]);
+  }, [initialCenter, showGenericMapRequestError]);
 
   // Instead of relying on the current zoom for caching, we fix the caching zoom to 12.
   // This way the same geographic area yields the same tile keys regardless of the actual zoom.
@@ -502,6 +570,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
         );
       } catch (err) {
         console.error(`Error fetching IDs for tile ${tileId}`, err);
+        if ((err as ApiErrorResponse)?.errorCode !== ApiExceptionType.TooManyRequests) {
+          showGenericMapRequestError(err, "Unable to load map data.");
+        }
         // still mark tile so we don’t retry immediately
         fetchedTilesRef.current.add(tileId);
         continue;
@@ -525,6 +596,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
           ]);
         } catch (err) {
           console.error(`Lineplot ${id} failed to load`, err);
+          if ((err as ApiErrorResponse)?.errorCode !== ApiExceptionType.TooManyRequests) {
+            showGenericMapRequestError(err, "Unable to load map data.");
+          }
         } finally {
           loadedPlotIds.current.add(id);
         }
@@ -844,7 +918,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                   fontSize: "1.3rem",
                   fontWeight: "bold",
                   color: "#0078ff",
-                  textShadow: "1px 1px 2px #fff",
+                  textShadow: "1px 1px 2px rgba(15, 23, 32, 0.35)",
                 }}
               >
                 Drop your Shapefile (zip) here!
@@ -865,6 +939,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 fetchLineplots();
               }}
               onClick={handleMapClick}
+              onError={handleMapError}
               mapStyle={mapStyle}
               onMoveEnd={handleMoveEnd}
               transformRequest={transformMapRequest}
@@ -924,7 +999,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                         8,
                       ],
                       "circle-opacity": ["step", ["zoom"], 0, 16, 0.8],
-                      "circle-stroke-color": "#fff",
+                      "circle-stroke-color": "#0f1720",
                       "circle-stroke-width": ["step", ["zoom"], 0, 16, 0.5],
                     };
                     break;
@@ -1140,7 +1215,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     "text-allow-overlap": false, // This will prevent text from overlapping, reducing clutter
                   }}
                   paint={{
-                    "text-color": "#000", // Set text color to black
+                    "text-color": "#0f1720",
                     "text-opacity": [
                       "step", // Change interpolation type to 'step'
                       ["zoom"],

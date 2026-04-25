@@ -8,6 +8,8 @@ const baseUrl = "api/app";
 let AppOptions: AppOptionsVm = {
   serverBaseUrl: "",
   signalrBaseUrl: "",
+  supportName: "",
+  supportEmail: "",
 };
 
 let antiforgeryRequestToken: string | null = null;
@@ -25,6 +27,8 @@ const AppService = {
     AppOptions = {
       serverBaseUrl: response.data.serverBaseUrl,
       signalrBaseUrl: response.data.signalrBaseUrl,
+      supportName: response.data.supportName,
+      supportEmail: response.data.supportEmail,
     };
     antiforgeryRequestToken = response.data.antiforgeryRequestToken;
 
@@ -62,6 +66,8 @@ export { AppService, AppOptions };
 export interface AppOptionsVm {
   serverBaseUrl: string;
   signalrBaseUrl: string;
+  supportName: string;
+  supportEmail: string;
 }
 
 export interface AppInitializeVm extends AppOptionsVm {

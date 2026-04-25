@@ -233,7 +233,10 @@ public class UserService : ServiceBase<UserRepository>
         var user = await Repository.GetUserByPasswordResetCode(code);
         if (user == null) throw ApiExceptionDictionary.InvalidPasswordResetCode;
 
-        if (user.PasswordResetCodeExpiration < DateTime.UtcNow) throw ApiExceptionDictionary.PasswordResetCodeExpired;
+        if (user.PasswordResetCodeExpiration == null || user.PasswordResetCodeExpiration < DateTime.UtcNow)
+        {
+            throw ApiExceptionDictionary.PasswordResetCodeExpired;
+        }
 
         if (!password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
@@ -264,6 +267,11 @@ public class UserService : ServiceBase<UserRepository>
         if (invitation == null) throw ApiExceptionDictionary.NotFound("Invitation");
 
         return invitation;
+    }
+
+    public async Task<List<AcceptInvitationVm>> GetPendingInvitationsForCurrentUser()
+    {
+        return await Repository.GetPendingInvitationsForCurrentUser();
     }
 
     public async Task DeclineInvitation(string code)

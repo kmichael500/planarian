@@ -8,7 +8,6 @@ import {
   Row,
   Col,
   Alert,
-  Tag,
   Grid,
   Checkbox,
 } from "antd";
@@ -17,6 +16,7 @@ import {
   formatNumber,
 } from "../../../Shared/Helpers/StringHelpers";
 import { MapService, GeologicMapResult } from "../Services/MapService";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 const { Panel } = Collapse;
 const { Text, Paragraph } = Typography;
@@ -506,15 +506,15 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                   )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Age">
-                  <Tag color={color || "default"} style={getTagStyle(color)}>
+                  <PlanarianTag color={color || "default"} style={getTagStyle(color)}>
                     {age}
-                  </Tag>
+                  </PlanarianTag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Interval">
                   {b_int && t_int ? (
-                    <Tag color={b_int.color} style={getTagStyle(b_int.color)}>
+                    <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
                       {b_int.int_name} ({b_int.b_age}–{t_int.t_age} Ma)
-                    </Tag>
+                    </PlanarianTag>
                   ) : (
                     defaultIfEmpty("")
                   )}
@@ -526,13 +526,13 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                 <Descriptions.Item label="Lithology Details">
                   {mainLiths.length > 0
                     ? mainLiths.map((l: any, idx: number) => (
-                        <Tag
+                        <PlanarianTag
                           key={idx}
                           color={l.color || "default"}
                           style={getTagStyle(l.color)}
                         >
                           {l.lith} ({l.lith_type})
-                        </Tag>
+                        </PlanarianTag>
                       ))
                     : defaultIfEmpty("")}
                 </Descriptions.Item>
@@ -571,30 +571,30 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                   {strat_names.map((sn: any) => sn.rank_name).join(", ")}
                 </Descriptions.Item>
                 <Descriptions.Item label="Age">
-                  <Tag
+                  <PlanarianTag
                     color={(b_int && b_int.color) || "default"}
                     style={getTagStyle(b_int && b_int.color)}
                   >
                     {macroAgeRange}
-                  </Tag>
+                  </PlanarianTag>
                 </Descriptions.Item>
                 <Descriptions.Item label="Thickness">
                   {thicknessRange}
                 </Descriptions.Item>
                 <Descriptions.Item label="Base Interval">
                   {b_int ? (
-                    <Tag color={b_int.color} style={getTagStyle(b_int.color)}>
+                    <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
                       {b_int.int_name}
-                    </Tag>
+                    </PlanarianTag>
                   ) : (
                     defaultIfEmpty("")
                   )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Top Interval">
                   {t_int ? (
-                    <Tag color={t_int.color} style={getTagStyle(t_int.color)}>
+                    <PlanarianTag color={t_int.color} style={getTagStyle(t_int.color)}>
                       {t_int.int_name}
-                    </Tag>
+                    </PlanarianTag>
                   ) : (
                     defaultIfEmpty("")
                   )}
@@ -602,26 +602,26 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                 <Descriptions.Item label="Lithology (parsed)">
                   {macroLiths.length > 0
                     ? macroLiths.map((l: any, idx: number) => (
-                        <Tag
+                        <PlanarianTag
                           key={idx}
                           color={l.color || "default"}
                           style={getTagStyle(l.color)}
                         >
                           {l.lith} ({l.lith_type})
-                        </Tag>
+                        </PlanarianTag>
                       ))
                     : defaultIfEmpty("")}
                 </Descriptions.Item>
                 <Descriptions.Item label="Environments">
                   {environs.length > 0
                     ? environs.map((env: any, idx: number) => (
-                        <Tag
+                        <PlanarianTag
                           key={idx}
                           color={env.color || "default"}
                           style={getTagStyle(env.color)}
                         >
                           {env.environ}
-                        </Tag>
+                        </PlanarianTag>
                       ))
                     : defaultIfEmpty("")}
                 </Descriptions.Item>

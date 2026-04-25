@@ -3,18 +3,19 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Import.Services;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Services;
-using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
+// ReSharper disable once CheckNamespace ( for partial class compatability )
 namespace Planarian.Modules.Account.Controller;
 
 [Route(Route)]
 [Authorize]
-public class AccountController : PlanarianControllerBase<AccountService>
+public partial class AccountController : PlanarianControllerBase<AccountService>
 {
     private const string Route = "api/account";
 
@@ -27,16 +28,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
         _importService = importService;
     }
 
-    [HttpPost]
-    [Authorize(Policy = PermissionPolicyKey.PlanarianAdmin)]
-    public async Task<ActionResult<string>> CreateAccount([FromBody] CreateAccountVm account,
-        CancellationToken cancellationToken)
-    {
-        var result = await Service.CreateAccount(account, cancellationToken);
-
-        return new JsonResult(result);
-    }
-
     // dangerous
     [HttpDelete("reset")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
@@ -45,61 +36,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
         await Service.ResetAccount(cancellationToken);
         return Ok("Account reset finished.");
     }
-
-    #region Archive
-
-    [HttpPost("archive")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public IActionResult StartArchive()
-    {
-        Service.StartArchive();
-        return Ok();
-    }
-
-    [HttpPost("archive/cancel")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public IActionResult CancelArchive()
-    {
-        Service.CancelArchive();
-        return Ok();
-    }
-
-    [HttpGet("archive/status")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public ActionResult<ArchiveProgressVm?> GetArchiveStatus()
-    {
-        var result = Service.GetArchiveStatus();
-        return Ok(result);
-    }
-
-    [HttpGet("archive/list")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<IEnumerable<ArchiveListItemVm>>> GetRecentArchives(CancellationToken cancellationToken)
-    {
-        var result = await Service.GetRecentArchives(cancellationToken);
-        return Ok(result);
-    }
-
-    [HttpGet("archive/download")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    [Throttle]
-    public async Task<IActionResult> DownloadArchive(
-        [FromQuery] string blobKey,
-        CancellationToken cancellationToken)
-    {
-        var result = await Service.CreateArchiveDownloadResponse(blobKey, cancellationToken);
-        return CreateFileResult(result);
-    }
-
-    [HttpDelete("archive")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> DeleteArchive(string blobKey, CancellationToken cancellationToken)
-    {
-        await Service.DeleteArchive(blobKey, cancellationToken);
-        return Ok();
-    }
-
-    #endregion
 
     #region Misc Settings
 
@@ -128,72 +64,6 @@ public class AccountController : PlanarianControllerBase<AccountService>
     // }
 
 
-
-    #endregion
-
-    #region Import
-
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("import/caves/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportCavesFile(string? uuid, IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
-                cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [HttpPost("import/caves/process/{fileId:length(10)}")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportCavesFileProcess(string fileId,
-        bool isDryRun,
-        CancellationToken cancellationToken)
-    {
-        var result = await _importService.ImportCavesFileProcess(fileId, isDryRun, cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("import/entrances/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportEntrancesFile(string? uuid, IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var result =
-            await _importService.AddTemporaryFileForImport(file.OpenReadStream(), file.FileName, uuid,
-                cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("import/file")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportFile(string? uuid, string delimiterRegex, string idRegex, IFormFile file,
-        CancellationToken cancellationToken, bool ignoreDuplicates)
-    {
-        await using var stream = file.OpenReadStream();
-        var result =
-            await _importService.AddFileForImport(stream, file.FileName, idRegex, delimiterRegex, ignoreDuplicates, uuid,
-                cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [HttpPost("import/entrances/process/{fileId:length(10)}")]
-    [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<IActionResult> ImportEntrancesFileProcess(string fileId,
-        bool isDryRun,
-        CancellationToken cancellationToken)
-    {
-        var result = await _importService.ImportEntrancesFileProcess(fileId, isDryRun, cancellationToken);
-
-        return new JsonResult(result);
-    }
 
     #endregion
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Map.Models;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
@@ -18,6 +19,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet]
+    [Throttle(RequestsPerMinute = 600)]
     public async Task<ActionResult<IEnumerable<object>>> GetMapData([FromQuery] double north, [FromQuery] double south,
         [FromQuery] double east,
         [FromQuery] double west, [FromQuery] int zoom, CancellationToken cancellationToken)
@@ -49,7 +51,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("lineplots/ids")]
-    [Throttle(RequestsPerMinute = 120)]
+    [Throttle(RequestsPerMinute = 600)]
     public async Task<IActionResult> GetLinePlotIds(
         [FromQuery] double north,
         [FromQuery] double south,
@@ -64,7 +66,7 @@ public class MapController : PlanarianControllerBase<MapService>
     }
 
     [HttpGet("lineplots/{plotId}")]
-    [Throttle(RequestsPerMinute = 240)]
+    [Throttle(RequestsPerMinute = 1200)]
     public async Task<IActionResult> GetLinePlotById(
         [FromRoute] string plotId,
         CancellationToken cancellationToken)

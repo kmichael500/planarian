@@ -4,9 +4,15 @@ import { CavesComponent } from "../Components/CavesComponent";
 import { CaveCreateButtonComponent } from "../Components/CaveCreateButtonComponent";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import "./CavesPage.scss";
 
 const CavesPage: React.FC = () => {
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const {
+    resetContentStyle,
+    setFullHeightContentStyle,
+    setHeaderTitle,
+    setHeaderButtons,
+  } = useContext(AppContext);
 
   useEffect(() => {
     setHeaderButtons([
@@ -15,12 +21,22 @@ const CavesPage: React.FC = () => {
       </ShouldDisplay>,
     ]);
     setHeaderTitle([`Caves`]);
-  }, []);
+    setFullHeightContentStyle();
+
+    return () => {
+      resetContentStyle();
+    };
+  }, [
+    resetContentStyle,
+    setFullHeightContentStyle,
+    setHeaderButtons,
+    setHeaderTitle,
+  ]);
 
   return (
-    <>
+    <div className="caves-page">
       <CavesComponent />
-    </>
+    </div>
   );
 };
 

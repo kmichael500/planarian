@@ -25,7 +25,10 @@ public class AppService : ServiceBase<AppRepository>
         _serverOptions.ServerBaseUrl = serverBaseUrl;
 #endif
         var result = new AppInitializeVm(
-            _serverOptions.ServerBaseUrl, $"{_serverOptions.ServerBaseUrl}/api/notificationHub");
+            _serverOptions.ServerBaseUrl,
+            $"{_serverOptions.ServerBaseUrl}/api/notificationHub",
+            _serverOptions.SupportName,
+            _serverOptions.SupportEmail);
 
         if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result; // if not authenticated
 
@@ -46,8 +49,8 @@ public class AppService : ServiceBase<AppRepository>
         return result;
     }
 
-    public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId)
+    public async Task<bool> HasCavePermission(string permissionKey, string? caveId, string? countyId, string? stateId)
     {
-        return await RequestUser.HasCavePermission(permissionKey, caveId, countyId, false);
+        return await RequestUser.HasCavePermission(permissionKey, caveId, countyId, stateId, false);
     }
 }

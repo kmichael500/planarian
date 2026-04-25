@@ -7,6 +7,7 @@ using NpgsqlTypes;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Map.Models;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
 

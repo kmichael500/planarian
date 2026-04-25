@@ -83,6 +83,7 @@ public class UserRepository : RepositoryBase
             .Where(e => e.InvitationCode == code && e.User != null && e.User.IsTemporary)
             .Select(e => new AcceptInvitationVm
             {
+                InvitationCode = e.InvitationCode!,
                 FirstName = e.User!.FirstName,
                 LastName = e.User.LastName,
                 Email = e.User.EmailAddress,
@@ -93,8 +94,42 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<AcceptInvitationVm>> GetPendingInvitationsForCurrentUser()
+    {
+        var email = await DbContext.Users
+            .Where(e => e.Id == RequestUser.Id && !e.IsTemporary && e.EmailConfirmedOn != null)
+            .Select(e => e.EmailAddress)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return new List<AcceptInvitationVm>();
+        }
+
+        return await DbContext.AccountUsers
+            .Where(e =>
+                !string.IsNullOrWhiteSpace(e.InvitationCode) &&
+                e.InvitationAcceptedOn == null &&
+                e.User != null &&
+                e.User.IsTemporary &&
+                e.User.EmailAddress.ToLower() == email.ToLower())
+            .OrderByDescending(e => e.InvitationSentOn)
+            .Select(e => new AcceptInvitationVm
+            {
+                InvitationCode = e.InvitationCode!,
+                FirstName = e.User!.FirstName,
+                LastName = e.User.LastName,
+                Email = e.User.EmailAddress,
+                Regions = e.Account!.AccountStates.OrderByDescending(ee => ee.State.Name).Select(ee => ee.State.Name),
+                AccountName = e.Account.Name,
+                AccountId = e.Account.Id
+            })
+            .ToListAsync();
+    }
+
     public async
-        Task<(AccountUser? AccountUser, User? User, IEnumerable<CavePermission>? CavePermissions, IEnumerable<UserPermission>? UserPermissions)>
+        Task<(AccountUser? AccountUser, User? User, IEnumerable<CavePermission>? CavePermissions,
+            IEnumerable<UserPermission>? UserPermissions)>
         GetInvitationEntities(string? invitationCode)
     {
         var accountUser = await DbContext.AccountUsers
@@ -122,25 +157,27 @@ public class UserRepository : RepositoryBase
         string permissionKey)
     {
         var permissions = GetCavePermissionQuery(userId, accountId, permissionKey);
-        
-        var data = await permissions.Select(e=> new
+
+        var data = await permissions.Select(e => new
         {
             CaveName = e.Cave!.Name,
             CaveCountyId = e.Cave!.CountyId,
             e.CaveId,
             e.CountyId,
-            StateId = e.County!.StateId
+            StateId = e.StateId ?? e.County!.StateId
         }).ToListAsync();
-        
-        var hasAllLocations = data.Any(permission => permission.CountyId == null && permission.CaveId == null);
+
+        var hasAllLocations = data.Any(permission =>
+            permission.StateId == null && permission.CountyId == null && permission.CaveId == null);
 
         var stateCountyValues = new StateCountyValue
         {
-            States = data.Where(e=>!string.IsNullOrWhiteSpace(e.StateId)).Select(permission => permission.StateId).Distinct().ToList(),
-            CountiesByState = 
+            States = data.Where(e => !string.IsNullOrWhiteSpace(e.StateId)).Select(permission => permission.StateId)
+                .Distinct().ToList(),
+            CountiesByState =
                 data.Where(e => !string.IsNullOrWhiteSpace(e.StateId) && !string.IsNullOrWhiteSpace(e.CountyId))
-                .GroupBy(permission => permission.StateId)
-                .ToDictionary(group => group.Key, e => e.Select(ee => ee.CountyId!).ToList())
+                    .GroupBy(permission => permission.StateId)
+                    .ToDictionary(group => group.Key, e => e.Select(ee => ee.CountyId!).ToList())
         };
 
         var cavePermissions = new List<SelectListItem<string, CavePermissionManagementData>>();
@@ -155,7 +192,8 @@ public class UserRepository : RepositoryBase
                     {
                         CountyId = cave.CaveCountyId,
                         RequestUserHasAccess =
-                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId, false)
+                            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, cave.CaveId, cave.CountyId,
+                                cave.StateId, false)
                     }
                 }
             );
@@ -183,14 +221,14 @@ public class UserRepository : RepositoryBase
             .Where(e => e.UserId == userId && e.AccountId == accountId && e.Permission.Key == permissionKey &&
                         e.Permission.PermissionType == PermissionType.Cave);
     }
-    
+
     public async Task<IEnumerable<string>> GetPermissions(string userId, string accountId)
     {
         var userPermissions = await DbContext.UserPermissions
             .Where(e => e.UserId == userId && (e.AccountId == accountId || string.IsNullOrWhiteSpace(e.AccountId)))
             .Select(e => e.Permission!.Key)
             .ToListAsync();
-        
+
         var cavePermissions = await DbContext.CavePermissions
             .Where(e => e.UserId == userId && e.AccountId == accountId)
             .Select(e => e.Permission!.Key)
@@ -201,6 +239,7 @@ public class UserRepository : RepositoryBase
             .Where(e =>
                 e.UserId == userId
                 && e.AccountId == accountId
+                && string.IsNullOrWhiteSpace(e.StateId)
                 && string.IsNullOrWhiteSpace(e.CaveId)
                 && string.IsNullOrWhiteSpace(e.CountyId)
                 && e.Permission!.Key == PermissionPolicyKey.Manager
@@ -217,12 +256,13 @@ public class UserRepository : RepositoryBase
                         || PermissionKey.PlanarianAdmin == e.Permission!.Key
                     )
                 );
-        }        
-        if(isAdminManger)
+        }
+
+        if (isAdminManger)
         {
             cavePermissions.Add(PermissionPolicyKey.AdminManager);
         }
-        
+
         var exportEnabled = await RequestUser.HasCavePermission(PermissionPolicyKey.Export, false);
         if (exportEnabled)
         {
@@ -230,7 +270,7 @@ public class UserRepository : RepositoryBase
         }
 
         userPermissions.AddRange(cavePermissions);
-        
+
         return userPermissions.Distinct();
     }
 
@@ -245,13 +285,13 @@ public class UserRepository : RepositoryBase
 
         return user;
     }
-    
+
     private static IQueryable<UserManagerGridVm> ToUserGridVmQuery(IQueryable<AccountUser> query)
     {
         return query.Select(e => new UserManagerGridVm(
-            e.UserId, 
-            e.User!.EmailAddress, 
-            e.User.FullName, 
+            e.UserId,
+            e.User!.EmailAddress,
+            e.User.FullName,
             e.InvitationSentOn,
             e.InvitationAcceptedOn,
             e.User.LastActiveOn
@@ -272,11 +312,30 @@ public class UserRepository : RepositoryBase
     }
 
     public async Task<UserPermission?> GetUserPermission(string userId, string permissionKey)
-        {
-            return await DbContext.UserPermissions
-                .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey && e.AccountId == RequestUser.AccountId)
-                .FirstOrDefaultAsync();
-        }
+    {
+        return await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.Permission!.Key == permissionKey &&
+                        e.AccountId == RequestUser.AccountId)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> DeleteAccountUserAccess(string userId, string accountId,
+        CancellationToken cancellationToken = default)
+    {
+        await DbContext.CavePermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await DbContext.UserPermissions
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var deletedAccountUsers = await DbContext.AccountUsers
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deletedAccountUsers > 0;
+    }
 
     public async Task<DateTime?> GetLastActiveOn(string userId)
     {
@@ -285,5 +344,5 @@ public class UserRepository : RepositoryBase
             .Select(u => u.LastActiveOn)
             .FirstOrDefaultAsync();
     }
-    
-}
+
+ }

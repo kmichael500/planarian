@@ -1,22 +1,21 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import { CloudUploadOutlined } from "@ant-design/icons";
 import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
-  Card,
   Col,
   Collapse,
   Descriptions,
   Grid,
   Row,
   Space,
-  Tag,
-  Tooltip,
   Select,
   DatePicker,
   InputNumber,
+  Skeleton,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
+import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import {
   defaultIfEmpty,
   DistanceFormat,
@@ -24,7 +23,6 @@ import {
   formatDate,
   formatDistance,
   formatNumber,
-  getDirectionsUrl,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
@@ -47,10 +45,43 @@ import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
+import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
+  <Descriptions bordered>
+    {Array.from({ length: rows }, (_, index) => (
+      <Descriptions.Item
+        label={<Skeleton.Input active size="small" />}
+        key={index}
+      >
+        <Skeleton.Input active block size="small" />
+      </Descriptions.Item>
+    ))}
+  </Descriptions>
+);
+
+const CaveDetailSkeleton = () => (
+  <>
+    <PlanarianDividerComponent title="Information" hideTopSpacing />
+    <SkeletonDescriptionGrid rows={10} />
+
+    <PlanarianDividerComponent title="Entrances" />
+    <SkeletonDescriptionGrid rows={6} />
+
+    <PlanarianDividerComponent title="Narrative" />
+    <Skeleton active paragraph={{ rows: 4 }} title={false} />
+
+    <PlanarianDividerComponent title="Files" />
+    <Skeleton active paragraph={{ rows: 3 }} title={false} />
+
+    <PlanarianDividerComponent title="Map" />
+    <Skeleton.Node active style={{ height: 360, width: "100%" }} />
+  </>
+);
 
 export interface CaveComponentOptions {
   showMap?: boolean;
@@ -70,11 +101,13 @@ const generateTags = (tagIds: string[] | undefined) => {
   if (!tagIds || tagIds.length === 0) {
     return defaultIfEmpty(null);
   }
-  return tagIds.map((tagId) => (
-    <Col key={tagId}>
-      <TagComponent tagId={tagId} />
-    </Col>
-  ));
+  return (
+    <Space size={[8, 8]} wrap>
+      {tagIds.map((tagId) => (
+        <TagComponent key={tagId} tagId={tagId} />
+      ))}
+    </Space>
+  );
 };
 
 const CaveComponent = ({
@@ -142,7 +175,7 @@ const CaveComponent = ({
           )}
           {cave?.alternateNames.map((name) => (
             <Col key={name}>
-              <Tag>{name}</Tag>
+              <PlanarianTag>{name}</PlanarianTag>
             </Col>
           ))}
         </Row>
@@ -187,17 +220,17 @@ const CaveComponent = ({
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
       <Descriptions.Item label="Reported By" key="reported-by">
-        <Row>{generateTags(cave?.reportedByNameTagIds)}</Row>
+        {generateTags(cave?.reportedByNameTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologyTags) && (
       <Descriptions.Item label="Geology" key="geology">
-        <Row>{generateTags(cave?.geologyTagIds)}</Row>
+        {generateTags(cave?.geologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologicAgeTags) && (
       <Descriptions.Item label="Geologic Age" key="geologic-age">
-        <Row>{generateTags(cave?.geologicAgeTagIds)}</Row>
+        {generateTags(cave?.geologicAgeTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCavePhysiographicProvinceTags) && (
@@ -205,32 +238,32 @@ const CaveComponent = ({
         label="Physiographic Province"
         key="physiographic-province"
       >
-        <Row>{generateTags(cave?.physiographicProvinceTagIds)}</Row>
+        {generateTags(cave?.physiographicProvinceTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveBiologyTags) && (
       <Descriptions.Item label="Biology" key="biology">
-        <Row>{generateTags(cave?.biologyTagIds)}</Row>
+        {generateTags(cave?.biologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && (
       <Descriptions.Item label="Archeology" key="archeology">
-        <Row>{generateTags(cave?.archeologyTagIds)}</Row>
+        {generateTags(cave?.archeologyTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveMapStatusTags) && (
       <Descriptions.Item label="Map Status" key="map-status">
-        <Row>{generateTags(cave?.mapStatusTagIds)}</Row>
+        {generateTags(cave?.mapStatusTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveCartographerNameTags) && (
       <Descriptions.Item label="Cartographers" key="cartographers">
-        <Row>{generateTags(cave?.cartographerNameTagIds)}</Row>
+        {generateTags(cave?.cartographerNameTagIds)}
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveOtherTags) && (
       <Descriptions.Item label="Other" key="other">
-        <Row>{generateTags(cave?.otherTagIds)}</Row>
+        {generateTags(cave?.otherTagIds)}
       </Descriptions.Item>
     ),
   ].filter(Boolean);
@@ -241,16 +274,12 @@ const CaveComponent = ({
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && (
         <Descriptions.Item
           label={
-            <Space>
-              Coordinates
-              <a
-                href={getDirectionsUrl(entrance.latitude, entrance.longitude)}
-                target="_blank"
-              >
-                <Tooltip title="Directions">
-                  <CarOutlined />
-                </Tooltip>
-              </a>
+            <Space direction="vertical" size={0}>
+              <span>Coordinates</span>
+              <DistanceFromMeComponent
+                latitude={entrance.latitude}
+                longitude={entrance.longitude}
+              />
             </Space>
           }
           key="coordinates"
@@ -289,7 +318,7 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && (
         <Descriptions.Item label="Reported By" key="reported-by">
-          <Row>{generateTags(entrance.reportedByNameTagIds)}</Row>
+          {generateTags(entrance.reportedByNameTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
@@ -299,17 +328,17 @@ const CaveComponent = ({
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
         <Descriptions.Item label="Status" key="status">
-          <Row>{generateTags(entrance.entranceStatusTagIds)}</Row>
+          {generateTags(entrance.entranceStatusTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) && (
         <Descriptions.Item label="Field Indication" key="field-indication">
-          <Row>{generateTags(entrance.fieldIndicationTagIds)}</Row>
+          {generateTags(entrance.fieldIndicationTagIds)}
         </Descriptions.Item>
       ),
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) && (
         <Descriptions.Item label="Hydrology" key="hydrology">
-          <Row>{generateTags(entrance.entranceHydrologyTagIds)}</Row>
+          {generateTags(entrance.entranceHydrologyTagIds)}
         </Descriptions.Item>
       ),
       <Descriptions.Item label="Land Access" span={3}>
@@ -340,7 +369,7 @@ const CaveComponent = ({
 
   const content = (
     <>
-      <PlanarianDividerComponent title="Information" />
+      <PlanarianDividerComponent title="Information" hideTopSpacing />
       <Descriptions layout={descriptionLayout} bordered>
         {descriptionItems}
       </Descriptions>
@@ -361,7 +390,7 @@ const CaveComponent = ({
                       {entrance.isPrimary && (
                         <>
                           <Col flex="auto"></Col>
-                          <Tag>Primary</Tag>
+                          <PlanarianTag>Primary</PlanarianTag>
                         </>
                       )}
                     </Row>
@@ -620,12 +649,7 @@ const CaveComponent = ({
   return (
     <>
       {inCardContainer ? (
-        <Card
-          bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
-          loading={isLoading}
-        >
-          {content}
-        </Card>
+        isLoading ? <CaveDetailSkeleton /> : content
       ) : (
         content
       )}

@@ -35,12 +35,13 @@ public class AppController : PlanarianControllerBase<AppService>
         result.AntiforgeryRequestToken = antiforgeryTokens.RequestToken;
         return new JsonResult(result);
     }
-    
+
     [HttpGet("permissions/caves")]
     [Authorize]
-    public async Task<ActionResult<string>> HasCavePermission([FromQuery] string? caveId, [FromQuery] string? countyId, [FromQuery] string permissionKey)
+    public async Task<ActionResult<string>> HasCavePermission([FromQuery] string? caveId, [FromQuery] string? countyId,
+        [FromQuery] string permissionKey, [FromQuery] string? stateId)
     {
-        var result = await Service.HasCavePermission(permissionKey, caveId, countyId);
+        var result = await Service.HasCavePermission(permissionKey, caveId, countyId, stateId);
         return new JsonResult(result);
     }
 }

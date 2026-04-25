@@ -1,7 +1,7 @@
 using NetTopologySuite.Algorithm;
 using NetTopologySuite.Geometries;
 
-namespace Planarian.Modules.Map.Controllers;
+namespace Planarian.Modules.Map.Models;
 
 public class ClusterDto
 {

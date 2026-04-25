@@ -1,29 +1,33 @@
-import { Col, Layout, Row, Spin, message } from "antd";
+import { RedoOutlined } from "@ant-design/icons";
+import { theme as antdTheme } from "antd";
+import { Col, ConfigProvider, Layout, Row, Spin, message } from "antd";
 import React from "react";
-import "./App.css";
-import { AppRouting } from "./Configuration/Routing/App.routing";
 import { Helmet } from "react-helmet";
 import { BrowserRouter } from "react-router-dom";
+import "./App.css";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
-import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
+import { AppRouting } from "./Configuration/Routing/App.routing";
+import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
+import { SyncfusionThemeManager } from "./SyncfusionThemeManager";
+import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
 import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
-import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
-import { RedoOutlined } from "@ant-design/icons";
 
 const { Content } = Layout;
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   return (
     <>
       <Helmet>
         <title>Planarian</title>
         <meta name="description" content="Cave project management" />
       </Helmet>
+      <SyncfusionThemeManager />
       <BrowserRouter>
         <AppProvider>
           <AppContext.Consumer>
@@ -35,11 +39,20 @@ const App: React.FC = () => {
               logout,
             }) =>
               isInitialized ? (
-                <Layout style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}>
+                <Layout
+                  style={{
+                    height: "calc(var(--vh, 1vh) * 100)",
+                    minHeight: 0,
+                    overflow: "hidden",
+                  }}
+                >
                   <SideBarComponent />
                   <Layout className="site-layout">
                     <HeaderComponent />
-                    <Content style={contentStyle ?? {}}>
+                    <Content
+                      className="site-layout-content"
+                      style={contentStyle ?? {}}
+                    >
                       <AppRouting />
                     </Content>
                   </Layout>
@@ -76,12 +89,14 @@ const App: React.FC = () => {
                                 window.location.assign("/login");
                               } catch (e) {
                                 const error = e as ApiErrorResponse;
-                                message.error(error.message ?? "Failed to log out.");
+                                message.error(
+                                  error.message ?? "Failed to log out."
+                                );
                               }
                             }}
                           >
                             Login
-                          </PlanarianButton>{" "}
+                          </PlanarianButton>
                         </Col>
                       )}
                   </Row>
@@ -92,6 +107,31 @@ const App: React.FC = () => {
         </AppProvider>
       </BrowserRouter>
     </>
+  );
+};
+
+const ThemeConsumerWrapper: React.FC = () => {
+  const { effectiveMode } = useTheme();
+
+  return (
+    <ConfigProvider
+      theme={{
+        algorithm:
+          effectiveMode === "dark"
+            ? antdTheme.darkAlgorithm
+            : antdTheme.defaultAlgorithm,
+      }}
+    >
+      <AppContent />
+    </ConfigProvider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <ThemeConsumerWrapper />
+    </ThemeProvider>
   );
 };
 

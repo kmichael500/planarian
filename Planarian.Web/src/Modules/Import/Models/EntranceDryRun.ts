@@ -1,5 +1,6 @@
 export interface EntranceDryRun {
   associatedCave: string;
+  entranceCountChange: number;
   locationQuality: string;
   isPrimaryEntrance: boolean;
   entranceName: string | null;

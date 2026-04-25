@@ -36,6 +36,7 @@ const SideBarComponent: React.FC = () => {
         zIndex: 1,
         width: "100%",
         height: "calc(var(--vh, 1vh) * 100)",
+        minHeight: 0,
       }}
     >
       <Space
@@ -43,7 +44,7 @@ const SideBarComponent: React.FC = () => {
         style={{ width: "100%", justifyContent: "center" }}
       >
         <Link to="/">
-          <LogoIcon style={{ width: "90px", paddingTop: "20px" }} />
+          <LogoIcon style={{ width: "90px", paddingTop: "20px", background: "transparent" }} />
         </Link>
       </Space>
       <Space

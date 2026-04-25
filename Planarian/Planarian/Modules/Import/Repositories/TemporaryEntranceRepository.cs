@@ -81,7 +81,7 @@ public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase
         var associatedEntrances = await db.GetTable<TemporaryEntrance>()
             .TableName(_temporaryEntranceTableName) 
             .Where(e => e.CaveId != null)
-            .Join(db.GetTable<Cave>(),
+            .Join(db.GetTable<Cave>().Where(e => e.AccountId == RequestUser.AccountId),
                 te => te.CaveId,
                 cave => cave.Id,
                 (te, cave) => new TemporaryEntranceResult
@@ -108,35 +108,96 @@ public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase
         await using var db = DbContext.CreateLinqToDBConnection();
 
         var tempEntranceTable = db.GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName);
+        var importedCaveIds = await tempEntranceTable
+            .Where(e => e.CaveId != null)
+            .Select(e => e.CaveId!)
+            .Distinct()
+            .ToListAsyncLinqToDB();
+
+        if (!importedCaveIds.Any()) return [];
+
+        var scopedImportedCaveIds = await db.GetTable<Cave>()
+            .Where(e => importedCaveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            .ToListAsyncLinqToDB();
+
+        if (!scopedImportedCaveIds.Any()) return [];
+
         var entranceTable = db.GetTable<Entrance>();
+        var tempPrimaryCounts = (await tempEntranceTable
+            .Where(e => e.CaveId != null && e.IsPrimary)
+            .GroupBy(e => e.CaveId!)
+            .Select(g => new { CaveId = g.Key, Count = g.Count() })
+            .ToListAsyncLinqToDB())
+            .ToDictionary(x => x.CaveId, x => x.Count);
 
-        var invalidTempEntrances = new List<string>();
-        int batchSize = 1000;
-        int offset = 0;
-    
-        while(true)  // Continue processing batches until the end of the table is reached
-        {
-            var batchQuery = (from temp in tempEntranceTable.Skip(offset).Take(batchSize).Where(e => e.IsPrimary)
-                where tempEntranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary && e.Id != temp.Id)
-                      || entranceTable.Any(e => e.CaveId == temp.CaveId && e.IsPrimary)
-                select temp.Id);
+        var existingPrimaryCounts = (await entranceTable
+            .Join(db.GetTable<Cave>().Where(e => e.AccountId == RequestUser.AccountId),
+                entrance => entrance.CaveId,
+                cave => cave.Id,
+                (entrance, cave) => entrance)
+            .Where(e => scopedImportedCaveIds.Contains(e.CaveId) && e.IsPrimary)
+            .GroupBy(e => e.CaveId)
+            .Select(g => new { CaveId = g.Key, Count = g.Count() })
+            .ToListAsyncLinqToDB())
+            .ToDictionary(x => x.CaveId, x => x.Count);
 
-            var batchResult = await batchQuery.ToListAsyncLinqToDB();
-            invalidTempEntrances.AddRange(batchResult);
+        var invalidCaveIds = scopedImportedCaveIds
+            .Where(caveId =>
+                tempPrimaryCounts.GetValueOrDefault(caveId) + existingPrimaryCounts.GetValueOrDefault(caveId) != 1)
+            .ToList();
 
-            if(batchResult.Count < batchSize)
-            {
-                break;  // Exit loop if the end of the table is reached
-            }
+        if (!invalidCaveIds.Any()) return [];
 
-            offset += batchSize;  // Prepare to process the next batch
-        }
-
-        return invalidTempEntrances;
+        return await tempEntranceTable
+            .Where(e => e.CaveId != null && invalidCaveIds.Contains(e.CaveId))
+            .Select(e => e.Id)
+            .ToListAsyncLinqToDB();
     }
 
+    public async Task<Dictionary<string, int>> GetExistingEntranceCounts(IEnumerable<string> caveIds,
+        CancellationToken cancellationToken)
+    {
+        var caveIdList = caveIds.Distinct().ToList();
+        if (!caveIdList.Any()) return [];
 
+        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caveIdList.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            , cancellationToken);
 
+        if (!scopedCaveIds.Any()) return [];
+
+        return (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .GroupBy(e => e.CaveId)
+            .Select(g => new { CaveId = g.Key, Count = g.Count() }), cancellationToken))
+            .ToDictionary(x => x.CaveId, x => x.Count);
+    }
+
+    public async Task<Dictionary<string, int>> GetExistingPrimaryEntranceCounts(IEnumerable<string> caveIds,
+        CancellationToken cancellationToken)
+    {
+        var caveIdList = caveIds.Distinct().ToList();
+        if (!caveIdList.Any()) return [];
+
+        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caveIdList.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            , cancellationToken);
+
+        if (!scopedCaveIds.Any()) return [];
+
+        return (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => scopedCaveIds.Contains(e.CaveId) && e.IsPrimary)
+            .GroupBy(e => e.CaveId)
+            .Select(g => new { CaveId = g.Key, Count = g.Count() }), cancellationToken))
+            .ToDictionary(x => x.CaveId, x => x.Count);
+    }
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
@@ -185,6 +246,63 @@ public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase
     {
         return DbContext.CreateLinqToDBConnection().GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName)
             .Where(e => e.Id == id).ToList();
+    }
+
+    public async Task<List<TemporaryEntrance>> GetAllEntrances()
+    {
+        return await DbContext.CreateLinqToDBConnection()
+            .GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName)
+            .ToListAsyncLinqToDB();
+    }
+
+    public async Task DeleteExistingEntrancesForImportedCaves(CancellationToken cancellationToken)
+    {
+        var caveIds = await DbContext.CreateLinqToDBConnection()
+            .GetTable<TemporaryEntrance>()
+            .TableName(_temporaryEntranceTableName)
+            .Where(e => e.CaveId != null)
+            .Select(e => e.CaveId!)
+            .Distinct()
+            .ToListAsyncLinqToDB();
+
+        if (!caveIds.Any()) return;
+
+        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            , cancellationToken);
+
+        if (!scopedCaveIds.Any()) return;
+
+        var entranceIds = await DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken: cancellationToken);
+
+        if (!entranceIds.Any()) return;
+
+        await DbContext.EntranceStatusTags
+            .Where(e => entranceIds.Contains(e.EntranceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceHydrologyTags
+            .Where(e => entranceIds.Contains(e.EntranceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.FieldIndicationTags
+            .Where(e => entranceIds.Contains(e.EntranceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceReportedByNameTags
+            .Where(e => entranceIds.Contains(e.EntranceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceOtherTag
+            .Where(e => entranceIds.Contains(e.EntranceId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => entranceIds.Contains(e.Id))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task DropTable()

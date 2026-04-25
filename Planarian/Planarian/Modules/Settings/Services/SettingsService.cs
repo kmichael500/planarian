@@ -1,14 +1,30 @@
+using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Options;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
+using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
+using Planarian.Shared.Helpers;
+using Planarian.Shared.Options;
 
 namespace Planarian.Modules.Settings.Services;
 
 public class SettingsService : ServiceBase<SettingsRepository>
 {
-    public SettingsService(SettingsRepository repository, RequestUser requestUser) : base(
+    private readonly ServerOptions _serverOptions;
+    private readonly RequestThrottleOptions _requestThrottleOptions;
+
+    public SettingsService(
+        SettingsRepository repository,
+        RequestUser requestUser,
+        ServerOptions serverOptions,
+        RequestThrottleOptions requestThrottleOptions) : base(
         repository, requestUser)
     {
+        _serverOptions = serverOptions;
+        _requestThrottleOptions = requestThrottleOptions;
     }
 
     public async Task<string> GetTagTypeName(string tagTypeId)
@@ -24,6 +40,21 @@ public class SettingsService : ServiceBase<SettingsRepository>
     public async Task<string?> GetStateName(string stateId)
     {
         return await Repository.GetStateName(stateId);
+    }
+    public async Task<NameProfilePhotoVm> GetUsersName(string userId)
+    {
+        var user = await Repository.GetUserNameProfilePhoto(userId);
+
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+
+        if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
+
+        user.ProfilePhotoUrl = UrlHelper.Build(
+            _serverOptions.ServerBaseUrl,
+            $"/api/users/{userId}/photo",
+            RequestUser.AccountId);
+
+        return user;
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetUsers()
@@ -47,4 +78,16 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetTags(key, projectId);
     }
 
+    public ChunkedUploaderConfigVm GetChunkedUploaderConfig()
+    {
+        return new ChunkedUploaderConfigVm
+        {
+            MaxConcurrentUploads = Math.Max(1, _requestThrottleOptions.MaxConcurrentUploads),
+            MaxFileSizeBytes = Math.Max(1, _requestThrottleOptions.ChunkedUploadMaxFileSizeBytes),
+            ChunkSizeBytes = (int)Math.Clamp(
+                _requestThrottleOptions.ChunkedUploadMaxChunkSizeBytes,
+                1,
+                int.MaxValue),
+        };
+    }
 }

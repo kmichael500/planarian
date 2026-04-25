@@ -1,0 +1,402 @@
+.import-files-dashboard {
+  --import-files-dashboard-pane-padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: 12px;
+  padding: 0;
+  border-radius: 12px;
+  position: relative;
+  color: var(--text-color);
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.import-files-dashboard--drag-active {
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 10%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color, #1677ff) 60%, transparent);
+}
+
+.import-files-dashboard--drag-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 8%, transparent);
+  pointer-events: none;
+}
+
+.import-files-dashboard__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.import-files-dashboard__controls-panel {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-color) 90%, transparent);
+  padding: var(--import-files-dashboard-pane-padding);
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__primary {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__main {
+  align-items: center;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__action-button,
+.import-files-dashboard__toolbar .import-files-dashboard__toolbar-primary {
+  white-space: nowrap;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__metrics {
+  grid-auto-columns: 64px;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__metric,
+.planarian-toolbar__metric.import-files-dashboard__toolbar-metric {
+  border-radius: 8px;
+  gap: 1px;
+  padding: 4px 6px;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__metric-label,
+.planarian-toolbar__metric.import-files-dashboard__toolbar-metric .planarian-toolbar__metric-label {
+  font-size: 0.62rem;
+}
+
+.import-files-dashboard__toolbar .planarian-toolbar__metric-value,
+.planarian-toolbar__metric.import-files-dashboard__toolbar-metric .planarian-toolbar__metric-value {
+  font-size: 0.82rem;
+}
+
+.import-files-dashboard__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+.import-files-dashboard__body-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.import-files-dashboard__pane-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--import-files-dashboard-pane-padding);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-color);
+  color: var(--text-color);
+}
+
+.import-files-dashboard__pane-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex: 0 0 auto;
+  min-height: 86px;
+}
+
+.import-files-dashboard__pane-header .ant-typography {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.import-files-dashboard__pane-header .ant-typography-secondary,
+.import-files-dashboard__queued-count {
+  color: var(--muted-text-color) !important;
+}
+
+.import-files-dashboard__pane-header-main > .ant-typography {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+.import-files-dashboard__pane-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.import-files-dashboard__queued-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.import-files-dashboard__pane-summary {
+  width: 100%;
+}
+
+.import-files-dashboard__pane-summary .ant-progress {
+  width: 100%;
+}
+
+.import-files-dashboard__pane-scroll {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-files-dashboard__virtual-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 4px 8px 0;
+  outline: none;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.import-files-dashboard__virtual-list:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color, #1677ff) 32%, transparent);
+  border-radius: 12px;
+}
+
+.import-files-dashboard__virtual-row {
+  min-height: 0;
+}
+
+.import-files-dashboard__virtual-row .import-files-dashboard__queue-card {
+  height: calc(100% - 10px);
+  margin-bottom: 0;
+}
+
+.import-files-dashboard__queue-card,
+.import-files-dashboard__queue-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-color);
+  color: var(--text-color);
+}
+
+.import-files-dashboard__queue-card .ant-typography,
+.import-files-dashboard__queue-placeholder .ant-typography {
+  color: var(--text-color);
+}
+
+.import-files-dashboard__queue-card .ant-typography-secondary,
+.import-files-dashboard__queue-placeholder .ant-typography-secondary {
+  color: var(--muted-text-color) !important;
+}
+
+.import-files-dashboard__queue-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.import-files-dashboard__queue-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 22px;
+}
+
+.import-files-dashboard__queue-action {
+  flex: 0 0 auto;
+}
+
+.import-files-dashboard__queue-progress {
+  position: relative;
+  min-height: 38px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--border-color) 62%, transparent);
+}
+
+.import-files-dashboard__queue-progress--active {
+  justify-content: stretch;
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 12%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress--finalizing {
+  justify-content: stretch;
+  background: color-mix(in srgb, #0f766e 14%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress--overall {
+  min-height: 34px;
+}
+
+.import-files-dashboard__queue-progress--success {
+  background: color-mix(in srgb, #16a34a 13%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress--failure {
+  background: color-mix(in srgb, #dc2626 12%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress--neutral {
+  background: color-mix(in srgb, #f59e0b 16%, var(--border-color));
+}
+
+.import-files-dashboard__queue-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 76%, transparent);
+  transition: width 0.2s ease;
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #0f766e 76%, transparent);
+}
+
+.import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-fill,
+.import-files-dashboard__queue-progress--failure .import-files-dashboard__queue-progress-fill,
+.import-files-dashboard__queue-progress--neutral .import-files-dashboard__queue-progress-fill {
+  width: 100%;
+}
+
+.import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #16a34a 72%, transparent);
+}
+
+.import-files-dashboard__queue-progress--failure .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #dc2626 70%, transparent);
+}
+
+.import-files-dashboard__queue-progress--neutral .import-files-dashboard__queue-progress-fill {
+  background: color-mix(in srgb, #f59e0b 72%, transparent);
+}
+
+.import-files-dashboard__queue-progress-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-color);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--surface-color) 70%, transparent);
+}
+
+.import-files-dashboard__queue-progress--active .import-files-dashboard__queue-progress-content {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.import-files-dashboard__queue-progress--finalizing .import-files-dashboard__queue-progress-content {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.import-files-dashboard__queue-progress--success .import-files-dashboard__queue-progress-content,
+.import-files-dashboard__queue-progress--failure .import-files-dashboard__queue-progress-content,
+.import-files-dashboard__queue-progress--neutral .import-files-dashboard__queue-progress-content {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.import-files-dashboard__queue-progress .ant-btn {
+  position: relative;
+  z-index: 2;
+  margin-left: 10px;
+  flex: 0 0 auto;
+}
+
+.import-files-dashboard__queue-note {
+  font-size: 0.78rem;
+  line-height: 1.2;
+  min-height: 16px;
+  color: var(--muted-text-color);
+}
+
+.import-files-dashboard__placeholder-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-files-dashboard__queue-placeholder {
+  opacity: 0.72;
+}
+
+.import-files-dashboard__queue-placeholder-line {
+  width: 58%;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+.import-files-dashboard__queue-placeholder-copy {
+  color: var(--muted-text-color);
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.import-files-dashboard__queue-progress--placeholder {
+  min-height: 46px;
+}
+
+@media (max-width: 768px) {
+  .import-files-dashboard__pane-header {
+    min-height: 78px;
+  }
+
+  .import-files-dashboard__body-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 860px) {
+  .import-files-dashboard__pane-header {
+    min-height: 78px;
+  }
+}
+
+@media (max-height: 760px) {
+  .import-files-dashboard__pane-header {
+    min-height: 74px;
+  }
+}
+
+@media (max-width: 620px) {
+  .import-files-dashboard__body-grid {
+    grid-template-columns: 1fr;
+  }
+}

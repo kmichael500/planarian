@@ -29,7 +29,7 @@ const StateDropdown = ({
     SettingsService.GetStates().then((data) => {
       setIsLoading(true);
       setStates(data);
-      if (data.length > 0 && autoSelectFirst) {
+      if (data.length === 1 && autoSelectFirst) {
         setDefaultValue(data[0].value);
 
         if (onChange) {

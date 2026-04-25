@@ -52,6 +52,7 @@ const CSVDisplay: React.FC<CSVDisplayProps> = ({ data }) => {
     <>
       {isLoaded && (
         <GridComponent
+          cssClass="planarian-csv-grid"
           ref={gridRef}
           height="100%"
           dataSource={parsedData}

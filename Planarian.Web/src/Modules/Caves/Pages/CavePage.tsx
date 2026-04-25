@@ -47,6 +47,7 @@ const CavePage = () => {
           permissionKey={PermissionKey.Manager}
           disabled={!hasEditPermission}
           icon={<EditOutlined />}
+          type="primary"
         >
           Edit
         </PlanarianButton>
@@ -90,7 +91,12 @@ const CavePage = () => {
     };
     getCave();
 
-    setContentStyle({});
+    setContentStyle({
+      ...defaultContentStyle,
+      margin: 0,
+      padding: defaultContentStyle.margin,
+      background: "var(--background-color)",
+    });
 
     return () => {
       setContentStyle(defaultContentStyle);

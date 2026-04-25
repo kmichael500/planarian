@@ -836,6 +836,10 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("StateId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -855,9 +859,11 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("PermissionId");
 
+                    b.HasIndex("StateId");
+
                     b.HasIndex("UserId", "AccountId", "PermissionId")
                         .IsUnique()
-                        .HasFilter("\"CountyId\" IS NULL AND \"CaveId\" IS NULL");
+                        .HasFilter("\"StateId\" IS NULL AND \"CountyId\" IS NULL AND \"CaveId\" IS NULL");
 
                     b.HasIndex("UserId", "AccountId", "CaveId", "PermissionId")
                         .IsUnique()
@@ -867,9 +873,13 @@ namespace Planarian.Migrations.Migrations
                         .IsUnique()
                         .HasFilter("\"CountyId\" IS NOT NULL");
 
+                    b.HasIndex("UserId", "AccountId", "StateId", "PermissionId")
+                        .IsUnique()
+                        .HasFilter("\"StateId\" IS NOT NULL");
+
                     b.ToTable("CavePermission", null, t =>
                         {
-                            t.HasCheckConstraint("CK_CavePermission_CountyOrCave", "\"CountyId\" IS NULL OR \"CaveId\" IS NULL");
+                            t.HasCheckConstraint("CK_CavePermission_OneLocation", "((CASE WHEN \"StateId\" IS NULL THEN 0 ELSE 1 END) + (CASE WHEN \"CountyId\" IS NULL THEN 0 ELSE 1 END) + (CASE WHEN \"CaveId\" IS NULL THEN 0 ELSE 1 END)) <= 1");
                         });
                 });
 
@@ -1694,12 +1704,10 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<string>("CaveId")
-                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
                     b.Property<string>("CountyId")
-                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
@@ -1712,6 +1720,10 @@ namespace Planarian.Migrations.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StateId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
@@ -1726,11 +1738,19 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("PermissionId");
 
+                    b.HasIndex("StateId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable((string)null);
 
                     b.ToView("UserCavePermissions", (string)null);
+
+                    b
+                        .HasAnnotation("Planarian:SqlView:ClrType", "Planarian.Model.Database.Entities.RidgeWalker.Views.UserCavePermissionsView")
+                        .HasAnnotation("Planarian:SqlView:Hash", "A52DB0A45B546F461AA1428BB101CC439AAEB9D2EABA414EB4BFD025AB2B4FA6")
+                        .HasAnnotation("Planarian:SqlView:Sql", "CREATE\nOR REPLACE VIEW \"UserCavePermissions\" AS\nSELECT cp.\"AccountId\",\n       cp.\"UserId\",\n       c.\"Id\" AS \"CaveId\",\n       NULL::character varying AS \"CountyId\",\n       p.\"Key\"                 AS \"PermissionKey\",\n       p.\"Id\"                  AS \"PermissionId\",\n       c.\"StateId\"             AS \"StateId\"\nFROM \"CavePermission\" cp\n    JOIN \"Caves\" c\nON c.\"AccountId\"::text = cp.\"AccountId\"::text AND\n    (cp.\"CaveId\" IS NOT NULL AND cp.\"CaveId\"::text = c.\"Id\"::text OR\n    cp.\"CountyId\" IS NOT NULL AND cp.\"CountyId\"::text = c.\"CountyId\"::text OR\n    cp.\"StateId\" IS NOT NULL AND cp.\"StateId\"::text = c.\"StateId\"::text OR\n    cp.\"CaveId\" IS NULL AND cp.\"CountyId\" IS NULL AND cp.\"StateId\" IS NULL)\n    JOIN \"Permissions\" p ON cp.\"PermissionId\"::text = p.\"Id\"::text\nWHERE p.\"PermissionType\"::text = 'Cave'::text\nUNION\nSELECT cp.\"AccountId\",\n       cp.\"UserId\",\n       NULL::character varying AS \"CaveId\",\n       ct.\"Id\"                 AS \"CountyId\",\n       p.\"Key\"                 AS \"PermissionKey\",\n       p.\"Id\"                  AS \"PermissionId\",\n       ct.\"StateId\"            AS \"StateId\"\nFROM \"CavePermission\" cp\n    JOIN \"Counties\" ct\nON ct.\"AccountId\"::text = cp.\"AccountId\"::text AND\n    (cp.\"CountyId\" IS NOT NULL AND cp.\"CountyId\"::text = ct.\"Id\"::text OR\n    cp.\"StateId\" IS NOT NULL AND cp.\"StateId\"::text = ct.\"StateId\"::text OR\n    cp.\"CaveId\" IS NULL AND cp.\"CountyId\" IS NULL AND cp.\"StateId\" IS NULL)\n    JOIN \"Permissions\" p ON cp.\"PermissionId\"::text = p.\"Id\"::text\nWHERE p.\"PermissionType\"::text = 'Cave'::text\nUNION\nSELECT up.\"AccountId\",\n       up.\"UserId\",\n       c.\"Id\" AS \"CaveId\",\n       NULL::character varying AS \"CountyId\",\n       p.\"Key\"                 AS \"PermissionKey\",\n       p.\"Id\"                  AS \"PermissionId\",\n       c.\"StateId\"             AS \"StateId\"\nFROM \"UserPermissions\" up\n    JOIN \"Caves\" c\nON c.\"AccountId\"::text = up.\"AccountId\"::text\n    CROSS JOIN \"Permissions\" p\nWHERE (up.\"PermissionId\"::text IN (SELECT \"Permissions\".\"Id\"\n    FROM \"Permissions\"\n    WHERE \"Permissions\".\"Key\"::text = 'Admin'::text))\n  AND p.\"PermissionType\"::text = 'Cave'::text\nUNION\nSELECT up.\"AccountId\",\n       up.\"UserId\",\n       NULL::character varying AS \"CaveId\",\n       ct.\"Id\"                 AS \"CountyId\",\n       p.\"Key\"                 AS \"PermissionKey\",\n       p.\"Id\"                  AS \"PermissionId\",\n       ct.\"StateId\"            AS \"StateId\"\nFROM \"UserPermissions\" up\n    JOIN \"Counties\" ct\nON ct.\"AccountId\"::text = up.\"AccountId\"::text\n    CROSS JOIN \"Permissions\" p\nWHERE (up.\"PermissionId\"::text IN (SELECT \"Permissions\".\"Id\"\n    FROM \"Permissions\"\n    WHERE \"Permissions\".\"Key\"::text = 'Admin'::text))\n  AND p.\"PermissionType\"::text = 'Cave'::text;\n")
+                        .HasAnnotation("Planarian:SqlView:ViewName", "UserCavePermissions");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.TagType", b =>
@@ -2393,6 +2413,11 @@ namespace Planarian.Migrations.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.State", "State")
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("Planarian.Model.Database.Entities.User", "User")
                         .WithMany("CavePermissions")
                         .HasForeignKey("UserId")
@@ -2410,6 +2435,8 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("ModifiedByUser");
 
                     b.Navigation("Permission");
+
+                    b.Navigation("State");
 
                     b.Navigation("User");
                 });
@@ -2918,21 +2945,21 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Cave", "Cave")
                         .WithMany()
-                        .HasForeignKey("CaveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CaveId");
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.County", "County")
                         .WithMany()
-                        .HasForeignKey("CountyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CountyId");
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Permission", "Permission")
                         .WithMany()
                         .HasForeignKey("PermissionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.State", "State")
+                        .WithMany()
+                        .HasForeignKey("StateId");
 
                     b.HasOne("Planarian.Model.Database.Entities.User", "User")
                         .WithMany()
@@ -2947,6 +2974,8 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("County");
 
                     b.Navigation("Permission");
+
+                    b.Navigation("State");
 
                     b.Navigation("User");
                 });

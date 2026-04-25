@@ -29,6 +29,14 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Planarian.Model\Planarian.Model.csproj"/>
+        <ProjectReference Include="..\Planarian.Migrations\Planarian.Migrations.csproj"
+                          PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="Analyzer" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <DesignTimeServicesReference Include="Planarian.Migrations.DesignTime.PlanarianDesignTimeServices, Planarian.Migrations" />
     </ItemGroup>
 
     <ItemGroup>

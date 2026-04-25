@@ -2,7 +2,6 @@ import { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { InvitationComponent } from "../Components/InvitationComponent";
 import { UserService } from "../../User/UserService";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
@@ -14,7 +13,12 @@ const AcceptInvitationPage = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const {
+    setHeaderTitle,
+    setHeaderButtons,
+    setContentStyle,
+    defaultContentStyle,
+  } = useContext(AppContext);
   const { invitationCode } = useParams();
 
   useEffect(() => {
@@ -27,7 +31,18 @@ const AcceptInvitationPage = () => {
 
   useEffect(() => {
     setHeaderTitle(["Invitation"]);
-  }, []);
+    setContentStyle({
+      margin: 0,
+      minHeight: "calc((var(--vh, 1vh) * 100) - 70px)",
+      overflow: "visible",
+      display: "flex",
+      background: "var(--background-color)",
+    });
+
+    return () => {
+      setContentStyle(defaultContentStyle);
+    };
+  }, [defaultContentStyle, setContentStyle, setHeaderTitle]);
   useEffect(() => {
     const getInvitation = async () => {
       try {

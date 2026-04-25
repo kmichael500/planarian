@@ -74,6 +74,14 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #region Invitations
 
+    [HttpGet("invitations")]
+    public async Task<ActionResult<IEnumerable<AcceptInvitationVm>>> GetPendingInvitations()
+    {
+        var result = await Service.GetPendingInvitationsForCurrentUser();
+
+        return new JsonResult(result);
+    }
+
     [HttpPost("invitations/{code:length(10)}/accept")]
     public async Task<ActionResult> AcceptInvitation(string code, CancellationToken cancellationToken)
     {

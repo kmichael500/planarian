@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Text.Json;
+using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -65,7 +67,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     "StartSel=<mark>,StopSel=</mark>,MaxWords=30,MinWords=10,MaxFragments=100,FragmentDelimiter= ...<br><br>"
                 ) // options
                 : null,
-            CountyId = e.County!.Id,
+            County = new SelectListItem<string>(e.County!.Name, e.County.Id),
             CountyDisplayId = e.County!.DisplayId,
             CountyNumber = e.CountyNumber,
             DisplayId =
@@ -108,7 +110,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     .Min()
                 : null,
             IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
-            ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
+            ReportedByTags = e.CaveReportedByNameTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
             Name = e.Name,
             LengthFeet = e.LengthFeet,
             DepthFeet = e.DepthFeet,
@@ -116,50 +119,58 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             NumberOfPits = e.NumberOfPits,
             ReportedOn = e.ReportedOn,
             IsArchived = e.IsArchived,
-            MapStatusTagIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
-            GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
-            BiologyTagIds = e.BiologyTags.Select(ee => ee.TagTypeId),
-            ArchaeologyTagIds = e.ArcheologyTags.Select(ee => ee.TagTypeId),
-            CartographerNameTagIds = e.CartographerNameTags.Select(ee => ee.TagTypeId),
-            GeologicAgeTagIds = e.GeologicAgeTags.Select(ee => ee.TagTypeId),
-            PhysiographicProvinceTagIds = e.PhysiographicProvinceTags.Select(ee => ee.TagTypeId),
-            OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
+            MapStatusTags = e.MapStatusTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            GeologyTags = e.GeologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            BiologyTags = e.BiologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            ArchaeologyTags = e.ArcheologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            CartographerNameTags = e.CartographerNameTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            GeologicAgeTags = e.GeologicAgeTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            PhysiographicProvinceTags = e.PhysiographicProvinceTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            OtherTags = e.CaveOtherTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
         });
 
-        var result = filterQuery.SortBy switch
+        var orderedQuery = filterQuery.SortBy switch
         {
-            nameof(CaveSearchVm.Name) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize,
-                e => e.Name, filterQuery.SortDescending),
-            nameof(CaveSearchVm.ReportedOn) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.ReportedOn, filterQuery.SortDescending),
-            nameof(CaveSearchVm.DepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.DepthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.LengthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.MaxPitDepthFeet) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.MaxPitDepthFeet, filterQuery.SortDescending),
-            nameof(CaveSearchVm.NumberOfPits) => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                filterQuery.PageSize, e => e.NumberOfPits, filterQuery.SortDescending),
+            nameof(CaveSearchVm.Name) => ApplyStableOrdering(caveSearchQuery, e => e.Name, filterQuery.SortDescending),
+            nameof(CaveSearchVm.ReportedOn) => ApplyStableOrdering(caveSearchQuery, e => e.ReportedOn,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.DepthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.DepthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.LengthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.MaxPitDepthFeet) => ApplyStableOrdering(caveSearchQuery, e => e.MaxPitDepthFeet,
+                filterQuery.SortDescending),
+            nameof(CaveSearchVm.NumberOfPits) => ApplyStableOrdering(caveSearchQuery, e => e.NumberOfPits,
+                filterQuery.SortDescending),
             nameof(CaveSearchVm.DisplayId) => filterQuery.SortDescending
-                ? await caveSearchQuery
+                ? caveSearchQuery
                     .OrderByDescending(e => e.CountyDisplayId)
                     .ThenByDescending(e => e.CountyNumber)
-                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize)
-                : await caveSearchQuery
+                : caveSearchQuery
                     .OrderBy(e => e.CountyDisplayId)
-                    .ThenBy(e => e.CountyNumber)
-                    .ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize),
+                    .ThenBy(e => e.CountyNumber),
             nameof(CaveSearchVm.DistanceMiles) => hasLocationForDistance
-                ? await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                    filterQuery.PageSize, e => e.DistanceMiles, !filterQuery.SortDescending)
-                : await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber,
-                    filterQuery.PageSize, e => e.LengthFeet, filterQuery.SortDescending),
-            _ => await caveSearchQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize, e => e.LengthFeet,
-                filterQuery.SortDescending)
+                ? ApplyStableOrdering(caveSearchQuery, e => e.DistanceMiles, !filterQuery.SortDescending)
+                : ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet, filterQuery.SortDescending),
+            _ => ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet, filterQuery.SortDescending)
         };
 
+        var result = await orderedQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize);
+
         return result;
+    }
+
+    private static IOrderedQueryable<CaveSearchVm> ApplyStableOrdering<TKey>(
+        IQueryable<CaveSearchVm> query,
+        Expression<Func<CaveSearchVm, TKey>> orderingExpression,
+        bool sortDescending)
+    {
+        return sortDescending
+            ? query.OrderByDescendingNullLast(orderingExpression).ThenBy(e => e.Id)
+            : query.OrderBy(orderingExpression).ThenBy(e => e.Id);
     }
 
     public async Task<List<CaveExportDto>> GetCavesForExport(FilterQuery filterQuery, string? permissionKey)
@@ -998,6 +1009,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.PhysiographicProvinceTags)
             .Include(e => e.CaveOtherTags)
             .Include(e => e.CaveReportedByNameTags)
+            .Include(e => e.Favorites)
             .Include(e => e.Files)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)
@@ -1028,6 +1040,172 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ToListAsync();
 
         return usedCountyNumbers.ToHashSet();
+    }
+
+    public async Task<List<ImportSyncCaveLookup>> GetImportSyncCaves()
+    {
+        return await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => e.AccountId == RequestUser.AccountId)
+            .Select(e => new ImportSyncCaveLookup(
+                e.Id,
+                e.StateId,
+                e.State.Abbreviation,
+                e.CountyId,
+                e.County.Name,
+                e.County.DisplayId,
+                e.CountyNumber,
+                e.Name,
+                e.AlternateNames,
+                e.LengthFeet,
+                e.DepthFeet,
+                e.MaxPitDepthFeet,
+                e.NumberOfPits,
+                e.Narrative,
+                e.ReportedOn,
+                e.IsArchived,
+                e.GeologyTags.Select(tag => tag.TagTypeId),
+                e.GeologicAgeTags.Select(tag => tag.TagTypeId),
+                e.MapStatusTags.Select(tag => tag.TagTypeId),
+                e.PhysiographicProvinceTags.Select(tag => tag.TagTypeId),
+                e.ArcheologyTags.Select(tag => tag.TagTypeId),
+                e.BiologyTags.Select(tag => tag.TagTypeId),
+                e.CaveOtherTags.Select(tag => tag.TagTypeId),
+                e.CartographerNameTags.Select(tag => tag.TagTypeId),
+                e.CaveReportedByNameTags.Select(tag => tag.TagTypeId)))
+            .ToListAsync();
+    }
+
+    public async Task BulkUpdateImportCaves(List<Cave> caves, CancellationToken cancellationToken)
+    {
+        if (!caves.Any()) return;
+
+        var scopedCaveIds = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caves.Select(ee => ee.Id).Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        var scopedCaves = caves.Where(e => scopedCaveIds.Contains(e.Id)).ToList();
+        if (!scopedCaves.Any()) return;
+
+        var config = new BulkConfig
+        {
+            PropertiesToInclude = new List<string>
+            {
+                nameof(Cave.Name),
+                nameof(Cave.AlternateNames),
+                nameof(Cave.CountyId),
+                nameof(Cave.CountyNumber),
+                nameof(Cave.StateId),
+                nameof(Cave.LengthFeet),
+                nameof(Cave.DepthFeet),
+                nameof(Cave.MaxPitDepthFeet),
+                nameof(Cave.NumberOfPits),
+                nameof(Cave.Narrative),
+                nameof(Cave.ReportedOn),
+                nameof(Cave.IsArchived)
+            }
+        };
+
+        await DbContext.BulkUpdateAsync(scopedCaves, config, cancellationToken: cancellationToken);
+    }
+
+    public async Task DeleteImportSyncCaveTags(List<string> caveIds, CancellationToken cancellationToken)
+    {
+        if (!caveIds.Any()) return;
+
+        var scopedCaveIds = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => caveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        if (!scopedCaveIds.Any()) return;
+
+        await DbContext.Set<GeologyTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<GeologicAgeTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<MapStatusTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<PhysiographicProvinceTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<ArcheologyTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<BiologyTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<CaveOtherTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<CartographerNameTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Set<CaveReportedByNameTag>()
+            .Where(e => scopedCaveIds.Contains(e.CaveId))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task DeleteImportSyncCave(string caveId,
+        List<Planarian.Model.Database.Entities.RidgeWalker.File> deferredFileDeletes,
+        CancellationToken cancellationToken)
+    {
+        var cave = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
+            .Include(e => e.Files)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (cave == null) throw ApiExceptionDictionary.NotFound(nameof(cave.Id));
+
+        var entranceIds = await DbContext.Entrances
+            .IgnoreQueryFilters()
+            .Where(e => e.CaveId == caveId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        await DbContext.CaveGeoJsons
+            .Where(e => e.CaveId == caveId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (entranceIds.Any())
+        {
+            await DbContext.EntranceStatusTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceHydrologyTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.FieldIndicationTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceReportedByNameTags
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.EntranceOtherTag
+                .Where(e => entranceIds.Contains(e.EntranceId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await DbContext.Entrances
+                .IgnoreQueryFilters()
+                .Where(e => entranceIds.Contains(e.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        await DeleteImportSyncCaveTags([caveId], cancellationToken);
+        await DbContext.Favorites
+            .Where(e => e.CaveId == caveId && e.AccountId == RequestUser.AccountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        deferredFileDeletes.AddRange(cave.Files);
+
+        DbContext.Caves.Remove(cave);
+        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);
@@ -1125,3 +1303,29 @@ public class CaveRepository : CaveRepository<PlanarianDbContext>
 }
 
 public record UsedCountyNumber(string CountyId, int CountyNumber);
+public record ImportSyncCaveLookup(
+    string Id,
+    string StateId,
+    string StateAbbreviation,
+    string CountyId,
+    string CountyName,
+    string CountyDisplayId,
+    int CountyNumber,
+    string Name,
+    string? AlternateNames,
+    double? LengthFeet,
+    double? DepthFeet,
+    double? MaxPitDepthFeet,
+    int? NumberOfPits,
+    string? Narrative,
+    DateTime? ReportedOn,
+    bool IsArchived,
+    IEnumerable<string> GeologyTagIds,
+    IEnumerable<string> GeologicAgeTagIds,
+    IEnumerable<string> MapStatusTagIds,
+    IEnumerable<string> PhysiographicProvinceTagIds,
+    IEnumerable<string> ArcheologyTagIds,
+    IEnumerable<string> BiologyTagIds,
+    IEnumerable<string> OtherTagIds,
+    IEnumerable<string> CartographerNameTagIds,
+    IEnumerable<string> ReportedByNameTagIds);

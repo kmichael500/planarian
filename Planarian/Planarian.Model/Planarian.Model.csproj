@@ -18,6 +18,10 @@
         <ProjectReference Include="..\Planarian.Library\Planarian.Library.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="Database\Views\*.sql"
+                          LogicalName="Planarian.Model.Database.Views.%(Filename)%(Extension)" />
+    </ItemGroup>
 
     <ItemGroup>
         <Folder Include="Shared\Exceptions\" />

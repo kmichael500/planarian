@@ -2,6 +2,7 @@ import {
   capitalizeFirstLetter,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 export interface CaveSearchVm {
   id: string;
@@ -13,7 +14,7 @@ export interface CaveSearchVm {
   lengthFeet: number | null;
   maxPitDepthFeet: number | null;
   numberOfPits: number | null;
-  countyId: string;
+  county: SelectListItem<string>;
   countyDisplayId: string;
   countyNumber: number;
   displayId: string;
@@ -21,15 +22,15 @@ export interface CaveSearchVm {
   primaryEntranceLongitude: number | null;
   primaryEntranceElevationFeet: number | null;
   distanceMiles: number | null;
-  archaeologyTagIds: string[];
-  biologyTagIds: string[];
-  cartographerNameTagIds: string[];
-  geologicAgeTagIds: string[];
-  geologyTagIds: string[];
-  mapStatusTagIds: string[];
-  otherTagIds: string[];
-  physiographicProvinceTagIds: string[];
-  reportedByTagIds: string[];
+  archaeologyTags: SelectListItem<string>[];
+  biologyTags: SelectListItem<string>[];
+  cartographerNameTags: SelectListItem<string>[];
+  geologicAgeTags: SelectListItem<string>[];
+  geologyTags: SelectListItem<string>[];
+  mapStatusTags: SelectListItem<string>[];
+  otherTags: SelectListItem<string>[];
+  physiographicProvinceTags: SelectListItem<string>[];
+  reportedByTags: SelectListItem<string>[];
   isFavorite: boolean;
 }
 

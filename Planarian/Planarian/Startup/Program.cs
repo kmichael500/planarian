@@ -20,6 +20,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Archive.Services;
+using Planarian.Modules.Account.Import.Services;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
@@ -29,7 +30,6 @@ using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Services;
-using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Repositories;
@@ -41,6 +41,8 @@ using Planarian.Modules.Notifications.Hubs;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
 using Planarian.Modules.Photos.Services;
+using Planarian.Modules.PlanarianSettings.Repositories;
+using Planarian.Modules.PlanarianSettings.Services;
 using Planarian.Modules.Projects.Repositories;
 using Planarian.Modules.Projects.Services;
 using Planarian.Modules.Settings.Repositories;
@@ -188,6 +190,7 @@ builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<AuthCookieService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
+builder.Services.AddScoped<ChunkedUploadService>();
 builder.Services.AddScoped<ThrottleEventLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
@@ -195,6 +198,7 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
@@ -228,6 +232,7 @@ builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped(typeof(AccountRepository<>));
+builder.Services.AddScoped<PlanarianSettingsRepository>();
 builder.Services.AddScoped<PermissionRepository>();
 builder.Services.AddScoped<CaveRepository>();
 builder.Services.AddScoped(typeof(CaveRepository<>));
@@ -261,17 +266,29 @@ builder.Services.AddSignalR()
 
 builder.Services.AddDbContext<PlanarianDbContext>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 });
 
 builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 }, ServiceLifetime.Scoped);
 
 builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
 {
-    options.UseNpgsql(serverOptions.SqlConnectionString, e => e.UseNetTopologySuite());
+    options.UseNpgsql(serverOptions.SqlConnectionString, e =>
+    {
+        e.MigrationsAssembly("Planarian.Migrations");
+        e.UseNetTopologySuite();
+    });
 });
 
 LinqToDBForEFTools.Initialize();
@@ -388,7 +405,9 @@ builder.Services.AddRateLimiter(options =>
             StatusCodes.Status429TooManyRequests,
             "Rate limit exceeded. Please try again later.",
             ApiExceptionType.TooManyRequests,
-            headers: headers);
+            headers: headers,
+            showContactInfo: true,
+            serverOptions: serverOptions);
     };
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         httpContext.RequestServices.GetRequiredService<RequestThrottleService>()

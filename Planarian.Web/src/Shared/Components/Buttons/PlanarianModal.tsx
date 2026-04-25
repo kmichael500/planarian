@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Grid, Space, Spin } from "antd";
+import { Grid, Space } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 
@@ -130,6 +130,7 @@ export function PlanarianModal({
 
   return (
     <dialog
+      className="planarian-modal"
       ref={dialogRef}
       onClick={handleDialogClick}
       style={{
@@ -150,6 +151,9 @@ export function PlanarianModal({
         padding: 0,
         overflow: "hidden",
         zIndex: 9999,
+        background: "var(--modal-background)",
+        color: "var(--text-color)",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.35)",
       }}
     >
       <style>
@@ -167,8 +171,10 @@ export function PlanarianModal({
       <header
         style={{
           padding: "1rem",
-          borderBottom: "1px solid #ddd",
+          borderBottom: "1px solid var(--border-color)",
           flexShrink: 0,
+          background: "var(--surface-color)",
+          color: "var(--text-color)",
         }}
       >
         <div
@@ -202,6 +208,8 @@ export function PlanarianModal({
           flex: 1,
           overflowY: "auto",
           padding: "1rem",
+          background: "var(--modal-background)",
+          color: "var(--text-color)",
         }}
       >
         {shouldRenderChildren && children}
@@ -211,9 +219,11 @@ export function PlanarianModal({
         <footer
           style={{
             padding: "1rem",
-            borderTop: "1px solid #ddd",
+            borderTop: "1px solid var(--border-color)",
             flexShrink: 0,
             width: "100%",
+            background: "var(--surface-color)",
+            color: "var(--text-color)",
           }}
         >
           {footerStyle ? (

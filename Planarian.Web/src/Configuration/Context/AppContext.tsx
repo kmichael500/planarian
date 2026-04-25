@@ -10,6 +10,7 @@ import { AccountService } from "../../Modules/Account/Services/AccountService";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { BrowserLoginVm } from "../../Modules/Authentication/Models/BrowserLoginVm";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { UserService } from "../../Modules/User/UserService";
 import {
   AppInitializeCurrentUserVm,
   AppInitializeVm,
@@ -55,15 +56,20 @@ interface AppContextProps {
   defaultContentStyle: React.CSSProperties;
   contentStyle: React.CSSProperties | null;
   setContentStyle: (style: React.CSSProperties) => void;
+  setContentStyleOverrides: (style: React.CSSProperties) => void;
+  setFullHeightContentStyle: (style?: React.CSSProperties) => void;
+  resetContentStyle: () => void;
+  pendingInvitationCount: number;
+  refreshPendingInvitations: () => Promise<void>;
 }
-
-const defaultContentStyle = {
-  margin: "16px",
-} as React.CSSProperties;
 
 const defaultFeaturePermissions: FeaturePermissions = {
   visibleFields: [],
 };
+
+const defaultContentStyle = {
+  margin: "16px",
+} as React.CSSProperties;
 
 export const AppContext = createContext<AppContextProps>({
   isAuthenticated: false,
@@ -74,23 +80,28 @@ export const AppContext = createContext<AppContextProps>({
   accountIds: [],
   hasPermission: () => false,
   permissions: defaultFeaturePermissions,
-  setPermissions: () => { },
-  setHeaderTitle: () => { },
+  setPermissions: () => {},
+  setHeaderTitle: () => {},
   headerTitle: ["", ""],
   headerButtons: [],
-  setHeaderButtons: () => { },
+  setHeaderButtons: () => {},
   hideBodyPadding: false,
-  setHideBodyPadding: () => { },
+  setHideBodyPadding: () => {},
   isInitialized: false,
   isLoading: true,
   initializedError: null,
-  refreshSession: async () => { },
-  login: async () => { },
-  logout: async () => { },
-  switchAccount: () => { },
+  refreshSession: async () => {},
+  login: async () => {},
+  logout: async () => {},
+  switchAccount: () => {},
   defaultContentStyle,
   contentStyle: null,
-  setContentStyle: () => { },
+  setContentStyle: () => {},
+  setContentStyleOverrides: () => {},
+  setFullHeightContentStyle: () => {},
+  resetContentStyle: () => {},
+  pendingInvitationCount: 0,
+  refreshPendingInvitations: async () => {},
 });
 
 interface AppProviderProps {
@@ -114,6 +125,8 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
     useState<ApiErrorResponse | null>(null);
+  const [pendingInvitationCount, setPendingInvitationCount] =
+    useState<number>(0);
   const [contentStyle, setContentStyle] = useState<React.CSSProperties | null>(
     defaultContentStyle
   );
@@ -124,7 +137,43 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setAccountIds([]);
     setPermissionKeys([]);
     setPermissions(defaultFeaturePermissions);
+    setPendingInvitationCount(0);
     AuthenticationService.ClearRuntimeSession();
+  }, []);
+
+  const setContentStyleOverrides = useCallback(
+    (style: React.CSSProperties) => {
+      setContentStyle({
+        ...defaultContentStyle,
+        ...style,
+      });
+    },
+    []
+  );
+
+  const setFullHeightContentStyle = useCallback(
+    (style?: React.CSSProperties) => {
+      setContentStyleOverrides({
+        display: "flex",
+        overflow: "hidden",
+        ...style,
+      });
+    },
+    [setContentStyleOverrides]
+  );
+
+  const resetContentStyle = useCallback(() => {
+    setContentStyle(defaultContentStyle);
+  }, []);
+
+  const refreshPendingInvitations = useCallback(async () => {
+    if (!AuthenticationService.IsAuthenticated()) {
+      setPendingInvitationCount(0);
+      return;
+    }
+
+    const pendingInvitations = await UserService.GetPendingInvitations();
+    setPendingInvitationCount(pendingInvitations.length);
   }, []);
 
   const loadSession = useCallback(
@@ -155,27 +204,33 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   );
 
   const applySessionState = useCallback(
-    async (appOptions: AppInitializeVm): Promise<AppInitializeVm> => {
+    async (appOptions: AppInitializeVm): Promise<void> => {
       const isAuthenticated = appOptions.currentUser != null;
       const resolvedCurrentAccountId =
         appOptions.currentUser?.currentAccountId ?? null;
-
-      const featureSettings = isAuthenticated
-        ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
-        : [];
 
       AuthenticationService.SyncSession(appOptions.currentUser);
       setCurrentUser(appOptions.currentUser);
       setCurrentAccountId(resolvedCurrentAccountId);
       setAccountIds(appOptions.accountIds);
       setPermissionKeys(appOptions.permissions);
+
+      const featureSettings =
+        isAuthenticated && resolvedCurrentAccountId
+          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
+          : [];
       setPermissions({ visibleFields: featureSettings });
+
+      if (isAuthenticated) {
+        await refreshPendingInvitations();
+      } else {
+        setPendingInvitationCount(0);
+      }
+
       setInitializedError(null);
       setIsInitialized(true);
-
-      return appOptions;
     },
-    []
+    [refreshPendingInvitations]
   );
 
   const refreshSession = useCallback(
@@ -238,7 +293,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   useEffect(() => {
     const unregister = AuthenticationService.RegisterUnauthorizedHandler(() => {
       AuthenticationService.ResetAccountId();
-
       clearSessionState();
       setInitializedError(null);
       setIsInitialized(true);
@@ -263,7 +317,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, [clearSessionState]);
 
   useEffect(() => {
-    void refreshSession().catch(() => { });
+    void refreshSession().catch(() => {});
   }, [refreshSession]);
 
   const currentAccountName = useMemo(() => {
@@ -317,9 +371,14 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         login,
         logout,
         switchAccount,
+        defaultContentStyle,
         contentStyle,
         setContentStyle,
-        defaultContentStyle,
+        setContentStyleOverrides,
+        setFullHeightContentStyle,
+        resetContentStyle,
+        pendingInvitationCount,
+        refreshPendingInvitations,
       }}
     >
       {props.children}

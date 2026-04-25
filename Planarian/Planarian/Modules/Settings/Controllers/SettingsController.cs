@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Services;
+using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Settings.Controllers;
@@ -77,6 +79,20 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
         var users = await Service.GetUsers();
 
         return new JsonResult(users);
+    }
+
+    [HttpGet("chunked-uploader")]
+    public ActionResult<ChunkedUploaderConfigVm> GetChunkedUploaderConfig()
+    {
+        return new JsonResult(Service.GetChunkedUploaderConfig());
+    }
+
+    [HttpGet("users/{userId:length(10)}")]
+    public async Task<ActionResult<NameProfilePhotoVm>> GetUsersName(string userId)
+    {
+        var userNameProfilePhoto = await Service.GetUsersName(userId);
+
+        return new JsonResult(userNameProfilePhoto);
     }
 
     #endregion

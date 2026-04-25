@@ -15,9 +15,9 @@ using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
-using Planarian.Modules.FeatureSettings.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
@@ -467,10 +467,10 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
         var isNew = string.IsNullOrWhiteSpace(values.Id);
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
 
 
         #region Data Validation
@@ -818,7 +818,7 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
-        IDbContextTransaction? transaction = null)
+        IDbContextTransaction? transaction = null, List<File>? deferredFileDeletes = null)
     {
         var outsideTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
@@ -830,7 +830,16 @@ public class CaveService : ServiceBase<CaveRepository>
             var entity = await Repository.GetAsync(caveId);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
-            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
+
+            var geoJsons = await Repository.GetCaveGeoJsonsAsync(caveId);
+            foreach (var geoJson in geoJsons)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.RemoveCaveGeoJson(geoJson);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
 
             foreach (var entrance in entity.Entrances)
             {
@@ -953,6 +962,14 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
+            foreach (var favorite in entity.Favorites)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(favorite);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+
             files = entity.Files.ToList();
 
             Repository.Delete(entity);
@@ -977,7 +994,14 @@ public class CaveService : ServiceBase<CaveRepository>
 
         if (isSuccessful)
         {
-            foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+            if (deferredFileDeletes != null)
+            {
+                deferredFileDeletes.AddRange(files);
+            }
+            else
+            {
+                foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+            }
         }
     }
 
@@ -987,7 +1011,7 @@ public class CaveService : ServiceBase<CaveRepository>
         var entity = await Repository.GetAsync(caveId);
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
 
 
         entity.IsArchived = true;
@@ -999,7 +1023,7 @@ public class CaveService : ServiceBase<CaveRepository>
         var entity = await Repository.GetAsync(caveId);
 
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
 
         entity.IsArchived = false;
         await Repository.SaveChangesAsync();
@@ -1070,7 +1094,7 @@ public class CaveService : ServiceBase<CaveRepository>
         if (cave == null)
             throw ApiExceptionDictionary.NotFound("Cave");
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId, cave.StateId);
 
         foreach (var oldGeoJson in cave.GeoJsons.ToList())
         {

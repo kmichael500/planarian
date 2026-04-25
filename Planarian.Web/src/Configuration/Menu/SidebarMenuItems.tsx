@@ -1,18 +1,19 @@
-import { Divider } from "antd";
-import { Link } from "react-router-dom";
-import { PlanarianMenuItem } from "./PlanarianMenuComponent";
 import {
-  LoginOutlined,
-  UserAddOutlined,
-  DatabaseOutlined,
-  SettingOutlined,
-  ImportOutlined,
   CompassOutlined,
+  ControlOutlined,
+  DatabaseOutlined,
+  ImportOutlined,
+  LoginOutlined,
+  SettingOutlined,
+  UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
+import { Divider } from "antd";
 import { useContext, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { AppContext } from "../Context/AppContext";
+import { PlanarianMenuItem } from "./PlanarianMenuComponent";
 
 const useSideBarMenuItems = () => {
   const { currentAccountId } = useContext(AppContext);
@@ -74,6 +75,16 @@ const useSideBarMenuItems = () => {
             permissionKey: PermissionKey.Admin,
           },
         ],
+      },
+      {
+        key: "/planarian-settings",
+        icon: (
+          <Link to="/planarian-settings">
+            <ControlOutlined />
+          </Link>
+        ),
+        label: "Planarian Settings",
+        permissionKey: PermissionKey.PlanarianAdmin,
       },
       {
         icon: <Divider />,

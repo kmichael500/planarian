@@ -918,13 +918,14 @@ const LayerControl: React.FC<{
 
 const ControlPanel = styled.div`
   position: absolute;
-  background: #fff;
+  background: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 8px;
   margin: 20px;
   font-size: 13px;
   line-height: 2;
-  color: #6b6b76;
   border-radius: 8px;
   outline: none;
   transition: all 0.3s ease;
@@ -942,6 +943,12 @@ const HoverIcon = styled.div`
   width: 28px;
   height: 24px;
   cursor: pointer;
+  color: var(--text-color);
+
+  svg {
+    fill: currentColor;
+  }
+
   ${ControlPanel}:hover &,
   ${LegendPanel}:hover & {
     display: none;

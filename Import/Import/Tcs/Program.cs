@@ -6,25 +6,113 @@ using Tcs;
 
 public partial class Program
 {
+    private static readonly Dictionary<string, string> GeologyCanonicalNames =
+        new(StringComparer.InvariantCultureIgnoreCase)
+        {
+            ["Monteagle Ls"] = "Monteagle Limestone",
+            ["Monteagle"] = "Monteagle Limestone",
+            ["Hartselle"] = "Hartselle Formation",
+            ["Bangor"] = "Bangor Limestone",
+            ["Warsaw Ls"] = "Warsaw Limestone",
+            ["St Louis Ls"] = "St Louis Limestone",
+            ["St Louis"] = "St Louis Limestone",
+            ["Pennington"] = "Pennington Formation",
+            ["Bigby-Canon Limestone"] = "Bigby-Cannon Limestone",
+            ["Bigby-Cannon Ls"] = "Bigby-Cannon Limestone",
+            ["Leipers-Catheys Fm"] = "Leipers-Catheys Formation",
+            ["Leipers-Catheys"] = "Leipers-Catheys Formation",
+            ["Chepultepec Do"] = "Chepultepec Dolomite",
+            ["Chepultepec"] = "Chepultepec Dolomite",
+            ["Blackford Fm"] = "Blackford Formation",
+            ["Eidson Member of Lincolnshire Fm"] = "Eidson Member of Lincolnshire Formation",
+            ["Hardin SS"] = "Hardin Sandstone",
+            ["Lincoinshire Formation"] = "Lincolnshire Formation",
+            ["Brassfield Formation"] = "Brassfield Limestone",
+            ["Leipers"] = "Leipers Formation",
+            ["Leipers Limestone"] = "Leipers Formation",
+            ["Longview"] = "Longview Dolomite",
+            ["Kingsport"] = "Kingsport Dolomite",
+            ["Fort Payne"] = "Fort Payne Formation",
+            ["Fernvale"] = "Fernvale Limestone",
+            ["Fervale"] = "Fernvale Limestone",
+            ["Arnheim"] = "Arnheim Formation",
+            ["Laurel"] = "Laurel Limestone",
+            ["Raccoon Mountain"] = "Raccoon Mountain Formation"
+        };
+
+    private static readonly Dictionary<string, string> GroupedGeologyCanonicalNames =
+        new(StringComparer.InvariantCultureIgnoreCase)
+        {
+            ["Hurricance Bridge and Woodway Limestones Undivid"] =
+                "Hurricane Bridge & Woodway Limestones Undivided",
+            ["Chepultepec, Longview and Newala Dols. Undiff."] =
+                "Chepultepec & Longview & Newala Dolomites Undifferentiated",
+            ["Kingsport, Longview, Chepultepec Undifferentiated"] =
+                "Kingsport & Longview & Chepultepec Undifferentiated",
+            ["Jonesboro, Mosheim, Lenoir Ls Undivided"] =
+                "Jonesboro & Mosheim & Lenoir Limestones Undivided",
+            ["Crooked Fork Group and Rockcastle Undiff."] =
+                "Crooked Fork Group & Rockcastle Undifferentiated",
+            ["Vandever, Newton, and Whitwell Formation, Undiff"] =
+                "Vandever & Newton & Whitwell Formation Undifferentiated",
+            ["Fort Payne Formation and Hardin SS and Wayne Group"] =
+                "Fort Payne Formation & Hardin Sandstone & Wayne Group",
+            ["Devonian and Silurian Undifferentiated"] =
+                "Devonian & Silurian Undifferentiated"
+        };
+
+    private static readonly Dictionary<string, string> GeologicAgeCanonicalNames =
+        new(StringComparer.InvariantCultureIgnoreCase)
+        {
+            ["Miss"] = "Mississippian",
+            ["Dev"] = "Devonian",
+            ["Devon"] = "Devonian",
+            ["Ord"] = "Ordovician",
+            ["Ordov"] = "Ordovician",
+            ["Penn"] = "Pennsylvanian",
+            ["Sil"] = "Silurian"
+        };
+
+    private static readonly Dictionary<string, string> GroupedGeologicAgeCanonicalNames =
+        new(StringComparer.InvariantCultureIgnoreCase)
+        {
+            ["Dev & Sil Und"] = "Devonian & Silurian Undifferentiated"
+        };
+
+    private static readonly Dictionary<string, string> PhysiographicProvinceCanonicalNames =
+        new(StringComparer.InvariantCultureIgnoreCase)
+        {
+            ["Sequatchie  Valley"] = "Sequatchie Valley",
+            ["Unaka Mtns & Blue Ridge"] = "Unaka Mountains & Blue Ridge",
+            ["Gulf & Atlantic Costal Plains Undiff."] = "Gulf & Atlantic Coastal Plains Undifferentiated"
+        };
+
+    internal enum TagSeparatorPolicy
+    {
+        CommaOnly,
+        Geology,
+        GeologicAge
+    }
+
     public static void Main()
     {
         const string filePath = "/Users/michaelketzner/Downloads/TCSnarr.csv";
         var extractedRecords = ReadCavesFromCsv(filePath);
-        
+
         var (caveRecords, entranceRecords) = SplitCaveRecords(extractedRecords);
-        
+
         // cave records contain the primary entrance, the entranceRecords contains the other entrances
         var allEntranceRecords = caveRecords.Concat(entranceRecords);
-        
+
         var planarianCaveRecords = ExtractCaveRecords(caveRecords);
-        
+
         var planarianEntranceRecords = ExtractEntranceRecords(allEntranceRecords);
-        
+
         WriteCsvFile("/Users/michaelketzner/Downloads/planarianCaveRecords.csv", planarianCaveRecords);
         WriteCsvFile("/Users/michaelketzner/Downloads/planarianEntranceRecords.csv", planarianEntranceRecords);
-        
+
     }
-    
+
     private static void WriteCsvFile<T>(string filePath, IEnumerable<T> records)
     {
         using var writer = new StreamWriter(filePath);
@@ -50,17 +138,18 @@ public partial class Program
             }
 
             var mapStatuses = cave.MapStatus;
-            var geology = ExtractTags((null, cave.CaveGeology));
-            var geologyAge = ExtractTags((null, cave.GeologicalAge));
+            var geology = ExtractGeologyTags(cave.CaveGeology);
+            var geologyAge = ExtractGeologicAgeTags(cave.GeologicalAge);
 
-            var physiographicProvinces = cave.PhysiographicProvince;
-            var reportedOnDate = ExtractReportedOnDate(cave.Narrative);
-            var reportedBy = ExtractReportedBy(cave.Narrative);
+            var physiographicProvinces = NormalizePhysiographicProvince(cave.PhysiographicProvince);
+            var narrative = TrimBoundaryWhitespace(cave.Narrative);
+            var reportedOnDate = ExtractReportedOnDate(narrative);
+            var reportedBy = ExtractReportedBy(narrative);
 
             #region TCS Specific Tags
 
             var otherTags =
-                ExtractTags(("Gear", cave.RequiredGear), ("Entrance Type", cave.EntranceType));
+                ExtractCommaSeparatedTags(("Gear", cave.RequiredGear));
 
             #endregion
 
@@ -78,7 +167,7 @@ public partial class Program
                 CaveDepthFt = cave.DepthFt,
                 MaxPitDepthFt = cave.PitDepthFt,
                 NumberOfPits = cave.NumberOfPits,
-                Narrative = cave.Narrative,
+                Narrative = narrative,
                 Geology = geology,
                 GeologicAges = geologyAge,
                 PhysiographicProvinces = physiographicProvinces,
@@ -113,7 +202,7 @@ public partial class Program
 
             // entrance number will be empty/null if it is the cave record, which is the primary entrance
             var isPrimaryEntrance = string.IsNullOrWhiteSpace(entranceNumberPart);
-           
+
 
             var countyCode = new string(tcsNumber?.TakeWhile(char.IsLetter).ToArray());
             var countyNumberStr = new string(tcsNumber?.SkipWhile(char.IsLetter).ToArray());
@@ -129,9 +218,11 @@ public partial class Program
             #region TCS Specific Tags
 
             var ownershipTags =
-                ExtractTags((null, entrance.Ownership));
+                ExtractCommaSeparatedTags((null, entrance.Ownership));
 
-            var fieldIndicationTags = ExtractTags((null, entrance.FieldIndication));
+            var fieldIndicationTags = ExtractCommaSeparatedTags(
+                (null, entrance.FieldIndication),
+                (null, entrance.EntranceType));
 
 
             #endregion
@@ -167,33 +258,96 @@ public partial class Program
     {
         return null;
     }
-    
+
     private static string? ExtractReportedBy(string? narrative)
     {
         return null;
     }
 
-    private static string ExtractTags(params (string? prefix, string? input)[] inputs)
+    private static string? TrimBoundaryWhitespace(string? value)
+    {
+        return value?.Trim();
+    }
+
+    internal static string ExtractGeologyTags(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return string.Empty;
+        }
+
+        var normalizedInput = NormalizeGeologyInput(input);
+
+        if (IsGroupedGeologyUnit(normalizedInput))
+        {
+            return NormalizeGroupedGeologyTag(normalizedInput);
+        }
+
+        return ExtractTags(TagSeparatorPolicy.Geology, (null, normalizedInput));
+    }
+
+    internal static string ExtractGeologicAgeTags(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return string.Empty;
+        }
+
+        var normalizedInput = NormalizeGeologicAgeInput(input);
+
+        if (IsGroupedGeologicAgeUnit(normalizedInput))
+        {
+            return NormalizeGroupedGeologicAgeTag(normalizedInput);
+        }
+
+        return ExtractTags(TagSeparatorPolicy.GeologicAge, (null, normalizedInput));
+    }
+
+    internal static string ExtractCommaSeparatedTags(params (string? prefix, string? input)[] inputs)
+    {
+        return ExtractTags(TagSeparatorPolicy.CommaOnly, inputs);
+    }
+
+    internal static string? NormalizePhysiographicProvince(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return input;
+        }
+
+        var normalizedInput = Regex.Replace(input.Trim(), @"\s+", " ");
+
+        if (PhysiographicProvinceCanonicalNames.TryGetValue(input.Trim(), out var canonicalName))
+        {
+            return canonicalName;
+        }
+
+        if (PhysiographicProvinceCanonicalNames.TryGetValue(normalizedInput, out canonicalName))
+        {
+            return canonicalName;
+        }
+
+        return normalizedInput;
+    }
+
+    private static string ExtractTags(TagSeparatorPolicy separatorPolicy, params (string? prefix, string? input)[] inputs)
     {
         var tagsList = new List<string>();
-        string[] separators = { ",", "and", "&", "AND" };
+        var seenTags = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 
         foreach (var (prefix, input) in inputs)
         {
             if (string.IsNullOrWhiteSpace(input))
                 continue;
 
-            // Split the input using the separators
-            var tags = input.Split(separators, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var tag in tags)
+            foreach (var tag in SplitTags(input, separatorPolicy))
             {
-                var trimmedTag = tag.Trim();
+                var trimmedTag = NormalizeTag(tag, separatorPolicy);
                 if (!string.IsNullOrWhiteSpace(prefix))
                 {
                     trimmedTag = $"{prefix}: {trimmedTag}";
                 }
-                if (!string.IsNullOrWhiteSpace(trimmedTag))
+                if (!string.IsNullOrWhiteSpace(trimmedTag) && seenTags.Add(trimmedTag))
                 {
                     tagsList.Add(trimmedTag);
                 }
@@ -201,6 +355,129 @@ public partial class Program
         }
 
         return string.Join(", ", tagsList);
+    }
+
+    private static string NormalizeTag(string input, TagSeparatorPolicy separatorPolicy)
+    {
+        var normalizedTag = Regex.Replace(input.Trim(), @"\s+", " ");
+
+        if (separatorPolicy == TagSeparatorPolicy.Geology)
+        {
+            normalizedTag = NormalizeGeologyTag(normalizedTag);
+        }
+        else if (separatorPolicy == TagSeparatorPolicy.GeologicAge)
+        {
+            normalizedTag = NormalizeGeologicAgeTag(normalizedTag);
+        }
+        else if (normalizedTag.Equals("Artifical Tunnel", StringComparison.InvariantCultureIgnoreCase))
+        {
+            normalizedTag = "Artificial Tunnel";
+        }
+        else if (normalizedTag.Equals("Large, walk-in", StringComparison.InvariantCultureIgnoreCase))
+        {
+            normalizedTag = "Large/Walk-in";
+        }
+
+        return normalizedTag;
+    }
+
+    private static string NormalizeGeologyTag(string input)
+    {
+        var normalized = input.Trim();
+
+        if (GeologyCanonicalNames.TryGetValue(normalized, out var canonicalName))
+        {
+            return canonicalName;
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeGeologicAgeTag(string input)
+    {
+        if (GeologicAgeCanonicalNames.TryGetValue(input.Trim(), out var canonicalName))
+        {
+            return canonicalName;
+        }
+
+        return input.Trim();
+    }
+
+    private static string NormalizeGroupedGeologyTag(string input)
+    {
+        var lookupKey = Regex.Replace(input, @"\s*&\s*", " and ");
+
+        if (GroupedGeologyCanonicalNames.TryGetValue(lookupKey, out var canonicalName))
+        {
+            return canonicalName;
+        }
+
+        return input;
+    }
+
+    private static string NormalizeGroupedGeologicAgeTag(string input)
+    {
+        if (GroupedGeologicAgeCanonicalNames.TryGetValue(input, out var canonicalName))
+        {
+            return canonicalName;
+        }
+
+        return input;
+    }
+
+    private static string NormalizeGeologyInput(string input)
+    {
+        var normalized = Regex.Replace(input.Trim(), @"\s+", " ");
+        normalized = Regex.Replace(normalized, @"\s*,\s*", ", ");
+        normalized = Regex.Replace(normalized, @"\s*&\s*", " & ");
+        normalized = Regex.Replace(normalized, @"\s+and\s+", " and ", RegexOptions.IgnoreCase);
+
+        return normalized;
+    }
+
+    private static string NormalizeGeologicAgeInput(string input)
+    {
+        var normalized = Regex.Replace(input.Trim(), @"\s+", " ");
+        normalized = Regex.Replace(normalized, @"\s*,\s*", ", ");
+        normalized = Regex.Replace(normalized, @"\s*&\s*", " & ");
+        normalized = Regex.Replace(normalized, @"\s+and\s+", " & ", RegexOptions.IgnoreCase);
+
+        return normalized;
+    }
+
+    private static bool IsGroupedGeologyUnit(string input)
+    {
+        return GroupedGeologySuffixRegex().IsMatch(input) &&
+               (input.Contains(',') || input.Contains('&') || GeologyAndSeparatorRegex().IsMatch(input));
+    }
+
+    private static bool IsGroupedGeologicAgeUnit(string input)
+    {
+        return GroupedGeologicAgeCanonicalNames.ContainsKey(input);
+    }
+
+    private static IEnumerable<string> SplitTags(string input, TagSeparatorPolicy separatorPolicy)
+    {
+        var tags = input
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .AsEnumerable();
+
+        if (separatorPolicy == TagSeparatorPolicy.Geology)
+        {
+            tags = tags
+                .SelectMany(tag => tag.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .SelectMany(tag => GeologyAndSeparatorRegex()
+                    .Split(tag)
+                    .Where(part => !string.IsNullOrWhiteSpace(part))
+                    .Select(part => part.Trim()));
+        }
+        else if (separatorPolicy == TagSeparatorPolicy.GeologicAge)
+        {
+            tags = tags
+                .SelectMany(tag => tag.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        return tags;
     }
 
     private static List<CaveRecord> ReadCavesFromCsv(string filePath)
@@ -212,9 +489,9 @@ public partial class Program
         using var reader = new StreamReader(filePath);
         using var csv = new CsvReader(reader, config);
         csv.Context.RegisterClassMap<CaveRecordMap>();
-        return [..csv.GetRecords<CaveRecord>()];
+        return [.. csv.GetRecords<CaveRecord>()];
     }
-    
+
     public static (List<CaveRecord> caveRecords, List<CaveRecord> entranceRecords) SplitCaveRecords(List<CaveRecord> caveRecords)
     {
         var regex = CaveIdRegex();
@@ -255,6 +532,11 @@ public partial class Program
     private static partial Regex CaveIdRegex();
 
     [GeneratedRegex(@"^[A-Z]{2}\d+")]
-
     private static partial Regex CaveIdRegexWithinString();
+
+    [GeneratedRegex(@"\s+and\s+", RegexOptions.IgnoreCase)]
+    private static partial Regex GeologyAndSeparatorRegex();
+
+    [GeneratedRegex(@"Undivid(?:ed)?|Undiff(?:erentiated)?", RegexOptions.IgnoreCase)]
+    private static partial Regex GroupedGeologySuffixRegex();
 }

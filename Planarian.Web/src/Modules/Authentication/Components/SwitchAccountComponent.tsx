@@ -1,7 +1,8 @@
-import { List, Form, Modal } from "antd";
+import { Form, List, Modal } from "antd";
 import React, { useContext, useMemo } from "react";
-import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
+import "./SwitchAccountComponent.scss";
 
 type SwitchAccountComponentProps = {
   isVisible: boolean;
@@ -20,7 +21,7 @@ const SwitchAccountComponent = ({
     [accountIds, currentAccountId]
   );
 
-  const handleSwitch = async (accountId: string) => {
+  const handleSwitch = (accountId: string) => {
     onCancel();
     switchAccount(accountId);
   };
@@ -33,12 +34,7 @@ const SwitchAccountComponent = ({
       footer={[<CancelButtonComponent key="cancel" onClick={onCancel} />]}
     >
       <Form id="switchAccountForm">
-        <div
-          style={{
-            backgroundColor: "#f0f2f5",
-            padding: "10px",
-          }}
-        >
+        <div className="planarian-account-banner">
           Your Current Account: {currentAccountName}
         </div>
         <div
@@ -55,22 +51,16 @@ const SwitchAccountComponent = ({
             dataSource={accountList}
             renderItem={(item) => (
               <List.Item
+                className="planarian-account-option"
                 key={item.value}
                 onClick={() => handleSwitch(item.value)}
                 style={{
                   cursor: "pointer",
-                  transition: "background-color 0.3s, border-color 0.3s",
                   padding: "10px",
                   border: "1px solid #d9d9d9",
                   borderRadius: "4px",
                   marginBottom: "10px",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#e6f7ff")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "")
-                }
               >
                 {item.display}
               </List.Item>

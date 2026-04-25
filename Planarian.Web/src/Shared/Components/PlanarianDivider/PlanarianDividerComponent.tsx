@@ -5,16 +5,18 @@ interface DividerProps {
   title: string | React.ReactElement;
   secondaryTitle?: string;
   element?: React.ReactElement | null;
+  hideTopSpacing?: boolean;
 }
 
 const PlanarianDividerComponent = ({
   title,
   secondaryTitle,
   element,
+  hideTopSpacing,
 }: DividerProps) => {
   return (
     <>
-      <br />
+      {!hideTopSpacing && <br />}
       <Row
         style={{ borderBottom: "1px solid #f0f0f0", paddingBottom: "5px" }}
         align="middle"
