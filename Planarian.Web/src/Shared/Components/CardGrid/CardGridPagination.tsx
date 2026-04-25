@@ -173,12 +173,15 @@ const CardGridPagination = <T extends object>({
     [currentPage, isChangingPage, totalPages]
   );
 
-  const tokens =
-    middleMode === "full"
-      ? getFullPaginationTokens(currentPage, totalPages)
-      : middleMode === "compact"
-        ? getCompactPaginationTokens(totalPages)
-        : [];
+  const tokens = useMemo(
+    () =>
+      middleMode === "full"
+        ? getFullPaginationTokens(currentPage, totalPages)
+        : middleMode === "compact"
+          ? getCompactPaginationTokens(totalPages)
+          : [],
+    [currentPage, middleMode, totalPages]
+  );
 
   useEffect(() => {
     setMiddleMode("full");
@@ -202,7 +205,7 @@ const CardGridPagination = <T extends object>({
     }
 
     setMiddleMode("hidden");
-  }, [middleMode, tokens]);
+  }, [layoutVersion, middleMode, tokens, windowWidth]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
