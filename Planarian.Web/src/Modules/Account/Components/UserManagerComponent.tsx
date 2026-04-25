@@ -34,10 +34,11 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
-import { useScrollRevealVisibility } from "../../../Shared/Hooks/useScrollRevealVisibility";
+import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
 import "./UserManagerComponent.scss";
 
 const { Text } = Typography;
+const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
 type UserStatusFilter = "all" | "accepted" | "pending";
 type UserSortBy =
@@ -58,6 +59,7 @@ const UserManagerComponent: React.FC = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const toolbarVisibility = useScrollRevealVisibility({
+    breakpointPx: USER_MANAGER_COLLAPSE_BREAKPOINT_PX,
     mode: "direct",
   });
 
@@ -276,7 +278,10 @@ const UserManagerComponent: React.FC = () => {
               allowClear
             />
           </div>
-          <ScrollCollapseSection visible={toolbarVisibility.isVisible}>
+          <ScrollCollapseSection
+            className="user-manager-toolbar__collapsible"
+            visible={toolbarVisibility.isVisible}
+          >
             <div className="user-manager-toolbar__secondary-rows">
               <div className="user-manager-toolbar__secondary-controls">
                 <Select<UserStatusFilter>

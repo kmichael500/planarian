@@ -17,10 +17,11 @@
 }
 
 .user-manager-toolbar {
+  align-items: center;
   display: flex;
-  flex-direction: column;
   flex: 0 0 auto;
   gap: 8px;
+  justify-content: space-between;
   margin: 0;
   min-width: 0;
   width: 100%;
@@ -28,8 +29,13 @@
 
 .user-manager-toolbar__search-row {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
-  width: 100%;
+}
+
+.user-manager-toolbar__collapsible {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 .user-manager-toolbar__secondary-rows {
@@ -206,6 +212,16 @@
 }
 
 @media (max-width: 760px) {
+  .user-manager-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .user-manager-toolbar__collapsible {
+    width: 100%;
+  }
+
   .user-manager-toolbar__secondary-rows {
     align-items: stretch;
     flex-wrap: wrap;

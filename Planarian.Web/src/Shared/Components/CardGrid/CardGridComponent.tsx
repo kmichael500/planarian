@@ -1,14 +1,11 @@
 import { Empty, Card, List } from "antd";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
 import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
+import { getScrollState } from "../../Scroll/getScrollState";
+import type { ScrollState } from "../../Scroll/ScrollState";
 import { CardGridPagination } from "./CardGridPagination";
 import "./CardGridComponent.scss";
-
-export interface CardGridScrollState {
-  direction: "up" | "down" | "idle";
-  scrollTop: number;
-}
 
 interface CardGridComponentProps<
   T extends object,
@@ -26,7 +23,7 @@ interface CardGridComponentProps<
   fillHeight?: boolean;
   onScrollStateChange?: (
     isScrolled: boolean,
-    state?: CardGridScrollState
+    state?: ScrollState
   ) => void;
 }
 
@@ -48,6 +45,24 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
   const previousScrollTopRef = useRef(0);
   let data: T[] = [];
 
+  const notifyScrollStateChange = useCallback(
+    (scrollTop: number) => {
+      const nextScrollState = getScrollState(
+        previousScrollTopRef.current,
+        scrollTop
+      );
+
+      previousScrollTopRef.current = nextScrollState.nextPreviousScrollTop;
+      isScrolledRef.current = nextScrollState.isScrolled;
+
+      onScrollStateChange?.(
+        nextScrollState.isScrolled,
+        nextScrollState.state
+      );
+    },
+    [onScrollStateChange]
+  );
+
   if (items) {
     data = items;
   } else if (pagedItems) {
@@ -65,6 +80,11 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
           if (onSearch) {
             await onSearch();
           }
+
+          if (bodyRef.current) {
+            bodyRef.current.scrollTop = 0;
+          }
+          notifyScrollStateChange(0);
         }}
       />
     </div>
@@ -80,27 +100,7 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
         className="planarian-card-grid__body"
         ref={bodyRef}
         onScroll={(event) => {
-          const body = event.currentTarget;
-          const scrollTop = Math.max(body.scrollTop, 0);
-          const scrollDelta = scrollTop - previousScrollTopRef.current;
-          const direction =
-            Math.abs(scrollDelta) <= 1
-              ? "idle"
-              : scrollDelta > 0
-                ? "down"
-                : "up";
-          const nextIsScrolled = scrollTop > 0;
-
-          previousScrollTopRef.current = scrollTop;
-
-          if (nextIsScrolled !== isScrolledRef.current) {
-            isScrolledRef.current = nextIsScrolled;
-          }
-
-          onScrollStateChange?.(nextIsScrolled, {
-            direction,
-            scrollTop,
-          });
+          notifyScrollStateChange(event.currentTarget.scrollTop);
         }}
       >
         {data.length === 0 && (

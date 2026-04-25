@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CardGridScrollState } from "../Components/CardGrid/CardGridComponent";
+import type { ScrollState } from "./ScrollState";
 
 type ScrollRevealVisibilityMode = "direct" | "mobileDebounce";
 
 interface UseScrollRevealVisibilityOptions {
+  breakpointPx?: number;
   enabled?: boolean;
   hideThresholdPx?: number;
   initialVisible?: boolean;
@@ -14,14 +15,12 @@ interface UseScrollRevealVisibilityOptions {
 
 interface UseScrollRevealVisibilityResult {
   isVisible: boolean;
-  handleScrollStateChange: (
-    isScrolled: boolean,
-    state?: CardGridScrollState
-  ) => void;
+  handleScrollStateChange: (isScrolled: boolean, state?: ScrollState) => void;
   reset: () => void;
 }
 
 const useScrollRevealVisibility = ({
+  breakpointPx,
   enabled = true,
   hideThresholdPx = 32,
   initialVisible = true,
@@ -30,7 +29,15 @@ const useScrollRevealVisibility = ({
   revealThresholdPx = 12,
 }: UseScrollRevealVisibilityOptions = {}): UseScrollRevealVisibilityResult => {
   const [isVisible, setIsVisible] = useState(initialVisible);
+  const [isWithinBreakpoint, setIsWithinBreakpoint] = useState(() =>
+    breakpointPx === undefined
+      ? true
+      : typeof window === "undefined"
+        ? true
+        : window.innerWidth <= breakpointPx
+  );
   const revealTimeoutRef = useRef<number | null>(null);
+  const isActive = enabled && isWithinBreakpoint;
 
   const clearRevealTimeout = useCallback(() => {
     if (revealTimeoutRef.current !== null) {
@@ -54,8 +61,8 @@ const useScrollRevealVisibility = ({
   }, [clearRevealTimeout, revealDelayMs]);
 
   const handleScrollStateChange = useCallback(
-    (isScrolled: boolean, state?: CardGridScrollState) => {
-      if (!enabled) {
+    (isScrolled: boolean, state?: ScrollState) => {
+      if (!isActive) {
         return;
       }
 
@@ -91,8 +98,8 @@ const useScrollRevealVisibility = ({
     },
     [
       clearRevealTimeout,
-      enabled,
       hideThresholdPx,
+      isActive,
       isVisible,
       mode,
       revealThresholdPx,
@@ -105,13 +112,26 @@ const useScrollRevealVisibility = ({
   }, [clearRevealTimeout]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!isActive) {
       reset();
     }
-  }, [enabled, reset]);
+  }, [isActive, reset]);
+
+  useEffect(() => {
+    if (breakpointPx === undefined || typeof window === "undefined") {
+      return;
+    }
+
+    const updateBreakpoint = () => {
+      setIsWithinBreakpoint(window.innerWidth <= breakpointPx);
+    };
+
+    window.addEventListener("resize", updateBreakpoint);
+    return () => window.removeEventListener("resize", updateBreakpoint);
+  }, [breakpointPx]);
 
   return {
-    isVisible,
+    isVisible: isActive ? isVisible : true,
     handleScrollStateChange,
     reset,
   };

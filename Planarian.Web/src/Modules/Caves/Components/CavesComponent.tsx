@@ -1,9 +1,6 @@
 import { Typography, Form, Space, message } from "antd";
 import { useState, useEffect } from "react";
-import {
-  CardGridComponent,
-  CardGridScrollState,
-} from "../../../Shared/Components/CardGrid/CardGridComponent";
+import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
@@ -57,7 +54,8 @@ import {
   migrateCaveSearchDisplayFeatureKeys,
 } from "./CaveSearchDisplayFields";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
-import { useScrollRevealVisibility } from "../../../Shared/Hooks/useScrollRevealVisibility";
+import type { ScrollState } from "../../../Shared/Scroll/ScrollState";
+import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
 import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -429,7 +427,7 @@ const CavesComponent: React.FC = () => {
 
   const handleGridScrollStateChange = (
     isScrolled: boolean,
-    state?: CardGridScrollState
+    state?: ScrollState
   ) => {
     if (!isMobile) {
       setIsResultsScrolled(isScrolled);
