@@ -36,6 +36,7 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
   onScrollStateChange,
 }: CardGridComponentProps<T, TQueryBuilder>) => {
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const isScrolledRef = useRef(false);
   let data: T[] = [];
 
   if (items) {
@@ -71,7 +72,11 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
         ref={bodyRef}
         onScroll={(event) => {
           const body = event.currentTarget;
-          onScrollStateChange?.(body.scrollTop > 0);
+          const nextIsScrolled = body.scrollTop > 0;
+          if (nextIsScrolled !== isScrolledRef.current) {
+            isScrolledRef.current = nextIsScrolled;
+            onScrollStateChange?.(nextIsScrolled);
+          }
         }}
       >
         {data.length === 0 && (
