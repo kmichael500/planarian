@@ -5,6 +5,11 @@ import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
 import { CardGridPagination } from "./CardGridPagination";
 import "./CardGridComponent.scss";
 
+export interface CardGridScrollState {
+  direction: "up" | "down" | "idle";
+  scrollTop: number;
+}
+
 interface CardGridComponentProps<
   T extends object,
   TQueryBuilder extends object
@@ -19,7 +24,10 @@ interface CardGridComponentProps<
   onSearch?: () => Promise<void>;
   useList?: boolean;
   fillHeight?: boolean;
-  onScrollStateChange?: (isScrolled: boolean) => void;
+  onScrollStateChange?: (
+    isScrolled: boolean,
+    state?: CardGridScrollState
+  ) => void;
 }
 
 const CardGridComponent = <T extends object, TQueryBuilder extends object>({
@@ -37,6 +45,7 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
 }: CardGridComponentProps<T, TQueryBuilder>) => {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const isScrolledRef = useRef(false);
+  const previousScrollTopRef = useRef(0);
   let data: T[] = [];
 
   if (items) {
@@ -72,11 +81,26 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
         ref={bodyRef}
         onScroll={(event) => {
           const body = event.currentTarget;
-          const nextIsScrolled = body.scrollTop > 0;
+          const scrollTop = Math.max(body.scrollTop, 0);
+          const scrollDelta = scrollTop - previousScrollTopRef.current;
+          const direction =
+            Math.abs(scrollDelta) <= 1
+              ? "idle"
+              : scrollDelta > 0
+                ? "down"
+                : "up";
+          const nextIsScrolled = scrollTop > 0;
+
+          previousScrollTopRef.current = scrollTop;
+
           if (nextIsScrolled !== isScrolledRef.current) {
             isScrolledRef.current = nextIsScrolled;
-            onScrollStateChange?.(nextIsScrolled);
           }
+
+          onScrollStateChange?.(nextIsScrolled, {
+            direction,
+            scrollTop,
+          });
         }}
       >
         {data.length === 0 && (

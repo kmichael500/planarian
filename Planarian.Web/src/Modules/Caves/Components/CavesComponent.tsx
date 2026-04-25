@@ -1,6 +1,9 @@
 import { Typography, Form, Space, message } from "antd";
-import { useState, useEffect } from "react";
-import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
+import { useState, useEffect, useRef } from "react";
+import {
+  CardGridComponent,
+  CardGridScrollState,
+} from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import DOMPurify from "dompurify";
@@ -58,6 +61,9 @@ import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
+const MOBILE_TOOLBAR_HIDE_THRESHOLD_PX = 32;
+const MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX = 12;
+const MOBILE_TOOLBAR_REVEAL_DELAY_MS = 50;
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -83,6 +89,7 @@ const CavesComponent: React.FC = () => {
   const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
     window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
   );
+  const mobileToolbarRevealTimeoutRef = useRef<number | null>(null);
 
   const accountId = AuthenticationService.GetAccountId();
   const featureStorageKey = accountId
@@ -122,6 +129,21 @@ const CavesComponent: React.FC = () => {
     window.addEventListener("resize", updateBreakpoint);
     return () => window.removeEventListener("resize", updateBreakpoint);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mobileToolbarRevealTimeoutRef.current !== null) {
+        window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isBelowToolbarBreakpoint && mobileToolbarRevealTimeoutRef.current !== null) {
+      window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
+      mobileToolbarRevealTimeoutRef.current = null;
+    }
+  }, [isBelowToolbarBreakpoint]);
 
 
   const handleSortChange = async (sortValue: string) => {
@@ -410,6 +432,66 @@ const CavesComponent: React.FC = () => {
     label: feature.display,
     value: feature.value,
   }));
+
+  const clearMobileToolbarRevealTimeout = () => {
+    if (mobileToolbarRevealTimeoutRef.current !== null) {
+      window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
+      mobileToolbarRevealTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleMobileToolbarReveal = () => {
+    if (!isResultsScrolled) {
+      return;
+    }
+
+    clearMobileToolbarRevealTimeout();
+
+    mobileToolbarRevealTimeoutRef.current = window.setTimeout(() => {
+      setIsResultsScrolled(false);
+      mobileToolbarRevealTimeoutRef.current = null;
+    }, MOBILE_TOOLBAR_REVEAL_DELAY_MS);
+  };
+
+  const handleGridScrollStateChange = (
+    isScrolled: boolean,
+    state?: CardGridScrollState
+  ) => {
+    if (!isMobile) {
+      setIsResultsScrolled(isScrolled);
+      if (isScrolled && !hasAutoCollapsedDisplay) {
+        setIsDisplayCollapsed(true);
+        setHasAutoCollapsedDisplay(true);
+      }
+      return;
+    }
+
+    const scrollTop = Math.max(state?.scrollTop ?? 0, 0);
+    const direction = state?.direction ?? "idle";
+
+    if (direction === "down" || scrollTop > MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX) {
+      clearMobileToolbarRevealTimeout();
+    }
+
+    if (scrollTop >= MOBILE_TOOLBAR_HIDE_THRESHOLD_PX) {
+      if (!isResultsScrolled) {
+        setIsResultsScrolled(true);
+      }
+      return;
+    }
+
+    if (scrollTop <= MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX) {
+      if (direction === "up" || direction === "idle") {
+        scheduleMobileToolbarReveal();
+      } else {
+        clearMobileToolbarRevealTimeout();
+      }
+      return;
+    }
+
+    clearMobileToolbarRevealTimeout();
+  };
+
   const toolbarMetrics: ToolbarMetric[] = [
     {
       key: "results",
@@ -654,13 +736,7 @@ const CavesComponent: React.FC = () => {
             pagedItems={caves}
             queryBuilder={queryBuilder}
             onSearch={onSearch}
-            onScrollStateChange={(isScrolled) => {
-              setIsResultsScrolled(isScrolled);
-              if (!isMobile && isScrolled && !hasAutoCollapsedDisplay) {
-                setIsDisplayCollapsed(true);
-                setHasAutoCollapsedDisplay(true);
-              }
-            }}
+            onScrollStateChange={handleGridScrollStateChange}
           />
         </SpinnerCardComponent>
       </div>
