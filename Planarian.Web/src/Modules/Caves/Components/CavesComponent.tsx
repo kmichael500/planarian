@@ -1,5 +1,5 @@
 import { Typography, Form, Space, message } from "antd";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   CardGridComponent,
   CardGridScrollState,
@@ -57,6 +57,7 @@ import {
   migrateCaveSearchDisplayFeatureKeys,
 } from "./CaveSearchDisplayFields";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
+import { useScrollRevealVisibility } from "../../../Shared/Hooks/useScrollRevealVisibility";
 import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -89,7 +90,6 @@ const CavesComponent: React.FC = () => {
   const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
     window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
   );
-  const mobileToolbarRevealTimeoutRef = useRef<number | null>(null);
 
   const accountId = AuthenticationService.GetAccountId();
   const featureStorageKey = accountId
@@ -129,21 +129,6 @@ const CavesComponent: React.FC = () => {
     window.addEventListener("resize", updateBreakpoint);
     return () => window.removeEventListener("resize", updateBreakpoint);
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (mobileToolbarRevealTimeoutRef.current !== null) {
-        window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isBelowToolbarBreakpoint && mobileToolbarRevealTimeoutRef.current !== null) {
-      window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
-      mobileToolbarRevealTimeoutRef.current = null;
-    }
-  }, [isBelowToolbarBreakpoint]);
 
 
   const handleSortChange = async (sortValue: string) => {
@@ -433,25 +418,14 @@ const CavesComponent: React.FC = () => {
     value: feature.value,
   }));
 
-  const clearMobileToolbarRevealTimeout = () => {
-    if (mobileToolbarRevealTimeoutRef.current !== null) {
-      window.clearTimeout(mobileToolbarRevealTimeoutRef.current);
-      mobileToolbarRevealTimeoutRef.current = null;
-    }
-  };
-
-  const scheduleMobileToolbarReveal = () => {
-    if (!isResultsScrolled) {
-      return;
-    }
-
-    clearMobileToolbarRevealTimeout();
-
-    mobileToolbarRevealTimeoutRef.current = window.setTimeout(() => {
-      setIsResultsScrolled(false);
-      mobileToolbarRevealTimeoutRef.current = null;
-    }, MOBILE_TOOLBAR_REVEAL_DELAY_MS);
-  };
+  const isMobile = isBelowToolbarBreakpoint;
+  const mobileToolbarVisibility = useScrollRevealVisibility({
+    enabled: isMobile,
+    hideThresholdPx: MOBILE_TOOLBAR_HIDE_THRESHOLD_PX,
+    mode: "mobileDebounce",
+    revealDelayMs: MOBILE_TOOLBAR_REVEAL_DELAY_MS,
+    revealThresholdPx: MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX,
+  });
 
   const handleGridScrollStateChange = (
     isScrolled: boolean,
@@ -466,31 +440,14 @@ const CavesComponent: React.FC = () => {
       return;
     }
 
-    const scrollTop = Math.max(state?.scrollTop ?? 0, 0);
-    const direction = state?.direction ?? "idle";
-
-    if (direction === "down" || scrollTop > MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX) {
-      clearMobileToolbarRevealTimeout();
-    }
-
-    if (scrollTop >= MOBILE_TOOLBAR_HIDE_THRESHOLD_PX) {
-      if (!isResultsScrolled) {
-        setIsResultsScrolled(true);
-      }
-      return;
-    }
-
-    if (scrollTop <= MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX) {
-      if (direction === "up" || direction === "idle") {
-        scheduleMobileToolbarReveal();
-      } else {
-        clearMobileToolbarRevealTimeout();
-      }
-      return;
-    }
-
-    clearMobileToolbarRevealTimeout();
+    mobileToolbarVisibility.handleScrollStateChange(isScrolled, state);
   };
+
+  useEffect(() => {
+    if (isMobile) {
+      setIsResultsScrolled(!mobileToolbarVisibility.isVisible);
+    }
+  }, [isMobile, mobileToolbarVisibility.isVisible]);
 
   const toolbarMetrics: ToolbarMetric[] = [
     {
@@ -500,8 +457,7 @@ const CavesComponent: React.FC = () => {
       value: isCavesLoading ? "..." : formatNumber(caves?.totalCount ?? 0),
     },
   ];
-  const isMobile = isBelowToolbarBreakpoint;
-  const showMobileRows = !isResultsScrolled;
+  const showMobileRows = isMobile ? mobileToolbarVisibility.isVisible : !isResultsScrolled;
   const mobileResultsMetric = toolbarMetrics[0];
 
   return (
