@@ -60,8 +60,6 @@ import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
-const MOBILE_TOOLBAR_HIDE_THRESHOLD_PX = 32;
-const MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX = 12;
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -418,21 +416,20 @@ const CavesComponent: React.FC = () => {
   const isMobile = isBelowToolbarBreakpoint;
   const mobileToolbarVisibility = useScrollRevealVisibility({
     enabled: isMobile,
-    hideThresholdPx: MOBILE_TOOLBAR_HIDE_THRESHOLD_PX,
     mode: "thresholdLockout",
-    revealThresholdPx: MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX,
   });
 
   const handleGridScrollStateChange = (
     isScrolled: boolean,
     state?: ScrollState
   ) => {
+    if (isScrolled && !hasAutoCollapsedDisplay) {
+      setIsDisplayCollapsed(true);
+      setHasAutoCollapsedDisplay(true);
+    }
+
     if (!isMobile) {
       setIsResultsScrolled(isScrolled);
-      if (isScrolled && !hasAutoCollapsedDisplay) {
-        setIsDisplayCollapsed(true);
-        setHasAutoCollapsedDisplay(true);
-      }
       return;
     }
 
@@ -481,7 +478,10 @@ const CavesComponent: React.FC = () => {
 
       <div className="caves-component__results">
         {isMobile ? (
-          <ScrollCollapseSection visible={showMobileRows}>
+          <ScrollCollapseSection
+            contentRef={mobileToolbarVisibility.contentRef}
+            visible={showMobileRows}
+          >
             <div className="caves-mobile-toolbar-section__inner">
               <FeatureCheckboxGroup
                 collapsible
