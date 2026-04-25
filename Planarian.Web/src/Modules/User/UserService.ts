@@ -50,6 +50,12 @@ const UserService = {
     );
     return response.data;
   },
+  async GetPendingInvitations(): Promise<AcceptInvitationVm[]> {
+    const response = await HttpClient.get<AcceptInvitationVm[]>(
+      `${baseUrl}/invitations`
+    );
+    return response.data;
+  },
 
   async AcceptInvitation(invitationCode: string): Promise<void> {
     const response = await HttpClient.post(

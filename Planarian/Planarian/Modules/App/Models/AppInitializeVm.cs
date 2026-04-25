@@ -17,5 +17,5 @@ public class AppInitializeVm
     public string ServerBaseUrl { get; set; }
     public string SupportName { get; set; }
     public string SupportEmail { get; set; }
-    public IEnumerable<string> Permissions { get; set; }
+    public IEnumerable<string> Permissions { get; set; } = new HashSet<string>();
 }
