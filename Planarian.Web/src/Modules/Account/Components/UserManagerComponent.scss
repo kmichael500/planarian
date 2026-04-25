@@ -6,15 +6,7 @@
   width: 100%;
 }
 
-.user-manager-card {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-}
-
-.user-manager-card > .ant-card-body {
+.user-manager-container {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;

@@ -1,3 +1,25 @@
+.caves-result-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.caves-result-card__title {
+  min-width: 0;
+}
+
+.caves-result-card__distance-from-me {
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.dark .caves-result-card__distance-from-me {
+  color: rgba(255, 255, 255, 0.65);
+}
+
 .caves-component {
   display: flex;
   flex: 1 1 auto;

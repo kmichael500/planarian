@@ -63,16 +63,14 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  background: var(--surface-color);
+  background: transparent;
 }
 
 .import-workflow__step-scroll {
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 0;
 }
 
 .import-workflow__step-panel {
@@ -791,10 +789,6 @@
 }
 
 @media (max-width: 768px) {
-  .import-workflow__step-scroll {
-    padding: 10px;
-  }
-
   .import-step-card {
     padding: 10px 12px;
   }
@@ -810,10 +804,6 @@
 @media (max-height: 860px) {
   .import-workflow {
     gap: 8px;
-  }
-
-  .import-workflow__step-scroll {
-    padding: 10px;
   }
 
   .import-step-card {

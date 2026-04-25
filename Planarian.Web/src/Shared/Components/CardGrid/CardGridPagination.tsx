@@ -1,8 +1,10 @@
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { LeftOutlined, RightOutlined, UpOutlined } from "@ant-design/icons";
+import { Dropdown, MenuProps } from "antd";
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -158,6 +160,18 @@ const CardGridPagination = <T extends object>({
   const [middleMode, setMiddleMode] = useState<MiddleMode>("full");
   const [isChangingPage, setIsChangingPage] = useState(false);
   const resultText = `${formatNumber(pagedItems.totalCount) ?? "0"} results`;
+  const pageMenuItems = useMemo<MenuProps["items"]>(
+    () =>
+      Array.from({ length: totalPages }, (_, index) => {
+        const pageNumber = index + 1;
+        return {
+          key: pageNumber.toString(),
+          label: `Page ${pageNumber}`,
+          disabled: pageNumber === currentPage || isChangingPage,
+        };
+      }),
+    [currentPage, isChangingPage, totalPages]
+  );
 
   const tokens =
     middleMode === "full"
@@ -271,12 +285,44 @@ const CardGridPagination = <T extends object>({
     </button>
   );
 
+  const renderSummaryPrimary = () => {
+    const pageLabel = `Page ${currentPage} of ${totalPages}`;
+
+    if (totalPages <= 1) {
+      return (
+        <span className="planarian-card-grid-pagination__summary-primary">
+          {pageLabel}
+        </span>
+      );
+    }
+
+    return (
+      <Dropdown
+        menu={{
+          items: pageMenuItems,
+          onClick: ({ key }) => void changePage(Number(key)),
+        }}
+        overlayClassName="planarian-card-grid-pagination__page-menu planarian-dropdown--touch"
+        placement="topLeft"
+        trigger={["click"]}
+        disabled={isChangingPage}
+      >
+        <button
+          type="button"
+          className="planarian-card-grid-pagination__summary-primary planarian-card-grid-pagination__summary-page-button"
+          aria-label="Choose page"
+        >
+          <span>{pageLabel}</span>
+          <UpOutlined />
+        </button>
+      </Dropdown>
+    );
+  };
+
   return (
     <div className="planarian-card-grid-pagination">
       <div className="planarian-card-grid-pagination__summary">
-        <span className="planarian-card-grid-pagination__summary-primary">
-          Page {currentPage} of {totalPages}
-        </span>
+        {renderSummaryPrimary()}
         <span className="planarian-card-grid-pagination__summary-secondary">
           {resultText}
         </span>

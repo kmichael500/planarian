@@ -24,17 +24,13 @@ import {
   GridCard,
   GridCardAction,
 } from "../../../Shared/Components/CardGrid/GridCard";
-import {
-  SelectListItem,
-  SelectListItemKey,
-} from "../../../Shared/Models/SelectListItem";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import {
   CaveSearchSortByConstants,
   CaveSearchVm,
 } from "../Models/CaveSearchVm";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
-import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import FavoriteCave from "./FavoriteCave";
@@ -49,6 +45,15 @@ import {
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
 import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
+import {
+  CAVE_SEARCH_DISPLAY_FEATURE_LABELS,
+  CAVE_SEARCH_DISPLAY_FEATURES,
+  CaveSearchDisplayFeature,
+  DEFAULT_CAVE_SEARCH_DISPLAY_FEATURES,
+  isCaveSearchTagDisplayFeature,
+  migrateCaveSearchDisplayFeatureKeys,
+} from "./CaveSearchDisplayFields";
+import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
@@ -84,7 +89,7 @@ const CavesComponent: React.FC = () => {
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";
   const sortOptions = [
-    ...(locationPermissionGranted !== false ? [{ display: "Distance", value: CaveSearchSortByConstants.DistanceMiles }] : []),
+    ...(locationPermissionGranted !== false ? [{ display: "Distance From Me", value: CaveSearchSortByConstants.DistanceMiles }] : []),
     { display: "Cave ID", value: CaveSearchSortByConstants.DisplayId },
     { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
     { display: "Depth", value: CaveSearchSortByConstants.DepthFeet },
@@ -241,96 +246,51 @@ const CavesComponent: React.FC = () => {
     await getCaves();
   };
 
-  const possibleFeaturesToRender: SelectListItemKey<CaveSearchVm>[] = [
-    {
-      display: "ID",
-      value: "displayId",
-      data: { key: FeatureKey.EnabledFieldCaveId },
-    },
-    {
-      display: "Distance",
-      value: "distanceMiles",
-      data: { key: FeatureKey.EnabledFieldCaveDistance },
-    },
-    {
-      display: "County",
-      value: "countyId",
-      data: { key: FeatureKey.EnabledFieldCaveCounty },
-    },
-    {
-      display: "Length",
-      value: "lengthFeet",
-      data: { key: FeatureKey.EnabledFieldCaveLengthFeet },
-    },
-    {
-      display: "Depth",
-      value: "depthFeet",
-      data: { key: FeatureKey.EnabledFieldCaveDepthFeet },
-    },
-    {
-      display: "Reported On",
-      value: "reportedOn",
-      data: { key: FeatureKey.EnabledFieldCaveReportedOn },
-    },
-    {
-      display: "Max Pit Depth",
-      value: "maxPitDepthFeet",
-      data: { key: FeatureKey.EnabledFieldCaveMaxPitDepthFeet },
-    },
-    {
-      display: "Number of Pits",
-      value: "numberOfPits",
-      data: { key: FeatureKey.EnabledFieldCaveNumberOfPits },
-    },
-    {
-      display: "Map Status",
-      value: "mapStatusTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveMapStatusTags },
-    },
-    {
-      display: "Geology",
-      value: "geologyTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveGeologyTags },
-    },
-    {
-      display: "Geologic Age",
-      value: "geologicAgeTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveGeologicAgeTags },
-    },
-    {
-      display: "Archaeology",
-      value: "archaeologyTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveArcheologyTags },
-    },
-    {
-      display: "Biology",
-      value: "biologyTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveBiologyTags },
-    },
-    {
-      display: "Cartographers",
-      value: "cartographerNameTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveCartographerNameTags },
-    },
-    {
-      display: "Physiographic Province",
-      value: "physiographicProvinceTagIds",
-      data: { key: FeatureKey.EnabledFieldCavePhysiographicProvinceTags },
-    },
-    {
-      display: "Reported By",
-      value: "reportedByTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveReportedByNameTags },
-    },
-    {
-      display: "Other Tags",
-      value: "otherTagIds",
-      data: { key: FeatureKey.EnabledFieldCaveOtherTags },
-    },
-  ];
+  const persistSelectedFeatures = (
+    features: NestedKeyOf<CaveSearchVm>[]
+  ) => {
+    if (featureStorageKey) {
+      localStorage.setItem(featureStorageKey, JSON.stringify(features));
+    }
+  };
+
+  const handleDisplayFeaturesChange = async (
+    checkedValues: NestedKeyOf<CaveSearchVm>[]
+  ) => {
+    const isDistanceBeingChecked =
+      checkedValues.includes("distanceMiles") &&
+      !selectedFeatures.includes("distanceMiles");
+
+    if (isDistanceBeingChecked) {
+      const userLocation = await LocationHelpers.getUsersLocation(message);
+      if (userLocation) {
+        queryBuilder.setUserLocation(
+          userLocation.latitude,
+          userLocation.longitude
+        );
+        setSelectedFeatures(checkedValues);
+        persistSelectedFeatures(checkedValues);
+        await getCaves();
+      } else {
+        const updatedValues = checkedValues.filter(
+          (value) => value !== "distanceMiles"
+        );
+        setSelectedFeatures(updatedValues);
+        persistSelectedFeatures(updatedValues);
+      }
+
+      return;
+    }
+
+    queryBuilder.setUserLocation(undefined, undefined);
+    queryBuilder.buildAsQueryString();
+    setSelectedFeatures(checkedValues);
+    persistSelectedFeatures(checkedValues);
+  };
+
   const { isFeatureEnabled } = useFeatureEnabled();
   const [filteredFeatures, setFilteredFeatures] = useState<
-    SelectListItemKey<CaveSearchVm>[]
+    CaveSearchDisplayFeature[]
   >([]);
 
   useEffect(() => {
@@ -342,16 +302,19 @@ const CavesComponent: React.FC = () => {
 
       if (savedFeaturesJson !== null) {
         try {
-          savedFeatures = JSON.parse(savedFeaturesJson);
+          const parsedFeatures = JSON.parse(savedFeaturesJson);
+          savedFeatures = Array.isArray(parsedFeatures)
+            ? migrateCaveSearchDisplayFeatureKeys(parsedFeatures)
+            : [];
         } catch {
           savedFeatures = [];
         }
       } else {
-        savedFeatures = ["countyId", "lengthFeet", "depthFeet", "reportedOn"];
+        savedFeatures = DEFAULT_CAVE_SEARCH_DISPLAY_FEATURES;
       }
 
-      const enabledFeatures: SelectListItemKey<CaveSearchVm>[] = [];
-      for (const feature of possibleFeaturesToRender) {
+      const enabledFeatures: CaveSearchDisplayFeature[] = [];
+      for (const feature of CAVE_SEARCH_DISPLAY_FEATURES) {
         const isEnabled = isFeatureEnabled(feature.data.key);
         if (isEnabled) {
           enabledFeatures.push(feature);
@@ -381,13 +344,7 @@ const CavesComponent: React.FC = () => {
 
       setFilteredFeatures(enabledFeatures);
       setSelectedFeatures(filteredSelectedFeatures);
-
-      if (featureStorageKey) {
-        localStorage.setItem(
-          featureStorageKey,
-          JSON.stringify(filteredSelectedFeatures)
-        );
-      }
+      persistSelectedFeatures(filteredSelectedFeatures);
 
       await getCaves();
     };
@@ -399,6 +356,24 @@ const CavesComponent: React.FC = () => {
     cave: CaveSearchVm,
     featureKey: NestedKeyOf<CaveSearchVm>
   ) => {
+    if (isCaveSearchTagDisplayFeature(featureKey)) {
+      const tags = cave[featureKey as keyof CaveSearchVm] as
+        | SelectListItem<string>[]
+        | undefined;
+
+      if (!tags || tags.length === 0) {
+        return defaultIfEmpty(null);
+      }
+
+      return (
+        <Space size={[3, 3]} className="caves-result-card__tags" wrap>
+          {tags.map((tag) => (
+            <TagComponent key={tag.value} item={tag} />
+          ))}
+        </Space>
+      );
+    }
+
     switch (featureKey) {
       case nameof<CaveSearchVm>("name"):
         return defaultIfEmpty(cave.name);
@@ -416,37 +391,16 @@ const CavesComponent: React.FC = () => {
         return defaultIfEmpty(cave.numberOfPits?.toString());
 
       case nameof<CaveSearchVm>("distanceMiles"):
-        if (cave.distanceMiles) {
-          return defaultIfEmpty(formatDistance(cave.distanceMiles * 5280));
-        }
-        return defaultIfEmpty(null);
-      case nameof<CaveSearchVm>("countyId"):
-        return <CountyTagComponent countyId={cave.countyId} />;
+        return (
+          <DistanceFromMeComponent
+            latitude={cave.primaryEntranceLatitude}
+            longitude={cave.primaryEntranceLongitude}
+          />
+        );
+      case nameof<CaveSearchVm>("county"):
+        return <CountyTagComponent item={cave.county} />;
       case nameof<CaveSearchVm>("displayId"):
         return cave.displayId;
-      case nameof<CaveSearchVm>("archaeologyTagIds"):
-      case nameof<CaveSearchVm>("biologyTagIds"):
-      case nameof<CaveSearchVm>("cartographerNameTagIds"):
-      case nameof<CaveSearchVm>("geologicAgeTagIds"):
-      case nameof<CaveSearchVm>("geologyTagIds"):
-      case nameof<CaveSearchVm>("mapStatusTagIds"):
-      case nameof<CaveSearchVm>("otherTagIds"):
-      case nameof<CaveSearchVm>("physiographicProvinceTagIds"):
-      case nameof<CaveSearchVm>("reportedByTagIds"):
-        if (
-          (cave[featureKey as keyof CaveSearchVm] as string[])?.length === 0
-        ) {
-          return defaultIfEmpty(null);
-        }
-        return (
-          <Space size={[3, 3]} className="caves-result-card__tags" wrap>
-            {(cave[featureKey as keyof CaveSearchVm] as string[])?.map(
-              (tagId: string) => (
-                <TagComponent key={tagId} tagId={tagId} />
-              )
-            )}
-          </Space>
-        );
       default:
         return null;
     }
@@ -507,52 +461,7 @@ const CavesComponent: React.FC = () => {
                 title="Display Attributes"
                 options={displayFeatureOptions}
                 value={selectedFeatures}
-                onChange={async (checkedValues) => {
-                  const previousFeatures = selectedFeatures;
-                  const isDistanceBeingChecked = checkedValues.includes(
-                    "distanceMiles" as NestedKeyOf<CaveSearchVm>
-                  ) && !previousFeatures.includes("distanceMiles");
-
-                  if (isDistanceBeingChecked) {
-                    const userLocation = await LocationHelpers.getUsersLocation(message);
-                    if (userLocation) {
-                      queryBuilder.setUserLocation(
-                        userLocation.latitude,
-                        userLocation.longitude
-                      );
-                      setSelectedFeatures(checkedValues);
-                      if (featureStorageKey) {
-                        localStorage.setItem(
-                          featureStorageKey,
-                          JSON.stringify(checkedValues)
-                        );
-                      }
-                      await getCaves();
-                    } else {
-                      const updatedValues = checkedValues.filter(
-                        (value) => value !== "distanceMiles"
-                      );
-                      setSelectedFeatures(updatedValues);
-                      if (featureStorageKey) {
-                        localStorage.setItem(
-                          featureStorageKey,
-                          JSON.stringify(updatedValues)
-                        );
-                      }
-                    }
-                  } else {
-                    queryBuilder.setUserLocation(undefined, undefined);
-                    queryBuilder.buildAsQueryString();
-
-                    setSelectedFeatures(checkedValues);
-                    if (featureStorageKey) {
-                      localStorage.setItem(
-                        featureStorageKey,
-                        JSON.stringify(checkedValues)
-                      );
-                    }
-                  }
-                }}
+                onChange={handleDisplayFeaturesChange}
               />
               <div className="caves-mobile-toolbar-row">
                 <div className="caves-mobile-toolbar-row__sort">
@@ -602,53 +511,7 @@ const CavesComponent: React.FC = () => {
             title="Display Attributes"
             options={displayFeatureOptions}
             value={selectedFeatures}
-            onChange={async (checkedValues) => {
-              const previousFeatures = selectedFeatures;
-              const isDistanceBeingChecked = checkedValues.includes(
-                "distanceMiles" as NestedKeyOf<CaveSearchVm>
-              ) && !previousFeatures.includes("distanceMiles");
-
-              if (isDistanceBeingChecked) {
-                const userLocation = await LocationHelpers.getUsersLocation(message);
-                if (userLocation) {
-                  queryBuilder.setUserLocation(
-                    userLocation.latitude,
-                    userLocation.longitude
-                  );
-                  setSelectedFeatures(checkedValues);
-                  if (featureStorageKey) {
-                    localStorage.setItem(
-                      featureStorageKey,
-                      JSON.stringify(checkedValues)
-                    );
-                  }
-                  await getCaves();
-                } else {
-                  // Remove distanceMiles from selection if permission denied
-                  const updatedValues = checkedValues.filter(
-                    (value) => value !== "distanceMiles"
-                  );
-                  setSelectedFeatures(updatedValues);
-                  if (featureStorageKey) {
-                    localStorage.setItem(
-                      featureStorageKey,
-                      JSON.stringify(updatedValues)
-                    );
-                  }
-                }
-              } else {
-                queryBuilder.setUserLocation(undefined, undefined);
-                queryBuilder.buildAsQueryString(); // Clear out user location from URL
-
-                setSelectedFeatures(checkedValues);
-                if (featureStorageKey) {
-                  localStorage.setItem(
-                    featureStorageKey,
-                    JSON.stringify(checkedValues)
-                  );
-                }
-              }
-            }}
+            onChange={handleDisplayFeaturesChange}
           />
         )}
         <SpinnerCardComponent spinning={isCavesLoading}>
@@ -657,6 +520,15 @@ const CavesComponent: React.FC = () => {
             noDataDescription={"No caves found"}
             noDataCreateButton={<CaveCreateButtonComponent />}
             renderItem={(cave) => {
+
+              const distanceMilesKey = nameof<CaveSearchVm>("distanceMiles") as NestedKeyOf<CaveSearchVm>;
+              const shouldShowDistanceFromMe =
+                selectedFeatures.includes(distanceMilesKey) &&
+                cave.primaryEntranceLatitude !== null &&
+                cave.primaryEntranceLatitude !== undefined &&
+                cave.primaryEntranceLongitude !== null &&
+                cave.primaryEntranceLongitude !== undefined;
+
               const actions: GridCardAction[] = [
                 {
                   key: "view",
@@ -687,14 +559,24 @@ const CavesComponent: React.FC = () => {
                   stickyFooter
                   stickyHeader
                   header={
-                    <span>
-                      <span className="caves-result-card__display-id">
-                        {cave.displayId}
-                      </span>{" "}
-                      <span className="caves-result-card__name">
-                        {cave.name}
-                      </span>
-                    </span>
+                    <div className="caves-result-card__header">
+                      <div className="caves-result-card__title">
+                        <span className="caves-result-card__display-id">
+                          {cave.displayId}
+                        </span>{" "}
+                        <span className="caves-result-card__name">
+                          {cave.name}
+                        </span>
+                      </div>
+                      {shouldShowDistanceFromMe && (
+                        <div className="caves-result-card__distance-from-me">
+                          <DistanceFromMeComponent
+                            latitude={cave.primaryEntranceLatitude}
+                            longitude={cave.primaryEntranceLongitude}
+                          />
+                        </div>
+                      )}
+                    </div>
                   }
                   headerExtra={
                     <FavoriteCave
@@ -706,28 +588,26 @@ const CavesComponent: React.FC = () => {
                   }
                 >
                   <Space direction="vertical" size={3}>
-                    {selectedFeatures.map((featureKey) => (
-                      <div
-                        key={featureKey}
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Typography.Text
-                          style={{ marginRight: "8px", fontWeight: "bold" }}
+                    {selectedFeatures
+                      .filter((featureKey) => featureKey !== nameof<CaveSearchVm>("distanceMiles"))
+                      .map((featureKey) => (
+                        <div
+                          key={featureKey}
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
                         >
-                          {
-                            possibleFeaturesToRender.find(
-                              (f) => f.value === featureKey
-                            )?.display
-                          }
-                          :
-                        </Typography.Text>
-                        {renderFeature(cave, featureKey)}
-                      </div>
-                    ))}
+                          <Typography.Text
+                            style={{ marginRight: "8px", fontWeight: "bold" }}
+                          >
+                            {CAVE_SEARCH_DISPLAY_FEATURE_LABELS[featureKey]}
+                            :
+                          </Typography.Text>
+                          {renderFeature(cave, featureKey)}
+                        </div>
+                      ))}
                     {cave.narrativeSnippet && (
                       <>
                         <Typography.Text

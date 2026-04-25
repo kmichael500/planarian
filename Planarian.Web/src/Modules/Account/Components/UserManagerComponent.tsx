@@ -4,7 +4,6 @@ import {
   Form,
   Input,
   message,
-  Card,
   Row,
   Col,
   Select,
@@ -263,7 +262,7 @@ const UserManagerComponent: React.FC = () => {
 
   return (
     <>
-      <Card className="user-manager-card">
+      <div className="user-manager-container">
         <ScrollCollapseSection visible={!isGridScrolled}>
           <div className="user-manager-toolbar">
             <div className="user-manager-controls-column">
@@ -322,7 +321,7 @@ const UserManagerComponent: React.FC = () => {
             />
           </SpinnerCardComponent>
         </div>
-      </Card>
+      </div>
 
       <Modal
         title="Invite User"

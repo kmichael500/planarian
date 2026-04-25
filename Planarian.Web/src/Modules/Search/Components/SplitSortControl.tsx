@@ -43,6 +43,7 @@ const SplitSortControl: React.FC<SplitSortControlProps> = ({
             void onSelect(key);
           },
         }}
+        overlayClassName="planarian-split-sort__menu planarian-dropdown--touch"
         trigger={["click"]}
       >
         <Button

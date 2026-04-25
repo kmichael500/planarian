@@ -66,6 +66,18 @@ body,
   color: var(--text-color) !important;
 }
 
+.planarian-dropdown--touch {
+  --planarian-dropdown-item-min-height: 48px;
+  --planarian-dropdown-item-padding-block: 10px;
+}
+
+.planarian-dropdown--touch .ant-dropdown-menu-item {
+  align-items: center;
+  display: flex;
+  min-height: var(--planarian-dropdown-item-min-height);
+  padding-block: var(--planarian-dropdown-item-padding-block);
+}
+
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover,
 .ant-dropdown .ant-dropdown-menu-item:hover {

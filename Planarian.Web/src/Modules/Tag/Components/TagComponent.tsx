@@ -1,13 +1,15 @@
-import { Col, Spin } from "antd";
+import { Spin } from "antd";
 import { PresetColorType, PresetStatusColorType } from "antd/es/_util/colors";
 import { LiteralUnion } from "antd/es/_util/type";
 import { useEffect, useState } from "react";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
+import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 
 export interface TripTagComponentProps {
-  tagId: string;
+  tagId?: string;
+  item?: SelectListItem<string>;
   color?: LiteralUnion<PresetColorType | PresetStatusColorType>;
 }
 
@@ -16,9 +18,20 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
   const [isTagNameLoading, setIsTagNameLoading] = useState(true);
 
   useEffect(() => {
+    if (props.item) {
+      setIsTagNameLoading(false);
+      return;
+    }
+
+    if (!props.tagId) {
+      setTagName(undefined);
+      setIsTagNameLoading(false);
+      return;
+    }
+
     const getTagName = async () => {
       try {
-        const tripNameResponse = await SettingsService.GetTagName(props.tagId);
+        const tripNameResponse = await SettingsService.GetTagName(props.tagId!);
         setTagName(tripNameResponse);
       } catch (error) {
         setTagName("Error");
@@ -27,20 +40,23 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
     };
 
     getTagName();
-  }, [props.tagId]);
+  }, [props.item, props.tagId]);
+
+  const displayValue = props.item?.display ?? tagName;
+  const colorKey = props.item?.value ?? props.tagId;
 
   return (
-    <Spin spinning={isTagNameLoading}>
+    <Spin spinning={!props.item && isTagNameLoading}>
       <PlanarianTag
-        key={props.tagId}
+        key={colorKey}
         color={props.color}
-        colorKey={props.tagId}
+        colorKey={colorKey}
         style={{
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}
       >
-        {defaultIfEmpty(tagName)}
+        {defaultIfEmpty(displayValue)}
       </PlanarianTag>
     </Spin>
   );

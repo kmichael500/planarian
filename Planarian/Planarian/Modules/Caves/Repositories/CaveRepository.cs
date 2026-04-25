@@ -67,7 +67,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     "StartSel=<mark>,StopSel=</mark>,MaxWords=30,MinWords=10,MaxFragments=100,FragmentDelimiter= ...<br><br>"
                 ) // options
                 : null,
-            CountyId = e.County!.Id,
+            County = new SelectListItem<string>(e.County!.Name, e.County.Id),
             CountyDisplayId = e.County!.DisplayId,
             CountyNumber = e.CountyNumber,
             DisplayId =
@@ -110,7 +110,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     .Min()
                 : null,
             IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
-            ReportedByTagIds = e.CaveReportedByNameTags.Select(ee => ee.TagTypeId),
+            ReportedByTags = e.CaveReportedByNameTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
             Name = e.Name,
             LengthFeet = e.LengthFeet,
             DepthFeet = e.DepthFeet,
@@ -118,14 +119,17 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             NumberOfPits = e.NumberOfPits,
             ReportedOn = e.ReportedOn,
             IsArchived = e.IsArchived,
-            MapStatusTagIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
-            GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
-            BiologyTagIds = e.BiologyTags.Select(ee => ee.TagTypeId),
-            ArchaeologyTagIds = e.ArcheologyTags.Select(ee => ee.TagTypeId),
-            CartographerNameTagIds = e.CartographerNameTags.Select(ee => ee.TagTypeId),
-            GeologicAgeTagIds = e.GeologicAgeTags.Select(ee => ee.TagTypeId),
-            PhysiographicProvinceTagIds = e.PhysiographicProvinceTags.Select(ee => ee.TagTypeId),
-            OtherTagIds = e.CaveOtherTags.Select(ee => ee.TagTypeId),
+            MapStatusTags = e.MapStatusTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            GeologyTags = e.GeologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            BiologyTags = e.BiologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            ArchaeologyTags = e.ArcheologyTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            CartographerNameTags = e.CartographerNameTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            GeologicAgeTags = e.GeologicAgeTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            PhysiographicProvinceTags = e.PhysiographicProvinceTags.Select(ee =>
+                new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
+            OtherTags = e.CaveOtherTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
         });
 
         var orderedQuery = filterQuery.SortBy switch

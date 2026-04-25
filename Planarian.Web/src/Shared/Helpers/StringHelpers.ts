@@ -85,13 +85,6 @@ export function isNullOrWhiteSpace(
   return input.replace(/\s/g, "").length < 1;
 }
 
-export function getDirectionsUrl(
-  latitude: string | number,
-  longitude: string | number
-): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=car`;
-}
-
 //#region nameof
 
 export const nameof = <T extends object>(name: NestedKeyOf<T>): string => name;

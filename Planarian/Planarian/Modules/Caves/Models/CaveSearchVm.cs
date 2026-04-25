@@ -1,3 +1,5 @@
+using Planarian.Model.Shared;
+
 namespace Planarian.Modules.Caves.Models;
 
 public class CaveSearchVm
@@ -13,7 +15,7 @@ public class CaveSearchVm
     public double? LengthFeet { get; set; }
     public double? MaxPitDepthFeet { get; set; }
     public int? NumberOfPits { get; set; }
-    public string CountyId { get; set; }
+    public SelectListItem<string> County { get; set; }
     public string CountyDisplayId { get; set; } = null!;
     public int CountyNumber { get; set; }
     public string DisplayId { get; set; }
@@ -26,13 +28,13 @@ public class CaveSearchVm
 
     public bool IsFavorite { get; set; }
 
-    public IEnumerable<string> ArchaeologyTagIds { get; set; }
-    public IEnumerable<string> BiologyTagIds { get; set; }
-    public IEnumerable<string> CartographerNameTagIds { get; set; }
-    public IEnumerable<string> GeologicAgeTagIds { get; set; }
-    public IEnumerable<string> GeologyTagIds { get; set; }
-    public IEnumerable<string> MapStatusTagIds { get; set; }
-    public IEnumerable<string> OtherTagIds { get; set; }
-    public IEnumerable<string> PhysiographicProvinceTagIds { get; set; }
-    public IEnumerable<string> ReportedByTagIds { get; set; }
+    public IEnumerable<SelectListItem<string>> ArchaeologyTags { get; set; }
+    public IEnumerable<SelectListItem<string>> BiologyTags { get; set; }
+    public IEnumerable<SelectListItem<string>> CartographerNameTags { get; set; }
+    public IEnumerable<SelectListItem<string>> GeologicAgeTags { get; set; }
+    public IEnumerable<SelectListItem<string>> GeologyTags { get; set; }
+    public IEnumerable<SelectListItem<string>> MapStatusTags { get; set; }
+    public IEnumerable<SelectListItem<string>> OtherTags { get; set; }
+    public IEnumerable<SelectListItem<string>> PhysiographicProvinceTags { get; set; }
+    public IEnumerable<SelectListItem<string>> ReportedByTags { get; set; }
 }

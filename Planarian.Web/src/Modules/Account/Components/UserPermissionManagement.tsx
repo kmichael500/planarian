@@ -187,7 +187,7 @@ export const UserPermissionManagement: React.FC<
       value: cave.id,
       display: cave.name,
       data: {
-        countyId: cave.countyId,
+        countyId: cave.county.value,
         requestUserHasAccess: true,
       },
     };
@@ -397,7 +397,7 @@ export const UserPermissionManagement: React.FC<
                   description={
                     <div style={{ display: "flex" }}>
                       <span>County:&nbsp;</span>
-                      <CountyTagComponent countyId={cave.countyId} />
+                      <CountyTagComponent item={cave.county} />
                     </div>
                   }
                 />

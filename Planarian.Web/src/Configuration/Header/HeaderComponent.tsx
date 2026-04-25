@@ -1,6 +1,6 @@
-import { Col, Drawer, Grid, Row, Spin, Typography } from "antd";
+import { Drawer, Grid, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
-import { useContext, useEffect, useState } from "react";
+import { CSSProperties, useContext, useEffect, useState } from "react";
 import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
 import { PlanarianTag } from "../../Shared/Components/Display/PlanarianTag";
@@ -14,11 +14,13 @@ import { ProfileMenu } from "../Menu/ProfileMenuComponent";
 import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
 import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import "./HeaderComponent.scss";
 
 const { useBreakpoint } = Grid;
 
 const HeaderComponent = () => {
-  const { headerTitle, headerButtons } = useContext(AppContext);
+  const { defaultContentStyle, headerTitle, headerButtons } =
+    useContext(AppContext);
 
   const isAuthenticated = AuthenticationService.IsAuthenticated();
   const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
@@ -40,6 +42,13 @@ const HeaderComponent = () => {
   }, [headerTitle]);
 
   const [visible, setVisible] = useState(false);
+  const sideBarMenuItems = SideBarMenuItems();
+  const isHeaderTitleLoading =
+    headerTitle[0] == null ||
+    (typeof headerTitle[0] === "string" && isNullOrWhiteSpace(headerTitle[0]));
+  const headerStyle = {
+    "--planarian-header-content-spacing": defaultContentStyle.margin,
+  } as CSSProperties;
 
   return (
     <>
@@ -48,43 +57,17 @@ const HeaderComponent = () => {
       </Helmet>
 
       <Header
-        style={{
-          paddingTop: "4px",
-          paddingBottom: "4px",
-          paddingRight: "16px",
-          paddingLeft: "16px",
-          height: "70px",
-          lineHeight: "normal",
-          background: "var(--background-color)",
-          position: "sticky",
-          top: 0,
-          zIndex: 1000,
-          width: "100%",
-          border: "1px solid var(--header-border-color, #f0f0f0)",
-        }}
+        className="planarian-header"
+        style={headerStyle}
       >
-        <Spin
-          style={{ width: "100%" }}
-          spinning={
-            headerTitle[0] == null ||
-            (typeof headerTitle[0] === "string" &&
-              isNullOrWhiteSpace(headerTitle[0]))
-          }
-        >
-          <Row
-            align="middle"
-            gutter={10}
-            style={{ minHeight: "60px", width: "100%" }}
-          >
-            <Col>
-              {!isLargeScreenSize && (
-                <PlanarianButton
-                  className="menu"
-                  icon={<MenuOutlined />}
-                  onClick={() => setVisible(true)}
-                />
-              )}
-
+        <div className="planarian-header__inner">
+          {!isLargeScreenSize && (
+            <>
+              <PlanarianButton
+                className="planarian-header__menu-button menu"
+                icon={<MenuOutlined />}
+                onClick={() => setVisible(true)}
+              />
               <Drawer
                 bodyStyle={{ padding: 0 }}
                 title="Planarian"
@@ -96,45 +79,37 @@ const HeaderComponent = () => {
                   onMenuItemClick={() => {
                     setVisible(false);
                   }}
-                  menuItems={[...SideBarMenuItems()]}
+                  menuItems={sideBarMenuItems}
                 />
               </Drawer>
-            </Col>
-            <Col flex="1 1 0" style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {typeof headerTitle[0] === "string" ? (
-                  <Typography.Title level={4} style={{ margin: 0 }}>
-                    {headerTitle[0]}
-                  </Typography.Title>
-                ) : (
-                  <Typography.Title level={4} style={{ margin: 0 }}>
-                    {headerTitle[0]}
-                  </Typography.Title>
-                )}
-              </div>
-            </Col>
+            </>
+          )}
 
-            {hasAccount && (
-              <Col style={{ flexShrink: 0 }}>
-                <AccountNameTag />
-              </Col>
+          <div className="planarian-header__title">
+            {typeof headerTitle[0] === "string" ? (
+              <Typography.Title
+                className="planarian-header__title-text"
+                level={4}
+              >
+                {isHeaderTitleLoading ? "" : headerTitle[0]}
+              </Typography.Title>
+            ) : (
+              <div className="planarian-header__title-text">
+                {isHeaderTitleLoading ? null : headerTitle[0]}
+              </div>
             )}
+          </div>
+
+          <div className="planarian-header__actions">
+            {hasAccount && <AccountNameTag />}
             {headerButtons.map((button, index) => (
-              <Col key={index}>{button}</Col>
+              <div className="planarian-header__action" key={index}>
+                {button}
+              </div>
             ))}
-            {isAuthenticated && (
-              <Col style={{ flexShrink: 0 }}>
-                <ProfileMenu />
-              </Col>
-            )}
-          </Row>
-        </Spin>
+            {isAuthenticated && <ProfileMenu />}
+          </div>
+        </div>
       </Header>
     </>
   );

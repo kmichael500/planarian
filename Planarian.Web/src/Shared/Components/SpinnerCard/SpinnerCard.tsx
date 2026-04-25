@@ -1,91 +1,42 @@
+import type React from "react";
+import type { ReactNode } from "react";
 import "./SpinnerCard.scss";
 
 interface SpinnerCardProps {
-  children?: React.ReactNode;
+  children?: ReactNode;
   className?: string;
+  numberOfCards?: number;
   spinning: boolean;
 }
 
-type PlaceholderCard = {
-  accentClass: string;
-  duration: string;
-  delay: string;
-  pulseScale: string;
-  pulseOpacity: string;
-  pulseBrightness: string;
-};
+const DEFAULT_CARD_COUNT = 8;
 
-const PLACEHOLDER_CARDS: PlaceholderCard[] = [
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--rose",
-    duration: "1.2s",
-    delay: "-0.8s",
-    pulseScale: "1.05",
-    pulseOpacity: "0.72",
-    pulseBrightness: "1.08",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--amber",
-    duration: "1.35s",
-    delay: "-0.3s",
-    pulseScale: "1.07",
-    pulseOpacity: "0.7",
-    pulseBrightness: "1.09",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--leaf",
-    duration: "1.4s",
-    delay: "-1.1s",
-    pulseScale: "1.06",
-    pulseOpacity: "0.71",
-    pulseBrightness: "1.08",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--aqua",
-    duration: "1.25s",
-    delay: "-0.5s",
-    pulseScale: "1.08",
-    pulseOpacity: "0.68",
-    pulseBrightness: "1.1",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--violet",
-    duration: "1.3s",
-    delay: "-0.9s",
-    pulseScale: "1.05",
-    pulseOpacity: "0.72",
-    pulseBrightness: "1.08",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--coral",
-    duration: "1.15s",
-    delay: "-0.2s",
-    pulseScale: "1.07",
-    pulseOpacity: "0.69",
-    pulseBrightness: "1.09",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--mint",
-    duration: "1.45s",
-    delay: "-1.3s",
-    pulseScale: "1.06",
-    pulseOpacity: "0.7",
-    pulseBrightness: "1.08",
-  },
-  {
-    accentClass: "planarian-spinner-card__placeholder-card--indigo",
-    duration: "1.25s",
-    delay: "-0.6s",
-    pulseScale: "1.08",
-    pulseOpacity: "0.68",
-    pulseBrightness: "1.1",
-  },
-];
+const SkeletonCard = () => (
+  <div className="planarian-spinner-card__placeholder-card">
+    <div className="planarian-spinner-card__placeholder-header">
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-title" />
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-badge" />
+    </div>
+    <div className="planarian-spinner-card__placeholder-body">
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-line planarian-spinner-card__placeholder-line--short" />
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-line" />
+      <div className="planarian-spinner-card__placeholder-tags">
+        <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-tag" />
+        <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-tag planarian-spinner-card__placeholder-tag--short" />
+      </div>
+    </div>
+    <div className="planarian-spinner-card__placeholder-footer">
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-button" />
+      <span className="planarian-spinner-card__placeholder planarian-spinner-card__placeholder-button" />
+    </div>
+  </div>
+);
 
 const SpinnerCardComponent: React.FC<SpinnerCardProps> = ({
   spinning,
   children,
   className,
+  numberOfCards = DEFAULT_CARD_COUNT,
 }) => {
   if (!spinning) {
     return <>{children}</>;
@@ -96,136 +47,11 @@ const SpinnerCardComponent: React.FC<SpinnerCardProps> = ({
     .join(" ");
 
   return (
-    <div className={classNames}>
-      <div className="planarian-spinner-card__surface">
-        <div className="planarian-spinner-card__grid" aria-hidden="true">
-          {PLACEHOLDER_CARDS.map((card, index) => (
-            <div
-              key={`${card.accentClass}-${index}`}
-              className={[
-                "planarian-spinner-card__placeholder-card",
-                card.accentClass,
-              ].join(" ")}
-            >
-              <div className="planarian-spinner-card__placeholder-header">
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-title"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-badge"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-              </div>
-
-              <div className="planarian-spinner-card__placeholder-body">
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-line planarian-spinner-card__placeholder-line--strong"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-line"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-                <div className="planarian-spinner-card__placeholder-tags">
-                  <div
-                    className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-tag"
-                    style={
-                      {
-                        "--planarian-spinner-duration": card.duration,
-                        "--planarian-spinner-delay": card.delay,
-                        "--planarian-spinner-pulse-scale": card.pulseScale,
-                        "--planarian-spinner-pulse-opacity":
-                          card.pulseOpacity,
-                        "--planarian-spinner-pulse-brightness":
-                          card.pulseBrightness,
-                      } as React.CSSProperties
-                    }
-                  />
-                  <div
-                    className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-tag planarian-spinner-card__placeholder-tag--short"
-                    style={
-                      {
-                        "--planarian-spinner-duration": card.duration,
-                        "--planarian-spinner-delay": card.delay,
-                        "--planarian-spinner-pulse-scale": card.pulseScale,
-                        "--planarian-spinner-pulse-opacity":
-                          card.pulseOpacity,
-                        "--planarian-spinner-pulse-brightness":
-                          card.pulseBrightness,
-                      } as React.CSSProperties
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="planarian-spinner-card__placeholder-footer">
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-button planarian-spinner-card__placeholder-button--primary"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-                <div
-                  className="planarian-spinner-card__pulse planarian-spinner-card__placeholder-button"
-                  style={
-                    {
-                      "--planarian-spinner-duration": card.duration,
-                      "--planarian-spinner-delay": card.delay,
-                      "--planarian-spinner-pulse-scale": card.pulseScale,
-                      "--planarian-spinner-pulse-opacity": card.pulseOpacity,
-                      "--planarian-spinner-pulse-brightness":
-                        card.pulseBrightness,
-                    } as React.CSSProperties
-                  }
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className={classNames} aria-busy="true" aria-live="polite">
+      <div className="planarian-spinner-card__grid" aria-hidden="true">
+        {Array.from({ length: numberOfCards }, (_, index) => (
+          <SkeletonCard key={index} />
+        ))}
       </div>
     </div>
   );

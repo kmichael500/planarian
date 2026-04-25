@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import { CarOutlined, CloudUploadOutlined } from "@ant-design/icons";
+import { CloudUploadOutlined } from "@ant-design/icons";
 import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
-  Card,
   Col,
   Collapse,
   Descriptions,
   Grid,
   Row,
   Space,
-  Tooltip,
   Select,
   DatePicker,
   InputNumber,
+  Skeleton,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
@@ -24,7 +23,6 @@ import {
   formatDate,
   formatDistance,
   formatNumber,
-  getDirectionsUrl,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
@@ -47,10 +45,43 @@ import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
+import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
+
+const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
+  <Descriptions bordered>
+    {Array.from({ length: rows }, (_, index) => (
+      <Descriptions.Item
+        label={<Skeleton.Input active size="small" />}
+        key={index}
+      >
+        <Skeleton.Input active block size="small" />
+      </Descriptions.Item>
+    ))}
+  </Descriptions>
+);
+
+const CaveDetailSkeleton = () => (
+  <>
+    <PlanarianDividerComponent title="Information" hideTopSpacing />
+    <SkeletonDescriptionGrid rows={10} />
+
+    <PlanarianDividerComponent title="Entrances" />
+    <SkeletonDescriptionGrid rows={6} />
+
+    <PlanarianDividerComponent title="Narrative" />
+    <Skeleton active paragraph={{ rows: 4 }} title={false} />
+
+    <PlanarianDividerComponent title="Files" />
+    <Skeleton active paragraph={{ rows: 3 }} title={false} />
+
+    <PlanarianDividerComponent title="Map" />
+    <Skeleton.Node active style={{ height: 360, width: "100%" }} />
+  </>
+);
 
 export interface CaveComponentOptions {
   showMap?: boolean;
@@ -243,16 +274,12 @@ const CaveComponent = ({
       isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && (
         <Descriptions.Item
           label={
-            <Space>
-              Coordinates
-              <a
-                href={getDirectionsUrl(entrance.latitude, entrance.longitude)}
-                target="_blank"
-              >
-                <Tooltip title="Directions">
-                  <CarOutlined />
-                </Tooltip>
-              </a>
+            <Space direction="vertical" size={0}>
+              <span>Coordinates</span>
+              <DistanceFromMeComponent
+                latitude={entrance.latitude}
+                longitude={entrance.longitude}
+              />
             </Space>
           }
           key="coordinates"
@@ -342,7 +369,7 @@ const CaveComponent = ({
 
   const content = (
     <>
-      <PlanarianDividerComponent title="Information" />
+      <PlanarianDividerComponent title="Information" hideTopSpacing />
       <Descriptions layout={descriptionLayout} bordered>
         {descriptionItems}
       </Descriptions>
@@ -622,12 +649,7 @@ const CaveComponent = ({
   return (
     <>
       {inCardContainer ? (
-        <Card
-          bodyStyle={!isLoading ? { paddingTop: "0px" } : {}}
-          loading={isLoading}
-        >
-          {content}
-        </Card>
+        isLoading ? <CaveDetailSkeleton /> : content
       ) : (
         content
       )}

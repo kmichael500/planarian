@@ -1,4 +1,5 @@
 @import "./styles/theme-tokens.css";
+@import "./styles/planarian-palette.css";
 
 body {
   margin: 0;

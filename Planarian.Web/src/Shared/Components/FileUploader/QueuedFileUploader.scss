@@ -1,4 +1,5 @@
 .import-files-dashboard {
+  --import-files-dashboard-pane-padding: 12px 14px;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -6,7 +7,7 @@
   min-height: 0;
   overflow: hidden;
   gap: 12px;
-  padding: 8px;
+  padding: 0;
   border-radius: 12px;
   position: relative;
   color: var(--text-color);
@@ -40,7 +41,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface-color) 90%, transparent);
-  padding: 14px 16px;
+  padding: var(--import-files-dashboard-pane-padding);
 }
 
 .import-files-dashboard__toolbar .planarian-toolbar__primary {
@@ -104,7 +105,7 @@
   max-height: 100%;
   height: 100%;
   overflow: hidden;
-  padding: 12px 14px;
+  padding: var(--import-files-dashboard-pane-padding);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--surface-color);
