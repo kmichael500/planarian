@@ -1,7 +1,9 @@
 import { Empty, Card, List } from "antd";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { PagedResult } from "../../../Modules/Search/Models/PagedResult";
 import { QueryBuilder } from "../../../Modules/Search/Services/QueryBuilder";
+import { getScrollState } from "../../Scroll/getScrollState";
+import type { ScrollState } from "../../Scroll/ScrollState";
 import { CardGridPagination } from "./CardGridPagination";
 import "./CardGridComponent.scss";
 
@@ -19,7 +21,10 @@ interface CardGridComponentProps<
   onSearch?: () => Promise<void>;
   useList?: boolean;
   fillHeight?: boolean;
-  onScrollStateChange?: (isScrolled: boolean) => void;
+  onScrollStateChange?: (
+    isScrolled: boolean,
+    state?: ScrollState
+  ) => void;
 }
 
 const CardGridComponent = <T extends object, TQueryBuilder extends object>({
@@ -36,7 +41,27 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
   onScrollStateChange,
 }: CardGridComponentProps<T, TQueryBuilder>) => {
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const isScrolledRef = useRef(false);
+  const previousScrollTopRef = useRef(0);
   let data: T[] = [];
+
+  const notifyScrollStateChange = useCallback(
+    (scrollTop: number) => {
+      const nextScrollState = getScrollState(
+        previousScrollTopRef.current,
+        scrollTop
+      );
+
+      previousScrollTopRef.current = nextScrollState.nextPreviousScrollTop;
+      isScrolledRef.current = nextScrollState.isScrolled;
+
+      onScrollStateChange?.(
+        nextScrollState.isScrolled,
+        nextScrollState.state
+      );
+    },
+    [onScrollStateChange]
+  );
 
   if (items) {
     data = items;
@@ -55,6 +80,11 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
           if (onSearch) {
             await onSearch();
           }
+
+          if (bodyRef.current) {
+            bodyRef.current.scrollTop = 0;
+          }
+          notifyScrollStateChange(0);
         }}
       />
     </div>
@@ -70,8 +100,7 @@ const CardGridComponent = <T extends object, TQueryBuilder extends object>({
         className="planarian-card-grid__body"
         ref={bodyRef}
         onScroll={(event) => {
-          const body = event.currentTarget;
-          onScrollStateChange?.(body.scrollTop > 0);
+          notifyScrollStateChange(event.currentTarget.scrollTop);
         }}
       >
         {data.length === 0 && (

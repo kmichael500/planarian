@@ -1,6 +1,9 @@
 import { CSSProperties, ReactNode } from "react";
-import { Checkbox, Collapse } from "antd";
+import { RightOutlined } from "@ant-design/icons";
+import { Checkbox } from "antd";
 import type { CheckboxOptionType } from "antd/es/checkbox";
+import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
+import "./FeatureCheckboxGroup.scss";
 
 interface FeatureCheckboxGroupProps<
   TValue extends string | number | boolean
@@ -39,23 +42,35 @@ const FeatureCheckboxGroup = <TValue extends string | number | boolean>({
   );
 
   if (collapsible) {
+    const isCollapsed = collapsed ?? false;
+
     return (
-      <Collapse
-        className="feature-checkbox-group feature-checkbox-group--compact"
-        activeKey={collapsed ? [] : ["content"]}
-        onChange={(keys) => {
-          onCollapsedChange?.(
-            Array.isArray(keys) ? !keys.includes("content") : keys !== "content"
-          );
-        }}
-        items={[
-          {
-            key: "content",
-            label: title,
-            children: checkboxGroup,
-          },
-        ]}
-      />
+      <div className="feature-checkbox-group feature-checkbox-group--compact">
+        <button
+          type="button"
+          className="feature-checkbox-group__toggle"
+          aria-expanded={!isCollapsed}
+          onClick={() => onCollapsedChange?.(!isCollapsed)}
+        >
+          <span className="feature-checkbox-group__toggle-label">{title}</span>
+          <RightOutlined
+            className={[
+              "feature-checkbox-group__toggle-icon",
+              isCollapsed ? "" : "feature-checkbox-group__toggle-icon--expanded",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          />
+        </button>
+        <ScrollCollapseSection
+          visible={!isCollapsed}
+          className="feature-checkbox-group__content"
+        >
+          <div className="feature-checkbox-group__content-inner">
+            {checkboxGroup}
+          </div>
+        </ScrollCollapseSection>
+      </div>
     );
   }
 

@@ -34,9 +34,11 @@ import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/Spi
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
+import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
 import "./UserManagerComponent.scss";
 
 const { Text } = Typography;
+const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
 type UserStatusFilter = "all" | "accepted" | "pending";
 type UserSortBy =
@@ -54,9 +56,12 @@ const UserManagerComponent: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
   const [sortDescending, setSortDescending] = useState(true);
-  const [isGridScrolled, setIsGridScrolled] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const toolbarVisibility = useScrollRevealVisibility({
+    breakpointPx: USER_MANAGER_COLLAPSE_BREAKPOINT_PX,
+    mode: "direct",
+  });
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -263,17 +268,22 @@ const UserManagerComponent: React.FC = () => {
   return (
     <>
       <div className="user-manager-container">
-        <ScrollCollapseSection visible={!isGridScrolled}>
-          <div className="user-manager-toolbar">
-            <div className="user-manager-controls-column">
-              <div className="user-manager-controls">
-                <Input.Search
-                  className="user-manager-search"
-                  placeholder="Search users"
-                  onSearch={(value) => setSearchText(value)}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  allowClear
-                />
+        <div className="user-manager-toolbar">
+          <div className="user-manager-toolbar__search-row">
+            <Input.Search
+              className="user-manager-search"
+              placeholder="Search users"
+              onSearch={(value) => setSearchText(value)}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+          </div>
+          <ScrollCollapseSection
+            className="user-manager-toolbar__collapsible"
+            visible={toolbarVisibility.isVisible}
+          >
+            <div className="user-manager-toolbar__secondary-rows">
+              <div className="user-manager-toolbar__secondary-controls">
                 <Select<UserStatusFilter>
                   className="user-manager-filter"
                   value={statusFilter}
@@ -294,21 +304,21 @@ const UserManagerComponent: React.FC = () => {
                   sortOptions={sortOptions}
                 />
               </div>
+              <div className="user-manager-invite-column">
+                <PlanarianButton
+                  className="user-manager-invite-button"
+                  permissionKey={PermissionKey.Admin}
+                  icon={<UserAddOutlined />}
+                  type="primary"
+                  alwaysShowChildren
+                  onClick={() => setInviteModalVisible(true)}
+                >
+                  Invite User
+                </PlanarianButton>
+              </div>
             </div>
-            <div className="user-manager-invite-column">
-              <PlanarianButton
-                className="user-manager-invite-button"
-                permissionKey={PermissionKey.Admin}
-                icon={<UserAddOutlined />}
-                type="primary"
-                alwaysShowChildren
-                onClick={() => setInviteModalVisible(true)}
-              >
-                Invite User
-              </PlanarianButton>
-            </div>
-          </div>
-        </ScrollCollapseSection>
+          </ScrollCollapseSection>
+        </div>
         <div className="user-manager-grid">
           <SpinnerCardComponent spinning={loading}>
             <CardGridComponent
@@ -316,7 +326,7 @@ const UserManagerComponent: React.FC = () => {
               items={filteredUsers}
               itemKey={(user) => user.userId}
               noDataDescription="No users found"
-              onScrollStateChange={setIsGridScrolled}
+              onScrollStateChange={toolbarVisibility.handleScrollStateChange}
               renderItem={renderUserCard}
             />
           </SpinnerCardComponent>

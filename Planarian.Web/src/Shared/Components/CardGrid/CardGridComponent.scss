@@ -68,6 +68,7 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  overscroll-behavior-y: none;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
