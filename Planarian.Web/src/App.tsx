@@ -31,11 +31,20 @@ const AppContent: React.FC = () => {
           <AppContext.Consumer>
             {({ isInitialized, isLoading, initializedError, contentStyle }) =>
               isInitialized ? (
-                <Layout style={{ minHeight: "calc(var(--vh, 1vh) * 100)" }}>
+                <Layout
+                  style={{
+                    height: "calc(var(--vh, 1vh) * 100)",
+                    minHeight: 0,
+                    overflow: "hidden",
+                  }}
+                >
                   <SideBarComponent />
                   <Layout className="site-layout">
                     <HeaderComponent />
-                    <Content style={contentStyle ?? {}}>
+                    <Content
+                      className="site-layout-content"
+                      style={contentStyle ?? {}}
+                    >
                       <AppRouting />
                     </Content>
                   </Layout>

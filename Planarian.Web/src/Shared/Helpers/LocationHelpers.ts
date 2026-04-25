@@ -5,6 +5,40 @@ import { formatCoordinateNumber } from "./StringHelpers";
 let locationRequestPromise: Promise<{ latitude: number; longitude: number; } | null> | null = null;
 
 export const LocationHelpers = {
+    getDirectionsUrl: (
+        latitude: string | number,
+        longitude: string | number
+    ): string =>
+        `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=car`,
+
+    getDistanceFeet: (
+        fromLatitude: number,
+        fromLongitude: number,
+        toLatitude: number,
+        toLongitude: number
+    ): number => {
+        const earthRadiusMiles = 3958.8;
+        const toRadians = (degrees: number) => degrees * (Math.PI / 180);
+        const latitudeDelta = toRadians(toLatitude - fromLatitude);
+        const longitudeDelta = toRadians(toLongitude - fromLongitude);
+        const fromLatitudeRadians = toRadians(fromLatitude);
+        const toLatitudeRadians = toRadians(toLatitude);
+
+        const haversine =
+            Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+            Math.cos(fromLatitudeRadians) *
+            Math.cos(toLatitudeRadians) *
+            Math.sin(longitudeDelta / 2) *
+            Math.sin(longitudeDelta / 2);
+
+        const distanceMiles =
+            earthRadiusMiles *
+            2 *
+            Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+        return distanceMiles * 5280;
+    },
+
     getUsersLocation: async (message?: MessageInstance): Promise<{ latitude: number; longitude: number; } | null> => {
         if (locationRequestPromise) {
             return locationRequestPromise;

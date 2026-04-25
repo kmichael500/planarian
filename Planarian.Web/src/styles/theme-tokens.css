@@ -1,4 +1,13 @@
 :root {
+  --primary-color: rgb(104, 141, 248);
+  --primary-action-background: rgb(104, 141, 248);
+  --primary-action-hover-background: rgb(88, 128, 245);
+  --primary-action-border-color: rgb(104, 141, 248);
+  --primary-action-text-color: #fff;
+  --map-action-background: #fff;
+  --map-action-hover-background: #f3f4f6;
+  --map-action-border-color: #d1d5db;
+  --map-action-text-color: #1f2937;
   --background-color: #fff;
   --text-color: #222;
   --muted-text-color: #5d6570;
@@ -16,6 +25,15 @@
 }
 
 .dark {
+  --primary-color: rgb(116, 147, 255);
+  --primary-action-background: #111827;
+  --primary-action-hover-background: #1f2937;
+  --primary-action-border-color: #374151;
+  --primary-action-text-color: #fff;
+  --map-action-background: #111827;
+  --map-action-hover-background: #1f2937;
+  --map-action-border-color: #374151;
+  --map-action-text-color: #fff;
   --background-color: #181a1b;
   --text-color: #eee;
   --muted-text-color: #adb3bf;

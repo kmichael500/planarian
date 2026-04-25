@@ -9,7 +9,11 @@ const CaveCreateButtonComponent: React.FC<CaveCreateButtonProps> = (
 ) => {
   return (
     <Link to={`/caves/add`}>
-      <AddButtonComponent type="primary" />
+      <AddButtonComponent
+        alwaysShowChildren
+        className="caves-page__header-add-button"
+        type="primary"
+      />
     </Link>
   );
 };

@@ -1,4 +1,10 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
@@ -31,6 +37,9 @@ interface AppContextProps {
   defaultContentStyle: React.CSSProperties;
   contentStyle: React.CSSProperties | null;
   setContentStyle: (style: React.CSSProperties) => void;
+  setContentStyleOverrides: (style: React.CSSProperties) => void;
+  setFullHeightContentStyle: (style?: React.CSSProperties) => void;
+  resetContentStyle: () => void;
   pendingInvitationCount: number;
   refreshPendingInvitations: () => Promise<void>;
 }
@@ -54,6 +63,9 @@ export const AppContext = createContext<AppContextProps>({
   },
   contentStyle: null,
   setContentStyle: () => {},
+  setContentStyleOverrides: () => {},
+  setFullHeightContentStyle: () => {},
+  resetContentStyle: () => {},
   pendingInvitationCount: 0,
   refreshPendingInvitations: async () => {},
 });
@@ -81,13 +93,42 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   const [pendingInvitationCount, setPendingInvitationCount] =
     useState<number>(0);
 
-  const defaultContentStyle = {
-    margin: "16px",
-  } as React.CSSProperties;
+  const defaultContentStyle = useMemo(
+    () =>
+      ({
+        margin: "16px",
+      } as React.CSSProperties),
+    []
+  );
 
   const [contentStyle, setContentStyle] = useState<React.CSSProperties | null>(
     defaultContentStyle
   );
+
+  const setContentStyleOverrides = useCallback(
+    (style: React.CSSProperties) => {
+      setContentStyle({
+        ...defaultContentStyle,
+        ...style,
+      });
+    },
+    [defaultContentStyle]
+  );
+
+  const setFullHeightContentStyle = useCallback(
+    (style?: React.CSSProperties) => {
+      setContentStyleOverrides({
+        display: "flex",
+        overflow: "hidden",
+        ...style,
+      });
+    },
+    [setContentStyleOverrides]
+  );
+
+  const resetContentStyle = useCallback(() => {
+    setContentStyle(defaultContentStyle);
+  }, [defaultContentStyle]);
 
   const refreshPendingInvitations = useCallback(async () => {
     if (!AuthenticationService.IsAuthenticated()) {
@@ -155,6 +196,9 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         initializedError: initializedError,
         contentStyle: contentStyle,
         setContentStyle: setContentStyle,
+        setContentStyleOverrides: setContentStyleOverrides,
+        setFullHeightContentStyle: setFullHeightContentStyle,
+        resetContentStyle: resetContentStyle,
         defaultContentStyle: defaultContentStyle,
         pendingInvitationCount: pendingInvitationCount,
         refreshPendingInvitations: refreshPendingInvitations,

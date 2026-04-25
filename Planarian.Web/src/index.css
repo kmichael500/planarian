@@ -1,4 +1,5 @@
 @import "./styles/theme-tokens.css";
+@import "./styles/planarian-palette.css";
 
 body {
   margin: 0;
@@ -14,6 +15,12 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 html,

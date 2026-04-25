@@ -1,0 +1,249 @@
+.planarian-card-grid-pagination {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  position: relative;
+  background: color-mix(in srgb, var(--surface-color) 94%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.planarian-card-grid-pagination__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.planarian-card-grid-pagination__summary-primary {
+  color: var(--text-color);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.planarian-card-grid-pagination__summary-page-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: -4px;
+  padding: 4px;
+  text-align: left;
+}
+
+.planarian-card-grid-pagination__summary-page-button:hover {
+  color: var(--primary-color, #1677ff);
+}
+
+.planarian-card-grid-pagination__summary-page-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #1677ff) 20%, transparent);
+  outline: none;
+}
+
+.planarian-card-grid-pagination__summary-page-button .anticon {
+  font-size: 0.72rem;
+}
+
+.planarian-card-grid-pagination__summary-secondary {
+  color: var(--text-secondary-color);
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.planarian-card-grid-pagination__pages,
+.planarian-card-grid-pagination__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.planarian-card-grid-pagination__pages {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.planarian-card-grid-pagination__nav {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.planarian-card-grid-pagination__ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary-color);
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font: inherit;
+  letter-spacing: 0.14em;
+  min-height: 40px;
+  min-width: 24px;
+  padding: 0;
+  position: relative;
+}
+
+.planarian-card-grid-pagination__ellipsis:hover:not(:disabled) {
+  color: var(--text-color);
+}
+
+.planarian-card-grid-pagination__ellipsis:focus-visible {
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #1677ff) 20%, transparent);
+  outline: none;
+}
+
+.planarian-card-grid-pagination__ellipsis:disabled {
+  color: var(--muted-text-color);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.planarian-card-grid-pagination__button,
+.planarian-card-grid-pagination__ellipsis {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.planarian-card-grid-pagination__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-color);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0 12px;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.planarian-card-grid-pagination__button:hover:not(:disabled) {
+  background: var(--hover-surface-color);
+  border-color: color-mix(in srgb, var(--primary-color, #1677ff) 28%, var(--border-color));
+}
+
+.planarian-card-grid-pagination__button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #1677ff) 20%, transparent);
+  outline: none;
+}
+
+.planarian-card-grid-pagination__button:disabled {
+  color: var(--muted-text-color);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.planarian-card-grid-pagination__button--active {
+  background: color-mix(in srgb, var(--primary-color, #1677ff) 14%, var(--surface-color));
+  border-color: color-mix(in srgb, var(--primary-color, #1677ff) 42%, var(--border-color));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #1677ff) 18%, transparent);
+  color: var(--text-color);
+}
+
+.planarian-card-grid-pagination__button--active:disabled {
+  color: var(--text-color);
+  opacity: 1;
+}
+
+.planarian-card-grid-pagination__button--nav {
+  min-width: auto;
+  padding: 0 10px;
+}
+
+.planarian-card-grid-pagination__button--nav .anticon {
+  font-size: 0.85rem;
+}
+
+.planarian-card-grid-pagination__page-menu .ant-dropdown-menu {
+  max-height: min(360px, calc(100vh - 120px));
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .planarian-card-grid-pagination {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .planarian-card-grid-pagination__summary-primary {
+    font-size: 0.9rem;
+  }
+
+  .planarian-card-grid-pagination__summary-page-button {
+    font-size: 0.9rem;
+  }
+
+  .planarian-card-grid-pagination__summary-secondary {
+    font-size: 0.8rem;
+  }
+
+  .planarian-card-grid-pagination__button,
+  .planarian-card-grid-pagination__ellipsis {
+    min-height: 38px;
+    min-width: 38px;
+  }
+
+  .planarian-card-grid-pagination__button {
+    border-radius: 8px;
+    padding: 0 10px;
+  }
+
+  .planarian-card-grid-pagination__button--nav {
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .planarian-card-grid-pagination {
+    gap: 8px;
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+
+  .planarian-card-grid-pagination__summary-secondary {
+    display: none;
+  }
+
+  .planarian-card-grid-pagination__button,
+  .planarian-card-grid-pagination__ellipsis {
+    min-height: 34px;
+    min-width: 34px;
+  }
+
+  .planarian-card-grid-pagination__button {
+    font-size: 0.92rem;
+    padding: 0 8px;
+  }
+
+  .planarian-card-grid-pagination__button--nav {
+    min-width: auto;
+    padding: 0 8px;
+  }
+}

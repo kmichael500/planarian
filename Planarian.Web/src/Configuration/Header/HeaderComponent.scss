@@ -1,0 +1,55 @@
+.planarian-header.ant-layout-header {
+  background: var(--background-color);
+  border-bottom: 1px solid var(--header-border-color, #f0f0f0);
+  height: 58px;
+  line-height: normal;
+  padding-block: 6px;
+  padding-inline: var(--planarian-header-content-spacing, 16px);
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+.planarian-header__inner {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-height: 46px;
+  min-width: 0;
+  width: 100%;
+}
+
+.planarian-header__menu-button {
+  flex: 0 0 auto;
+}
+
+.planarian-header__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.planarian-header__title-text,
+.planarian-header__title-text.ant-typography {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planarian-header__title-text .ant-typography {
+  margin: 0;
+}
+
+.planarian-header__actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-width: 0;
+}
+
+.planarian-header__action {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
