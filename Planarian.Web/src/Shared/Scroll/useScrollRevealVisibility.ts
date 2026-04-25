@@ -34,6 +34,7 @@ const useScrollRevealVisibility = ({
   revealThresholdRatio = 0.12,
 }: UseScrollRevealVisibilityOptions = {}): UseScrollRevealVisibilityResult => {
   const contentElementRef = useRef<HTMLDivElement | null>(null);
+  const contentResizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isVisible, setIsVisible] = useState(initialVisible);
   const [isWithinBreakpoint, setIsWithinBreakpoint] = useState(() =>
     breakpointPx === undefined
@@ -61,13 +62,30 @@ const useScrollRevealVisibility = ({
     topZoneRevealLockedRef.current = false;
   }, [initialVisible]);
 
+  const disconnectContentResizeObserver = useCallback(() => {
+    if (contentResizeObserverRef.current) {
+      contentResizeObserverRef.current.disconnect();
+      contentResizeObserverRef.current = null;
+    }
+  }, []);
+
   const contentRef = useCallback((node: HTMLDivElement | null) => {
+    disconnectContentResizeObserver();
     contentElementRef.current = node;
 
     if (node) {
       setMeasuredContentHeight(node.scrollHeight);
+
+      if (typeof ResizeObserver !== "undefined") {
+        const observer = new ResizeObserver(() => {
+          setMeasuredContentHeight(node.scrollHeight);
+        });
+
+        observer.observe(node);
+        contentResizeObserverRef.current = observer;
+      }
     }
-  }, []);
+  }, [disconnectContentResizeObserver]);
 
   const handleScrollStateChange = useCallback(
     (isScrolled: boolean, state?: ScrollState) => {
@@ -130,28 +148,8 @@ const useScrollRevealVisibility = ({
   }, [breakpointPx]);
 
   useEffect(() => {
-    if (
-      typeof ResizeObserver === "undefined" ||
-      !contentElementRef.current
-    ) {
-      return;
-    }
-
-    const element = contentElementRef.current;
-    const updateMeasuredHeight = () => {
-      setMeasuredContentHeight(element.scrollHeight);
-    };
-
-    updateMeasuredHeight();
-
-    const observer = new ResizeObserver(() => {
-      updateMeasuredHeight();
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, []);
+    return () => disconnectContentResizeObserver();
+  }, [disconnectContentResizeObserver]);
 
   return {
     contentRef,
