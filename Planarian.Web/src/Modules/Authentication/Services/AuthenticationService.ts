@@ -82,8 +82,29 @@ const AuthenticationService = {
   ResetUnauthorizedHandling(): void {
     isHandlingUnauthorized = false;
   },
+  IsAuthenticated(): boolean {
+    return sessionSnapshot.currentUser != null;
+  },
   GetAccountId(): string | null {
     return sessionSnapshot.currentUser?.currentAccountId ?? null;
+  },
+  SwitchAccountFull(
+    accountId: string,
+    navigate?: (to: string, options?: { replace?: boolean }) => void,
+    redirectPath?: string | null
+  ): void {
+    const userId = sessionSnapshot.currentUser?.id;
+    if (userId) {
+      this.SetStoredAccountId(userId, accountId);
+    }
+
+    const targetPath = redirectPath ?? "/";
+    if (navigate) {
+      navigate(targetPath, { replace: true });
+      return;
+    }
+
+    window.location.assign(targetPath);
   },
   SetStoredAccountId(userId: string, accountId: string): void {
     const storage = getStorage();
