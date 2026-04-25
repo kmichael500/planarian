@@ -62,7 +62,6 @@ const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
 const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
 const MOBILE_TOOLBAR_HIDE_THRESHOLD_PX = 32;
 const MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX = 12;
-const MOBILE_TOOLBAR_REVEAL_DELAY_MS = 50;
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -420,8 +419,7 @@ const CavesComponent: React.FC = () => {
   const mobileToolbarVisibility = useScrollRevealVisibility({
     enabled: isMobile,
     hideThresholdPx: MOBILE_TOOLBAR_HIDE_THRESHOLD_PX,
-    mode: "mobileDebounce",
-    revealDelayMs: MOBILE_TOOLBAR_REVEAL_DELAY_MS,
+    mode: "thresholdLockout",
     revealThresholdPx: MOBILE_TOOLBAR_REVEAL_THRESHOLD_PX,
   });
 

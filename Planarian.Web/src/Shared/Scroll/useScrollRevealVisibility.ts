@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScrollState } from "./ScrollState";
 
-type ScrollRevealVisibilityMode = "direct" | "mobileDebounce";
+type ScrollRevealVisibilityMode = "direct" | "thresholdLockout";
 
 interface UseScrollRevealVisibilityOptions {
   breakpointPx?: number;
@@ -9,7 +9,6 @@ interface UseScrollRevealVisibilityOptions {
   hideThresholdPx?: number;
   initialVisible?: boolean;
   mode?: ScrollRevealVisibilityMode;
-  revealDelayMs?: number;
   revealThresholdPx?: number;
 }
 
@@ -25,7 +24,6 @@ const useScrollRevealVisibility = ({
   hideThresholdPx = 32,
   initialVisible = true,
   mode = "direct",
-  revealDelayMs = 140,
   revealThresholdPx = 12,
 }: UseScrollRevealVisibilityOptions = {}): UseScrollRevealVisibilityResult => {
   const [isVisible, setIsVisible] = useState(initialVisible);
@@ -36,29 +34,13 @@ const useScrollRevealVisibility = ({
         ? true
         : window.innerWidth <= breakpointPx
   );
-  const revealTimeoutRef = useRef<number | null>(null);
+  const topZoneRevealLockedRef = useRef(false);
   const isActive = enabled && isWithinBreakpoint;
 
-  const clearRevealTimeout = useCallback(() => {
-    if (revealTimeoutRef.current !== null) {
-      window.clearTimeout(revealTimeoutRef.current);
-      revealTimeoutRef.current = null;
-    }
-  }, []);
-
   const reset = useCallback(() => {
-    clearRevealTimeout();
     setIsVisible(initialVisible);
-  }, [clearRevealTimeout, initialVisible]);
-
-  const scheduleReveal = useCallback(() => {
-    clearRevealTimeout();
-
-    revealTimeoutRef.current = window.setTimeout(() => {
-      setIsVisible(true);
-      revealTimeoutRef.current = null;
-    }, revealDelayMs);
-  }, [clearRevealTimeout, revealDelayMs]);
+    topZoneRevealLockedRef.current = false;
+  }, [initialVisible]);
 
   const handleScrollStateChange = useCallback(
     (isScrolled: boolean, state?: ScrollState) => {
@@ -74,42 +56,26 @@ const useScrollRevealVisibility = ({
       const scrollTop = Math.max(state?.scrollTop ?? 0, 0);
       const direction = state?.direction ?? "idle";
 
-      if (direction === "down" || scrollTop > revealThresholdPx) {
-        clearRevealTimeout();
-      }
-
       if (scrollTop >= hideThresholdPx) {
         setIsVisible(false);
+        topZoneRevealLockedRef.current = false;
         return;
       }
 
       if (scrollTop <= revealThresholdPx) {
-        if (direction === "up" || direction === "idle") {
-          if (!isVisible) {
-            scheduleReveal();
-          }
-        } else {
-          clearRevealTimeout();
+        if (
+          (direction === "up" || direction === "idle") &&
+          !isVisible &&
+          !topZoneRevealLockedRef.current
+        ) {
+          setIsVisible(true);
+          topZoneRevealLockedRef.current = true;
         }
         return;
       }
-
-      clearRevealTimeout();
     },
-    [
-      clearRevealTimeout,
-      hideThresholdPx,
-      isActive,
-      isVisible,
-      mode,
-      revealThresholdPx,
-      scheduleReveal,
-    ]
+    [hideThresholdPx, isActive, isVisible, mode, revealThresholdPx]
   );
-
-  useEffect(() => {
-    return () => clearRevealTimeout();
-  }, [clearRevealTimeout]);
 
   useEffect(() => {
     if (!isActive) {
