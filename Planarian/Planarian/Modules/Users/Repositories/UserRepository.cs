@@ -81,7 +81,7 @@ public class UserRepository : RepositoryBase
     public async Task<List<AcceptInvitationVm>> GetPendingInvitationsForCurrentUser()
     {
         var email = await DbContext.Users
-            .Where(e => e.Id == RequestUser.Id && !e.IsTemporary)
+            .Where(e => e.Id == RequestUser.Id && !e.IsTemporary && e.EmailConfirmedOn != null)
             .Select(e => e.EmailAddress)
             .FirstOrDefaultAsync();
 

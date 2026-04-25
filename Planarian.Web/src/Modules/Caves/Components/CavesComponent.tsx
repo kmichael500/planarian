@@ -259,8 +259,11 @@ const CavesComponent: React.FC = () => {
   const handleDisplayFeaturesChange = async (
     checkedValues: NestedKeyOf<CaveSearchVm>[]
   ) => {
+    const isDistanceSelected = checkedValues.includes("distanceMiles");
+    const isDistanceSorted =
+      queryBuilder.getSortBy() === CaveSearchSortByConstants.DistanceMiles;
     const isDistanceBeingChecked =
-      checkedValues.includes("distanceMiles") &&
+      isDistanceSelected &&
       !selectedFeatures.includes("distanceMiles");
 
     if (isDistanceBeingChecked) {
@@ -284,7 +287,9 @@ const CavesComponent: React.FC = () => {
       return;
     }
 
-    queryBuilder.setUserLocation(undefined, undefined);
+    if (!isDistanceSelected && !isDistanceSorted) {
+      queryBuilder.setUserLocation(undefined, undefined);
+    }
     queryBuilder.buildAsQueryString();
     setSelectedFeatures(checkedValues);
     persistSelectedFeatures(checkedValues);
