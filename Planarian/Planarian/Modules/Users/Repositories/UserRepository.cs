@@ -42,19 +42,19 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-    public async Task<NameProfilePhotoVm> GetUserDisplayInfo(string userId)
+    public async Task<NameProfilePhotoVm?> GetUserDisplayInfo(string userId)
     {
-        return await DbContext.Users
-            .Where(e => e.Id == userId)
-            .Select(e => new NameProfilePhotoVm(e.FullName, e.ProfilePhotoBlobKey))
-            .FirstAsync();
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == userId && e.User != null)
+            .Select(e => new NameProfilePhotoVm(e.User!.FullName, e.User.ProfilePhotoBlobKey))
+            .FirstOrDefaultAsync();
     }
 
     public async Task<string?> GetUserProfilePhotoBlobKey(string userId)
     {
-        return await DbContext.Users
-            .Where(e => e.Id == userId)
-            .Select(e => e.ProfilePhotoBlobKey)
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == userId && e.User != null)
+            .Select(e => e.User!.ProfilePhotoBlobKey)
             .FirstOrDefaultAsync();
     }
 

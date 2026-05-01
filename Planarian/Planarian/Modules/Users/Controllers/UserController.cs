@@ -51,7 +51,7 @@ public class UserController : PlanarianControllerBase<UserService>
     public async Task<IActionResult> GetUserProfilePhoto(string userId, CancellationToken cancellationToken)
     {
         var result = await Service.GetUserProfilePhotoResponse(userId, cancellationToken);
-        return CreateFileResult(result);
+        return await CreateFileResult(result);
     }
 
     [HttpPut("current")]

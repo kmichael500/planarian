@@ -63,7 +63,10 @@ public class UserService : ServiceBase<UserRepository>
 
     public async Task<NameProfilePhotoVm> GetUserDisplayInfo(string userId)
     {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
         var user = await Repository.GetUserDisplayInfo(userId);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
 
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
 
@@ -77,6 +80,8 @@ public class UserService : ServiceBase<UserRepository>
     public async Task<AuthenticatedFileResponse> GetUserProfilePhotoResponse(string userId,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
         var blobKey = await Repository.GetUserProfilePhotoBlobKey(userId);
         if (string.IsNullOrWhiteSpace(blobKey))
             throw ApiExceptionDictionary.NotFound("Profile photo");

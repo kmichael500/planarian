@@ -75,20 +75,31 @@ public class BlobService
     {
         try
         {
-            var blobDownload = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
-            var blobContentType = string.IsNullOrWhiteSpace(blobDownload.Value.Details.ContentType)
+            var blobProperties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var blobContentType = string.IsNullOrWhiteSpace(blobProperties.Value.ContentType)
                 ? fallbackContentType ?? BinaryContentType
-                : blobDownload.Value.Details.ContentType;
+                : blobProperties.Value.ContentType;
             var (contentType, forceDownload) = FileResponsePolicy.Resolve(fileName, blobContentType, download);
 
             return new AuthenticatedFileResponse
             {
-                Stream = blobDownload.Value.Content,
+                OpenReadStreamAsync = async readCancellationToken =>
+                {
+                    try
+                    {
+                        var blobDownload = await blobClient.DownloadStreamingAsync(cancellationToken: readCancellationToken);
+                        return blobDownload.Value.Content;
+                    }
+                    catch (RequestFailedException ex) when (ex.Status == 404)
+                    {
+                        throw ApiExceptionDictionary.NotFound("File");
+                    }
+                },
                 ContentType = contentType,
                 FileName = fileName,
                 Download = forceDownload,
-                EntityTag = EntityTagHeaderValue.Parse(blobDownload.Value.Details.ETag.ToString()),
-                LastModified = blobDownload.Value.Details.LastModified
+                EntityTag = EntityTagHeaderValue.Parse(blobProperties.Value.ETag.ToString()),
+                LastModified = blobProperties.Value.LastModified
             };
         }
         catch (RequestFailedException ex) when (ex.Status == 404)

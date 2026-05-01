@@ -25,7 +25,7 @@ public class FileController : PlanarianControllerBase<FileService>
         CancellationToken cancellationToken)
     {
         var result = await Service.CreateFileResponse(fileId, false, cancellationToken);
-        return CreateFileResult(result);
+        return await CreateFileResult(result);
     }
 
     [HttpGet("{fileId:length(10)}/download")]
@@ -33,7 +33,7 @@ public class FileController : PlanarianControllerBase<FileService>
     public async Task<IActionResult> DownloadFile(string fileId, CancellationToken cancellationToken)
     {
         var result = await Service.CreateFileResponse(fileId, true, cancellationToken);
-        return CreateFileResult(result);
+        return await CreateFileResult(result);
     }
 
     [HttpPut("multiple")]

@@ -51,7 +51,7 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         CancellationToken cancellationToken)
     {
         var result = await Service.CreateArchiveDownloadResponse(blobKey, cancellationToken);
-        return CreateFileResult(result);
+        return await CreateFileResult(result);
     }
 
     [HttpDelete("archive")]

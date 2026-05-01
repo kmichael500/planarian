@@ -278,14 +278,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         return;
       }
 
-      AuthenticationService.SetStoredAccountId(currentUser.id, accountId);
-
-      if (redirectPath) {
-        window.location.assign(redirectPath);
-        return;
-      }
-
-      window.location.reload();
+      AuthenticationService.SwitchAccount(accountId, redirectPath);
     },
     [currentUser]
   );

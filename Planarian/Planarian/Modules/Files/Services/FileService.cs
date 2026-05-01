@@ -431,7 +431,7 @@ public class FileService : ServiceBase<FileRepository>
 
         var response = await CreateBlobResponse(blobProperties.BlobKey, blobProperties.ContainerName, file.FileName,
             false, CancellationToken.None);
-        return response.Stream;
+        return await response.OpenReadStreamAsync(CancellationToken.None);
     }
 }
 

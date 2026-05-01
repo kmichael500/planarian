@@ -88,22 +88,15 @@ const AuthenticationService = {
   GetAccountId(): string | null {
     return sessionSnapshot.currentUser?.currentAccountId ?? null;
   },
-  SwitchAccountFull(
-    accountId: string,
-    navigate?: (to: string, options?: { replace?: boolean }) => void,
-    redirectPath?: string | null
-  ): void {
+  SwitchAccount(accountId: string, redirectPath?: string | null): void {
     const userId = sessionSnapshot.currentUser?.id;
     if (userId) {
       this.SetStoredAccountId(userId, accountId);
     }
 
-    const targetPath = redirectPath ?? "/";
-    if (navigate) {
-      navigate(targetPath, { replace: true });
-      return;
-    }
-
+    const targetPath =
+      redirectPath ??
+      `${window.location.pathname}${window.location.search}${window.location.hash}`;
     window.location.assign(targetPath);
   },
   SetStoredAccountId(userId: string, accountId: string): void {

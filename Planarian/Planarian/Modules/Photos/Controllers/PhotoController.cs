@@ -30,7 +30,7 @@ public class PhotoController : PlanarianControllerBase<PhotoService>
     public async Task<IActionResult> GetPhotoContent(string photoId, CancellationToken cancellationToken)
     {
         var result = await Service.GetPhotoResponse(photoId, cancellationToken);
-        return CreateFileResult(result);
+        return await CreateFileResult(result);
     }
 
     #endregion
