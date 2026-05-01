@@ -13,6 +13,17 @@ const FileService = {
     await HttpClient.put<string>(`${filesBaseUrl}/multiple`, values);
   },
 
+  async getFileBlob(fileId: string): Promise<Blob> {
+    const response = await HttpClient.get<Blob>(
+      `${filesBaseUrl}/${fileId}/${FileAccessAction.View}`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    return response.data;
+  },
+
   getFileAccessUrl(fileId: string, action: FileAccessAction): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
       `${filesBaseUrl}/${fileId}/${action}`
