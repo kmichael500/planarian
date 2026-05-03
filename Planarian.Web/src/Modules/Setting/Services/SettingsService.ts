@@ -15,6 +15,12 @@ const SettingsService = {
     );
     return response.data;
   },
+  async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {
+    const response = await HttpClient.get<NameProfilePhotoVm>(
+      `${baseUrl}/users/${userId}`
+    );
+    return response.data;
+  },
   async GetStates(
     permissionKey: PermissionKey | null = null
   ): Promise<SelectListItem<string>[]> {
@@ -72,12 +78,6 @@ const SettingsService = {
     }
     const response = await HttpClient.get<string>(`${baseUrl}/tags/${tagId}`);
     CacheService.set(cacheKey, response.data);
-    return response.data;
-  },
-  async GetUsersName(userId: string): Promise<NameProfilePhotoVm> {
-    const response = await HttpClient.get<NameProfilePhotoVm>(
-      `${baseUrl}/users/${userId}`
-    );
     return response.data;
   },
   async GetUsers(): Promise<SelectListItem<string>[]> {

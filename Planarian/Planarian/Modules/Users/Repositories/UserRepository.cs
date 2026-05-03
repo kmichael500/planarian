@@ -42,6 +42,22 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
+    public async Task<NameProfilePhotoVm?> GetUserDisplayInfo(string userId)
+    {
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == userId && e.User != null)
+            .Select(e => new NameProfilePhotoVm(e.User!.FullName, e.User.ProfilePhotoBlobKey))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<string?> GetUserProfilePhotoBlobKey(string userId)
+    {
+        return await DbContext.AccountUsers
+            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == userId && e.User != null)
+            .Select(e => e.User!.ProfilePhotoBlobKey)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<User?> GetUserByPasswordResetCode(string code)
     {
         return await DbContext.Users.Where(e => e.PasswordResetCode == code).FirstOrDefaultAsync();
@@ -329,4 +345,4 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
-}
+ }

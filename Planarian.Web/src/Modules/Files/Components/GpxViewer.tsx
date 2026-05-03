@@ -173,7 +173,7 @@ export const GpxViewer: React.FC<GpxViewerProps> = ({
     setGpxGeoJson(null);
     setGpxBounds(null);
 
-    fetch(embedUrl)
+    fetch(embedUrl, { credentials: "include" })
       .then((response) => response.text())
       .then((data) => {
         if (isCancelled) {

@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Form, Checkbox, Col, Row, message } from "antd";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 type FeatureFormValues = {
   [key in FeatureKey]?: boolean;
@@ -54,6 +55,7 @@ export const EnabledFieldsComponent = ({
   onChange?: (featureKey: FeatureKey, checked: boolean) => void;
 }) => {
   const [form] = Form.useForm<FeatureFormValues>();
+  const { currentAccountId } = useContext(AppContext);
 
   const handleCheckboxChange = async (
     featureKey: FeatureKey,
@@ -61,7 +63,11 @@ export const EnabledFieldsComponent = ({
   ) => {
     const originalValue = form.getFieldValue(featureKey);
     try {
-      await AccountService.CreateOrUpdateFeatureSetting(featureKey, checked);
+      await AccountService.CreateOrUpdateFeatureSetting(
+        featureKey,
+        checked,
+        currentAccountId
+      );
       if (onChange) {
         onChange(featureKey, checked);
       }

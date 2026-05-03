@@ -10,14 +10,14 @@ import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettingsVm } from "../Components/MiscAccountSettingsComponent";
 import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CacheService } from "../../../Shared/Services/CacheService";
 import { CaveDryRunRecord } from "../../Import/Models/CaveDryRunRecord";
 import { EntranceDryRun } from "../../Import/Models/EntranceDryRun";
 import { FileImportResult } from "../../Import/Models/FileUploadresult";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
-import { FileAccessUrlVm } from "../../Files/Services/FileService";
+import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import {
   ImportFileRequest,
   ImportFileUploadSession,
@@ -68,11 +68,9 @@ const AccountService = {
   },
 
   async StartArchiveDownload(blobKey: string): Promise<void> {
-    const response = await HttpClient.post<FileAccessUrlVm>(
-      `${baseUrl}/archive/download?blobKey=${encodeURIComponent(blobKey)}`,
-      {}
+    HttpHelpers.NavigateToApiUrl(
+      `${baseUrl}/archive/download?blobKey=${encodeURIComponent(blobKey)}`
     );
-    window.location.assign(response.data.url);
   },
 
   async DeleteArchive(blobKey: string): Promise<void> {
@@ -196,8 +194,11 @@ const AccountService = {
   },
   //#endregion
 
-  async GetFeatureSettings(resetCache: boolean = false) {
-    const cacheKey = `${AuthenticationService.GetAccountId}-featureSettings`;
+  async GetFeatureSettings(
+    resetCache: boolean = false,
+    accountId?: string | null
+  ) {
+    const cacheKey = `${accountId ?? "anonymous"}-featureSettings`;
 
     const cachedData = CacheService.get<FeatureSettingVm[]>(cacheKey);
     if (!resetCache && cachedData) {
@@ -205,7 +206,12 @@ const AccountService = {
     }
 
     const response = await HttpClient.get<FeatureSettingVm[]>(
-      `${baseUrl}/feature-settings`
+      `${baseUrl}/feature-settings`,
+      {
+        headers: !isNullOrWhiteSpace(accountId)
+          ? { "x-account": accountId }
+          : undefined,
+      }
     );
 
     CacheService.set(cacheKey, response.data);
@@ -213,11 +219,22 @@ const AccountService = {
     return response.data;
   },
 
-  async CreateOrUpdateFeatureSetting(key: FeatureKey, isEnabled: boolean) {
+  async CreateOrUpdateFeatureSetting(
+    key: FeatureKey,
+    isEnabled: boolean,
+    accountId?: string | null
+  ) {
     const response = await HttpClient.post<FeatureSettingVm[]>(
       `${baseUrl}/feature-settings/${key}?isEnabled=${isEnabled}`,
-      {}
+      {},
+      {
+        headers: !isNullOrWhiteSpace(accountId)
+          ? { "x-account": accountId }
+          : undefined,
+      }
     );
+    const cacheKey = `${accountId ?? "anonymous"}-featureSettings`;
+    CacheService.set(cacheKey, response.data);
     return response.data;
   },
 

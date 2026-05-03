@@ -34,6 +34,7 @@ import { TagType } from "../../Tag/Models/TagType";
 import {
   Fragment,
   ReactNode,
+  useContext,
   useCallback,
   useEffect,
   useMemo,
@@ -44,9 +45,9 @@ import { CancelButtonComponent } from "../../../Shared/Components/Buttons/Cancel
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
 import { performCaveExport, ExportType } from "../Service/CaveExportService";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { getFeatureKeyLabel } from "../../Account/Models/FeatureKeyHelpers";
 import { EntranceLocationFilter } from "../../Search/Helpers/EntranceLocationFilterHelpers";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 export interface CaveAdvancedSearchDrawerProps {
   queryBuilder: QueryBuilder<CaveSearchParamsVm>;
@@ -129,7 +130,8 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
   filterClearSignal,
 }) => {
   const { isFeatureEnabled } = useFeatureEnabled();
-  const accountId = AuthenticationService.GetAccountId();
+  const { currentAccountId: accountId, currentAccountName } =
+    useContext(AppContext);
   const exportFeatureStorageKey = accountId
     ? `${accountId}-exportFeatures`
     : "exportFeatures";
@@ -229,14 +231,15 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
       await performCaveExport(
         pendingExportType,
         queryBuilder,
-        exportFeatureKeys
+        exportFeatureKeys,
+        currentAccountName
       );
       setIsExportModalVisible(false);
       setPendingExportType(null);
     } finally {
       setIsExporting(false);
     }
-  }, [pendingExportType, queryBuilder, exportFeatureKeys]);
+  }, [currentAccountName, pendingExportType, queryBuilder, exportFeatureKeys]);
 
   const handleExportCancel = useCallback(() => {
     setIsExportModalVisible(false);

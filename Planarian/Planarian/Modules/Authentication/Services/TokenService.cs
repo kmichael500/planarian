@@ -82,10 +82,4 @@ public class TokenService
             signingCredentials: credentials);
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
     }
-
-    private JwtSecurityToken ValidateToken(string token)
-    {
-        _tokenHandler.ValidateToken(token, GetTokenValidationParameters(), out _);
-        return _tokenHandler.ReadJwtToken(token);
-    }
 }

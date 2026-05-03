@@ -1,4 +1,5 @@
 using Planarian.Library.Helpers;
+using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Trips;
@@ -12,6 +13,7 @@ using Planarian.Modules.Trips.Models;
 using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Helpers;
 using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Trips.Services;
@@ -21,14 +23,16 @@ public class TripService : ServiceBase<TripRepository>
     private readonly BlobService _blobService;
     private readonly TagRepository _tagRepository;
     private readonly UserRepository _userRepository;
+    private readonly ServerOptions _serverOptions;
 
     public TripService(TripRepository repository, RequestUser requestUser, BlobService blobService,
-        TagRepository tagRepository, UserRepository userRepository) :
+        TagRepository tagRepository, UserRepository userRepository, ServerOptions serverOptions) :
         base(repository, requestUser)
     {
         _blobService = blobService;
         _tagRepository = tagRepository;
         _userRepository = userRepository;
+        _serverOptions = serverOptions;
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
@@ -76,8 +80,10 @@ public class TripService : ServiceBase<TripRepository>
 
         foreach (var photo in photos)
         {
-            var uri = _blobService.GetSasUrl(photo.Url, 24);
-            if (uri?.AbsolutePath != null) photo.Url = uri.AbsoluteUri;
+            photo.Url = UrlHelper.Build(
+                _serverOptions.ServerBaseUrl,
+                $"/api/photos/{photo.Id}/content",
+                RequestUser.AccountId);
         }
 
         return photos;

@@ -5,7 +5,6 @@ import {
   HubConnectionState,
 } from "@microsoft/signalr";
 import { AppOptions } from "../../Services/AppService";
-import { AuthenticationService } from "../../../Modules/Authentication/Services/AuthenticationService";
 
 interface UseSignalRGroupOptions {
   groupName: string | null;
@@ -39,16 +38,7 @@ function useSignalRGroup({
   useEffect(() => {
     const newConnection = new HubConnectionBuilder()
       .withUrl(AppOptions.signalrBaseUrl, {
-        accessTokenFactory: () => {
-          if (AuthenticationService.IsAuthenticated()) {
-            const token = AuthenticationService.GetToken();
-            if (token) {
-              return token;
-            }
-          }
-
-          throw new Error("No access token found");
-        },
+        withCredentials: true,
       })
       .withAutomaticReconnect()
       .build();
@@ -87,9 +77,10 @@ function useSignalRGroup({
           return;
         }
 
-        if (groupName) {
-          await connection.invoke("JoinGroup", groupName);
-          hasJoinedGroupRef.current = groupName;
+        const currentGroupName = groupNameRef.current;
+        if (currentGroupName) {
+          await connection.invoke("JoinGroup", currentGroupName);
+          hasJoinedGroupRef.current = currentGroupName;
         }
 
         await onConnectedRef.current?.();
@@ -103,12 +94,11 @@ function useSignalRGroup({
       isDisposed = true;
 
       if (
-        groupName &&
-        hasJoinedGroupRef.current === groupName &&
+        hasJoinedGroupRef.current &&
         connection.state === HubConnectionState.Connected
       ) {
         connection
-          .invoke("LeaveGroup", groupName)
+          .invoke("LeaveGroup", hasJoinedGroupRef.current)
           .catch((e) => console.error("Error leaving group: ", e));
         hasJoinedGroupRef.current = null;
       }
@@ -118,6 +108,34 @@ function useSignalRGroup({
         .stop()
         .catch((e) => console.error("Error stopping the connection: ", e));
     };
+  }, [connection]);
+
+  useEffect(() => {
+    if (!connection || connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    const syncGroup = async () => {
+      const previousGroupName = hasJoinedGroupRef.current;
+      if (previousGroupName === groupName) {
+        return;
+      }
+
+      if (previousGroupName) {
+        await connection.invoke("LeaveGroup", previousGroupName);
+      }
+
+      if (groupName) {
+        await connection.invoke("JoinGroup", groupName);
+      }
+
+      hasJoinedGroupRef.current = groupName;
+      await onConnectedRef.current?.();
+    };
+
+    syncGroup().catch((e) =>
+      console.error("Error syncing SignalR group membership: ", e)
+    );
   }, [connection, groupName]);
 }
 

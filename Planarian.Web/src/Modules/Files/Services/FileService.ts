@@ -1,5 +1,6 @@
-import { HttpClient } from "../../..";
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
+import { HttpClient } from "../../..";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const filesBaseUrl = "api/files";
 export enum FileAccessAction {
@@ -12,22 +13,27 @@ const FileService = {
     await HttpClient.put<string>(`${filesBaseUrl}/multiple`, values);
   },
 
-  async createFileSasLink(
-    fileId: string,
-    action: FileAccessAction
-  ): Promise<string> {
-    const response = await HttpClient.post<FileAccessUrlVm>(
-      `${filesBaseUrl}/${fileId}/${action}`
+  async getFileBlob(fileId: string): Promise<Blob> {
+    const response = await HttpClient.get<Blob>(
+      `${filesBaseUrl}/${fileId}/${FileAccessAction.View}`,
+      {
+        responseType: "blob",
+      }
     );
-    return response.data.url;
+
+    return response.data;
   },
 
-  async startFileDownload(fileId: string): Promise<void> {
-    const accessUrl = await this.createFileSasLink(
-      fileId,
-      FileAccessAction.Download
+  getFileAccessUrl(fileId: string, action: FileAccessAction): string {
+    return HttpHelpers.BuildAuthenticatedApiUrl(
+      `${filesBaseUrl}/${fileId}/${action}`
     );
-    window.location.assign(accessUrl);
+  },
+
+  startFileDownload(fileId: string): void {
+    HttpHelpers.NavigateToApiUrl(
+      `${filesBaseUrl}/${fileId}/${FileAccessAction.Download}`
+    );
   },
 };
 export { FileService };
@@ -41,8 +47,4 @@ export interface FileInformation {
   FileTypeKey: string;
   CaveId?: string;
   DisplayName?: string;
-}
-
-export interface FileAccessUrlVm {
-  url: string;
 }

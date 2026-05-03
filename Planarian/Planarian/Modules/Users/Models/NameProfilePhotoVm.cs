@@ -1,4 +1,4 @@
-namespace Planarian.Modules.Settings.Models;
+namespace Planarian.Modules.Users.Models;
 
 public class NameProfilePhotoVm
 {
@@ -18,6 +18,5 @@ public class NameProfilePhotoVm
 
     public string Name { get; set; } = null!;
     public string? BlobKey { get; set; }
-
     public string? ProfilePhotoUrl { get; set; }
 }

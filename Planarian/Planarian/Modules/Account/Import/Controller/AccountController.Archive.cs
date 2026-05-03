@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Services;
-using Planarian.Modules.Files.Models;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
 
@@ -44,15 +43,15 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         return Ok(result);
     }
 
-    [HttpPost("archive/download")]
+    [HttpGet("archive/download")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     [Throttle]
-    public async Task<ActionResult<FileAccessUrlVm>> DownloadArchive(
+    public async Task<IActionResult> DownloadArchive(
         [FromQuery] string blobKey,
         CancellationToken cancellationToken)
     {
-        var result = await Service.CreateArchiveDownloadUrl(blobKey, cancellationToken);
-        return new JsonResult(result);
+        var result = await Service.CreateArchiveDownloadResponse(blobKey, cancellationToken);
+        return await CreateFileResult(result);
     }
 
     [HttpDelete("archive")]

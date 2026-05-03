@@ -42,14 +42,17 @@ const AccountSettingsComponent = () => {
     [TagType.CaveOther]: FeatureKey.EnabledFieldCaveOtherTags,
   };
 
-  const { setPermissions, permissions } = useContext(AppContext);
+  const { currentAccountId, setPermissions } = useContext(AppContext);
 
   const includedTagTypes = Object.keys(tagTypeFeatureMap).sort() as TagType[];
 
   const [filteredTagTypes, setFilteredTagTypes] = useState<TagType[]>([]);
 
   const fetchFeatureSettings = async () => {
-    const enabledFeatures = await AccountService.GetFeatureSettings(true);
+    const enabledFeatures = await AccountService.GetFeatureSettings(
+      true,
+      currentAccountId
+    );
     setPermissions({ visibleFields: enabledFeatures });
 
     // Check for People tag feature keys
@@ -77,7 +80,7 @@ const AccountSettingsComponent = () => {
 
   useEffect(() => {
     fetchFeatureSettings();
-  }, []);
+  }, [currentAccountId]);
 
   const [states, setStates] = useState<SelectListItem<string>[]>([]);
   const [featureSettings, setFeatureSettings] = useState<FeatureSettingVm[]>(
