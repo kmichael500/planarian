@@ -215,10 +215,16 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setAccountIds(appOptions.accountIds);
       setPermissionKeys(appOptions.permissions);
 
-      const featureSettings =
-        isAuthenticated && resolvedCurrentAccountId
-          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
-          : [];
+      let featureSettings: FeatureSettingVm[] = [];
+      if (isAuthenticated && resolvedCurrentAccountId) {
+        try {
+          featureSettings = await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId);
+        } catch {
+          // The stored account ID is invalid — clear it so the user isn't
+          // stuck and can select a valid account after initialization.
+          AuthenticationService.ResetAccountId();
+        }
+      }
       setPermissions({ visibleFields: featureSettings });
 
       if (isAuthenticated) {
@@ -289,7 +295,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       clearSessionState();
       setInitializedError(null);
       setIsInitialized(true);
-      setIsLoading(false);
 
       const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const isLoginPage = window.location.pathname.startsWith("/login");
@@ -310,8 +315,16 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, [clearSessionState]);
 
   useEffect(() => {
-    void refreshSession().catch(() => {});
-  }, [refreshSession]);
+    void refreshSession().catch(() => {
+      // Clear local storage so that corrupt/invalid account data doesn't
+      // prevent the user from ever loading the app (blank white screen).
+      localStorage.clear();
+      sessionStorage.clear();
+      clearSessionState();
+      setInitializedError(null);
+      setIsInitialized(true);
+    });
+  }, [refreshSession, clearSessionState]);
 
   const currentAccountName = useMemo(() => {
     if (!currentAccountId) {

@@ -73,6 +73,7 @@ if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
   baseUrl = "https://wa-planarian.azurewebsites.net";
 }
 
+
 const HttpClient = axios.create({
   baseURL: baseUrl,
   withCredentials: true,
