@@ -219,9 +219,10 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       if (isAuthenticated && resolvedCurrentAccountId) {
         try {
           featureSettings = await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId);
-        } catch {
+        } catch (e) {
           // The stored account ID is invalid — clear it so the user isn't
           // stuck and can select a valid account after initialization.
+          console.error("Failed to load feature settings, clearing stored account ID:", e);
           AuthenticationService.ResetAccountId();
         }
       }
@@ -315,11 +316,20 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, [clearSessionState]);
 
   useEffect(() => {
-    void refreshSession().catch(() => {
-      // Clear local storage so that corrupt/invalid account data doesn't
+    void refreshSession().catch((e) => {
+      // Clear stored account IDs so that corrupt/invalid account data doesn't
       // prevent the user from ever loading the app (blank white screen).
-      localStorage.clear();
-      sessionStorage.clear();
+      console.error("App initialization failed, clearing stored account data:", e);
+      const clearAccountKeys = (storage: Storage) => {
+        for (let i = storage.length - 1; i >= 0; i--) {
+          const key = storage.key(i);
+          if (key && key.startsWith("currentAccountId-")) {
+            storage.removeItem(key);
+          }
+        }
+      };
+      clearAccountKeys(localStorage);
+      clearAccountKeys(sessionStorage);
       clearSessionState();
       setInitializedError(null);
       setIsInitialized(true);
