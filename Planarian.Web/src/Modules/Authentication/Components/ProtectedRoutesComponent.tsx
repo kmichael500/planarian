@@ -1,9 +1,7 @@
-import { useContext, useEffect } from "react";
+import { useContext } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { AuthenticationService } from "../Services/AuthenticationService";
 import { PermissionKey } from "../Models/PermissionKey";
-import { AppService } from "../../../Shared/Services/AppService";
 
 const ProtectedRoutesComponent = ({
   permissionKey,
@@ -12,28 +10,23 @@ const ProtectedRoutesComponent = ({
 }) => {
   const location = useLocation();
 
-  const { setIsAuthenticated } = useContext(AppContext);
+  const { hasPermission, isAuthenticated } = useContext(AppContext);
 
   const redirectUrl = encodeURIComponent(location.pathname);
 
   let url = `login?redirectUrl=${redirectUrl}`;
 
-  const isAuthenticated = AuthenticationService.IsAuthenticated();
-  let hasPermission = true;
+  let isAuthorized = true;
 
   if (permissionKey && isAuthenticated) {
-    hasPermission = AppService.HasPermission(permissionKey);
+    isAuthorized = hasPermission(permissionKey);
 
-    if (!hasPermission) {
+    if (!isAuthorized) {
       url = "unauthorized";
     }
   }
 
-  useEffect(() => {
-    setIsAuthenticated(isAuthenticated);
-  }, []);
-
-  if (isAuthenticated && hasPermission) {
+  if (isAuthenticated && isAuthorized) {
     return <Outlet />;
   } else {
     return <Navigate to={url} />;

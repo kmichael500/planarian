@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
@@ -85,7 +87,10 @@ builder.Configuration.AddJsonFile("appsettings.Development.json", false);
 #endif
 
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add(new ConditionalAutoValidateAntiforgeryTokenAttribute());
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -113,9 +118,11 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         In = ParameterLocation.Header,
-        Description = "Please insert JWT with Bearer into field",
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey
+        Description = "Use POST /api/authentication/token to get a JWT for Swagger or scripts, then paste the bearer token here.",
+        Name = HeaderNames.Authorization,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -163,6 +170,15 @@ builder.Services.AddSingleton(requestThrottleOptions);
 
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = AuthCookieService.AntiforgeryCookieName;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.Path = "/";
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.HeaderName = AuthCookieService.RequestTokenHeaderName;
+});
 
 #endregion
 
@@ -171,6 +187,7 @@ builder.Services.AddSingleton(emailOptions);
 builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<AuthCookieService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<ChunkedUploadService>();
@@ -187,7 +204,6 @@ builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
@@ -297,13 +313,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     {
         OnMessageReceived = context =>
         {
-            var accessToken = context.Request.Query["access_token"];
+            var authorizationHeader = context.Request.Headers[HeaderNames.Authorization].ToString();
+            if (authorizationHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Token = authorizationHeader["Bearer ".Length..].Trim();
+                return Task.CompletedTask;
+            }
 
-            // If the request is for our hub...
-            var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken))
-                // Read the token out of the query string
-                context.Token = accessToken;
+            var cookieToken = context.Request.Cookies[AuthCookieService.AuthCookieName];
+            if (!string.IsNullOrWhiteSpace(cookieToken))
+            {
+                context.Token = cookieToken;
+            }
+
             return Task.CompletedTask;
         }
     };

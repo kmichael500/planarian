@@ -1,27 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Options;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Settings.Repositories;
+using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
+using Planarian.Shared.Helpers;
 using Planarian.Shared.Options;
-using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Settings.Services;
 
 public class SettingsService : ServiceBase<SettingsRepository>
 {
-    private readonly BlobService _blobService;
+    private readonly ServerOptions _serverOptions;
     private readonly RequestThrottleOptions _requestThrottleOptions;
 
     public SettingsService(
         SettingsRepository repository,
         RequestUser requestUser,
-        BlobService blobService,
+        ServerOptions serverOptions,
         RequestThrottleOptions requestThrottleOptions) : base(
         repository, requestUser)
     {
-        _blobService = blobService;
+        _serverOptions = serverOptions;
         _requestThrottleOptions = requestThrottleOptions;
     }
 
@@ -29,7 +31,7 @@ public class SettingsService : ServiceBase<SettingsRepository>
     {
         return await Repository.GetTagTypeName(tagTypeId);
     }
-    
+
     public async Task<string?> GetCountyName(string countyId)
     {
         return await Repository.GetCountyId(countyId);
@@ -47,9 +49,10 @@ public class SettingsService : ServiceBase<SettingsRepository>
 
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
 
-
-        var url = _blobService.GetSasUrl(user.BlobKey);
-        user.ProfilePhotoUrl = url?.AbsoluteUri;
+        user.ProfilePhotoUrl = UrlHelper.Build(
+            _serverOptions.ServerBaseUrl,
+            $"/api/users/{userId}/photo",
+            RequestUser.AccountId);
 
         return user;
     }
@@ -87,5 +90,4 @@ public class SettingsService : ServiceBase<SettingsRepository>
                 int.MaxValue),
         };
     }
-    
 }

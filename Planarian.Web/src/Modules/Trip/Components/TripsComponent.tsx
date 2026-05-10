@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Col, Row, Typography } from "antd";
 import { TripVm } from "../Models/TripVm";
@@ -30,13 +30,7 @@ const TripsComponent: React.FC<TripsByProjectIdComponentProps> = (props) => {
   let [trips, setTrips] = useState<PagedResult<TripVm>>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
-  useEffect(() => {
-    if (trips === undefined) {
-      getTrips();
-    }
-  });
-
-  const getTrips = async () => {
+  const getTrips = useCallback(async () => {
     setIsTripsLoading(true);
 
     const tripsResponse = await ProjectService.GetTrips(
@@ -45,7 +39,13 @@ const TripsComponent: React.FC<TripsByProjectIdComponentProps> = (props) => {
     );
     setTrips(tripsResponse);
     setIsTripsLoading(false);
-  };
+  }, [props.projectId]);
+
+  useEffect(() => {
+    if (trips === undefined) {
+      void getTrips();
+    }
+  }, [getTrips, trips]);
 
   const onSearch = async () => {
     await getTrips();

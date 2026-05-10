@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   Card,
   Switch,
@@ -37,8 +37,8 @@ import {
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { nameof } from "../../../Shared/Helpers/StringHelpers";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
-import { AppService } from "../../../Shared/Services/AppService";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const { Text, Paragraph } = Typography;
 
@@ -53,10 +53,11 @@ export const UserPermissionManagement: React.FC<
 > = ({ userId, maxCaveSelectCount = null, permissionKey }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
+  const { hasPermission } = useContext(AppContext);
 
   const [everythingDisabled, setEverythingDisabled] = useState<boolean>(true);
 
-  const isAdminManager = AppService.HasPermission(PermissionKey.AdminManager);
+  const isAdminManager = hasPermission(PermissionKey.AdminManager);
 
   const [form] = Form.useForm<CavePermissionManagementVm>();
 
@@ -78,7 +79,17 @@ export const UserPermissionManagement: React.FC<
             permissionKey
           );
 
-        await handleSearchCaves(1);
+        const pagedResult: PagedResult<CaveSearchVm> =
+          await CaveService.SearchCavesPaged(
+            "",
+            1,
+            pageSize,
+            PermissionKey.Manager
+          );
+
+        setSearchResults(pagedResult.results);
+        setCurrentPage(pagedResult.pageNumber);
+        setTotalPages(pagedResult.totalPages);
 
         form.setFieldsValue({
           hasAllLocations: data.hasAllLocations,
@@ -89,14 +100,7 @@ export const UserPermissionManagement: React.FC<
           cavePermissions: data.cavePermissions ?? [],
         });
 
-        if (
-          data.hasAllLocations &&
-          AppService.HasPermission(PermissionKey.Admin)
-        ) {
-          setEverythingDisabled(false);
-        } else {
-          setEverythingDisabled(false);
-        }
+        setEverythingDisabled(false);
       } catch (error) {
         message.error("Failed to load user location permissions.");
         console.error(error);
@@ -104,8 +108,8 @@ export const UserPermissionManagement: React.FC<
         setLoading(false);
       }
     };
-    loadPermissions();
-  }, [userId, form]);
+    void loadPermissions();
+  }, [form, pageSize, permissionKey, userId]);
 
   const handleFormSubmit = async (values: CavePermissionManagementVm) => {
     const newPermissions: CreateUserCavePermissionsVm = {

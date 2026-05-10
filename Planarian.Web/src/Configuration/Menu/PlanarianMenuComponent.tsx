@@ -4,7 +4,6 @@ import { Link, useLocation } from "react-router-dom";
 import { AppContext } from "../Context/AppContext";
 import { MenuInfo, MenuMode } from "rc-menu/lib/interface";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
-import { AppService } from "../../Shared/Services/AppService";
 import { MenuItemType } from "antd/lib/menu/interface";
 
 const { SubMenu } = Menu;
@@ -26,7 +25,7 @@ interface MenuComponentProps {
 const PlanarianMenuComponent = (props: MenuComponentProps) => {
   const [selectedKey, setSelectedKey] = useState<string>("");
   const [openedKeys, setOpenedKeys] = useState<string[]>([]);
-  const { isAuthenticated } = useContext(AppContext);
+  const { hasPermission, isAuthenticated } = useContext(AppContext);
 
   const filteredMenuItems = props.menuItems.filter(
     (item) => item.requiresAuthentication === isAuthenticated
@@ -38,7 +37,7 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
     if (item.isVisible === false) return null;
 
     if (item.permissionKey) {
-      if (!AppService.HasPermission(item.permissionKey)) {
+      if (!hasPermission(item.permissionKey)) {
         return null;
       }
     }
@@ -80,8 +79,7 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
     const findSelectedItem = (
       items: PlanarianMenuItem[]
     ): PlanarianMenuItem | undefined => {
-      const currentPathname = new URL(location.pathname, window.location.origin)
-        .pathname;
+      const currentPathname = location.pathname;
 
       // First pass: Look for an exact match
       for (const item of items) {
@@ -126,7 +124,7 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
       // }
       // setOpenedKeys(openKeys);
     }
-  }, [location, props.menuItems]);
+  }, [location.pathname, props.menuItems]);
 
   return (
     <>

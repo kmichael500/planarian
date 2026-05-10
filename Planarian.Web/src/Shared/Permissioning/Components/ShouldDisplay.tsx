@@ -2,7 +2,6 @@ import React, { ReactNode, useCallback, useContext } from "react";
 import { FeatureKey } from "../../../Modules/Account/Models/FeatureSettingVm";
 import { PermissionKey } from "../../../Modules/Authentication/Models/PermissionKey";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { AppService } from "../../Services/AppService";
 
 interface ShouldDisplayProps {
   featureKey?: FeatureKey;
@@ -26,12 +25,8 @@ const ShouldDisplay: React.FC<ShouldDisplayProps> = ({
 
 export { ShouldDisplay };
 
-export interface UseFeatureEnabledProps {
-  featureKey: FeatureKey | undefined;
-}
-
 export const useFeatureEnabled = () => {
-  const { permissions } = useContext(AppContext);
+  const { hasPermission, permissions } = useContext(AppContext);
 
   const isFeatureEnabled = useCallback(
     (featureKey?: FeatureKey | null | undefined, permissionKey?: PermissionKey): boolean => {
@@ -48,14 +43,12 @@ export const useFeatureEnabled = () => {
       }
 
       if (permissionKey && permissionKey.length > 0) {
-        if (permissionKey === PermissionKey.Export) {
-        }
-        return AppService.HasPermission(permissionKey);
+        return hasPermission(permissionKey);
       }
 
       return true;
     },
-    [permissions]
+    [hasPermission, permissions]
   );
 
   return { isFeatureEnabled };

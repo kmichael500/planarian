@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Card, Col, ColProps, Form, Input, message, Row } from "antd";
 import { EditOutlined, KeyOutlined } from "@ant-design/icons";
 import { UserVm } from "../Models/UserVm";
@@ -13,6 +13,7 @@ import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const UserUpdateComponent: React.FC = () => {
   const [form] = Form.useForm();
@@ -22,6 +23,7 @@ const UserUpdateComponent: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const { refreshSession } = useContext(AppContext);
 
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
@@ -46,6 +48,7 @@ const UserUpdateComponent: React.FC = () => {
     setIsSubmitting(true);
     try {
       await UserService.UpdateCurrentUser(values);
+      await refreshSession();
 
       message.success("Updated successfully");
     } catch (e) {

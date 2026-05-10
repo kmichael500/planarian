@@ -1,5 +1,5 @@
 import { Card, Typography } from "antd";
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -28,19 +28,19 @@ const ProjectsPage: React.FC = () => {
   let [trips, setTrips] = useState<PagedResult<ProjectVm>>();
   let [isTripsLoading, setIsTripsLoading] = useState(true);
 
-  useEffect(() => {
-    if (trips === undefined) {
-      getTrips();
-    }
-  });
-
-  const getTrips = async () => {
+  const getTrips = useCallback(async () => {
     setIsTripsLoading(true);
 
     const tripsResponse = await ProjectService.GetProjects(queryBuilder);
     setTrips(tripsResponse);
     setIsTripsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (trips === undefined) {
+      void getTrips();
+    }
+  }, [getTrips, trips]);
 
   const onSearch = async () => {
     await getTrips();

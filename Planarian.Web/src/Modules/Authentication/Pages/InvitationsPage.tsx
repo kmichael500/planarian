@@ -5,7 +5,6 @@ import {
 } from "@ant-design/icons";
 import React from "react";
 import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
@@ -13,7 +12,6 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
 import { UserService } from "../../User/UserService";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import { AppService } from "../../../Shared/Services/AppService";
 import { AuthenticationService } from "../Services/AuthenticationService";
 
 const { Text, Title } = Typography;
@@ -29,7 +27,6 @@ const InvitationsPage = () => {
   >(null);
   const { setHeaderTitle, setHeaderButtons, refreshPendingInvitations } =
     useContext(AppContext);
-  const navigate = useNavigate();
 
   useEffect(() => {
     setHeaderTitle(["Invitations"]);
@@ -58,12 +55,7 @@ const InvitationsPage = () => {
       await UserService.AcceptInvitation(invitation.invitationCode);
       message.success("You have accepted the invitation.");
       await refreshPendingInvitations();
-      await AppService.InitializeApp();
-      AuthenticationService.SwitchAccountFull(
-        invitation.accountId,
-        navigate,
-        "/caves"
-      );
+      AuthenticationService.SwitchAccount(invitation.accountId, "/caves");
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);

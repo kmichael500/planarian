@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
-using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
@@ -19,22 +18,22 @@ public class FileController : PlanarianControllerBase<FileService>
     {
     }
 
-    [HttpPost("{fileId:length(10)}/view")]
+    [HttpGet("{fileId:length(10)}/view")]
     [Throttle]
-    public async Task<ActionResult<FileAccessUrlVm>> ViewFile(
+    public async Task<IActionResult> ViewFile(
         string fileId,
         CancellationToken cancellationToken)
     {
-        var result = await Service.CreateAccessUrl(fileId, false, cancellationToken);
-        return new JsonResult(result);
+        var result = await Service.CreateFileResponse(fileId, false, cancellationToken);
+        return await CreateFileResult(result);
     }
 
-    [HttpPost("{fileId:length(10)}/download")]
+    [HttpGet("{fileId:length(10)}/download")]
     [Throttle]
-    public async Task<ActionResult<FileAccessUrlVm>> DownloadFile(string fileId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DownloadFile(string fileId, CancellationToken cancellationToken)
     {
-        var result = await Service.CreateAccessUrl(fileId, true, cancellationToken);
-        return new JsonResult(result);
+        var result = await Service.CreateFileResponse(fileId, true, cancellationToken);
+        return await CreateFileResult(result);
     }
 
     [HttpPut("multiple")]
