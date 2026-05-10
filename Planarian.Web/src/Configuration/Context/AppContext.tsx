@@ -215,10 +215,17 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setAccountIds(appOptions.accountIds);
       setPermissionKeys(appOptions.permissions);
 
-      const featureSettings =
-        isAuthenticated && resolvedCurrentAccountId
-          ? await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId)
-          : [];
+      let featureSettings: FeatureSettingVm[] = [];
+      if (isAuthenticated && resolvedCurrentAccountId) {
+        try {
+          featureSettings = await AccountService.GetFeatureSettings(false, resolvedCurrentAccountId);
+        } catch (e) {
+          // The stored account ID is invalid — clear it so the user isn't
+          // stuck and can select a valid account after initialization.
+          console.error("Failed to load feature settings, clearing stored account ID:", e);
+          AuthenticationService.ResetAccountId();
+        }
+      }
       setPermissions({ visibleFields: featureSettings });
 
       if (isAuthenticated) {
@@ -289,7 +296,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       clearSessionState();
       setInitializedError(null);
       setIsInitialized(true);
-      setIsLoading(false);
 
       const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const isLoginPage = window.location.pathname.startsWith("/login");
@@ -310,8 +316,25 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
   }, [clearSessionState]);
 
   useEffect(() => {
-    void refreshSession().catch(() => {});
-  }, [refreshSession]);
+    void refreshSession().catch((e) => {
+      // Clear stored account IDs so that corrupt/invalid account data doesn't
+      // prevent the user from ever loading the app (blank white screen).
+      console.error("App initialization failed, clearing stored account data:", e);
+      const clearAccountKeys = (storage: Storage) => {
+        for (let i = storage.length - 1; i >= 0; i--) {
+          const key = storage.key(i);
+          if (key && key.startsWith("currentAccountId-")) {
+            storage.removeItem(key);
+          }
+        }
+      };
+      clearAccountKeys(localStorage);
+      clearAccountKeys(sessionStorage);
+      clearSessionState();
+      setInitializedError(null);
+      setIsInitialized(true);
+    });
+  }, [refreshSession, clearSessionState]);
 
   const currentAccountName = useMemo(() => {
     if (!currentAccountId) {
