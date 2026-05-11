@@ -110,6 +110,28 @@ HttpClient.interceptors.response.use(
   function (error) {
     if (error.response) {
       if (error.response.data) {
+        if (typeof error.response.data !== "object") {
+          if (error.response.status === 401 || error.response.status === 403) {
+            const unauthorizedError: ApiErrorResponse = {
+              message: "Unauthorized",
+              errorCode:
+                error.response.status === 403
+                  ? ApiExceptionType.Forbidden
+                  : ApiExceptionType.Unauthorized,
+              data: error.response.data,
+              statusCode: error.response.status,
+            };
+            return Promise.reject(unauthorizedError);
+          }
+
+          return Promise.reject({
+            message: String(error.response.data),
+            errorCode: ApiExceptionType.InternalServerError,
+            data: error.response.data,
+            statusCode: error.response.status,
+          } as ApiErrorResponse);
+        }
+
         const apiError = error.response.data as ApiErrorResponse;
         const retryAfterHeader = error.response.headers?.["retry-after"];
         apiError.statusCode = error.response.status;
@@ -132,10 +154,12 @@ HttpClient.interceptors.response.use(
       }
 
       if (error.response.status === 401 || error.response.status === 403) {
-        // Create a custom unauthorized error object
         const unauthorizedError: ApiErrorResponse = {
           message: "Unauthorized",
-          errorCode: ApiExceptionType.Unauthorized,
+          errorCode:
+            error.response.status === 403
+              ? ApiExceptionType.Forbidden
+              : ApiExceptionType.Unauthorized,
           data: null,
           statusCode: error.response.status,
         };

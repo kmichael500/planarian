@@ -9,7 +9,10 @@ import { AuthenticationService } from "../../Modules/Authentication/Services/Aut
 import { FeatureSettingVm } from "../../Modules/Account/Models/FeatureSettingVm";
 import { AccountService } from "../../Modules/Account/Services/AccountService";
 import { AppService } from "../../Shared/Services/AppService";
-import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "../../Shared/Models/ApiErrorResponse";
 import { isNullOrWhiteSpace } from "../../Shared/Helpers/StringHelpers";
 import { UserService } from "../../Modules/User/UserService";
 
@@ -140,7 +143,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setPendingInvitationCount(pendingInvitations.length);
   }, []);
 
-  const initializeApp = async () => {
+  const initializeApp = async (allowAccountReset = true) => {
     try {
       setIsLoading(true);
       await AppService.InitializeApp();
@@ -161,6 +164,15 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setInitializedError(null);
     } catch (e) {
       const error = e as ApiErrorResponse;
+      if (
+        allowAccountReset &&
+        error?.errorCode === ApiExceptionType.Unauthorized &&
+        !isNullOrWhiteSpace(AuthenticationService.GetAccountId())
+      ) {
+        AuthenticationService.ResetAccountId();
+        await initializeApp(false);
+        return;
+      }
       setInitializedError(error);
     } finally {
       setIsLoading(false);

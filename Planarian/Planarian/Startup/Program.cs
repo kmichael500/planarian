@@ -452,6 +452,7 @@ app.UseCors(x =>
         .WithExposedHeaders("Content-Disposition")
 );
 
+app.UseMiddleware<HttpResponseExceptionMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<RequestUserMiddleware>();
 app.UseRateLimiter();
@@ -459,9 +460,6 @@ app.UseAuthorization();
 
 
 app.MapHub<NotificationHub>("/api/notificationHub", options => { });
-
-
-app.UseMiddleware<HttpResponseExceptionMiddleware>();
 
 app.MapControllers();
 
