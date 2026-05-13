@@ -56,7 +56,9 @@
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "swa deploy --env production"
+    "deploy": "swa deploy --env production",
+    "deploy:dev": "../scripts/deploy-dev.sh --web-only",
+    "deploy:prod": "../scripts/deploy-prod.sh --web-only"
   },
   "eslintConfig": {
     "extends": [

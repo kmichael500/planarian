@@ -116,9 +116,6 @@ const HeaderComponent = () => {
 };
 
 const AccountNameTag = () => {
-  let accountName = "";
-  let accountNameAbbreviation = "";
-
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
@@ -128,8 +125,13 @@ const AccountNameTag = () => {
     ([key, value]) => value && key !== "xs"
   );
 
-  accountName = AuthenticationService.GetAccountName();
-  accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
+  const accountName = AuthenticationService.GetAccountName();
+  if (isNullOrWhiteSpace(accountName)) {
+    return null;
+  }
+
+  const accountNameAbbreviation =
+    StringHelpers.GenerateAbbreviation(accountName);
 
   return (
     <>

@@ -97,9 +97,7 @@ const AuthenticationService = {
     const name = AppOptions.accountIds.find(
       (x) => x.value === this.GetAccountId()
     )?.display;
-    if (!name) throw new NotFoundError("account name");
-
-    return name;
+    return name ?? "";
   },
   GetUserId(): string | null {
     const token = this.GetToken();

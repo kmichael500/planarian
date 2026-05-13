@@ -4,17 +4,23 @@ import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
 
 const baseUrl = "api/app";
-let AppOptions: AppInitializeVm;
+let AppOptions: AppInitializeVm = {
+  serverBaseUrl: "",
+  signalrBaseUrl: "",
+  supportName: "",
+  supportEmail: "",
+  accountIds: [],
+  permissions: [],
+};
 const AppService = {
   async InitializeApp(): Promise<void> {
     const response = await HttpClient.get<AppInitializeVm>(
       `${baseUrl}/initialize`
     );
     AppOptions = response.data;
-    console.log("init");
   },
   HasPermission(permission: PermissionKey): boolean {
-    if (!AppOptions.permissions) {
+    if (!AppOptions?.permissions) {
       return false;
     }
     if (permission === PermissionKey.View) {
