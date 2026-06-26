@@ -1,10 +1,7 @@
-import { Modal, Form, List } from "antd";
-import { AppOptions, AppService } from "../../../Shared/Services/AppService";
-import { AuthenticationService } from "../Services/AuthenticationService";
-import React, { useEffect, useState } from "react";
+import { Form, List, Modal } from "antd";
+import React, { useContext, useMemo } from "react";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
-import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { useNavigate } from "react-router-dom";
 import "./SwitchAccountComponent.scss";
 
 type SwitchAccountComponentProps = {
@@ -16,39 +13,17 @@ const SwitchAccountComponent = ({
   isVisible: isOpen,
   handleCancel: onCancel,
 }: SwitchAccountComponentProps) => {
-  const currentAccountId = AuthenticationService.GetAccountId();
-  const currentAccountName = AuthenticationService.GetAccountName();
+  const { accountIds, currentAccountId, currentAccountName, switchAccount } =
+    useContext(AppContext);
 
-  const navigate = useNavigate();
-  const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
+  const accountList = useMemo(
+    () => accountIds.filter((item) => item.value !== currentAccountId),
+    [accountIds, currentAccountId]
+  );
 
-  useEffect(() => {
-    async function initialize() {
-      await AppService.InitializeApp();
-      if (!accountList) {
-        const result = AppOptions.accountIds.filter(
-          (item) => item.value !== currentAccountId
-        );
-        setAccountList(result);
-      }
-    }
-
-    initialize();
-
-    const unsubscribe = AuthenticationService.onAuthChange(() => {
-      const result = AppOptions.accountIds.filter(
-        (item) => item.value !== currentAccountId
-      );
-      setAccountList(result);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [isOpen]);
-
-  const handleSwitch = async (accountId: string) => {
-    AuthenticationService.SwitchAccountFull(accountId, navigate);
+  const handleSwitch = (accountId: string) => {
+    onCancel();
+    switchAccount(accountId);
   };
 
   return (
@@ -58,11 +33,7 @@ const SwitchAccountComponent = ({
       onCancel={onCancel}
       footer={[<CancelButtonComponent key="cancel" onClick={onCancel} />]}
     >
-      <Form
-        id="switchAccountForm"
-        onFinish={(values) => handleSwitch(values.account)}
-      >
-        {/* Display the current account */}
+      <Form id="switchAccountForm">
         <div className="planarian-account-banner">
           Your Current Account: {currentAccountName}
         </div>
@@ -75,10 +46,7 @@ const SwitchAccountComponent = ({
         >
           Please select one of the accounts below to switch to:
         </div>
-        <Form.Item
-          name="account"
-          rules={[{ required: true, message: "Please select an account!" }]}
-        >
+        <Form.Item name="account">
           <List
             dataSource={accountList}
             renderItem={(item) => (
@@ -89,6 +57,8 @@ const SwitchAccountComponent = ({
                 style={{
                   cursor: "pointer",
                   padding: "10px",
+                  border: "1px solid #d9d9d9",
+                  borderRadius: "4px",
                   marginBottom: "10px",
                 }}
               >

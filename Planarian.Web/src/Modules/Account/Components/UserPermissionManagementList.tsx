@@ -1,5 +1,5 @@
 import { Form, message, List, Modal, Select } from "antd";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
@@ -32,17 +32,17 @@ export const UserPermissionManagementList: React.FC<
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
 
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     try {
-      const data = await AccountUserManagerService.GetUserPermissions(userId!);
+      const data = await AccountUserManagerService.GetUserPermissions(userId);
       setPermissions(data);
     } catch (err: any) {
       message.error(err.message || "Failed to load user permissions");
       console.error(err);
     }
-  };
+  }, [userId]);
 
-  const loadPermissionSelectList = async () => {
+  const loadPermissionSelectList = useCallback(async () => {
     try {
       const list = await AccountUserManagerService.GetPermissionSelectList(
         PermissionType.User
@@ -52,12 +52,7 @@ export const UserPermissionManagementList: React.FC<
       message.error(err.message || "Failed to load permission list");
       console.error(err);
     }
-  };
-
-  useEffect(() => {
-    loadPermissions();
-    loadPermissionSelectList();
-  }, [userId]);
+  }, []);
 
   const handleOpenModal = () => {
     form.resetFields();
@@ -105,12 +100,14 @@ export const UserPermissionManagementList: React.FC<
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await loadPermissions();
-      await loadPermissionSelectList();
-      setIsLoading(false);
+      try {
+        await Promise.all([loadPermissions(), loadPermissionSelectList()]);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    fetchData();
-  }, [userId]);
+    void fetchData();
+  }, [loadPermissionSelectList, loadPermissions]);
 
   return (
     <Card

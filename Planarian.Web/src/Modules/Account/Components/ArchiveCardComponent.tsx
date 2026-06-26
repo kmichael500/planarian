@@ -1,8 +1,7 @@
 import { CloseOutlined, DownloadOutlined } from "@ant-design/icons";
 import { Alert, Card, Progress, Space, Spin, Typography, message } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
@@ -12,6 +11,7 @@ import { ProgressState } from "../../../Shared/Models/ProgressState";
 import { AccountService } from "../Services/AccountService";
 import { ArchiveProgressVm } from "../Models/Archive/ArchiveProgressVm";
 import { ArchiveListItemVm } from "../Models/Archive/ArchiveListItemVm";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const initialArchiveProgress: ArchiveProgressVm = {
     statusMessage: "Preparing archive...",
@@ -20,7 +20,7 @@ const initialArchiveProgress: ArchiveProgressVm = {
 };
 
 const ArchiveCardComponent: React.FC = () => {
-    const accountId = AuthenticationService.GetAccountId();
+    const { currentAccountId: accountId } = useContext(AppContext);
     const archiveProgressGroupName = accountId ? `archive-${accountId}` : null;
 
     const [isArchiveRunning, setIsArchiveRunning] = useState<boolean>(false);

@@ -51,7 +51,7 @@ export const PltViewer: React.FC<PltViewerProps> = ({
       setBounds(null);
 
       try {
-        const response = await fetch(embedUrl);
+        const response = await fetch(embedUrl, { credentials: "include" });
         if (!response.ok) {
           throw new Error("Unable to download PLT file.");
         }

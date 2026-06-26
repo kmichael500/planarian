@@ -9,16 +9,16 @@ using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
-using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Account.Repositories;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Services;
-using Planarian.Modules.Files.Models;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Models;
 
 namespace Planarian.Modules.Account.Services;
 
@@ -114,7 +114,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
 
-        if (entity.IsDefault) throw ApiExceptionDictionary.Unauthorized("Cannot modify default tag types.");
+        if (entity.IsDefault) throw ApiExceptionDictionary.Forbidden("Cannot modify default tag types.");
 
 
         entity.Name = tag.Name;
@@ -269,7 +269,7 @@ public class AccountService : ServiceBase<AccountRepository>
         var isNew = featureSetting == null;
 
         if (!isNew && featureSetting!.IsDefault)
-            throw ApiExceptionDictionary.Unauthorized("Cannot modify default feature settings.");
+            throw ApiExceptionDictionary.Forbidden("Cannot modify default feature settings.");
 
         featureSetting ??= new FeatureSetting
         {
@@ -454,18 +454,20 @@ public class AccountService : ServiceBase<AccountRepository>
         return result;
     }
 
-    public async Task<FileAccessUrlVm> CreateArchiveDownloadUrl(string blobKey, CancellationToken cancellationToken)
+    public async Task<AuthenticatedFileResponse> CreateArchiveDownloadResponse(string blobKey,
+        CancellationToken cancellationToken)
     {
         EnsureValidArchiveBlobKey(blobKey);
         EnsureArchiveBlobIsNotActive(blobKey, "Archive is not available while it is still running.");
 
         await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, blobKey);
 
-        return await _fileService.CreateBlobAccessUrl(
+        return await _fileService.CreateBlobResponse(
             blobKey,
             RequestUser.AccountContainerName,
             Path.GetFileName(blobKey),
-            isDownload: true);
+            isDownload: true,
+            cancellationToken: cancellationToken);
     }
 
     public async Task DeleteArchive(string blobKey, CancellationToken cancellationToken)

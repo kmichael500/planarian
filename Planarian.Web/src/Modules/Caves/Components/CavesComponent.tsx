@@ -1,5 +1,5 @@
 import { Typography, Form, Space, message } from "antd";
-import { useState, useEffect } from "react";
+import { useContext, useState, useEffect } from "react";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { PagedResult } from "../../Search/Models/PagedResult";
@@ -31,7 +31,6 @@ import {
 } from "../Models/CaveSearchVm";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import FavoriteCave from "./FavoriteCave";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
@@ -44,6 +43,7 @@ import {
   EntranceLocationFilter,
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
 import {
   CAVE_SEARCH_DISPLAY_FEATURE_LABELS,
@@ -86,7 +86,7 @@ const CavesComponent: React.FC = () => {
     window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
   );
 
-  const accountId = AuthenticationService.GetAccountId();
+  const { currentAccountId: accountId } = useContext(AppContext);
   const featureStorageKey = accountId
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";

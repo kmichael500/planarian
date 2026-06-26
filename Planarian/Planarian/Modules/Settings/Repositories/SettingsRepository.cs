@@ -41,7 +41,7 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
 
     public async Task<IEnumerable<SelectListItem<string>>> GetStates(string? permissionKey = null)
     {
-        return await DbContext.AccountStates.Where(e=>e.AccountId == RequestUser.AccountId)
+        return await DbContext.AccountStates.Where(e => e.AccountId == RequestUser.AccountId)
             .Select(accountState => new SelectListItem<string>(accountState.State!.Name, accountState.State.Id))
             .ToListAsync();
     }

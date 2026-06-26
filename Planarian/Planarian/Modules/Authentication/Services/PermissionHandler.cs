@@ -40,6 +40,7 @@ public class RequestUserMiddleware
     {
         var tokenService = context.RequestServices.GetRequiredService<TokenService>();
         var requestUser = context.RequestServices.GetRequiredService<RequestUser>();
+        var throwOnInvalidAccountId = !context.Request.Path.StartsWithSegments("/api/app/initialize");
 
         if (context.User.Identity?.IsAuthenticated == true)
         {
@@ -52,7 +53,7 @@ public class RequestUserMiddleware
             var userId = tokenService.GetUserId(context.User);
             if (!string.IsNullOrWhiteSpace(userId))
             {
-                await requestUser.Initialize(accountId, userId);
+                await requestUser.Initialize(accountId, userId, throwOnInvalidAccountId);
             }
         }
 

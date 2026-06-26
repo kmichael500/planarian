@@ -22,18 +22,31 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
     [AllowAnonymous]
     [HttpPost("login")]
     [Throttle]
-    public async Task<ActionResult<string>> Login([FromBody] UserLoginVm values, CancellationToken cancellationToken)
+    public async Task<IActionResult> Login([FromBody] BrowserLoginVm values, CancellationToken cancellationToken)
     {
-        var token = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password);
+        await Service.AuthenticateEmailPassword(
+            HttpContext,
+            values.EmailAddress,
+            values.Password,
+            values.Remember ?? false);
 
-        return new JsonResult(token);
+        return Ok();
+    }
+
+    [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
+    [HttpPost("token")]
+    [Throttle]
+    public async Task<ActionResult<ApiTokenLoginResultVm>> Token([FromBody] TokenLoginVm values, CancellationToken cancellationToken)
+    {
+        var accessToken = await Service.AuthenticateEmailPassword(values.EmailAddress, values.Password);
+        return Ok(new ApiTokenLoginResultVm(accessToken));
     }
 
     [HttpPost("logout")]
-    [Authorize]
-    public async Task<IActionResult> Logout()
+    public IActionResult Logout()
     {
-        await Service.Logout(HttpContext);
+        Service.Logout(HttpContext);
         return new OkResult();
     }
 }

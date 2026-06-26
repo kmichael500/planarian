@@ -1,27 +1,39 @@
+using Azure;
 using Azure.Storage.Blobs;
-using Azure.Storage.Sas;
-using Microsoft.Extensions.Caching.Memory;
+using Azure.Storage.Blobs.Models;
+using Microsoft.Net.Http.Headers;
+using Planarian.Library.Exceptions;
 using Planarian.Library.Options;
+using Planarian.Shared.Models;
 
 namespace Planarian.Shared.Services;
 
 public class BlobService
 {
-    private readonly MemoryCache _cache;
+    private const string BinaryContentType = "application/octet-stream";
+
     private readonly BlobContainerClient _containerClient;
 
-    public BlobService(BlobOptions blobOptions, MemoryCache cache)
+    public BlobService(BlobOptions blobOptions)
     {
-        _cache = cache;
         _containerClient = new BlobContainerClient(blobOptions.ConnectionString, blobOptions.ContainerName);
     }
 
     #region Users
 
-    public async Task<string> AddUsersProfilePicture(string userId, Stream stream)
+    public async Task<string> AddUsersProfilePicture(string userId, Stream stream, string? contentType = null)
     {
         var blobKey = $"{userId}/profilePicture";
-        await _containerClient.UploadBlobAsync(blobKey, stream);
+
+        var blobClient = _containerClient.GetBlobClient(blobKey);
+        await blobClient.UploadAsync(stream, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = string.IsNullOrWhiteSpace(contentType) ? null : contentType
+            }
+        });
+
         return blobKey;
     }
 
@@ -34,41 +46,67 @@ public class BlobService
     {
         var blobKey = $"projects/{projectId}/trips/{tripId}/photos/{photoId}";
 
-        await _containerClient.UploadBlobAsync(blobKey, stream);
+        var blobClient = _containerClient.GetBlobClient(blobKey);
+        await blobClient.UploadAsync(stream, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = MimeTypes.GetMimeType(fileExtension)
+            }
+        });
 
         return blobKey;
     }
 
     #endregion
 
-    public Uri? GetSasUrl(string blobKey, int expiresInHours = 48)
+    public async Task<AuthenticatedFileResponse> CreateBlobResponse(string blobKey, string? fileName,
+        bool download, CancellationToken cancellationToken, string? fallbackContentType = null)
     {
-        var exists = _cache.TryGetValue(blobKey, out Uri? uri);
-        if (exists) return uri;
+        if (string.IsNullOrWhiteSpace(blobKey))
+            throw ApiExceptionDictionary.NotFound("File");
 
         var blobClient = _containerClient.GetBlobClient(blobKey);
-
-        var now = DateTimeOffset.UtcNow;
-
-        var sasExpiresOn = now.AddHours(expiresInHours);
-        var cacheExpiresOn = now.AddHours(expiresInHours).AddMinutes(-10);
-        var maxAge = (cacheExpiresOn - now).TotalSeconds;
-
-        var blobSasBuilder = new BlobSasBuilder(BlobSasPermissions.Read, sasExpiresOn)
-        {
-            ContentType = "image/jpg",
-            CacheControl = $"public, max-age={maxAge}",
-            ContentLanguage = "en-US"
-        };
-
-        var sasUrl = blobClient.GenerateSasUri(blobSasBuilder);
-        _cache.Set(blobKey, sasUrl, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpiration = cacheExpiresOn
-        });
-        return sasUrl;
+        return await CreateBlobResponse(blobClient, fileName, download, cancellationToken, fallbackContentType);
     }
 
+    public static async Task<AuthenticatedFileResponse> CreateBlobResponse(BlobClient blobClient, string? fileName,
+        bool download, CancellationToken cancellationToken, string? fallbackContentType = null)
+    {
+        try
+        {
+            var blobProperties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var blobContentType = string.IsNullOrWhiteSpace(blobProperties.Value.ContentType)
+                ? fallbackContentType ?? BinaryContentType
+                : blobProperties.Value.ContentType;
+            var (contentType, forceDownload) = FileResponsePolicy.Resolve(fileName, blobContentType, download);
+
+            return new AuthenticatedFileResponse
+            {
+                OpenReadStreamAsync = async readCancellationToken =>
+                {
+                    try
+                    {
+                        var blobDownload = await blobClient.DownloadStreamingAsync(cancellationToken: readCancellationToken);
+                        return blobDownload.Value.Content;
+                    }
+                    catch (RequestFailedException ex) when (ex.Status == 404)
+                    {
+                        throw ApiExceptionDictionary.NotFound("File");
+                    }
+                },
+                ContentType = contentType,
+                FileName = fileName,
+                Download = forceDownload,
+                EntityTag = EntityTagHeaderValue.Parse(blobProperties.Value.ETag.ToString()),
+                LastModified = blobProperties.Value.LastModified
+            };
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            throw ApiExceptionDictionary.NotFound("File");
+        }
+    }
 
     public async Task DeleteBlob(string? blobKey)
     {

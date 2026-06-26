@@ -45,7 +45,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
         let featureCollection: FeatureCollection | null = null;
 
         if (normalizedType === "zip") {
-          const response = await fetch(embedUrl);
+          const response = await fetch(embedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to download shapefile archive.");
           }
@@ -53,7 +53,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
           const parsed = await shp(arrayBuffer);
           featureCollection = normalizeToFeatureCollection(parsed);
         } else if (normalizedType === "kml") {
-          const response = await fetch(embedUrl);
+          const response = await fetch(embedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to download KML file.");
           }
@@ -66,7 +66,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
           const geoJson = convertKmlToGeoJson(xmlDocument);
           featureCollection = normalizeToFeatureCollection(geoJson);
         } else if (normalizedType === "geojson" || normalizedType === "json") {
-          const response = await fetch(embedUrl);
+          const response = await fetch(embedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to download GeoJSON file.");
           }

@@ -2,8 +2,8 @@ import { Avatar, Spin, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { StringHelpers } from "../../../Shared/Helpers/StringHelpers";
 import { NameProfilePhotoVm } from "../Models/NameProfilePhotoVm";
-import { SettingsService } from "../../Setting/Services/SettingsService";
 import { AvatarSize } from "antd/lib/avatar/AvatarContext";
+import { UserService } from "../UserService";
 
 const { Text } = Typography;
 
@@ -17,18 +17,32 @@ const UserAvatarComponent: React.FC<UserAvatarComponentProps> = (props) => {
   let [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (usersName === undefined) {
-      const getUsersName = async () => {
-        const tripNameResponse = await SettingsService.GetUsersName(
-          props.userId
-        );
+    let isCancelled = false;
+
+    const getUsersName = async () => {
+      setIsLoading(true);
+
+      try {
+        const tripNameResponse = await UserService.GetUsersName(props.userId);
+        if (isCancelled) {
+          return;
+        }
 
         setUsersName(tripNameResponse);
-        setIsLoading(false);
-      };
-      getUsersName();
-    }
-  });
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    setUsersName(undefined);
+    getUsersName();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [props.userId]);
 
   return (
     <Spin spinning={isLoading}>

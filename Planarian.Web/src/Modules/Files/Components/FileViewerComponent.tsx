@@ -25,6 +25,7 @@ import { GpxViewer } from "./GpxViewer";
 import { VectorDatasetViewer } from "./VectorDatasetViewer";
 import { PltViewer } from "./PltViewer";
 import { FileAccessAction, FileService } from "../Services/FileService";
+import { PdfViewer } from "./PdfViewer";
 
 interface FileViewerProps {
   fileId?: string | null;
@@ -66,7 +67,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     <PlanarianButton
       icon={<CloudDownloadOutlined />}
       onClick={async () => {
-        await FileService.startFileDownload(fileId);
+        FileService.startFileDownload(fileId);
       }}
     >
       Download
@@ -74,18 +75,23 @@ const FileViewer: React.FC<FileViewerProps> = ({
   ) : null;
 
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [pdfFile, setPdfFile] = useState<Blob | null>(null);
   const [fileEmbedUrl, setFileEmbedUrl] = useState<string | undefined>(undefined);
   const [fileAccessError, setFileAccessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setPdfFile(null);
+      setFileContent(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
+      setIsLoading(false);
       return;
     }
 
     if (!fileId) {
+      setPdfFile(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
       setFileContent(null);
@@ -94,23 +100,21 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
 
     setFileContent(null);
+    setPdfFile(null);
     setFileEmbedUrl(undefined);
     setFileAccessError(null);
     setIsLoading(true);
 
     let isCancelled = false;
-    const loadFileSasLink = async () => {
+    const loadFileAccessUrl = async () => {
       try {
-        const sasLink = await FileService.createFileSasLink(
-          fileId,
-          FileAccessAction.View
-        );
+        const accessUrl = FileService.getFileAccessUrl(fileId, FileAccessAction.View);
         if (isCancelled) {
           return;
         }
 
-        setFileEmbedUrl(sasLink);
-        if (!isTextFileType(fileType) && !isCsvFileType(fileType)) {
+        setFileEmbedUrl(accessUrl);
+        if (!isTextFileType(fileType) && !isCsvFileType(fileType) && !isPdf) {
           setIsLoading(false);
         }
       } catch {
@@ -123,12 +127,12 @@ const FileViewer: React.FC<FileViewerProps> = ({
       }
     };
 
-    loadFileSasLink();
+    loadFileAccessUrl();
 
     return () => {
       isCancelled = true;
     };
-  }, [open, fileId, fileType]);
+  }, [open, fileId, fileType, isPdf]);
 
   useEffect(() => {
     if (!open || !fileEmbedUrl) {
@@ -146,7 +150,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
       const loadFileContent = async () => {
         try {
-          const response = await fetch(fileEmbedUrl);
+          const response = await fetch(fileEmbedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to load file.");
           }
@@ -176,6 +180,39 @@ const FileViewer: React.FC<FileViewerProps> = ({
       };
     }
   }, [open, fileEmbedUrl, fileType, fileAccessError]);
+
+  useEffect(() => {
+    if (!open || !fileId || !isPdf) {
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoading(true);
+    setPdfFile(null);
+
+    const loadPdf = async () => {
+      try {
+        const pdfBlob = await FileService.getFileBlob(fileId);
+        if (isCancelled) {
+          return;
+        }
+
+        setPdfFile(pdfBlob);
+        setIsLoading(false);
+      } catch {
+        if (!isCancelled) {
+          setFileAccessError("Unable to load file.");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadPdf();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open, fileId, isPdf]);
 
   const hasPrevious = typeof onPrevious === "function";
   const hasNext = typeof onNext === "function";
@@ -272,33 +309,12 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   />
                 </div>
               )}
-              {isPdf && !isNullOrWhiteSpace(fileEmbedUrl) && (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    overflow: "hidden",
-                    position: "relative",
-                    WebkitOverflowScrolling: "touch",
-                  }}
-                >
-                  <iframe
-                    key={fileEmbedUrl || undefined}
-                    src={`https://docs.google.com/gview?url=${encodeURIComponent(
-                      fileEmbedUrl
-                    )}&embedded=true`}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      border: "none",
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      overflow: "auto",
-                    }}
-                    title="PDF Viewer"
-                  />
-                </div>
+              {isPdf && pdfFile && (
+                <PdfViewer
+                  file={pdfFile}
+                  openUrl={fileEmbedUrl}
+                  downloadButton={downloadButton}
+                />
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
               {isTextFileType(fileType) && (

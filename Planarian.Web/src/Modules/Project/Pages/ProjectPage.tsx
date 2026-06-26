@@ -27,16 +27,15 @@ const ProjectPage: React.FC = () => {
 
   useEffect(() => {
     setHeaderTitle([`Project: ${project?.name ?? ""}`]);
-  }, [project]);
+  }, [project, setHeaderTitle]);
+
   useEffect(() => {
-    if (project === undefined) {
-      const getProject = async () => {
-        const projectResponse = await ProjectService.GetProject(projectId);
-        setProject(projectResponse);
-      };
-      getProject();
-    }
-  });
+    const getProject = async () => {
+      const projectResponse = await ProjectService.GetProject(projectId);
+      setProject(projectResponse);
+    };
+    void getProject();
+  }, [projectId]);
 
   return (
     <>

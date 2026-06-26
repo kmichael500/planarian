@@ -1,29 +1,32 @@
+import { MenuOutlined } from "@ant-design/icons";
 import { Drawer, Grid, Typography } from "antd";
 import { Header } from "antd/lib/layout/layout";
 import { CSSProperties, useContext, useEffect, useState } from "react";
-import { MenuOutlined } from "@ant-design/icons";
 import { Helmet } from "react-helmet";
+import { AppContext } from "../Context/AppContext";
+import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
+import { ProfileMenu } from "../Menu/ProfileMenuComponent";
+import { useSideBarMenuItems } from "../Menu/SidebarMenuItems";
+import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianTag } from "../../Shared/Components/Display/PlanarianTag";
 import {
   StringHelpers,
   isNullOrWhiteSpace,
 } from "../../Shared/Helpers/StringHelpers";
-import { AppContext } from "../Context/AppContext";
-import { PlanarianButton } from "../../Shared/Components/Buttons/PlanarianButtton";
-import { ProfileMenu } from "../Menu/ProfileMenuComponent";
-import { PlanarianMenuComponent } from "../Menu/PlanarianMenuComponent";
-import { SideBarMenuItems } from "../Menu/SidebarMenuItems";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 import "./HeaderComponent.scss";
 
 const { useBreakpoint } = Grid;
 
 const HeaderComponent = () => {
-  const { defaultContentStyle, headerTitle, headerButtons } =
-    useContext(AppContext);
-
-  const isAuthenticated = AuthenticationService.IsAuthenticated();
-  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
+  const {
+    currentAccountName,
+    defaultContentStyle,
+    headerTitle,
+    headerButtons,
+    isAuthenticated,
+  } = useContext(AppContext);
+  const menuItems = useSideBarMenuItems();
+  const hasAccount = !isNullOrWhiteSpace(currentAccountName);
 
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -42,7 +45,6 @@ const HeaderComponent = () => {
   }, [headerTitle]);
 
   const [visible, setVisible] = useState(false);
-  const sideBarMenuItems = SideBarMenuItems();
   const isHeaderTitleLoading =
     headerTitle[0] == null ||
     (typeof headerTitle[0] === "string" && isNullOrWhiteSpace(headerTitle[0]));
@@ -56,10 +58,7 @@ const HeaderComponent = () => {
         <title>{navigationTitle} | Planarian</title>
       </Helmet>
 
-      <Header
-        className="planarian-header"
-        style={headerStyle}
-      >
+      <Header className="planarian-header" style={headerStyle}>
         <div className="planarian-header__inner">
           {!isLargeScreenSize && (
             <>
@@ -79,7 +78,7 @@ const HeaderComponent = () => {
                   onMenuItemClick={() => {
                     setVisible(false);
                   }}
-                  menuItems={sideBarMenuItems}
+                  menuItems={menuItems}
                 />
               </Drawer>
             </>
@@ -101,7 +100,7 @@ const HeaderComponent = () => {
           </div>
 
           <div className="planarian-header__actions">
-            {hasAccount && <AccountNameTag />}
+            {hasAccount && <AccountNameTag accountName={currentAccountName} />}
             {headerButtons.map((button, index) => (
               <div className="planarian-header__action" key={index}>
                 {button}
@@ -115,10 +114,7 @@ const HeaderComponent = () => {
   );
 };
 
-const AccountNameTag = () => {
-  let accountName = "";
-  let accountNameAbbreviation = "";
-
+const AccountNameTag = ({ accountName }: { accountName: string | null }) => {
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
@@ -128,8 +124,11 @@ const AccountNameTag = () => {
     ([key, value]) => value && key !== "xs"
   );
 
-  accountName = AuthenticationService.GetAccountName();
-  accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
+  if (isNullOrWhiteSpace(accountName)) {
+    return null;
+  }
+
+  const accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
 
   return (
     <>

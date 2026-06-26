@@ -4,65 +4,44 @@ import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
 
 const baseUrl = "api/app";
-let AppOptions: AppInitializeVm;
+
+let AppOptions: AppOptionsVm = {
+  serverBaseUrl: "",
+  signalrBaseUrl: "",
+  supportName: "",
+  supportEmail: "",
+};
+
+let antiforgeryRequestToken: string | null = null;
+
 const AppService = {
-  async InitializeApp(): Promise<void> {
-    const response = await HttpClient.get<AppInitializeVm>(
-      `${baseUrl}/initialize`
-    );
-    AppOptions = response.data;
-    console.log("init");
+  async InitializeApp(
+    selectedAccountId?: string | null
+  ): Promise<AppInitializeVm> {
+    const response = await HttpClient.get<AppInitializeVm>(`${baseUrl}/initialize`, {
+      headers: !isNullOrWhiteSpace(selectedAccountId)
+        ? { "x-account": selectedAccountId }
+        : undefined,
+    });
+
+    AppOptions = {
+      serverBaseUrl: response.data.serverBaseUrl,
+      signalrBaseUrl: response.data.signalrBaseUrl,
+      supportName: response.data.supportName,
+      supportEmail: response.data.supportEmail,
+    };
+    antiforgeryRequestToken = response.data.antiforgeryRequestToken;
+
+    return response.data;
   },
-  HasPermission(permission: PermissionKey): boolean {
-    if (!AppOptions.permissions) {
-      return false;
-    }
-    if (permission === PermissionKey.View) {
-      return (
-        AppOptions.permissions.includes(PermissionKey.View) ||
-        AppOptions.permissions.includes(PermissionKey.Manager) ||
-        AppOptions.permissions.includes(PermissionKey.Admin) ||
-        AppOptions.permissions.includes(PermissionKey.PlanarianAdmin)
-      );
-    }
-
-    if (permission === PermissionKey.Manager) {
-      return (
-        AppOptions.permissions.includes(PermissionKey.Manager) ||
-        AppOptions.permissions.includes(PermissionKey.Admin) ||
-        AppOptions.permissions.includes(PermissionKey.PlanarianAdmin)
-      );
-    }
-
-    if (permission === PermissionKey.AdminManager) {
-      return (
-        AppOptions.permissions.includes(PermissionKey.AdminManager) ||
-        AppOptions.permissions.includes(PermissionKey.Admin) ||
-        AppOptions.permissions.includes(PermissionKey.PlanarianAdmin)
-      );
-    }
-
-    if (permission === PermissionKey.Admin) {
-      return (
-        AppOptions.permissions.includes(PermissionKey.Admin) ||
-        AppOptions.permissions.includes(PermissionKey.PlanarianAdmin)
-      );
-    }
-
-    if (permission === PermissionKey.PlanarianAdmin) {
-      return AppOptions.permissions.includes(PermissionKey.PlanarianAdmin);
-    }
-
-    return AppOptions.permissions.includes(permission);
+  GetAntiforgeryRequestToken(): string | null {
+    return antiforgeryRequestToken;
   },
   async HasCavePermission(
     permissionKey: PermissionKey,
     caveId: string | null = null,
     countyId: string | null = null
   ): Promise<boolean> {
-    if (!this.HasPermission(permissionKey)) {
-      return false;
-    }
     const params = new URLSearchParams();
     if (!isNullOrWhiteSpace(caveId)) {
       params.append("caveId", caveId);
@@ -81,13 +60,25 @@ const AppService = {
     return response.data;
   },
 };
+
 export { AppService, AppOptions };
 
-export interface AppInitializeVm {
+export interface AppOptionsVm {
   serverBaseUrl: string;
   signalrBaseUrl: string;
   supportName: string;
   supportEmail: string;
+}
+
+export interface AppInitializeVm extends AppOptionsVm {
   accountIds: SelectListItem<string>[];
   permissions: PermissionKey[];
+  currentUser: AppInitializeCurrentUserVm | null;
+  antiforgeryRequestToken: string | null;
+}
+
+export interface AppInitializeCurrentUserVm {
+  id: string;
+  fullName: string;
+  currentAccountId: string | null;
 }

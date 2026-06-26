@@ -1,10 +1,8 @@
 import { Card, Checkbox, Form, Input, Select, Space, message } from "antd";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { AppService } from "../../../Shared/Services/AppService";
 import { AccountService } from "../../Account/Services/AccountService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CreateAccountVm } from "../Models/CreateAccountVm";
@@ -15,7 +13,6 @@ const CreateAccountComponent = () => {
   const [states, setStates] = useState<SelectListItem<string>[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadStates = async () => {
@@ -42,8 +39,7 @@ const CreateAccountComponent = () => {
         defaultViewAccessAllCaves: values.defaultViewAccessAllCaves,
         exportEnabled: values.exportEnabled,
       });
-      await AppService.InitializeApp();
-      AuthenticationService.SwitchAccountFull(accountId, navigate, "/caves");
+      AuthenticationService.SwitchAccount(accountId, "/caves");
       message.success("Account created.");
       form.resetFields();
     } catch (error: any) {

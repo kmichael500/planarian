@@ -1,20 +1,22 @@
-import { theme as antdTheme } from "antd";
-import { Col, ConfigProvider, Layout, Row, Spin } from "antd";
 import { RedoOutlined } from "@ant-design/icons";
+import { theme as antdTheme } from "antd";
+import { Col, ConfigProvider, Layout, Row, Spin, message } from "antd";
 import React from "react";
 import { Helmet } from "react-helmet";
 import { BrowserRouter } from "react-router-dom";
 import "./App.css";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
-import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
-import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
 import { AppRouting } from "./Configuration/Routing/App.routing";
-import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
+import { SideBarComponent } from "./Configuration/Sidebar/SidebarComponent";
+import { LogoIcon } from "./Configuration/Sidebar/AppIcon";
 import { SyncfusionThemeManager } from "./SyncfusionThemeManager";
-import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
-import { ApiExceptionType } from "./Shared/Models/ApiErrorResponse";
 import { ThemeProvider, useTheme } from "./ThemeProvider";
+import { PlanarianButton } from "./Shared/Components/Buttons/PlanarianButtton";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "./Shared/Models/ApiErrorResponse";
 
 const { Content } = Layout;
 
@@ -29,7 +31,13 @@ const AppContent: React.FC = () => {
       <BrowserRouter>
         <AppProvider>
           <AppContext.Consumer>
-            {({ isInitialized, isLoading, initializedError, contentStyle }) =>
+            {({
+              isInitialized,
+              isLoading,
+              initializedError,
+              contentStyle,
+              logout,
+            }) =>
               isInitialized ? (
                 <Layout
                   style={{
@@ -75,14 +83,20 @@ const AppContent: React.FC = () => {
                         <Col span={24}>
                           <PlanarianButton
                             icon={<RedoOutlined />}
-                            onClick={() => {
-                              AuthenticationService.ResetAccountId();
-                              AuthenticationService.Logout();
-                              window.location.reload();
+                            onClick={async () => {
+                              try {
+                                await logout();
+                                window.location.assign("/login");
+                              } catch (e) {
+                                const error = e as ApiErrorResponse;
+                                message.error(
+                                  error.message ?? "Failed to log out."
+                                );
+                              }
                             }}
                           >
                             Login
-                          </PlanarianButton>{" "}
+                          </PlanarianButton>
                         </Col>
                       )}
                   </Row>
@@ -93,14 +107,6 @@ const AppContent: React.FC = () => {
         </AppProvider>
       </BrowserRouter>
     </>
-  );
-};
-
-const App: React.FC = () => {
-  return (
-    <ThemeProvider>
-      <ThemeConsumerWrapper />
-    </ThemeProvider>
   );
 };
 
@@ -118,6 +124,14 @@ const ThemeConsumerWrapper: React.FC = () => {
     >
       <AppContent />
     </ConfigProvider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <ThemeConsumerWrapper />
+    </ThemeProvider>
   );
 };
 

@@ -1,6 +1,5 @@
 import { message } from "antd";
 import { saveAs } from "file-saver";
-import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CaveService } from "./CaveService";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
@@ -12,7 +11,8 @@ export type ExportType = "gpx" | "csv";
 const performCaveExport = async (
   type: ExportType,
   queryBuilder: QueryBuilder<CaveSearchParamsVm>,
-  exportFeatureKeys?: FeatureKey[]
+  exportFeatureKeys?: FeatureKey[],
+  accountName?: string | null
 ) => {
   const exportLabel = type.toUpperCase();
   const hide = message.loading(`Exporting ${exportLabel}...`, 0);
@@ -23,9 +23,8 @@ const performCaveExport = async (
         ? await CaveService.ExportCavesGpx(queryBuilder, exportFeatureKeys)
         : await CaveService.ExportCavesCsv(queryBuilder, exportFeatureKeys);
 
-    const accountName = AuthenticationService.GetAccountName() || "Export";
     const localDateTime = new Date().toISOString();
-    const fileName = `${accountName} ${localDateTime}.${type}`;
+    const fileName = `${accountName || "Export"} ${localDateTime}.${type}`;
 
     saveAs(response, fileName);
   } catch (err) {

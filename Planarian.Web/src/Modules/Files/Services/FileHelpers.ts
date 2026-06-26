@@ -13,7 +13,7 @@ export function isPdfFileType(fileType: string | null | undefined): boolean {
 }
 
 export const isTextFileType = (fileType: string | null | undefined) => {
-  const textFileTypes = ["th", "txt", "json", "xml", "html", "js", "ts", "css"]; // Add more file types as needed
+  const textFileTypes = ["th", "txt", "json"];
   return fileType ? textFileTypes.includes(fileType.toLowerCase()) : false;
 };
 export const isCsvFileType = (fileType: string | null | undefined) => {

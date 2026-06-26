@@ -1,43 +1,41 @@
-import { useContext, useRef, useState } from "react";
-import { Dropdown, Avatar, Badge } from "antd";
 import {
-  UserOutlined,
-  SwapOutlined,
-  LogoutOutlined,
   BgColorsOutlined,
+  LogoutOutlined,
   MailOutlined,
+  SwapOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
+import { Avatar, Badge, Dropdown, message } from "antd";
+import { useContext, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
+import { AppContext } from "../Context/AppContext";
+import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
+import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
 import {
   PlanarianMenuComponent,
   PlanarianMenuItem,
 } from "./PlanarianMenuComponent";
-import { AppContext } from "../Context/AppContext";
-import { SwitchAccountComponent } from "../../Modules/Authentication/Components/SwitchAccountComponent";
-import { AppOptions } from "../../Shared/Services/AppService";
-import {
-  StringHelpers,
-  isNullOrWhiteSpace,
-} from "../../Shared/Helpers/StringHelpers";
+import { StringHelpers } from "../../Shared/Helpers/StringHelpers";
 import { useTheme } from "../../ThemeProvider";
 
 function ProfileMenu() {
-  const { modeLabel, cycleMode } = useTheme();
-  const getUserInitials = () => {
-    const name = AuthenticationService.GetName();
-    return `${StringHelpers.GenerateAbbreviation(name ?? "")}`;
-  };
-
-  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
-
   const navigate = useNavigate();
-  const { isAuthenticated, setIsAuthenticated, pendingInvitationCount } =
-    useContext(AppContext);
+  const { modeLabel, cycleMode } = useTheme();
+  const {
+    accountIds,
+    currentAccountId,
+    currentUser,
+    isAuthenticated,
+    logout,
+    pendingInvitationCount,
+  } = useContext(AppContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const keepThemePreviewOpenRef = useRef(false);
+
+  const getUserInitials = () =>
+    `${StringHelpers.GenerateAbbreviation(currentUser?.fullName ?? "")}`;
 
   const menuItems = [
     {
@@ -67,29 +65,31 @@ function ProfileMenu() {
       icon: <SwapOutlined />,
       label: "Switch Account",
       requiresAuthentication: true,
-      isVisible: AppOptions.accountIds.length > 1,
+      isVisible: accountIds.length > 1,
       action: () => {
         setIsModalOpen(true);
       },
     },
     {
       key: "logout",
-
       icon: <LogoutOutlined />,
       action: async () => {
-        await AuthenticationService.Logout();
-        setIsAuthenticated(false);
-        navigate("/login");
+        try {
+          await logout();
+          navigate("/login", { replace: true });
+        } catch (e) {
+          const error = e as ApiErrorResponse;
+          message.error(error.message ?? "Failed to log out.");
+        }
       },
       label: "Logout",
-
       requiresAuthentication: true,
     },
   ] as PlanarianMenuItem[];
 
   return (
     <>
-      {hasAccount && (
+      {currentAccountId && (
         <SwitchAccountComponent
           isVisible={isModalOpen}
           handleCancel={() => setIsModalOpen(false)}
@@ -99,8 +99,6 @@ function ProfileMenu() {
         <Dropdown
           open={isDropdownOpen}
           onOpenChange={(open) => {
-            // Keep the menu open while cycling themes so the user can preview
-            // each mode in place without reopening the dropdown.
             if (!open && keepThemePreviewOpenRef.current) {
               keepThemePreviewOpenRef.current = false;
               return;
