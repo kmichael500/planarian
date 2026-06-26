@@ -20,6 +20,7 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
     }
 
     [AllowAnonymous]
+    [IgnoreAntiforgeryToken]
     [HttpPost("login")]
     [Throttle]
     public async Task<IActionResult> Login([FromBody] BrowserLoginVm values, CancellationToken cancellationToken)
