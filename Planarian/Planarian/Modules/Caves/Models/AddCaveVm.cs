@@ -43,6 +43,9 @@ public class AddCaveVm
 
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; }
+    public bool IsCountyNumberManuallySet { get; set; }
+    public bool UseFirstAvailableCountyNumber { get; set; }
+    public int? CountyNumber { get; set; }
 
 
     public double LengthFeet { get; set; }

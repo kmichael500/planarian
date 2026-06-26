@@ -78,6 +78,26 @@ public class CaveController : PlanarianControllerBase<CaveService>
         return new JsonResult(cave);
     }
 
+    [HttpGet("counties/{countyId:length(10)}/next-number")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    public async Task<ActionResult<int>> GetNextCountyNumber(string countyId,
+        [FromQuery] bool useFirstAvailableCountyNumber = false)
+    {
+        var countyNumber = await Service.GetNextCountyNumber(countyId, useFirstAvailableCountyNumber);
+
+        return new JsonResult(countyNumber);
+    }
+
+    [HttpGet("counties/{countyId:length(10)}/county-numbers/{countyNumber:int}/in-use")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    public async Task<ActionResult<bool>> IsCountyNumberInUse(string countyId, int countyNumber,
+        [FromQuery] string? caveId = null)
+    {
+        var isInUse = await Service.IsCountyNumberInUse(countyId, countyNumber, caveId);
+
+        return new JsonResult(isInUse);
+    }
+
     [HttpPost]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<string>> AddCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)

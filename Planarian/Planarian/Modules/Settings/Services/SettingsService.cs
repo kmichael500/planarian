@@ -35,6 +35,13 @@ public class SettingsService : ServiceBase<SettingsRepository>
         return await Repository.GetCountyId(countyId);
     }
 
+    public async Task<CountyMetadataVm> GetCountyMetadata(string countyId)
+    {
+        var county = await Repository.GetCountyMetadata(countyId);
+        if (county == null) throw ApiExceptionDictionary.NotFound("County");
+        return county;
+    }
+
     public async Task<string?> GetStateName(string stateId)
     {
         return await Repository.GetStateName(stateId);

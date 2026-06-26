@@ -74,6 +74,26 @@ const CaveService = {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
     return response.data;
   },
+  async GetNextCountyNumber(
+    countyId: string,
+    useFirstAvailableCountyNumber: boolean = false
+  ): Promise<number> {
+    const response = await HttpClient.get<number>(
+      `${baseUrl}/counties/${countyId}/next-number?useFirstAvailableCountyNumber=${useFirstAvailableCountyNumber}`
+    );
+    return response.data;
+  },
+  async IsCountyNumberInUse(
+    countyId: string,
+    countyNumber: number,
+    caveId?: string
+  ): Promise<boolean> {
+    const queryString = !isNullOrWhiteSpace(caveId) ? `?caveId=${caveId}` : "";
+    const response = await HttpClient.get<boolean>(
+      `${baseUrl}/counties/${countyId}/county-numbers/${countyNumber}/in-use${queryString}`
+    );
+    return response.data;
+  },
   async ArchiveCave(id: string): Promise<void> {
     const response = await HttpClient.post<void>(`${baseUrl}/${id}/archive`);
     return response.data;

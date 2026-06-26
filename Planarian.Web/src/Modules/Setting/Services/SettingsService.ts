@@ -6,6 +6,7 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { TagType } from "../../Tag/Models/TagType";
 import { NameProfilePhotoVm } from "../../User/Models/NameProfilePhotoVm";
 import { ChunkedUploaderConfig } from "../../../Shared/Components/FileUploader/types";
+import { CountyMetadataVm } from "../Models/CountyMetadataVm";
 
 const baseUrl = "api/settings";
 const SettingsService = {
@@ -60,6 +61,18 @@ const SettingsService = {
     }
     const response = await HttpClient.get<string>(
       `${baseUrl}/tags/counties/${countyId}`
+    );
+    CacheService.set(cacheKey, response.data);
+    return response.data;
+  },
+  async GetCountyMetadata(countyId?: string): Promise<CountyMetadataVm> {
+    const cacheKey = `county-metadata-${countyId}`;
+    const cachedDisplayValue = CacheService.get<CountyMetadataVm>(cacheKey);
+    if (cachedDisplayValue) {
+      return cachedDisplayValue;
+    }
+    const response = await HttpClient.get<CountyMetadataVm>(
+      `${baseUrl}/tags/counties/${countyId}/metadata`
     );
     CacheService.set(cacheKey, response.data);
     return response.data;

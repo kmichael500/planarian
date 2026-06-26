@@ -20,18 +20,30 @@ const CountyDropdown = ({
 
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
-    SettingsService.GetCounties(selectedStateId, permissionKey).then((data) => {
-      setCounties(data);
-      setIsLoading(false);
-    });
-  }, [selectedStateId]);
+    let isCurrent = true;
+    setIsLoading(true);
+
+    SettingsService.GetCounties(selectedStateId, permissionKey)
+      .then((data) => {
+        if (!isCurrent) return;
+        setCounties(data);
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedStateId, permissionKey]);
 
   const sortedCounties = sortSelectListItems(counties);
 
   return (
     <>
       <Spin spinning={isLoading}>
-        {!isLoading && counties.length > 0 && (
+        {(isLoading || counties.length > 0) && (
           <Select
             id="countyDropdown"
             loading={isLoading}
