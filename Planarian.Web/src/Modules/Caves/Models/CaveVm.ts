@@ -7,6 +7,9 @@ export interface CaveVm {
   reportedByUserId: string | null;
   countyId: string;
   stateId: string;
+  countyDisplayId: string;
+  countyIdDelimiter?: string | null;
+  countyNumber: number;
   name: string;
   alternateNames: string[];
   lengthFeet: number;

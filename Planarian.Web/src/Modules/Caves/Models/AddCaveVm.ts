@@ -7,6 +7,10 @@ export interface AddCaveVm {
   alternateNames: string[];
   countyId: string | null;
   stateId: string;
+  countyDisplayId?: string | null;
+  countyNumber?: number | null;
+  isCountyNumberManuallySet: boolean;
+  useFirstAvailableCountyNumber: boolean;
   lengthFeet: number;
   depthFeet: number;
   maxPitDepthFeet: number;

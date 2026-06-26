@@ -61,6 +61,51 @@ const EditCavePage: React.FC = () => {
         }
       });
       setCave(caveResponse);
+      const formValues: AddCaveVm = {
+        id: caveResponse.id,
+        name: caveResponse.name,
+        alternateNames: caveResponse.alternateNames,
+        countyId: caveResponse.countyId,
+        stateId: caveResponse.stateId,
+        countyDisplayId: caveResponse.countyDisplayId,
+        countyNumber: caveResponse.countyNumber,
+        useFirstAvailableCountyNumber: false,
+        lengthFeet: caveResponse.lengthFeet,
+        depthFeet: caveResponse.depthFeet,
+        maxPitDepthFeet: caveResponse.maxPitDepthFeet,
+        numberOfPits: caveResponse.numberOfPits,
+        narrative: caveResponse.narrative,
+        reportedOn: caveResponse.reportedOn,
+        entrances: caveResponse.entrances.map((entrance) => ({
+          id: entrance.id,
+          isPrimary: entrance.isPrimary,
+          locationQualityTagId: entrance.locationQualityTagId,
+          name: entrance.name,
+          description: entrance.description,
+          latitude: entrance.latitude,
+          longitude: entrance.longitude,
+          elevationFeet: entrance.elevationFeet,
+          reportedOn: entrance.reportedOn,
+          pitFeet: entrance.pitFeet,
+          entranceStatusTagIds: entrance.entranceStatusTagIds,
+          fieldIndicationTagIds: entrance.fieldIndicationTagIds,
+          entranceHydrologyTagIds: entrance.entranceHydrologyTagIds,
+          reportedByNameTagIds: entrance.reportedByNameTagIds,
+        })),
+        geologyTagIds: caveResponse.geologyTagIds,
+        files: caveResponse.files,
+        reportedByNameTagIds: caveResponse.reportedByNameTagIds,
+        biologyTagIds: caveResponse.biologyTagIds,
+        archeologyTagIds: caveResponse.archeologyTagIds,
+        cartographerNameTagIds: caveResponse.cartographerNameTagIds,
+        mapStatusTagIds: caveResponse.mapStatusTagIds,
+        geologicAgeTagIds: caveResponse.geologicAgeTagIds,
+        physiographicProvinceTagIds: caveResponse.physiographicProvinceTagIds,
+        otherTagIds: caveResponse.otherTagIds,
+        isCountyNumberManuallySet: false,
+      };
+
+      form.setFieldsValue(formValues);
 
       setHeaderButtons([
         <DeleteButtonComponent
@@ -108,15 +153,17 @@ const EditCavePage: React.FC = () => {
   return (
     <>
       <Card loading={isLoading}>
-        <Form<AddCaveVm>
-          layout="vertical"
-          initialValues={cave}
-          onFinish={handleFormSubmit}
-          onChange={handleFormChange} // Attach change handler
-          form={form}
-        >
-          <AddCaveComponent isEditing={true} form={form} cave={cave} />
-        </Form>
+        {cave && (
+          <Form<AddCaveVm>
+            layout="vertical"
+            initialValues={cave}
+            onFinish={handleFormSubmit}
+            onChange={handleFormChange}
+            form={form}
+          >
+            <AddCaveComponent isEditing={true} form={form} cave={cave} />
+          </Form>
+        )}
       </Card>
     </>
   );

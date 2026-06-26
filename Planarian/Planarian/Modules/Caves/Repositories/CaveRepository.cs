@@ -41,7 +41,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         var userLatitude = filterQuery.Ulat;
         var userLongitude = filterQuery.Ulon;
         var hasLocationForDistance = userLatitude.HasValue && userLongitude.HasValue;
-        
+
         double cosUserLatitude = 0;
 
         if (hasLocationForDistance)
@@ -213,27 +213,27 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             CaveOtherTags = c.CaveOtherTags.Select(ct => ct.TagType.Name)
                 .ToList(),
             Entrances = c.Entrances.Select(e => new EntranceExportDto
-                {
-                    Name = e.Name,
-                    Description = e.Description,
-                    IsPrimary = e.IsPrimary,
-                    ReportedOn = e.ReportedOn,
-                    PitDepthFeet = e.PitDepthFeet,
-                    Latitude = e.Location.Y,
-                    Longitude = e.Location.X,
-                    Elevation = e.Location.Z,
-                    LocationQuality = e.LocationQualityTag.Name,
-                    EntranceStatusTags = e.EntranceStatusTags.Select(t => t.TagType.Name)
+            {
+                Name = e.Name,
+                Description = e.Description,
+                IsPrimary = e.IsPrimary,
+                ReportedOn = e.ReportedOn,
+                PitDepthFeet = e.PitDepthFeet,
+                Latitude = e.Location.Y,
+                Longitude = e.Location.X,
+                Elevation = e.Location.Z,
+                LocationQuality = e.LocationQualityTag.Name,
+                EntranceStatusTags = e.EntranceStatusTags.Select(t => t.TagType.Name)
                         .ToList(),
-                    FieldIndicationTags = e.FieldIndicationTags.Select(t => t.TagType.Name)
+                FieldIndicationTags = e.FieldIndicationTags.Select(t => t.TagType.Name)
                         .ToList(),
-                    EntranceHydrologyTags = e.EntranceHydrologyTags.Select(t => t.TagType.Name)
+                EntranceHydrologyTags = e.EntranceHydrologyTags.Select(t => t.TagType.Name)
                         .ToList(),
-                    EntranceReportedByTags = e.EntranceReportedByNameTags.Select(t => t.TagType.Name)
+                EntranceReportedByTags = e.EntranceReportedByNameTags.Select(t => t.TagType.Name)
                         .ToList(),
-                    EntranceOtherTags = e.EntranceOtherTags.Select(t => t.TagType.Name)
+                EntranceOtherTags = e.EntranceOtherTags.Select(t => t.TagType.Name)
                         .ToList()
-                })
+            })
                 .ToList()
         }).ToListAsync();
 
@@ -909,16 +909,53 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return query;
     }
 
-    public async Task<int> GetNewDisplayId(string countyId)
+    private IQueryable<Cave> GetCountyNumberQuery(string countyId)
     {
-        var maxCaveNumber = await DbContext.Caves
+        return DbContext.Caves
             .IgnoreQueryFilters() // need to ignore filter to calculate county number for all caves, not just ones the user has access too
-            .Where(e => e.AccountId == RequestUser.AccountId && e.CountyId == countyId)
-            .MaxAsync(e => (int?)e.CountyNumber);
+            .Where(e => e.AccountId == RequestUser.AccountId && e.CountyId == countyId);
+    }
 
-        // If maxCaveNumber is null, it means there are no cave numbers assigned yet.
-        // In that case, return 1, otherwise increment the maximum cave number by 1.
-        return maxCaveNumber.HasValue ? maxCaveNumber.Value + 1 : 1;
+    public async Task<int> GetNewDisplayId(string countyId, bool useFirstAvailableCountyNumber = false)
+    {
+        if (!useFirstAvailableCountyNumber)
+        {
+            var maxCaveNumber = await GetCountyNumberQuery(countyId)
+                .MaxAsync(e => (int?)e.CountyNumber);
+
+            return maxCaveNumber.HasValue ? maxCaveNumber.Value + 1 : 1;
+        }
+
+        var usedCountyNumbers = await GetCountyNumberQuery(countyId)
+            .Select(e => e.CountyNumber)
+            .OrderBy(e => e)
+            .ToListAsync();
+
+        var nextCountyNumber = 1;
+
+        foreach (var usedCountyNumber in usedCountyNumbers)
+        {
+            if (usedCountyNumber < nextCountyNumber)
+                continue;
+
+            if (usedCountyNumber == nextCountyNumber)
+            {
+                nextCountyNumber++;
+                continue;
+            }
+
+            break;
+        }
+
+        return nextCountyNumber;
+    }
+
+    public async Task<bool> IsCountyNumberInUse(string countyId, int countyNumber, string? excludedCaveId = null)
+    {
+        return await GetCountyNumberQuery(countyId)
+            .Where(e => e.CountyNumber == countyNumber)
+            .Where(e => string.IsNullOrWhiteSpace(excludedCaveId) || e.Id != excludedCaveId)
+            .AnyAsync();
     }
 
     public async Task<CaveVm?> GetCave(string caveId)
@@ -927,10 +964,13 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new CaveVm
             {
                 Id = e.Id,
-                IsFavorite = e.Favorites.Any(favorite=>favorite.UserId == RequestUser.Id),
+                IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
                 ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
                 CountyId = e.CountyId,
+                CountyDisplayId = e.County.DisplayId,
+                CountyIdDelimiter = e.Account.CountyIdDelimiter,
+                CountyNumber = e.CountyNumber,
                 DisplayId = $"{e.County.DisplayId}{e.Account.CountyIdDelimiter}{e.CountyNumber}",
                 Name = e.Name,
                 AlternateNames = e.AlternateNamesList,
@@ -957,23 +997,23 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     }).FirstOrDefault(),
                 MapIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
-                    {
-                        Id = ee.Id,
-                        IsPrimary = ee.IsPrimary,
-                        ReportedByUserId = ee.ReportedByUserId,
-                        LocationQualityTagId = ee.LocationQualityTagId,
-                        Name = ee.Name,
-                        Description = ee.Description,
-                        Latitude = ee.Location.Y,
-                        Longitude = ee.Location.X,
-                        ElevationFeet = ee.Location.Z,
-                        ReportedOn = ee.ReportedOn,
-                        PitFeet = ee.PitDepthFeet,
-                        EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId),
-                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(eee => eee.TagTypeId),
-                        EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId),
-                        ReportedByNameTagIds = ee.EntranceReportedByNameTags.Select(eee => eee.TagTypeId)
-                    })
+                {
+                    Id = ee.Id,
+                    IsPrimary = ee.IsPrimary,
+                    ReportedByUserId = ee.ReportedByUserId,
+                    LocationQualityTagId = ee.LocationQualityTagId,
+                    Name = ee.Name,
+                    Description = ee.Description,
+                    Latitude = ee.Location.Y,
+                    Longitude = ee.Location.X,
+                    ElevationFeet = ee.Location.Z,
+                    ReportedOn = ee.ReportedOn,
+                    PitFeet = ee.PitDepthFeet,
+                    EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId),
+                    FieldIndicationTagIds = ee.FieldIndicationTags.Select(eee => eee.TagTypeId),
+                    EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId),
+                    ReportedByNameTagIds = ee.EntranceReportedByNameTags.Select(eee => eee.TagTypeId)
+                })
                     .OrderByDescending(ee => ee.IsPrimary)
                     .ThenBy(ee => ee.ReportedOn).ToList(),
                 GeologyTagIds = e.GeologyTags.Select(ee => ee.TagTypeId),
@@ -1251,7 +1291,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
         var favoriteCave = await GetFavoriteCaveQuery(caveId)
             .FirstOrDefaultAsync();
-        
+
         return favoriteCave;
     }
 
@@ -1291,7 +1331,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
         DbContext.CaveGeoJsons.Remove(geoJson);
     }
-    
+
     #endregion
 }
 

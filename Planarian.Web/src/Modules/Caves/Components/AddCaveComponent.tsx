@@ -6,14 +6,18 @@ import {
   InputNumber,
   Row,
   Col,
+  Space,
   Radio,
   ColProps,
   Collapse,
   Select,
   DatePicker,
+  Checkbox,
+  Typography,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { AddCaveVm } from "../Models/AddCaveVm";
+import { CaveVm } from "../Models/CaveVm";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { AddEntranceVm } from "../Models/AddEntranceVm";
@@ -33,19 +37,41 @@ import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { PermissionKey } from "../../Authentication/Models/PermissionKey";
+import { SettingsService } from "../../Setting/Services/SettingsService";
+import { CaveService } from "../Service/CaveService";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
   isEditing?: boolean;
-  cave?: AddCaveVm;
+  cave?: AddCaveVm | CaveVm;
 }
 const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
+  const editingCave = isEditing ? (cave as CaveVm | undefined) : undefined;
   const [selectedStateId, setSelectedStateId] = useState<string>();
+  const [selectedCountyId, setSelectedCountyId] = useState<string>();
+  const [countyDisplayId, setCountyDisplayId] = useState<string>();
+  const [countyIdDelimiter, setCountyIdDelimiter] = useState<string>();
+  const [isCountyMetadataLoading, setIsCountyMetadataLoading] =
+    useState<boolean>(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+  const [isInitialCountyLoad, setIsInitialCountyLoad] = useState<boolean>(true);
+  const isCountyNumberManuallySet = Form.useWatch(
+    nameof<AddCaveVm>("isCountyNumberManuallySet"),
+    form
+  );
+  const useFirstAvailableCountyNumber = Form.useWatch(
+    nameof<AddCaveVm>("useFirstAvailableCountyNumber"),
+    form
+  );
 
-  const [caveState, setCaveState] = useState<AddCaveVm>(
+  const [caveState, setCaveState] = useState<AddCaveVm | CaveVm>(
     cave ?? ({} as AddCaveVm)
   );
+
+  useEffect(() => {
+    setCaveState(cave ?? ({} as AddCaveVm));
+  }, [cave]);
 
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
@@ -64,7 +90,85 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     if (!isNullOrWhiteSpace(initialStateValue)) {
       setSelectedStateId(initialStateValue);
     }
+
+    const initialCountyValue = form.getFieldValue("countyId");
+    if (!isNullOrWhiteSpace(initialCountyValue)) {
+      setSelectedCountyId(initialCountyValue);
+    }
   }, [form]);
+
+  useEffect(() => {
+    if (cave?.countyDisplayId) {
+      if (cave.stateId) {
+        setSelectedStateId(cave.stateId);
+      }
+
+      if (cave.countyId) {
+        setSelectedCountyId(cave.countyId);
+      }
+
+      setCountyDisplayId(cave.countyDisplayId);
+      setCountyIdDelimiter(editingCave?.countyIdDelimiter ?? undefined);
+      form.setFieldsValue({ countyDisplayId: cave.countyDisplayId });
+    }
+  }, [
+    form,
+    cave?.countyDisplayId,
+    cave?.countyId,
+    editingCave?.countyIdDelimiter,
+    cave?.stateId,
+  ]);
+
+  useEffect(() => {
+    if (isNullOrWhiteSpace(selectedCountyId)) {
+      setCountyDisplayId(undefined);
+      setCountyIdDelimiter(undefined);
+      setIsCountyMetadataLoading(false);
+      form.setFieldsValue({
+        countyDisplayId: undefined,
+        countyNumber: undefined,
+        isCountyNumberManuallySet: false,
+      });
+      return;
+    }
+
+    if (
+      isEditing &&
+      cave?.countyId === selectedCountyId &&
+      !isNullOrWhiteSpace(cave?.countyDisplayId)
+    ) {
+      setCountyDisplayId(cave.countyDisplayId);
+      setCountyIdDelimiter(editingCave?.countyIdDelimiter ?? undefined);
+      setIsCountyMetadataLoading(false);
+      form.setFieldsValue({ countyDisplayId: cave.countyDisplayId });
+      return;
+    }
+
+    let isCurrent = true;
+    setIsCountyMetadataLoading(true);
+
+    SettingsService.GetCountyMetadata(selectedCountyId).then((county) => {
+      if (!isCurrent) return;
+
+      setCountyDisplayId(county.displayId);
+      setCountyIdDelimiter(county.countyIdDelimiter ?? undefined);
+      form.setFieldsValue({ countyDisplayId: county.displayId });
+    }).finally(() => {
+      if (!isCurrent) return;
+      setIsCountyMetadataLoading(false);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    form,
+    isEditing,
+    selectedCountyId,
+    cave?.countyDisplayId,
+    cave?.countyId,
+    editingCave?.countyIdDelimiter,
+  ]);
 
   const validateEntrances = async (
     rule: RuleObject,
@@ -87,6 +191,9 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
   const [groupedByFileTypes, setGroupedByFiles] = useState<{
     [key: string]: EditFileMetadataVm[];
   }>({});
+  const [autoCountyNumber, setAutoCountyNumber] = useState<number>();
+  const [isCountyNumberLoading, setIsCountyNumberLoading] =
+    useState<boolean>(false);
 
   useEffect(() => {
     if (caveState?.files) {
@@ -94,6 +201,64 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       setGroupedByFiles(temp);
     }
   }, [caveState]);
+
+  useEffect(() => {
+    if (isNullOrWhiteSpace(selectedCountyId)) {
+      setAutoCountyNumber(undefined);
+      setIsCountyNumberLoading(false);
+      form.setFieldsValue({ countyNumber: undefined });
+      return;
+    }
+
+    if (isCountyNumberManuallySet) {
+      setAutoCountyNumber(undefined);
+      setIsCountyNumberLoading(false);
+      return;
+    }
+
+    if (isEditing && cave?.countyId === selectedCountyId && cave?.countyNumber) {
+      setAutoCountyNumber(cave.countyNumber);
+      setIsCountyNumberLoading(false);
+      form.setFieldsValue({ countyNumber: cave.countyNumber });
+      return;
+    }
+
+    let isCurrent = true;
+    setIsCountyNumberLoading(true);
+
+    CaveService.GetNextCountyNumber(
+      selectedCountyId,
+      !!useFirstAvailableCountyNumber
+    )
+      .then((nextCountyNumber) => {
+        if (!isCurrent) return;
+
+        setAutoCountyNumber(nextCountyNumber);
+        form.setFieldsValue({ countyNumber: nextCountyNumber });
+      })
+      .catch(() => {
+        if (!isCurrent) return;
+
+        setAutoCountyNumber(undefined);
+        form.setFieldsValue({ countyNumber: undefined });
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsCountyNumberLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    form,
+    isCountyNumberManuallySet,
+    useFirstAvailableCountyNumber,
+    isEditing,
+    selectedCountyId,
+    cave?.countyId,
+    cave?.countyNumber,
+  ]);
 
   //#region  Column Props
   const fourColProps = {
@@ -132,9 +297,41 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     xs: 24,
   } as ColProps;
   //#endregion
+
+  const countyNumberPrefix = countyDisplayId
+    ? `${countyDisplayId}${countyIdDelimiter ?? ""}`
+    : "";
+  const countyNumberPlaceholder =
+    isCountyNumberManuallySet
+      ? "Enter number"
+      : isCountyMetadataLoading || isCountyNumberLoading
+        ? "Loading..."
+        : "Auto-Assigned";
+  const currentCountyId = selectedCountyId ?? form.getFieldValue("countyId");
+  const shouldShowCountyNumberModeSelection =
+    !isEditing || cave?.countyId !== currentCountyId;
+
   return (
     <Row style={{ marginBottom: 10 }} gutter={5}>
+      <style>
+        {`
+          .county-number-input.ant-input-affix-wrapper .ant-input-prefix,
+          .county-number-input.ant-input-number-affix-wrapper .ant-input-number-prefix {
+            margin-inline-end: 0;
+          }
+
+          .county-number-input.ant-input-number-affix-wrapper-status-error .ant-input-number-input,
+          .county-number-input.ant-input-number-status-error .ant-input-number-input,
+          .county-number-input.ant-input-affix-wrapper-status-error input,
+          .county-number-input.ant-input-status-error input {
+            color: #ff4d4f !important;
+          }
+        `}
+      </style>
       <Form.Item name="id" noStyle>
+        <Input type="hidden" />
+      </Form.Item>
+      <Form.Item name={nameof<AddCaveVm>("countyDisplayId")} noStyle>
         <Input type="hidden" />
       </Form.Item>
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveName}>
@@ -175,7 +372,14 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
               onChange={(e) => {
                 setSelectedStateId(e.toString());
                 if (isInitialLoad) return setIsInitialLoad(false);
-                form.setFieldsValue({ countyId: undefined });
+                setSelectedCountyId(undefined);
+                setCountyDisplayId(undefined);
+                form.setFieldsValue({
+                  countyId: undefined,
+                  countyDisplayId: undefined,
+                  countyNumber: undefined,
+                  isCountyNumberManuallySet: false,
+                });
               }}
             />
           </Form.Item>
@@ -191,8 +395,124 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
             {selectedStateId && (
               <CountyDropdown
                 selectedStateId={selectedStateId}
+                onChange={(value) => {
+                  setSelectedCountyId(value);
+
+                  if (isInitialCountyLoad) {
+                    setIsInitialCountyLoad(false);
+                    return;
+                  }
+
+                  form.setFieldsValue({
+                    countyNumber: undefined,
+                    isCountyNumberManuallySet: false,
+                  });
+                }}
               ></CountyDropdown>
             )}
+          </Form.Item>
+        </Col>
+      </ShouldDisplay>
+      <ShouldDisplay permissionKey={PermissionKey.Manager}>
+        <Col {...twoColProps}>
+          <Form.Item label="County Cave Number">
+            <Form.Item
+              name={nameof<AddCaveVm>("countyNumber")}
+              validateTrigger="onBlur"
+              style={{ marginBottom: 0 }}
+              rules={[
+                ({ getFieldValue }) => ({
+                  async validator(_, value) {
+                    if (!getFieldValue("isCountyNumberManuallySet")) {
+                      return;
+                    }
+
+                    if (value == null || value === undefined || value < 1) {
+                      throw new Error("Enter a county number greater than 0");
+                    }
+
+                    const selectedCounty = getFieldValue("countyId");
+                    if (isNullOrWhiteSpace(selectedCounty)) {
+                      throw new Error("Select a county first");
+                    }
+
+                    const isInUse = await CaveService.IsCountyNumberInUse(
+                      selectedCounty,
+                      value,
+                      getFieldValue("id")
+                    );
+
+                    if (isInUse) {
+                      throw new Error(
+                        "That county number is already in use for the selected county."
+                      );
+                    }
+                  },
+                }),
+              ]}
+            >
+              <InputNumber<number>
+                min={1}
+                placeholder={countyNumberPlaceholder}
+                prefix={countyNumberPrefix || undefined}
+                disabled={!isCountyNumberManuallySet}
+                className="county-number-input"
+                style={{ width: "100%" }}
+              />
+            </Form.Item>
+            <div style={{ marginTop: 8 }}>
+              <Space size={[12, 4]} wrap align="center">
+                {shouldShowCountyNumberModeSelection && (
+                  <Form.Item
+                    name={nameof<AddCaveVm>("useFirstAvailableCountyNumber")}
+                    noStyle
+                  >
+                    <Radio.Group
+                      disabled={isCountyNumberManuallySet}
+                      optionType="button"
+                      buttonStyle="solid"
+                      size="small"
+                    >
+                      <Radio.Button value={false}>
+                        Highest available
+                      </Radio.Button>
+                      <Radio.Button value={true}>Lowest available</Radio.Button>
+                    </Radio.Group>
+                  </Form.Item>
+                )}
+                <Form.Item
+                  name={nameof<AddCaveVm>("isCountyNumberManuallySet")}
+                  valuePropName="checked"
+                  noStyle
+                >
+                  <Checkbox
+                    disabled={isNullOrWhiteSpace(selectedCountyId)}
+                    onChange={(event) => {
+                      if (!event.target.checked) {
+                        form.setFieldsValue({
+                          countyNumber:
+                            isEditing && cave?.countyId === selectedCountyId
+                              ? cave?.countyNumber
+                              : undefined,
+                        });
+                      }
+                    }}
+                  >
+                    Manually Assign
+                  </Checkbox>
+                </Form.Item>
+              </Space>
+              {shouldShowCountyNumberModeSelection && (
+                <Typography.Text
+                  type="secondary"
+                  style={{ display: "block", marginTop: 4 }}
+                >
+                  Highest available uses the highest existing county number plus
+                  one. Lowest available uses the lowest county number that is
+                  not already in use.
+                </Typography.Text>
+              )}
+            </div>
           </Form.Item>
         </Col>
       </ShouldDisplay>

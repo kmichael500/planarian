@@ -36,6 +36,14 @@ public class SettingsController : PlanarianControllerBase<SettingsService>
         return new JsonResult(countyName);
     }
 
+    [HttpGet("tags/counties/{countyId:length(10)}/metadata")]
+    public async Task<ActionResult<CountyMetadataVm>> GetCountyMetadata(string countyId)
+    {
+        var county = await Service.GetCountyMetadata(countyId);
+
+        return new JsonResult(county);
+    }
+
     [HttpGet("tags/states/")]
     public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetStates([FromQuery] string? permissionKey)
     {

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Settings.Models;
 using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 
@@ -95,6 +96,20 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
     {
         return await DbContext.Counties.Where(e => e.Id == countyId && e.AccountId == RequestUser.AccountId)
             .Select(e => e.Name).FirstOrDefaultAsync();
+    }
+
+    public async Task<CountyMetadataVm?> GetCountyMetadata(string countyId)
+    {
+        return await DbContext.Counties
+            .Where(e => e.Id == countyId && e.AccountId == RequestUser.AccountId)
+            .Select(e => new CountyMetadataVm
+            {
+                Id = e.Id,
+                Name = e.Name,
+                DisplayId = e.DisplayId,
+                CountyIdDelimiter = e.Account!.CountyIdDelimiter
+            })
+            .FirstOrDefaultAsync();
     }
 
     public async Task<string?> GetStateName(string stateId)

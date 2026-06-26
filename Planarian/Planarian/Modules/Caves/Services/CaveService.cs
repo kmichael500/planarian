@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using CsvHelper;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
@@ -56,6 +57,16 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<PagedResult<CaveSearchVm>> GetCavesSearch(FilterQuery query, string? permissionKey = null)
     {
         return await Repository.GetCavesSearch(query, permissionKey);
+    }
+
+    public async Task<int> GetNextCountyNumber(string countyId, bool useFirstAvailableCountyNumber = false)
+    {
+        return await Repository.GetNewDisplayId(countyId, useFirstAvailableCountyNumber);
+    }
+
+    public async Task<bool> IsCountyNumberInUse(string countyId, int countyNumber, string? caveId = null)
+    {
+        return await Repository.IsCountyNumberInUse(countyId, countyNumber, caveId);
     }
 
     public async Task<byte[]> ExportCavesGpx(FilterQuery filterQuery, string? permissionKey,
@@ -491,6 +502,9 @@ public class CaveService : ServiceBase<CaveRepository>
         if (values.MaxPitDepthFeet < 0)
             throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
 
+        if (values.IsCountyNumberManuallySet && (!values.CountyNumber.HasValue || values.CountyNumber.Value <= 0))
+            throw ApiExceptionDictionary.BadRequest("County number must be greater than 0 when manually set.");
+
         if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
             throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
 
@@ -522,6 +536,17 @@ public class CaveService : ServiceBase<CaveRepository>
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
             var isNewCounty = entity.CountyId != values.CountyId;
+            int? countyNumber = null;
+
+            if (values.IsCountyNumberManuallySet)
+            {
+                countyNumber = values.CountyNumber;
+
+                var countyNumberInUse =
+                    await Repository.IsCountyNumberInUse(values.CountyId, countyNumber.Value, values.Id);
+                if (countyNumberInUse)
+                    throw ApiExceptionDictionary.BadRequest("That county number is already in use for the selected county.");
+            }
 
             entity.Name = values.Name.Trim();
             entity.SetAlternateNamesList(values.AlternateNames.Select(e => e.Trim()));
@@ -643,7 +668,15 @@ public class CaveService : ServiceBase<CaveRepository>
                 entity.CaveReportedByNameTags.Add(tag);
             }
 
-            if (isNewCounty) entity.CountyNumber = await Repository.GetNewDisplayId(entity.CountyId);
+            if (values.IsCountyNumberManuallySet && countyNumber.HasValue)
+            {
+                entity.CountyNumber = countyNumber.Value;
+            }
+            else if (isNewCounty)
+            {
+                entity.CountyNumber = await Repository.GetNewDisplayId(entity.CountyId,
+                    values.UseFirstAvailableCountyNumber);
+            }
 
             if (!isNew)
                 // remove entrances

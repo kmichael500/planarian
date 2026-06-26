@@ -60,6 +60,9 @@ public class CaveVm
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
+    [MaxLength(PropertyLength.SmallText)] public string CountyDisplayId { get; set; } = null!;
+    [MaxLength(PropertyLength.SmallText)] public string? CountyIdDelimiter { get; set; }
+    public int CountyNumber { get; set; }
 
     public string DisplayId { get; set; } = null!;
 
@@ -72,7 +75,7 @@ public class CaveVm
     public int? NumberOfPits { get; set; } = 0;
 
     public string? Narrative { get; set; }
-    
+
     public bool IsFavorite { get; set; }
 
     public DateTime? ReportedOn { get; set; }
