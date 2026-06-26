@@ -695,7 +695,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   const zoomControlPosition = "top-left";
   const scaleControlPosition = "bottom-left"; // Define position for scale control
-  const accountName = AuthenticationService.GetAccountName();
+  const accountName = AuthenticationService.GetAccountName() || "Planarian";
 
   const entrancesTileParams = useMemo(() => {
     const params = new URLSearchParams();

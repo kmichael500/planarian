@@ -94,12 +94,13 @@ const AuthenticationService = {
     return null;
   },
   GetAccountName(): string {
-    const name = AppOptions.accountIds.find(
-      (x) => x.value === this.GetAccountId()
-    )?.display;
-    if (!name) throw new NotFoundError("account name");
+    const accountId = this.EnsureValidAccountSelection();
+    if (!accountId) {
+      return "";
+    }
 
-    return name;
+    const accountIds = AppOptions?.accountIds ?? [];
+    return accountIds.find((x) => x.value === accountId)?.display ?? "";
   },
   GetUserId(): string | null {
     const token = this.GetToken();
@@ -133,6 +134,38 @@ const AuthenticationService = {
       const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
       return payload ? payload.currentAccountId : null;
     }
+    return null;
+  },
+  EnsureValidAccountSelection(): string | null {
+    const accountIds = AppOptions?.accountIds ?? [];
+    if (!accountIds.length) {
+      return this.GetAccountId();
+    }
+
+    const currentAccountId = this.GetAccountId();
+    if (
+      currentAccountId &&
+      accountIds.some((x) => x.value === currentAccountId)
+    ) {
+      return currentAccountId;
+    }
+
+    this.ResetAccountId();
+
+    const token = this.GetToken();
+    if (!token) {
+      return null;
+    }
+
+    const payload = jwt_decode<JwtPayload>(token) as JwtPayload;
+    const tokenAccountId = payload?.currentAccountId;
+    if (
+      tokenAccountId &&
+      accountIds.some((x) => x.value === tokenAccountId)
+    ) {
+      return tokenAccountId;
+    }
+
     return null;
   },
   GetUserGroupPrefix(): string {

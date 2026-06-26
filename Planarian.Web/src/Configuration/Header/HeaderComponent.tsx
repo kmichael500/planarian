@@ -23,7 +23,8 @@ const HeaderComponent = () => {
     useContext(AppContext);
 
   const isAuthenticated = AuthenticationService.IsAuthenticated();
-  const hasAccount = !isNullOrWhiteSpace(AuthenticationService.GetAccountId());
+  const accountName = AuthenticationService.GetAccountName();
+  const hasAccount = !isNullOrWhiteSpace(accountName);
 
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -101,7 +102,7 @@ const HeaderComponent = () => {
           </div>
 
           <div className="planarian-header__actions">
-            {hasAccount && <AccountNameTag />}
+            {hasAccount && <AccountNameTag accountName={accountName} />}
             {headerButtons.map((button, index) => (
               <div className="planarian-header__action" key={index}>
                 {button}
@@ -115,10 +116,7 @@ const HeaderComponent = () => {
   );
 };
 
-const AccountNameTag = () => {
-  let accountName = "";
-  let accountNameAbbreviation = "";
-
+const AccountNameTag = ({ accountName }: { accountName: string }) => {
   const screens = useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
     ([key, value]) => value && key === "xl"
@@ -128,8 +126,8 @@ const AccountNameTag = () => {
     ([key, value]) => value && key !== "xs"
   );
 
-  accountName = AuthenticationService.GetAccountName();
-  accountNameAbbreviation = StringHelpers.GenerateAbbreviation(accountName);
+  const accountNameAbbreviation =
+    StringHelpers.GenerateAbbreviation(accountName);
 
   return (
     <>

@@ -145,6 +145,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setIsLoading(true);
       await AppService.InitializeApp();
       if (AuthenticationService.IsAuthenticated()) {
+        AuthenticationService.EnsureValidAccountSelection();
         await refreshPendingInvitations();
 
         if (!isNullOrWhiteSpace(AuthenticationService.GetAccountId())) {

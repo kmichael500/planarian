@@ -17,7 +17,8 @@ const SwitchAccountComponent = ({
   handleCancel: onCancel,
 }: SwitchAccountComponentProps) => {
   const currentAccountId = AuthenticationService.GetAccountId();
-  const currentAccountName = AuthenticationService.GetAccountName();
+  const currentAccountName =
+    AuthenticationService.GetAccountName() || "No account selected";
 
   const navigate = useNavigate();
   const [accountList, setAccountList] = useState<SelectListItem<string>[]>();
