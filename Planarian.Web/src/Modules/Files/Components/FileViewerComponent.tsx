@@ -20,12 +20,39 @@ import {
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { GpxViewer } from "./GpxViewer";
 import { VectorDatasetViewer } from "./VectorDatasetViewer";
 import { PltViewer } from "./PltViewer";
 import { FileAccessAction, FileService } from "../Services/FileService";
-import { PdfViewer } from "./PdfViewer";
+
+type PromiseWithResolversResult<T> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type PromiseConstructorWithResolvers = PromiseConstructor & {
+  withResolvers?: <T>() => PromiseWithResolversResult<T>;
+};
+
+const ensurePromiseWithResolvers = () => {
+  const promiseSupport = Promise as PromiseConstructorWithResolvers;
+  if (typeof promiseSupport.withResolvers === "function") {
+    return;
+  }
+
+  promiseSupport.withResolvers = function withResolvers<T>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+      resolve = resolvePromise;
+      reject = rejectPromise;
+    });
+
+    return { promise, resolve, reject };
+  };
+};
 
 interface FileViewerProps {
   fileId?: string | null;
@@ -76,33 +103,47 @@ const FileViewer: React.FC<FileViewerProps> = ({
 
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<Blob | null>(null);
+  const [PdfViewerComponent, setPdfViewerComponent] = useState<
+    ((props: {
+      file: Blob;
+      openUrl?: string;
+      downloadButton?: React.ReactNode;
+    }) => JSX.Element) | null
+  >(null);
   const [fileEmbedUrl, setFileEmbedUrl] = useState<string | undefined>(undefined);
   const [fileAccessError, setFileAccessError] = useState<string | null>(null);
+  const [pdfViewerLoadError, setPdfViewerLoadError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setPdfFile(null);
+      setPdfViewerComponent(null);
       setFileContent(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
+      setPdfViewerLoadError(false);
       setIsLoading(false);
       return;
     }
 
     if (!fileId) {
       setPdfFile(null);
+      setPdfViewerComponent(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
       setFileContent(null);
+      setPdfViewerLoadError(false);
       setIsLoading(false);
       return;
     }
 
     setFileContent(null);
     setPdfFile(null);
+    setPdfViewerComponent(null);
     setFileEmbedUrl(undefined);
     setFileAccessError(null);
+    setPdfViewerLoadError(false);
     setIsLoading(true);
 
     let isCancelled = false;
@@ -214,6 +255,38 @@ const FileViewer: React.FC<FileViewerProps> = ({
     };
   }, [open, fileId, isPdf]);
 
+  useEffect(() => {
+    if (!open || !isPdf || !pdfFile) {
+      setPdfViewerComponent(null);
+      setPdfViewerLoadError(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadPdfViewer = async () => {
+      try {
+        ensurePromiseWithResolvers();
+        const module = await import("./PdfViewer");
+        if (!isCancelled) {
+          setPdfViewerComponent(() => module.PdfViewer);
+          setPdfViewerLoadError(false);
+        }
+      } catch {
+        if (!isCancelled) {
+          setPdfViewerComponent(null);
+          setPdfViewerLoadError(true);
+        }
+      }
+    };
+
+    loadPdfViewer();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [open, isPdf, pdfFile]);
+
   const hasPrevious = typeof onPrevious === "function";
   const hasNext = typeof onNext === "function";
   const previousDisabled = hasPrevious && canGoPrevious === false;
@@ -309,11 +382,19 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   />
                 </div>
               )}
-              {isPdf && pdfFile && (
-                <PdfViewer
+              {isPdf && pdfFile && PdfViewerComponent && (
+                <PdfViewerComponent
                   file={pdfFile}
                   openUrl={fileEmbedUrl}
                   downloadButton={downloadButton}
+                />
+              )}
+              {isPdf && pdfFile && !PdfViewerComponent && !pdfViewerLoadError && <Spin />}
+              {isPdf && pdfFile && pdfViewerLoadError && (
+                <Result
+                  status="warning"
+                  title="Unable to load the in-app PDF viewer."
+                  extra={downloadButton}
                 />
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}

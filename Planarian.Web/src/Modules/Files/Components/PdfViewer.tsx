@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { Grid, Result, Space, Spin, Typography } from "antd";
+import { Result, Space, Spin, Typography } from "antd";
 import {
   MinusOutlined,
   EyeOutlined,
@@ -12,35 +12,8 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import "./PdfViewer.scss";
 
-type PromiseWithResolversResult<T> = {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-};
-
-type PromiseConstructorWithResolvers = PromiseConstructor & {
-  withResolvers?: <T>() => PromiseWithResolversResult<T>;
-};
-
-const promiseWithResolversSupport =
-  Promise as PromiseConstructorWithResolvers;
-
-if (typeof promiseWithResolversSupport.withResolvers !== "function") {
-  promiseWithResolversSupport.withResolvers = function withResolvers<T>() {
-    let resolve!: (value: T | PromiseLike<T>) => void;
-    let reject!: (reason?: unknown) => void;
-
-    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-      resolve = resolvePromise;
-      reject = rejectPromise;
-    });
-
-    return { promise, resolve, reject };
-  };
-}
-
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+  "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
 ).toString();
 

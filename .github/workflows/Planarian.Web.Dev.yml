@@ -24,6 +24,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.16.0"
+
       # Cache node_modules
       # - name: Cache node modules
       #   uses: actions/cache@v2
@@ -36,7 +41,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd Planarian.Web
-          npm install
+          npm ci
 
       - name: Build React App
         run: |
