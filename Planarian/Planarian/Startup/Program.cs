@@ -146,7 +146,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var serverOptions = builder.Configuration.GetSection(ServerOptions.Key).Get<ServerOptions>();
 if (serverOptions == null) throw new Exception("Server options not found");
+var deploymentConfiguration = ServerConfigurationValidator.Validate(
+    serverOptions,
+    builder.Configuration["AllowedHosts"],
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME")));
 builder.Services.AddSingleton(serverOptions);
+builder.Services.AddSingleton(deploymentConfiguration);
 
 var authOptions = builder.Configuration.GetSection(AuthOptions.Key).Get<AuthOptions>();
 if (authOptions == null) throw new Exception("Auth options not found");
@@ -255,6 +260,8 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IApiRequestOrigin, ApiRequestOrigin>();
+builder.Services.AddScoped<IClientRequestOrigin, ClientRequestOrigin>();
+builder.Services.AddScoped<ClientUrlBuilder>();
 builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
     {
@@ -465,16 +472,8 @@ app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
 
-var corsOrigins = serverOptions.AllowedCorsOrigins
-    .SplitAndTrim(',')
-    .Append(serverOptions.ClientBaseUrl)
-    .Where(origin => !string.IsNullOrWhiteSpace(origin))
-    .Select(origin => origin.Trim())
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToArray();
-
 app.UseCors(x =>
-    x.WithOrigins(corsOrigins)
+    x.WithOrigins(deploymentConfiguration.AllowedCorsOrigins.ToArray())
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()

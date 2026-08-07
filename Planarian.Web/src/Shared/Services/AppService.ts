@@ -6,7 +6,7 @@ import { SelectListItem } from "../Models/SelectListItem";
 const baseUrl = "api/app";
 
 let AppOptions: AppOptionsVm = {
-  serverBaseUrl: "",
+  apiBaseUrl: "",
   signalrBaseUrl: "",
   supportName: "",
   supportEmail: "",
@@ -25,7 +25,7 @@ const AppService = {
     });
 
     AppOptions = {
-      serverBaseUrl: response.data.serverBaseUrl,
+      apiBaseUrl: response.data.apiBaseUrl,
       signalrBaseUrl: response.data.signalrBaseUrl,
       supportName: response.data.supportName,
       supportEmail: response.data.supportEmail,
@@ -64,7 +64,7 @@ const AppService = {
 export { AppService, AppOptions };
 
 export interface AppOptionsVm {
-  serverBaseUrl: string;
+  apiBaseUrl: string;
   signalrBaseUrl: string;
   supportName: string;
   supportEmail: string;

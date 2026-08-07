@@ -718,17 +718,17 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   }, [currentAccountId, mapFiltersQueryString]);
 
   const entranceTiles = useMemo(() => {
-    if (!AppOptions.serverBaseUrl) {
+    if (!AppOptions.apiBaseUrl) {
       return [];
     }
     return [
-      `${AppOptions.serverBaseUrl}/api/map/{z}/{x}/{y}.mvt?${entrancesTileParams}`,
+      `${AppOptions.apiBaseUrl}/api/map/{z}/{x}/{y}.mvt?${entrancesTileParams}`,
     ];
   }, [entrancesTileParams]);
 
   const transformMapRequest = useCallback<NonNullable<MapProps["transformRequest"]>>(
     (url) => {
-      if (AppOptions.serverBaseUrl && url.startsWith(AppOptions.serverBaseUrl)) {
+      if (AppOptions.apiBaseUrl && url.startsWith(AppOptions.apiBaseUrl)) {
         return {
           url,
           credentials: "include",
@@ -891,7 +891,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
   return (
     <Spin spinning={isLoading}>
-      {!isLoading && AppOptions.serverBaseUrl && bodyPaddingReady && (
+      {!isLoading && AppOptions.apiBaseUrl && bodyPaddingReady && (
         <div
           style={{ position: "relative", width: "100%", height: "100%" }}
           onDragOver={onDragOver}

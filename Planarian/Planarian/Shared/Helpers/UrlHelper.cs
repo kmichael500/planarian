@@ -4,9 +4,9 @@ namespace Planarian.Shared.Helpers;
 
 public static class UrlHelper
 {
-    public static string Build(string serverBaseUrl, string path, string? accountId)
+    public static string Build(string baseUrl, string path, string? accountId)
     {
-        var builder = new UriBuilder(new Uri(new Uri(serverBaseUrl), path));
+        var builder = new UriBuilder(new Uri(new Uri(baseUrl), path));
         if (string.IsNullOrWhiteSpace(accountId))
             return builder.Uri.ToString();
 

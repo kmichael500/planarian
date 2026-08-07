@@ -24,10 +24,10 @@ public class AppService : ServiceBase<AppRepository>
 
     public async Task<AppInitializeVm> Initialize()
     {
-        var serverBaseUrl = _apiRequestOrigin.GetOrigin();
+        var apiBaseUrl = _apiRequestOrigin.GetOrigin();
         var result = new AppInitializeVm(
-            serverBaseUrl,
-            $"{serverBaseUrl}/api/notificationHub",
+            apiBaseUrl,
+            $"{apiBaseUrl}/api/notificationHub",
             _serverOptions.SupportName,
             _serverOptions.SupportEmail);
 

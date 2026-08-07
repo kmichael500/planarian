@@ -11,7 +11,7 @@ import {
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
 import { AppService } from "./Shared/Services/AppService";
-import { resolveApiBaseUrl } from "./Shared/Helpers/ApiBaseUrl";
+import { parseApiOriginMappings, resolveApiBaseUrl } from "./Shared/Helpers/ApiBaseUrl";
 
 import utc from "dayjs/plugin/utc";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -33,14 +33,14 @@ if (typeof window !== "undefined") {
 }
 
 if (typeof window !== "undefined") {
-  const hostname = window.location.hostname;
-  if (hostname === "app.planarian.xyz" || hostname === "app.planarian.org") {
+  const umamiWebsiteId = process.env.REACT_APP_UMAMI_WEBSITE_ID?.trim();
+  if (umamiWebsiteId) {
     const script = document.createElement("script");
     script.src = "https://cloud.umami.is/script.js";
     script.defer = true;
     script.setAttribute(
       "data-website-id",
-      "bf1b5632-1b4f-417d-875a-df5ab6593653"
+      umamiWebsiteId
     );
     document.body.appendChild(script);
   }
@@ -67,7 +67,7 @@ reportWebVitals();
 const baseUrl = resolveApiBaseUrl({
   hostname: window.location.hostname,
   nodeEnv: process.env.NODE_ENV,
-  explicitOverride: process.env.REACT_APP_SERVER_URL,
+  mappings: parseApiOriginMappings(process.env.REACT_APP_API_ORIGIN_MAPPINGS),
 });
 
 const HttpClient = axios.create({

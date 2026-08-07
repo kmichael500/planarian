@@ -2,13 +2,13 @@ using HandlebarsDotNet;
 using Newtonsoft.Json;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Shared.Base;
 using Planarian.Shared.Email.Models;
 using Planarian.Shared.Email.Substitutions;
+using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 
 namespace Planarian.Shared.Email.Services;
@@ -16,13 +16,13 @@ namespace Planarian.Shared.Email.Services;
 public class EmailService : ServiceBase<MessageTypeRepository>
 {
     private readonly IEmailMessageFactory _emailMessageFactory;
-    private readonly ServerOptions _serverOptions;
+    private readonly ClientUrlBuilder _clientUrlBuilder;
 
     public EmailService(MessageTypeRepository repository, RequestUser requestUser,
-        IEmailMessageFactory emailMessageFactory, ServerOptions serverOptions) : base(repository, requestUser)
+        IEmailMessageFactory emailMessageFactory, ClientUrlBuilder clientUrlBuilder) : base(repository, requestUser)
     {
         _emailMessageFactory = emailMessageFactory;
-        _serverOptions = serverOptions;
+        _clientUrlBuilder = clientUrlBuilder;
     }
 
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
@@ -33,6 +33,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         if (messageType == null) throw ApiExceptionDictionary.MessageTypeNotFound;
 
+        substitutions.Substitutions["websiteUrl"] = _clientUrlBuilder.GetOrigin();
         var html = Handlebars.Compile(messageType.Html)(substitutions.Substitutions);
 
         var results = await _emailMessageFactory.Create()
@@ -58,7 +59,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         const string message =
             "We have received a request to reset your password for your account. If you did not make this request, please ignore this email. If you did make this request, please click the link below to reset your password. This link will expire in 30 minutes.";
 
-        var link = $"{_serverOptions.ClientBaseUrl}/reset-password?code={resetCode}";
+        var link = _clientUrlBuilder.BuildPasswordResetUrl(resetCode);
 
         await SendGenericEmail("Planarian Password Reset", emailAddress, fullName,
             new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
@@ -66,7 +67,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
     public async Task SendEmailConfirmationEmail(string emailAddress, string fullName, string emailConfirmationCode)
     {
-        var link = $"{_serverOptions.ClientBaseUrl}/confirm-email?code={emailConfirmationCode}";
+        var link = _clientUrlBuilder.BuildEmailConfirmationUrl(emailConfirmationCode);
 
         var paragraphs = new List<string>
         {
@@ -81,7 +82,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     
     public async Task SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName)
     {
-        var link = $"{_serverOptions.ClientBaseUrl}/user/invitations/{accountUser.InvitationCode}";
+        var link = _clientUrlBuilder.BuildInvitationUrl(accountUser.InvitationCode);
         var paragraphs = new List<string>
         {
             $"You have been invited by {accountName} to join Planarian! Please click the link below to create your account and accept the invitation.",

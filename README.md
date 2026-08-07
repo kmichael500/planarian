@@ -141,3 +141,11 @@ If you want to work on the codebase locally:
 4. Open `Planarian/Planarian.sln`.
 5. Run the backend from Visual Studio or your normal .NET workflow.
 6. Start the frontend from `Planarian.Web` with `npm start`.
+
+## Deployment origin configuration
+
+The frontend build requires the public, non-secret `REACT_APP_API_ORIGIN_MAPPINGS` environment variable for hosted deployments. It is a JSON object mapping each frontend hostname to its API origin, for example `{"portal.example.com":"https://services.example.net"}`.
+
+For local deployment-script use, place the variable in the ignored `Planarian.Web/.env` file, for example `REACT_APP_API_ORIGIN_MAPPINGS='{"portal.example.com":"https://services.example.net"}'`. Set `PLANARIAN_DEPLOY_ENV_FILE` to use another uncommitted environment file when needed.
+
+The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit API hostnames. These mappings intentionally do not infer hostnames from naming conventions.
