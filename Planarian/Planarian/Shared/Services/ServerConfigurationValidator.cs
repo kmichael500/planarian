@@ -23,6 +23,7 @@ public static class ServerConfigurationValidator
 
         var corsOrigins = serverOptions.AllowedCorsOrigins
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(origin => NormalizeOrigin(origin, "Server:AllowedCorsOrigins entry"))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -75,7 +76,7 @@ public static class ServerConfigurationValidator
         if (string.IsNullOrWhiteSpace(allowedHosts)) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var rawHost in allowedHosts.Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        foreach (var rawHost in allowedHosts.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
             if (rawHost == "*" || rawHost.StartsWith("*.", StringComparison.Ordinal))
             {
@@ -93,10 +94,10 @@ public static class ServerConfigurationValidator
     {
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
-            !string.IsNullOrEmpty(uri.UserInfo) || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) ||
+            uri.Host.Contains('*') || !string.IsNullOrEmpty(uri.UserInfo) || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) ||
             !string.IsNullOrEmpty(uri.Fragment))
         {
-            throw new InvalidOperationException($"{description} must be an absolute HTTP/HTTPS origin without a path, query, or fragment.");
+            throw new InvalidOperationException($"{description} must be an absolute HTTP/HTTPS origin without a path, query, fragment, or wildcard.");
         }
 
         return uri.GetLeftPart(UriPartial.Authority);

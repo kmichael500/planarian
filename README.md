@@ -144,8 +144,12 @@ If you want to work on the codebase locally:
 
 ## Deployment origin configuration
 
-The frontend build requires the public, non-secret `REACT_APP_API_ORIGIN_MAPPINGS` environment variable for hosted deployments. It is a JSON object mapping each frontend hostname to its API origin, for example `{"portal.example.com":"https://services.example.net"}`.
+The frontend build requires the public, non-secret `REACT_APP_API_ORIGIN_MAPPINGS` environment variable for hosted deployments. It is a JSON object mapping each frontend hostname to its API origin, for example `{"portal.example.com":"https://services.example.com"}`. Mapping keys are compared with `window.location.hostname`, so they are hostnames without ports.
 
-For local deployment-script use, place the variable in the ignored `Planarian.Web/.env` file, for example `REACT_APP_API_ORIGIN_MAPPINGS='{"portal.example.com":"https://services.example.net"}'`. Set `PLANARIAN_DEPLOY_ENV_FILE` to use another uncommitted environment file when needed.
+For local deployment-script use, place the variable in the ignored `Planarian.Web/.env` file, for example `REACT_APP_API_ORIGIN_MAPPINGS='{"portal.example.org":"https://backend.example.org"}'`. Set `PLANARIAN_DEPLOY_ENV_FILE` to use another uncommitted environment file when needed.
 
-The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit API hostnames. These mappings intentionally do not infer hostnames from naming conventions.
+The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. For example, an API host `services.example.com` can map to `https://portal.example.com`, while `backend.example.org` can map to `https://portal.example.org`. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit semicolon-delimited API hostnames without ports. These mappings intentionally do not infer hostnames from naming conventions.
+
+Hosted browser frontend/API mappings must use HTTPS and be schemeful same-site. Planarian authentication uses host-only, `Secure`, `SameSite=Lax` cookies, so arbitrary unrelated registrable domains cannot provide browser cookie authentication. This does not impose an `app` → `api` naming convention: subdomain names are arbitrary, and no deployment domain is hard-coded in source.
+
+Production web deployments also require the public GitHub Environment variable `REACT_APP_UMAMI_WEBSITE_ID`. The production workflow fails its build when it is absent; development does not enable analytics by default.

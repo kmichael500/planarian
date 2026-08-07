@@ -81,7 +81,7 @@ function normalizeHostname(value: string): string {
 
   try {
     const url = new URL(`http://${hostname}`);
-    if (url.host !== hostname) {
+    if (url.hostname !== hostname || url.port) {
       throw new Error();
     }
   } catch {
