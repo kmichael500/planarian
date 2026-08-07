@@ -27,10 +27,10 @@ PLANARIAN_DEPLOY_ENV_FILE="${PLANARIAN_DEPLOY_ENV_FILE:-${ROOT_DIR}/Planarian.We
 
 if [[ -f "${PLANARIAN_DEPLOY_ENV_FILE}" ]]; then
   echo "Loading deployment environment from ${PLANARIAN_DEPLOY_ENV_FILE}..."
-  set -a
-  # shellcheck disable=SC1090
-  source "${PLANARIAN_DEPLOY_ENV_FILE}"
-  set +a
+  # Parse dotenv syntax without executing values from an uncommitted file.
+  # shellcheck source=load-dotenv.sh
+  source "${ROOT_DIR}/scripts/load-dotenv.sh"
+  load_dotenv "${PLANARIAN_DEPLOY_ENV_FILE}"
 fi
 
 if [[ -n "${EXPLICIT_API_ORIGIN_MAPPINGS}" ]]; then
@@ -87,6 +87,14 @@ echo "Using Azure subscription: ${AZURE_SUBSCRIPTION_ID}"
 az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
 if [[ "${DEPLOY_API}" == true ]]; then
+  echo "Configuring forwarded headers for ${API_WEBAPP_NAME}..."
+  az webapp config appsettings set \
+    --resource-group "${AZURE_RESOURCE_GROUP}" \
+    --name "${API_WEBAPP_NAME}" \
+    --settings ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
+    --only-show-errors \
+    --output none
+
   API_PUBLISH_DIR="${TMP_BASE}/api-publish"
   API_ZIP="${TMP_BASE}/planarian-api-dev.zip"
 

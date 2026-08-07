@@ -75,6 +75,7 @@ var appConfigConnectionString = builder.Configuration.GetConnectionString("AppCo
 
 var isDevelopment = builder.Environment.IsDevelopment();
 var isAzureAppService = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
+var isHostedDeployment = isAzureAppService || !isDevelopment;
 if (isAzureAppService && !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_FORWARDEDHEADERS_ENABLED"), "true", StringComparison.OrdinalIgnoreCase))
     throw new InvalidOperationException("Azure App Service requires ASPNETCORE_FORWARDEDHEADERS_ENABLED=true so public HTTPS origins are available behind TLS termination.");
 
@@ -158,7 +159,7 @@ if (serverOptions == null) throw new Exception("Server options not found");
 var deploymentConfiguration = ServerConfigurationValidator.Validate(
     serverOptions,
     builder.Configuration["AllowedHosts"],
-    isAzureAppService);
+    isHostedDeployment);
 builder.Services.AddSingleton(serverOptions);
 builder.Services.AddSingleton(deploymentConfiguration);
 

@@ -7,14 +7,14 @@ public sealed record ServerDeploymentConfiguration(IReadOnlyCollection<string> A
 public static class ServerConfigurationValidator
 {
     public static ServerDeploymentConfiguration Validate(ServerOptions serverOptions, string? allowedHosts,
-        bool isAzureAppService)
+        bool isHostedDeployment)
     {
         var clientOriginMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var mapping in serverOptions.ClientOriginMappings)
         {
             var apiHostname = NormalizeHostname(mapping.Key, "ClientOriginMappings API-host key");
             if (!clientOriginMappings.TryAdd(apiHostname, NormalizeOrigin(mapping.Value,
-                    $"ClientOriginMappings value for '{apiHostname}'", isAzureAppService)))
+                    $"ClientOriginMappings value for '{apiHostname}'", isHostedDeployment)))
             {
                 throw new InvalidOperationException($"Duplicate ClientOriginMappings API-host key '{apiHostname}'.");
             }
@@ -23,11 +23,11 @@ public static class ServerConfigurationValidator
 
         var corsOrigins = serverOptions.AllowedCorsOrigins
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(origin => NormalizeOrigin(origin, "Server:AllowedCorsOrigins entry", isAzureAppService))
+            .Select(origin => NormalizeOrigin(origin, "Server:AllowedCorsOrigins entry", isHostedDeployment))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (!isAzureAppService)
+        if (!isHostedDeployment)
         {
             return new ServerDeploymentConfiguration(corsOrigins);
         }
@@ -35,12 +35,12 @@ public static class ServerConfigurationValidator
         var configuredAllowedHosts = ParseAllowedHosts(allowedHosts);
         if (configuredAllowedHosts.Count == 0 || configuredAllowedHosts.Any(host => host == "*" || host.StartsWith("*.", StringComparison.Ordinal)))
         {
-            throw new InvalidOperationException("Azure App Service requires AllowedHosts with at least one explicit hostname and no wildcards.");
+            throw new InvalidOperationException("Hosted deployments require AllowedHosts with at least one explicit hostname and no wildcards.");
         }
 
         if (clientOriginMappings.Count == 0)
         {
-            throw new InvalidOperationException("Azure App Service requires at least one Server:ClientOriginMappings entry.");
+            throw new InvalidOperationException("Hosted deployments require at least one Server:ClientOriginMappings entry.");
         }
 
         foreach (var mapping in clientOriginMappings)
@@ -93,13 +93,18 @@ public static class ServerConfigurationValidator
     private static string NormalizeOrigin(string value, string description, bool requireHttps)
     {
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
-            (requireHttps ? uri.Scheme != Uri.UriSchemeHttps : uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            (uri.Scheme != Uri.UriSchemeHttps &&
+             (requireHttps || uri.Scheme != Uri.UriSchemeHttp || !IsLocalDevelopmentHost(uri.Host))) ||
             uri.Host.Contains('*') || !string.IsNullOrEmpty(uri.UserInfo) || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) ||
             !string.IsNullOrEmpty(uri.Fragment))
         {
-            throw new InvalidOperationException($"{description} must be an absolute {(requireHttps ? "HTTPS" : "HTTP/HTTPS")} origin without a path, query, fragment, or wildcard.");
+            throw new InvalidOperationException($"{description} must be an absolute {(requireHttps ? "HTTPS" : "HTTPS, or HTTP only for localhost development")} origin without a path, query, fragment, or wildcard.");
         }
 
         return uri.GetLeftPart(UriPartial.Authority);
     }
+
+    private static bool IsLocalDevelopmentHost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+        (System.Net.IPAddress.TryParse(host, out var address) && System.Net.IPAddress.IsLoopback(address));
 }
