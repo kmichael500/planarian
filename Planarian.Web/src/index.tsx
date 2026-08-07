@@ -6,12 +6,12 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import axios, { AxiosHeaders } from "axios";
 import { AuthenticationService } from "./Modules/Authentication/Services/AuthenticationService";
-import { isNullOrWhiteSpace } from "./Shared/Helpers/StringHelpers";
 import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "./Shared/Models/ApiErrorResponse";
 import { AppService } from "./Shared/Services/AppService";
+import { resolveApiBaseUrl } from "./Shared/Helpers/ApiBaseUrl";
 
 import utc from "dayjs/plugin/utc";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -64,14 +64,11 @@ root.render(
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 
-let baseUrl: string | undefined;
-if (!isNullOrWhiteSpace(process.env.REACT_APP_SERVER_URL)) {
-  baseUrl = process.env.REACT_APP_SERVER_URL;
-} else if (process.env.NODE_ENV === "development") {
-  baseUrl = "https://localhost:7111";
-} else {
-  baseUrl = "https://wa-planarian.azurewebsites.net";
-}
+const baseUrl = resolveApiBaseUrl({
+  hostname: window.location.hostname,
+  nodeEnv: process.env.NODE_ENV,
+  explicitOverride: process.env.REACT_APP_SERVER_URL,
+});
 
 const HttpClient = axios.create({
   baseURL: baseUrl,

@@ -1,5 +1,4 @@
 using Planarian.Library.Helpers;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Leads;
 using Planarian.Model.Database.Entities.Trips;
@@ -23,16 +22,16 @@ public class TripService : ServiceBase<TripRepository>
     private readonly BlobService _blobService;
     private readonly TagRepository _tagRepository;
     private readonly UserRepository _userRepository;
-    private readonly ServerOptions _serverOptions;
+    private readonly IApiRequestOrigin _apiRequestOrigin;
 
     public TripService(TripRepository repository, RequestUser requestUser, BlobService blobService,
-        TagRepository tagRepository, UserRepository userRepository, ServerOptions serverOptions) :
+        TagRepository tagRepository, UserRepository userRepository, IApiRequestOrigin apiRequestOrigin) :
         base(repository, requestUser)
     {
         _blobService = blobService;
         _tagRepository = tagRepository;
         _userRepository = userRepository;
-        _serverOptions = serverOptions;
+        _apiRequestOrigin = apiRequestOrigin;
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
@@ -81,7 +80,7 @@ public class TripService : ServiceBase<TripRepository>
         foreach (var photo in photos)
         {
             photo.Url = UrlHelper.Build(
-                _serverOptions.ServerBaseUrl,
+                _apiRequestOrigin.GetOrigin(),
                 $"/api/photos/{photo.Id}/content",
                 RequestUser.AccountId);
         }

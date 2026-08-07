@@ -175,7 +175,7 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.Name = AuthCookieService.AntiforgeryCookieName;
     options.Cookie.HttpOnly = true;
     options.Cookie.Path = "/";
-    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None;
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.HeaderName = AuthCookieService.RequestTokenHeaderName;
 });
@@ -254,6 +254,7 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IApiRequestOrigin, ApiRequestOrigin>();
 builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
     {
@@ -464,7 +465,13 @@ app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
 
-var corsOrigins = serverOptions.AllowedCorsOrigins.SplitAndTrim(',').Append(serverOptions.ClientBaseUrl).ToArray();
+var corsOrigins = serverOptions.AllowedCorsOrigins
+    .SplitAndTrim(',')
+    .Append(serverOptions.ClientBaseUrl)
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim())
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 app.UseCors(x =>
     x.WithOrigins(corsOrigins)

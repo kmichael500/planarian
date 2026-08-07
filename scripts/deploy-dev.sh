@@ -13,7 +13,7 @@ Environment overrides:
   AZURE_RESOURCE_GROUP    Azure resource group
   API_WEBAPP_NAME         Azure App Service name for the API
   STATIC_WEBAPP_NAME      Azure Static Web App name
-  REACT_APP_SERVER_URL    API URL baked into the web build
+  REACT_APP_SERVER_URL    Optional API URL override for a custom web host; normal deployments use runtime Planarian hostname mapping
 USAGE
 }
 
@@ -25,7 +25,7 @@ AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-66757d3a-24fe-47b8-85be-8063f5f1
 AZURE_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-rg-planarian}"
 API_WEBAPP_NAME="${API_WEBAPP_NAME:-wa-planarian-dev}"
 STATIC_WEBAPP_NAME="${STATIC_WEBAPP_NAME:-swa-planarian-dev}"
-REACT_APP_SERVER_URL="${REACT_APP_SERVER_URL:-https://wa-planarian-dev.azurewebsites.net}"
+REACT_APP_SERVER_URL="${REACT_APP_SERVER_URL:-}"
 
 DEPLOY_API=true
 DEPLOY_WEB=true
@@ -100,10 +100,18 @@ if [[ "${DEPLOY_API}" == true ]]; then
 fi
 
 if [[ "${DEPLOY_WEB}" == true ]]; then
-  echo "Building web with REACT_APP_SERVER_URL=${REACT_APP_SERVER_URL}..."
+  if [[ -n "${REACT_APP_SERVER_URL}" ]]; then
+    echo "Building web with custom REACT_APP_SERVER_URL override..."
+  else
+    echo "Building web with runtime Planarian hostname API mapping..."
+  fi
   (
     cd "${ROOT_DIR}/Planarian.Web"
-    REACT_APP_SERVER_URL="${REACT_APP_SERVER_URL}" npm run build
+    if [[ -n "${REACT_APP_SERVER_URL}" ]]; then
+      REACT_APP_SERVER_URL="${REACT_APP_SERVER_URL}" npm run build
+    else
+      npm run build
+    fi
   )
 
   echo "Fetching Static Web App deployment token..."

@@ -45,7 +45,7 @@ public class AuthCookieService
             HttpOnly = httpOnly,
             IsEssential = true,
             Path = "/",
-            SameSite = SameSiteMode.None,
+            SameSite = SameSiteMode.Lax,
             Secure = true
         };
     }

@@ -28,10 +28,7 @@ public class AppController : PlanarianControllerBase<AppService>
     {
         var antiforgeryTokens = _antiforgery.GetAndStoreTokens(HttpContext);
 
-        var request = HttpContext.Request;
-        var serverBaseUrl = $"{request.Scheme}://{request.Host}";
-
-        var result = await Service.Initialize(serverBaseUrl);
+        var result = await Service.Initialize();
         result.AntiforgeryRequestToken = antiforgeryTokens.RequestToken;
         return new JsonResult(result);
     }
