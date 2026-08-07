@@ -7,7 +7,8 @@ export interface ApiBaseUrlOptions {
 }
 
 export function parseApiOriginMappings(
-  value: string | undefined
+  value: string | undefined,
+  nodeEnv?: string
 ): ApiOriginMappings {
   if (!value?.trim()) {
     return new Map();
@@ -37,7 +38,7 @@ export function parseApiOriginMappings(
       );
     }
 
-    mappings.set(hostname, normalizeApiOrigin(rawOrigin, hostname));
+    mappings.set(hostname, normalizeApiOrigin(rawOrigin, hostname, nodeEnv));
   }
 
   return mappings;
@@ -91,7 +92,7 @@ function normalizeHostname(value: string): string {
   return hostname;
 }
 
-function normalizeApiOrigin(value: unknown, hostname: string): string {
+function normalizeApiOrigin(value: unknown, hostname: string, nodeEnv?: string): string {
   if (typeof value !== "string") {
     throw new Error(`API origin for frontend hostname "${hostname}" must be a string.`);
   }
@@ -103,15 +104,17 @@ function normalizeApiOrigin(value: unknown, hostname: string): string {
     throw new Error(`API origin for frontend hostname "${hostname}" must be an absolute HTTP/HTTPS origin.`);
   }
 
+  const permitsLocalHttp =
+    nodeEnv === "development" && hostname === "localhost" && url.protocol === "http:";
   if (
-    !["http:", "https:"].includes(url.protocol) ||
+    (url.protocol !== "https:" && !permitsLocalHttp) ||
     url.username ||
     url.password ||
     url.pathname !== "/" ||
     url.search ||
     url.hash
   ) {
-    throw new Error(`API origin for frontend hostname "${hostname}" must be an absolute HTTP/HTTPS origin without a path, query, or fragment.`);
+    throw new Error(`API origin for frontend hostname "${hostname}" must be an absolute HTTPS origin without a path, query, or fragment.`);
   }
 
   return url.origin;

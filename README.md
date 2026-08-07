@@ -140,7 +140,7 @@ If you want to work on the codebase locally:
 3. Set up Azure Blob Storage for file uploads, or use a local emulator like Azurite.
 4. Open `Planarian/Planarian.sln`.
 5. Run the backend from Visual Studio or your normal .NET workflow.
-6. Start the frontend from `Planarian.Web` with `npm start`.
+6. Copy `Planarian.Web/.env.example` to the ignored `Planarian.Web/.env` and start the frontend with `npm start`. The normal local topology is `https://localhost:3000` → `https://localhost:7111`; this is required because authentication and antiforgery cookies are `Secure` and `SameSite=Lax`. Do not commit certificate/key material; react-scripts can generate a local development certificate, or configure `SSL_CRT_FILE` and `SSL_KEY_FILE` locally.
 
 ## Deployment origin configuration
 
@@ -150,6 +150,6 @@ For local deployment-script use, place the variable in the ignored `Planarian.We
 
 The API uses `Server:ClientOriginMappings` to map each API hostname to its frontend origin for request-generated links. For example, an API host `services.example.com` can map to `https://portal.example.com`, while `backend.example.org` can map to `https://portal.example.org`. Configure `Server:AllowedCorsOrigins` separately for credentialed browser requests and set top-level `AllowedHosts` to explicit semicolon-delimited API hostnames without ports. These mappings intentionally do not infer hostnames from naming conventions.
 
-Hosted browser frontend/API mappings must use HTTPS and be schemeful same-site. Planarian authentication uses host-only, `Secure`, `SameSite=Lax` cookies, so arbitrary unrelated registrable domains cannot provide browser cookie authentication. This does not impose an `app` → `api` naming convention: subdomain names are arbitrary, and no deployment domain is hard-coded in source.
+Hosted browser frontend/API mappings must use HTTPS and be schemeful same-site. HTTPS is validated for hosted mapping origins; same-site relationships remain an explicit deployment responsibility because correctly evaluating public suffixes requires public-suffix data that Planarian does not embed. Planarian authentication uses host-only, `Secure`, `SameSite=Lax` cookies, so arbitrary unrelated registrable domains cannot provide browser cookie authentication. This does not impose an `app` → `api` naming convention: subdomain names are arbitrary, and no deployment domain is hard-coded in source.
 
 Production web deployments also require the public GitHub Environment variable `REACT_APP_UMAMI_WEBSITE_ID`. The production workflow fails its build when it is absent; development does not enable analytics by default.

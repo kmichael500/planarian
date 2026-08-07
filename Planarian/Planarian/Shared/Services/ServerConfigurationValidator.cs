@@ -14,7 +14,7 @@ public static class ServerConfigurationValidator
         {
             var apiHostname = NormalizeHostname(mapping.Key, "ClientOriginMappings API-host key");
             if (!clientOriginMappings.TryAdd(apiHostname, NormalizeOrigin(mapping.Value,
-                    $"ClientOriginMappings value for '{apiHostname}'")))
+                    $"ClientOriginMappings value for '{apiHostname}'", isAzureAppService)))
             {
                 throw new InvalidOperationException($"Duplicate ClientOriginMappings API-host key '{apiHostname}'.");
             }
@@ -23,7 +23,7 @@ public static class ServerConfigurationValidator
 
         var corsOrigins = serverOptions.AllowedCorsOrigins
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(origin => NormalizeOrigin(origin, "Server:AllowedCorsOrigins entry"))
+            .Select(origin => NormalizeOrigin(origin, "Server:AllowedCorsOrigins entry", isAzureAppService))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -90,14 +90,14 @@ public static class ServerConfigurationValidator
         return hosts;
     }
 
-    private static string NormalizeOrigin(string value, string description)
+    private static string NormalizeOrigin(string value, string description, bool requireHttps)
     {
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            (requireHttps ? uri.Scheme != Uri.UriSchemeHttps : uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
             uri.Host.Contains('*') || !string.IsNullOrEmpty(uri.UserInfo) || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) ||
             !string.IsNullOrEmpty(uri.Fragment))
         {
-            throw new InvalidOperationException($"{description} must be an absolute HTTP/HTTPS origin without a path, query, fragment, or wildcard.");
+            throw new InvalidOperationException($"{description} must be an absolute {(requireHttps ? "HTTPS" : "HTTP/HTTPS")} origin without a path, query, fragment, or wildcard.");
         }
 
         return uri.GetLeftPart(UriPartial.Authority);

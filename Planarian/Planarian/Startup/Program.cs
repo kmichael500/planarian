@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.HttpOverrides;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
@@ -73,6 +74,9 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
 var isDevelopment = builder.Environment.IsDevelopment();
+var isAzureAppService = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
+if (isAzureAppService && !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_FORWARDEDHEADERS_ENABLED"), "true", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("Azure App Service requires ASPNETCORE_FORWARDEDHEADERS_ENABLED=true so public HTTPS origins are available behind TLS termination.");
 
 builder.Configuration.AddAzureAppConfiguration(options =>
 {
@@ -154,7 +158,7 @@ if (serverOptions == null) throw new Exception("Server options not found");
 var deploymentConfiguration = ServerConfigurationValidator.Validate(
     serverOptions,
     builder.Configuration["AllowedHosts"],
-    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME")));
+    isAzureAppService);
 builder.Services.AddSingleton(serverOptions);
 builder.Services.AddSingleton(deploymentConfiguration);
 
@@ -453,6 +457,9 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o =>
 #endregion
 
 var app = builder.Build();
+
+if (isAzureAppService)
+    app.UseForwardedHeaders();
 
 app.UseResponseCompression();
 

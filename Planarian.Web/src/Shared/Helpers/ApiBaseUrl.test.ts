@@ -1,7 +1,7 @@
 import { parseApiOriginMappings, resolveApiBaseUrl } from "./ApiBaseUrl";
 
 describe("API origin mappings", () => {
-  const mappings = (value: string) => parseApiOriginMappings(value);
+  const mappings = (value: string, nodeEnv?: string) => parseApiOriginMappings(value, nodeEnv);
 
   it("resolves a configured frontend hostname without inferring an API name", () => {
     expect(
@@ -44,6 +44,11 @@ describe("API origin mappings", () => {
     expect(() => mappings(value)).toThrow("API origin");
   });
 
+  it("rejects insecure hosted API origins", () => {
+    expect(() => mappings('{"portal.example.com":"http://services.example.com"}', "production"))
+      .toThrow("absolute HTTPS origin");
+  });
+
   it("rejects mapping keys with ports because window.location.hostname excludes them", () => {
     expect(() => mappings('{"portal.example.com:3000":"https://services.example.com"}')).toThrow(
       "Invalid frontend hostname mapping key"
@@ -77,7 +82,7 @@ describe("API origin mappings", () => {
       resolveApiBaseUrl({
         hostname: "localhost",
         nodeEnv: "development",
-        mappings: mappings('{"localhost":"http://localhost:7123"}'),
+        mappings: mappings('{"localhost":"http://localhost:7123"}', "development"),
       })
     ).toBe("http://localhost:7123");
   });

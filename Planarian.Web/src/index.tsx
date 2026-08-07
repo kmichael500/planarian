@@ -31,7 +31,7 @@ function configureBootstrap(): void {
   const baseUrl = resolveApiBaseUrl({
     hostname: window.location.hostname,
     nodeEnv: process.env.NODE_ENV,
-    mappings: parseApiOriginMappings(process.env.REACT_APP_API_ORIGIN_MAPPINGS),
+    mappings: parseApiOriginMappings(process.env.REACT_APP_API_ORIGIN_MAPPINGS, process.env.NODE_ENV),
   });
   configureHttpClient(baseUrl);
 
