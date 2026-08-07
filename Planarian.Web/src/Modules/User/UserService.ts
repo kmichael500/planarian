@@ -1,4 +1,4 @@
-import { HttpClient } from "../..";
+import { HttpClient } from "../../Shared/Http/HttpClient";
 import { AcceptInvitationVm } from "./Models/AcceptInvitationVm";
 import { NameProfilePhotoVm } from "./Models/NameProfilePhotoVm";
 import { UserVm } from "./Models/UserVm";

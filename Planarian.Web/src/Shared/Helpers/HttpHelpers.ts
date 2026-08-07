@@ -1,5 +1,5 @@
 import { serialize } from "object-to-formdata";
-import { baseUrl } from "../..";
+import { getApiBaseUrl } from "../Http/HttpClient";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 export const HttpHelpers = {
@@ -9,7 +9,7 @@ export const HttpHelpers = {
   },
 
   BuildAuthenticatedApiUrl(path: string): string {
-    const normalizedBaseUrl = baseUrl ?? window.location.origin;
+    const normalizedBaseUrl = getApiBaseUrl() ?? window.location.origin;
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const url = new URL(normalizedPath, normalizedBaseUrl);
     const accountId = AuthenticationService.GetAccountId();

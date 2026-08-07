@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import bbox from "@turf/bbox";
-import shp from "shpjs";
 import { kml as convertKmlToGeoJson } from "@tmcw/togeojson";
 import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
 import { Source, Layer, useMap } from "react-map-gl/maplibre";
@@ -50,6 +49,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
             throw new Error("Unable to download shapefile archive.");
           }
           const arrayBuffer = await response.arrayBuffer();
+          const { default: shp } = await import("shpjs");
           const parsed = await shp(arrayBuffer);
           featureCollection = normalizeToFeatureCollection(parsed);
         } else if (normalizedType === "kml") {

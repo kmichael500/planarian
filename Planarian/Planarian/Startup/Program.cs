@@ -84,6 +84,11 @@ builder.Configuration.AddAzureAppConfiguration(options =>
 
 #if DEBUG
 builder.Configuration.AddJsonFile("appsettings.Development.json", false);
+// Host filtering is configured when the web host is created, before Azure App
+// Configuration and the development override are added. Apply the final local
+// value explicitly so localhost requests reach the CORS middleware.
+builder.WebHost.UseSetting("AllowedHosts",
+    builder.Configuration["AllowedHosts"] ?? "localhost");
 #endif
 
 

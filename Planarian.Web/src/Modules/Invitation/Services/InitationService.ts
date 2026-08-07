@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { MemberGridType } from "../../../Shared/Components/MemberGrid/MemberGridComponent";
 import { InviteMember as InviteMember } from "../../../Shared/Models/InviteMember";
 

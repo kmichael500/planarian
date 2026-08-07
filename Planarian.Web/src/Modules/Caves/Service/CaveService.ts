@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { PagedResult } from "../../Search/Models/PagedResult";
 import {
   QueryBuilder,

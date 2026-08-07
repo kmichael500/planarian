@@ -1,4 +1,5 @@
-import { HttpClient } from "../..";
+import { HttpClient } from "../Http/HttpClient";
+import { RequestRuntimeState } from "../Http/RequestRuntimeState";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
@@ -12,7 +13,6 @@ let AppOptions: AppOptionsVm = {
   supportEmail: "",
 };
 
-let antiforgeryRequestToken: string | null = null;
 
 const AppService = {
   async InitializeApp(
@@ -30,12 +30,12 @@ const AppService = {
       supportName: response.data.supportName,
       supportEmail: response.data.supportEmail,
     };
-    antiforgeryRequestToken = response.data.antiforgeryRequestToken;
+    RequestRuntimeState.setAntiforgeryRequestToken(response.data.antiforgeryRequestToken);
 
     return response.data;
   },
   GetAntiforgeryRequestToken(): string | null {
-    return antiforgeryRequestToken;
+    return RequestRuntimeState.getAntiforgeryRequestToken();
   },
   async HasCavePermission(
     permissionKey: PermissionKey,

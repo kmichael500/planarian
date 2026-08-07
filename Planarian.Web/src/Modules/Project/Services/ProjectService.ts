@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { CreateOrEditProject } from "../Models/CreateOrEditProject";
 import { ProjectVm } from "../Models/ProjectVm";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";

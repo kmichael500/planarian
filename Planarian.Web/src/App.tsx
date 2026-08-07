@@ -75,7 +75,7 @@ const AppContent: React.FC = () => {
                   />
                   <Row>
                     <Col span={24}>
-                      <Spin spinning={isLoading} size="large" tip="Planarian" />
+                      <Spin spinning={isLoading} size="large" />
                     </Col>
                     <Col span={24}>{initializedError?.message}</Col>
                     {initializedError?.errorCode ===

@@ -29,7 +29,6 @@ import { FullScreenControl } from "./FullScreenControl";
 import { useNavigate } from "react-router-dom";
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 
-import shpjs from "shpjs";
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
@@ -810,6 +809,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const { default: shpjs } = await import("shpjs");
       const parsed = await shpjs(arrayBuffer);
 
       // Handle possibility of multiple shapefile layers.

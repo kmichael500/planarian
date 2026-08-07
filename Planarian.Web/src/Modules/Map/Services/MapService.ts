@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { FeatureCollection } from "geojson";
 const baseUrl = "api/map";
 const cacheDuration = 24 * 60 * 60 * 1000; // 1 day in milliseconds
