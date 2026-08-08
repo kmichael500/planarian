@@ -8,9 +8,9 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 namespace Planarian.Model.Interceptors;
 
 /// <summary>
-/// Resolves Cave/Entrance ownership once per distinct foreign-key chunk before
-/// SaveChanges validation. This keeps tenant validation set-oriented instead of
-/// issuing one SELECT per association row.
+/// Resolves Cave/Entrance/File ownership once per distinct foreign-key chunk
+/// before SaveChanges validation. This keeps tenant validation set-oriented
+/// instead of issuing one SELECT per association row.
 /// </summary>
 internal static class SaveChangesOwnershipBatchLoader
 {
@@ -25,6 +25,9 @@ internal static class SaveChangesOwnershipBatchLoader
 
         var caveLinks = new List<(object Entity, PropertyInfo Navigation, string CaveId)>();
         var entranceLinks = new List<(object Entity, PropertyInfo Navigation, string EntranceId)>();
+        var stagedFileIds = changed.Select(e => e.Entity).OfType<CaveChangeRequestStagedFile>()
+            .Select(e => e.FileId).Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal).ToList();
 
         foreach (var entry in changed)
         {
@@ -50,7 +53,7 @@ internal static class SaveChangesOwnershipBatchLoader
             }
         }
 
-        if (caveLinks.Count == 0 && entranceLinks.Count == 0) return;
+        if (caveLinks.Count == 0 && entranceLinks.Count == 0 && stagedFileIds.Count == 0) return;
 
         var accountId = context.RequestUser?.AccountId;
         if (string.IsNullOrWhiteSpace(accountId))
@@ -109,6 +112,23 @@ internal static class SaveChangesOwnershipBatchLoader
                     throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
                 link.Navigation.SetValue(link.Entity, entrance);
             }
+        }
+
+        if (stagedFileIds.Count > 0)
+        {
+            var ownedFileIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var chunk in stagedFileIds.Chunk(LookupBatchSize))
+            {
+                var ids = await context.Files.IgnoreQueryFilters()
+                    .Where(f => chunk.Contains(f.Id) &&
+                                (f.AccountId == accountId || (f.Cave != null && f.Cave.AccountId == accountId)))
+                    .Select(f => f.Id)
+                    .ToListAsync(cancellationToken);
+                ownedFileIds.UnionWith(ids);
+            }
+
+            if (stagedFileIds.Any(id => !ownedFileIds.Contains(id)))
+                throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
         }
     }
 }
