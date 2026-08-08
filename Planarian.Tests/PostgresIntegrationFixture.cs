@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Testcontainers.PostgreSql;
@@ -6,38 +7,150 @@ using Xunit;
 
 namespace Planarian.Tests;
 
-/// <summary>Real PostgreSQL/PostGIS fixture. Docker is required; tests never opt out.</summary>
+/// <summary>
+/// Real PostgreSQL/PostGIS fixture. All fixture instances in the test process
+/// share one Testcontainers server; individual tests create isolated databases.
+/// Docker is required and tests never silently opt out.
+/// </summary>
 public sealed class PostgresIntegrationFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgis/postgis:16-3.4")
-        .WithDatabase("planarian_tests")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
+    private static readonly SemaphoreSlim SharedGate = new(1, 1);
+    private static PostgreSqlContainer? _sharedContainer;
+    private static bool _sharedDatabaseMigrated;
 
-    public string ConnectionString => _container.GetConnectionString();
+    public string ConnectionString => _sharedContainer?.GetConnectionString()
+        ?? throw new InvalidOperationException("PostgreSQL integration fixture has not been initialized.");
 
-    public async Task InitializeAsync()
+    public async Task InitializeAsync() => await EnsureSharedContainerAsync();
+
+    // The Testcontainers resource reaper owns process-level cleanup. Disposing a
+    // class fixture must not stop the server because other xUnit class fixtures
+    // in the same process intentionally share it.
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
+        CreateDbContext(ConnectionString, userId, accountId);
+
+    public async Task<PostgresTestDatabase> CreateDatabaseAsync(string testName)
     {
-        await _container.StartAsync();
-        await using var db = CreateDbContext("test-user", "test-account");
-        await db.Database.MigrateAsync();
+        await EnsureSharedContainerAsync();
+
+        var prefix = SanitizeDatabaseName(testName);
+        var suffix = Guid.NewGuid().ToString("N")[..12];
+        var maxPrefixLength = Math.Max(1, 63 - "planarian__".Length - suffix.Length);
+        if (prefix.Length > maxPrefixLength) prefix = prefix[..maxPrefixLength];
+        var databaseName = $"planarian_{prefix}_{suffix}";
+
+        await using (var connection = new NpgsqlConnection(ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"CREATE DATABASE {QuoteIdentifier(databaseName)}";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(ConnectionString) { Database = databaseName };
+        var database = new PostgresTestDatabase(builder.ConnectionString, databaseName, ConnectionString);
+        try
+        {
+            await using var db = database.CreateDbContext("migration-user", null);
+            await db.Database.MigrateAsync();
+            return database;
+        }
+        catch
+        {
+            await database.DisposeAsync();
+            throw;
+        }
     }
 
-    public Task DisposeAsync() => _container.DisposeAsync().AsTask();
+    private static async Task EnsureSharedContainerAsync()
+    {
+        await SharedGate.WaitAsync();
+        try
+        {
+            if (_sharedContainer is null)
+            {
+                _sharedContainer = new PostgreSqlBuilder()
+                    .WithImage("postgis/postgis:16-3.4")
+                    .WithDatabase("planarian_tests")
+                    .WithUsername("postgres")
+                    .WithPassword("postgres")
+                    .Build();
+                await _sharedContainer.StartAsync();
+            }
 
-    public PlanarianDbContext CreateDbContext(string userId, string? accountId)
+            if (!_sharedDatabaseMigrated)
+            {
+                await using var db = CreateDbContext(_sharedContainer.GetConnectionString(), "fixture-user", null);
+                await db.Database.MigrateAsync();
+                _sharedDatabaseMigrated = true;
+            }
+        }
+        finally
+        {
+            SharedGate.Release();
+        }
+    }
+
+    internal static PlanarianDbContext CreateDbContext(string connectionString, string userId, string? accountId)
     {
         var options = new DbContextOptionsBuilder<PlanarianDbContext>()
-            .UseNpgsql(ConnectionString, options =>
+            .UseNpgsql(connectionString, options =>
             {
                 options.MigrationsAssembly("Planarian.Migrations");
                 options.UseNetTopologySuite();
             })
             .Options;
         var db = new PlanarianDbContext(options);
-        db.RequestUser = new RequestUser(db) { Id = userId, AccountId = accountId, FirstName = "Test", LastName = "User" };
+        db.RequestUser = new RequestUser(db)
+        {
+            Id = userId,
+            AccountId = accountId,
+            FirstName = "Test",
+            LastName = "User"
+        };
         return db;
+    }
+
+    private static string SanitizeDatabaseName(string value)
+    {
+        var sanitized = new string(value.ToLowerInvariant()
+            .Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_')
+            .ToArray()).Trim('_');
+        return string.IsNullOrWhiteSpace(sanitized) ? "test" : sanitized;
+    }
+
+    private static string QuoteIdentifier(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
+}
+
+public sealed class PostgresTestDatabase : IAsyncDisposable
+{
+    private readonly string _databaseName;
+    private readonly string _adminConnectionString;
+    private int _disposed;
+
+    internal PostgresTestDatabase(string connectionString, string databaseName, string adminConnectionString)
+    {
+        ConnectionString = connectionString;
+        _databaseName = databaseName;
+        _adminConnectionString = adminConnectionString;
+    }
+
+    public string ConnectionString { get; }
+
+    public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
+        PostgresIntegrationFixture.CreateDbContext(ConnectionString, userId, accountId);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        NpgsqlConnection.ClearAllPools();
+        await using var connection = new NpgsqlConnection(_adminConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DROP DATABASE IF EXISTS \"{_databaseName.Replace("\"", "\"\"")}\" WITH (FORCE)";
+        await command.ExecuteNonQueryAsync();
     }
 }
