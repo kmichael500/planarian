@@ -56,11 +56,18 @@ internal static class SaveChangesOwnershipBatchLoader
         if (string.IsNullOrWhiteSpace(accountId))
             throw ApiExceptionDictionary.Forbidden("You do not have permission to modify this entity.");
 
+        var caves = entries.Select(e => e.Entity).OfType<Cave>()
+            .Where(c => c.AccountId == accountId && !string.IsNullOrWhiteSpace(c.Id))
+            .GroupBy(c => c.Id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
         if (caveLinks.Count > 0)
         {
-            var caveIds = caveLinks.Select(link => link.CaveId).Distinct(StringComparer.Ordinal).ToList();
-            var caves = new Dictionary<string, Cave>(StringComparer.Ordinal);
-            foreach (var chunk in caveIds.Chunk(LookupBatchSize))
+            var unresolvedCaveIds = caveLinks.Select(link => link.CaveId)
+                .Distinct(StringComparer.Ordinal)
+                .Where(id => !caves.ContainsKey(id))
+                .ToList();
+            foreach (var chunk in unresolvedCaveIds.Chunk(LookupBatchSize))
             {
                 var rows = await context.Caves.IgnoreQueryFilters()
                     .Where(c => c.AccountId == accountId && chunk.Contains(c.Id))
@@ -76,11 +83,18 @@ internal static class SaveChangesOwnershipBatchLoader
             }
         }
 
+        var entrances = entries.Select(e => e.Entity).OfType<Entrance>()
+            .Where(e => !string.IsNullOrWhiteSpace(e.Id) && e.Cave is not null && e.Cave.AccountId == accountId)
+            .GroupBy(e => e.Id, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
         if (entranceLinks.Count > 0)
         {
-            var entranceIds = entranceLinks.Select(link => link.EntranceId).Distinct(StringComparer.Ordinal).ToList();
-            var entrances = new Dictionary<string, Entrance>(StringComparer.Ordinal);
-            foreach (var chunk in entranceIds.Chunk(LookupBatchSize))
+            var unresolvedEntranceIds = entranceLinks.Select(link => link.EntranceId)
+                .Distinct(StringComparer.Ordinal)
+                .Where(id => !entrances.ContainsKey(id))
+                .ToList();
+            foreach (var chunk in unresolvedEntranceIds.Chunk(LookupBatchSize))
             {
                 var rows = await context.Entrances.IgnoreQueryFilters()
                     .Where(e => chunk.Contains(e.Id) && e.Cave != null && e.Cave.AccountId == accountId)
