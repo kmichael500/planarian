@@ -3,6 +3,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
@@ -44,6 +45,7 @@ public sealed class EntranceImportPlanner
             try
             {
                 var validDate = DateTime.TryParse(record.ReportedOnDate, out var reportedOn);
+                reportedOn = reportedOn.ToUtcKind();
                 if (!record.DecimalLatitude.HasValue)
                 {
                     failedRecords.Add(new(record, validationRowNumber,

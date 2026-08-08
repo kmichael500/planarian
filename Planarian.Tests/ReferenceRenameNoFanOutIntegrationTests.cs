@@ -34,10 +34,17 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresIntegrationF
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
-            foreach (var caveId in caveIds.Skip(1))
+            foreach (var caveId in caveIds)
             {
                 var snapshot = await reader.BuildAsync(caveId);
-                var revision = new CaveRevision { Id = IdGenerator.Generate(), AccountId = tenant.AccountId, CaveId = caveId, Source = CaveRevisionSource.ManagerEdit, Operation = CaveRevisionOperation.Create, SnapshotSchemaVersion = 1, SnapshotJson = CaveSnapshotJson.Serialize(snapshot) };
+                var previousRevisionId = caveId == tenant.CaveId ? tenant.RevisionId : null;
+                var revision = new CaveRevision
+                {
+                    Id = IdGenerator.Generate(), AccountId = tenant.AccountId, CaveId = caveId,
+                    PreviousRevisionId = previousRevisionId, Source = CaveRevisionSource.ManagerEdit,
+                    Operation = CaveRevisionOperation.Update, SnapshotSchemaVersion = 1,
+                    SnapshotJson = CaveSnapshotJson.Serialize(snapshot)
+                };
                 db.CaveRevisions.Add(revision);
                 await db.SaveChangesAsync();
                 var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == caveId);
@@ -45,7 +52,6 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresIntegrationF
                 await db.SaveChangesAsync();
                 pointers[caveId] = revision.Id;
             }
-            pointers[tenant.CaveId] = tenant.RevisionId;
         }
 
         Dictionary<string,int> beforeCounts;
@@ -70,13 +76,13 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresIntegrationF
         {
             var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
             var coordinator = new CaveMutationCoordinator(db, db.RequestUser, reader);
-            result = await coordinator.PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Name = "Legitimate edit");
+            result = await coordinator.PublishExistingAsync(tenant.CaveId, pointers[tenant.CaveId], CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Name = "Legitimate edit");
         }
         Assert.True(result.CreatedRevision);
 
         await using (var verify = database.CreateDbContext("manager", tenant.AccountId))
         {
-            var previous = await verify.CaveRevisions.SingleAsync(r => r.Id == tenant.RevisionId);
+            var previous = await verify.CaveRevisions.SingleAsync(r => r.Id == pointers[tenant.CaveId]);
             var current = await verify.CaveRevisions.SingleAsync(r => r.Id == result.RevisionId);
             var diff = new CaveRevisionDiffService().Compare(
                 CaveSnapshotJson.Deserialize(previous.SnapshotJson, previous.SnapshotSchemaVersion),
