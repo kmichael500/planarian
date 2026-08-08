@@ -12,7 +12,7 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Database;
 
-public class PlanarianDbContextBase : DbContext
+public partial class PlanarianDbContextBase : DbContext
 {
     protected readonly SaveChangesInterceptor ChangesInterceptor = new();
     public RequestUser RequestUser = null!;
