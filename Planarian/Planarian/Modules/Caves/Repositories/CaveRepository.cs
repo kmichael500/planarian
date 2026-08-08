@@ -1049,6 +1049,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.CaveOtherTags)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Favorites)
+            .Include(e => e.CavePermissions)
             .Include(e => e.Files)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)

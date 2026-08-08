@@ -1033,6 +1033,20 @@ public class CaveService : ServiceBase<CaveRepository>
 
             files = entity.Files.ToList();
 
+            foreach (var permission in entity.CavePermissions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(permission);
+            }
+
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Repository.Delete(file);
+            }
+
+            await Repository.SaveChangesAsync(cancellationToken);
+
             Repository.Delete(entity);
             await Repository.SaveChangesAsync(cancellationToken);
             await _caveMutationCoordinator.PublishPreparedDeleteAsync(
