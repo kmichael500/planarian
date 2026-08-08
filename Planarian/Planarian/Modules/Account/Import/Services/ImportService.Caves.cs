@@ -158,12 +158,6 @@ public partial class ImportService
 
             foreach (var record in caveRecordsToRemove) caveRecords.Remove(record);
 
-            async void OnBatchProcessed(int processed, int total)
-            {
-                var message = $"Inserted {processed} out of {total} records.";
-                await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
-            }
-
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
             _tagRepository.AddRange(newCounties);
             await _tagRepository.SaveChangesAsync(cancellationToken);
@@ -1141,12 +1135,6 @@ public partial class ImportService
             {
                 throw ApiExceptionDictionary.BadRequest($"Tag '{newTag.Name}' exceeds the maximum allowed length of {PropertyLength.Name}");
             }
-        }
-
-        async void OnBatchProcessed(int currentProcessedCount, int total)
-        {
-            var message = $"Inserted {currentProcessedCount} out of {total} {key} tags.";
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
         }
 
         // Insert new tags into the repository

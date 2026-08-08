@@ -746,9 +746,6 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<string>("BaseGeographicScopeJson")
-                        .HasColumnType("jsonb");
-
                     b.Property<string>("BaseRevisionId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -783,9 +780,6 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("ProposedCountyId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ProposedGeographicScopeJson")
-                        .HasColumnType("jsonb");
 
                     b.Property<string>("ProposedStateId")
                         .HasMaxLength(10)
@@ -863,6 +857,8 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FileId");
 
                     b.HasIndex("AccountId", "ChangeRequestId");
 
@@ -1246,6 +1242,8 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ImportBatchId");
 
                     b.HasIndex("PreviousRevisionId");
+
+                    b.HasIndex("AccountId", "ChangeRequestId");
 
                     b.HasIndex("AccountId", "ImportBatchId");
 
@@ -2702,6 +2700,12 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestStagedFile", b =>
                 {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.File", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
                         .WithMany()
                         .HasForeignKey("AccountId", "ChangeRequestId")
@@ -2861,6 +2865,12 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", b =>
                 {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "ChangeRequestId")
+                        .HasPrincipalKey("AccountId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveImportBatch", null)
                         .WithMany()
                         .HasForeignKey("AccountId", "ImportBatchId")

@@ -220,19 +220,19 @@ public partial class ImportService
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrances. This may take a while...");
-            await _temporaryEntranceRepository.Reset();
+            await _entranceImportPlanStore.Reset();
 
-            async void OnBatchProcessed(int currentProcessedCount, int total)
+            Task OnBatchProcessed(int currentProcessedCount, int total)
             {
                 var message = $"Inserted {currentProcessedCount} out of {total}.";
-                await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
+                return _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
             }
 
-            await _temporaryEntranceRepository.InsertEntrances(entrances, OnBatchProcessed);
+            await _entranceImportPlanStore.InsertEntrances(entrances, OnBatchProcessed);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting entrances!");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Associating entrances with caves");
-            var (unassociatedEntranceIds, associatedEntrances) = await _temporaryEntranceRepository.UpdateTemporaryEntranceWithCaveId();
+            var (unassociatedEntranceIds, associatedEntrances) = await _entranceImportPlanStore.UpdateTemporaryEntranceWithCaveId();
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished associating entrances with caves");
             foreach (var unassociatedEntranceId in unassociatedEntranceIds)
@@ -257,9 +257,9 @@ public partial class ImportService
                 .Cast<string>()
                 .Distinct()
                 .ToList();
-            var existingEntranceCounts = await _temporaryEntranceRepository.GetExistingEntranceCounts(importedCaveIds,
+            var existingEntranceCounts = await _entranceImportPlanStore.GetExistingEntranceCounts(importedCaveIds,
                 cancellationToken);
-            var existingPrimaryEntranceCounts = await _temporaryEntranceRepository.GetExistingPrimaryEntranceCounts(
+            var existingPrimaryEntranceCounts = await _entranceImportPlanStore.GetExistingPrimaryEntranceCounts(
                 importedCaveIds, cancellationToken);
             var importedEntranceCounts = associatedEntrances
                 .Where(e => !string.IsNullOrWhiteSpace(e.CaveId))
@@ -268,12 +268,12 @@ public partial class ImportService
 
             if (syncExisting)
             {
-                await _temporaryEntranceRepository.DeleteExistingEntrancesForImportedCaves(cancellationToken);
+                await _entranceImportPlanStore.DeleteExistingEntrancesForImportedCaves(cancellationToken);
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Validating there is only one primary entrance per cave");
-            var invalidPrimaryEntrance = await _temporaryEntranceRepository.GetInvalidIsPrimaryRecords();
+            var invalidPrimaryEntrance = await _entranceImportPlanStore.GetInvalidIsPrimaryRecords();
             if (invalidPrimaryEntrance.Any())
             {
                 var associatedEntrancesById = associatedEntrances.ToDictionary(e => e.Id);
@@ -334,7 +334,7 @@ public partial class ImportService
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Moving entrances to main table");
-            await _temporaryEntranceRepository.MigrateTemporaryEntrancesAsync();
+            await _entranceImportPlanStore.MigrateTemporaryEntrancesAsync();
 
             #region Tag Insert
 
@@ -357,7 +357,7 @@ public partial class ImportService
 
             #endregion
 
-            await _temporaryEntranceRepository.Clear();
+            await _entranceImportPlanStore.Clear();
 
             var records = new List<EntranceDryRun>();
 
@@ -575,11 +575,6 @@ public partial class ImportService
 
         return allTags;
 
-        async void OnBatchProcessed(int currentProcessedCount, int total)
-        {
-            var message = $"Inserted {currentProcessedCount} out of {total} {key} tags.";
-            await _notificationService.SendNotificationToGroupAsync(signalRGroup, message);
-        }
     }
 
 

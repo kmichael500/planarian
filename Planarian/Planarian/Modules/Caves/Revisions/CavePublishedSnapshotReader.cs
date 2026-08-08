@@ -29,10 +29,19 @@ public sealed class CavePublishedSnapshotReader
     {
         var ids = caveIds.Distinct().ToList();
         if (ids.Count == 0) return [];
-        var caves = await Query().Where(c => ids.Contains(c.Id)).ToListAsync(cancellationToken);
-        if (caves.Count != ids.Count)
+        var result = new List<CavePublishedSnapshotV1>(ids.Count);
+        foreach (var chunk in ids.Chunk(250))
+        {
+            // Split-query Includes are bounded intentionally. Revisions for a
+            // 10k import must never assemble every aggregate in one graph.
+            var caves = await Query().Where(c => chunk.Contains(c.Id)).ToListAsync(cancellationToken);
+            if (caves.Count != chunk.Length)
+                throw new InvalidOperationException("One or more Caves are not owned by the current account.");
+            result.AddRange(caves.Select(Build));
+        }
+        if (result.Count != ids.Count)
             throw new InvalidOperationException("One or more Caves are not owned by the current account.");
-        return caves.Select(Build).ToList();
+        return result;
     }
 
     private IQueryable<Cave> Query() => _db.Caves.IgnoreQueryFilters()

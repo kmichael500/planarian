@@ -28,12 +28,42 @@ public sealed record CaveProposalSnapshotV1
     public DateTime? ReportedOn { get; init; }
     public bool IsArchived { get; init; }
     public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];
-    public IReadOnlyList<CaveEntranceSnapshotV1> Entrances { get; init; } = [];
-    public IReadOnlyList<CaveFileSnapshotV1> StagedFiles { get; init; } = [];
+    public IReadOnlyList<CaveProposalEntranceV1> Entrances { get; init; } = [];
+    public IReadOnlyList<ProposalFileIntent> Files { get; init; } = [];
     public IReadOnlyList<ProposalTagIntent> NewTagIntents { get; init; } = [];
 }
 
 public sealed record ProposalTagIntent(SnapshotTagRole Role, string Name);
+
+/// <summary>Pending entrance intent. New tag names stay attached to this entrance.</summary>
+public sealed record CaveProposalEntranceV1
+{
+    public string EntranceId { get; init; } = null!;
+    public string? Name { get; init; }
+    public bool IsPrimary { get; init; }
+    public string? Description { get; init; }
+    public string? ReportedByUserId { get; init; }
+    public double? Latitude { get; init; }
+    public double? Longitude { get; init; }
+    public double? Elevation { get; init; }
+    public int Srid { get; init; } = 4326;
+    public string LocationQualityTagId { get; init; } = null!;
+    public DateTime? ReportedOn { get; init; }
+    public double? PitDepthFeet { get; init; }
+    public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];
+    public IReadOnlyList<ProposalTagIntent> NewTagIntents { get; init; } = [];
+}
+
+public enum ProposalFileDisposition
+{
+    RetainPublished,
+    RemovePublished,
+    PublishStaged
+}
+
+/// <summary>Complete file intent; absence from another table never implies removal.</summary>
+public sealed record ProposalFileIntent(string FileId, ProposalFileDisposition Disposition,
+    string? FileTypeTagId = null, string? DisplayName = null);
 
 public static class CaveProposalJson
 {

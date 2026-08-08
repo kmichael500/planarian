@@ -53,6 +53,10 @@ public class CaveRevisionConfiguration : BaseEntityTypeConfiguration<CaveRevisio
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
             .HasForeignKey(e => new { e.AccountId, e.ImportBatchId })
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CaveChangeRequest>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => new { e.AccountId, e.CaveId, e.CreatedOn });
         builder.HasIndex(e => e.PreviousRevisionId);
         builder.HasIndex(e => e.ChangeRequestId);

@@ -5,6 +5,7 @@ on:
     paths:
       - "Planarian.Web/**"
       - "Planarian/**"
+      - "Planarian.Tests/**"
       - "scripts/**"
       - ".github/workflows/pr-validation.yml"
 
@@ -30,5 +31,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet restore Planarian/Planarian/Planarian.csproj
-      - run: dotnet build Planarian/Planarian/Planarian.csproj --configuration Release --no-restore
+      - run: dotnet restore Planarian/Planarian/Planarian.sln
+      - run: dotnet build Planarian/Planarian/Planarian.sln --configuration Release --no-restore
+      - run: dotnet test Planarian.Tests/Planarian.Tests.csproj --configuration Release --no-restore

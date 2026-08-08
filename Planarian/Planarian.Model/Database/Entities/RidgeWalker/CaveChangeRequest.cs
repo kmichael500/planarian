@@ -24,8 +24,6 @@ public class CaveChangeRequest : EntityBase
     [MaxLength(PropertyLength.Id)] public string? ReviewerUserId { get; set; }
     public DateTime? ReviewedOn { get; set; }
     public string? ReviewerNotes { get; set; }
-    public string? BaseGeographicScopeJson { get; set; }
-    public string? ProposedGeographicScopeJson { get; set; }
     [MaxLength(PropertyLength.Id)] public string? BaseStateId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? BaseCountyId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? ProposedStateId { get; set; }
@@ -39,8 +37,6 @@ public class CaveChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveCh
     {
         builder.HasAlternateKey(e => new { e.AccountId, e.Id });
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(PropertyLength.Key);
-        builder.Property(e => e.BaseGeographicScopeJson).HasColumnType("jsonb");
-        builder.Property(e => e.ProposedGeographicScopeJson).HasColumnType("jsonb");
         builder.Property(e => e.Version).HasColumnName("xmin").IsRowVersion().ValueGeneratedOnAddOrUpdate();
         builder.HasIndex(e => new { e.AccountId, e.Status, e.CreatedOn });
         builder.HasIndex(e => new { e.CaveId, e.Status });
@@ -100,6 +96,9 @@ public class CaveChangeRequestStagedFileConfiguration : BaseEntityTypeConfigurat
         builder.HasOne<CaveChangeRequest>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
             .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<File>().WithMany()
+            .HasForeignKey(e => e.FileId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => new { e.ChangeRequestId, e.FileId }).IsUnique();
     }

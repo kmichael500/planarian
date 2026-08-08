@@ -19,7 +19,7 @@ public partial class ImportService : ServiceBase
     private readonly FileService _fileService;
     private readonly TagRepository<PlanarianDbContextBase> _tagRepository;
     private readonly SettingsRepository<PlanarianDbContextBase> _settingsRepository;
-    private readonly TemporaryEntranceRepository _temporaryEntranceRepository;
+    private readonly EntranceImportPlanStore _entranceImportPlanStore;
     private readonly NotificationService _notificationService;
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
@@ -29,7 +29,7 @@ public partial class ImportService : ServiceBase
     public ImportService(RequestUser requestUser, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
         SettingsRepository<PlanarianDbContextBase> settingsRepository,
-        TemporaryEntranceRepository temporaryEntranceRepository,
+        EntranceImportPlanStore entranceImportPlanStore,
         NotificationService notificationService,
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
@@ -39,7 +39,7 @@ public partial class ImportService : ServiceBase
         _fileService = fileService;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
-        _temporaryEntranceRepository = temporaryEntranceRepository;
+        _entranceImportPlanStore = entranceImportPlanStore;
         _notificationService = notificationService;
         _accountRepository = accountRepository;
         _repository = caveRepository;

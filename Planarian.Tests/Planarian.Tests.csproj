@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Planarian\Planarian.Model\Planarian.Model.csproj" />
+    <ProjectReference Include="..\Planarian\Planarian.Migrations\Planarian.Migrations.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />

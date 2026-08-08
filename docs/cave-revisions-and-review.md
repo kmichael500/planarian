@@ -27,6 +27,15 @@ concurrency tokens are excluded. Historical tag references retain
 published relational state. `CaveRevision` keeps a logical Cave ID and does
 not require the live Cave row, so delete history survives hard deletion.
 
+Reference display values are historical Cave state. A later published Cave
+snapshot may capture a renamed State, County, TagType, Location Quality, or
+File Type using the same stable ID. The history diff reports that separately as
+an effective reference-data change, rather than claiming that the actor who
+published the Cave revision performed the shared-reference rename. A Cave
+revision timestamp is the snapshot-capture time, not necessarily the exact
+time at which any nested shared reference changed. V1 intentionally does not
+fan out revisions when shared reference data is renamed.
+
 ## Proposal and review boundary
 
 Pending submissions are separate immutable proposal versions. A proposal has

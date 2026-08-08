@@ -257,7 +257,7 @@ builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped(typeof(FileRepository<>));
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
-builder.Services.AddScoped<TemporaryEntranceRepository>();
+builder.Services.AddScoped<EntranceImportPlanStore>();
 builder.Services.AddScoped<FeatureSettingRepository>();
 
 

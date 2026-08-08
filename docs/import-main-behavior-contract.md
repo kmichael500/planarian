@@ -8,11 +8,13 @@ not inferred from the feature branch.
 | Account context | Imports require `RequestUser.AccountId`; account-owned lookups use the active account | Two-account isolation test |
 | Cave identity | Sync identity is State + County + CountyNumber | Duplicate-key characterization |
 | References | States use global definitions; AccountStates, Counties, and custom Tags are active-account scoped | Same-code/name foreign-account tests |
-| Cave fields | Name, alternate names, State, County, CountyNumber, lengths/depth, pits, narrative, ReportedOn, archive state | Complete field matrix |
-| Cave tags | Geology, Geologic Age, Map Status, Physiographic Province, Archeology, Biology, Other, Cartographer, Reported By | Role-aware tag tests |
+| Cave fields | `CaveName`, `AlternateNames`, `State`, `CountyCode`, `CountyName`, `CountyCaveNumber`, `CaveLengthFt`, `CaveDepthFt`, `MaxPitDepthFt`, `NumberOfPits`, `Narrative`, `ReportedOnDate`, `IsArchived` | Complete field matrix |
+| Cave tags | `Geology`, `GeologicAges`, `MapStatuses`, `PhysiographicProvinces`, `Archeology`, `Biology`, `OtherTags`, `CartographerNames`, `ReportedByNames` | Role-aware tag tests |
 | Cave sync | Updates, inserts, no-change, and CSV-missing deletion follow main; unrelated Entrances/Files are preserved unless the Cave is deleted | Sync ownership tests |
 | Dry run | Main uses the same processing rules and rolls back; replacement must produce the same preview with no durable writes | Preview/database equality test |
-| Entrance association | CountyDisplayId + CountyCaveNumber within the active account | Foreign collision test |
+| Entrance fields | `CountyCode`, `CountyCaveNumber`, `EntranceName`, decimal latitude/longitude, elevation, location quality, description, pit depth, reported date, reported-by names, primary flag | Complete field matrix |
+| Entrance tags | `LocationQuality`, `EntranceStatuses`, `EntranceHydrology`, `FieldIndication`, `ReportedByNames` | Role-aware tag tests |
+| Entrance association | `CountyCode`/County display ID + `CountyCaveNumber` within the active account | Foreign collision test |
 | Entrance primary rule | Append uses existing + imported primary counts; sync validates intended replacement state | Zero/one/multiple tests |
 | Entrance geometry | Longitude=X, latitude=Y, elevation=Z, SRID 4326 | PostGIS geometry test |
 | Entrance sync | Only represented active-account Caves have Entrances replaced | Unrelated/foreign deletion tests |

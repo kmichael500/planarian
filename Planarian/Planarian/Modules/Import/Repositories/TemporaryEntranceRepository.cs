@@ -14,12 +14,12 @@ namespace Planarian.Modules.Import.Repositories;
 /// memory and resolved against account-scoped reference data; no dynamic SQL
 /// table or temporary database lifecycle is needed.
 /// </summary>
-public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase>
+public class EntranceImportPlanStore : RepositoryBase<PlanarianDbContextBase>
 {
     private readonly List<TemporaryEntrance> _rows = [];
     private readonly AccountExecutionScope _scope;
 
-    public TemporaryEntranceRepository(PlanarianDbContextBase dbContext, RequestUser requestUser)
+    public EntranceImportPlanStore(PlanarianDbContextBase dbContext, RequestUser requestUser)
         : base(dbContext, requestUser)
     {
         _scope = AccountExecutionScope.Require(requestUser);
@@ -27,12 +27,12 @@ public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase
 
     public Task Reset() { _rows.Clear(); return Task.CompletedTask; }
 
-    public Task<int> InsertEntrances(IEnumerable<TemporaryEntrance> entrances, Action<int, int> onBatchProcessed)
+    public async Task<int> InsertEntrances(IEnumerable<TemporaryEntrance> entrances, Func<int, int, Task> onBatchProcessed)
     {
         _rows.Clear();
         _rows.AddRange(entrances);
-        onBatchProcessed(_rows.Count, _rows.Count);
-        return Task.FromResult(_rows.Count);
+        await onBatchProcessed(_rows.Count, _rows.Count);
+        return _rows.Count;
     }
 
     public async Task<(List<string> unassociatedEntrances, List<TemporaryEntranceResult> associatedEntrances)> UpdateTemporaryEntranceWithCaveId()
