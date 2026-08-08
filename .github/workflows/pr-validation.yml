@@ -33,4 +33,51 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet restore Planarian/Planarian.sln
       - run: dotnet build Planarian/Planarian.sln --configuration Release --no-restore
-      - run: dotnet test Planarian.Tests/Planarian.Tests.csproj --configuration Release --no-restore
+      - name: Run .NET tests
+        id: dotnet_tests
+        continue-on-error: true
+        run: >-
+          dotnet test Planarian.Tests/Planarian.Tests.csproj
+          --configuration Release
+          --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory Planarian.Tests/TestResults
+      - name: Surface .NET test failures
+        if: always()
+        shell: python
+        run: |
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          path = "Planarian.Tests/TestResults/test-results.trx"
+          test_step_failed = "${{ steps.dotnet_tests.outcome }}" == "failure"
+
+          def escape(value: str) -> str:
+              return (
+                  value.replace("%", "%25")
+                  .replace("\r", "%0D")
+                  .replace("\n", "%0A")
+              )
+
+          if not os.path.exists(path):
+              if test_step_failed:
+                  print("::error title=.NET tests failed::dotnet test failed before a TRX result file was produced")
+                  sys.exit(1)
+              sys.exit(0)
+
+          root = ET.parse(path).getroot()
+          namespace = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          failures = root.findall(".//t:UnitTestResult[@outcome='Failed']", namespace)
+
+          for result in failures:
+              name = result.attrib.get("testName", "Unknown test")
+              message = result.findtext("t:Output/t:ErrorInfo/t:Message", default="", namespaces=namespace)
+              stack = result.findtext("t:Output/t:ErrorInfo/t:StackTrace", default="", namespaces=namespace)
+              details = message.strip()
+              if stack.strip():
+                  details = f"{details}\n{stack.strip()}" if details else stack.strip()
+              print(f"::error title={escape(name)}::{escape(details or 'Test failed')}")
+
+          if failures or test_step_failed:
+              sys.exit(1)
