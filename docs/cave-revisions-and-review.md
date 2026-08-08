@@ -23,7 +23,7 @@ metadata only: file bytes, SAS URLs, GeoJSON, search vectors, EF metadata, and
 concurrency tokens are excluded. Historical tag references retain
 `NameAtRevision`.
 
-`Cave.CurrentRevisionId` is intended to point at the accepted snapshot matching the actual
+`Cave.CurrentRevisionId` points at the accepted snapshot matching the actual
 published relational state. `CaveRevision` keeps a logical Cave ID and does
 not require the live Cave row, so delete history survives hard deletion.
 
@@ -41,20 +41,34 @@ fan out revisions when shared reference data is renamed.
 Pending submissions are separate immutable proposal versions. A proposal has
 an exact `BaseRevisionId`; it never mutates published Cave data, allocates a
 CountyNumber, publishes files, or creates live taxonomy resources while
-pending. Reviewer amendments append a new proposal version. Approval reuses
-the same publication writer and creates an accepted revision from the actual
-resulting database state. Rejection creates no Cave revision.
+pending. Reviewer amendments append a new proposal version. Approval must
+cross the same published-history boundary and create an accepted revision from
+the actual resulting database state. Rejection creates no Cave revision.
 
 ## Mutation boundary
 
-All revisionable publication paths—manager edits, archive/unarchive, delete,
-file association changes, Cave imports, Entrance imports, and approval—must
-cross `CaveMutationCoordinator`; the current branch has the coordinator
-foundation but has not yet routed every existing publication path through it.
-The coordinator owns the transaction,
-expected revision checks, `xmin` conflict detection, snapshot creation,
-revision insertion, pointer advancement, and commit. GeoJSON is a separate
-domain in V1.
+Published Cave history has one semantic boundary but two execution shapes.
+Interactive manager mutations use `CaveMutationCoordinator`; high-volume CSV
+imports use `ImportRevisionPublisher` inside the import executor transaction.
+Both publish snapshots from actual relational state, enforce expected revision
+state, create no revision for semantic no-ops, and advance history atomically
+with the corresponding relational change.
+
+Manager Cave create/edit/archive/unarchive/hard-delete and published Cave-file
+upload, staged publication, and metadata edits are routed through
+`CaveMutationCoordinator`. For short mutations the coordinator owns the
+transaction. For larger existing service workflows it exposes prepare/publish
+operations that require and participate in the caller's active EF transaction,
+so permissions, tag/file work, revision insertion, pointer advancement, and
+commit remain one atomic unit without nested transactions. Hard delete writes
+a final tombstone revision from the last live snapshot after dependent
+relational rows are removed but before commit; physical blob deletion remains
+deferred until after commit. GeoJSON is a separate domain in V1.
+
+Cave and Entrance imports deliberately do not route thousands of rows through
+per-Cave coordinator calls. Their executors lock and verify scoped Cave rows,
+apply bounded relational batches, and use `ImportRevisionPublisher` once per
+transaction to create the corresponding accepted history and import provenance.
 
 ## Import strategy
 
@@ -64,6 +78,8 @@ revision before applying the batch. Relational changes, revisions, and
 revision pointers use bounded EF Core batches. No-change records create no
 revision. Import provenance is stored in `CaveImportBatch` rather than tied to
 temporary upload rows. Physical blob cleanup is deferred until after commit.
+Destructive sync statements are account-qualified at execution time in
+addition to consuming account-scoped immutable plans.
 
 ## Inventory notes
 
