@@ -141,35 +141,37 @@ public sealed class CavePublishedSnapshotReader
     {
         var geology = _db.GeologyTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Geology, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.Geology, t.TagTypeId, t.TagType.Name });
         var geologicAge = _db.GeologicAgeTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.GeologicAge, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.GeologicAge, t.TagTypeId, t.TagType.Name });
         var mapStatus = _db.MapStatusTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.MapStatus, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.MapStatus, t.TagTypeId, t.TagType.Name });
         var physiographic = _db.PhysiographicProvinceTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.PhysiographicProvince, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.PhysiographicProvince, t.TagTypeId, t.TagType.Name });
         var archeology = _db.ArcheologyTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Archeology, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.Archeology, t.TagTypeId, t.TagType.Name });
         var biology = _db.BiologyTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Biology, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.Biology, t.TagTypeId, t.TagType.Name });
         var other = _db.CaveOtherTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.CaveOther, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.CaveOther, t.TagTypeId, t.TagType.Name });
         var cartographer = _db.CartographerNameTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Cartographer, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.Cartographer, t.TagTypeId, t.TagType.Name });
         var reportedBy = _db.CaveReportedByNameTags.IgnoreQueryFilters()
             .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
-            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.CaveReportedBy, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.CaveId, Role = (int)SnapshotTagRole.CaveReportedBy, t.TagTypeId, t.TagType.Name });
 
-        return await geology.Concat(geologicAge).Concat(mapStatus).Concat(physiographic).Concat(archeology)
+        var rows = await geology.Concat(geologicAge).Concat(mapStatus).Concat(physiographic).Concat(archeology)
             .Concat(biology).Concat(other).Concat(cartographer).Concat(reportedBy)
             .AsNoTracking().ToListAsync(cancellationToken);
+        return rows.Select(row => new CaveTagRow(row.CaveId, (SnapshotTagRole)row.Role, row.TagTypeId, row.Name))
+            .ToList();
     }
 
     private Task<List<EntranceRow>> LoadEntrancesAsync(string[] caveIds, CancellationToken cancellationToken) =>
@@ -187,26 +189,28 @@ public sealed class CavePublishedSnapshotReader
         var status = _db.EntranceStatusTags.IgnoreQueryFilters()
             .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
                         t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
-            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceStatus, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.EntranceId, Role = (int)SnapshotTagRole.EntranceStatus, t.TagTypeId, t.TagType.Name });
         var hydrology = _db.EntranceHydrologyTags.IgnoreQueryFilters()
             .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
                         t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
-            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceHydrology, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.EntranceId, Role = (int)SnapshotTagRole.EntranceHydrology, t.TagTypeId, t.TagType.Name });
         var field = _db.FieldIndicationTags.IgnoreQueryFilters()
             .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
                         t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
-            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.FieldIndication, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.EntranceId, Role = (int)SnapshotTagRole.FieldIndication, t.TagTypeId, t.TagType.Name });
         var reportedBy = _db.EntranceReportedByNameTags.IgnoreQueryFilters()
             .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
                         t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
-            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceReportedBy, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.EntranceId, Role = (int)SnapshotTagRole.EntranceReportedBy, t.TagTypeId, t.TagType.Name });
         var other = _db.EntranceOtherTag.IgnoreQueryFilters()
             .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
                         t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
-            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceOther, t.TagTypeId, t.TagType.Name));
+            .Select(t => new { t.EntranceId, Role = (int)SnapshotTagRole.EntranceOther, t.TagTypeId, t.TagType.Name });
 
-        return await status.Concat(hydrology).Concat(field).Concat(reportedBy).Concat(other)
+        var rows = await status.Concat(hydrology).Concat(field).Concat(reportedBy).Concat(other)
             .AsNoTracking().ToListAsync(cancellationToken);
+        return rows.Select(row => new EntranceTagRow(row.EntranceId, (SnapshotTagRole)row.Role, row.TagTypeId, row.Name))
+            .ToList();
     }
 
     private Task<List<FileRow>> LoadFilesAsync(string[] caveIds, CancellationToken cancellationToken) =>
