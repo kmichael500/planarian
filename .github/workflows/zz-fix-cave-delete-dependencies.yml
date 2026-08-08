@@ -1,0 +1,26 @@
+name: Fix Cave delete dependencies
+
+on:
+  push:
+    branches: [feature/cave-revisions]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cave-revisions
+          fetch-depth: 0
+      - run: python .github/scripts/fix_cave_delete_dependencies.py
+      - name: Commit fix and remove helper files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/zz-fix-cave-delete-dependencies.yml .github/scripts/fix_cave_delete_dependencies.py
+          git add Planarian/Planarian/Modules/Caves/Repositories/CaveRepository.cs Planarian/Planarian/Modules/Caves/Services/CaveService.cs
+          git commit -m "fix: remove cave dependents before hard delete"
+          git push origin HEAD:feature/cave-revisions
