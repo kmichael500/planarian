@@ -16,6 +16,7 @@ namespace Planarian.Modules.Account.Import.Services;
 
 public partial class ImportService : ServiceBase
 {
+    private readonly PlanarianDbContext _dbContext;
     private readonly FileService _fileService;
     private readonly TagRepository<PlanarianDbContextBase> _tagRepository;
     private readonly SettingsRepository<PlanarianDbContextBase> _settingsRepository;
@@ -26,7 +27,7 @@ public partial class ImportService : ServiceBase
     private readonly FileRepository<PlanarianDbContextBase> _fileRepository;
     private readonly ChunkedUploadService _chunkedUploadService;
 
-    public ImportService(RequestUser requestUser, FileService fileService,
+    public ImportService(RequestUser requestUser, PlanarianDbContext dbContext, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
         SettingsRepository<PlanarianDbContextBase> settingsRepository,
         EntranceImportPlanStore entranceImportPlanStore,
@@ -36,6 +37,7 @@ public partial class ImportService : ServiceBase
         FileRepository<PlanarianDbContextBase> fileRepository,
         ChunkedUploadService chunkedUploadService) : base(requestUser)
     {
+        _dbContext = dbContext;
         _fileService = fileService;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
@@ -68,7 +70,6 @@ public partial class ImportService : ServiceBase
             return false;
         }
 
-        // trim value of string
         if (typeof(T) == typeof(string) && fieldValue != null) fieldValue = (T)(object)fieldValue.ToString()?.Trim()!;
 
         return true;
