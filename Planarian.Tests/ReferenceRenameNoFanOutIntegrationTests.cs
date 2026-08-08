@@ -16,7 +16,7 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresIntegrationF
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(SharedTagRenameDoesNotFanOutButNextLegitimateRevisionCapturesRename));
         var tenant = await IntegrationTestData.SeedTenantAsync(database, 'a');
-        var caveIds = new[] { tenant.CaveId, "cave0000b", "cave0000c" };
+        var caveIds = new[] { tenant.CaveId, "cave00000b", "cave00000c" };
         string tagId;
 
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
