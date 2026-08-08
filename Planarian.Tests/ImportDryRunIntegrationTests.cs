@@ -45,7 +45,7 @@ public sealed class ImportDryRunIntegrationTests(PostgresIntegrationFixture fixt
         await using var command=connection.CreateCommand(); command.CommandText="""
         select (select count(*) from "TagTypes"),(select count(*) from "Counties"),(select count(*) from "AccountStates"),(select count(*) from "Caves"),
         (select count(*) from "GeologyTags")+(select count(*) from "GeologicAgeTags")+(select count(*) from "MapStatusTags")+(select count(*) from "PhysiographicProvinceTags")+(select count(*) from "ArcheologyTags")+(select count(*) from "BiologyTags")+(select count(*) from "CaveOtherTags")+(select count(*) from "CartographerNameTags")+(select count(*) from "CaveReportedByNameTags"),
-        (select count(*) from "Entrances"),(select count(*) from "EntranceStatusTags")+(select count(*) from "EntranceHydrologyTags")+(select count(*) from "FieldIndicationTags")+(select count(*) from "EntranceReportedByNameTags")+(select count(*) from "EntranceOtherTags"),
+        (select count(*) from "Entrances"),(select count(*) from "EntranceStatusTags")+(select count(*) from "EntranceHydrologyTags")+(select count(*) from "FieldIndicationTags")+(select count(*) from "EntranceReportedByNameTags")+(select count(*) from "EntranceOtherTag"),
         (select count(*) from "CaveRevisions"),(select count(*) from "CaveImportBatches")
         """;
         await using var r=await command.ExecuteReaderAsync(); Assert.True(await r.ReadAsync()); return new State(r.GetInt64(0),r.GetInt64(1),r.GetInt64(2),r.GetInt64(3),r.GetInt64(4),r.GetInt64(5),r.GetInt64(6),r.GetInt64(7),r.GetInt64(8));
