@@ -105,16 +105,27 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"caves/{caveId}/files/{entity.Id}{fileExtension}";
 
-        stream.Position = 0;
-        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
+        try
+        {
+            stream.Position = 0;
+            await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
-        entity.BlobKey = blobKey;
-        entity.BlobContainer = RequestUser.AccountContainerName;
-        await Repository.SaveChangesAsync(cancellationToken);
-        await _caveMutationCoordinator.PublishPreparedAsync(
-            revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
-            cancellationToken: cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            entity.BlobKey = blobKey;
+            entity.BlobContainer = RequestUser.AccountContainerName;
+            await Repository.SaveChangesAsync(cancellationToken);
+            await _caveMutationCoordinator.PublishPreparedAsync(
+                revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                cancellationToken: cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            // The blob store is outside the PostgreSQL transaction. The key is
+            // unique to this newly-created File, so deleting it is safe even if
+            // upload failed before the blob became visible.
+            await BestEffortDeleteBlobAsync(blobKey, RequestUser.AccountContainerName);
+            throw;
+        }
 
         var fileInformation = new FileVm
         {
@@ -172,18 +183,28 @@ public class FileService : ServiceBase<FileRepository>
         var sourceBlobClient = client.GetBlobClient(sourceBlobKey);
         var finalBlobClient = client.GetBlobClient(blobKey);
 
-        var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
-            sourceBlobClient.Uri,
-            cancellationToken: cancellationToken);
-        await copyOperation.WaitForCompletionAsync(cancellationToken);
+        try
+        {
+            var copyOperation = await finalBlobClient.StartCopyFromUriAsync(
+                sourceBlobClient.Uri,
+                cancellationToken: cancellationToken);
+            await copyOperation.WaitForCompletionAsync(cancellationToken);
 
-        entity.BlobKey = blobKey;
-        entity.BlobContainer = RequestUser.AccountContainerName;
-        await Repository.SaveChangesAsync(cancellationToken);
-        await _caveMutationCoordinator.PublishPreparedAsync(
-            revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
-            cancellationToken: cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            entity.BlobKey = blobKey;
+            entity.BlobContainer = RequestUser.AccountContainerName;
+            await Repository.SaveChangesAsync(cancellationToken);
+            await _caveMutationCoordinator.PublishPreparedAsync(
+                revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                cancellationToken: cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            // Never remove the staged source on failure. Only compensate the
+            // deterministic destination created for this publication attempt.
+            await BestEffortDeleteBlobAsync(blobKey, RequestUser.AccountContainerName);
+            throw;
+        }
 
         var fileInformation = new FileVm
         {
@@ -203,7 +224,7 @@ public class FileService : ServiceBase<FileRepository>
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
-        await RemoveExpiredFiles();
+        var expiredBlobs = await RemoveExpiredFiles(cancellationToken);
 
         var tempCaveImportTagType =
             await _tagRepository.GetFileTypeTagByName(fileTypeTagName, RequestUser.AccountId);
@@ -226,15 +247,25 @@ public class FileService : ServiceBase<FileRepository>
         var fileExtension = Path.GetExtension(fileName);
         var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
 
-        await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
+        try
+        {
+            await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
 
-        entity.BlobKey = blobKey;
-        entity.BlobContainer = RequestUser.AccountContainerName;
+            entity.BlobKey = blobKey;
+            entity.BlobContainer = RequestUser.AccountContainerName;
 
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await BestEffortDeleteBlobAsync(blobKey, RequestUser.AccountContainerName);
+            throw;
+        }
 
-        Repository.Add(entity);
-        await Repository.SaveChangesAsync();
-        await transaction.CommitAsync(cancellationToken);
+        foreach (var expiredBlob in expiredBlobs)
+            await BestEffortDeleteBlobAsync(expiredBlob.BlobKey, expiredBlob.BlobContainer);
 
         var fileInformation = new FileVm
         {
@@ -248,17 +279,37 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
-    private async Task RemoveExpiredFiles()
+    private async Task<List<BlobDeleteTarget>> RemoveExpiredFiles(CancellationToken cancellationToken)
     {
         var expiredFiles = await Repository.GetExpiredFiles();
-        foreach (var expiredFile in expiredFiles)
-        {
-            await DeleteFile(expiredFile.BlobKey, expiredFile.BlobContainer);
-            Repository.Delete(expiredFile);
-        }
+        var blobs = expiredFiles
+            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) && !string.IsNullOrWhiteSpace(file.BlobContainer))
+            .Select(file => new BlobDeleteTarget(file.BlobKey!, file.BlobContainer!))
+            .ToList();
 
-        await Repository.SaveChangesAsync();
+        foreach (var expiredFile in expiredFiles)
+            Repository.Delete(expiredFile);
+
+        await Repository.SaveChangesAsync(cancellationToken);
+        return blobs;
     }
+
+    private async Task BestEffortDeleteBlobAsync(string blobKey, string blobContainer)
+    {
+        try
+        {
+            var client = await GetBlobContainerClient(blobContainer, createIfNotExists: false);
+            await client.GetBlobClient(blobKey).DeleteIfExistsAsync(cancellationToken: CancellationToken.None);
+        }
+        catch
+        {
+            // Compensation must never replace the original database/upload
+            // exception. An out-of-band cleanup process can retry a rare blob
+            // deletion failure without corrupting relational state.
+        }
+    }
+
+    private sealed record BlobDeleteTarget(string BlobKey, string BlobContainer);
 
     #region Blob Storage
 
