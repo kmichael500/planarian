@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
 using System.Text.Json.Serialization;
-using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +29,7 @@ using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
@@ -220,6 +220,8 @@ builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
+builder.Services.AddScoped<CavePublishedSnapshotReader>();
+builder.Services.AddScoped<CaveMutationCoordinator>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
@@ -309,7 +311,6 @@ builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
     });
 });
 
-LinqToDBForEFTools.Initialize();
 //
 // // Convert NetTopologySuite Point to SqlGeometry
 // MappingSchema.Default.SetConverter<Point, SqlGeometry>(p =>

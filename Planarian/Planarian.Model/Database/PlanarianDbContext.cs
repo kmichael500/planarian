@@ -66,6 +66,11 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
     public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<CaveRevision> CaveRevisions { get; set; } = null!;
+    public DbSet<CaveImportBatch> CaveImportBatches { get; set; } = null!;
+    public DbSet<CaveChangeRequest> CaveChangeRequests { get; set; } = null!;
+    public DbSet<CaveProposalVersion> CaveProposalVersions { get; set; } = null!;
+    public DbSet<CaveChangeRequestStagedFile> CaveChangeRequestStagedFiles { get; set; } = null!;
     public DbSet<CaveGeoJson> CaveGeoJsons { get; set; } = null!;
     public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
     

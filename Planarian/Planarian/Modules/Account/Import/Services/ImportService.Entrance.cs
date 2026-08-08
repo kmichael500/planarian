@@ -341,23 +341,19 @@ public partial class ImportService
             const int batchSize = 5000;
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrance status tags");
-            await _repository.BulkInsertAsync(entranceStatusTags, onBatchProcessed: OnBatchProcessed,
-                batchSize: batchSize,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(entranceStatusTags);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting entrance hydrology tags");
-            await _repository.BulkInsertAsync(entranceHydrologyTags, onBatchProcessed: OnBatchProcessed,
-                batchSize: batchSize,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(entranceHydrologyTags);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrance hydrology tags");
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting field indication tags");
-            await _repository.BulkInsertAsync(entranceFieldIndicationTags, onBatchProcessed: OnBatchProcessed,
-                batchSize: batchSize,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(entranceFieldIndicationTags);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting reported by name tags");
-            await _repository.BulkInsertAsync(entranceReportedByNameTags, onBatchProcessed: OnBatchProcessed,
-                batchSize: batchSize,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(entranceReportedByNameTags);
+            await _repository.SaveChangesAsync(cancellationToken);
 
             #endregion
 
@@ -571,8 +567,8 @@ public partial class ImportService
 
         var newTags = tags.Where(gt => allTags.All(ag => ag.Name != gt.Name)).ToList();
 
-        await _tagRepository.BulkInsertAsync(newTags, onBatchProcessed: OnBatchProcessed,
-            cancellationToken: cancellationToken);
+        _tagRepository.AddRange(newTags);
+        await _tagRepository.SaveChangesAsync(cancellationToken);
 
         allTags.AddRange(newTags);
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Finished processing {key} tags");

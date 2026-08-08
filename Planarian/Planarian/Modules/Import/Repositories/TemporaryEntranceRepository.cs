@@ -1,7 +1,7 @@
-using LinqToDB;
-using LinqToDB.Data;
-using LinqToDB.EntityFrameworkCore;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -12,302 +12,243 @@ using Planarian.Shared.Base;
 
 namespace Planarian.Modules.Import.Repositories;
 
+/// <summary>
+/// Owns the short-lived staging table used by the entrance importer.
+/// The table name is generated per import, so this is intentionally a small
+/// parameterized provider-specific adapter rather than an EF entity set.
+/// </summary>
 public class TemporaryEntranceRepository : RepositoryBase<PlanarianDbContextBase>
 {
-    private readonly string _temporaryEntranceTableName;
+    private readonly string _temporaryEntranceTableName = "TemporaryEntrance" + Guid.NewGuid().ToString("N");
+    private NpgsqlConnection? _connection;
 
     public TemporaryEntranceRepository(PlanarianDbContextBase dbContext, RequestUser requestUser)
         : base(dbContext, requestUser)
     {
-        _temporaryEntranceTableName = "TemporaryEntrance" + Guid.NewGuid().ToString().Replace("-", "");
     }
 
+    private string Table => _temporaryEntranceTableName.Quote();
 
-    public async Task<ITable<TemporaryEntrance>> CreateTable()
+    private async Task<NpgsqlConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = DbContext.CreateLinqToDBConnection();
+        if (_connection is null)
+        {
+            _connection = (NpgsqlConnection)DbContext.Database.GetDbConnection();
+            await _connection.OpenAsync(cancellationToken);
+        }
 
-        var result = await db
-            .CreateTableAsync<TemporaryEntrance>(_temporaryEntranceTableName);
-        return result;
+        return _connection;
     }
 
-    public async Task<BulkCopyRowsCopied> InsertEntrances(IEnumerable<TemporaryEntrance> entrances,
+    public async Task CreateTable()
+    {
+        var connection = await GetConnectionAsync();
+        await using var command = new NpgsqlCommand($@"
+            CREATE TEMP TABLE {Table} (
+                ""Id"" varchar(50) NOT NULL,
+                ""CaveId"" varchar(50),
+                ""CountyDisplayId"" varchar(50) NOT NULL,
+                ""CountyCaveNumber"" integer NOT NULL,
+                ""ReportedByUserId"" varchar(50),
+                ""LocationQualityTagId"" varchar(50) NOT NULL,
+                ""Name"" varchar(255),
+                ""IsPrimary"" boolean NOT NULL,
+                ""Description"" text,
+                ""Latitude"" double precision NOT NULL,
+                ""Longitude"" double precision NOT NULL,
+                ""Elevation"" double precision NOT NULL,
+                ""ReportedOn"" timestamp with time zone,
+                ""PitFeet"" double precision,
+                ""CreatedByUserId"" varchar(50),
+                ""ModifiedByUserId"" varchar(50),
+                ""CreatedOn"" timestamp with time zone NOT NULL,
+                ""ModifiedOn"" timestamp with time zone
+            ) ON COMMIT PRESERVE ROWS", connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public async Task<int> InsertEntrances(IEnumerable<TemporaryEntrance> entrances,
         Action<int, int> onBatchProcessed)
     {
-        await using var db = DbContext.CreateLinqToDBConnection();
+        var rows = entrances.ToList();
+        var connection = await GetConnectionAsync();
+        var processed = 0;
 
-
-        var options = new BulkCopyOptions
+        foreach (var batch in rows.Chunk(500))
         {
-            TableName = _temporaryEntranceTableName,
-            NotifyAfter = 1000,
-            RowsCopiedCallback = copied => onBatchProcessed((int)copied.RowsCopied, entrances.Count())
-        };
+            await using var command = new NpgsqlCommand { Connection = connection };
+            var values = new List<string>();
+            for (var i = 0; i < batch.Length; i++)
+            {
+                var row = batch[i];
+                var p = $"p{i}_";
+                values.Add($"(@{p}id, @{p}cave, @{p}county, @{p}number, @{p}reportedBy, @{p}quality, @{p}name, @{p}primary, @{p}description, @{p}lat, @{p}lng, @{p}elevation, @{p}reportedOn, @{p}pit, @{p}createdBy, @{p}modifiedBy, @{p}createdOn, @{p}modifiedOn)");
+                Add(command, $"{p}id", row.Id);
+                Add(command, $"{p}cave", row.CaveId);
+                Add(command, $"{p}county", row.CountyDisplayId);
+                Add(command, $"{p}number", row.CountyCaveNumber);
+                Add(command, $"{p}reportedBy", row.ReportedByUserId);
+                Add(command, $"{p}quality", row.LocationQualityTagId);
+                Add(command, $"{p}name", row.Name);
+                Add(command, $"{p}primary", row.IsPrimary);
+                Add(command, $"{p}description", row.Description);
+                Add(command, $"{p}lat", row.Latitude);
+                Add(command, $"{p}lng", row.Longitude);
+                Add(command, $"{p}elevation", row.Elevation);
+                Add(command, $"{p}reportedOn", row.ReportedOn);
+                Add(command, $"{p}pit", row.PitFeet);
+                Add(command, $"{p}createdBy", row.CreatedByUserId);
+                Add(command, $"{p}modifiedBy", row.ModifiedByUserId);
+                Add(command, $"{p}createdOn", row.CreatedOn);
+                Add(command, $"{p}modifiedOn", row.ModifiedOn);
+            }
 
-        return await db.BulkCopyAsync(options, entrances);
+            command.CommandText = $"INSERT INTO {Table} (\"Id\", \"CaveId\", \"CountyDisplayId\", \"CountyCaveNumber\", \"ReportedByUserId\", \"LocationQualityTagId\", \"Name\", \"IsPrimary\", \"Description\", \"Latitude\", \"Longitude\", \"Elevation\", \"ReportedOn\", \"PitFeet\", \"CreatedByUserId\", \"ModifiedByUserId\", \"CreatedOn\", \"ModifiedOn\") VALUES {string.Join(",", values)}";
+            await command.ExecuteNonQueryAsync();
+            processed += batch.Length;
+            onBatchProcessed(processed, rows.Count);
+        }
+
+        return processed;
     }
+
+    private static void Add(NpgsqlCommand command, string name, object? value) =>
+        command.Parameters.AddWithValue(name, value ?? DBNull.Value);
 
     public async Task<(List<string> unassociatedEntrances, List<TemporaryEntranceResult> associatedEntrances)> UpdateTemporaryEntranceWithCaveId()
     {
-        if (string.IsNullOrEmpty(_temporaryEntranceTableName))
-            throw new InvalidOperationException("The temporary table has not been created.");
+        var connection = await GetConnectionAsync();
+        await using (var update = new NpgsqlCommand($@"
+            UPDATE {Table} t SET ""CaveId"" = c.""Id""
+            FROM ""Caves"" c INNER JOIN ""Counties"" co ON co.""Id"" = c.""CountyId""
+            WHERE t.""CountyCaveNumber"" = c.""CountyNumber""
+              AND t.""CountyDisplayId"" = co.""DisplayId""
+              AND c.""AccountId"" = @account", connection))
+        {
+            update.Parameters.AddWithValue("account", RequestUser.AccountId!);
+            await update.ExecuteNonQueryAsync();
+        }
 
-        await using var db = DbContext.CreateLinqToDBConnection();
-
-        var result = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName)
-            .Set(te => te.CaveId, te => db.GetTable<Cave>()
-                .Join(db.GetTable<County>(),
-                    cave => cave.CountyId,
-                    county => county.Id,
-                    (cave, county) => new { cave, county })
-                .Where(joined => joined.cave.CountyNumber == te.CountyCaveNumber
-                                 && joined.county.DisplayId == te.CountyDisplayId
-                                 && joined.cave.AccountId == RequestUser.AccountId)
-                .Select(joined => joined.cave.Id)
-                .FirstOrDefault())
-            .UpdateAsync();
-
-
-        var unassociatedEntrances = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName)
-            .Where(e => e.CaveId == null)
-            .Select(e => e.Id)
-            .ToListAsyncLinqToDB();
-
-        var delimiter = "-";
-        
-        var associatedEntrances = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName) 
-            .Where(e => e.CaveId != null)
-            .Join(db.GetTable<Cave>().Where(e => e.AccountId == RequestUser.AccountId),
-                te => te.CaveId,
-                cave => cave.Id,
-                (te, cave) => new TemporaryEntranceResult
+        var unassociated = await ReadIdsAsync($"SELECT \"Id\" FROM {Table} WHERE \"CaveId\" IS NULL", connection);
+        var associated = new List<TemporaryEntranceResult>();
+        await using (var command = new NpgsqlCommand($@"
+            SELECT t.""Id"", t.""CaveId"", c.""Name"", co.""DisplayId"" || '-' || c.""CountyNumber""
+            FROM {Table} t INNER JOIN ""Caves"" c ON c.""Id"" = t.""CaveId""
+            INNER JOIN ""Counties"" co ON co.""Id"" = c.""CountyId""
+            WHERE t.""CaveId"" IS NOT NULL AND c.""AccountId"" = @account", connection))
+        {
+            command.Parameters.AddWithValue("account", RequestUser.AccountId!);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                associated.Add(new TemporaryEntranceResult
                 {
-                 Id = te.Id,
-                 CaveId = te.CaveId,
-                 CaveName = cave.Name,
-                 DisplayId = $"{te.CountyDisplayId}{delimiter}{te.CountyCaveNumber}",
-                })
-            .IgnoreQueryFilters()
-            .ToListAsyncLinqToDB();
+                    Id = reader.GetString(0), CaveId = reader.GetString(1), CaveName = reader.GetString(2),
+                    DisplayId = reader.GetString(3)
+                });
+        }
 
+        await using (var delete = new NpgsqlCommand($"DELETE FROM {Table} WHERE \"CaveId\" IS NULL", connection))
+            await delete.ExecuteNonQueryAsync();
+        return (unassociated, associated);
+    }
 
-        var deleteResult = await db.GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName)
-            .IgnoreQueryFilters()
-            .Where(e => e.CaveId == null).DeleteAsync();
-
-        return (unassociatedEntrances, associatedEntrances);
+    private static async Task<List<string>> ReadIdsAsync(string sql, NpgsqlConnection connection)
+    {
+        var result = new List<string>();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) result.Add(reader.GetString(0));
+        return result;
     }
 
     public async Task<List<string>> GetInvalidIsPrimaryRecords()
     {
-        await using var db = DbContext.CreateLinqToDBConnection();
-
-        var tempEntranceTable = db.GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName);
-        var importedCaveIds = await tempEntranceTable
-            .Where(e => e.CaveId != null)
-            .Select(e => e.CaveId!)
-            .Distinct()
-            .ToListAsyncLinqToDB();
-
-        if (!importedCaveIds.Any()) return [];
-
-        var scopedImportedCaveIds = await db.GetTable<Cave>()
-            .Where(e => importedCaveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            .ToListAsyncLinqToDB();
-
-        if (!scopedImportedCaveIds.Any()) return [];
-
-        var entranceTable = db.GetTable<Entrance>();
-        var tempPrimaryCounts = (await tempEntranceTable
-            .Where(e => e.CaveId != null && e.IsPrimary)
-            .GroupBy(e => e.CaveId!)
-            .Select(g => new { CaveId = g.Key, Count = g.Count() })
-            .ToListAsyncLinqToDB())
-            .ToDictionary(x => x.CaveId, x => x.Count);
-
-        var existingPrimaryCounts = (await entranceTable
-            .Join(db.GetTable<Cave>().Where(e => e.AccountId == RequestUser.AccountId),
-                entrance => entrance.CaveId,
-                cave => cave.Id,
-                (entrance, cave) => entrance)
-            .Where(e => scopedImportedCaveIds.Contains(e.CaveId) && e.IsPrimary)
-            .GroupBy(e => e.CaveId)
-            .Select(g => new { CaveId = g.Key, Count = g.Count() })
-            .ToListAsyncLinqToDB())
-            .ToDictionary(x => x.CaveId, x => x.Count);
-
-        var invalidCaveIds = scopedImportedCaveIds
-            .Where(caveId =>
-                tempPrimaryCounts.GetValueOrDefault(caveId) + existingPrimaryCounts.GetValueOrDefault(caveId) != 1)
-            .ToList();
-
-        if (!invalidCaveIds.Any()) return [];
-
-        return await tempEntranceTable
-            .Where(e => e.CaveId != null && invalidCaveIds.Contains(e.CaveId))
-            .Select(e => e.Id)
-            .ToListAsyncLinqToDB();
+        var connection = await GetConnectionAsync();
+        var result = new List<string>();
+        await using var command = new NpgsqlCommand($@"
+            SELECT t.""Id""
+            FROM {Table} t
+            WHERE t.""CaveId"" IS NOT NULL
+            GROUP BY t.""Id"", t.""CaveId""
+            HAVING (SELECT count(*) FROM {Table} x WHERE x.""CaveId"" = t.""CaveId"" AND x.""IsPrimary"") +
+                   (SELECT count(*) FROM ""Entrances"" e WHERE e.""CaveId"" = t.""CaveId"" AND e.""IsPrimary"") <> 1", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) result.Add(reader.GetString(0));
+        return result;
     }
 
-    public async Task<Dictionary<string, int>> GetExistingEntranceCounts(IEnumerable<string> caveIds,
-        CancellationToken cancellationToken)
+    public async Task<Dictionary<string, int>> GetExistingEntranceCounts(IEnumerable<string> caveIds, CancellationToken cancellationToken)
     {
-        var caveIdList = caveIds.Distinct().ToList();
-        if (!caveIdList.Any()) return [];
-
-        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => caveIdList.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            , cancellationToken);
-
-        if (!scopedCaveIds.Any()) return [];
-
-        return (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Entrances
-            .IgnoreQueryFilters()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .GroupBy(e => e.CaveId)
-            .Select(g => new { CaveId = g.Key, Count = g.Count() }), cancellationToken))
-            .ToDictionary(x => x.CaveId, x => x.Count);
+        var ids = caveIds.Distinct().ToList();
+        return await DbContext.Entrances.IgnoreQueryFilters().Where(e => ids.Contains(e.CaveId))
+            .GroupBy(e => e.CaveId).Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.Key, e => e.Count, cancellationToken);
     }
 
-    public async Task<Dictionary<string, int>> GetExistingPrimaryEntranceCounts(IEnumerable<string> caveIds,
-        CancellationToken cancellationToken)
+    public async Task<Dictionary<string, int>> GetExistingPrimaryEntranceCounts(IEnumerable<string> caveIds, CancellationToken cancellationToken)
     {
-        var caveIdList = caveIds.Distinct().ToList();
-        if (!caveIdList.Any()) return [];
-
-        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => caveIdList.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            , cancellationToken);
-
-        if (!scopedCaveIds.Any()) return [];
-
-        return (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Entrances
-            .IgnoreQueryFilters()
-            .Where(e => scopedCaveIds.Contains(e.CaveId) && e.IsPrimary)
-            .GroupBy(e => e.CaveId)
-            .Select(g => new { CaveId = g.Key, Count = g.Count() }), cancellationToken))
-            .ToDictionary(x => x.CaveId, x => x.Count);
+        var ids = caveIds.Distinct().ToList();
+        return await DbContext.Entrances.IgnoreQueryFilters().Where(e => ids.Contains(e.CaveId) && e.IsPrimary)
+            .GroupBy(e => e.CaveId).Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.Key, e => e.Count, cancellationToken);
     }
 
     public async Task MigrateTemporaryEntrancesAsync()
     {
-        var command = $@"
-        INSERT INTO {nameof(DbContext.Entrances).Quote()} (
-            {nameof(Entrance.Id).Quote()},
-            {nameof(Entrance.CaveId).Quote()},
-            {nameof(Entrance.LocationQualityTagId).Quote()},
-            {nameof(Entrance.Name).Quote()},
-            {nameof(Entrance.IsPrimary).Quote()},
-            {nameof(Entrance.Description).Quote()},
-            {nameof(Entrance.Location).Quote()},
-            {nameof(Entrance.ReportedOn).Quote()},
-            {nameof(Entrance.ReportedByUserId).Quote()},
-            {nameof(Entrance.PitDepthFeet).Quote()},
-            {nameof(Entrance.CreatedByUserId).Quote()},
-            {nameof(Entrance.ModifiedByUserId).Quote()},
-            {nameof(Entrance.CreatedOn).Quote()},
-            {nameof(Entrance.ModifiedOn).Quote()}
-        )
-        SELECT 
-            {nameof(TemporaryEntrance.Id).Quote()},
-            {nameof(TemporaryEntrance.CaveId).Quote()},
-            {nameof(TemporaryEntrance.LocationQualityTagId).Quote()},
-            {nameof(TemporaryEntrance.Name).Quote()},
-            {nameof(TemporaryEntrance.IsPrimary).Quote()},
-            {nameof(TemporaryEntrance.Description).Quote()},
-             ST_SetSRID(ST_MakePoint(
-                CAST({nameof(TemporaryEntrance.Longitude).Quote()} AS FLOAT),
-                CAST({nameof(TemporaryEntrance.Latitude).Quote()} AS FLOAT),
-                CAST({nameof(TemporaryEntrance.Elevation).Quote()} AS FLOAT)
-            ), 4326),
-            {nameof(TemporaryEntrance.ReportedOn).Quote()},
-            {nameof(TemporaryEntrance.ReportedByUserId).Quote()},
-            {nameof(TemporaryEntrance.PitFeet).Quote()},
-            {nameof(TemporaryEntrance.CreatedByUserId).Quote()},
-            {nameof(TemporaryEntrance.ModifiedByUserId).Quote()},
-            {nameof(TemporaryEntrance.CreatedOn).Quote()},
-            {nameof(TemporaryEntrance.ModifiedOn).Quote()}
-        FROM {_temporaryEntranceTableName.Quote()}";
-        
-        await DbContext.Database.ExecuteSqlRawAsync(command);
+        var connection = await GetConnectionAsync();
+        await using var command = new NpgsqlCommand($@"
+            INSERT INTO ""Entrances"" (""Id"", ""CaveId"", ""LocationQualityTagId"", ""Name"", ""IsPrimary"", ""Description"", ""Location"", ""ReportedOn"", ""ReportedByUserId"", ""PitDepthFeet"", ""CreatedByUserId"", ""ModifiedByUserId"", ""CreatedOn"", ""ModifiedOn"")
+            SELECT ""Id"", ""CaveId"", ""LocationQualityTagId"", ""Name"", ""IsPrimary"", ""Description"", ST_SetSRID(ST_MakePoint(""Longitude"", ""Latitude"", ""Elevation""), 4326), ""ReportedOn"", ""ReportedByUserId"", ""PitFeet"", ""CreatedByUserId"", ""ModifiedByUserId"", ""CreatedOn"", ""ModifiedOn"" FROM {Table}", connection);
+        await command.ExecuteNonQueryAsync();
     }
 
-    public List<TemporaryEntrance> GetEntrancesById(string id)
+    public async Task<List<TemporaryEntrance>> GetEntrancesById(string id) => await ReadEntrancesAsync("WHERE \"Id\" = @id", new("id", id));
+
+    public async Task<List<TemporaryEntrance>> GetAllEntrances() => await ReadEntrancesAsync();
+
+    private async Task<List<TemporaryEntrance>> ReadEntrancesAsync(string where = "", NpgsqlParameter? parameter = null)
     {
-        return DbContext.CreateLinqToDBConnection().GetTable<TemporaryEntrance>().TableName(_temporaryEntranceTableName)
-            .Where(e => e.Id == id).ToList();
+        var connection = await GetConnectionAsync();
+        await using var command = new NpgsqlCommand($"SELECT * FROM {Table} {where}", connection);
+        if (parameter is not null) command.Parameters.Add(parameter);
+        var result = new List<TemporaryEntrance>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            result.Add(new TemporaryEntrance
+            {
+                Id = reader.GetString(reader.GetOrdinal("Id")), CaveId = GetString(reader, "CaveId"),
+                CountyDisplayId = reader.GetString(reader.GetOrdinal("CountyDisplayId")), CountyCaveNumber = reader.GetInt32(reader.GetOrdinal("CountyCaveNumber")),
+                ReportedByUserId = GetString(reader, "ReportedByUserId"), LocationQualityTagId = reader.GetString(reader.GetOrdinal("LocationQualityTagId")),
+                Name = GetString(reader, "Name"), IsPrimary = reader.GetBoolean(reader.GetOrdinal("IsPrimary")), Description = GetString(reader, "Description"),
+                Latitude = reader.GetDouble(reader.GetOrdinal("Latitude")), Longitude = reader.GetDouble(reader.GetOrdinal("Longitude")), Elevation = reader.GetDouble(reader.GetOrdinal("Elevation")),
+                ReportedOn = GetDate(reader, "ReportedOn"), PitFeet = GetDouble(reader, "PitFeet"), CreatedByUserId = GetString(reader, "CreatedByUserId"), ModifiedByUserId = GetString(reader, "ModifiedByUserId"),
+                CreatedOn = reader.GetDateTime(reader.GetOrdinal("CreatedOn")), ModifiedOn = GetDate(reader, "ModifiedOn")
+            });
+        return result;
     }
 
-    public async Task<List<TemporaryEntrance>> GetAllEntrances()
-    {
-        return await DbContext.CreateLinqToDBConnection()
-            .GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName)
-            .ToListAsyncLinqToDB();
-    }
+    private static string? GetString(NpgsqlDataReader reader, string column) => reader.IsDBNull(reader.GetOrdinal(column)) ? null : reader.GetString(reader.GetOrdinal(column));
+    private static double? GetDouble(NpgsqlDataReader reader, string column) => reader.IsDBNull(reader.GetOrdinal(column)) ? null : reader.GetDouble(reader.GetOrdinal(column));
+    private static DateTime? GetDate(NpgsqlDataReader reader, string column) => reader.IsDBNull(reader.GetOrdinal(column)) ? null : reader.GetDateTime(reader.GetOrdinal(column));
 
     public async Task DeleteExistingEntrancesForImportedCaves(CancellationToken cancellationToken)
     {
-        var caveIds = await DbContext.CreateLinqToDBConnection()
-            .GetTable<TemporaryEntrance>()
-            .TableName(_temporaryEntranceTableName)
-            .Where(e => e.CaveId != null)
-            .Select(e => e.CaveId!)
-            .Distinct()
-            .ToListAsyncLinqToDB();
-
-        if (!caveIds.Any()) return;
-
-        var scopedCaveIds = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => caveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            , cancellationToken);
-
-        if (!scopedCaveIds.Any()) return;
-
-        var entranceIds = await DbContext.Entrances
-            .IgnoreQueryFilters()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .Select(e => e.Id)
-            .ToListAsync(cancellationToken: cancellationToken);
-
-        if (!entranceIds.Any()) return;
-
-        await DbContext.EntranceStatusTags
-            .Where(e => entranceIds.Contains(e.EntranceId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.EntranceHydrologyTags
-            .Where(e => entranceIds.Contains(e.EntranceId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.FieldIndicationTags
-            .Where(e => entranceIds.Contains(e.EntranceId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.EntranceReportedByNameTags
-            .Where(e => entranceIds.Contains(e.EntranceId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.EntranceOtherTag
-            .Where(e => entranceIds.Contains(e.EntranceId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Entrances
-            .IgnoreQueryFilters()
-            .Where(e => entranceIds.Contains(e.Id))
-            .ExecuteDeleteAsync(cancellationToken);
+        var caveIds = (await ReadEntrancesAsync("WHERE \"CaveId\" IS NOT NULL")).Select(e => e.CaveId!).Distinct().ToList();
+        if (caveIds.Count == 0) return;
+        var entranceIds = await DbContext.Entrances.IgnoreQueryFilters().Where(e => caveIds.Contains(e.CaveId)).Select(e => e.Id).ToListAsync(cancellationToken);
+        if (entranceIds.Count == 0) return;
+        await DbContext.EntranceStatusTags.Where(e => entranceIds.Contains(e.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceHydrologyTags.Where(e => entranceIds.Contains(e.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+        await DbContext.FieldIndicationTags.Where(e => entranceIds.Contains(e.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceReportedByNameTags.Where(e => entranceIds.Contains(e.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+        await DbContext.EntranceOtherTag.Where(e => entranceIds.Contains(e.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+        await DbContext.Entrances.IgnoreQueryFilters().Where(e => entranceIds.Contains(e.Id)).ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task DropTable()
     {
-        await DbContext.CreateLinqToDBConnection()
-            .DropTableAsync<TemporaryEntrance>(_temporaryEntranceTableName);
+        if (_connection is null) return;
+        await using var command = new NpgsqlCommand($"DROP TABLE IF EXISTS {Table}", _connection);
+        await command.ExecuteNonQueryAsync();
     }
 }

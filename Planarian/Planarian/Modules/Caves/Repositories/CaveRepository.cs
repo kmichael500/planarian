@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Text.Json;
-using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -1129,26 +1128,31 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         var scopedCaves = caves.Where(e => scopedCaveIds.Contains(e.Id)).ToList();
         if (!scopedCaves.Any()) return;
 
-        var config = new BulkConfig
-        {
-            PropertiesToInclude = new List<string>
-            {
-                nameof(Cave.Name),
-                nameof(Cave.AlternateNames),
-                nameof(Cave.CountyId),
-                nameof(Cave.CountyNumber),
-                nameof(Cave.StateId),
-                nameof(Cave.LengthFeet),
-                nameof(Cave.DepthFeet),
-                nameof(Cave.MaxPitDepthFeet),
-                nameof(Cave.NumberOfPits),
-                nameof(Cave.Narrative),
-                nameof(Cave.ReportedOn),
-                nameof(Cave.IsArchived)
-            }
-        };
+        var ids = scopedCaves.Select(e => e.Id).ToList();
+        var currentCaves = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => ids.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .ToListAsync(cancellationToken);
 
-        await DbContext.BulkUpdateAsync(scopedCaves, config, cancellationToken: cancellationToken);
+        var incoming = scopedCaves.ToDictionary(e => e.Id);
+        foreach (var current in currentCaves)
+        {
+            var update = incoming[current.Id];
+            current.Name = update.Name;
+            current.SetAlternateNamesList(update.AlternateNamesList);
+            current.CountyId = update.CountyId;
+            current.CountyNumber = update.CountyNumber;
+            current.StateId = update.StateId;
+            current.LengthFeet = update.LengthFeet;
+            current.DepthFeet = update.DepthFeet;
+            current.MaxPitDepthFeet = update.MaxPitDepthFeet;
+            current.NumberOfPits = update.NumberOfPits;
+            current.Narrative = update.Narrative;
+            current.ReportedOn = update.ReportedOn;
+            current.IsArchived = update.IsArchived;
+        }
+
+        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteImportSyncCaveTags(List<string> caveIds, CancellationToken cancellationToken)

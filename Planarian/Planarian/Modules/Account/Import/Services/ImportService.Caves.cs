@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
-using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -72,7 +71,8 @@ public partial class ImportService
                 }
             }
 
-            await _accountRepository.BulkInsertAsync(newAccountStates, cancellationToken: cancellationToken);
+            _accountRepository.AddRange(newAccountStates);
+            await _accountRepository.SaveChangesAsync(cancellationToken);
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing states");
 
@@ -165,8 +165,8 @@ public partial class ImportService
             }
 
             var newCounties = counties.Where(gt => allCounties.All(ag => ag.DisplayId != gt.DisplayId)).ToList();
-            await _tagRepository.BulkInsertAsync(newCounties, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _tagRepository.AddRange(newCounties);
+            await _tagRepository.SaveChangesAsync(cancellationToken);
 
             allCounties.AddRange(newCounties);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished processing counties");
@@ -605,77 +605,73 @@ public partial class ImportService
             var cavesForInsert = syncExisting ? newCavesForInsert : caves;
             var cavesForTagInsert = syncExisting ? cavesForUpdate.Concat(cavesForInsert).ToList() : caves;
 
-            var config = new BulkConfig
-            {
-                PropertiesToExclude = new List<string> { nameof(Cave.NarrativeSearchVector) }
-            };
             if (cavesForInsert.Any())
             {
                 await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                     "Inserting caves. This may take a while...");
-                await _repository.BulkInsertAsync(cavesForInsert, onBatchProcessed: OnBatchProcessed,
-                    cancellationToken: cancellationToken, bulkConfig: config);
+                _repository.AddRange(cavesForInsert);
+                await _repository.SaveChangesAsync(cancellationToken);
                 await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting caves!");
             }
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geology tags.");
             var geologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.GeologyTags).ToList();
-            await _repository.BulkInsertAsync(geologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(geologyTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting geology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting geologic age tags.");
             var geologicAgeTagsForInsert = cavesForTagInsert.SelectMany(e => e.GeologicAgeTags).ToList();
-            await _repository.BulkInsertAsync(geologicAgeTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(geologicAgeTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting geologic age tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting map status tags.");
             var mapStatusTagsForInsert = cavesForTagInsert.SelectMany(e => e.MapStatusTags).ToList();
-            await _repository.BulkInsertAsync(mapStatusTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(mapStatusTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting map status tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting physiographic province tags.");
             var physiographicProvinceTagsForInsert = cavesForTagInsert.SelectMany(e => e.PhysiographicProvinceTags).ToList();
-            await _repository.BulkInsertAsync(physiographicProvinceTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(physiographicProvinceTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting physiographic province tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting archeology tags.");
             var archeologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.ArcheologyTags).ToList();
-            await _repository.BulkInsertAsync(archeologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(archeologyTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting archeology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting biology tags.");
             var biologyTagsForInsert = cavesForTagInsert.SelectMany(e => e.BiologyTags).ToList();
-            await _repository.BulkInsertAsync(biologyTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(biologyTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting biology tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting other tags.");
             var otherTagsForInsert = cavesForTagInsert.SelectMany(e => e.CaveOtherTags).ToList();
-            await _repository.BulkInsertAsync(otherTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(otherTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished inserting other tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting cartographer tags.");
             var cartographerTagsForInsert = cavesForTagInsert.SelectMany(e => e.CartographerNameTags).ToList();
-            await _repository.BulkInsertAsync(cartographerTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(cartographerTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting cartographer tags.");
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Inserting reported by tags.");
             var reportedByTagsForInsert = cavesForTagInsert.SelectMany(e => e.CaveReportedByNameTags).ToList();
-            await _repository.BulkInsertAsync(reportedByTagsForInsert, onBatchProcessed: OnBatchProcessed,
-                cancellationToken: cancellationToken);
+            _repository.AddRange(reportedByTagsForInsert);
+            await _repository.SaveChangesAsync(cancellationToken);
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Finished inserting reported by tags.");
 
@@ -1154,8 +1150,8 @@ public partial class ImportService
         }
 
         // Insert new tags into the repository
-        await _tagRepository.BulkInsertAsync(newTags, onBatchProcessed: OnBatchProcessed,
-            cancellationToken: cancellationToken);
+        _tagRepository.AddRange(newTags);
+        await _tagRepository.SaveChangesAsync(cancellationToken);
 
         allTags.AddRange(newTags); // Combine new tags with existing ones
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, $"Finished processing {key} tags");
