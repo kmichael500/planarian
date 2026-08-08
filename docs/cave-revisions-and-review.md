@@ -62,8 +62,19 @@ operations that require and participate in the caller's active EF transaction,
 so permissions, tag/file work, revision insertion, pointer advancement, and
 commit remain one atomic unit without nested transactions. Hard delete writes
 a final tombstone revision from the last live snapshot after dependent
-relational rows are removed but before commit; physical blob deletion remains
-deferred until after commit. GeoJSON is a separate domain in V1.
+relational rows are removed but before commit. Pending staged-file references
+are removed in the same transaction before their published File rows are
+removed.
+
+Blob storage cannot participate in the PostgreSQL transaction, so Cave-file
+writes use explicit compensation. If an upload or staged-file copy succeeds in
+blob storage but the relational/revision publication later fails, the unique
+destination blob is deleted best-effort without replacing the original
+exception. A staged source is never removed on failed publication. Expired
+temporary-file rows are removed transactionally, but their blobs are deleted
+only after the database transaction commits. Cave hard-delete and import-sync
+blob cleanup are likewise deferred until after commit. GeoJSON is a separate
+domain in V1.
 
 Cave and Entrance imports deliberately do not route thousands of rows through
 per-Cave coordinator calls. Their executors lock and verify scoped Cave rows,
@@ -78,8 +89,9 @@ revision before applying the batch. Relational changes, revisions, and
 revision pointers use bounded EF Core batches. No-change records create no
 revision. Import provenance is stored in `CaveImportBatch` rather than tied to
 temporary upload rows. Physical blob cleanup is deferred until after commit.
-Destructive sync statements are account-qualified at execution time in
-addition to consuming account-scoped immutable plans.
+Destructive sync statements bypass permission query filters only after the
+owned Cave/File/Entrance IDs are established, and each such statement restores
+an explicit account predicate before mutation.
 
 ## Inventory notes
 
