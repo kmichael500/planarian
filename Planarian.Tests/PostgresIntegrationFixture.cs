@@ -31,7 +31,13 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
     public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
         CreateDbContext(ConnectionString, userId, accountId);
 
-    public async Task<PostgresTestDatabase> CreateDatabaseAsync(string testName)
+    public Task<PostgresTestDatabase> CreateDatabaseAsync(string testName) =>
+        CreateDatabaseCoreAsync(testName, migrateToLatest: true);
+
+    public Task<PostgresTestDatabase> CreateUnmigratedDatabaseAsync(string testName) =>
+        CreateDatabaseCoreAsync(testName, migrateToLatest: false);
+
+    private async Task<PostgresTestDatabase> CreateDatabaseCoreAsync(string testName, bool migrateToLatest)
     {
         await EnsureSharedContainerAsync();
 
@@ -53,8 +59,7 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
         var database = new PostgresTestDatabase(builder.ConnectionString, databaseName, ConnectionString);
         try
         {
-            await using var db = database.CreateDbContext("migration-user", null);
-            await db.Database.MigrateAsync();
+            if (migrateToLatest) await database.MigrateAsync(null);
             return database;
         }
         catch
@@ -141,6 +146,21 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
 
     public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
         PostgresIntegrationFixture.CreateDbContext(ConnectionString, userId, accountId);
+
+    public IReadOnlyList<string> GetMigrationNames()
+    {
+        using var db = CreateDbContext("migration-list-user", null);
+        return db.Database.GetMigrations().ToList();
+    }
+
+    public async Task MigrateAsync(string? targetMigration)
+    {
+        await using var db = CreateDbContext("migration-user", null);
+        if (targetMigration is null)
+            await db.Database.MigrateAsync();
+        else
+            await db.Database.MigrateAsync(targetMigration);
+    }
 
     public async ValueTask DisposeAsync()
     {
