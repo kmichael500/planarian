@@ -24,15 +24,15 @@ public sealed class CaveImportExecutor
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
     private readonly CavePublishedSnapshotReader _snapshots;
-    private readonly CaveMutationCoordinator _mutations;
+    private readonly ImportRevisionPublisher _revisionPublisher;
 
     public CaveImportExecutor(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotReader snapshots, CaveMutationCoordinator mutations)
+        CavePublishedSnapshotReader snapshots, ImportRevisionPublisher revisionPublisher)
     {
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
-        _mutations = mutations;
+        _revisionPublisher = revisionPublisher;
     }
 
     public async Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string? sourceFileName,
@@ -97,7 +97,7 @@ public sealed class CaveImportExecutor
                 operations[cave.Id] = cave.Action == CaveImportAction.Insert ? CaveRevisionOperation.Create : CaveRevisionOperation.Update;
             foreach (var deletion in plan.Deletions) operations[deletion.CaveId] = CaveRevisionOperation.Delete;
 
-            await _mutations.PublishImportChangesAsync(before, after, expectedRevisions, operations, importBatchId, cancellationToken);
+            await _revisionPublisher.PublishAsync(before, after, expectedRevisions, operations, importBatchId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
