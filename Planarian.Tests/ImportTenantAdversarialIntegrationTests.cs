@@ -41,17 +41,17 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresIntegrationF
     [Fact]
     public async Task ForeignPrimaryEntranceDoesNotAffectAccountAPrimaryCount()
     {
-        await using var d=await fixture.CreateDatabaseAsync(nameof(ForeignPrimaryEntranceDoesNotAffectAccountAPrimaryCount)); var a=await IntegrationTestData.SeedTenantAsync(d,'a'); var b=await IntegrationTestData.SeedTenantAsync(d,'b'); await SeedPrimary(d,b,"bprimary"); await MakeBVisibleKeyCollide(d,b,"A01");
+        await using var d=await fixture.CreateDatabaseAsync(nameof(ForeignPrimaryEntranceDoesNotAffectAccountAPrimaryCount)); var a=await IntegrationTestData.SeedTenantAsync(d,'a'); var b=await IntegrationTestData.SeedTenantAsync(d,'b'); await SeedPrimary(d,b,"bprimary00"); await MakeBVisibleKeyCollide(d,b,"A01");
         await using var db=d.CreateDbContext("a",a.AccountId); var p=new EntranceImportPlanner(db,db.RequestUser); await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader+"\nA Primary,A01,1,true,35,-86,500,Survey Grade,0,Open,,,,,,\n");
-        var plan=await p.PlanAsync(csv,false); Assert.Single(plan.Entrances); await ExecuteEntrances(db,plan,"primary.csv"); await using var vb=d.CreateDbContext("b",b.AccountId); Assert.True(await vb.Entrances.IgnoreQueryFilters().AnyAsync(e=>e.Id=="bprimary"&&e.IsPrimary));
+        var plan=await p.PlanAsync(csv,false); Assert.Single(plan.Entrances); await ExecuteEntrances(db,plan,"primary.csv"); await using var vb=d.CreateDbContext("b",b.AccountId); Assert.True(await vb.Entrances.IgnoreQueryFilters().AnyAsync(e=>e.Id=="bprimary00"&&e.IsPrimary));
     }
 
     [Fact]
     public async Task EntranceSyncDoesNotDeleteForeignEntrancesOrTags()
     {
-        await using var d=await fixture.CreateDatabaseAsync(nameof(EntranceSyncDoesNotDeleteForeignEntrancesOrTags)); var a=await IntegrationTestData.SeedTenantAsync(d,'a'); var b=await IntegrationTestData.SeedTenantAsync(d,'b'); await SeedPrimary(d,a,"aprimary"); await SeedPrimary(d,b,"bprimary");
+        await using var d=await fixture.CreateDatabaseAsync(nameof(EntranceSyncDoesNotDeleteForeignEntrancesOrTags)); var a=await IntegrationTestData.SeedTenantAsync(d,'a'); var b=await IntegrationTestData.SeedTenantAsync(d,'b'); await SeedPrimary(d,a,"aprimary00"); await SeedPrimary(d,b,"bprimary00");
         await using var db=d.CreateDbContext("a",a.AccountId); var p=new EntranceImportPlanner(db,db.RequestUser); await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader+"\nReplacement,A01,1,true,35.2,-86.2,520,Survey Grade,0,Open,Wet,Sink,2026-08-01,Surveyor,Replacement\n"); var plan=await p.PlanAsync(csv,true); await ExecuteEntrances(db,plan,"sync.csv");
-        await using var vb=d.CreateDbContext("b",b.AccountId); Assert.True(await vb.Entrances.IgnoreQueryFilters().AnyAsync(e=>e.Id=="bprimary")); Assert.True(await vb.EntranceStatusTags.AnyAsync(t=>t.EntranceId=="bprimary"));
+        await using var vb=d.CreateDbContext("b",b.AccountId); Assert.True(await vb.Entrances.IgnoreQueryFilters().AnyAsync(e=>e.Id=="bprimary00")); Assert.True(await vb.EntranceStatusTags.AnyAsync(t=>t.EntranceId=="bprimary00"));
     }
 
     [Fact]
