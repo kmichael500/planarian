@@ -14,10 +14,12 @@ using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
@@ -35,16 +37,19 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ClientUrlBuilder _clientUrlBuilder;
+    private readonly CaveMutationCoordinator _caveMutationCoordinator;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         TagRepository tagRepository,
-        FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder) : base(
+        FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
+        CaveMutationCoordinator caveMutationCoordinator) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _clientUrlBuilder = clientUrlBuilder;
+        _caveMutationCoordinator = caveMutationCoordinator;
     }
 
     #region Caves
@@ -535,6 +540,13 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
+            CaveMutationPreparation? revisionPreparation = null;
+            if (!isNew)
+            {
+                revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                    entity.Id, entity.CurrentRevisionId, cancellationToken);
+            }
+
             var isNewCounty = entity.CountyId != values.CountyId;
             int? countyNumber = null;
 
@@ -824,6 +836,19 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
+            if (isNew)
+            {
+                await _caveMutationCoordinator.PublishPersistedNewAsync(
+                    entity.Id, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Create,
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await _caveMutationCoordinator.PublishPreparedAsync(
+                    revisionPreparation!, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                    cancellationToken: cancellationToken);
+            }
+
             await transaction.CommitAsync(cancellationToken);
 
             foreach (var blobProperties in blobsToDelete)
@@ -864,6 +889,9 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
             await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
+
+            var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                entity.Id, entity.CurrentRevisionId, cancellationToken);
 
             var geoJsons = await Repository.GetCaveGeoJsonsAsync(caveId);
             foreach (var geoJson in geoJsons)
@@ -1007,6 +1035,8 @@ public class CaveService : ServiceBase<CaveRepository>
 
             Repository.Delete(entity);
             await Repository.SaveChangesAsync(cancellationToken);
+            await _caveMutationCoordinator.PublishPreparedDeleteAsync(
+                revisionPreparation, CaveRevisionSource.ManagerEdit, cancellationToken: cancellationToken);
 
             if (!outsideTransaction)
             {
@@ -1047,8 +1077,9 @@ public class CaveService : ServiceBase<CaveRepository>
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
 
 
-        entity.IsArchived = true;
-        await Repository.SaveChangesAsync();
+        await _caveMutationCoordinator.PublishExistingAsync(
+            caveId, entity.CurrentRevisionId, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Archive,
+            cave => cave.IsArchived = true);
     }
 
     public async Task UnarchiveCave(string caveId)
@@ -1058,8 +1089,9 @@ public class CaveService : ServiceBase<CaveRepository>
         if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
 
-        entity.IsArchived = false;
-        await Repository.SaveChangesAsync();
+        await _caveMutationCoordinator.PublishExistingAsync(
+            caveId, entity.CurrentRevisionId, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Unarchive,
+            cave => cave.IsArchived = false);
     }
 
     #endregion

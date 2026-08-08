@@ -7,6 +7,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Settings.Repositories;
@@ -43,10 +44,11 @@ public class FileService : ServiceBase<FileRepository>
     private readonly RequestThrottleService _requestThrottleService;
     private readonly SettingsRepository _settingsRepository;
     private readonly CaveRepository _caveRepository;
+    private readonly CaveMutationCoordinator _caveMutationCoordinator;
 
     public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
         FileOptions fileOptions, SettingsRepository settingsRepository, CaveRepository caveRepository,
-        RequestThrottleService requestThrottleService) : base(
+        RequestThrottleService requestThrottleService, CaveMutationCoordinator caveMutationCoordinator) : base(
         repository, requestUser)
     {
         _tagRepository = tagRepository;
@@ -54,6 +56,7 @@ public class FileService : ServiceBase<FileRepository>
         _settingsRepository = settingsRepository;
         _caveRepository = caveRepository;
         _requestThrottleService = requestThrottleService;
+        _caveMutationCoordinator = caveMutationCoordinator;
     }
 
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
@@ -69,6 +72,8 @@ public class FileService : ServiceBase<FileRepository>
         }
 
         await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId, caveEntity.StateId);
+        var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+            caveId, cancellationToken: cancellationToken);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         // check if tag type name exists in the file name
@@ -106,6 +111,9 @@ public class FileService : ServiceBase<FileRepository>
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
         await Repository.SaveChangesAsync(cancellationToken);
+        await _caveMutationCoordinator.PublishPreparedAsync(
+            revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+            cancellationToken: cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm
@@ -132,6 +140,8 @@ public class FileService : ServiceBase<FileRepository>
         }
 
         await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId,  caveEntity.StateId);
+        var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+            caveId, cancellationToken: cancellationToken);
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
 
         var autoTagType =
@@ -170,6 +180,9 @@ public class FileService : ServiceBase<FileRepository>
         entity.BlobKey = blobKey;
         entity.BlobContainer = RequestUser.AccountContainerName;
         await Repository.SaveChangesAsync(cancellationToken);
+        await _caveMutationCoordinator.PublishPreparedAsync(
+            revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+            cancellationToken: cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var fileInformation = new FileVm
@@ -314,12 +327,19 @@ public class FileService : ServiceBase<FileRepository>
     public async Task UpdateFilesMetadata(IEnumerable<EditFileMetadataVm> values, CancellationToken cancellationToken)
     {
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        var revisionPreparations = new Dictionary<string, CaveMutationPreparation>(StringComparer.Ordinal);
         foreach (var value in values)
         {
             await EnsureFileManagerAccess(value.Id);
 
             var file = await Repository.GetFileById(value.Id);
             if (file == null) throw ApiExceptionDictionary.NotFound("File");
+
+            if (!string.IsNullOrWhiteSpace(file.CaveId) && !revisionPreparations.ContainsKey(file.CaveId))
+            {
+                revisionPreparations[file.CaveId] = await _caveMutationCoordinator.PrepareExistingAsync(
+                    file.CaveId, cancellationToken: cancellationToken);
+            }
 
             if (!string.IsNullOrWhiteSpace(value.DisplayName))
             {
@@ -329,10 +349,17 @@ public class FileService : ServiceBase<FileRepository>
 
             file.FileTypeTagId = value.FileTypeTagId;
 
-            await Repository.SaveChangesAsync();
+            await Repository.SaveChangesAsync(cancellationToken);
         }
 
-        await transaction.CommitAsync();
+        foreach (var preparation in revisionPreparations.Values)
+        {
+            await _caveMutationCoordinator.PublishPreparedAsync(
+                preparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                cancellationToken: cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<AuthenticatedFileResponse> CreateFileResponse(string fileId, bool isDownload,
