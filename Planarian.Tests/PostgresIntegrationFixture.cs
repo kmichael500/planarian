@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
@@ -156,10 +158,8 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
     public async Task MigrateAsync(string? targetMigration)
     {
         await using var db = CreateDbContext("migration-user", null);
-        if (targetMigration is null)
-            await db.Database.MigrateAsync();
-        else
-            await db.Database.MigrateAsync(targetMigration);
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync(targetMigration);
     }
 
     public async ValueTask DisposeAsync()
