@@ -22,15 +22,15 @@ public sealed class EntranceImportExecutor
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
     private readonly CavePublishedSnapshotReader _snapshots;
-    private readonly CaveMutationCoordinator _mutations;
+    private readonly ImportRevisionPublisher _revisionPublisher;
 
     public EntranceImportExecutor(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotReader snapshots, CaveMutationCoordinator mutations)
+        CavePublishedSnapshotReader snapshots, ImportRevisionPublisher revisionPublisher)
     {
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
-        _mutations = mutations;
+        _revisionPublisher = revisionPublisher;
     }
 
     public async Task<string> ExecuteAsync(EntranceImportPlan plan, string? sourceFileName,
@@ -80,7 +80,7 @@ public sealed class EntranceImportExecutor
                 StringComparer.Ordinal);
             var operations = targetIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                 StringComparer.Ordinal);
-            await _mutations.PublishImportChangesAsync(before, after, expected, operations, batchId,
+            await _revisionPublisher.PublishAsync(before, after, expected, operations, batchId,
                 cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
