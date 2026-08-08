@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -13,9 +14,11 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    partial class PlanarianDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260808034556_CaveRevisionTenantSafety")]
+    partial class CaveRevisionTenantSafety
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -818,8 +821,6 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("AccountId", "BaseRevisionId");
 
-                    b.HasIndex("AccountId", "CurrentProposalVersionId");
-
                     b.HasIndex("CaveId", "Status");
 
                     b.HasIndex("AccountId", "Status", "CreatedOn");
@@ -1119,10 +1120,6 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("PreviousProposalVersionId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.Property<string>("ProposalJson")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -1132,9 +1129,9 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "ChangeRequestId");
+                    b.HasAlternateKey("AccountId", "Id");
 
-                    b.HasIndex("AccountId", "PreviousProposalVersionId");
+                    b.HasIndex("AccountId", "ChangeRequestId");
 
                     b.HasIndex("ChangeRequestId", "CreatedOn");
 
@@ -2692,12 +2689,6 @@ namespace Planarian.Migrations.Migrations
                         .HasForeignKey("AccountId", "BaseRevisionId")
                         .HasPrincipalKey("AccountId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId", "CurrentProposalVersionId")
-                        .HasPrincipalKey("AccountId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestStagedFile", b =>
@@ -2820,12 +2811,6 @@ namespace Planarian.Migrations.Migrations
                         .HasPrincipalKey("AccountId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId", "PreviousProposalVersionId")
-                        .HasPrincipalKey("AccountId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveReportedByNameTag", b =>

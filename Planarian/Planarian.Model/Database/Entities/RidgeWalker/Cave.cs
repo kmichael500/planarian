@@ -116,8 +116,9 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
 
         builder.HasOne<CaveRevision>()
             .WithMany()
-            .HasForeignKey(e => e.CurrentRevisionId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.CurrentRevisionId })
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasGeneratedTsVectorColumn<Cave>(
             e => e.NarrativeSearchVector, // The computed column property

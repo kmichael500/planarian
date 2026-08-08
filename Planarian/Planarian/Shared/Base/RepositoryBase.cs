@@ -48,8 +48,10 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
             .ToListAsync(cancellationToken);
         if (ids.Count == 0) return 0;
 
-        return await DbContext.Set<TEntity>().IgnoreQueryFilters()
-            .Where(entity => ids.Contains(entity.Id))
+        // Reuse the original scoped query for the DELETE. This is important:
+        // selecting tenant-scoped IDs and then deleting by IDs alone would
+        // turn a safe lookup into an unscoped mutation.
+        return await query.Where(entity => ids.Contains(entity.Id))
             .ExecuteDeleteAsync(cancellationToken);
     }
 

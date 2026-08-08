@@ -13,6 +13,7 @@ public sealed record CavePublishedSnapshotV1
     public SnapshotReference State { get; init; } = null!;
     public SnapshotReference County { get; init; } = null!;
     public int CountyNumber { get; init; }
+    public string? ReportedByUserId { get; init; }
     public double? LengthFeet { get; init; }
     public double? DepthFeet { get; init; }
     public double? MaxPitDepthFeet { get; init; }
@@ -25,9 +26,17 @@ public sealed record CavePublishedSnapshotV1
     public IReadOnlyList<CaveFileSnapshotV1> Files { get; init; } = [];
 }
 
-public sealed record SnapshotReference(string Id, string NameAtRevision);
+public sealed record SnapshotReference(string Id, string NameAtRevision, string? DisplayIdAtRevision = null,
+    string? AbbreviationAtRevision = null);
 
-public sealed record SnapshotTagReference(string TagTypeId, string NameAtRevision, string Key);
+public enum SnapshotTagRole
+{
+    Geology, GeologicAge, MapStatus, PhysiographicProvince, Archeology, Biology, CaveOther,
+    Cartographer, CaveReportedBy, EntranceStatus, EntranceHydrology, FieldIndication,
+    EntranceReportedBy, EntranceOther
+}
+
+public sealed record SnapshotTagReference(SnapshotTagRole Role, string TagTypeId, string NameAtRevision);
 
 public sealed record CaveEntranceSnapshotV1
 {
@@ -35,9 +44,11 @@ public sealed record CaveEntranceSnapshotV1
     public string? Name { get; init; }
     public bool IsPrimary { get; init; }
     public string? Description { get; init; }
+    public string? ReportedByUserId { get; init; }
     public double? Latitude { get; init; }
     public double? Longitude { get; init; }
     public double? Elevation { get; init; }
+    public int Srid { get; init; } = 4326;
     public string LocationQualityTagId { get; init; } = null!;
     public string LocationQualityNameAtRevision { get; init; } = null!;
     public DateTime? ReportedOn { get; init; }
@@ -52,7 +63,6 @@ public sealed record CaveFileSnapshotV1
     public string FileTypeNameAtRevision { get; init; } = null!;
     public string FileName { get; init; } = null!;
     public string? DisplayName { get; init; }
-    public string? BlobContainer { get; init; }
 }
 
 public static class CaveSnapshotJson
@@ -71,7 +81,10 @@ public static class CaveSnapshotJson
         if (schemaVersion != 1)
             throw new NotSupportedException($"Unsupported Cave snapshot schema version: {schemaVersion}.");
 
-        return JsonSerializer.Deserialize<CavePublishedSnapshotV1>(json, Options)
-               ?? throw new InvalidOperationException("Cave snapshot JSON was empty.");
+        var snapshot = JsonSerializer.Deserialize<CavePublishedSnapshotV1>(json, Options)
+                       ?? throw new InvalidOperationException("Cave snapshot JSON was empty.");
+        if (snapshot.SchemaVersion != schemaVersion)
+            throw new InvalidOperationException("Cave snapshot row and payload schema versions differ.");
+        return snapshot;
     }
 }

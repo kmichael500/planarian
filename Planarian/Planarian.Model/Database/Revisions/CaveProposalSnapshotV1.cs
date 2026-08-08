@@ -30,8 +30,10 @@ public sealed record CaveProposalSnapshotV1
     public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];
     public IReadOnlyList<CaveEntranceSnapshotV1> Entrances { get; init; } = [];
     public IReadOnlyList<CaveFileSnapshotV1> StagedFiles { get; init; } = [];
-    public IReadOnlyList<string> NewPeopleTagNames { get; init; } = [];
+    public IReadOnlyList<ProposalTagIntent> NewTagIntents { get; init; } = [];
 }
+
+public sealed record ProposalTagIntent(SnapshotTagRole Role, string Name);
 
 public static class CaveProposalJson
 {
@@ -40,7 +42,10 @@ public static class CaveProposalJson
     public static CaveProposalSnapshotV1 Deserialize(string json, int schemaVersion)
     {
         if (schemaVersion != 1) throw new NotSupportedException($"Unsupported Cave proposal schema version: {schemaVersion}.");
-        return JsonSerializer.Deserialize<CaveProposalSnapshotV1>(json, CaveSnapshotJson.Options)
-               ?? throw new InvalidOperationException("Cave proposal JSON was empty.");
+        var proposal = JsonSerializer.Deserialize<CaveProposalSnapshotV1>(json, CaveSnapshotJson.Options)
+                       ?? throw new InvalidOperationException("Cave proposal JSON was empty.");
+        if (proposal.SchemaVersion != schemaVersion)
+            throw new InvalidOperationException("Cave proposal row and payload schema versions differ.");
+        return proposal;
     }
 }

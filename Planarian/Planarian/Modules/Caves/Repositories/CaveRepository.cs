@@ -1210,7 +1210,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
         var entranceIds = await DbContext.Entrances
             .IgnoreQueryFilters()
-            .Where(e => e.CaveId == caveId)
+            .Where(e => e.CaveId == caveId && e.Cave.AccountId == RequestUser.AccountId)
             .Select(e => e.Id)
             .ToListAsync(cancellationToken);
 
@@ -1237,7 +1237,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 .ExecuteDeleteAsync(cancellationToken);
             await DbContext.Entrances
                 .IgnoreQueryFilters()
-                .Where(e => entranceIds.Contains(e.Id))
+                .Where(e => entranceIds.Contains(e.Id) && e.Cave.AccountId == RequestUser.AccountId)
                 .ExecuteDeleteAsync(cancellationToken);
         }
 

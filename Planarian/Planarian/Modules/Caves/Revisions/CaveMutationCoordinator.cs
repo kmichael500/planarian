@@ -14,16 +14,19 @@ public sealed class CaveMutationCoordinator
     private readonly RequestUser _requestUser;
     private readonly CavePublishedSnapshotReader _snapshots;
     private readonly CaveRevisionDiffService _diff = new();
+    private readonly AccountExecutionScope _scope;
 
     public CaveMutationCoordinator(PlanarianDbContext db, RequestUser requestUser, CavePublishedSnapshotReader snapshots)
-    { _db = db; _requestUser = requestUser; _snapshots = snapshots; }
+    { _db = db; _requestUser = requestUser; _scope = AccountExecutionScope.Require(requestUser); _snapshots = snapshots; }
 
     public async Task<CaveMutationResult> PublishExistingAsync(string caveId, string? expectedRevisionId,
         CaveRevisionSource source, CaveRevisionOperation operation, Action<Cave> write,
         string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        var cave = await _db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == caveId, cancellationToken);
+        var cave = await _db.Caves.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(c => c.Id == caveId && c.AccountId == _scope.AccountId, cancellationToken)
+            ?? throw new InvalidOperationException("Cave is not owned by the current account.");
         var previous = await EstablishBaselineIfNeededAsync(cave, cancellationToken);
         if (expectedRevisionId is not null && cave.CurrentRevisionId != expectedRevisionId)
             throw new CaveRevisionConflictException(caveId, expectedRevisionId, cave.CurrentRevisionId);
@@ -46,7 +49,9 @@ public sealed class CaveMutationCoordinator
         string? importBatchId = null, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        cave.AccountId = _requestUser.AccountId ?? cave.AccountId;
+        if (!string.IsNullOrWhiteSpace(cave.AccountId) && cave.AccountId != _scope.AccountId)
+            throw new InvalidOperationException("Cave account does not match the current account.");
+        cave.AccountId = _scope.AccountId;
         _db.Caves.Add(cave);
         await _db.SaveChangesAsync(cancellationToken);
         var snapshot = await _snapshots.BuildAsync(cave.Id, cancellationToken);
@@ -63,7 +68,7 @@ public sealed class CaveMutationCoordinator
     {
         if (cave.CurrentRevisionId is not null)
         {
-            var existing = await _db.CaveRevisions.SingleAsync(r => r.Id == cave.CurrentRevisionId, cancellationToken);
+            var existing = await _db.CaveRevisions.SingleAsync(r => r.Id == cave.CurrentRevisionId && r.AccountId == _scope.AccountId, cancellationToken);
             return (existing, CaveSnapshotJson.Deserialize(existing.SnapshotJson, existing.SnapshotSchemaVersion));
         }
         var snapshot = await _snapshots.BuildAsync(cave.Id, cancellationToken);

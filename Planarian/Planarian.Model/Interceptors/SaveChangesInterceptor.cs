@@ -231,6 +231,21 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                 var cave = (Cave)entity.Entity;
                 ValidateAccount(cave.AccountId, requestUserAccountId);
                 break;
+            case nameof(CaveRevision):
+                ValidateAccount(((CaveRevision)entity.Entity).AccountId, requestUserAccountId);
+                break;
+            case nameof(CaveImportBatch):
+                ValidateAccount(((CaveImportBatch)entity.Entity).AccountId, requestUserAccountId);
+                break;
+            case nameof(CaveChangeRequest):
+                ValidateAccount(((CaveChangeRequest)entity.Entity).AccountId, requestUserAccountId);
+                break;
+            case nameof(CaveProposalVersion):
+                ValidateAccount(((CaveProposalVersion)entity.Entity).AccountId, requestUserAccountId);
+                break;
+            case nameof(CaveChangeRequestStagedFile):
+                ValidateAccount(((CaveChangeRequestStagedFile)entity.Entity).AccountId, requestUserAccountId);
+                break;
             case nameof(CaveOtherTag):
                 var caveOtherTag = (CaveOtherTag)entity.Entity;
                 var caveOtherTagAccountId = caveOtherTag.Cave?.AccountId ?? await context.CaveOtherTags

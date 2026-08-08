@@ -220,7 +220,7 @@ public partial class ImportService
 
             await _notificationService.SendNotificationToGroupAsync(signalRGroup,
                 "Inserting entrances. This may take a while...");
-            await _temporaryEntranceRepository.CreateTable();
+            await _temporaryEntranceRepository.Reset();
 
             async void OnBatchProcessed(int currentProcessedCount, int total)
             {
@@ -357,7 +357,7 @@ public partial class ImportService
 
             #endregion
 
-            await _temporaryEntranceRepository.DropTable();
+            await _temporaryEntranceRepository.Clear();
 
             var records = new List<EntranceDryRun>();
 

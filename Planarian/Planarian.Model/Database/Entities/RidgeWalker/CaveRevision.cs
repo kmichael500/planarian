@@ -44,6 +44,15 @@ public class CaveRevisionConfiguration : BaseEntityTypeConfiguration<CaveRevisio
         builder.Property(e => e.Source).HasConversion<string>().HasMaxLength(PropertyLength.Key);
         builder.Property(e => e.Operation).HasConversion<string>().HasMaxLength(PropertyLength.Key);
         builder.Property(e => e.SnapshotJson).HasColumnType("jsonb");
+        builder.HasAlternateKey(e => new { e.AccountId, e.Id });
+        builder.HasOne<CaveRevision>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.PreviousRevisionId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CaveImportBatch>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ImportBatchId })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => new { e.AccountId, e.CaveId, e.CreatedOn });
         builder.HasIndex(e => e.PreviousRevisionId);
         builder.HasIndex(e => e.ChangeRequestId);
@@ -66,6 +75,7 @@ public class CaveImportBatchConfiguration : BaseEntityTypeConfiguration<CaveImpo
 {
     public override void Configure(EntityTypeBuilder<CaveImportBatch> builder)
     {
+        builder.HasAlternateKey(e => new { e.AccountId, e.Id });
         builder.HasIndex(e => new { e.AccountId, e.CreatedOn });
     }
 }

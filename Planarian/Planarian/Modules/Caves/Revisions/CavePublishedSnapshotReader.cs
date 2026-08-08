@@ -10,11 +10,18 @@ namespace Planarian.Modules.Caves.Revisions;
 public sealed class CavePublishedSnapshotReader
 {
     private readonly PlanarianDbContext _db;
-    public CavePublishedSnapshotReader(PlanarianDbContext db) => _db = db;
+    private readonly AccountExecutionScope _scope;
+
+    public CavePublishedSnapshotReader(PlanarianDbContext db, RequestUser requestUser)
+    {
+        _db = db;
+        _scope = AccountExecutionScope.Require(requestUser);
+    }
 
     public async Task<CavePublishedSnapshotV1> BuildAsync(string caveId, CancellationToken cancellationToken = default)
     {
-        var cave = await Query().SingleAsync(c => c.Id == caveId, cancellationToken);
+        var cave = await Query().SingleOrDefaultAsync(c => c.Id == caveId, cancellationToken)
+                   ?? throw new InvalidOperationException("Cave is not owned by the current account.");
         return Build(cave);
     }
 
@@ -23,10 +30,14 @@ public sealed class CavePublishedSnapshotReader
         var ids = caveIds.Distinct().ToList();
         if (ids.Count == 0) return [];
         var caves = await Query().Where(c => ids.Contains(c.Id)).ToListAsync(cancellationToken);
+        if (caves.Count != ids.Count)
+            throw new InvalidOperationException("One or more Caves are not owned by the current account.");
         return caves.Select(Build).ToList();
     }
 
-    private IQueryable<Cave> Query() => _db.Caves.IgnoreQueryFilters().AsNoTracking().AsSplitQuery()
+    private IQueryable<Cave> Query() => _db.Caves.IgnoreQueryFilters()
+        .Where(c => c.AccountId == _scope.AccountId)
+        .AsNoTracking().AsSplitQuery()
         .Include(c => c.State).Include(c => c.County)
         .Include(c => c.Files).ThenInclude(f => f.FileTypeTag)
         .Include(c => c.Entrances).ThenInclude(e => e.LocationQualityTag)
@@ -48,29 +59,30 @@ public sealed class CavePublishedSnapshotReader
     private static CavePublishedSnapshotV1 Build(Cave cave)
     {
         var tags = new List<SnapshotTagReference>();
-        AddTags(cave.GeologyTags, tags, TagTypeKeyConstant.Geology);
-        AddTags(cave.GeologicAgeTags, tags, TagTypeKeyConstant.GeologicAge);
-        AddTags(cave.MapStatusTags, tags, TagTypeKeyConstant.MapStatus);
-        AddTags(cave.PhysiographicProvinceTags, tags, TagTypeKeyConstant.PhysiographicProvince);
-        AddTags(cave.BiologyTags, tags, TagTypeKeyConstant.Biology);
-        AddTags(cave.ArcheologyTags, tags, TagTypeKeyConstant.Archeology);
-        AddTags(cave.CartographerNameTags, tags, TagTypeKeyConstant.People);
-        AddTags(cave.CaveReportedByNameTags, tags, TagTypeKeyConstant.People);
-        AddTags(cave.CaveOtherTags, tags, TagTypeKeyConstant.CaveOther);
+        AddTags(cave.GeologyTags, tags, SnapshotTagRole.Geology, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.GeologicAgeTags, tags, SnapshotTagRole.GeologicAge, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.MapStatusTags, tags, SnapshotTagRole.MapStatus, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.PhysiographicProvinceTags, tags, SnapshotTagRole.PhysiographicProvince, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.BiologyTags, tags, SnapshotTagRole.Biology, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.ArcheologyTags, tags, SnapshotTagRole.Archeology, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.CartographerNameTags, tags, SnapshotTagRole.Cartographer, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.CaveReportedByNameTags, tags, SnapshotTagRole.CaveReportedBy, e => e.TagTypeId, e => e.TagType);
+        AddTags(cave.CaveOtherTags, tags, SnapshotTagRole.CaveOther, e => e.TagTypeId, e => e.TagType);
         return new CavePublishedSnapshotV1
         {
             CaveId = cave.Id, AccountId = cave.AccountId, Name = cave.Name,
             AlternateNames = cave.AlternateNamesList.Order(StringComparer.Ordinal).ToList(),
-            State = new SnapshotReference(cave.StateId, cave.State.Name), County = new SnapshotReference(cave.CountyId, cave.County.Name),
+            State = new SnapshotReference(cave.StateId, cave.State.Name, null, cave.State.Abbreviation),
+            County = new SnapshotReference(cave.CountyId, cave.County.Name, cave.County.DisplayId),
             CountyNumber = cave.CountyNumber, LengthFeet = cave.LengthFeet, DepthFeet = cave.DepthFeet,
             MaxPitDepthFeet = cave.MaxPitDepthFeet, NumberOfPits = cave.NumberOfPits, Narrative = cave.Narrative,
-            ReportedOn = cave.ReportedOn, IsArchived = cave.IsArchived,
-            Tags = tags.OrderBy(t => t.TagTypeId).ThenBy(t => t.Key).ToList(),
+            ReportedByUserId = cave.ReportedByUserId, ReportedOn = cave.ReportedOn, IsArchived = cave.IsArchived,
+            Tags = tags.OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList(),
             Entrances = cave.Entrances.OrderBy(e => e.Id).Select(BuildEntrance).ToList(),
             Files = cave.Files.OrderBy(f => f.Id).Select(f => new CaveFileSnapshotV1
             {
                 Id = f.Id, FileTypeTagId = f.FileTypeTagId, FileTypeNameAtRevision = f.FileTypeTag.Name,
-                FileName = f.FileName, DisplayName = f.DisplayName, BlobContainer = f.BlobContainer
+                FileName = f.FileName, DisplayName = f.DisplayName
             }).ToList()
         };
     }
@@ -78,28 +90,25 @@ public sealed class CavePublishedSnapshotReader
     private static CaveEntranceSnapshotV1 BuildEntrance(Entrance e)
     {
         var tags = new List<SnapshotTagReference>();
-        AddTags(e.EntranceStatusTags, tags, TagTypeKeyConstant.EntranceStatus);
-        AddTags(e.EntranceHydrologyTags, tags, TagTypeKeyConstant.EntranceHydrology);
-        AddTags(e.FieldIndicationTags, tags, TagTypeKeyConstant.FieldIndication);
-        AddTags(e.EntranceReportedByNameTags, tags, TagTypeKeyConstant.People);
-        AddTags(e.EntranceOtherTags, tags, "EntranceOther");
+        AddTags(e.EntranceStatusTags, tags, SnapshotTagRole.EntranceStatus, x => x.TagTypeId, x => x.TagType);
+        AddTags(e.EntranceHydrologyTags, tags, SnapshotTagRole.EntranceHydrology, x => x.TagTypeId, x => x.TagType);
+        AddTags(e.FieldIndicationTags, tags, SnapshotTagRole.FieldIndication, x => x.TagTypeId, x => x.TagType);
+        AddTags(e.EntranceReportedByNameTags, tags, SnapshotTagRole.EntranceReportedBy, x => x.TagTypeId, x => x.TagType);
+        AddTags(e.EntranceOtherTags, tags, SnapshotTagRole.EntranceOther, x => x.TagTypeId, x => x.TagType);
         return new CaveEntranceSnapshotV1
         {
-            Id = e.Id, Name = e.Name, IsPrimary = e.IsPrimary, Description = e.Description,
-            Latitude = e.Location?.Y, Longitude = e.Location?.X, Elevation = e.Location?.Z,
+            Id = e.Id, Name = e.Name, IsPrimary = e.IsPrimary, Description = e.Description, ReportedByUserId = e.ReportedByUserId,
+            Latitude = e.Location?.Y, Longitude = e.Location?.X, Elevation = e.Location?.Z, Srid = e.Location?.SRID ?? 4326,
             LocationQualityTagId = e.LocationQualityTagId, LocationQualityNameAtRevision = e.LocationQualityTag.Name,
             ReportedOn = e.ReportedOn, PitDepthFeet = e.PitDepthFeet,
-            Tags = tags.OrderBy(t => t.TagTypeId).ThenBy(t => t.Key).ToList()
+            Tags = tags.OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList()
         };
     }
 
-    private static void AddTags<T>(IEnumerable<T> entities, ICollection<SnapshotTagReference> result, string key) where T : class
+    private static void AddTags<T>(IEnumerable<T> entities, ICollection<SnapshotTagReference> result,
+        SnapshotTagRole role, Func<T, string> id, Func<T, TagType> tagType) where T : class
     {
         foreach (var entity in entities)
-        {
-            var tagType = entity.GetType().GetProperty("TagType")?.GetValue(entity) as TagType;
-            var tagTypeId = entity.GetType().GetProperty("TagTypeId")?.GetValue(entity) as string;
-            if (tagType is not null && tagTypeId is not null) result.Add(new SnapshotTagReference(tagTypeId, tagType.Name, key));
-        }
+            result.Add(new SnapshotTagReference(role, id(entity), tagType(entity).Name));
     }
 }

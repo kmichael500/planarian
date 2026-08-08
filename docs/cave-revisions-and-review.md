@@ -8,10 +8,8 @@ history, imports, and pending review.
 Planarian uses EF Core 8 with Npgsql/PostGIS as its application persistence
 model. Inserts use bounded `AddRange`/`SaveChangesAsync` batches; uniform
 set-based changes use `ExecuteUpdateAsync` or `ExecuteDeleteAsync`; distinct
-per-row changes use tracked entities in bounded chunks. The generated
-temporary entrance importer table is the only provider-specific staging
-adapter and uses parameterized Npgsql commands because its table name is
-created per import.
+per-row changes use tracked entities in bounded chunks. Entrance import rows
+are now typed in-memory data rather than a dynamic PostgreSQL staging table.
 
 The former linq2db and EFCore.BulkExtensions dependencies and production APIs
 were removed. No replacement ORM or bulk package was added.
@@ -25,7 +23,7 @@ metadata only: file bytes, SAS URLs, GeoJSON, search vectors, EF metadata, and
 concurrency tokens are excluded. Historical tag references retain
 `NameAtRevision`.
 
-`Cave.CurrentRevisionId` points at the accepted snapshot matching the actual
+`Cave.CurrentRevisionId` is intended to point at the accepted snapshot matching the actual
 published relational state. `CaveRevision` keeps a logical Cave ID and does
 not require the live Cave row, so delete history survives hard deletion.
 
@@ -42,7 +40,9 @@ resulting database state. Rejection creates no Cave revision.
 
 All revisionable publication paths—manager edits, archive/unarchive, delete,
 file association changes, Cave imports, Entrance imports, and approval—must
-cross `CaveMutationCoordinator`. The coordinator owns the transaction,
+cross `CaveMutationCoordinator`; the current branch has the coordinator
+foundation but has not yet routed every existing publication path through it.
+The coordinator owns the transaction,
 expected revision checks, `xmin` conflict detection, snapshot creation,
 revision insertion, pointer advancement, and commit. GeoJSON is a separate
 domain in V1.
@@ -71,6 +71,5 @@ performance is not a CI assertion.
 | Account cleanup `Take(...).DeleteAsync` | EF `ExecuteDeleteAsync` (bounded query semantics retained for cleanup) |
 | Account linq2db async helpers | EF `ToListAsync`, `FirstOrDefaultAsync`, `CountAsync` |
 | Account linq2db uniform updates | EF `ExecuteUpdateAsync` |
-| Temporary entrance linq2db table/COPY API | Parameterized Npgsql commands in one isolated staging adapter |
+| Temporary entrance linq2db table/COPY API | Typed in-memory import rows resolved through EF |
 | Map linq2db namespace | Normal EF Core queries |
-

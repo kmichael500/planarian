@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Migrations", "Pla
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Library", "Planarian.Library\Planarian.Library.csproj", "{216B7FAF-1AE8-4F50-B6CE-14966D35637D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Planarian.Tests", "..\Planarian.Tests\Planarian.Tests.csproj", "{4E4F9A62-0D30-4B75-9B83-6CBF711DE9D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{216B7FAF-1AE8-4F50-B6CE-14966D35637D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E4F9A62-0D30-4B75-9B83-6CBF711DE9D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E4F9A62-0D30-4B75-9B83-6CBF711DE9D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E4F9A62-0D30-4B75-9B83-6CBF711DE9D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E4F9A62-0D30-4B75-9B83-6CBF711DE9D1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
