@@ -1065,6 +1065,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public async Task DeleteStagedFileReferencesAsync(IEnumerable<string> fileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return;
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to delete staged file references.");
+
+        await DbContext.Set<CaveChangeRequestStagedFile>()
+            .IgnoreQueryFilters()
+            .Where(staged => staged.AccountId == RequestUser.AccountId && ids.Contains(staged.FileId))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task<Cave?> GetCaveWithLinePlots(string caveId)
     {
         return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)

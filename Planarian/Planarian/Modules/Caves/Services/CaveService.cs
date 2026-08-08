@@ -1039,6 +1039,8 @@ public class CaveService : ServiceBase<CaveRepository>
                 Repository.Delete(permission);
             }
 
+            await Repository.DeleteStagedFileReferencesAsync(files.Select(file => file.Id), cancellationToken);
+
             foreach (var file in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
