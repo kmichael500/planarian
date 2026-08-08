@@ -255,15 +255,15 @@ public sealed class CaveImportExecutor
         var updateIds = changedCaves.Where(c => c.Action == CaveImportAction.Update).Select(c => c.Id).ToList();
         foreach (var chunk in updateIds.Chunk(AssociationBatchSize))
         {
-            await _db.GeologyTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.GeologicAgeTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.MapStatusTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.PhysiographicProvinceTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.ArcheologyTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.BiologyTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CaveOtherTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CartographerNameTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CaveReportedByNameTags.Where(t => chunk.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
+            await _db.GeologyTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.GeologicAgeTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.MapStatusTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.PhysiographicProvinceTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.ArcheologyTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.BiologyTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CaveOtherTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CartographerNameTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CaveReportedByNameTags.Where(t => chunk.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
         }
         foreach (var chunk in changedCaves.SelectMany(c => c.Tags).Chunk(AssociationBatchSize))
         {
@@ -300,24 +300,25 @@ public sealed class CaveImportExecutor
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))
             {
-                await _db.EntranceStatusTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceHydrologyTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.FieldIndicationTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceReportedByNameTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceOtherTag.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceStatusTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceHydrologyTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.FieldIndicationTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceReportedByNameTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceOtherTag.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
                 await _db.Entrances.IgnoreQueryFilters().Where(e => entranceChunk.Contains(e.Id) && e.Cave != null && e.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
             }
-            await _db.CaveGeoJsons.Where(g => scopedIds.Contains(g.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.GeologyTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.GeologicAgeTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.MapStatusTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.PhysiographicProvinceTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.ArcheologyTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.BiologyTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CaveOtherTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CartographerNameTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
-            await _db.CaveReportedByNameTags.Where(t => scopedIds.Contains(t.CaveId)).ExecuteDeleteAsync(cancellationToken);
+            await _db.CaveGeoJsons.Where(g => scopedIds.Contains(g.CaveId) && g.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.GeologyTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.GeologicAgeTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.MapStatusTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.PhysiographicProvinceTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.ArcheologyTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.BiologyTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CaveOtherTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CartographerNameTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+            await _db.CaveReportedByNameTags.Where(t => scopedIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
             await _db.Favorites.Where(f => f.AccountId == _scope.AccountId && scopedIds.Contains(f.CaveId)).ExecuteDeleteAsync(cancellationToken);
+            await _db.CavePermissions.Where(p => p.AccountId == _scope.AccountId && p.CaveId != null && scopedIds.Contains(p.CaveId)).ExecuteDeleteAsync(cancellationToken);
             await _db.Files.Where(f => f.CaveId != null && scopedIds.Contains(f.CaveId) && f.Cave != null && f.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
             await _db.Caves.IgnoreQueryFilters().Where(c => c.AccountId == _scope.AccountId && scopedIds.Contains(c.Id)).ExecuteDeleteAsync(cancellationToken);
         }

@@ -190,11 +190,11 @@ public sealed class EntranceImportExecutor
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))
             {
-                await _db.EntranceStatusTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceHydrologyTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.FieldIndicationTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceReportedByNameTags.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
-                await _db.EntranceOtherTag.Where(t => entranceChunk.Contains(t.EntranceId)).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceStatusTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceHydrologyTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.FieldIndicationTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceReportedByNameTags.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
+                await _db.EntranceOtherTag.Where(t => entranceChunk.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null && t.Entrance.Cave.AccountId == _scope.AccountId).ExecuteDeleteAsync(cancellationToken);
                 await _db.Entrances.IgnoreQueryFilters()
                     .Where(e => entranceChunk.Contains(e.Id) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
                     .ExecuteDeleteAsync(cancellationToken);
