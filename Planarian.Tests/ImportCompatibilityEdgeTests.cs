@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
