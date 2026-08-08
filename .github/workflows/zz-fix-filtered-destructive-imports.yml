@@ -1,0 +1,26 @@
+name: Fix filtered destructive imports
+
+on:
+  push:
+    branches: [feature/cave-revisions]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cave-revisions
+          fetch-depth: 0
+      - run: python .github/scripts/fix_filtered_destructive_imports.py
+      - name: Commit fix and remove helper files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/zz-fix-filtered-destructive-imports.yml .github/scripts/fix_filtered_destructive_imports.py
+          git add Planarian/Planarian/Modules/Import/Planning/CaveImportExecutor.cs Planarian/Planarian/Modules/Import/Planning/EntranceImportExecutor.cs
+          git commit -m "fix: bypass cave permission filters during scoped import cleanup"
+          git push origin HEAD:feature/cave-revisions
