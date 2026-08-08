@@ -1,7 +1,7 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using Planarian.Model.Database;
-using Planarian.Model.Database.Entities;
-using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 
@@ -9,6 +9,7 @@ namespace Planarian.Modules.Caves.Revisions;
 
 public sealed class CavePublishedSnapshotReader
 {
+    private const int ChunkSize = 250;
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
 
@@ -20,104 +21,217 @@ public sealed class CavePublishedSnapshotReader
 
     public async Task<CavePublishedSnapshotV1> BuildAsync(string caveId, CancellationToken cancellationToken = default)
     {
-        var cave = await Query().SingleOrDefaultAsync(c => c.Id == caveId, cancellationToken)
-                   ?? throw new InvalidOperationException("Cave is not owned by the current account.");
-        return Build(cave);
+        var snapshots = await BuildManyAsync([caveId], cancellationToken);
+        return snapshots.Single();
     }
 
-    public async Task<List<CavePublishedSnapshotV1>> BuildManyAsync(IEnumerable<string> caveIds, CancellationToken cancellationToken = default)
+    public async Task<List<CavePublishedSnapshotV1>> BuildManyAsync(IEnumerable<string> caveIds,
+        CancellationToken cancellationToken = default)
     {
-        var ids = caveIds.Distinct().ToList();
+        var ids = caveIds.Distinct(StringComparer.Ordinal).ToList();
         if (ids.Count == 0) return [];
-        var result = new List<CavePublishedSnapshotV1>(ids.Count);
-        foreach (var chunk in ids.Chunk(250))
+
+        var snapshotsById = new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal);
+        foreach (var chunk in ids.Chunk(ChunkSize))
         {
-            // Split-query Includes are bounded intentionally. Revisions for a
-            // 10k import must never assemble every aggregate in one graph.
-            var caves = await Query().Where(c => chunk.Contains(c.Id)).ToListAsync(cancellationToken);
-            if (caves.Count != chunk.Length)
+            cancellationToken.ThrowIfCancellationRequested();
+            var cores = await LoadCoreAsync(chunk, cancellationToken);
+            if (cores.Count != chunk.Length)
                 throw new InvalidOperationException("One or more Caves are not owned by the current account.");
-            result.AddRange(caves.Select(Build));
-        }
-        if (result.Count != ids.Count)
-            throw new InvalidOperationException("One or more Caves are not owned by the current account.");
-        return result;
-    }
 
-    private IQueryable<Cave> Query() => _db.Caves.IgnoreQueryFilters()
-        .Where(c => c.AccountId == _scope.AccountId)
-        .AsNoTracking().AsSplitQuery()
-        .Include(c => c.State).Include(c => c.County)
-        .Include(c => c.Files).ThenInclude(f => f.FileTypeTag)
-        .Include(c => c.Entrances).ThenInclude(e => e.LocationQualityTag)
-        .Include(c => c.Entrances).ThenInclude(e => e.EntranceStatusTags).ThenInclude(t => t.TagType)
-        .Include(c => c.Entrances).ThenInclude(e => e.EntranceHydrologyTags).ThenInclude(t => t.TagType)
-        .Include(c => c.Entrances).ThenInclude(e => e.FieldIndicationTags).ThenInclude(t => t.TagType)
-        .Include(c => c.Entrances).ThenInclude(e => e.EntranceReportedByNameTags).ThenInclude(t => t.TagType)
-        .Include(c => c.Entrances).ThenInclude(e => e.EntranceOtherTags).ThenInclude(t => t.TagType)
-        .Include(c => c.GeologyTags).ThenInclude(t => t.TagType)
-        .Include(c => c.GeologicAgeTags).ThenInclude(t => t.TagType)
-        .Include(c => c.MapStatusTags).ThenInclude(t => t.TagType)
-        .Include(c => c.PhysiographicProvinceTags).ThenInclude(t => t.TagType)
-        .Include(c => c.BiologyTags).ThenInclude(t => t.TagType)
-        .Include(c => c.ArcheologyTags).ThenInclude(t => t.TagType)
-        .Include(c => c.CartographerNameTags).ThenInclude(t => t.TagType)
-        .Include(c => c.CaveReportedByNameTags).ThenInclude(t => t.TagType)
-        .Include(c => c.CaveOtherTags).ThenInclude(t => t.TagType);
+            // Five bounded projection groups per chunk: core, cave tags,
+            // entrances, entrance tags, and files. No tracked aggregate graph is
+            // materialized and memory usage scales with ChunkSize, not import size.
+            var caveTags = await LoadCaveTagsAsync(chunk, cancellationToken);
+            var entrances = await LoadEntrancesAsync(chunk, cancellationToken);
+            var entranceIds = entrances.Select(e => e.Id).ToArray();
+            var entranceTags = await LoadEntranceTagsAsync(chunk, entranceIds, cancellationToken);
+            var files = await LoadFilesAsync(chunk, cancellationToken);
 
-    private static CavePublishedSnapshotV1 Build(Cave cave)
-    {
-        var tags = new List<SnapshotTagReference>();
-        AddTags(cave.GeologyTags, tags, SnapshotTagRole.Geology, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.GeologicAgeTags, tags, SnapshotTagRole.GeologicAge, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.MapStatusTags, tags, SnapshotTagRole.MapStatus, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.PhysiographicProvinceTags, tags, SnapshotTagRole.PhysiographicProvince, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.BiologyTags, tags, SnapshotTagRole.Biology, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.ArcheologyTags, tags, SnapshotTagRole.Archeology, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.CartographerNameTags, tags, SnapshotTagRole.Cartographer, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.CaveReportedByNameTags, tags, SnapshotTagRole.CaveReportedBy, e => e.TagTypeId, e => e.TagType);
-        AddTags(cave.CaveOtherTags, tags, SnapshotTagRole.CaveOther, e => e.TagTypeId, e => e.TagType);
-        return new CavePublishedSnapshotV1
-        {
-            CaveId = cave.Id, AccountId = cave.AccountId, Name = cave.Name,
-            AlternateNames = cave.AlternateNamesList.Order(StringComparer.Ordinal).ToList(),
-            State = new SnapshotReference(cave.StateId, cave.State.Name, null, cave.State.Abbreviation),
-            County = new SnapshotReference(cave.CountyId, cave.County.Name, cave.County.DisplayId),
-            CountyNumber = cave.CountyNumber, LengthFeet = cave.LengthFeet, DepthFeet = cave.DepthFeet,
-            MaxPitDepthFeet = cave.MaxPitDepthFeet, NumberOfPits = cave.NumberOfPits, Narrative = cave.Narrative,
-            ReportedByUserId = cave.ReportedByUserId, ReportedOn = cave.ReportedOn, IsArchived = cave.IsArchived,
-            Tags = tags.OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList(),
-            Entrances = cave.Entrances.OrderBy(e => e.Id).Select(BuildEntrance).ToList(),
-            Files = cave.Files.OrderBy(f => f.Id).Select(f => new CaveFileSnapshotV1
+            var caveTagsByCave = caveTags.GroupBy(t => t.CaveId)
+                .ToDictionary(g => g.Key,
+                    g => (IReadOnlyList<SnapshotTagReference>)g
+                        .Select(t => new SnapshotTagReference(t.Role, t.TagTypeId, t.Name))
+                        .OrderBy(t => t.Role).ThenBy(t => t.TagTypeId, StringComparer.Ordinal).ToList(),
+                    StringComparer.Ordinal);
+            var entranceTagsByEntrance = entranceTags.GroupBy(t => t.EntranceId)
+                .ToDictionary(g => g.Key,
+                    g => (IReadOnlyList<SnapshotTagReference>)g
+                        .Select(t => new SnapshotTagReference(t.Role, t.TagTypeId, t.Name))
+                        .OrderBy(t => t.Role).ThenBy(t => t.TagTypeId, StringComparer.Ordinal).ToList(),
+                    StringComparer.Ordinal);
+            var entrancesByCave = entrances.GroupBy(e => e.CaveId)
+                .ToDictionary(g => g.Key,
+                    g => (IReadOnlyList<CaveEntranceSnapshotV1>)g.OrderBy(e => e.Id, StringComparer.Ordinal)
+                        .Select(e => new CaveEntranceSnapshotV1
+                        {
+                            Id = e.Id,
+                            Name = e.Name,
+                            IsPrimary = e.IsPrimary,
+                            Description = e.Description,
+                            ReportedByUserId = e.ReportedByUserId,
+                            Latitude = e.Location?.Y,
+                            Longitude = e.Location?.X,
+                            Elevation = e.Location?.Z,
+                            Srid = e.Location?.SRID ?? 4326,
+                            LocationQualityTagId = e.LocationQualityTagId,
+                            LocationQualityNameAtRevision = e.LocationQualityName,
+                            ReportedOn = e.ReportedOn,
+                            PitDepthFeet = e.PitDepthFeet,
+                            Tags = entranceTagsByEntrance.GetValueOrDefault(e.Id) ?? []
+                        }).ToList(),
+                    StringComparer.Ordinal);
+            var filesByCave = files.GroupBy(f => f.CaveId)
+                .ToDictionary(g => g.Key,
+                    g => (IReadOnlyList<CaveFileSnapshotV1>)g.OrderBy(f => f.Id, StringComparer.Ordinal)
+                        .Select(f => new CaveFileSnapshotV1
+                        {
+                            Id = f.Id,
+                            FileTypeTagId = f.FileTypeTagId,
+                            FileTypeNameAtRevision = f.FileTypeName,
+                            FileName = f.FileName,
+                            DisplayName = f.DisplayName
+                        }).ToList(),
+                    StringComparer.Ordinal);
+
+            foreach (var core in cores)
             {
-                Id = f.Id, FileTypeTagId = f.FileTypeTagId, FileTypeNameAtRevision = f.FileTypeTag.Name,
-                FileName = f.FileName, DisplayName = f.DisplayName
-            }).ToList()
-        };
+                var alternateNames = JsonSerializer.Deserialize<List<string>>(core.AlternateNames) ?? [];
+                snapshotsById[core.Id] = new CavePublishedSnapshotV1
+                {
+                    CaveId = core.Id,
+                    AccountId = core.AccountId,
+                    Name = core.Name,
+                    AlternateNames = alternateNames.Order(StringComparer.Ordinal).ToList(),
+                    State = new SnapshotReference(core.StateId, core.StateName, null, core.StateAbbreviation),
+                    County = new SnapshotReference(core.CountyId, core.CountyName, core.CountyDisplayId),
+                    CountyNumber = core.CountyNumber,
+                    ReportedByUserId = core.ReportedByUserId,
+                    LengthFeet = core.LengthFeet,
+                    DepthFeet = core.DepthFeet,
+                    MaxPitDepthFeet = core.MaxPitDepthFeet,
+                    NumberOfPits = core.NumberOfPits,
+                    Narrative = core.Narrative,
+                    ReportedOn = core.ReportedOn,
+                    IsArchived = core.IsArchived,
+                    Tags = caveTagsByCave.GetValueOrDefault(core.Id) ?? [],
+                    Entrances = entrancesByCave.GetValueOrDefault(core.Id) ?? [],
+                    Files = filesByCave.GetValueOrDefault(core.Id) ?? []
+                };
+            }
+        }
+
+        if (snapshotsById.Count != ids.Count)
+            throw new InvalidOperationException("One or more Caves are not owned by the current account.");
+        return ids.Select(id => snapshotsById[id]).ToList();
     }
 
-    private static CaveEntranceSnapshotV1 BuildEntrance(Entrance e)
+    private Task<List<CaveCoreRow>> LoadCoreAsync(string[] caveIds, CancellationToken cancellationToken) =>
+        _db.Caves.IgnoreQueryFilters()
+            .Where(c => c.AccountId == _scope.AccountId && caveIds.Contains(c.Id))
+            .AsNoTracking()
+            .Select(c => new CaveCoreRow(
+                c.Id, c.AccountId, c.Name, c.AlternateNames, c.StateId, c.State.Name, c.State.Abbreviation,
+                c.CountyId, c.County.Name, c.County.DisplayId, c.CountyNumber, c.ReportedByUserId,
+                c.LengthFeet, c.DepthFeet, c.MaxPitDepthFeet, c.NumberOfPits, c.Narrative, c.ReportedOn,
+                c.IsArchived))
+            .ToListAsync(cancellationToken);
+
+    private async Task<List<CaveTagRow>> LoadCaveTagsAsync(string[] caveIds, CancellationToken cancellationToken)
     {
-        var tags = new List<SnapshotTagReference>();
-        AddTags(e.EntranceStatusTags, tags, SnapshotTagRole.EntranceStatus, x => x.TagTypeId, x => x.TagType);
-        AddTags(e.EntranceHydrologyTags, tags, SnapshotTagRole.EntranceHydrology, x => x.TagTypeId, x => x.TagType);
-        AddTags(e.FieldIndicationTags, tags, SnapshotTagRole.FieldIndication, x => x.TagTypeId, x => x.TagType);
-        AddTags(e.EntranceReportedByNameTags, tags, SnapshotTagRole.EntranceReportedBy, x => x.TagTypeId, x => x.TagType);
-        AddTags(e.EntranceOtherTags, tags, SnapshotTagRole.EntranceOther, x => x.TagTypeId, x => x.TagType);
-        return new CaveEntranceSnapshotV1
-        {
-            Id = e.Id, Name = e.Name, IsPrimary = e.IsPrimary, Description = e.Description, ReportedByUserId = e.ReportedByUserId,
-            Latitude = e.Location?.Y, Longitude = e.Location?.X, Elevation = e.Location?.Z, Srid = e.Location?.SRID ?? 4326,
-            LocationQualityTagId = e.LocationQualityTagId, LocationQualityNameAtRevision = e.LocationQualityTag.Name,
-            ReportedOn = e.ReportedOn, PitDepthFeet = e.PitDepthFeet,
-            Tags = tags.OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList()
-        };
+        var geology = _db.GeologyTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Geology, t.TagTypeId, t.TagType.Name));
+        var geologicAge = _db.GeologicAgeTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.GeologicAge, t.TagTypeId, t.TagType.Name));
+        var mapStatus = _db.MapStatusTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.MapStatus, t.TagTypeId, t.TagType.Name));
+        var physiographic = _db.PhysiographicProvinceTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.PhysiographicProvince, t.TagTypeId, t.TagType.Name));
+        var archeology = _db.ArcheologyTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Archeology, t.TagTypeId, t.TagType.Name));
+        var biology = _db.BiologyTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Biology, t.TagTypeId, t.TagType.Name));
+        var other = _db.CaveOtherTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.CaveOther, t.TagTypeId, t.TagType.Name));
+        var cartographer = _db.CartographerNameTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.Cartographer, t.TagTypeId, t.TagType.Name));
+        var reportedBy = _db.CaveReportedByNameTags.IgnoreQueryFilters()
+            .Where(t => caveIds.Contains(t.CaveId) && t.Cave != null && t.Cave.AccountId == _scope.AccountId)
+            .Select(t => new CaveTagRow(t.CaveId, SnapshotTagRole.CaveReportedBy, t.TagTypeId, t.TagType.Name));
+
+        return await geology.Concat(geologicAge).Concat(mapStatus).Concat(physiographic).Concat(archeology)
+            .Concat(biology).Concat(other).Concat(cartographer).Concat(reportedBy)
+            .AsNoTracking().ToListAsync(cancellationToken);
     }
 
-    private static void AddTags<T>(IEnumerable<T> entities, ICollection<SnapshotTagReference> result,
-        SnapshotTagRole role, Func<T, string> id, Func<T, TagType> tagType) where T : class
+    private Task<List<EntranceRow>> LoadEntrancesAsync(string[] caveIds, CancellationToken cancellationToken) =>
+        _db.Entrances.IgnoreQueryFilters()
+            .Where(e => caveIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
+            .AsNoTracking()
+            .Select(e => new EntranceRow(e.Id, e.CaveId, e.Name, e.IsPrimary, e.Description, e.ReportedByUserId,
+                e.Location, e.LocationQualityTagId, e.LocationQualityTag.Name, e.ReportedOn, e.PitDepthFeet))
+            .ToListAsync(cancellationToken);
+
+    private async Task<List<EntranceTagRow>> LoadEntranceTagsAsync(string[] caveIds, string[] entranceIds,
+        CancellationToken cancellationToken)
     {
-        foreach (var entity in entities)
-            result.Add(new SnapshotTagReference(role, id(entity), tagType(entity).Name));
+        if (entranceIds.Length == 0) return [];
+        var status = _db.EntranceStatusTags.IgnoreQueryFilters()
+            .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
+                        t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
+            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceStatus, t.TagTypeId, t.TagType.Name));
+        var hydrology = _db.EntranceHydrologyTags.IgnoreQueryFilters()
+            .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
+                        t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
+            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceHydrology, t.TagTypeId, t.TagType.Name));
+        var field = _db.FieldIndicationTags.IgnoreQueryFilters()
+            .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
+                        t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
+            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.FieldIndication, t.TagTypeId, t.TagType.Name));
+        var reportedBy = _db.EntranceReportedByNameTags.IgnoreQueryFilters()
+            .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
+                        t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
+            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceReportedBy, t.TagTypeId, t.TagType.Name));
+        var other = _db.EntranceOtherTag.IgnoreQueryFilters()
+            .Where(t => entranceIds.Contains(t.EntranceId) && t.Entrance != null && t.Entrance.Cave != null &&
+                        t.Entrance.Cave.AccountId == _scope.AccountId && caveIds.Contains(t.Entrance.CaveId))
+            .Select(t => new EntranceTagRow(t.EntranceId, SnapshotTagRole.EntranceOther, t.TagTypeId, t.TagType.Name));
+
+        return await status.Concat(hydrology).Concat(field).Concat(reportedBy).Concat(other)
+            .AsNoTracking().ToListAsync(cancellationToken);
     }
+
+    private Task<List<FileRow>> LoadFilesAsync(string[] caveIds, CancellationToken cancellationToken) =>
+        _db.Files.IgnoreQueryFilters()
+            .Where(f => f.CaveId != null && caveIds.Contains(f.CaveId) && f.Cave != null &&
+                        f.Cave.AccountId == _scope.AccountId)
+            .AsNoTracking()
+            .Select(f => new FileRow(f.CaveId!, f.Id, f.FileTypeTagId, f.FileTypeTag.Name, f.FileName, f.DisplayName))
+            .ToListAsync(cancellationToken);
+
+    private sealed record CaveCoreRow(
+        string Id, string AccountId, string Name, string AlternateNames,
+        string StateId, string StateName, string StateAbbreviation,
+        string CountyId, string CountyName, string CountyDisplayId, int CountyNumber,
+        string? ReportedByUserId, double? LengthFeet, double? DepthFeet, double? MaxPitDepthFeet,
+        int? NumberOfPits, string? Narrative, DateTime? ReportedOn, bool IsArchived);
+
+    private sealed record CaveTagRow(string CaveId, SnapshotTagRole Role, string TagTypeId, string Name);
+
+    private sealed record EntranceRow(
+        string Id, string CaveId, string? Name, bool IsPrimary, string? Description, string? ReportedByUserId,
+        Point? Location, string LocationQualityTagId, string LocationQualityName, DateTime? ReportedOn,
+        double? PitDepthFeet);
+
+    private sealed record EntranceTagRow(string EntranceId, SnapshotTagRole Role, string TagTypeId, string Name);
+    private sealed record FileRow(string CaveId, string Id, string FileTypeTagId, string FileTypeName,
+        string FileName, string? DisplayName);
 }
