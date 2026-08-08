@@ -33,7 +33,6 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
-using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
 using Planarian.Modules.Map.Controllers;
@@ -257,7 +256,6 @@ builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped(typeof(FileRepository<>));
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
-builder.Services.AddScoped<EntranceImportPlanStore>();
 builder.Services.AddScoped<FeatureSettingRepository>();
 
 

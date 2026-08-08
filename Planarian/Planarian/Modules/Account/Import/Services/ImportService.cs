@@ -5,7 +5,6 @@ using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
-using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
@@ -20,7 +19,6 @@ public partial class ImportService : ServiceBase
     private readonly FileService _fileService;
     private readonly TagRepository<PlanarianDbContextBase> _tagRepository;
     private readonly SettingsRepository<PlanarianDbContextBase> _settingsRepository;
-    private readonly EntranceImportPlanStore _entranceImportPlanStore;
     private readonly NotificationService _notificationService;
     private readonly AccountRepository<PlanarianDbContextBase> _accountRepository;
     private readonly CaveRepository<PlanarianDbContextBase> _repository;
@@ -30,7 +28,6 @@ public partial class ImportService : ServiceBase
     public ImportService(RequestUser requestUser, PlanarianDbContext dbContext, FileService fileService,
         TagRepository<PlanarianDbContextBase> tagRepository,
         SettingsRepository<PlanarianDbContextBase> settingsRepository,
-        EntranceImportPlanStore entranceImportPlanStore,
         NotificationService notificationService,
         AccountRepository<PlanarianDbContextBase> accountRepository,
         CaveRepository<PlanarianDbContextBase> caveRepository,
@@ -41,7 +38,6 @@ public partial class ImportService : ServiceBase
         _fileService = fileService;
         _tagRepository = tagRepository;
         _settingsRepository = settingsRepository;
-        _entranceImportPlanStore = entranceImportPlanStore;
         _notificationService = notificationService;
         _accountRepository = accountRepository;
         _repository = caveRepository;
