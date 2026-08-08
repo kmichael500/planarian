@@ -1,0 +1,130 @@
+name: One-shot cave revision validation
+
+on:
+  push:
+    branches:
+      - feature/cave-revisions
+    paths:
+      - .github/workflows/one-shot-cave-revision-validation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cave-revisions
+          fetch-depth: 0
+
+      - name: Verify DbContext patch landed
+        shell: bash
+        run: |
+          grep -q 'partial class PlanarianDbContext' Planarian/Planarian.Model/Database/PlanarianDbContext.cs
+          ! grep -q '__ACCIDENTAL\|__BAD\|__PROBE\|__WRONG\|__PLACEHOLDER\|__STOP\|__DO_NOT_KEEP\|__NO\|__TEST\|__NEEDS_PATCH' Planarian/Planarian.Model/Database/PlanarianDbContext.cs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Planarian.Web/package-lock.json
+      - run: npm ci
+        working-directory: Planarian.Web
+      - run: scripts/validate-env-example.sh
+      - name: Frontend tests
+        run: npm test -- --watchAll=false --runInBand
+        working-directory: Planarian.Web
+      - name: Frontend production build
+        run: npm run build
+        working-directory: Planarian.Web
+        env:
+          REACT_APP_API_ORIGIN_MAPPINGS: '{"localhost":"https://localhost:7111"}'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore Planarian/Planarian.sln
+      - name: Build
+        run: dotnet build Planarian/Planarian.sln --configuration Release --no-restore
+      - name: Real PostgreSQL/PostGIS tests
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test Planarian.Tests/Planarian.Tests.csproj --configuration Release --no-restore --logger "console;verbosity=detailed" | tee /tmp/planarian-tests.log
+
+      - name: Empty DB and exact-main upgrade tests are present and passed
+        shell: bash
+        run: |
+          grep -q 'EmptyDatabaseMigratesToLatest' /tmp/planarian-tests.log
+          grep -q 'ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData' /tmp/planarian-tests.log
+          grep -q 'CaveXminRejectsStaleWriterAndVersionChanges' /tmp/planarian-tests.log
+          grep -q 'CaveChangeRequestXminRejectsStaleWriterAndVersionChanges' /tmp/planarian-tests.log
+
+      - name: Verify EF model has no pending migration changes
+        shell: bash
+        run: |
+          dotnet tool install --global dotnet-ef --version 8.0.20
+          cat > Planarian/Planarian.Migrations/appsettings.Migrations.json <<'JSON'
+          {
+            "ConnectionStrings": {
+              "default": "Host=localhost;Database=planarian_model_check;Username=postgres;Password=postgres"
+            }
+          }
+          JSON
+          dotnet ef migrations has-pending-model-changes \
+            --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+            --no-build
+
+      - name: Reject deprecated production paths
+        shell: bash
+        run: |
+          if grep -R -n -E 'linq2db|LinqToDB|EFCore\.BulkExtensions|TemporaryEntrance|EntranceImportPlanStore|CaveChangeHistory|ChangeLogBuilder|CREATE[[:space:]]+TEMP[^;]*Entrance|field[- ]event replay' Planarian/Planarian Planarian/Planarian.Model --include='*.cs'; then
+            exit 1
+          fi
+
+      - name: Record successful validation and measurements
+        shell: bash
+        run: |
+          mkdir -p docs/validation
+          VALIDATED_HEAD=$(git rev-parse HEAD)
+          BENCH=$(grep '10K_IMPORT_BENCHMARK ' /tmp/planarian-tests.log | tail -1 | sed 's/^.*10K_IMPORT_BENCHMARK //')
+          STORAGE=$(grep 'SNAPSHOT_STORAGE_MEASUREMENTS ' /tmp/planarian-tests.log | tail -1 | sed 's/^.*SNAPSHOT_STORAGE_MEASUREMENTS //')
+          test -n "$BENCH"
+          test -n "$STORAGE"
+          cat > docs/validation/cave-revision-import-foundation.md <<EOF
+          # Cave revision/import foundation validation
+
+          Validated source head: \`$VALIDATED_HEAD\`
+
+          Exact commands passed:
+
+          - \`dotnet restore Planarian/Planarian.sln\`
+          - \`dotnet build Planarian/Planarian.sln --configuration Release --no-restore\`
+          - \`dotnet test Planarian.Tests/Planarian.Tests.csproj --configuration Release --no-restore\`
+          - \`dotnet ef migrations has-pending-model-changes\`
+          - frontend test suite
+          - frontend production build
+          - production deprecated-path scan
+
+          ## 10k benchmark
+
+          \`\`\`json
+          $BENCH
+          \`\`\`
+
+          ## Snapshot storage
+
+          \`\`\`json
+          $STORAGE
+          \`\`\`
+          EOF
+          rm .github/workflows/one-shot-cave-revision-validation.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/validation/cave-revision-import-foundation.md .github/workflows/one-shot-cave-revision-validation.yml
+          git commit -m 'Record cave revision import validation'
+          git push origin HEAD:feature/cave-revisions
