@@ -104,6 +104,7 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasIndex(e => new { e.CountyNumber, e.CountyId }).IsUnique();
+        builder.HasAlternateKey(e => new { e.AccountId, e.Id });
         builder.HasIndex(e => e.LengthFeet);
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);
@@ -116,8 +117,8 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
 
         builder.HasOne<CaveRevision>()
             .WithMany()
-            .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.CurrentRevisionId })
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.Id, e.CurrentRevisionId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasGeneratedTsVectorColumn<Cave>(

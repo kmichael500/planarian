@@ -40,8 +40,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresIntegrationFixtur
         var foreignKeyNames = new List<string>();
         while (await reader.ReadAsync()) foreignKeyNames.Add(reader.GetString(0));
 
-        Assert.Contains(foreignKeyNames, name => name.Contains("AccountId_CurrentRevisionId", StringComparison.Ordinal));
-        Assert.Contains(foreignKeyNames, name => name.Contains("AccountId_ChangeRequestId", StringComparison.Ordinal));
+        Assert.Contains(foreignKeyNames, name => name.Contains("AccountId_Id_CurrentRevisionId", StringComparison.Ordinal));
+        Assert.Contains(foreignKeyNames, name => name.Contains("CaveChangeRequests_AccountId_CaveId_", StringComparison.Ordinal));
     }
 
     [Fact]

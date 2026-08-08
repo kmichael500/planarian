@@ -14,7 +14,7 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20260808044117_CaveRevisionImportFoundation")]
+    [Migration("20260808134729_CaveRevisionImportFoundation")]
     partial class CaveRevisionImportFoundation
     {
         /// <inheritdoc />
@@ -704,6 +704,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("AccountId", "Id");
+
                     b.HasIndex("CountyId");
 
                     b.HasIndex("CountyNumber");
@@ -722,10 +724,10 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("StateId");
 
-                    b.HasIndex("AccountId", "CurrentRevisionId");
-
                     b.HasIndex("CountyNumber", "CountyId")
                         .IsUnique();
+
+                    b.HasIndex("AccountId", "Id", "CurrentRevisionId");
 
                     b.ToTable("Caves");
                 });
@@ -811,13 +813,21 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "ApprovedRevisionId");
+                    b.HasIndex("BaseStateId");
 
-                    b.HasIndex("AccountId", "BaseRevisionId");
+                    b.HasIndex("ProposedStateId");
 
-                    b.HasIndex("AccountId", "CurrentProposalVersionId");
+                    b.HasIndex("AccountId", "BaseCountyId");
+
+                    b.HasIndex("AccountId", "ProposedCountyId");
 
                     b.HasIndex("CaveId", "Status");
+
+                    b.HasIndex("AccountId", "CaveId", "ApprovedRevisionId");
+
+                    b.HasIndex("AccountId", "CaveId", "BaseRevisionId");
+
+                    b.HasIndex("AccountId", "Id", "CurrentProposalVersionId");
 
                     b.HasIndex("AccountId", "Status", "CreatedOn");
 
@@ -937,6 +947,11 @@ namespace Planarian.Migrations.Migrations
                     b.Property<int>("InsertedCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("ModifiedByUserId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -950,6 +965,9 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("SourceFileName")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("SourceRecordCount")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("SyncExisting")
                         .HasColumnType("boolean");
@@ -1131,11 +1149,11 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "ChangeRequestId");
-
-                    b.HasIndex("AccountId", "PreviousProposalVersionId");
+                    b.HasAlternateKey("AccountId", "Id");
 
                     b.HasIndex("ChangeRequestId", "CreatedOn");
+
+                    b.HasIndex("AccountId", "ChangeRequestId", "PreviousProposalVersionId");
 
                     b.ToTable("CaveProposalVersions");
                 });
@@ -1240,19 +1258,21 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("AccountId", "Id");
+
                     b.HasIndex("ChangeRequestId");
 
                     b.HasIndex("ImportBatchId");
 
                     b.HasIndex("PreviousRevisionId");
 
-                    b.HasIndex("AccountId", "ChangeRequestId");
-
                     b.HasIndex("AccountId", "ImportBatchId");
 
-                    b.HasIndex("AccountId", "PreviousRevisionId");
+                    b.HasIndex("AccountId", "CaveId", "ChangeRequestId");
 
                     b.HasIndex("AccountId", "CaveId", "CreatedOn");
+
+                    b.HasIndex("AccountId", "CaveId", "PreviousRevisionId");
 
                     b.ToTable("CaveRevisions");
                 });
@@ -2667,8 +2687,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "CurrentRevisionId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "Id", "CurrentRevisionId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Account");
@@ -2682,27 +2702,61 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", null)
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "ApprovedRevisionId")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.State", null)
+                        .WithMany()
+                        .HasForeignKey("BaseStateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.State", null)
+                        .WithMany()
+                        .HasForeignKey("ProposedStateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.County", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "BaseCountyId")
+                        .HasPrincipalKey("AccountId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.County", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "ProposedCountyId")
                         .HasPrincipalKey("AccountId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "BaseRevisionId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "CaveId", "ApprovedRevisionId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "CaveId", "BaseRevisionId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "CurrentProposalVersionId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "Id", "CurrentProposalVersionId")
+                        .HasPrincipalKey("AccountId", "ChangeRequestId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestStagedFile", b =>
                 {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.File", null)
                         .WithMany()
                         .HasForeignKey("FileId")
@@ -2726,6 +2780,15 @@ namespace Planarian.Migrations.Migrations
                         .IsRequired();
 
                     b.Navigation("Cave");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveImportBatch", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveOtherTag", b =>
@@ -2821,6 +2884,12 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", b =>
                 {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
                         .WithMany()
                         .HasForeignKey("AccountId", "ChangeRequestId")
@@ -2830,8 +2899,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "PreviousProposalVersionId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "ChangeRequestId", "PreviousProposalVersionId")
+                        .HasPrincipalKey("AccountId", "ChangeRequestId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -2868,11 +2937,11 @@ namespace Planarian.Migrations.Migrations
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", b =>
                 {
-                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "ChangeRequestId")
-                        .HasPrincipalKey("AccountId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveImportBatch", null)
                         .WithMany()
@@ -2880,10 +2949,16 @@ namespace Planarian.Migrations.Migrations
                         .HasPrincipalKey("AccountId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "CaveId", "ChangeRequestId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveRevision", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "PreviousRevisionId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "CaveId", "PreviousRevisionId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 

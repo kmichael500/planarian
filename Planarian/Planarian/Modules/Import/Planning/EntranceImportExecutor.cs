@@ -57,6 +57,8 @@ public sealed class EntranceImportExecutor
                 AccountId = _scope.AccountId,
                 SourceFileName = sourceFileName,
                 SyncExisting = plan.SyncExisting,
+                Kind = CaveImportKind.EntranceCsv,
+                SourceRecordCount = plan.Entrances.Count,
                 InsertedCount = plan.Entrances.Count,
                 UpdatedCount = 0,
                 DeletedCount = plan.SyncExisting ? plan.Targets.Values.Sum(t => t.ExistingEntranceCount) : 0,

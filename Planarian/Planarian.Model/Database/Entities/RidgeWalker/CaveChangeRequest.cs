@@ -35,22 +35,34 @@ public class CaveChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveCh
 {
     public override void Configure(EntityTypeBuilder<CaveChangeRequest> builder)
     {
+        builder.HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.HasAlternateKey(e => new { e.AccountId, e.Id });
+        builder.HasAlternateKey(e => new { e.AccountId, e.CaveId, e.Id });
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(PropertyLength.Key);
         builder.Property(e => e.Version).HasColumnName("xmin").IsRowVersion().ValueGeneratedOnAddOrUpdate();
         builder.HasIndex(e => new { e.AccountId, e.Status, e.CreatedOn });
         builder.HasIndex(e => new { e.CaveId, e.Status });
         builder.HasOne<CaveRevision>().WithMany()
-            .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.BaseRevisionId })
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.CaveId, e.BaseRevisionId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveRevision>().WithMany()
-            .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.ApprovedRevisionId })
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.CaveId, e.ApprovedRevisionId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveProposalVersion>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.ChangeRequestId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.Id, e.CurrentProposalVersionId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<State>().WithMany().HasForeignKey(e => e.BaseStateId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<State>().WithMany().HasForeignKey(e => e.ProposedStateId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<County>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.CurrentProposalVersionId })
+            .HasForeignKey(e => new { e.AccountId, e.BaseCountyId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<County>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ProposedCountyId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -68,7 +80,9 @@ public class CaveProposalVersionConfiguration : BaseEntityTypeConfiguration<Cave
 {
     public override void Configure(EntityTypeBuilder<CaveProposalVersion> builder)
     {
+        builder.HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.HasAlternateKey(e => new { e.AccountId, e.Id });
+        builder.HasAlternateKey(e => new { e.AccountId, e.ChangeRequestId, e.Id });
         builder.Property(e => e.ProposalJson).HasColumnType("jsonb");
         builder.HasIndex(e => new { e.ChangeRequestId, e.CreatedOn });
         builder.HasOne<CaveChangeRequest>().WithMany()
@@ -76,8 +90,8 @@ public class CaveProposalVersionConfiguration : BaseEntityTypeConfiguration<Cave
             .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveProposalVersion>().WithMany()
-            .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.PreviousProposalVersionId })
+            .HasPrincipalKey(e => new { e.AccountId, e.ChangeRequestId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId, e.PreviousProposalVersionId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
@@ -93,6 +107,7 @@ public class CaveChangeRequestStagedFileConfiguration : BaseEntityTypeConfigurat
 {
     public override void Configure(EntityTypeBuilder<CaveChangeRequestStagedFile> builder)
     {
+        builder.HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveChangeRequest>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
             .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })

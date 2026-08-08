@@ -96,7 +96,9 @@ internal static class IntegrationTestData
                 Id = importBatchId,
                 AccountId = accountId,
                 SourceFileName = $"seed-{suffix}.csv",
-                SyncExisting = false
+                SyncExisting = false,
+                Kind = CaveImportKind.CaveCsv,
+                SourceRecordCount = 1
             });
             await db.SaveChangesAsync();
             var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(c => c.Id == caveId);

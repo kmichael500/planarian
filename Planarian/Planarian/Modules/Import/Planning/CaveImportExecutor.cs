@@ -66,6 +66,8 @@ public sealed class CaveImportExecutor
                 AccountId = _scope.AccountId,
                 SourceFileName = sourceFileName,
                 SyncExisting = plan.SyncExisting,
+                Kind = CaveImportKind.CaveCsv,
+                SourceRecordCount = plan.Caves.Count,
                 InsertedCount = plan.Caves.Count(c => c.Action == CaveImportAction.Insert),
                 UpdatedCount = plan.Caves.Count(c => c.Action == CaveImportAction.Update),
                 DeletedCount = plan.Deletions.Count,

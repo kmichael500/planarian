@@ -23,6 +23,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         const int batchSize = 500;
 
+        // Revision/workflow rows deliberately use restrictive relationships so
+        // accepted history survives an ordinary Cave delete.  An account purge
+        // is the explicit exception: sever nullable workflow pointers first,
+        // then remove the dependent graph in an order that cannot cross the
+        // trusted account boundary.
+        await DeleteRevisionWorkflowForAccountAsync(cancellationToken);
+
         int deletedCount = 0;
         int totalDeleted = 0;
 
@@ -246,6 +253,50 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         } while (deletedCount == batchSize);
 
         progress.Report("Deleted all caves.");
+    }
+
+    private async Task DeleteRevisionWorkflowForAccountAsync(CancellationToken cancellationToken)
+    {
+        var accountId = RequestUser.AccountId
+            ?? throw new InvalidOperationException("Account scope is required for cave data deletion.");
+
+        await DbContext.Caves.IgnoreQueryFilters()
+            .Where(c => c.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.CurrentRevisionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveChangeRequests.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.CurrentProposalVersionId, (string?)null)
+                .SetProperty(r => r.BaseRevisionId, (string?)null)
+                .SetProperty(r => r.ApprovedRevisionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveRevisions.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.PreviousRevisionId, (string?)null)
+                .SetProperty(r => r.ChangeRequestId, (string?)null)
+                .SetProperty(r => r.ImportBatchId, (string?)null), cancellationToken);
+
+        await DbContext.CaveProposalVersions.IgnoreQueryFilters()
+            .Where(v => v.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.PreviousProposalVersionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+            .Where(link => link.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveProposalVersions.IgnoreQueryFilters()
+            .Where(v => v.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveRevisions.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveChangeRequests.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveImportBatches.IgnoreQueryFilters()
+            .Where(b => b.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
 
