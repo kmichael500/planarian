@@ -200,8 +200,9 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            // Never remove the staged source on failure. Only compensate the
-            // deterministic destination created for this publication attempt.
+            // Compensate only the deterministic destination created by this
+            // publication attempt. The staged source belongs to the upload-
+            // session lifecycle and is cleaned by its caller.
             await BestEffortDeleteBlobAsync(blobKey, RequestUser.AccountContainerName);
             throw;
         }
