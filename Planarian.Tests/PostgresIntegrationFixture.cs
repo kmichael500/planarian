@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -146,8 +148,11 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
 
     public string ConnectionString { get; }
 
-    public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
-        PostgresIntegrationFixture.CreateDbContext(ConnectionString, userId, accountId);
+    public PlanarianDbContext CreateDbContext(string userId, string? accountId)
+    {
+        var persistedUserId = accountId is null ? userId : EnsurePersistedTestUser(userId);
+        return PostgresIntegrationFixture.CreateDbContext(ConnectionString, persistedUserId, accountId);
+    }
 
     public IReadOnlyList<string> GetMigrationNames()
     {
@@ -160,6 +165,32 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
         await using var db = CreateDbContext("migration-user", null);
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync(targetMigration);
+    }
+
+    private string EnsurePersistedTestUser(string requestedUserId)
+    {
+        var userId = NormalizeUserId(requestedUserId);
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            insert into "Users" ("Id", "FirstName", "LastName", "EmailAddress", "IsTemporary", "CreatedOn")
+            values (@id, 'Integration', 'User', @email, false, now())
+            on conflict ("Id") do nothing
+            """;
+        command.Parameters.AddWithValue("id", userId);
+        command.Parameters.AddWithValue("email", $"{userId}@integration.test");
+        command.ExecuteNonQuery();
+        return userId;
+    }
+
+    private static string NormalizeUserId(string requestedUserId)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedUserId) && requestedUserId.Length <= 10)
+            return requestedUserId;
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(requestedUserId ?? string.Empty));
+        return $"t{Convert.ToHexString(bytes).ToLowerInvariant()[..9]}";
     }
 
     public async ValueTask DisposeAsync()
