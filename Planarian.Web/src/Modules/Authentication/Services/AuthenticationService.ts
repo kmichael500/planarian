@@ -1,4 +1,5 @@
-import { HttpClient } from "../../..";
+import { HttpClient, registerUnauthorizedHandler } from "../../../Shared/Http/HttpClient";
+import { RequestRuntimeState } from "../../../Shared/Http/RequestRuntimeState";
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 
 const baseUrl = "api/authentication";
@@ -27,8 +28,17 @@ const getStorage = () =>
 let sessionSnapshot: SessionSnapshot = {
   currentUser: null,
 };
-let unauthorizedHandler: UnauthorizedHandler | null = null;
+let directUnauthorizedHandler: UnauthorizedHandler | null = null;
 let isHandlingUnauthorized = false;
+
+const invokeUnauthorizedHandler = () => {
+  if (isHandlingUnauthorized) {
+    return;
+  }
+
+  isHandlingUnauthorized = true;
+  directUnauthorizedHandler?.();
+};
 
 const AuthenticationService = {
   async Login(
@@ -48,6 +58,7 @@ const AuthenticationService = {
     sessionSnapshot = {
       currentUser,
     };
+    RequestRuntimeState.setCurrentAccountId(currentUser?.currentAccountId ?? null);
 
     const storage = getStorage();
     if (!storage) {
@@ -62,22 +73,20 @@ const AuthenticationService = {
     sessionSnapshot = {
       currentUser: null,
     };
+    RequestRuntimeState.setCurrentAccountId(null);
   },
   RegisterUnauthorizedHandler(handler: UnauthorizedHandler): () => void {
-    unauthorizedHandler = handler;
+    directUnauthorizedHandler = handler;
+    const unregisterHttpHandler = registerUnauthorizedHandler(invokeUnauthorizedHandler);
     return () => {
-      if (unauthorizedHandler === handler) {
-        unauthorizedHandler = null;
+      if (directUnauthorizedHandler === handler) {
+        directUnauthorizedHandler = null;
       }
+      unregisterHttpHandler();
     };
   },
   HandleUnauthorized(): void {
-    if (isHandlingUnauthorized || !unauthorizedHandler) {
-      return;
-    }
-
-    isHandlingUnauthorized = true;
-    unauthorizedHandler?.();
+    invokeUnauthorizedHandler();
   },
   ResetUnauthorizedHandling(): void {
     isHandlingUnauthorized = false;

@@ -4,29 +4,30 @@ using Planarian.Modules.App.Models;
 using Planarian.Modules.App.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.App.Services;
 
 public class AppService : ServiceBase<AppRepository>
 {
+    private readonly IApiRequestOrigin _apiRequestOrigin;
     private readonly ServerOptions _serverOptions;
     private readonly UserRepository _userRepository;
 
-    public AppService(AppRepository repository, RequestUser requestUser, ServerOptions serverOptions, UserRepository userRepository) : base(repository,
+    public AppService(AppRepository repository, RequestUser requestUser, IApiRequestOrigin apiRequestOrigin, ServerOptions serverOptions, UserRepository userRepository) : base(repository,
         requestUser)
     {
+        _apiRequestOrigin = apiRequestOrigin;
         _serverOptions = serverOptions;
         _userRepository = userRepository;
     }
 
-    public async Task<AppInitializeVm> Initialize(string serverBaseUrl)
+    public async Task<AppInitializeVm> Initialize()
     {
-#if DEBUG
-        _serverOptions.ServerBaseUrl = serverBaseUrl;
-#endif
+        var apiBaseUrl = _apiRequestOrigin.GetOrigin();
         var result = new AppInitializeVm(
-            _serverOptions.ServerBaseUrl,
-            $"{_serverOptions.ServerBaseUrl}/api/notificationHub",
+            apiBaseUrl,
+            $"{apiBaseUrl}/api/notificationHub",
             _serverOptions.SupportName,
             _serverOptions.SupportEmail);
 

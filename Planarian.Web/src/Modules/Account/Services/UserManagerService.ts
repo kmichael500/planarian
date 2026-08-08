@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { PermissionType } from "../../Authentication/Models/PermissionType";

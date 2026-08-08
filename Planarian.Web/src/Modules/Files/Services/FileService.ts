@@ -1,5 +1,5 @@
 import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const filesBaseUrl = "api/files";

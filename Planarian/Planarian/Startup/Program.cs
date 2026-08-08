@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.HttpOverrides;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
@@ -73,6 +74,10 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
 var isDevelopment = builder.Environment.IsDevelopment();
+var isAzureAppService = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
+var isHostedDeployment = isAzureAppService || !isDevelopment;
+if (isAzureAppService && !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_FORWARDEDHEADERS_ENABLED"), "true", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("Azure App Service requires ASPNETCORE_FORWARDEDHEADERS_ENABLED=true so public HTTPS origins are available behind TLS termination.");
 
 builder.Configuration.AddAzureAppConfiguration(options =>
 {
@@ -84,6 +89,11 @@ builder.Configuration.AddAzureAppConfiguration(options =>
 
 #if DEBUG
 builder.Configuration.AddJsonFile("appsettings.Development.json", false);
+// Host filtering is configured when the web host is created, before Azure App
+// Configuration and the development override are added. Apply the final local
+// value explicitly so localhost requests reach the CORS middleware.
+builder.WebHost.UseSetting("AllowedHosts",
+    builder.Configuration["AllowedHosts"] ?? "localhost");
 #endif
 
 
@@ -146,7 +156,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var serverOptions = builder.Configuration.GetSection(ServerOptions.Key).Get<ServerOptions>();
 if (serverOptions == null) throw new Exception("Server options not found");
+var deploymentConfiguration = ServerConfigurationValidator.Validate(
+    serverOptions,
+    builder.Configuration["AllowedHosts"],
+    isHostedDeployment);
 builder.Services.AddSingleton(serverOptions);
+builder.Services.AddSingleton(deploymentConfiguration);
 
 var authOptions = builder.Configuration.GetSection(AuthOptions.Key).Get<AuthOptions>();
 if (authOptions == null) throw new Exception("Auth options not found");
@@ -175,7 +190,7 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.Name = AuthCookieService.AntiforgeryCookieName;
     options.Cookie.HttpOnly = true;
     options.Cookie.Path = "/";
-    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None;
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.HeaderName = AuthCookieService.RequestTokenHeaderName;
 });
@@ -254,6 +269,9 @@ builder.Services.AddHttpClient<GeologicMapHttpClient>();
 
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IApiRequestOrigin, ApiRequestOrigin>();
+builder.Services.AddScoped<IClientRequestOrigin, ClientRequestOrigin>();
+builder.Services.AddScoped<ClientUrlBuilder>();
 builder.Services.AddSignalR()
     .AddJsonProtocol(options =>
     {
@@ -441,6 +459,9 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o =>
 
 var app = builder.Build();
 
+if (isAzureAppService)
+    app.UseForwardedHeaders();
+
 app.UseResponseCompression();
 
 if (false)
@@ -464,10 +485,8 @@ app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
 
-var corsOrigins = serverOptions.AllowedCorsOrigins.SplitAndTrim(',').Append(serverOptions.ClientBaseUrl).ToArray();
-
 app.UseCors(x =>
-    x.WithOrigins(corsOrigins)
+    x.WithOrigins(deploymentConfiguration.AllowedCorsOrigins.ToArray())
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()

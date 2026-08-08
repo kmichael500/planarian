@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
-import { Grid, Result, Space, Spin, Typography } from "antd";
+import { Result, Space, Spin, Typography } from "antd";
 import {
   MinusOutlined,
   EyeOutlined,
@@ -8,8 +7,6 @@ import {
   VerticalAlignMiddleOutlined,
 } from "@ant-design/icons";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import "./PdfViewer.scss";
 
 type PromiseWithResolversResult<T> = {
@@ -39,10 +36,10 @@ if (typeof promiseWithResolversSupport.withResolvers !== "function") {
   };
 }
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+type PdfComponents = {
+  Document: React.ComponentType<any>;
+  Page: React.ComponentType<any>;
+};
 
 interface PdfViewerProps {
   file: Blob;
@@ -70,6 +67,39 @@ export function PdfViewer({
   const [pageWidth, setPageWidth] = useState<number | undefined>(undefined);
   const [renderError, setRenderError] = useState(false);
   const [documentLoading, setDocumentLoading] = useState(true);
+  const [pdfComponents, setPdfComponents] = useState<PdfComponents | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadPdfViewer = async () => {
+      try {
+        const [{ Document, Page, pdfjs }] = await Promise.all([
+          import("react-pdf"),
+          import("react-pdf/dist/Page/AnnotationLayer.css"),
+          import("react-pdf/dist/Page/TextLayer.css"),
+        ]);
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).toString();
+
+        if (!isCancelled) {
+          setPdfComponents({ Document, Page });
+        }
+      } catch {
+        if (!isCancelled) {
+          setDocumentLoading(false);
+          setRenderError(true);
+        }
+      }
+    };
+
+    loadPdfViewer();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setNumPages(0);
@@ -142,6 +172,12 @@ export function PdfViewer({
       />
     );
   }
+
+  if (!pdfComponents) {
+    return <Spin />;
+  }
+
+  const { Document, Page } = pdfComponents;
 
   return (
     <div className="pdf-viewer">

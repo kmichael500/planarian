@@ -12,7 +12,6 @@ using Newtonsoft.Json.Linq;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -25,6 +24,7 @@ using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Caves.Services;
@@ -34,17 +34,17 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FileService _fileService;
     private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
-    private readonly ServerOptions _serverOptions;
+    private readonly ClientUrlBuilder _clientUrlBuilder;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         TagRepository tagRepository,
-        FeatureSettingRepository featureSettingRepository, ServerOptions serverOptions) : base(
+        FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder) : base(
         repository, requestUser)
     {
         _fileService = fileService;
         _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
-        _serverOptions = serverOptions;
+        _clientUrlBuilder = clientUrlBuilder;
     }
 
     #region Caves
@@ -378,7 +378,7 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
 
                 descriptionStringBuilder.AppendLine();
-                descriptionStringBuilder.AppendLine($"{_serverOptions.ClientBaseUrl}/caves/{cave.Id}");
+                descriptionStringBuilder.AppendLine(_clientUrlBuilder.BuildCaveUrl(cave.Id));
 
                 // Build the GPX waypoint.
                 sb.AppendLine($"  <wpt lat=\"{latitude}\" lon=\"{longitude}\">");

@@ -1,5 +1,5 @@
 import { Spin, Result } from "antd";
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import {
   CloudDownloadOutlined,
   LeftOutlined,
@@ -20,12 +20,16 @@ import {
 } from "../Services/FileHelpers";
 import { CSVDisplay } from "./CsvDisplayComponent";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
-import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { GpxViewer } from "./GpxViewer";
-import { VectorDatasetViewer } from "./VectorDatasetViewer";
 import { PltViewer } from "./PltViewer";
 import { FileAccessAction, FileService } from "../Services/FileService";
-import { PdfViewer } from "./PdfViewer";
+
+const PdfViewer = lazy(async () => ({
+  default: (await import("./PdfViewer")).PdfViewer,
+}));
+const VectorDatasetViewer = lazy(async () => ({
+  default: (await import("./VectorDatasetViewer")).VectorDatasetViewer,
+}));
 
 interface FileViewerProps {
   fileId?: string | null;
@@ -310,11 +314,13 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 </div>
               )}
               {isPdf && pdfFile && (
-                <PdfViewer
-                  file={pdfFile}
-                  openUrl={fileEmbedUrl}
-                  downloadButton={downloadButton}
-                />
+                <Suspense fallback={<Spin />}>
+                  <PdfViewer
+                    file={pdfFile}
+                    openUrl={fileEmbedUrl}
+                    downloadButton={downloadButton}
+                  />
+                </Suspense>
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
               {isTextFileType(fileType) && (
@@ -330,11 +336,13 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 </pre>
               )}
               {isVectorDataset && fileEmbedUrl && (
-                <VectorDatasetViewer
-                  embedUrl={fileEmbedUrl}
-                  fileType={fileType}
-                  downloadButton={downloadButton}
-                />
+                <Suspense fallback={<Spin />}>
+                  <VectorDatasetViewer
+                    embedUrl={fileEmbedUrl}
+                    fileType={fileType}
+                    downloadButton={downloadButton}
+                  />
+                </Suspense>
               )}
               {isPlt && fileEmbedUrl && (
                 <PltViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />

@@ -33,10 +33,19 @@ jobs:
 
       - name: Build React App
         run: |
+          if [ -z "${REACT_APP_API_ORIGIN_MAPPINGS:-}" ]; then
+            echo "::error::REACT_APP_API_ORIGIN_MAPPINGS GitHub Environment variable is required for hosted web builds."
+            exit 1
+          fi
+          if [ -z "${REACT_APP_UMAMI_WEBSITE_ID:-}" ]; then
+            echo "::error::REACT_APP_UMAMI_WEBSITE_ID GitHub Environment variable is required for production web builds."
+            exit 1
+          fi
           cd Planarian.Web
           npm run build
         env:
-          REACT_APP_SERVER_URL: ${{ secrets.REACT_APP_SERVER_URL }}
+          REACT_APP_API_ORIGIN_MAPPINGS: ${{ vars.REACT_APP_API_ORIGIN_MAPPINGS }}
+          REACT_APP_UMAMI_WEBSITE_ID: ${{ vars.REACT_APP_UMAMI_WEBSITE_ID }}
 
       - name: Deploy to Azure Static Web App
         id: deploy

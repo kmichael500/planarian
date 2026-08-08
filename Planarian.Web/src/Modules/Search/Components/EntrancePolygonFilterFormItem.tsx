@@ -18,7 +18,6 @@ import { MapService } from "../../Map/Services/MapService";
 import type { LngLatBoundsLike } from "maplibre-gl";
 import { LayerControl } from "../../Map/Components/LayerControl";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
-import shpjs from "shpjs";
 import bbox from "@turf/bbox";
 
 const mapStyle: StyleSpecification = {
@@ -392,6 +391,7 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const { default: shpjs } = await import("shpjs");
       const parsed = await shpjs(arrayBuffer);
 
       const collections = Array.isArray(parsed) ? parsed : [parsed];

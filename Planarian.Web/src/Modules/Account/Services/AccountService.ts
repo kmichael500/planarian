@@ -1,6 +1,6 @@
 import { RcFile } from "antd/lib/upload";
 import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { FileVm } from "../../Files/Models/FileVm";
 import { TagType } from "../../Tag/Models/TagType";
 import { TagTypeTableVm } from "../Models/TagTypeTableVm";

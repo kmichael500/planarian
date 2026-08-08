@@ -1,5 +1,5 @@
 import { RcFile } from "antd/lib/upload";
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { InviteMember } from "../../../Shared/Models/InviteMember";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";

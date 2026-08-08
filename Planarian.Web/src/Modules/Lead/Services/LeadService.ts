@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 
 const baseUrl = "api/leads";
 const LeadService = {

@@ -1,4 +1,4 @@
-import { HttpClient } from "../../..";
+import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { CreateAccountVm } from "../Models/CreateAccountVm";
 
 const baseUrl = "api/planarian-settings";

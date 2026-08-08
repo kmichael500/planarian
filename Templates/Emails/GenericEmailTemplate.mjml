@@ -122,8 +122,8 @@
           line-height="20px"
           padding="0"
         >
-          <a class="website-link" href="https://app.planarian.xyz">
-            https://app.planarian.xyz
+          <a class="website-link" href="{{websiteUrl}}">
+            {{websiteUrl}}
           </a>
         </mj-text>
       </mj-column>

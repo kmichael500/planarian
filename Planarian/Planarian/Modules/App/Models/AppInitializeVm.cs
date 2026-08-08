@@ -4,9 +4,9 @@ namespace Planarian.Modules.App.Models;
 
 public class AppInitializeVm
 {
-    public AppInitializeVm(string serverBaseUrl, string signalrBaseUrl, string supportName, string supportEmail)
+    public AppInitializeVm(string apiBaseUrl, string signalrBaseUrl, string supportName, string supportEmail)
     {
-        ServerBaseUrl = serverBaseUrl;
+        ApiBaseUrl = apiBaseUrl;
         SignalrBaseUrl = signalrBaseUrl;
         SupportName = supportName;
         SupportEmail = supportEmail;
@@ -14,7 +14,7 @@ public class AppInitializeVm
 
     public string SignalrBaseUrl { get; set; } 
     public IEnumerable<SelectListItem<string>> AccountIds { get; set; } = new HashSet<SelectListItem<string>>();
-    public string ServerBaseUrl { get; set; }
+    public string ApiBaseUrl { get; set; }
     public IEnumerable<string> Permissions { get; set; } = Array.Empty<string>();
     public AppInitializeCurrentUserVm? CurrentUser { get; set; }
     public string? AntiforgeryRequestToken { get; set; }

@@ -1,4 +1,4 @@
-import { HttpClient } from "../../../..";
+import { HttpClient } from "../../../../Shared/Http/HttpClient";
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 
 const baseUrl = "api/register";

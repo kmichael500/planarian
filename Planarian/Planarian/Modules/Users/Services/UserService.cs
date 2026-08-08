@@ -1,7 +1,6 @@
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
-using Planarian.Library.Options;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
@@ -23,15 +22,15 @@ public class UserService : ServiceBase<UserRepository>
     private const int PasswordResetExpirationMinutes = 30;
     private readonly EmailService _emailService;
     private readonly RequestThrottleService _requestThrottleService;
-    private readonly ServerOptions _serverOptions;
+    private readonly IApiRequestOrigin _apiRequestOrigin;
     private readonly BlobService _blobService;
 
     public UserService(UserRepository repository, RequestUser requestUser, EmailService emailService,
-        ServerOptions serverOptions, RequestThrottleService requestThrottleService, BlobService blobService) : base(repository,
+        IApiRequestOrigin apiRequestOrigin, RequestThrottleService requestThrottleService, BlobService blobService) : base(repository,
         requestUser)
     {
         _emailService = emailService;
-        _serverOptions = serverOptions;
+        _apiRequestOrigin = apiRequestOrigin;
         _requestThrottleService = requestThrottleService;
         _blobService = blobService;
     }
@@ -71,7 +70,7 @@ public class UserService : ServiceBase<UserRepository>
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
 
         user.ProfilePhotoUrl = UrlHelper.Build(
-            _serverOptions.ServerBaseUrl,
+            _apiRequestOrigin.GetOrigin(),
             $"/api/users/{userId}/photo",
             RequestUser.AccountId);
         return user;

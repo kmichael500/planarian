@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Planarian.Library.Options;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Settings.Models;
@@ -8,22 +7,23 @@ using Planarian.Modules.Users.Models;
 using Planarian.Shared.Base;
 using Planarian.Shared.Helpers;
 using Planarian.Shared.Options;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Settings.Services;
 
 public class SettingsService : ServiceBase<SettingsRepository>
 {
-    private readonly ServerOptions _serverOptions;
+    private readonly IApiRequestOrigin _apiRequestOrigin;
     private readonly RequestThrottleOptions _requestThrottleOptions;
 
     public SettingsService(
         SettingsRepository repository,
         RequestUser requestUser,
-        ServerOptions serverOptions,
+        IApiRequestOrigin apiRequestOrigin,
         RequestThrottleOptions requestThrottleOptions) : base(
         repository, requestUser)
     {
-        _serverOptions = serverOptions;
+        _apiRequestOrigin = apiRequestOrigin;
         _requestThrottleOptions = requestThrottleOptions;
     }
 
@@ -57,7 +57,7 @@ public class SettingsService : ServiceBase<SettingsRepository>
         if (string.IsNullOrWhiteSpace(user.BlobKey)) return user;
 
         user.ProfilePhotoUrl = UrlHelper.Build(
-            _serverOptions.ServerBaseUrl,
+            _apiRequestOrigin.GetOrigin(),
             $"/api/users/{userId}/photo",
             RequestUser.AccountId);
 

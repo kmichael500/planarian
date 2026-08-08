@@ -1,4 +1,5 @@
-import { HttpClient } from "../..";
+import { HttpClient } from "../Http/HttpClient";
+import { RequestRuntimeState } from "../Http/RequestRuntimeState";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
@@ -6,13 +7,12 @@ import { SelectListItem } from "../Models/SelectListItem";
 const baseUrl = "api/app";
 
 let AppOptions: AppOptionsVm = {
-  serverBaseUrl: "",
+  apiBaseUrl: "",
   signalrBaseUrl: "",
   supportName: "",
   supportEmail: "",
 };
 
-let antiforgeryRequestToken: string | null = null;
 
 const AppService = {
   async InitializeApp(
@@ -25,17 +25,17 @@ const AppService = {
     });
 
     AppOptions = {
-      serverBaseUrl: response.data.serverBaseUrl,
+      apiBaseUrl: response.data.apiBaseUrl,
       signalrBaseUrl: response.data.signalrBaseUrl,
       supportName: response.data.supportName,
       supportEmail: response.data.supportEmail,
     };
-    antiforgeryRequestToken = response.data.antiforgeryRequestToken;
+    RequestRuntimeState.setAntiforgeryRequestToken(response.data.antiforgeryRequestToken);
 
     return response.data;
   },
   GetAntiforgeryRequestToken(): string | null {
-    return antiforgeryRequestToken;
+    return RequestRuntimeState.getAntiforgeryRequestToken();
   },
   async HasCavePermission(
     permissionKey: PermissionKey,
@@ -64,7 +64,7 @@ const AppService = {
 export { AppService, AppOptions };
 
 export interface AppOptionsVm {
-  serverBaseUrl: string;
+  apiBaseUrl: string;
   signalrBaseUrl: string;
   supportName: string;
   supportEmail: string;
