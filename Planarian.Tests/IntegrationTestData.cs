@@ -104,19 +104,20 @@ internal static class IntegrationTestData
             await db.SaveChangesAsync();
         }
 
-        // Review/File fixtures are inserted using the database's own defaults
-        // for optional workflow metadata. The exact columns intentionally stay
-        // small so this helper remains valid as review UX grows.
+        // Review/File fixtures are inserted using the exact persisted column
+        // contract from the current migration. Keep this raw SQL intentionally
+        // small so the shared seed can exercise query filters independently of
+        // SaveChanges interception while still failing when the schema drifts.
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                insert into "CaveChangeRequests" ("Id", "AccountId", "CaveId", "BaseRevisionId", "CreatedOn")
-                values (@request_id, @account_id, @cave_id, @revision_id, now());
+                insert into "CaveChangeRequests" ("Id", "AccountId", "CaveId", "BaseRevisionId", "Status", "CreatedOn")
+                values (@request_id, @account_id, @cave_id, @revision_id, 'Pending', now());
 
-                insert into "CaveProposalVersions" ("Id", "AccountId", "ChangeRequestId", "VersionNumber", "SnapshotSchemaVersion", "SnapshotJson", "CreatedOn")
-                values (@proposal_id, @account_id, @request_id, 1, 1, @snapshot::jsonb, now());
+                insert into "CaveProposalVersions" ("Id", "AccountId", "ChangeRequestId", "SchemaVersion", "ProposalJson", "CreatedOn")
+                values (@proposal_id, @account_id, @request_id, 1, @snapshot::jsonb, now());
 
                 insert into "Files" ("Id", "AccountId", "FileTypeTagId", "FileName", "BlobKey", "BlobContainer", "CreatedOn")
                 values (@file_id, @account_id, @file_type_id, @file_name, @blob_key, 'test', now());
