@@ -70,7 +70,9 @@ Blob storage cannot participate in the PostgreSQL transaction, so Cave-file
 writes use explicit compensation. If an upload or staged-file copy succeeds in
 blob storage but the relational/revision publication later fails, the unique
 destination blob is deleted best-effort without replacing the original
-exception. A staged source is never removed on failed publication. Expired
+exception. Destination compensation does not delete the staging source;
+staging-session cleanup remains owned by the upload-session caller, which
+cleans the committed staging blob when the import attempt finishes. Expired
 temporary-file rows are removed transactionally, but their blobs are deleted
 only after the database transaction commits. Cave hard-delete and import-sync
 blob cleanup are likewise deferred until after commit. GeoJSON is a separate
