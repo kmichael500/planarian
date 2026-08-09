@@ -4,6 +4,16 @@ This contract was freshly read from `11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae`,
 not inferred from the feature branch. The goal is to preserve observable import
 semantics while replacing the internal staging/rollback architecture.
 
+The checked-in `Planarian.Tests/Fixtures/import-main-11cdd9e.json` golden matrix
+anchors representative CSV input, sync mode, validation, preview, and committed
+state expectations to that exact commit. `MainImportBehaviorGoldenFixtureTests`
+prevents silent re-anchoring and ties every row to an executable compatibility
+or preview/commit test. The aggregate tests compare every importer-owned scalar,
+role-specific tag value and identity, geometry component, revision result, and
+relationship-preservation rule represented by the V1 snapshot. Fields absent
+from the preview DTO (generated IDs, tag IDs, revision IDs, and xmin) are checked
+against the plan and committed database, not claimed as preview fields.
+
 | Area | Main behavior | Required assertion |
 | --- | --- | --- |
 | Account context | Imports require `RequestUser.AccountId`; account-owned lookups use the active account | Two-account isolation test |
@@ -56,3 +66,23 @@ When the new planner/executor differs internally from `main`, tests must prove
 that the difference is intentional and that externally meaningful behavior is
 preserved. A change should not be labeled a baseline correctness fix unless a
 separate test and product decision establish that `main` itself was wrong.
+
+There are no intentional product-semantic differences from exact
+`main@11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae`. The deliberate differences are
+architecture-only (read-only planning, typed plans, bounded EF execution, and
+revision provenance) plus the documented tenant/data-integrity corrections:
+required File ownership, tenant-qualified File/staged-file relationships, and
+fail-closed migration of unassignable legacy Files.
+
+## Fresh final source comparison
+
+The final implementation was compared again with the actual Cave and Entrance
+import services at the baseline commit. Parsing/defaults, State/County lookup,
+case-insensitive eligible-reference reuse, role mapping, optional-date behavior,
+geometry axis/SRID behavior, primary validation, sync targeting, preview values,
+and committed aggregate results are behaviorally equivalent. Typed immutable
+plans, read-only preview, bounded EF batches, concurrency locks, import batches,
+and snapshot publication are architecture-only differences with equivalent
+import results. Account-qualified reads/deletes and File ownership constraints
+are intentional tenant/data-integrity corrections. No separate main bug fix or
+unexplained observable difference remains.

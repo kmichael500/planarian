@@ -9,7 +9,7 @@ namespace Planarian.Modules.Caves.Revisions;
 
 public sealed class CavePublishedSnapshotReader
 {
-    private const int ChunkSize = 250;
+    private const int ChunkSize = 2500;
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
 

@@ -31,9 +31,18 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture 
             await connection.OpenAsync(); await using var c=connection.CreateCommand(); c.CommandText="""
             insert into "States"("Id","Name","Abbreviation","CreatedOn") values('mainstate1','Tennessee','TN',now());
             insert into "Accounts"("Id","Name","CountyIdDelimiter","DefaultViewAccessAllCaves","ExportEnabled","CreatedOn") values('mainacct01','Existing Main Account','-',false,true,now());
+            insert into "AccountStates"("Id","AccountId","StateId","CreatedOn") values('mainastate','mainacct01','mainstate1',now());
             insert into "Counties"("Id","AccountId","StateId","DisplayId","Name","CreatedOn") values('maincnty01','mainacct01','mainstate1','MAIN','Existing County',now());
             insert into "Caves"("Id","AccountId","StateId","CountyId","Name","AlternateNames","CountyNumber","IsArchived","CreatedOn") values('maincave01','mainacct01','mainstate1','maincnty01','Existing Main Cave','[]',42,false,now());
-            insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values('mainfile01','mainacct01','file','Existing file',false,now());
+            insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values
+              ('mainfile01','mainacct01','file','Existing file',false,now()),
+              ('maingeo001','mainacct01','geology','Limestone',false,now()),
+              ('mainqual01','mainacct01','location-quality','Survey Grade',false,now()),
+              ('mainstat01','mainacct01','entrance-status','Open',false,now());
+            insert into "GeologyTags"("Id","TagTypeId","CaveId","CreatedOn") values('maingeot01','maingeo001','maincave01',now());
+            insert into "Entrances"("Id","CaveId","LocationQualityTagId","Name","IsPrimary","Description","Location","ReportedOn","PitDepthFeet","CreatedOn") values
+              ('mainentr01','maincave01','mainqual01','Historic Entrance',true,'Preserved entrance',ST_SetSRID(ST_MakePoint(-86.25,35.15,612),4326),'2025-04-03',18,now());
+            insert into "EntranceStatusTags"("Id","TagTypeId","EntranceId","CreatedOn") values('mainenst01','mainstat01','mainentr01',now());
             insert into "Files"("Id","AccountId","CaveId","FileTypeTagId","FileName","BlobKey","BlobContainer","CreatedOn") values
               ('mainfiler1','mainacct01','maincave01','mainfile01','existing-cave.pdf','caves/maincave01/files/mainfiler1.pdf','main',now()),
               ('mainfilet1','mainacct01',null,'mainfile01','temporary.csv','temp/import/caves/mainfilet1.csv','main',now());
@@ -43,6 +52,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture 
         await using(var verify=database.CreateDbContext("main","mainacct01"))
         {
             var cave=await verify.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); Assert.Equal("Existing Main Cave",cave.Name); Assert.Equal("mainacct01",cave.AccountId); Assert.Null(cave.CurrentRevisionId);
+            Assert.True(await verify.AccountStates.AnyAsync(x=>x.AccountId=="mainacct01"&&x.StateId=="mainstate1"));
+            var geology=await verify.GeologyTags.SingleAsync(x=>x.CaveId=="maincave01");Assert.Equal("maingeo001",geology.TagTypeId);
+            var entrance=await verify.Entrances.IgnoreQueryFilters().SingleAsync(x=>x.Id=="mainentr01");Assert.Equal("Historic Entrance",entrance.Name);Assert.True(entrance.IsPrimary);Assert.Equal("Preserved entrance",entrance.Description);Assert.Equal(-86.25,entrance.Location.X,6);Assert.Equal(35.15,entrance.Location.Y,6);Assert.Equal(612,entrance.Location.Z,6);Assert.Equal(4326,entrance.Location.SRID);Assert.Equal(18,entrance.PitDepthFeet);Assert.True(await verify.EntranceStatusTags.AnyAsync(x=>x.EntranceId=="mainentr01"&&x.TagTypeId=="mainstat01"));
             var files=await verify.Files.OrderBy(f=>f.Id).ToListAsync(); Assert.Equal(2,files.Count);
             Assert.Equal(("mainacct01","maincave01","existing-cave.pdf"),(files[0].AccountId,files[0].CaveId,files[0].FileName));
             Assert.Equal(("mainacct01",(string?)null,"temporary.csv"),(files[1].AccountId,files[1].CaveId,files[1].FileName));

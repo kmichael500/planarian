@@ -60,6 +60,8 @@ public sealed class ProductionSourceSafetyTests
     [Fact]
     public void WorkflowEntityQueryFilterBypassesRestoreAccountPredicateImmediately()
     {
+        // Supplemental source lint only. ImportTenantAdversarialIntegrationTests
+        // and PostgreSQL FK tests are the executable tenant-security boundary.
         var files = ProductionFiles();
         var sets = new[]
         {

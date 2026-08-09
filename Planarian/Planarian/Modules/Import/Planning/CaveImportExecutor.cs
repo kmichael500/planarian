@@ -17,9 +17,9 @@ public sealed record CaveImportExecutionResult(string ImportBatchId, IReadOnlyLi
 
 public sealed class CaveImportExecutor
 {
-    private const int CaveBatchSize = 375;
+    private const int CaveBatchSize = 1000;
     private const int LookupBatchSize = 500;
-    private const int AssociationBatchSize = 1000;
+    private const int AssociationBatchSize = 10_000;
 
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;

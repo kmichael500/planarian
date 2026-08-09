@@ -24,6 +24,7 @@ public class DbContextDesignTimeFactory : IDesignTimeDbContextFactory<PlanarianD
         {
             o.MigrationsAssembly("Planarian.Migrations");
             o.UseNetTopologySuite();
+            o.MaxBatchSize(1000);
         });
 
 

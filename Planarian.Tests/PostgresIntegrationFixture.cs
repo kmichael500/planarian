@@ -132,6 +132,7 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
             {
                 options.MigrationsAssembly("Planarian.Migrations");
                 options.UseNetTopologySuite();
+                options.MaxBatchSize(1000);
             })
             .AddInterceptors(interceptors)
             .Options;

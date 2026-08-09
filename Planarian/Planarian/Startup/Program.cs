@@ -288,6 +288,7 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 });
 
@@ -297,6 +298,7 @@ builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 }, ServiceLifetime.Scoped);
 
@@ -306,6 +308,7 @@ builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 });
 

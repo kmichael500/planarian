@@ -118,6 +118,15 @@ Destructive sync statements bypass permission query filters only after the
 owned Cave/File/Entrance IDs are established, and each such statement restores
 an explicit account predicate before mutation.
 
+Executable import guarantees include complete Cave and Entrance aggregate
+inserts, semantic no-change/xmin preservation, exact sync replacement and
+unrelated-aggregate preservation, four read-only planning modes guarded by a
+write/DDL interceptor and full row-state comparison, seven preview-to-commit
+scenarios, deterministic multi-record late-failure rollback, and complete
+foreign-tenant state comparison. The source regex that checks account predicates
+near `IgnoreQueryFilters()` is supplemental lint only; executable PostgreSQL
+tenant-isolation tests and database foreign keys are the security boundaries.
+
 ## Inventory notes
 
 The current branch's former alternate data-access paths and replacements are

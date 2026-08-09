@@ -15,7 +15,7 @@ namespace Planarian.Modules.Import.Planning;
 /// </summary>
 public sealed class ImportRevisionPublisher
 {
-    private const int BatchSize = 500;
+    private const int BatchSize = 1000;
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
 

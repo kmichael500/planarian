@@ -16,8 +16,8 @@ namespace Planarian.Modules.Import.Planning;
 public sealed class EntranceImportExecutor
 {
     private const int CaveBatchSize = 500;
-    private const int EntranceBatchSize = 750;
-    private const int AssociationBatchSize = 1000;
+    private const int EntranceBatchSize = 1500;
+    private const int AssociationBatchSize = 4000;
 
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
