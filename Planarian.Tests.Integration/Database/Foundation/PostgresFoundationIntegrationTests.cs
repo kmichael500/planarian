@@ -69,8 +69,11 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile));
-        var a = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
-        var b = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'b');
+        var a = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var b = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var request = await TestDataBuilder.CreateChangeRequestAsync(database, a);
+        var aFile = await TestDataBuilder.AddFileAsync(database, a);
+        var bFile = await TestDataBuilder.AddFileAsync(database, b);
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
@@ -84,8 +87,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
             """, connection))
         {
             sameAccount.Parameters.AddWithValue("account", a.AccountId);
-            sameAccount.Parameters.AddWithValue("request", a.ChangeRequestId);
-            sameAccount.Parameters.AddWithValue("existing_file", a.FileId);
+            sameAccount.Parameters.AddWithValue("request", request.ChangeRequestId);
+            sameAccount.Parameters.AddWithValue("existing_file", aFile.FileId);
             Assert.Equal(2, await sameAccount.ExecuteNonQueryAsync());
         }
 
@@ -94,8 +97,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
             values ('foreignf01', @account, @request, @file, now())
             """, connection);
         foreignAccount.Parameters.AddWithValue("account", a.AccountId);
-        foreignAccount.Parameters.AddWithValue("request", a.ChangeRequestId);
-        foreignAccount.Parameters.AddWithValue("file", b.FileId);
+        foreignAccount.Parameters.AddWithValue("request", request.ChangeRequestId);
+        foreignAccount.Parameters.AddWithValue("file", bFile.FileId);
         var error = await Assert.ThrowsAsync<PostgresException>(() => foreignAccount.ExecuteNonQueryAsync());
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
     }
@@ -114,7 +117,7 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task CaveXminRejectsStaleWriterAndVersionChanges()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveXminRejectsStaleWriterAndVersionChanges));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
 
         await using var first = database.CreateDbContext("first", tenant.AccountId);
         await using var stale = database.CreateDbContext("stale", tenant.AccountId);
@@ -134,12 +137,13 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task CaveChangeRequestXminRejectsStaleWriterAndVersionChanges()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveChangeRequestXminRejectsStaleWriterAndVersionChanges));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var request = await TestDataBuilder.CreateChangeRequestAsync(database, tenant);
 
         await using var first = database.CreateDbContext("first", tenant.AccountId);
         await using var stale = database.CreateDbContext("stale", tenant.AccountId);
-        var firstRequest = await first.CaveChangeRequests.SingleAsync(r => r.Id == tenant.ChangeRequestId);
-        var staleRequest = await stale.CaveChangeRequests.SingleAsync(r => r.Id == tenant.ChangeRequestId);
+        var firstRequest = await first.CaveChangeRequests.SingleAsync(r => r.Id == request.ChangeRequestId);
+        var staleRequest = await stale.CaveChangeRequests.SingleAsync(r => r.Id == request.ChangeRequestId);
         var originalVersion = firstRequest.Version;
 
         firstRequest.ReviewerNotes = "First writer";

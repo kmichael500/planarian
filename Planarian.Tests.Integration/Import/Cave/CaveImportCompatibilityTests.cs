@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using NetTopologySuite.Geometries;
-using Planarian.Library.Exceptions;
-using Planarian.Model.Database.Entities;
+using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
@@ -12,56 +10,315 @@ using Xunit;
 
 namespace Planarian.Tests;
 
-public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture):IClassFixture<PostgresTestServer>
+public sealed class CaveImportCompatibilityTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
-    [Fact] public async Task RequiredCaveNameIsRejected()=>await AssertPlanFails(",County A,A01,1,AA,,,,,,,,,,,,,,,false,,");
-    [Fact] public async Task StateMatchingRemainsCaseSensitive()=>await AssertPlanFails("Bad State,County A,A01,7,aa,,,,,,,,,,,,,,,false,,");
-    [Theory][InlineData(-1,1,1,1)][InlineData(1,-1,1,1)][InlineData(1,1,-1,1)][InlineData(1,1,1,-1)]
-    public async Task NegativeNumbersRemainInvalid(double length,double depth,double pit,int pits)=>await AssertPlanFails($"Negative,County A,A01,9,AA,,,,{length},{depth},{pit},{pits},,,,,,,,false,,");
-    [Fact] public async Task NonSyncDuplicateCountyNumberIsRejected()=>await AssertPlanFails("Duplicate,County A,A01,1,AA,,,,,,,,,,,,,,,false,,",false);
-    [Fact] public async Task SyncDuplicateCompositeKeyIsRejected()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(SyncDuplicateCompositeKeyIsRejected));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);var row="First,County A,A01,1,AA,,,,,,,,,,,,,,,false,,";await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\n"+row+"\n"+row.Replace("First","Second")+"\n");await Assert.ThrowsAsync<ApiException>(()=>p.PlanAsync(csv,true));}
-    [Fact] public Task EarlierReporterSpellingWinsOverLaterCartographer()=>AssertPeopleEncounterOrder(
-        [PeopleRow("First",20,"","alice"),PeopleRow("Second",21,"Alice","")],"alice");
-    [Fact] public Task EarlierCartographerSpellingWinsOverLaterReporter()=>AssertPeopleEncounterOrder(
-        [PeopleRow("First",20,"Alice",""),PeopleRow("Second",21,"","alice")],"Alice");
-    [Fact] public Task SameRowPeopleFieldsUseModelFieldOrder()=>AssertPeopleEncounterOrder(
-        [PeopleRow("Both",20,"Alice","alice")],"Alice");
-    [Fact] public async Task ExistingAccountTagIsReusedCaseInsensitivelyWithCanonicalName()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(ExistingAccountTagIsReusedCaseInsensitivelyWithCanonicalName));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');string id;await using(var s=d.CreateDbContext("a",t.AccountId)){var tag=Tag(t.AccountId,TagTypeKeyConstant.Geology,"Foo");s.TagTypes.Add(tag);await s.SaveChangesAsync();id=tag.Id;}await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nCase,County A,A01,20,AA,,,,,,,1,  foo  ,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);Assert.Empty(plan.TagCreations);var planned=Assert.Single(plan.Caves);Assert.Contains(planned.Tags,x=>x.TagTypeId==id);Assert.Equal(["Foo"],planned.Geology);Assert.Equal(["Foo"],Assert.Single(plan.CreatePreview(false)).Geology);await Execute(db,plan,"case.csv");db.ChangeTracker.Clear();Assert.Single(await db.TagTypes.Where(x=>x.AccountId==t.AccountId&&x.Key==TagTypeKeyConstant.Geology&&x.Name.ToLower()=="foo").ToListAsync());var snap=await new CavePublishedSnapshotRepository(db,db.RequestUser).BuildAsync(planned.Id);Assert.Contains(snap.Tags,x=>x.TagTypeId==id&&x.NameAtRevision=="Foo");}
-    [Fact] public async Task SameImportCaseVariantsCreateOneTagUsingFirstSpelling()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(SameImportCaseVariantsCreateOneTagUsingFirstSpelling));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);var h=ImportDryRunIntegrationTests.CaveHeader;await using var csv=ImportDryRunIntegrationTests.CsvStream(h+"\nFirst,County A,A01,20,AA,,,,,,,1,\"Limestone, limestone\",,,,,,,false,,\nSecond,County A,A01,21,AA,,,,,,,1,LIMESTONE,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);var creation=Assert.Single(plan.TagCreations,x=>x.Key==TagTypeKeyConstant.Geology);Assert.Equal("Limestone",creation.Name);Assert.All(plan.Caves,c=>Assert.Equal([creation.Id],c.Tags.Where(x=>x.Role==CaveImportTagRole.Geology).Select(x=>x.TagTypeId)));await Execute(db,plan,"variants.csv");Assert.Single(await db.TagTypes.Where(x=>x.AccountId==t.AccountId&&x.Key==TagTypeKeyConstant.Geology&&x.Name.ToLower()=="limestone").ToListAsync());}
-    [Fact] public async Task SameTextUnderDifferentTagKeysRemainsIndependent()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(SameTextUnderDifferentTagKeysRemainsIndependent));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nKeys,County A,A01,20,AA,,Active,,,,,1,active,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);Assert.Equal(2,plan.TagCreations.Count(x=>x.Name.Equals("active",StringComparison.OrdinalIgnoreCase)));Assert.Contains(plan.TagCreations,x=>x.Key==TagTypeKeyConstant.Geology);Assert.Contains(plan.TagCreations,x=>x.Key==TagTypeKeyConstant.MapStatus);Assert.Equal(2,Assert.Single(plan.Caves).Tags.Select(x=>x.TagTypeId).Distinct().Count());}
-    [Fact] public async Task PreexistingCaseOnlyDuplicatesResolveDeterministicallyWithoutMutation()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(PreexistingCaseOnlyDuplicatesResolveDeterministicallyWithoutMutation));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using(var s=d.CreateDbContext("a",t.AccountId)){s.TagTypes.AddRange(new TagType("Foo",TagTypeKeyConstant.Geology){Id="zzzzzzzzzz",AccountId=t.AccountId},new TagType("foo",TagTypeKeyConstant.Geology){Id="aaaaaaaaaa",AccountId=t.AccountId});await s.SaveChangesAsync();}await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nLegacy,County A,A01,20,AA,,,,,,,1,FOO,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);Assert.Empty(plan.TagCreations);Assert.Equal("aaaaaaaaaa",Assert.Single(Assert.Single(plan.Caves).Tags).TagTypeId);await Execute(db,plan,"legacy.csv");db.ChangeTracker.Clear();var tags=await db.TagTypes.Where(x=>x.AccountId==t.AccountId&&x.Key==TagTypeKeyConstant.Geology&&x.Name.ToLower()=="foo").OrderBy(x=>x.Id).Select(x=>new{x.Id,x.Name}).ToListAsync();Assert.Equal(2,tags.Count);Assert.Equal(new[]{"aaaaaaaaaa:foo","zzzzzzzzzz:Foo"},tags.Select(x=>$"{x.Id}:{x.Name}"));}
-    [Fact] public async Task AccountTagWinsOverDefaultWhenNeitherSpellingIsExact()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(AccountTagWinsOverDefaultWhenNeitherSpellingIsExact));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using(var s=d.CreateDbContext("a",t.AccountId)){s.TagTypes.AddRange(new TagType("Foo",TagTypeKeyConstant.Geology){Id="default000",AccountId=null,IsDefault=true},new TagType("foo",TagTypeKeyConstant.Geology){Id="account000",AccountId=t.AccountId,IsDefault=false});await s.SaveChangesAsync();}await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nOwned,County A,A01,20,AA,,,,,,,1,FOO,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);Assert.Empty(plan.TagCreations);Assert.Equal("account000",Assert.Single(Assert.Single(plan.Caves).Tags).TagTypeId);Assert.Equal(["foo"],Assert.Single(plan.Caves).Geology);}
-    [Fact] public async Task ForeignCustomTagIsIneligible()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(ForeignCustomTagIsIneligible));var a=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');var b=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'b');string id;await using(var s=d.CreateDbContext("b",b.AccountId)){var tag=Tag(b.AccountId,"geology","Foreign Geo");s.TagTypes.Add(tag);await s.SaveChangesAsync();id=tag.Id;}await using var db=d.CreateDbContext("a",a.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nTags,County A,A01,22,AA,,,,,,,1,foreign geo,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,false);Assert.DoesNotContain(Assert.Single(plan.Caves).Tags,x=>x.TagTypeId==id);Assert.Contains(plan.TagCreations,x=>x.Name=="foreign geo");await Execute(db,plan,"foreign.csv");Assert.False(await db.GeologyTags.AnyAsync(x=>x.TagTypeId==id));Assert.Single(await db.TagTypes.Where(x=>x.AccountId==a.AccountId&&x.Key==TagTypeKeyConstant.Geology&&x.Name.ToLower()=="foreign geo").ToListAsync());}
-    [Fact] public async Task FullInsertOwnsCaveScalarsAndAllSupportedTagRoles()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(FullInsertOwnsCaveScalarsAndAllSupportedTagRoles));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nFull,County A,A01,30,AA,Alt,Map,Cart,123.5,45.5,20.5,4,Limestone,Mississippian,Plateau,Artifact,Bats,2026-08-01,Reporter,true,Interesting,Full narrative\n");var plan=await p.PlanAsync(csv,false);var row=Assert.Single(plan.Caves);Assert.Equal(9,plan.TagCreations.Count);await Execute(db,plan,"full.csv");var snap=await new CavePublishedSnapshotRepository(db,db.RequestUser).BuildAsync(row.Id);
-        Assert.Equal(row.Id,snap.CaveId);Assert.Equal(t.AccountId,snap.AccountId);Assert.Equal(t.StateId,snap.State.Id);Assert.Equal(t.CountyId,snap.County.Id);Assert.Equal(30,snap.CountyNumber);Assert.Equal("Full",snap.Name);Assert.Equal(["Alt"],snap.AlternateNames);Assert.Equal(123.5,snap.LengthFeet);Assert.Equal(45.5,snap.DepthFeet);Assert.Equal(20.5,snap.MaxPitDepthFeet);Assert.Equal(4,snap.NumberOfPits);Assert.Equal("Full narrative",snap.Narrative);Assert.Equal(new DateTime(2026,8,1,0,0,0,DateTimeKind.Utc),snap.ReportedOn);Assert.True(snap.IsArchived);
-        AssertTags(snap.Tags,(SnapshotTagRole.Geology,"Limestone"),(SnapshotTagRole.GeologicAge,"Mississippian"),(SnapshotTagRole.MapStatus,"Map"),(SnapshotTagRole.PhysiographicProvince,"Plateau"),(SnapshotTagRole.Archeology,"Artifact"),(SnapshotTagRole.Biology,"Bats"),(SnapshotTagRole.CaveOther,"Interesting"),(SnapshotTagRole.Cartographer,"Cart"),(SnapshotTagRole.CaveReportedBy,"Reporter"));
-        var cave=await db.Caves.IgnoreQueryFilters().SingleAsync(x=>x.Id==row.Id);Assert.NotNull(cave.CurrentRevisionId);var revision=await db.CaveRevisions.SingleAsync(x=>x.Id==cave.CurrentRevisionId);Assert.Equal(CaveRevisionSource.Import,revision.Source);Assert.Equal(CaveRevisionOperation.Create,revision.Operation);Assert.Equal(CaveSnapshotJson.Serialize(snap),CaveSnapshotJson.Serialize(CaveSnapshotJson.Deserialize(revision.SnapshotJson,revision.SnapshotSchemaVersion)));
-        foreach(var tag in snap.Tags)Assert.Contains(plan.TagCreations,x=>x.Id==tag.TagTypeId&&x.Name==tag.NameAtRevision);
-    }
-    [Fact] public async Task SyncUpdatePreservesEntranceAndFile()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(SyncUpdatePreservesEntranceAndFile));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await SeedEntrance(d,t,"preserved0");await using(var seed=d.CreateDbContext("a",t.AccountId)){var f=await seed.Files.SingleAsync(x=>x.Id==t.FileId);f.CaveId=t.CaveId;f.DisplayName="Preserved display";f.ExpiresOn=new DateTime(2027,1,2,0,0,0,DateTimeKind.Utc);await seed.SaveChangesAsync();}await using var db=d.CreateDbContext("a",t.AccountId);var reader=new CavePublishedSnapshotRepository(db,db.RequestUser);var before=await reader.BuildAsync(t.CaveId);var fileBefore=await db.Files.AsNoTracking().Where(x=>x.Id==t.FileId).Select(x=>new{x.Id,x.AccountId,x.CaveId,x.FileTypeTagId,x.FileName,x.DisplayName,x.BlobKey,x.BlobContainer,x.ExpiresOn}).SingleAsync();var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nUpdated,County A,A01,1,AA,,,,200,50,12,2,,,,,,2026-08-01,,false,,Updated\n");var plan=await p.PlanAsync(csv,true);await Execute(db,plan,"update.csv");db.ChangeTracker.Clear();var after=await reader.BuildAsync(t.CaveId);var fileAfter=await db.Files.AsNoTracking().Where(x=>x.Id==t.FileId).Select(x=>new{x.Id,x.AccountId,x.CaveId,x.FileTypeTagId,x.FileName,x.DisplayName,x.BlobKey,x.BlobContainer,x.ExpiresOn}).SingleAsync();Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Entrances),System.Text.Json.JsonSerializer.Serialize(after.Entrances));Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Files),System.Text.Json.JsonSerializer.Serialize(after.Files));Assert.Equal(fileBefore,fileAfter);}
-    [Fact] public async Task SyncNoChangeIsOmittedAndCreatesNoRevision()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(SyncNoChangeIsOmittedAndCreatesNoRevision));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');var sql=new SqlTimingInterceptor();await using var db=CreateObservedContext(d,t,sql);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nCave A,County A,A01,1,AA,,,,,,,,,,,,,,,false,,\n");var plan=await p.PlanAsync(csv,true);Assert.Equal(CaveImportAction.NoChange,Assert.Single(plan.Caves).Action);Assert.Empty(plan.CreatePreview(true));var caveBefore=await db.Caves.IgnoreQueryFilters().AsNoTracking().SingleAsync(x=>x.Id==t.CaveId);var snapshotBefore=await new CavePublishedSnapshotRepository(db,db.RequestUser).BuildAsync(t.CaveId);var revisionIdsBefore=await db.CaveRevisions.Where(r=>r.CaveId==t.CaveId).OrderBy(r=>r.Id).Select(r=>r.Id).ToListAsync();sql.Reset();await Execute(db,plan,"no.csv");db.ChangeTracker.Clear();var caveAfter=await db.Caves.IgnoreQueryFilters().AsNoTracking().SingleAsync(x=>x.Id==t.CaveId);var snapshotAfter=await new CavePublishedSnapshotRepository(db,db.RequestUser).BuildAsync(t.CaveId);var revisionIdsAfter=await db.CaveRevisions.Where(r=>r.CaveId==t.CaveId).OrderBy(r=>r.Id).Select(r=>r.Id).ToListAsync();Assert.Equal(caveBefore.Version,caveAfter.Version);Assert.Equal(caveBefore.CurrentRevisionId,caveAfter.CurrentRevisionId);Assert.Equal(revisionIdsBefore,revisionIdsAfter);Assert.Equal(CaveSnapshotJson.Serialize(snapshotBefore),CaveSnapshotJson.Serialize(snapshotAfter));var writes=sql.Items.Where(x=>IsWrite(x.Sql)).Select(x=>x.Sql).ToList();Assert.DoesNotContain(writes,x=>x.Contains("\"Caves\"",StringComparison.Ordinal)||x.Contains("\"CaveRevisions\"",StringComparison.Ordinal)||CaveTagTables.Any(x.Contains));}
-    [Fact] public async Task CommitAbortsOnPlannedVersionDrift()
-    {await using var d=await fixture.CreateDatabaseAsync(nameof(CommitAbortsOnPlannedVersionDrift));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');CaveImportPlan plan;await using(var pctx=d.CreateDbContext("a",t.AccountId)){var p=new CaveImportPlanningWorkflow(pctx,pctx.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\nPlanned,County A,A01,1,AA,,,,100,10,5,1,,,,,,,,false,,planned\n");plan=await p.PlanAsync(csv,true);}await using(var other=d.CreateDbContext("a",t.AccountId)){var cave=await other.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id==t.CaveId);cave.Name="Concurrent";await other.SaveChangesAsync();}await using var db=d.CreateDbContext("a",t.AccountId);await Assert.ThrowsAsync<CaveRevisionConflictException>(()=>Execute(db,plan,"conflict.csv"));Assert.False(await db.CaveImportBatches.AnyAsync(b=>b.SourceFileName=="conflict.csv"));}
+    [Fact]
+    public async Task ExistingAccountTagIsReusedCaseInsensitivelyAndPersistedWithCanonicalName()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ExistingAccountTagIsReusedCaseInsensitivelyAndPersistedWithCanonicalName));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var existing = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.Geology, "Foo");
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+        var csv = CaveCsv("Case,County A,A01,20,AA,,,,,,,1,  foo  ,,,,,,,false,,");
 
-    private async Task AssertPlanFails(string row,bool sync=false){await using var d=await fixture.CreateDatabaseAsync(Guid.NewGuid().ToString("N"));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\n"+row+"\n");await Assert.ThrowsAsync<ApiException>(()=>p.PlanAsync(csv,sync));}
-    private async Task AssertPeopleEncounterOrder(string[] rows,string expectedName)
-    {await using var d=await fixture.CreateDatabaseAsync(Guid.NewGuid().ToString("N"));var t=await TestDataScenarios.CreatePublishedCaveScenarioAsync(d,'a');await using var db=d.CreateDbContext("a",t.AccountId);var p=new CaveImportPlanningWorkflow(db,db.RequestUser);await using var csv=ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader+"\n"+string.Join("\n",rows)+"\n");var plan=await p.PlanAsync(csv,false);var creation=Assert.Single(plan.TagCreations,x=>x.Key==TagTypeKeyConstant.People);Assert.Equal(expectedName,creation.Name);var peopleTags=plan.Caves.SelectMany(c=>c.Tags).Where(x=>x.Role is CaveImportTagRole.Cartographer or CaveImportTagRole.ReportedBy).ToList();Assert.NotEmpty(peopleTags);Assert.All(peopleTags,x=>Assert.Equal(creation.Id,x.TagTypeId));var preview=plan.CreatePreview(false);Assert.All(preview.SelectMany(x=>x.CartographerNames.Concat(x.ReportedByNames)),name=>Assert.Equal(expectedName,name));await Execute(db,plan,"people-order.csv");db.ChangeTracker.Clear();Assert.Single(await db.TagTypes.Where(x=>x.AccountId==t.AccountId&&x.Key==TagTypeKeyConstant.People&&x.Name.ToLower()==expectedName.ToLower()).ToListAsync());foreach(var cave in plan.Caves){var snapshot=await new CavePublishedSnapshotRepository(db,db.RequestUser).BuildAsync(cave.Id);var expectedRoles=cave.Tags.Where(x=>x.Role is CaveImportTagRole.Cartographer or CaveImportTagRole.ReportedBy).Select(x=>x.Role==CaveImportTagRole.Cartographer?SnapshotTagRole.Cartographer:SnapshotTagRole.CaveReportedBy).Order().ToList();var actual=snapshot.Tags.Where(x=>x.Role is SnapshotTagRole.Cartographer or SnapshotTagRole.CaveReportedBy).ToList();Assert.Equal(expectedRoles,actual.Select(x=>x.Role).Order());Assert.All(actual,x=>{Assert.Equal(creation.Id,x.TagTypeId);Assert.Equal(expectedName,x.NameAtRevision);});}}
-    private static string PeopleRow(string name,int number,string cartographer,string reporter)=>$"{name},County A,A01,{number},AA,,,{cartographer},,,,1,,,,,,,{reporter},false,,";
-    private static TagType Tag(string account,string key,string name)=>new(name,key){Id=IdGenerator.Generate(),AccountId=account,IsDefault=false};
-    private static readonly string[] CaveTagTables=["GeologyTags","GeologicAgeTags","MapStatusTags","PhysiographicProvinceTags","ArcheologyTags","BiologyTags","CaveOtherTags","CartographerNameTags","CaveReportedByNameTags"];
-    private static bool IsWrite(string sql)=>sql.Contains("INSERT",StringComparison.OrdinalIgnoreCase)||sql.Contains("UPDATE",StringComparison.OrdinalIgnoreCase)||sql.Contains("DELETE",StringComparison.OrdinalIgnoreCase);
-    private static Planarian.Model.Database.PlanarianDbContext CreateObservedContext(PostgresTestDatabase d,PublishedCaveScenario t,SqlTimingInterceptor sql){var options=new DbContextOptionsBuilder<Planarian.Model.Database.PlanarianDbContext>().UseNpgsql(d.ConnectionString,o=>{o.MigrationsAssembly("Planarian.Migrations");o.UseNetTopologySuite();}).AddInterceptors(sql).Options;var db=new Planarian.Model.Database.PlanarianDbContext(options);db.RequestUser=new RequestUser(db){Id="a",AccountId=t.AccountId,FirstName="Test",LastName="User"};return db;}
-    private static void AssertTags(IReadOnlyList<SnapshotTagReference> actual,params (SnapshotTagRole Role,string Name)[] expected)=>Assert.Equal(expected.OrderBy(x=>x.Role).ThenBy(x=>x.Name).Select(x=>$"{x.Role}:{x.Name}"),actual.OrderBy(x=>x.Role).ThenBy(x=>x.NameAtRevision).Select(x=>$"{x.Role}:{x.NameAtRevision}"));
-    private static async Task Execute(Planarian.Model.Database.PlanarianDbContext db,CaveImportPlan plan,string file){var r=new CavePublishedSnapshotRepository(db,db.RequestUser);await new CaveImportExecutionRepository(db,db.RequestUser,r,new CaveImportRevisionRepository(db,db.RequestUser)).ExecuteAsync(plan,file);}
-    private static async Task SeedEntrance(PostgresTestDatabase d,PublishedCaveScenario t,string id){await using var db=d.CreateDbContext("a",t.AccountId);var q=Tag(t.AccountId,TagTypeKeyConstant.LocationQuality,"Survey Grade");db.TagTypes.Add(q);await db.SaveChangesAsync();db.Entrances.Add(new Entrance{Id=id,CaveId=t.CaveId,LocationQualityTagId=q.Id,IsPrimary=true,Location=new Point(new CoordinateZ(-86,35,500)){SRID=4326}});await db.SaveChangesAsync();}
+        // Act
+        var plan = await import.PlanCsvAsync(csv, syncExisting: false);
+        await import.ExecuteAsync(plan, "case.csv");
+        db.ChangeTracker.Clear();
+
+        // Assert
+        Assert.Empty(plan.TagCreations);
+        var planned = Assert.Single(plan.Caves);
+        Assert.Equal(["Foo"], planned.Geology);
+        Assert.Contains(planned.Tags, tag => tag.TagTypeId == existing.Id);
+        Assert.Equal(["Foo"], Assert.Single(plan.CreatePreview(false)).Geology);
+        Assert.Single(await db.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
+            tag.Key == TagTypeKeyConstant.Geology && tag.Name.ToLower() == "foo").ToListAsync());
+        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
+        Assert.Contains(snapshot.Tags, tag => tag.TagTypeId == existing.Id && tag.NameAtRevision == "Foo");
+    }
+
+    [Fact]
+    public async Task CaseVariantsCreateAndPersistOneTagUsingFirstSpelling()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(CaseVariantsCreateAndPersistOneTagUsingFirstSpelling));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+        var csv = CaveCsv(
+            "First,County A,A01,20,AA,,,,,,,1,\"Limestone, limestone\",,,,,,,false,,",
+            "Second,County A,A01,21,AA,,,,,,,1,LIMESTONE,,,,,,,false,,");
+
+        // Act
+        var plan = await import.PlanCsvAsync(csv, syncExisting: false);
+        await import.ExecuteAsync(plan, "variants.csv");
+
+        // Assert
+        var creation = Assert.Single(plan.TagCreations, tag => tag.Key == TagTypeKeyConstant.Geology);
+        Assert.Equal("Limestone", creation.Name);
+        Assert.All(plan.Caves, cave => Assert.Equal([creation.Id], cave.Tags
+            .Where(tag => tag.Role == CaveImportTagRole.Geology).Select(tag => tag.TagTypeId)));
+        Assert.Single(await db.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
+            tag.Key == TagTypeKeyConstant.Geology && tag.Name.ToLower() == "limestone").ToListAsync());
+    }
+
+    [Fact]
+    public async Task PreexistingCaseOnlyDuplicateTagsAreNotMutatedDuringPersistence()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(PreexistingCaseOnlyDuplicateTagsAreNotMutatedDuringPersistence));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await TestDataBuilder.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.Geology, "Foo", "zzzzzzzzzz");
+        await TestDataBuilder.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.Geology, "foo", "aaaaaaaaaa");
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+
+        // Act
+        var plan = await import.PlanCsvAsync(
+            CaveCsv("Legacy,County A,A01,20,AA,,,,,,,1,FOO,,,,,,,false,,"),
+            syncExisting: false);
+        await import.ExecuteAsync(plan, "legacy.csv");
+        db.ChangeTracker.Clear();
+
+        // Assert
+        Assert.Empty(plan.TagCreations);
+        Assert.Equal("aaaaaaaaaa", Assert.Single(Assert.Single(plan.Caves).Tags).TagTypeId);
+        var tags = await db.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
+                tag.Key == TagTypeKeyConstant.Geology && tag.Name.ToLower() == "foo")
+            .OrderBy(tag => tag.Id).Select(tag => $"{tag.Id}:{tag.Name}").ToListAsync();
+        Assert.Equal(["aaaaaaaaaa:foo", "zzzzzzzzzz:Foo"], tags);
+    }
+
+    [Fact]
+    public async Task ForeignCustomTagIsNotAssociatedAndLocalIntentPersists()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(ForeignCustomTagIsNotAssociatedAndLocalIntentPersists));
+        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var foreign = await TestDataBuilder.AddTagAsync(database, accountB.AccountId,
+            TagTypeKeyConstant.Geology, "Foreign Geo");
+        await using var db = database.CreateDbContext("a", accountA.AccountId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+
+        // Act
+        var plan = await import.PlanCsvAsync(
+            CaveCsv("Tags,County A,A01,22,AA,,,,,,,1,foreign geo,,,,,,,false,,"),
+            syncExisting: false);
+        await import.ExecuteAsync(plan, "foreign.csv");
+
+        // Assert
+        Assert.DoesNotContain(Assert.Single(plan.Caves).Tags, tag => tag.TagTypeId == foreign.Id);
+        Assert.Contains(plan.TagCreations, tag => tag.Name == "foreign geo");
+        Assert.False(await db.GeologyTags.AnyAsync(tag => tag.TagTypeId == foreign.Id));
+        Assert.Single(await db.TagTypes.Where(tag => tag.AccountId == accountA.AccountId &&
+            tag.Key == TagTypeKeyConstant.Geology && tag.Name.ToLower() == "foreign geo").ToListAsync());
+    }
+
+    [Fact]
+    public async Task FullInsertPersistsScalarsTagsAndImportRevision()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(FullInsertPersistsScalarsTagsAndImportRevision));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+        var csv = CaveCsv("Full,County A,A01,30,AA,Alt,Map,Cart,123.5,45.5,20.5,4,Limestone," +
+                          "Mississippian,Plateau,Artifact,Bats,2026-08-01,Reporter,true,Interesting,Full narrative");
+
+        // Act
+        var plan = await import.PlanCsvAsync(csv, syncExisting: false);
+        var planned = Assert.Single(plan.Caves);
+        await import.ExecuteAsync(plan, "full.csv");
+        var snapshot = await new CavePublishedSnapshotRepository(db, db.RequestUser).BuildAsync(planned.Id);
+
+        // Assert
+        Assert.Equal(9, plan.TagCreations.Count);
+        Assert.Equal((planned.Id, tenant.AccountId, tenant.StateId, tenant.CountyId, 30, "Full"),
+            (snapshot.CaveId, snapshot.AccountId, snapshot.State.Id, snapshot.County.Id,
+                snapshot.CountyNumber, snapshot.Name));
+        Assert.Equal(["Alt"], snapshot.AlternateNames);
+        Assert.Equal((123.5, 45.5, 20.5, 4),
+            (snapshot.LengthFeet, snapshot.DepthFeet, snapshot.MaxPitDepthFeet, snapshot.NumberOfPits));
+        Assert.Equal("Full narrative", snapshot.Narrative);
+        Assert.True(snapshot.IsArchived);
+        AssertTags(snapshot.Tags,
+            (SnapshotTagRole.Geology, "Limestone"),
+            (SnapshotTagRole.GeologicAge, "Mississippian"),
+            (SnapshotTagRole.MapStatus, "Map"),
+            (SnapshotTagRole.PhysiographicProvince, "Plateau"),
+            (SnapshotTagRole.Archeology, "Artifact"),
+            (SnapshotTagRole.Biology, "Bats"),
+            (SnapshotTagRole.CaveOther, "Interesting"),
+            (SnapshotTagRole.Cartographer, "Cart"),
+            (SnapshotTagRole.CaveReportedBy, "Reporter"));
+        var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == planned.Id);
+        var revision = await db.CaveRevisions.SingleAsync(row => row.Id == cave.CurrentRevisionId);
+        Assert.Equal((CaveRevisionSource.Import, CaveRevisionOperation.Create),
+            (revision.Source, revision.Operation));
+        Assert.Equal(CaveSnapshotJson.Serialize(snapshot),
+            CaveSnapshotJson.Serialize(CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion)));
+    }
+
+    [Fact]
+    public async Task SyncUpdatePreservesEntranceAndFile()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(SyncUpdatePreservesEntranceAndFile));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await TestDataBuilder.AddEntranceAsync(database, tenant, "preserved0");
+        var testFile = await TestDataBuilder.AddFileAsync(database, tenant, associateWithCave: true);
+        await using (var seed = database.CreateDbContext("a", tenant.AccountId))
+        {
+            var file = await seed.Files.SingleAsync(row => row.Id == testFile.FileId);
+            file.DisplayName = "Preserved display";
+            file.ExpiresOn = new DateTime(2027, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+            await seed.SaveChangesAsync();
+        }
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var before = await snapshots.BuildAsync(tenant.CaveId);
+        var fileBefore = await FileStateAsync(db, testFile.FileId);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+
+        // Act
+        var plan = await import.PlanCsvAsync(
+            CaveCsv("Updated,County A,A01,1,AA,,,,200,50,12,2,,,,,,2026-08-01,,false,,Updated"),
+            syncExisting: true);
+        await import.ExecuteAsync(plan, "update.csv");
+        db.ChangeTracker.Clear();
+
+        // Assert
+        var after = await snapshots.BuildAsync(tenant.CaveId);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Entrances),
+            System.Text.Json.JsonSerializer.Serialize(after.Entrances));
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Files),
+            System.Text.Json.JsonSerializer.Serialize(after.Files));
+        Assert.Equal(fileBefore, await FileStateAsync(db, testFile.FileId));
+    }
+
+    [Fact]
+    public async Task SyncNoChangeWritesNoCaveTagOrRevisionRows()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(SyncNoChangeWritesNoCaveTagOrRevisionRows));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var sql = new SqlTimingInterceptor();
+        await using var db = CreateObservedContext(database, tenant, sql);
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+        var plan = await import.PlanCsvAsync(
+            CaveCsv("Cave A,County A,A01,1,AA,,,,,,,,,,,,,,,false,,"),
+            syncExisting: true);
+        var caveBefore = await db.Caves.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == tenant.CaveId);
+        var revisionIdsBefore = await db.CaveRevisions.Where(row => row.CaveId == tenant.CaveId)
+            .OrderBy(row => row.Id).Select(row => row.Id).ToListAsync();
+        sql.Reset();
+
+        // Act
+        await import.ExecuteAsync(plan, "no-change.csv");
+        db.ChangeTracker.Clear();
+
+        // Assert
+        Assert.Equal(CaveImportAction.NoChange, Assert.Single(plan.Caves).Action);
+        Assert.Empty(plan.CreatePreview(omitNoChange: true));
+        var caveAfter = await db.Caves.IgnoreQueryFilters().AsNoTracking().SingleAsync(row => row.Id == tenant.CaveId);
+        Assert.Equal((caveBefore.Version, caveBefore.CurrentRevisionId),
+            (caveAfter.Version, caveAfter.CurrentRevisionId));
+        Assert.Equal(revisionIdsBefore, await db.CaveRevisions.Where(row => row.CaveId == tenant.CaveId)
+            .OrderBy(row => row.Id).Select(row => row.Id).ToListAsync());
+        var writes = sql.Items.Where(item => IsWrite(item.Sql)).Select(item => item.Sql).ToList();
+        Assert.DoesNotContain(writes, statement => statement.Contains("\"Caves\"", StringComparison.Ordinal) ||
+            statement.Contains("\"CaveRevisions\"", StringComparison.Ordinal) || CaveTagTables.Any(statement.Contains));
+    }
+
+    [Fact]
+    public async Task CommitAbortsOnPlannedVersionDrift()
+    {
+        // Arrange
+        await using var database = await fixture.CreateDatabaseAsync(nameof(CommitAbortsOnPlannedVersionDrift));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        CaveImportPlan plan;
+        await using (var planningDb = database.CreateDbContext("a", tenant.AccountId))
+        {
+            var import = new CaveImportTestHarness(planningDb, planningDb.RequestUser);
+            plan = await import.PlanCsvAsync(
+                CaveCsv("Planned,County A,A01,1,AA,,,,100,10,5,1,,,,,,,,false,,planned"),
+                syncExisting: true);
+        }
+        await using (var concurrent = database.CreateDbContext("a", tenant.AccountId))
+        {
+            var cave = await concurrent.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+            cave.Name = "Concurrent";
+            await concurrent.SaveChangesAsync();
+        }
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var execution = new CaveImportTestHarness(db, db.RequestUser);
+
+        // Act / Assert
+        await Assert.ThrowsAsync<CaveRevisionConflictException>(() => execution.ExecuteAsync(plan, "conflict.csv"));
+        Assert.False(await db.CaveImportBatches.AnyAsync(batch => batch.SourceFileName == "conflict.csv"));
+    }
+
+    private static string CaveCsv(params string[] rows) =>
+        ImportDryRunIntegrationTests.CaveHeader + "\n" + string.Join("\n", rows) + "\n";
+
+    private static async Task<object> FileStateAsync(PlanarianDbContext db, string fileId) =>
+        await db.Files.AsNoTracking().Where(file => file.Id == fileId).Select(file => new
+        {
+            file.Id,
+            file.AccountId,
+            file.CaveId,
+            file.FileTypeTagId,
+            file.FileName,
+            file.DisplayName,
+            file.BlobKey,
+            file.BlobContainer,
+            file.ExpiresOn
+        }).SingleAsync();
+
+    private static PlanarianDbContext CreateObservedContext(PostgresTestDatabase database,
+        PublishedCaveTestData tenant, SqlTimingInterceptor sql)
+    {
+        var options = new DbContextOptionsBuilder<PlanarianDbContext>()
+            .UseNpgsql(database.ConnectionString, builder =>
+            {
+                builder.MigrationsAssembly("Planarian.Migrations");
+                builder.UseNetTopologySuite();
+            })
+            .AddInterceptors(sql)
+            .Options;
+        var db = new PlanarianDbContext(options);
+        db.RequestUser = new RequestUser(db)
+        {
+            Id = "a",
+            AccountId = tenant.AccountId,
+            FirstName = "Test",
+            LastName = "User"
+        };
+        return db;
+    }
+
+    private static void AssertTags(IReadOnlyList<SnapshotTagReference> actual,
+        params (SnapshotTagRole Role, string Name)[] expected) =>
+        Assert.Equal(
+            expected.OrderBy(item => item.Role).ThenBy(item => item.Name)
+                .Select(item => $"{item.Role}:{item.Name}"),
+            actual.OrderBy(item => item.Role).ThenBy(item => item.NameAtRevision)
+                .Select(item => $"{item.Role}:{item.NameAtRevision}"));
+
+    private static bool IsWrite(string sql) =>
+        sql.Contains("INSERT", StringComparison.OrdinalIgnoreCase) ||
+        sql.Contains("UPDATE", StringComparison.OrdinalIgnoreCase) ||
+        sql.Contains("DELETE", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly string[] CaveTagTables =
+    [
+        "GeologyTags", "GeologicAgeTags", "MapStatusTags", "PhysiographicProvinceTags", "ArcheologyTags",
+        "BiologyTags", "CaveOtherTags", "CartographerNameTags", "CaveReportedByNameTags"
+    ];
 }

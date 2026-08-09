@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Planarian.Library.Options;
-using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
+using Planarian.Shared.Repositories;
 
 namespace Planarian.Shared.Services;
 
@@ -18,17 +17,17 @@ public class ThrottleEventLogService
     private readonly MemoryCache _memoryCache;
     private readonly RequestUser _requestUser;
     private readonly TimeSpan _retentionWindow;
-    private readonly IDbContextFactory<PlanarianDbContext> _dbContextFactory;
+    private readonly ThrottleEventLogRepository _repository;
 
     public ThrottleEventLogService(
-        IDbContextFactory<PlanarianDbContext> dbContextFactory,
+        ThrottleEventLogRepository repository,
         IHttpContextAccessor httpContextAccessor,
         ILogger<ThrottleEventLogService> logger,
         MemoryCache memoryCache,
         RequestUser requestUser,
         ServerOptions serverOptions)
     {
-        _dbContextFactory = dbContextFactory;
+        _repository = repository;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _memoryCache = memoryCache;
@@ -50,7 +49,6 @@ public class ThrottleEventLogService
 
         try
         {
-            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             string? ipAddress;
 
             try
@@ -62,7 +60,7 @@ public class ThrottleEventLogService
                 ipAddress = null;
             }
 
-            dbContext.ThrottleEventLogs.Add(new ThrottleEventLog
+            await _repository.AddAsync(new ThrottleEventLog
             {
                 OperationName = operationName,
                 LimiterKeyType = limiterKeyType,
@@ -75,9 +73,7 @@ public class ThrottleEventLogService
                 WindowSeconds = Math.Max(1, (int)Math.Ceiling(window.TotalSeconds)),
                 RetryAfterSeconds = retryAfterSeconds,
                 OccurredOn = DateTime.UtcNow
-            });
-
-            await dbContext.SaveChangesAsync(cancellationToken);
+            }, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -105,11 +101,7 @@ public class ThrottleEventLogService
         {
             var cutoff = DateTime.UtcNow.Subtract(_retentionWindow);
 
-            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-
-            await dbContext.ThrottleEventLogs
-                .Where(e => e.OccurredOn < cutoff)
-                .ExecuteDeleteAsync(cancellationToken);
+            await _repository.DeleteBeforeAsync(cutoff, cancellationToken);
         }
         catch (Exception ex)
         {

@@ -15,7 +15,7 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresTestServer f
     public async Task SharedTagRenameDoesNotFanOutButNextLegitimateRevisionCapturesRename()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(SharedTagRenameDoesNotFanOutButNextLegitimateRevisionCapturesRename));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         var caveIds = new[] { tenant.CaveId, "cave00000b", "cave00000c" };
         string tagId;
 
@@ -93,7 +93,7 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresTestServer f
         }
     }
 
-    private static Cave NewCave(string id, PublishedCaveScenario tenant, int number, string name) => new()
+    private static Cave NewCave(string id, PublishedCaveTestData tenant, int number, string name) => new()
     {
         Id = id, AccountId = tenant.AccountId, StateId = tenant.StateId, CountyId = tenant.CountyId,
         CountyNumber = number, Name = name, IsArchived = false

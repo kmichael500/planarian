@@ -21,6 +21,13 @@ public sealed class CaveImportPlanner
         CancellationToken cancellationToken = default)
     {
         var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
+        for (var index = 0; index < records.Count; index++)
+        {
+            if (string.IsNullOrWhiteSpace(records[index].CaveName))
+                failedRecords.Add(new(records[index], index + 2, $"{nameof(CaveCsvModel.CaveName)} is required."));
+        }
+        ThrowIfInvalid(failedRecords);
+
         var stateInputs = records.Select(r => r.State.Trim()).Distinct().ToList();
         var statesByInput = new Dictionary<string, CaveImportStateLookup>(StringComparer.Ordinal);
         foreach (var input in stateInputs)

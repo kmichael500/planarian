@@ -15,9 +15,9 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task CaveNameOverModelMaximumIsRejected()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(CaveNameOverModelMaximumIsRejected));
-        var t = await TestDataScenarios.CreatePublishedCaveScenarioAsync(d, 'a');
+        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
-        var planner = new CaveImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new CaveImportTestHarness(db, db.RequestUser);
         var name = new string('x', PropertyLength.Name + 1);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader + "\n" +
             $"{name},County A,A01,50,AA,,,,100,20,5,1,,,,,,,,false,,\n");
@@ -28,9 +28,9 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task EntranceNameOverModelMaximumIsRejected()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(EntranceNameOverModelMaximumIsRejected));
-        var t = await TestDataScenarios.CreatePublishedCaveScenarioAsync(d, 'a');
+        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
-        var planner = new EntranceImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new EntranceImportTestHarness(db, db.RequestUser);
         var name = new string('x', PropertyLength.Name + 1);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +
             $"{name},A01,1,true,35,-86,500,Survey Grade,0,,,,,,,\n");
@@ -41,9 +41,9 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task DuplicateEntranceTagInputProducesOneSemanticAssociation()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(DuplicateEntranceTagInputProducesOneSemanticAssociation));
-        var t = await TestDataScenarios.CreatePublishedCaveScenarioAsync(d, 'a');
+        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
-        var planner = new EntranceImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new EntranceImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +
             "Duplicate,A01,1,true,35,-86,500,Survey Grade,0,\"Open,open\",,,,,,\n");
         var plan = await planner.PlanAsync(csv, false);
@@ -59,17 +59,18 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task CaveSyncDeleteReturnsBlobCleanupOnlyAfterRelationalCommit()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(CaveSyncDeleteReturnsBlobCleanupOnlyAfterRelationalCommit));
-        var t = await TestDataScenarios.CreatePublishedCaveScenarioAsync(d, 'a');
+        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
+        var testFile = await TestDataBuilder.AddFileAsync(d, t);
         await using (var seed = d.CreateDbContext("a", t.AccountId))
         {
-            var file = await seed.Files.SingleAsync(f => f.Id == t.FileId);
+            var file = await seed.Files.SingleAsync(f => f.Id == testFile.FileId);
             file.CaveId = t.CaveId;
             file.BlobKey = "delete-after-commit";
             file.BlobContainer = "test";
             await seed.SaveChangesAsync();
         }
         await using var db = d.CreateDbContext("a", t.AccountId);
-        var planner = new CaveImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new CaveImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.CaveHeader + "\n" +
             "Replacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,\n");
         var plan = await planner.PlanAsync(csv, true);
@@ -85,7 +86,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task DefaultEntranceTagIsReusable()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(DefaultEntranceTagIsReusable));
-        var t = await TestDataScenarios.CreatePublishedCaveScenarioAsync(d, 'a');
+        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
         string id;
         await using (var seed = d.CreateDbContext("a", t.AccountId))
         {
@@ -96,7 +97,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
             id = tag.Id;
         }
         await using var db = d.CreateDbContext("a", t.AccountId);
-        var planner = new EntranceImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new EntranceImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +
             "Default,A01,1,true,35,-86,500,Survey Grade,0,Default Status,,,,,,\n");
         var plan = await planner.PlanAsync(csv, false);

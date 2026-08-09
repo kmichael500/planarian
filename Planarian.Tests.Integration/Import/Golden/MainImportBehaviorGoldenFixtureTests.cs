@@ -36,7 +36,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         var item = Assert.Single(LoadFixture().Cases,
             value => value.Area == area && value.Behavior == behavior);
         await using var database = await fixture.CreateDatabaseAsync($"golden_{area}_{behavior}");
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         await ApplySetupAsync(database, tenant, item.Setup);
 
         var beforeDatabase = await NormalizedDatabaseState.CaptureAllAsync(database);
@@ -133,10 +133,10 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     }
 
     private static async Task ExecuteCaveCaseAsync(GoldenCase item, PostgresTestDatabase database,
-        Planarian.Model.Database.PlanarianDbContext db, PublishedCaveScenario tenant, string beforeDatabase,
+        Planarian.Model.Database.PlanarianDbContext db, PublishedCaveTestData tenant, string beforeDatabase,
         IReadOnlyDictionary<string, CaveMarker> beforeCaves, IReadOnlyList<GoldenTagType> beforeTags)
     {
-        var planner = new CaveImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new CaveImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(
             ImportDryRunIntegrationTests.CaveHeader + "\n" + item.InputCsv + "\n");
 
@@ -166,10 +166,10 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     }
 
     private static async Task ExecuteEntranceCaseAsync(GoldenCase item, PostgresTestDatabase database,
-        Planarian.Model.Database.PlanarianDbContext db, PublishedCaveScenario tenant, string beforeDatabase,
+        Planarian.Model.Database.PlanarianDbContext db, PublishedCaveTestData tenant, string beforeDatabase,
         IReadOnlyDictionary<string, CaveMarker> beforeCaves, IReadOnlyList<GoldenTagType> beforeTags)
     {
-        var planner = new EntranceImportPlanningWorkflow(db, db.RequestUser);
+        var planner = new EntranceImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(
             ImportDryRunIntegrationTests.EntranceHeader + "\n" + item.InputCsv + "\n");
 
@@ -315,7 +315,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
                ?? throw new InvalidOperationException("Golden fixture could not be deserialized.");
     }
 
-    private static async Task ApplySetupAsync(PostgresTestDatabase database, PublishedCaveScenario tenant, string setup)
+    private static async Task ApplySetupAsync(PostgresTestDatabase database, PublishedCaveTestData tenant, string setup)
     {
         switch (setup)
         {
@@ -337,9 +337,10 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
                 return;
             case "existing-entrance-and-file":
                 await SeedEntranceAsync(database, tenant, "preserved0", "Preserved", true);
+                var testFile = await TestDataBuilder.AddFileAsync(database, tenant);
                 await using (var db = database.CreateDbContext("a", tenant.AccountId))
                 {
-                    var file = await db.Files.SingleAsync(value => value.Id == tenant.FileId);
+                    var file = await db.Files.SingleAsync(value => value.Id == testFile.FileId);
                     file.CaveId = tenant.CaveId;
                     file.DisplayName = "Preserved display";
                     file.ExpiresOn = new DateTime(2027, 1, 2, 0, 0, 0, DateTimeKind.Utc);
@@ -358,7 +359,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         }
     }
 
-    private static async Task SeedEntranceAsync(PostgresTestDatabase database, PublishedCaveScenario tenant, string id,
+    private static async Task SeedEntranceAsync(PostgresTestDatabase database, PublishedCaveTestData tenant, string id,
         string name, bool primary)
     {
         await using var db = database.CreateDbContext("a", tenant.AccountId);
@@ -373,7 +374,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         await db.SaveChangesAsync();
     }
 
-    private static async Task SeedUnrelatedCaveAsync(PostgresTestDatabase database, PublishedCaveScenario tenant)
+    private static async Task SeedUnrelatedCaveAsync(PostgresTestDatabase database, PublishedCaveTestData tenant)
     {
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var cave = new Cave

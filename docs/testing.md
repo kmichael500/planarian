@@ -33,7 +33,9 @@ environment owns external Docker cleanup.
 
 Ordinary arrangement uses small typed EF builders/scenarios and creates only relevant state: account, county,
 published Cave, Entrance, tag, request, or file as needed. Avoid universal mega-seeds and hidden unrelated entities.
-High-volume setup belongs in a dedicated scale seeder.
+`TestDataBuilder` provides those composable capabilities. The only routine model/filter bypass is
+`GlobalStateTestData`, because `State` is shared global reference data. High-volume setup belongs in the dedicated
+`ImportScaleSeeder`; ordinary tests must not use it.
 
 Raw SQL is appropriate for PostgreSQL catalogs/constraints/PostGIS/locks/`xmin`, named historical-schema seeders,
 exact JSON/`xmin` no-write observations, and dedicated high-volume seeders (including test-only binary COPY when EF
@@ -46,6 +48,9 @@ Use fast unit tests for pure parsing/planning rules, matching, defaults, validat
 calculation, and preview. Use PostgreSQL integration tests for planning repository projections and tenant scoping,
 dry-run write rejection/state equality, commit atomicity, locks/concurrency, revisions, PostGIS, and deferred cleanup.
 The golden fixture remains the compatibility authority; never update it merely to make a refactor pass.
+Integration imports use the test-only `CaveImportTestHarness` and `EntranceImportTestHarness` to compose the real
+parser, planning repository, pure planner, execution repository, snapshot repository, and revision repository. These
+harnesses remove plumbing without hiding CSV inputs or persistence assertions.
 
 ## Readability and performance
 
@@ -56,7 +61,9 @@ deterministic, independent, and never depend on execution order.
 Scale diagnostics separate parse, state-load, pure planning, and execution time and report SQL commands, writes,
 `SaveChanges`, tracked-entry high-water marks, plan counts, and revisions. Prefer structural limits over flaky wall
 clock limits. Compare small and large workloads to catch N+1 growth; bounded chunk growth is expected. Keep change
-tracking bounded and do not measure scale seeding as importer execution.
+tracking bounded and do not measure scale seeding as importer execution. Scale CSV generation, seeding, metrics, and
+execution live separately in `ImportScaleDataFactory`, `ImportScaleSeeder`, `ImportScaleMetrics`, and
+`ImportScaleRunner`.
 
 ## Running tests
 

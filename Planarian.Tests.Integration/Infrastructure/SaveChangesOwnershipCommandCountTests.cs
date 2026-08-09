@@ -29,7 +29,7 @@ public sealed class SaveChangesOwnershipCommandCountTests(PostgresTestServer fix
     public async Task SixHundredCaveAssociationsUseBoundedOwnershipSelects()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(SixHundredCaveAssociationsUseBoundedOwnershipSelects));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         var counter = new DbCommandCounter();
         await using var db = CreateContext(database, tenant.AccountId, counter);
         var tags = Enumerable.Range(0, 600).Select(i => new TagType($"Tag {i}", "geology") { Id = $"t{i:D9}", AccountId = tenant.AccountId, IsDefault = false }).ToList();
@@ -47,7 +47,7 @@ public sealed class SaveChangesOwnershipCommandCountTests(PostgresTestServer fix
     public async Task EntranceAssociationsUseBoundedDistinctEntranceOwnershipSelects()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(EntranceAssociationsUseBoundedDistinctEntranceOwnershipSelects));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         string qualityId, statusId;
         await using (var seed = database.CreateDbContext("seed", tenant.AccountId))
         {

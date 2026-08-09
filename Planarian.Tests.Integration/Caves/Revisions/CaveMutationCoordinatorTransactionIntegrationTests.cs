@@ -14,7 +14,7 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CallerOwnedTransactionPublishesManagerUpdateAndAdvancesPointer));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         string revisionId;
 
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
@@ -50,7 +50,7 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CallerOwnedDeletePublishesFinalTombstoneWithPreDeleteSnapshot));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         string tombstoneId;
 
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
@@ -84,7 +84,7 @@ public sealed class CaveMutationCoordinatorTransactionIntegrationTests(PostgresT
     public async Task PreparedSemanticNoOpDoesNotCreateRevision()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(PreparedSemanticNoOpDoesNotCreateRevision));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
 
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {

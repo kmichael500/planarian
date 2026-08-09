@@ -17,7 +17,8 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
     public async Task ProjectionReaderMatchesLegacyIncludeReaderForRepresentativeAggregate()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(ProjectionReaderMatchesLegacyIncludeReaderForRepresentativeAggregate));
-        var tenant = await TestDataScenarios.CreatePublishedCaveScenarioAsync(database, 'a');
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var testFile = await TestDataBuilder.AddFileAsync(database, tenant);
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             var geology = Tag(tenant.AccountId, "geology", "Limestone");
@@ -37,7 +38,7 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
             db.Entrances.Add(entrance);
             await db.SaveChangesAsync();
             db.EntranceStatusTags.Add(new EntranceStatusTag { Id = IdGenerator.Generate(), EntranceId = entrance.Id, TagTypeId = status.Id });
-            var file = await db.Files.SingleAsync(f => f.Id == tenant.FileId);
+            var file = await db.Files.SingleAsync(f => f.Id == testFile.FileId);
             file.CaveId = cave.Id;
             file.DisplayName = "Survey map";
             await db.SaveChangesAsync();

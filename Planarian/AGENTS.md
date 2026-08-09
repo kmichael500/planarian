@@ -6,3 +6,5 @@
 - Preserve tenant predicates, import locking/atomicity, bounded tracking, and normal 10k-Cave scalability.
 - Raw SQL is limited to provider contracts, historical migration setup, specialized observation, or scale seeding.
 - Before completion, build the solution, run unit and relevant integration/golden/scale suites, and check pending models.
+- Use the narrowest correct test layer and small scenario-specific builders, never a universal mega-seed. Report the
+  behavior, its proving test, the regression protected, and every validation suite run.

@@ -8,6 +8,8 @@ on:
       - "Planarian.Tests/**"
       - "Planarian.Tests.Unit/**"
       - "Planarian.Tests.Integration/**"
+      - "docs/**"
+      - "AGENTS.md"
       - "scripts/**"
       - ".github/workflows/pr-validation.yml"
 
