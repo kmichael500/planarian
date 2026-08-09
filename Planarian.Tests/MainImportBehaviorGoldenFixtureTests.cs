@@ -60,13 +60,13 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
         var difference = Assert.Single(golden.ApprovedSemanticDifferences);
         Assert.Equal("case-insensitive-tag-creation-deduplication", difference.Id);
         Assert.Equal(BaselineCommit, difference.BaselineCommit);
-        Assert.Equal(18, golden.Cases.Count);
+        Assert.Equal(19, golden.Cases.Count);
         var required = new[]
         {
             "required-fields", "invalid-numeric", "optional-date", "state-resolution", "county-creation",
             "reference-case", "tags-and-insert", "update-and-preserve-relationships", "no-change",
             "sync-deletion", "required-coordinates", "coordinate-ranges", "elevation-pit-validation",
-            "location-quality-tags-geometry", "append-primary-rules", "sync-replacement",
+            "location-quality-reference-case", "location-quality-tags-geometry", "append-primary-rules", "sync-replacement",
             "targeted-deletion-scope"
         };
         foreach (var behavior in required) Assert.Contains(golden.Cases, item => item.Behavior == behavior);
@@ -92,10 +92,44 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
         }
         var registered = golden.ApprovedSemanticDifferences.Select(value => value.Id)
             .ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(golden.ApprovedSemanticDifferences.Count, registered.Count);
+        Assert.All(golden.Cases.GroupBy(value => (value.Area, value.Behavior)), group => Assert.Single(group));
         var overrides = golden.Cases.Where(value => value.TargetOverride is not null).ToList();
         Assert.All(overrides, value => Assert.Contains(value.TargetOverride!.ApprovedDifferenceId, registered));
         Assert.All(golden.ApprovedSemanticDifferences, value =>
-            Assert.Single(overrides, item => item.TargetOverride!.ApprovedDifferenceId == value.Id));
+            Assert.Contains(overrides, item => item.TargetOverride!.ApprovedDifferenceId == value.Id));
+        Assert.Empty(ValidateSemanticOverrides(golden));
+    }
+
+    [Fact]
+    public void SemanticOverrideValidatorRejectsUnknownDifferenceId()
+    {
+        var golden = LoadFixture();
+        var item = Assert.Single(golden.Cases, value => value.Behavior == "reference-case");
+        var invalid = item.TargetOverride! with { ApprovedDifferenceId = "unregistered-semantic-difference" };
+        Assert.Contains(ValidateOverride(golden, item, invalid),
+            error => error.Contains("unregistered", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SemanticOverrideValidatorRejectsUnrelatedChangeUnderValidId()
+    {
+        var golden = LoadFixture();
+        var item = Assert.Single(golden.Cases, value => value.Behavior == "reference-case");
+        var original = item.TargetOverride!;
+        var caves = original.Preview.Caves.ToList();
+        caves[0] = caves[0] with { Name = "Unrelated masked Cave name" };
+        var invalid = original with { Preview = original.Preview with { Caves = caves } };
+        Assert.Contains(ValidateOverride(golden, item, invalid),
+            error => error.Contains("unrelated preview semantics", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SemanticOverrideValidatorAcceptsBaselineAndRegisteredTagCorrections()
+    {
+        var golden = LoadFixture();
+        Assert.Contains(golden.Cases, value => value.TargetOverride is null);
+        Assert.Empty(ValidateSemanticOverrides(golden));
     }
 
     private static async Task ExecuteCaveCaseAsync(GoldenCase item, PostgresTestDatabase database,
@@ -192,6 +226,37 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
             $"Golden mismatch for {label}.\nExpected:\n{expectedJson}\nActual:\n{actualJson}");
     }
 
+    private static IReadOnlyList<string> ValidateSemanticOverrides(GoldenFixture golden)
+    {
+        var errors = new List<string>();
+        foreach (var item in golden.Cases.Where(value => value.TargetOverride is not null))
+            errors.AddRange(ValidateOverride(golden, item, item.TargetOverride!));
+        return errors;
+    }
+
+    private static IReadOnlyList<string> ValidateOverride(GoldenFixture golden, GoldenCase item,
+        GoldenTargetOverride target)
+    {
+        var errors = new List<string>();
+        if (!golden.ApprovedSemanticDifferences.Any(value => value.Id == target.ApprovedDifferenceId))
+            errors.Add($"Override {item.Area}/{item.Behavior} uses unregistered semantic difference '{target.ApprovedDifferenceId}'.");
+        if (target.ApprovedDifferenceId != "case-insensitive-tag-creation-deduplication") return errors;
+
+        var baselinePreview = item.BaselinePreview!;
+        var permittedPreview = baselinePreview with { TagCreations = target.Preview.TagCreations };
+        if (GoldenJson(permittedPreview) != GoldenJson(target.Preview))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated preview semantics.");
+
+        var baselineCommitted = item.BaselineCommitted!.WithExpectedTagTypes(baselinePreview.TagCreations);
+        var targetCommitted = target.Committed.WithExpectedTagTypes(target.Preview.TagCreations);
+        var permittedCommitted = baselineCommitted with { TagTypes = targetCommitted.TagTypes };
+        if (GoldenJson(permittedCommitted) != GoldenJson(targetCommitted))
+            errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated committed semantics.");
+        return errors;
+    }
+
+    private static string GoldenJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
+
     private static GoldenFixture LoadFixture()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "import-main-11cdd9e.json");
@@ -209,6 +274,13 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
                 await using (var db = database.CreateDbContext("a", tenant.AccountId))
                 {
                     db.TagTypes.Add(Tag(tenant.AccountId, TagTypeKeyConstant.Geology, "Foo"));
+                    await db.SaveChangesAsync();
+                }
+                return;
+            case "existing-location-quality":
+                await using (var db = database.CreateDbContext("a", tenant.AccountId))
+                {
+                    db.TagTypes.Add(Tag(tenant.AccountId, TagTypeKeyConstant.LocationQuality, "Survey Grade"));
                     await db.SaveChangesAsync();
                 }
                 return;

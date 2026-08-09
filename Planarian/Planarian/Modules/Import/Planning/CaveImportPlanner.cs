@@ -277,8 +277,8 @@ public sealed class CaveImportPlanner
             (TagTypeKeyConstant.Archeology, records.SelectMany(r => r.Archeology.SplitAndTrim())),
             (TagTypeKeyConstant.Biology, records.SelectMany(r => r.Biology.SplitAndTrim())),
             (TagTypeKeyConstant.CaveOther, records.SelectMany(r => r.OtherTags.SplitAndTrim())),
-            (TagTypeKeyConstant.People, records.SelectMany(r => r.CartographerNames.SplitAndTrim())),
-            (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
+            (TagTypeKeyConstant.People, records.SelectMany(r =>
+                r.CartographerNames.SplitAndTrim().Concat(r.ReportedByNames.SplitAndTrim())))
         };
         return ImportTagResolver.ResolveAsync(_db, _scope.AccountId, requests, cancellationToken);
     }

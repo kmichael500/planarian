@@ -9,7 +9,8 @@ anchors representative CSV input, sync mode, validation, baseline preview, and
 baseline committed state to that exact commit. A target override is permitted
 only when it names an entry in `approvedSemanticDifferences`; the anchor test
 rejects unregistered overrides and requires every registered difference to be
-used exactly once. `MainImportBehaviorGoldenFixtureTests` ties every row to an
+exercised by at least one target override. Multiple independently executable
+cases may exercise the same approved difference. `MainImportBehaviorGoldenFixtureTests` ties every row to an
 executable compatibility or preview/commit test. The committed state compares
 durable TagType creation/removal deltas independently of Cave snapshots, as well
 as importer-owned scalars, role-specific tag values, geometry, revision results,
@@ -78,6 +79,11 @@ an unused lowercase tag while associating the Cave or Entrance with an existing
 canonically cased tag. Cave and Entrance imports now trim names and use
 case-insensitive equality consistently for requested-name deduplication,
 existence checks, creation decisions, and resolution.
+
+When a genuinely new tag is created, its canonical name preserves the first
+trimmed spelling encountered in CSV order. Cave People values are encountered
+row by row; within each row, the People-valued fields follow their defined
+CSV/model order (Cartographer before Reported By).
 
 An eligible existing tag retains its stored ID, name casing, ownership, and
 default status. Tag key/type remains part of identity, and eligibility remains

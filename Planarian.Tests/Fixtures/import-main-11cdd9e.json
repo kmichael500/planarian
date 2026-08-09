@@ -174,6 +174,32 @@
       "coverageTest": "NumericValidationMatchesMain"
     },
     {
+      "area": "entrance", "behavior": "location-quality-reference-case", "setup": "existing-location-quality",
+      "inputCsv": "Case,A01,1,true,35,-86,500,survey grade,0,,,,,,Case description", "sync": false,
+      "validation": { "outcome": "success" },
+      "baselinePreview": {
+        "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":1, "name":"Case", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Case description", "tags":{} }],
+        "countyCreations":[], "tagCreations":["LocationQuality:survey grade"]
+      },
+      "baselineCommitted": {
+        "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
+        "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Case", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Case description", "tags":{} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }]
+      },
+      "targetOverride": {
+        "approvedDifferenceId": "case-insensitive-tag-creation-deduplication",
+        "preview": {
+          "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":1, "name":"Case", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Case description", "tags":{} }],
+          "countyCreations":[], "tagCreations":[]
+        },
+        "committed": {
+          "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
+          "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Case", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Case description", "tags":{} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }],
+          "tagTypes": { "added":[], "removed":[] }
+        }
+      },
+      "coverageTest": "ExistingLocationQualityAndMultiValueTagAreReusedCaseInsensitively"
+    },
+    {
       "area": "entrance", "behavior": "optional-date", "setup": "default",
       "inputCsv": "Trim,A01,1,true,35,-86,500,Survey Grade,0,,,,not-a-date,,Description", "sync": false,
       "validation": { "outcome": "success" },
