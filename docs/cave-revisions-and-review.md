@@ -1,146 +1,167 @@
 # Cave revisions and review architecture
 
-This document records the implementation boundary for Cave publication,
-history, imports, and pending review.
+This document separates the revision/history functionality delivered on
+`feature/cave-revisions` from the persistence foundation and the future
+change-request workflow. Persistence entities are not evidence that an
+end-to-end review feature exists.
 
-## Data access
+## Implemented now
 
-Planarian uses EF Core 8 with Npgsql/PostGIS as its application persistence
-model. Inserts use bounded `AddRange`/`SaveChangesAsync` batches; uniform
-set-based changes use `ExecuteUpdateAsync` or `ExecuteDeleteAsync`; distinct
-per-row changes use tracked entities in bounded chunks. Entrance import rows
-are now typed in-memory data rather than a dynamic PostgreSQL staging table.
+### Published Cave revision history
 
-The former linq2db and EFCore.BulkExtensions dependencies and production APIs
-were removed. No replacement ORM or bulk package was added.
+- `CaveRevision` records actual published Cave state as a versioned
+  `CavePublishedSnapshotV1` JSON document.
+- `Cave.CurrentRevisionId` points to the snapshot matching current relational
+  state. `PreviousRevisionId` forms the revision chain.
+- Each revision records its source and operation. `CaveRevisionDiffService`
+  derives semantic differences from complete snapshots.
+- Authorized manager create/edit, archive/unarchive, hard delete, and published
+  file mutations publish through `CaveMutationCoordinator`.
+- Cave and Entrance imports publish through `ImportRevisionPublisher`, with
+  provenance stored in `CaveImportBatch`.
+- Both publication paths suppress semantic no-ops and commit relational state,
+  the revision, and the current-revision pointer atomically.
+- Hard delete retains a final tombstone revision after the live Cave row is
+  removed. `CaveRevision` therefore keeps a logical Cave ID without requiring a
+  live Cave foreign key.
+- Snapshot references retain historical labels such as State, County, TagType,
+  Location Quality, and File Type names. Reference renames are reported as
+  metadata changes rather than retroactively rewriting history.
+- Tenant-filtered reads and account-qualified mutation checks remain the
+  security boundary.
+- Every persisted `File`, including a staged temporary file, is account-owned.
+  Tenant-qualified File and staged-file foreign keys enforce ownership.
 
-## Published history
+`CavePublishedSnapshotV1` contains revisionable metadata, not file bytes, SAS
+URLs, GeoJSON, search vectors, EF metadata, or concurrency tokens. V1 does not
+fan out Cave revisions merely because shared reference data is renamed.
 
-Current Cave data remains normalized. Each accepted revision stores an
-explicit, versioned `CavePublishedSnapshotV1` JSON document containing the
-published Cave aggregate's revisionable state. It contains references and
-metadata only: file bytes, SAS URLs, GeoJSON, search vectors, EF metadata, and
-concurrency tokens are excluded. Historical tag references retain
-`NameAtRevision`.
+### Change-request persistence/model foundation
 
-`Cave.CurrentRevisionId` points at the accepted snapshot matching the actual
-published relational state. `CaveRevision` keeps a logical Cave ID and does
-not require the live Cave row, so delete history survives hard deletion.
+The branch also implements database/model infrastructure for later workflow:
 
-Reference display values are historical Cave state. A later published Cave
-snapshot may capture a renamed State, County, TagType, Location Quality, or
-File Type using the same stable ID. The history diff reports that separately as
-an effective reference-data change, rather than claiming that the actor who
-published the Cave revision performed the shared-reference rename. A Cave
-revision timestamp is the snapshot-capture time, not necessarily the exact
-time at which any nested shared reference changed. V1 intentionally does not
-fan out revisions when shared reference data is renamed.
+- `CaveChangeRequest`;
+- immutable/versioned `CaveProposalVersion` rows and proposal JSON V1;
+- `CaveChangeRequestStagedFile` with account-qualified ownership;
+- base, current-proposal-version, and approved-revision linkage fields;
+- Pending, Approved, and Rejected persistence states;
+- reviewer identity, review timestamp, and review-note metadata; and
+- `CaveRevision.Source.UserSubmission` plus change-request provenance linkage.
 
-## Proposal and review boundary
+This is persistence/model foundation only. It is not a complete user workflow.
 
-Pending submissions are separate immutable proposal versions. A proposal has
-an exact `BaseRevisionId`; it never mutates published Cave data, allocates a
-CountyNumber, publishes files, or creates live taxonomy resources while
-pending. Reviewer amendments append a new proposal version. Approval must
-cross the same published-history boundary and create an accepted revision from
-the actual resulting database state. Rejection creates no Cave revision.
+### Data access and import publication
 
-## Mutation boundary
+Planarian uses EF Core 8 with Npgsql/PostGIS. CSV parsing and immutable planning
+occur outside the write transaction. Executors lock affected Caves in stable ID
+order, verify planned revision state, apply bounded EF batches, and publish
+revisions once inside the transaction. Entrance rows are typed in-memory data;
+the former temporary staging table, linq2db, and EFCore.BulkExtensions paths are
+gone. Destructive sync operations first establish owned IDs, then retain an
+explicit account predicate even when bypassing query filters.
 
-Published Cave history has one semantic boundary but two execution shapes.
-Interactive manager mutations use `CaveMutationCoordinator`; high-volume CSV
-imports use `ImportRevisionPublisher` inside the import executor transaction.
-Both publish snapshots from actual relational state, enforce expected revision
-state, create no revision for semantic no-ops, and advance history atomically
-with the corresponding relational change.
+Blob storage cannot join the PostgreSQL transaction. Published-file operations
+therefore use compensation: a newly written destination blob is deleted
+best-effort if relational/revision publication fails, without masking the
+original error. Temporary, hard-delete, and import-sync blob deletion occurs
+only after relational commit.
 
-## File ownership and provider validation
+PostgreSQL/PostGIS integration tests run through Testcontainers. Local macOS
+Colima socket detection is test-fixture behavior only and does not affect CI.
 
-Every persisted `File` is account-owned. This includes temporary import files,
-which have no `CaveId` but are owned by the uploading account. The
-tenant-qualified `Files(AccountId, Id)` key allows PostgreSQL to enforce that a
-staged change-request file belongs to the same account as its request. The
-migration backfills a legacy cave file from its Cave's account and fails with a
-diagnostic if any remaining legacy row has no determinable owner; it never
-assigns a synthetic empty account ID.
+## Not implemented yet
 
-Provider-specific tests require PostgreSQL/PostGIS through Testcontainers. The
-test fixture automatically detects the standard macOS Colima profile when no
-`DOCKER_HOST` is configured, uses its socket, and disables Ryuk because the
-Colima VM cannot bind-mount that macOS socket. This is local-only and does not
-affect CI. For a non-default Colima profile, configure the endpoint explicitly,
-for example:
+This branch does not provide a complete end-user change-request workflow. The
+following remain future work:
 
-```bash
-DOCKER_HOST=unix://$HOME/.colima/work/docker.sock \
-TESTCONTAINERS_RYUK_DISABLED=true \
-dotnet test Planarian.Tests/Planarian.Tests.csproj
-```
+- an application service for creating and submitting requests;
+- an append-only proposal-version/amendment service;
+- request retrieval and review APIs;
+- a manager/admin review queue;
+- approve and reject operations;
+- reviewer amendment operations;
+- approval-time stale-base conflict handling and explicit re-review;
+- materialization of an approved proposal into normalized Cave state;
+- publication of the resulting `UserSubmission` CaveRevision;
+- staged-file publication and cleanup for completed requests;
+- notifications;
+- frontend suggestion/new-Cave/edit UI;
+- frontend review/diff UI; and
+- an end-user Cave revision/history viewer.
 
-Manager Cave create/edit/archive/unarchive/hard-delete and published Cave-file
-upload, staged publication, and metadata edits are routed through
-`CaveMutationCoordinator`. For short mutations the coordinator owns the
-transaction. For larger existing service workflows it exposes prepare/publish
-operations that require and participate in the caller's active EF transaction,
-so permissions, tag/file work, revision insertion, pointer advancement, and
-commit remain one atomic unit without nested transactions. Hard delete writes
-a final tombstone revision from the last live snapshot after dependent
-relational rows are removed but before commit. Pending staged-file references
-are removed in the same transaction before their published File rows are
-removed.
+These items must not be described as functioning features merely because their
+database columns or entities exist.
 
-Blob storage cannot participate in the PostgreSQL transaction, so Cave-file
-writes use explicit compensation. If an upload or staged-file copy succeeds in
-blob storage but the relational/revision publication later fails, the unique
-destination blob is deleted best-effort without replacing the original
-exception. Destination compensation does not delete the staging source;
-staging-session cleanup remains owned by the upload-session caller, which
-cleans the committed staging blob when the import attempt finishes. Expired
-temporary-file rows are removed transactionally, but their blobs are deleted
-only after the database transaction commits. Cave hard-delete and import-sync
-blob cleanup are likewise deferred until after commit. GeoJSON is a separate
-domain in V1.
+## Future change-request architecture contract
 
-Cave and Entrance imports deliberately do not route thousands of rows through
-per-Cave coordinator calls. Their executors lock and verify scoped Cave rows,
-apply bounded relational batches, and use `ImportRevisionPublisher` once per
-transaction to create the corresponding accepted history and import provenance.
+### Published state versus proposed state
 
-## Import strategy
+`CaveRevision` represents actual published Cave state only. A pending suggestion
+must never create a fake revision. Pending state is a `CaveChangeRequest` plus
+immutable, versioned `CaveProposalVersion` snapshots. Diffs are derived from
+complete semantic snapshots/proposals.
 
-CSV parsing and planning occur outside the write transaction. Commit locks the
-affected Cave rows in stable ID order and verifies each planned current
-revision before applying the batch. Relational changes, revisions, and
-revision pointers use bounded EF Core batches. No-change records create no
-revision. Import provenance is stored in `CaveImportBatch` rather than tied to
-temporary upload rows. Physical blob cleanup is deferred until after commit.
-Destructive sync statements bypass permission query filters only after the
-owned Cave/File/Entrance IDs are established, and each such statement restores
-an explicit account predicate before mutation.
+Do not restore the obsolete `feature/review-changes` backend design of mutable
+request state plus typed field-by-field `CaveChangeHistory` rows replayed to
+construct accepted state. Useful product and UX ideas may be retained, but the
+backend contract is published immutable snapshots, pending immutable proposal
+versions, derived semantic diffs, and one controlled publication boundary.
 
-Executable import guarantees include complete Cave and Entrance aggregate
-inserts, semantic no-change/xmin preservation, exact sync replacement and
-unrelated-aggregate preservation, four read-only planning modes guarded by a
-write/DDL interceptor and full row-state comparison, seven preview-to-commit
-scenarios, deterministic multi-record late-failure rollback, and complete
-foreign-tenant state comparison. The source regex that checks account predicates
-near `IgnoreQueryFilters()` is supplemental lint only; executable PostgreSQL
-tenant-isolation tests and database foreign keys are the security boundaries.
+### Base revision and amendments
 
-## Inventory notes
+An update proposal records the exact published revision on which it was based.
+Approval must verify that the Cave has not advanced incompatibly. A stale
+proposal must enter an explicit conflict/re-review path; it must not be silently
+applied to newer state.
 
-The current branch's former alternate data-access paths and replacements are
-listed below. Performance numbers are intentionally kept in the benchmark
-report once PostgreSQL benchmark infrastructure is available; wall-clock
-performance is not a CI assertion.
+User or reviewer amendments append a new proposal version. Published proposal
+versions are never edited in place, and `CurrentProposalVersionId` identifies
+the latest version.
 
-| Former path | Replacement |
-| --- | --- |
-| RepositoryBase `BulkInsertAsync` | Explicit repository `AddRange` followed by bounded `SaveChangesAsync` |
-| Cave import `BulkConfig`/bulk insert | EF `AddRange` and `SaveChangesAsync` |
-| Cave import `BulkUpdateImportCaves` | Bounded tracked load, property updates, and one save |
-| Account cleanup `Take(...).DeleteAsync` | EF `ExecuteDeleteAsync` (bounded query semantics retained for cleanup) |
-| Account linq2db async helpers | EF `ToListAsync`, `FirstOrDefaultAsync`, `CountAsync` |
-| Account linq2db uniform updates | EF `ExecuteUpdateAsync` |
-| Temporary entrance linq2db table/COPY API | Typed in-memory import rows resolved through EF |
-| Map linq2db namespace | Normal EF Core queries |
+### Approval and rejection
+
+Approval must use the normal published mutation boundary, not write Cave tables
+independently. In one atomic workflow it must:
+
+1. verify permissions and request status;
+2. verify the base revision/concurrency state;
+3. resolve proposal intents;
+4. materialize the intended normalized Cave aggregate;
+5. publish a snapshot of the actual resulting database state;
+6. create a `CaveRevision` with `Source = UserSubmission`;
+7. attach `ChangeRequestId`;
+8. set `ApprovedRevisionId`;
+9. persist request status and reviewer metadata; and
+10. commit all relational state atomically.
+
+The accepted snapshot must describe actual validated relational state, never a
+blind copy of proposal JSON. Rejection records status/reviewer metadata and
+preserves the audit record, but changes no published Cave and creates no
+`CaveRevision`.
+
+### Permissions and direct edits
+
+Authorized manager/admin direct edits continue to bypass the proposal queue and
+publish normal history through `CaveMutationCoordinator`. Users with appropriate
+account- and Cave-scoped view access may submit suggestions without acquiring
+published-write authority. Managers/admins review those suggestions.
+
+### New Caves and taxonomy
+
+A new-Cave proposal must not allocate final live identifiers such as
+CountyNumber while pending. `CountyNumberIntent` remains the design basis unless
+implementation review identifies a concrete problem.
+
+Pending proposals may contain new-tag intent but must not create live TagTypes.
+Approval first attempts eligible case-insensitive reuse under the same policy as
+CSV imports: identity is tag key plus trimmed case-insensitive name; canonical
+existing ID/name is retained; active-account or default eligibility is required;
+legacy duplicates use exact spelling, then active-account ownership, then stable
+ID. A new active-account tag is created only when no eligible equivalent exists.
+
+### Staged files
+
+Proposal files remain staged and account-owned while pending. They become normal
+published Cave files only if approval succeeds. File publication and Cave
+revision publication must remain relationally atomic, using the existing blob
+compensation rules.

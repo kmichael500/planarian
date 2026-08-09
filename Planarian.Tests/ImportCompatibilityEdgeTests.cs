@@ -38,18 +38,21 @@ public sealed class ImportCompatibilityEdgeTests(PostgresIntegrationFixture fixt
     }
 
     [Fact]
-    public async Task DuplicateEntranceTagInputRemainsObservableInPlan()
+    public async Task DuplicateEntranceTagInputProducesOneSemanticAssociation()
     {
-        await using var d = await fixture.CreateDatabaseAsync(nameof(DuplicateEntranceTagInputRemainsObservableInPlan));
+        await using var d = await fixture.CreateDatabaseAsync(nameof(DuplicateEntranceTagInputProducesOneSemanticAssociation));
         var t = await IntegrationTestData.SeedTenantAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
         var planner = new EntranceImportPlanner(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +
-            "Duplicate,A01,1,true,35,-86,500,Survey Grade,0,\"Open,Open\",,,,,,\n");
+            "Duplicate,A01,1,true,35,-86,500,Survey Grade,0,\"Open,open\",,,,,,\n");
         var plan = await planner.PlanAsync(csv, false);
         var statuses = Assert.Single(plan.Entrances).Tags.Where(t => t.Role == EntranceImportTagRole.Status).ToList();
-        Assert.Equal(2, statuses.Count);
-        Assert.Equal(statuses[0].TagTypeId, statuses[1].TagTypeId);
+        Assert.Single(statuses);
+        var creation = Assert.Single(plan.TagCreations,
+            tag => tag.Key == TagTypeKeyConstant.EntranceStatus);
+        Assert.Equal("Open", creation.Name);
+        Assert.Equal(creation.Id, statuses[0].TagTypeId);
     }
 
     [Fact]

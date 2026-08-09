@@ -189,7 +189,7 @@ public sealed class EntranceImportPlanner
     }
 
     private static void AddTags(ICollection<PlannedEntranceTag> result, string entranceId,
-        IEnumerable<TagLookup> tags, EntranceImportTagRole role)
+        IEnumerable<ImportTagLookup> tags, EntranceImportTagRole role)
     {
         foreach (var tag in tags)
             result.Add(new PlannedEntranceTag(IdGenerator.Generate(), entranceId, tag.Id, role));
@@ -220,62 +220,25 @@ public sealed class EntranceImportPlanner
         }
     }
 
-    private async Task<TagResolutionSet> ResolveTagsAsync(IReadOnlyList<EntranceCsvModel> records,
+    private Task<ImportTagResolutionSet> ResolveTagsAsync(IReadOnlyList<EntranceCsvModel> records,
         CancellationToken cancellationToken)
     {
-        var requested = new Dictionary<string, List<string>>(StringComparer.Ordinal)
+        var requested = new List<(string Key, IEnumerable<string?> Names)>
         {
-            [TagTypeKeyConstant.LocationQuality] = DistinctNames(records.Select(r => r.LocationQuality)),
-            [TagTypeKeyConstant.EntranceStatus] = DistinctNames(records.SelectMany(r => r.EntranceStatuses.SplitAndTrim())),
-            [TagTypeKeyConstant.EntranceHydrology] = DistinctNames(records.SelectMany(r => r.EntranceHydrology.SplitAndTrim())),
-            [TagTypeKeyConstant.FieldIndication] = DistinctNames(records.SelectMany(r => r.FieldIndication.SplitAndTrim())),
-            [TagTypeKeyConstant.People] = DistinctNames(records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
+            (TagTypeKeyConstant.LocationQuality, records.Select(r => r.LocationQuality)),
+            (TagTypeKeyConstant.EntranceStatus, records.SelectMany(r => r.EntranceStatuses.SplitAndTrim())),
+            (TagTypeKeyConstant.EntranceHydrology, records.SelectMany(r => r.EntranceHydrology.SplitAndTrim())),
+            (TagTypeKeyConstant.FieldIndication, records.SelectMany(r => r.FieldIndication.SplitAndTrim())),
+            (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
         };
-        var keys = requested.Keys.ToList();
-        var existing = await _db.TagTypes
-            .Where(tag => keys.Contains(tag.Key) && (tag.AccountId == _scope.AccountId || tag.IsDefault))
-            .AsNoTracking()
-            .Select(tag => new TagLookup(tag.Id, tag.Key, tag.Name, false))
-            .ToListAsync(cancellationToken);
-
-        var all = existing.ToList();
-        var creations = new List<ImportTagCreationIntent>();
-        foreach (var (key, names) in requested)
-        {
-            foreach (var name in names)
-            {
-                if (all.Any(tag => tag.Key == key && tag.Name == name)) continue;
-                if (name.Length > PropertyLength.Name)
-                    throw ApiExceptionDictionary.BadRequest(
-                        $"Tag '{name}' exceeds the maximum allowed length of {PropertyLength.Name}");
-                var creation = new ImportTagCreationIntent(IdGenerator.Generate(), key, name);
-                creations.Add(creation);
-                all.Add(new TagLookup(creation.Id, key, name, true));
-            }
-        }
-        return new TagResolutionSet(all, creations);
+        return ImportTagResolver.ResolveAsync(_db, _scope.AccountId, requested, cancellationToken);
     }
 
-    private static List<string> DistinctNames(IEnumerable<string?> values) => values
-        .Select(value => value?.Trim())
-        .Where(value => !string.IsNullOrWhiteSpace(value))
-        .Cast<string>()
-        .Distinct()
-        .ToList();
+    private static ImportTagLookup? ResolveTag(ImportTagResolutionSet set, string key, string name) =>
+        ImportTagResolver.Resolve(set, key, name);
 
-    private static TagLookup? ResolveTag(TagResolutionSet set, string key, string name) => set.All
-        .FirstOrDefault(tag => tag.Key == key && tag.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-
-    private static List<TagLookup> ResolveMany(TagResolutionSet set, string key, string? raw)
-    {
-        var result = new List<TagLookup>();
-        foreach (var name in raw.SplitAndTrim())
-        {
-            var tag = ResolveTag(set, key, name) ?? throw ApiExceptionDictionary.NotFound(key);
-            result.Add(tag);
-        }
-        return result;
-    }
+    private static List<ImportTagLookup> ResolveMany(ImportTagResolutionSet set, string key, string? raw) =>
+        ImportTagResolver.ResolveMany(set, key, raw.SplitAndTrim());
 
     private static void ValidateNormalized(NormalizedEntranceRow row, int rowNumber,
         List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords)
@@ -354,15 +317,12 @@ public sealed class EntranceImportPlanner
         return true;
     }
 
-    private sealed record TagLookup(string Id, string Key, string Name, bool IsCreation);
-    private sealed record TagResolutionSet(IReadOnlyList<TagLookup> All, IReadOnlyList<ImportTagCreationIntent> Creations);
-
     private sealed record NormalizedEntranceRow(
         string Id, int SourceIndex, EntranceCsvModel Source, string CountyDisplayId, int CountyCaveNumber,
         string? Name, bool IsPrimary, string? Description, double Latitude, double Longitude, double Elevation,
-        TagLookup LocationQuality, DateTime? ReportedOn, double? PitDepthFeet,
-        IReadOnlyList<TagLookup> StatusTags, IReadOnlyList<TagLookup> HydrologyTags,
-        IReadOnlyList<TagLookup> FieldIndicationTags, IReadOnlyList<TagLookup> ReportedByTags);
+        ImportTagLookup LocationQuality, DateTime? ReportedOn, double? PitDepthFeet,
+        IReadOnlyList<ImportTagLookup> StatusTags, IReadOnlyList<ImportTagLookup> HydrologyTags,
+        IReadOnlyList<ImportTagLookup> FieldIndicationTags, IReadOnlyList<ImportTagLookup> ReportedByTags);
 }
 
 internal static class PlannedEntranceSourceExtensions

@@ -27,6 +27,12 @@ A typical workflow looks like this:
 5. Members can suggest updates when they notice something wrong.
 6. Managers/admins review changes so the data stays accurate.
 
+Implementation is staged: immutable Cave revision/history and the
+change-request persistence model exist, while the request submission, review,
+approval, and frontend workflows remain future work. See
+[`docs/cave-revisions-and-review.md`](docs/cave-revisions-and-review.md) for the
+exact current/future boundary.
+
 ## Data
 
 Most of these fields can be enabled or disabled, so a group can decide what it wants to collect.

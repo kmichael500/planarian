@@ -42,11 +42,12 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
         var beforeDatabase = await NormalizedDatabaseState.CaptureAllAsync(database);
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var beforeCaves = await LoadCaveMarkersAsync(db, tenant.AccountId);
+        var beforeTags = await LoadTagTypesAsync(db, tenant.AccountId);
 
         if (area == "cave")
-            await ExecuteCaveCaseAsync(item, database, db, tenant, beforeDatabase, beforeCaves);
+            await ExecuteCaveCaseAsync(item, database, db, tenant, beforeDatabase, beforeCaves, beforeTags);
         else if (area == "entrance")
-            await ExecuteEntranceCaseAsync(item, database, db, tenant, beforeDatabase, beforeCaves);
+            await ExecuteEntranceCaseAsync(item, database, db, tenant, beforeDatabase, beforeCaves, beforeTags);
         else
             throw new InvalidOperationException($"Unsupported golden area '{area}'.");
     }
@@ -56,6 +57,9 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
     {
         var golden = LoadFixture();
         Assert.Equal(BaselineCommit, golden.BaselineCommit);
+        var difference = Assert.Single(golden.ApprovedSemanticDifferences);
+        Assert.Equal("case-insensitive-tag-creation-deduplication", difference.Id);
+        Assert.Equal(BaselineCommit, difference.BaselineCommit);
         Assert.Equal(18, golden.Cases.Count);
         var required = new[]
         {
@@ -82,15 +86,21 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
             Assert.Contains(item.CoverageTest, methods);
             if (item.Validation.Outcome == "success")
             {
-                Assert.NotNull(item.Preview);
-                Assert.NotNull(item.Committed);
+                Assert.NotNull(item.BaselinePreview);
+                Assert.NotNull(item.BaselineCommitted);
             }
         }
+        var registered = golden.ApprovedSemanticDifferences.Select(value => value.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var overrides = golden.Cases.Where(value => value.TargetOverride is not null).ToList();
+        Assert.All(overrides, value => Assert.Contains(value.TargetOverride!.ApprovedDifferenceId, registered));
+        Assert.All(golden.ApprovedSemanticDifferences, value =>
+            Assert.Single(overrides, item => item.TargetOverride!.ApprovedDifferenceId == value.Id));
     }
 
     private static async Task ExecuteCaveCaseAsync(GoldenCase item, PostgresTestDatabase database,
         Planarian.Model.Database.PlanarianDbContext db, TenantSeed tenant, string beforeDatabase,
-        IReadOnlyDictionary<string, CaveMarker> beforeCaves)
+        IReadOnlyDictionary<string, CaveMarker> beforeCaves, IReadOnlyList<GoldenTagType> beforeTags)
     {
         var planner = new CaveImportPlanner(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(
@@ -110,20 +120,20 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
 
         AssertValidationSuccess(item);
         var actualPreview = GoldenPreview.From(plan);
-        AssertGoldenEqual(item.Preview!, actualPreview, $"{item.Area}/{item.Behavior} preview");
+        AssertGoldenEqual(item.TargetPreview, actualPreview, $"{item.Area}/{item.Behavior} preview");
 
         var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
         await new CaveImportExecutor(db, db.RequestUser, reader,
             new ImportRevisionPublisher(db, db.RequestUser)).ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 
-        var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves);
-        AssertGoldenEqual(item.Committed!, actualCommitted, $"{item.Area}/{item.Behavior} committed");
+        var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves, beforeTags);
+        AssertGoldenEqual(item.TargetCommitted, actualCommitted, $"{item.Area}/{item.Behavior} committed");
     }
 
     private static async Task ExecuteEntranceCaseAsync(GoldenCase item, PostgresTestDatabase database,
         Planarian.Model.Database.PlanarianDbContext db, TenantSeed tenant, string beforeDatabase,
-        IReadOnlyDictionary<string, CaveMarker> beforeCaves)
+        IReadOnlyDictionary<string, CaveMarker> beforeCaves, IReadOnlyList<GoldenTagType> beforeTags)
     {
         var planner = new EntranceImportPlanner(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(
@@ -143,15 +153,15 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
 
         AssertValidationSuccess(item);
         var actualPreview = GoldenPreview.From(plan);
-        AssertGoldenEqual(item.Preview!, actualPreview, $"{item.Area}/{item.Behavior} preview");
+        AssertGoldenEqual(item.TargetPreview, actualPreview, $"{item.Area}/{item.Behavior} preview");
 
         var reader = new CavePublishedSnapshotReader(db, db.RequestUser);
         await new EntranceImportExecutor(db, db.RequestUser, reader,
             new ImportRevisionPublisher(db, db.RequestUser)).ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 
-        var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves);
-        AssertGoldenEqual(item.Committed!, actualCommitted, $"{item.Area}/{item.Behavior} committed");
+        var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves, beforeTags);
+        AssertGoldenEqual(item.TargetCommitted, actualCommitted, $"{item.Area}/{item.Behavior} committed");
     }
 
     private static void AssertValidationSuccess(GoldenCase item) =>
@@ -271,13 +281,27 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
         Planarian.Model.Database.PlanarianDbContext db, string accountId) =>
         await db.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == accountId).AsNoTracking()
             .ToDictionaryAsync(cave => cave.Id, cave => new CaveMarker(cave.Version, cave.CurrentRevisionId));
+
+    private static async Task<IReadOnlyList<GoldenTagType>> LoadTagTypesAsync(
+        Planarian.Model.Database.PlanarianDbContext db, string accountId)
+    {
+        var tags = await db.TagTypes.IgnoreQueryFilters()
+            .Where(tag => tag.AccountId == accountId || tag.IsDefault)
+            .AsNoTracking().ToListAsync();
+        return tags.Select(tag => GoldenTagType.From(tag, accountId))
+            .OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ThenBy(tag => tag.Ownership).ToList();
+    }
 }
 
 internal sealed class GoldenFixture
 {
     public string BaselineCommit { get; init; } = string.Empty;
+    public List<ApprovedSemanticDifference> ApprovedSemanticDifferences { get; init; } = [];
     public List<GoldenCase> Cases { get; init; } = [];
 }
+
+internal sealed record ApprovedSemanticDifference(string Id, string BaselineCommit, List<string> AffectedAreas,
+    string HistoricalBehavior, string TargetBehavior, string Rationale);
 
 internal sealed class GoldenCase
 {
@@ -287,10 +311,24 @@ internal sealed class GoldenCase
     public string InputCsv { get; init; } = string.Empty;
     public bool Sync { get; init; }
     public GoldenValidation Validation { get; init; } = new();
-    public GoldenPreview? Preview { get; init; }
-    public GoldenCommittedState? Committed { get; init; }
+    public GoldenPreview? BaselinePreview { get; init; }
+    public GoldenCommittedState? BaselineCommitted { get; init; }
+    public GoldenTargetOverride? TargetOverride { get; init; }
     public string CoverageTest { get; init; } = string.Empty;
+    public GoldenPreview TargetPreview => TargetOverride?.Preview ?? BaselinePreview!;
+    public GoldenCommittedState TargetCommitted
+    {
+        get
+        {
+            var preview = TargetPreview;
+            var committed = TargetOverride?.Committed ?? BaselineCommitted!;
+            return committed.WithExpectedTagTypes(preview.TagCreations);
+        }
+    }
 }
+
+internal sealed record GoldenTargetOverride(string ApprovedDifferenceId, GoldenPreview Preview,
+    GoldenCommittedState Committed);
 
 internal sealed record GoldenValidation(string Outcome = "", int StatusCode = 0, string? ErrorCode = null,
     string? Message = null, string? ReasonContains = null);
@@ -347,10 +385,23 @@ internal sealed record CaveMarker(uint Version, string? RevisionId);
 internal sealed record GoldenCommittedState(
     List<string> TenantCaveKeys,
     List<string> TenantCountyCodes,
-    List<GoldenCommittedCave> Caves)
+    List<GoldenCommittedCave> Caves,
+    GoldenTagTypeDelta? TagTypes = null)
 {
+    public GoldenCommittedState WithExpectedTagTypes(IEnumerable<string> tagCreations) => TagTypes is not null
+        ? this
+        : this with
+        {
+            TagTypes = new GoldenTagTypeDelta(tagCreations.Select(value =>
+            {
+                var separator = value.IndexOf(':');
+                return new GoldenTagType(value[..separator], value[(separator + 1)..], "account");
+            }).OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ToList(), [])
+        };
+
     public static async Task<GoldenCommittedState> CaptureAsync(Planarian.Model.Database.PlanarianDbContext db,
-        string accountId, IReadOnlyDictionary<string, CaveMarker> before)
+        string accountId, IReadOnlyDictionary<string, CaveMarker> before,
+        IReadOnlyList<GoldenTagType> beforeTags)
     {
         var caveRows = await db.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == accountId)
             .Include(cave => cave.County).Include(cave => cave.State).AsNoTracking().ToListAsync();
@@ -372,9 +423,23 @@ internal sealed record GoldenCommittedState(
 
         var counties = await db.Counties.IgnoreQueryFilters().Where(county => county.AccountId == accountId)
             .OrderBy(county => county.DisplayId).Select(county => $"{county.DisplayId}:{county.Name}").ToListAsync();
-        return new GoldenCommittedState(caves.Select(cave => cave.Key).ToList(), counties, caves);
+        var afterTagRows = await db.TagTypes.IgnoreQueryFilters()
+            .Where(tag => tag.AccountId == accountId || tag.IsDefault)
+            .AsNoTracking().ToListAsync();
+        var afterTags = afterTagRows.Select(tag => GoldenTagType.From(tag, accountId))
+            .OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ThenBy(tag => tag.Ownership).ToList();
+        return new GoldenCommittedState(caves.Select(cave => cave.Key).ToList(), counties, caves,
+            new GoldenTagTypeDelta(afterTags.Except(beforeTags).ToList(), beforeTags.Except(afterTags).ToList()));
     }
 }
+
+internal sealed record GoldenTagType(string Key, string Name, string Ownership)
+{
+    public static GoldenTagType From(TagType tag, string accountId) =>
+        new(tag.Key, tag.Name, tag.AccountId == accountId ? "account" : "default");
+}
+
+internal sealed record GoldenTagTypeDelta(List<GoldenTagType> Added, List<GoldenTagType> Removed);
 
 internal sealed record GoldenCommittedCave(
     string Key, string Name, string State, string CountyName, List<string> AlternateNames,

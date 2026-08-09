@@ -1,6 +1,16 @@
 {
   "baselineCommit": "11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae",
   "description": "Executable golden expectations characterized from exact main; never regenerate from the feature branch.",
+  "approvedSemanticDifferences": [
+    {
+      "id": "case-insensitive-tag-creation-deduplication",
+      "baselineCommit": "11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae",
+      "affectedAreas": ["Cave tag imports", "Entrance tag imports"],
+      "historicalBehavior": "Tag creation and requested-name deduplication were case-sensitive even though association resolution was case-insensitive.",
+      "targetBehavior": "Trimmed tag names are matched and deduplicated case-insensitively within each tag key, preserving an eligible existing tag's ID and canonical name.",
+      "rationale": "The baseline creation check was inconsistent with its own case-insensitive resolution and could persist unused case-only duplicates."
+    }
+  ],
   "cases": [
     {
       "area": "cave", "behavior": "required-fields", "setup": "default",
@@ -18,11 +28,11 @@
       "area": "cave", "behavior": "optional-date", "setup": "default",
       "inputCsv": "Dates,County A,A01,9,AA,,,,,,,,,,,,,not-a-date,,false,,", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves": [{ "action":"insert", "key":"A01-9", "name":"Dates", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{} }],
         "entrances":[], "countyCreations":[], "tagCreations":[]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1","A01-9"], "tenantCountyCodes":["A01:County A"],
         "caves":[
           { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null },
@@ -41,11 +51,11 @@
       "area": "cave", "behavior": "county-creation", "setup": "default",
       "inputCsv": "New,New County,NEW,77,AA,,,,,,,,,,,,,,,false,,", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[{ "action":"insert", "key":"NEW-77", "name":"New", "state":"AA", "countyName":"New County", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{} }],
         "entrances":[], "countyCreations":["NEW:New County"], "tagCreations":[]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1","NEW-77"], "tenantCountyCodes":["A01:County A","NEW:New County"],
         "caves":[
           { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null },
@@ -58,28 +68,43 @@
       "area": "cave", "behavior": "reference-case", "setup": "existing-geology-case",
       "inputCsv": "Case,County A,A01,20,AA,,,,,,,1,foo,,,,,,,false,,", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[{ "action":"insert", "key":"A01-20", "name":"Case", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{"Geology":["Foo"]} }],
         "entrances":[], "countyCreations":[], "tagCreations":["Geology:foo"]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1","A01-20"], "tenantCountyCodes":["A01:County A"],
         "caves":[
           { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null },
           { "key":"A01-20", "name":"Case", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{"Geology":["Foo"]}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Create" }
         ]
       },
-      "coverageTest": "CreationComparisonIsCaseSensitiveButResolutionIsInsensitive"
+      "targetOverride": {
+        "approvedDifferenceId": "case-insensitive-tag-creation-deduplication",
+        "preview": {
+          "caves":[{ "action":"insert", "key":"A01-20", "name":"Case", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{"Geology":["Foo"]} }],
+          "entrances":[], "countyCreations":[], "tagCreations":[]
+        },
+        "committed": {
+          "tenantCaveKeys":["A01-1","A01-20"], "tenantCountyCodes":["A01:County A"],
+          "caves":[
+            { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null },
+            { "key":"A01-20", "name":"Case", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"", "tags":{"Geology":["Foo"]}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Create" }
+          ],
+          "tagTypes": { "added":[], "removed":[] }
+        }
+      },
+      "coverageTest": "ExistingAccountTagIsReusedCaseInsensitivelyWithCanonicalName"
     },
     {
       "area": "cave", "behavior": "tags-and-insert", "setup": "default",
       "inputCsv": "Full,County A,A01,30,AA,Alt,Map,Cart,123.5,45.5,20.5,4,Limestone,Mississippian,Plateau,Artifact,Bats,2026-08-01,Reporter,true,Interesting,Full narrative", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[{ "action":"insert", "key":"A01-30", "name":"Full", "state":"AA", "countyName":"County A", "alternateNames":["Alt"], "lengthFeet":123.5, "depthFeet":45.5, "maxPitDepthFeet":20.5, "numberOfPits":4, "reportedOn":"2026-08-01", "isArchived":true, "narrative":"Full narrative", "tags":{"Archeology":["Artifact"],"Biology":["Bats"],"Cartographer":["Cart"],"CaveOther":["Interesting"],"CaveReportedBy":["Reporter"],"GeologicAge":["Mississippian"],"Geology":["Limestone"],"MapStatus":["Map"],"PhysiographicProvince":["Plateau"]} }],
         "entrances":[], "countyCreations":[], "tagCreations":["Archeology:Artifact","Biology:Bats","CaveOther:Interesting","GeologicAge:Mississippian","Geology:Limestone","MapStatus:Map","People:Cart","People:Reporter","PhysiographicProvince:Plateau"]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1","A01-30"], "tenantCountyCodes":["A01:County A"],
         "caves":[
           { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null },
@@ -92,11 +117,11 @@
       "area": "cave", "behavior": "update-and-preserve-relationships", "setup": "existing-entrance-and-file",
       "inputCsv": "Updated,County A,A01,1,AA,,,,200,50,12,2,,,,,,2026-08-01,,false,,Updated", "sync": true,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[{ "action":"update", "key":"A01-1", "name":"Updated", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":200, "depthFeet":50, "maxPitDepthFeet":12, "numberOfPits":2, "reportedOn":"2026-08-01", "isArchived":false, "narrative":"Updated", "tags":{} }],
         "entrances":[], "countyCreations":[], "tagCreations":[]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
         "caves":[{ "key":"A01-1", "name":"Updated", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":200, "depthFeet":50, "maxPitDepthFeet":12, "numberOfPits":2, "reportedOn":"2026-08-01", "isArchived":false, "narrative":"Updated", "tags":{}, "entrances":[{ "name":"Preserved", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":null, "reportedOn":null, "description":null, "tags":{} }], "fileNames":["seed-a.pdf"], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }]
       },
@@ -106,8 +131,8 @@
       "area": "cave", "behavior": "no-change", "setup": "default",
       "inputCsv": "Cave A,County A,A01,1,AA,,,,,,,,,,,,,,,false,,", "sync": true,
       "validation": { "outcome": "success" },
-      "preview": { "caves":[], "entrances":[], "countyCreations":[], "tagCreations":[] },
-      "committed": {
+      "baselinePreview": { "caves":[], "entrances":[], "countyCreations":[], "tagCreations":[] },
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
         "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":false, "latestRevisionOperation":null }]
       },
@@ -117,14 +142,14 @@
       "area": "cave", "behavior": "sync-deletion", "setup": "default",
       "inputCsv": "Replacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,Replacement", "sync": true,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[
           { "action":"insert", "key":"REP-2", "name":"Replacement", "state":"AA", "countyName":"Replacement County", "alternateNames":[], "lengthFeet":10, "depthFeet":2, "maxPitDepthFeet":1, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"Replacement", "tags":{} },
           { "action":"delete", "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":0, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{} }
         ],
         "entrances":[], "countyCreations":["REP:Replacement County"], "tagCreations":[]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["REP-2"], "tenantCountyCodes":["A01:County A","REP:Replacement County"],
         "caves":[{ "key":"REP-2", "name":"Replacement", "state":"AA", "countyName":"Replacement County", "alternateNames":[], "lengthFeet":10, "depthFeet":2, "maxPitDepthFeet":1, "numberOfPits":1, "reportedOn":null, "isArchived":false, "narrative":"Replacement", "tags":{}, "entrances":[], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Create" }]
       },
@@ -152,11 +177,11 @@
       "area": "entrance", "behavior": "optional-date", "setup": "default",
       "inputCsv": "Trim,A01,1,true,35,-86,500,Survey Grade,0,,,,not-a-date,,Description", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":1, "name":"Trim", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Description", "tags":{} }],
         "countyCreations":[], "tagCreations":["LocationQuality:Survey Grade"]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
         "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Trim", "isPrimary":true, "latitude":35, "longitude":-86, "elevation":500, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"Description", "tags":{} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }]
       },
@@ -166,11 +191,11 @@
       "area": "entrance", "behavior": "location-quality-tags-geometry", "setup": "default",
       "inputCsv": "Main,A01,1,true,35.123456,-86.654321,612.5,Survey Grade,22.5,Open,Wet,Sink,2026-08-01,Surveyor,Full description", "sync": false,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":1, "name":"Main", "isPrimary":true, "latitude":35.123456, "longitude":-86.654321, "elevation":612.5, "locationQuality":"Survey Grade", "pitDepthFeet":22.5, "reportedOn":"2026-08-01", "description":"Full description", "tags":{"EntranceHydrology":["Wet"],"EntranceReportedBy":["Surveyor"],"EntranceStatus":["Open"],"FieldIndication":["Sink"]} }],
         "countyCreations":[], "tagCreations":["EntranceHydrology:Wet","EntranceStatus:Open","FieldIndication:Sink","LocationQuality:Survey Grade","People:Surveyor"]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
         "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Main", "isPrimary":true, "latitude":35.123456, "longitude":-86.654321, "elevation":612.5, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":22.5, "reportedOn":"2026-08-01", "description":"Full description", "tags":{"EntranceHydrology":["Wet"],"EntranceReportedBy":["Surveyor"],"EntranceStatus":["Open"],"FieldIndication":["Sink"]} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }]
       },
@@ -186,11 +211,11 @@
       "area": "entrance", "behavior": "sync-replacement", "setup": "existing-primary",
       "inputCsv": "Replacement,A01,1,true,35.2,-86.2,520,Survey Grade,7.5,Open,Wet,Sink,2026-08-02,Surveyor,Replacement description", "sync": true,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":0, "name":"Replacement", "isPrimary":true, "latitude":35.2, "longitude":-86.2, "elevation":520, "locationQuality":"Survey Grade", "pitDepthFeet":7.5, "reportedOn":"2026-08-02", "description":"Replacement description", "tags":{"EntranceHydrology":["Wet"],"EntranceReportedBy":["Surveyor"],"EntranceStatus":["Open"],"FieldIndication":["Sink"]} }],
         "countyCreations":[], "tagCreations":["EntranceHydrology:Wet","EntranceStatus:Open","FieldIndication:Sink","People:Surveyor"]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1"], "tenantCountyCodes":["A01:County A"],
         "caves":[{ "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Replacement", "isPrimary":true, "latitude":35.2, "longitude":-86.2, "elevation":520, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":7.5, "reportedOn":"2026-08-02", "description":"Replacement description", "tags":{"EntranceHydrology":["Wet"],"EntranceReportedBy":["Surveyor"],"EntranceStatus":["Open"],"FieldIndication":["Sink"]} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" }]
       },
@@ -200,11 +225,11 @@
       "area": "entrance", "behavior": "targeted-deletion-scope", "setup": "existing-primary-and-unrelated-cave",
       "inputCsv": "Replacement,A01,1,true,35.2,-86.2,520,Survey Grade,0,,,,,,,", "sync": true,
       "validation": { "outcome": "success" },
-      "preview": {
+      "baselinePreview": {
         "caves":[], "entrances":[{ "caveKey":"A01-1", "countChange":0, "name":"Replacement", "isPrimary":true, "latitude":35.2, "longitude":-86.2, "elevation":520, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"", "tags":{} }],
         "countyCreations":[], "tagCreations":[]
       },
-      "committed": {
+      "baselineCommitted": {
         "tenantCaveKeys":["A01-1","A01-2"], "tenantCountyCodes":["A01:County A"],
         "caves":[
           { "key":"A01-1", "name":"Cave A", "state":"AA", "countyName":"County A", "alternateNames":[], "lengthFeet":null, "depthFeet":null, "maxPitDepthFeet":null, "numberOfPits":null, "reportedOn":null, "isArchived":false, "narrative":null, "tags":{}, "entrances":[{ "name":"Replacement", "isPrimary":true, "latitude":35.2, "longitude":-86.2, "elevation":520, "srid":4326, "locationQuality":"Survey Grade", "pitDepthFeet":0, "reportedOn":null, "description":"", "tags":{} }], "fileNames":[], "versionOrRevisionChanged":true, "latestRevisionOperation":"Update" },

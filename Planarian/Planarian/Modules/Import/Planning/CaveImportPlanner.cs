@@ -61,6 +61,9 @@ public sealed class CaveImportPlanner
             .ToList();
 
         var tagSet = await ResolveTagsAsync(records, cancellationToken);
+        var tagNamesById = tagSet.All
+            .GroupBy(tag => tag.Id)
+            .ToDictionary(group => group.Key, group => group.First().Name, StringComparer.Ordinal);
 
         var existingCounties = await _db.Counties
             .Where(c => c.AccountId == _scope.AccountId)
@@ -176,7 +179,7 @@ public sealed class CaveImportPlanner
                         skipCountyNumberConflictCheck: syncExisting))
                     continue;
 
-                var tagIds = new Dictionary<CaveImportTagRole, IReadOnlyList<TagLookup>>
+                var tagIds = new Dictionary<CaveImportTagRole, IReadOnlyList<ImportTagLookup>>
                 {
                     [CaveImportTagRole.Geology] = geology,
                     [CaveImportTagRole.GeologicAge] = geologicAges,
@@ -194,7 +197,7 @@ public sealed class CaveImportPlanner
                 if (existing is not null)
                 {
                     deleteIds.Remove(existing.Id);
-                    summary = BuildChangeSummary(existing, transient, tagIds, tagSet.NameById);
+                    summary = BuildChangeSummary(existing, transient, tagIds, tagNamesById);
                     action = string.IsNullOrWhiteSpace(summary) ? CaveImportAction.NoChange : CaveImportAction.Update;
                 }
 
@@ -237,7 +240,7 @@ public sealed class CaveImportPlanner
 
         return new CaveImportPlan(_scope.AccountId, syncExisting, planned, deletions,
             accountStateCreations, countyCreations, tagSet.Creations,
-            tagSet.NameById, targets);
+            tagNamesById, targets);
     }
 
     private async Task<List<ExistingCave>> LoadExistingCavesAsync(CancellationToken cancellationToken)
@@ -262,64 +265,26 @@ public sealed class CaveImportPlanner
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<TagSet> ResolveTagsAsync(IReadOnlyList<CaveCsvModel> records,
+    private Task<ImportTagResolutionSet> ResolveTagsAsync(IReadOnlyList<CaveCsvModel> records,
         CancellationToken cancellationToken)
     {
-        var requests = new List<(string Key, List<string> Names)>
+        var requests = new List<(string Key, IEnumerable<string?> Names)>
         {
-            (TagTypeKeyConstant.Geology, DistinctNames(records.SelectMany(r => r.Geology.SplitAndTrim()))),
-            (TagTypeKeyConstant.GeologicAge, DistinctNames(records.SelectMany(r => r.GeologicAges.SplitAndTrim()))),
-            (TagTypeKeyConstant.MapStatus, DistinctNames(records.SelectMany(r => r.MapStatuses.SplitAndTrim()))),
-            (TagTypeKeyConstant.PhysiographicProvince, DistinctNames(records.SelectMany(r => r.PhysiographicProvinces.SplitAndTrim()))),
-            (TagTypeKeyConstant.Archeology, DistinctNames(records.SelectMany(r => r.Archeology.SplitAndTrim()))),
-            (TagTypeKeyConstant.Biology, DistinctNames(records.SelectMany(r => r.Biology.SplitAndTrim()))),
-            (TagTypeKeyConstant.CaveOther, DistinctNames(records.SelectMany(r => r.OtherTags.SplitAndTrim()))),
-            (TagTypeKeyConstant.People, DistinctNames(records.SelectMany(r => r.CartographerNames.SplitAndTrim()))),
-            (TagTypeKeyConstant.People, DistinctNames(records.SelectMany(r => r.ReportedByNames.SplitAndTrim())))
+            (TagTypeKeyConstant.Geology, records.SelectMany(r => r.Geology.SplitAndTrim())),
+            (TagTypeKeyConstant.GeologicAge, records.SelectMany(r => r.GeologicAges.SplitAndTrim())),
+            (TagTypeKeyConstant.MapStatus, records.SelectMany(r => r.MapStatuses.SplitAndTrim())),
+            (TagTypeKeyConstant.PhysiographicProvince, records.SelectMany(r => r.PhysiographicProvinces.SplitAndTrim())),
+            (TagTypeKeyConstant.Archeology, records.SelectMany(r => r.Archeology.SplitAndTrim())),
+            (TagTypeKeyConstant.Biology, records.SelectMany(r => r.Biology.SplitAndTrim())),
+            (TagTypeKeyConstant.CaveOther, records.SelectMany(r => r.OtherTags.SplitAndTrim())),
+            (TagTypeKeyConstant.People, records.SelectMany(r => r.CartographerNames.SplitAndTrim())),
+            (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
         };
-        var keys = requests.Select(r => r.Key).Distinct().ToList();
-        var all = await _db.TagTypes
-            .Where(t => keys.Contains(t.Key) && (t.AccountId == _scope.AccountId || t.IsDefault))
-            .AsNoTracking()
-            .Select(t => new TagLookup(t.Id, t.Key, t.Name))
-            .ToListAsync(cancellationToken);
-        var creations = new List<ImportTagCreationIntent>();
-        foreach (var (key, names) in requests)
-        {
-            foreach (var name in names.OrderBy(n => n))
-            {
-                if (all.Any(t => t.Key == key && t.Name == name)) continue;
-                if (name.Length > PropertyLength.Name)
-                    throw ApiExceptionDictionary.BadRequest(
-                        $"Tag '{name}' exceeds the maximum allowed length of {PropertyLength.Name}");
-                var creation = new ImportTagCreationIntent(IdGenerator.Generate(), key, name);
-                creations.Add(creation);
-                all.Add(new TagLookup(creation.Id, key, name));
-            }
-        }
-        return new TagSet(all, creations,
-            all.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal));
+        return ImportTagResolver.ResolveAsync(_db, _scope.AccountId, requests, cancellationToken);
     }
 
-    private static List<string> DistinctNames(IEnumerable<string?> values) => values
-        .Select(value => value?.Trim())
-        .Where(value => !string.IsNullOrWhiteSpace(value))
-        .Cast<string>()
-        .Distinct()
-        .ToList();
-
-    private static List<TagLookup> ResolveMany(TagSet set, string key, string? raw)
-    {
-        var result = new List<TagLookup>();
-        foreach (var name in raw.SplitAndTrim())
-        {
-            var tag = set.All.FirstOrDefault(t => t.Key == key &&
-                                                  t.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
-            if (tag is null) throw ApiExceptionDictionary.NotFound(key);
-            result.Add(tag);
-        }
-        return result;
-    }
+    private static List<ImportTagLookup> ResolveMany(ImportTagResolutionSet set, string key, string? raw) =>
+        ImportTagResolver.ResolveMany(set, key, raw.SplitAndTrim());
 
     private static bool ValidateCave(Cave cave, HashSet<UsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord, int rowNumber, List<FailedCaveCsvRecord<CaveCsvModel>> failures,
@@ -370,7 +335,7 @@ public sealed class CaveImportPlanner
     }
 
     private static string? BuildChangeSummary(ExistingCave existing, Cave imported,
-        IReadOnlyDictionary<CaveImportTagRole, IReadOnlyList<TagLookup>> importedTags,
+        IReadOnlyDictionary<CaveImportTagRole, IReadOnlyList<ImportTagLookup>> importedTags,
         IReadOnlyDictionary<string, string> names)
     {
         var changes = new List<string>();
@@ -499,9 +464,6 @@ public sealed class CaveImportPlanner
 
     private sealed record StateLookup(string Id, string Name, string Abbreviation);
     private sealed record CountyLookup(string Id, string StateId, string DisplayId, string Name, bool IsCreation);
-    private sealed record TagLookup(string Id, string Key, string Name);
-    private sealed record TagSet(IReadOnlyList<TagLookup> All, IReadOnlyList<ImportTagCreationIntent> Creations,
-        IReadOnlyDictionary<string, string> NameById);
     private sealed record UsedCountyNumber(string CountyId, int CountyNumber);
     private sealed record ExistingCave(
         string Id, uint Version, string? CurrentRevisionId,
