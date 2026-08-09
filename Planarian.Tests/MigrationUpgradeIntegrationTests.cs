@@ -51,4 +51,99 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture 
         var ca=await a.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); var cb=await b.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); var version=ca.Version;
         ca.Name="Updated after upgrade"; await a.SaveChangesAsync(); Assert.NotEqual(version,ca.Version); cb.Name="Stale"; await Assert.ThrowsAsync<DbUpdateConcurrencyException>(()=>b.SaveChangesAsync());
     }
+
+    [Fact]
+    public async Task V29LegacyCaveFileWithNullOwnerIsBackfilledFromItsCave()
+    {
+        await using var database = await CreateV29DatabaseAsync(nameof(V29LegacyCaveFileWithNullOwnerIsBackfilledFromItsCave));
+        await SeedV29FileAsync(database, "legfile01", accountId: null, caveId: "legcave01",
+            fileName: "legacy-cave.pdf", blobKey: "caves/legcave01/files/legfile01.pdf");
+
+        await database.MigrateAsync(null);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select f."AccountId", f."CaveId", f."FileName", f."BlobKey",
+                   exists(select 1 from pg_constraint where conname = 'FK_Files_Accounts_AccountId'),
+                   exists(select 1 from pg_constraint where conname = 'AK_Files_AccountId_Id'),
+                   exists(select 1 from pg_constraint where conname = 'FK_CaveChangeRequestStagedFiles_Files_AccountId_FileId')
+            from "Files" f where f."Id" = 'legfile01'
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("legacyacct", reader.GetString(0));
+        Assert.Equal("legcave01", reader.GetString(1));
+        Assert.Equal("legacy-cave.pdf", reader.GetString(2));
+        Assert.Equal("caves/legcave01/files/legfile01.pdf", reader.GetString(3));
+        Assert.True(reader.GetBoolean(4));
+        Assert.True(reader.GetBoolean(5));
+        Assert.True(reader.GetBoolean(6));
+    }
+
+    [Fact]
+    public async Task V29TemporaryAccountFileSurvivesOwnershipMigrationUnchanged()
+    {
+        await using var database = await CreateV29DatabaseAsync(nameof(V29TemporaryAccountFileSurvivesOwnershipMigrationUnchanged));
+        await SeedV29FileAsync(database, "temporary1", "legacyacct", null, "temporary.csv", "temp/import/temporary1.csv");
+
+        await database.MigrateAsync(null);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("select \"AccountId\", \"CaveId\", \"FileName\", \"BlobKey\" from \"Files\" where \"Id\"='temporary1'", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("legacyacct", reader.GetString(0));
+        Assert.True(reader.IsDBNull(1));
+        Assert.Equal("temporary.csv", reader.GetString(2));
+        Assert.Equal("temp/import/temporary1.csv", reader.GetString(3));
+    }
+
+    [Fact]
+    public async Task V29UnassignableNullOwnerFileFailsClosedAndLeavesV29Schema()
+    {
+        await using var database = await CreateV29DatabaseAsync(nameof(V29UnassignableNullOwnerFileFailsClosedAndLeavesV29Schema));
+        await SeedV29FileAsync(database, "orphanfile", null, null, "orphan.pdf", "orphan/orphanfile.pdf");
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(null));
+        Assert.Contains("Cannot migrate Files.AccountId", error.MessageText, StringComparison.Ordinal);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("select \"AccountId\" is null, is_nullable from \"Files\" join information_schema.columns on table_name='Files' and column_name='AccountId' where \"Id\"='orphanfile'", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.True(reader.GetBoolean(0));
+        Assert.Equal("YES", reader.GetString(1));
+    }
+
+    private async Task<PostgresTestDatabase> CreateV29DatabaseAsync(string name)
+    {
+        var database = await fixture.CreateUnmigratedDatabaseAsync(name);
+        var migration = database.GetMigrationNames().Single(x => x.EndsWith(MainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(migration);
+        return database;
+    }
+
+    private static async Task SeedV29FileAsync(PostgresTestDatabase database, string fileId, string? accountId, string? caveId,
+        string fileName, string blobKey)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "States"("Id","Name","Abbreviation","CreatedOn") values('legstate','Legacy State','LS',now()) on conflict do nothing;
+            insert into "Accounts"("Id","Name","CountyIdDelimiter","DefaultViewAccessAllCaves","ExportEnabled","CreatedOn") values('legacyacct','Legacy Account','-',false,true,now()) on conflict do nothing;
+            insert into "Counties"("Id","AccountId","StateId","DisplayId","Name","CreatedOn") values('legcounty','legacyacct','legstate','LEG','Legacy County',now()) on conflict do nothing;
+            insert into "Caves"("Id","AccountId","StateId","CountyId","Name","AlternateNames","CountyNumber","IsArchived","CreatedOn") values('legcave01','legacyacct','legstate','legcounty','Legacy Cave','[]',1,false,now()) on conflict do nothing;
+            insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values('legacyfile','legacyacct','file','Legacy file',false,now()) on conflict do nothing;
+            insert into "Files"("Id","AccountId","CaveId","FileTypeTagId","FileName","BlobKey","BlobContainer","CreatedOn") values(@id,@account,@cave,'legacyfile',@name,@blob,'legacy',now())
+            """, connection);
+        command.Parameters.AddWithValue("id", fileId);
+        command.Parameters.AddWithValue("account", (object?)accountId ?? DBNull.Value);
+        command.Parameters.AddWithValue("cave", (object?)caveId ?? DBNull.Value);
+        command.Parameters.AddWithValue("name", fileName);
+        command.Parameters.AddWithValue("blob", blobKey);
+        await command.ExecuteNonQueryAsync();
+    }
 }

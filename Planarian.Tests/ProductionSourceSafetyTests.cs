@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
+using System.Xml.Linq;
 using Xunit;
 
 namespace Planarian.Tests;
@@ -25,6 +27,34 @@ public sealed class ProductionSourceSafetyTests
 
         Assert.DoesNotMatch(new Regex(@"CREATE\s+TEMP[^;]*Entrance",
             RegexOptions.IgnoreCase | RegexOptions.Singleline), source);
+    }
+
+    [Fact]
+    public void ProhibitedImportInfrastructurePackagesAreAbsentFromProjectReferences()
+    {
+        var forbidden = new[] { "linq2db", "EFCore.BulkExtensions", "Z.EntityFramework.Extensions" };
+        var root = FindRepositoryRoot();
+        var productionRoot = Path.Combine(root, "Planarian");
+        var packages = Directory.EnumerateFiles(productionRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !Path.GetFileNameWithoutExtension(path).Contains("Test", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(path => XDocument.Load(path).Descendants().Where(e => e.Name.LocalName == "PackageReference")
+                .Select(e => (Path: path, Package: e.Attribute("Include")?.Value ?? e.Attribute("Update")?.Value ?? "")))
+            .ToList();
+
+        foreach (var package in packages)
+            Assert.DoesNotContain(forbidden, name => string.Equals(name, package.Package, StringComparison.OrdinalIgnoreCase));
+
+        // project.assets.json is the restore graph, so this also catches a package
+        // arriving through a transitive dependency rather than a direct reference.
+        var restoredPackages = Directory.EnumerateFiles(productionRoot, "project.assets.json", SearchOption.AllDirectories)
+            .Where(path => path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains("Test", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(path => JsonDocument.Parse(System.IO.File.ReadAllText(path)).RootElement
+                .GetProperty("libraries").EnumerateObject().Select(property => property.Name.Split('/')[0]))
+            .ToList();
+        foreach (var package in restoredPackages)
+            Assert.DoesNotContain(forbidden, name => string.Equals(name, package, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

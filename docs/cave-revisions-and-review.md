@@ -64,11 +64,18 @@ migration backfills a legacy cave file from its Cave's account and fails with a
 diagnostic if any remaining legacy row has no determinable owner; it never
 assigns a synthetic empty account ID.
 
-Provider-specific tests require PostgreSQL/PostGIS through Testcontainers. On
-local macOS Colima installations that reject Ryuk's socket bind, run tests with
-`DOCKER_HOST=unix:///Users/michaelketzner/.colima/default/docker.sock` and
-`TESTCONTAINERS_RYUK_DISABLED=true`. This is a local workaround only, not a CI
-default.
+Provider-specific tests require PostgreSQL/PostGIS through Testcontainers. The
+test fixture automatically detects the standard macOS Colima profile when no
+`DOCKER_HOST` is configured, uses its socket, and disables Ryuk because the
+Colima VM cannot bind-mount that macOS socket. This is local-only and does not
+affect CI. For a non-default Colima profile, configure the endpoint explicitly,
+for example:
+
+```bash
+DOCKER_HOST=unix://$HOME/.colima/work/docker.sock \
+TESTCONTAINERS_RYUK_DISABLED=true \
+dotnet test Planarian.Tests/Planarian.Tests.csproj
+```
 
 Manager Cave create/edit/archive/unarchive/hard-delete and published Cave-file
 upload, staged publication, and metadata edits are routed through

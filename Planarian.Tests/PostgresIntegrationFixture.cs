@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
@@ -80,13 +81,15 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
         {
             if (_sharedContainer is null)
             {
-                _sharedContainer = new PostgreSqlBuilder()
+                ConfigureColimaForTestcontainers();
+                var container = new PostgreSqlBuilder()
                     .WithImage("postgis/postgis:16-3.4")
                     .WithDatabase("planarian_tests")
                     .WithUsername("postgres")
                     .WithPassword("postgres")
                     .Build();
-                await _sharedContainer.StartAsync();
+                await container.StartAsync();
+                _sharedContainer = container;
             }
 
             if (!_sharedDatabaseMigrated)
@@ -102,7 +105,27 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
         }
     }
 
-    internal static PlanarianDbContext CreateDbContext(string connectionString, string userId, string? accountId)
+    /// <summary>
+    /// Docker contexts are not consumed by Testcontainers. Colima exposes its
+    /// socket below the macOS user profile, and its VM cannot bind-mount that
+    /// host socket into Ryuk. Configure both only when the caller did not
+    /// provide an explicit Docker endpoint.
+    /// </summary>
+    private static void ConfigureColimaForTestcontainers()
+    {
+        if (!OperatingSystem.IsMacOS() || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOCKER_HOST")))
+            return;
+
+        var socket = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".colima", "default", "docker.sock");
+        if (!Directory.Exists(Path.GetDirectoryName(socket))) return;
+
+        Environment.SetEnvironmentVariable("DOCKER_HOST", $"unix://{socket}");
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED")))
+            Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
+    }
+
+    internal static PlanarianDbContext CreateDbContext(string connectionString, string userId, string? accountId,
+        params IInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<PlanarianDbContext>()
             .UseNpgsql(connectionString, options =>
@@ -110,6 +133,7 @@ public sealed class PostgresIntegrationFixture : IAsyncLifetime
                 options.MigrationsAssembly("Planarian.Migrations");
                 options.UseNetTopologySuite();
             })
+            .AddInterceptors(interceptors)
             .Options;
         var db = new PlanarianDbContext(options);
         db.RequestUser = new RequestUser(db)
@@ -152,6 +176,12 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
     {
         var persistedUserId = accountId is null ? userId : EnsurePersistedTestUser(userId);
         return PostgresIntegrationFixture.CreateDbContext(ConnectionString, persistedUserId, accountId);
+    }
+
+    public PlanarianDbContext CreateDbContext(string userId, string? accountId, params IInterceptor[] interceptors)
+    {
+        var persistedUserId = accountId is null ? userId : EnsurePersistedTestUser(userId);
+        return PostgresIntegrationFixture.CreateDbContext(ConnectionString, persistedUserId, accountId, interceptors);
     }
 
     public IReadOnlyList<string> GetMigrationNames()

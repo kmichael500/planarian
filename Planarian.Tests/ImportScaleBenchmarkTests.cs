@@ -45,6 +45,8 @@ public sealed class ImportScaleBenchmarkTests(PostgresIntegrationFixture fixture
         var total=Stopwatch.StartNew();var memoryBefore=GC.GetTotalMemory(true);
         var initial=await RunCaves(d,account,"initial",BuildCaves(Enumerable.Range(1,Count),n=>false),false);Assert.Equal(Count,initial.Inserts);
         var entrances=await RunEntrances(d,account,"entrances",BuildEntrances(Enumerable.Range(1,Count),false),false);Assert.Equal(13_200,entrances.Rows);
+        AssertCaveStructure(initial, maxCommands: 600, maxSaves: 40, maxTracked: 40_000);
+        AssertEntranceStructure(entrances, maxCommands: 250, maxSaves: 40, maxTracked: 50_000);
 
         Dictionary<int,(uint Version,string? Revision)> before;
         await using(var verify=d.CreateDbContext("bench",account))
@@ -53,6 +55,7 @@ public sealed class ImportScaleBenchmarkTests(PostgresIntegrationFixture fixture
             before=await verify.Caves.IgnoreQueryFilters().Where(c=>c.AccountId==account).AsNoTracking().ToDictionaryAsync(c=>c.CountyNumber,c=>(c.Version,c.CurrentRevisionId));
         }
         var mostly=await RunCaves(d,account,"mostly",BuildCaves(Enumerable.Range(1,Count),n=>n%20==0),true);Assert.Equal(500,mostly.Updates);Assert.Equal(9500,mostly.NoChange);
+        AssertCaveStructure(mostly, maxCommands: 250, maxSaves: 40, maxTracked: 40_000);
         await using(var verify=d.CreateDbContext("bench",account))
         {
             var after=await verify.Caves.IgnoreQueryFilters().Where(c=>c.AccountId==account).AsNoTracking().ToDictionaryAsync(c=>c.CountyNumber,c=>(c.Version,c.CurrentRevisionId));
@@ -63,9 +66,11 @@ public sealed class ImportScaleBenchmarkTests(PostgresIntegrationFixture fixture
         var churn=await RunCaves(d,account,"churn",BuildCaves(churnNumbers,n=>n%10==0,true),true);Assert.Equal(100,churn.Deletes);Assert.Equal(100,churn.Inserts);
         var replace=Enumerable.Range(101,900).Concat(Enumerable.Range(10001,100));
         var entranceChurn=await RunEntrances(d,account,"entrance-churn",BuildEntrances(replace,true),true);Assert.Equal(1000,entranceChurn.Targets);
+        AssertCaveStructure(churn, maxCommands: 300, maxSaves: 50, maxTracked: 40_000);
+        AssertEntranceStructure(entranceChurn, maxCommands: 250, maxSaves: 40, maxTracked: 30_000);
         await using(var verify=d.CreateDbContext("bench",account)){Assert.Equal(Count,await verify.Caves.IgnoreQueryFilters().CountAsync(c=>c.AccountId==account));var selected=await verify.Caves.IgnoreQueryFilters().Where(c=>c.AccountId==account&&replace.Contains(c.CountyNumber)).Select(c=>c.Id).ToListAsync();Assert.Equal(1000,await verify.Entrances.IgnoreQueryFilters().CountAsync(e=>selected.Contains(e.CaveId)));Assert.Equal(1000,await verify.Entrances.IgnoreQueryFilters().CountAsync(e=>selected.Contains(e.CaveId)&&e.IsPrimary));}
         total.Stop();var process=Process.GetCurrentProcess();process.Refresh();
-        output.WriteLine("10K_IMPORT_BENCHMARK "+System.Text.Json.JsonSerializer.Serialize(new{initial,entrances,mostly,churn,entranceChurn,totalMs=total.Elapsed.TotalMilliseconds,managedMemoryDeltaBytes=GC.GetTotalMemory(false)-memoryBefore,peakWorkingSetBytes=process.PeakWorkingSet64}));
+        output.WriteLine("10K_IMPORT_BENCHMARK "+System.Text.Json.JsonSerializer.Serialize(new{initial,entrances,mostly,churn,entranceChurn,totalMs=total.Elapsed.TotalMilliseconds,managedMemoryDeltaBytes=GC.GetTotalMemory(false)-memoryBefore,peakWorkingSetBytes=process.PeakWorkingSet64 > 0 ? process.PeakWorkingSet64 : (long?)null}));
     }
 
     private async Task<CaveMetrics> RunCaves(PostgresTestDatabase d,string account,string phase,string text,bool sync)
@@ -81,6 +86,18 @@ public sealed class ImportScaleBenchmarkTests(PostgresIntegrationFixture fixture
     private static string BuildCaves(IEnumerable<int> numbers,Func<int,bool> changed,bool churn=false){var b=new StringBuilder(ImportDryRunIntegrationTests.CaveHeader).Append('\n');foreach(var n in numbers){var name=changed(n)?$"Benchmark Cave {n} updated":$"Benchmark Cave {n}";var geo=churn&&n%25==0?"Dolomite":"Limestone";b.Append(Csv(name,"Benchmark County","BEN",n,"TN",$"Alt {n}","Mapped","Mapper A,Mapper B",1000+n%500,100+n%200,20+n%100,2+n%5,geo,"Mississippian","Cumberland Plateau","Artifact","Bats","2026-08-01","Reporter A,Reporter B,Reporter C",false,"Interesting",$"Benchmark narrative {n} "+new string((char)('a'+n%26),180+n%160))).Append('\n');}return b.ToString();}
     private static string BuildEntrances(IEnumerable<int> numbers,bool replacement){var b=new StringBuilder(ImportDryRunIntegrationTests.EntranceHeader).Append('\n');foreach(var n in numbers){var count=replacement?1:EntranceCount(n);for(var i=0;i<count;i++)b.Append(Csv(replacement?$"Replacement {n}":$"Entrance {n}-{i+1}","BEN",n,i==0,35+n/100000d+i/1000000d,-86-n/100000d-i/1000000d,500+n%1000+i,replacement&&n%10==0?"Estimated":"Survey Grade",i*5,replacement&&n%10==0?"Restricted":"Open","Wet","Sink","2026-08-02","Reporter A,Reporter B",replacement?"Replacement entrance":"Benchmark entrance")).Append('\n');}return b.ToString();}
     private static int EntranceCount(int n)=>n<=8000?1:n<=9500?2:n<=9900?3:10;
+    private static void AssertCaveStructure(CaveMetrics metrics,int maxCommands,int maxSaves,int maxTracked)
+    {
+        Assert.InRange(metrics.Commands, 1, maxCommands);
+        Assert.InRange(metrics.SaveChanges, 1, maxSaves);
+        Assert.InRange(metrics.TrackedHighWater, 1, maxTracked);
+    }
+    private static void AssertEntranceStructure(EntranceMetrics metrics,int maxCommands,int maxSaves,int maxTracked)
+    {
+        Assert.InRange(metrics.Commands, 1, maxCommands);
+        Assert.InRange(metrics.SaveChanges, 1, maxSaves);
+        Assert.InRange(metrics.TrackedHighWater, 1, maxTracked);
+    }
     private static string Csv(params object?[] values)=>string.Join(',',values.Select(v=>{var s=v switch{null=>"",bool x=>x?"true":"false",IFormattable f=>f.ToString(null,CultureInfo.InvariantCulture),_=>v.ToString()??""};return s.Contains(',')||s.Contains('"')?'"'+s.Replace("\"","\"\"")+'"':s;}));
     private static int ProbeCaves(string text){using var s=ImportDryRunIntegrationTests.CsvStream(text);using var r=new StreamReader(s);using var c=new CsvReader(r,new CsvConfiguration(CultureInfo.InvariantCulture){MissingFieldFound=null});c.Context.RegisterClassMap<CaveCsvModelMap>();return c.GetRecords<CaveCsvModel>().Count();}
     private static int ProbeEntrances(string text){using var s=ImportDryRunIntegrationTests.CsvStream(text);using var r=new StreamReader(s);using var c=new CsvReader(r,new CsvConfiguration(CultureInfo.InvariantCulture){MissingFieldFound=null});c.Context.RegisterClassMap<EntranceCsvModelMap>();return c.GetRecords<EntranceCsvModel>().Count();}
