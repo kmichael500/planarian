@@ -490,13 +490,26 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task DeleteContainer(string containerName)
     {
+        var normalizedContainerName = containerName.ToLowerInvariant();
+
         // Create a container client using your configured connection string
         var containerClient = new BlobContainerClient(
             _fileOptions.ConnectionString,
-            containerName.ToLowerInvariant());
+            normalizedContainerName);
 
-        // Attempt to delete the entire container
-        await containerClient.DeleteIfExistsAsync();
+        try
+        {
+            // Attempt to delete the entire container
+            await containerClient.DeleteIfExistsAsync();
+        }
+        finally
+        {
+            // A successful initialization is cached to prevent concurrent
+            // requests from creating the same container. Once a reset deletes
+            // that container, the cached task must be discarded so the next
+            // upload creates it again.
+            ContainerInitializationTasks.TryRemove(normalizedContainerName, out _);
+        }
     }
 
 
