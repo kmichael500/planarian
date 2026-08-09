@@ -27,6 +27,16 @@ public class FileConfiguration : BaseEntityTypeConfiguration<File>
 {
     public override void Configure(EntityTypeBuilder<File> builder)
     {
+        // Files may be unowned for legacy/shared workflows, but a staged file is
+        // always account-owned.  This alternate key lets that relationship be
+        // enforced by PostgreSQL without changing those legitimate nullable rows.
+        builder.HasAlternateKey(e => new { e.AccountId, e.Id });
+
+        builder.HasOne(e => e.Account)
+            .WithMany()
+            .HasForeignKey(e => e.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder
             .HasOne(e => e.Cave)
             .WithMany(e => e.Files)

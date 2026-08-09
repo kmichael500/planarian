@@ -31,18 +31,84 @@ public sealed class PostgresFoundationIntegrationTests(PostgresIntegrationFixtur
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            select conname
-            from pg_constraint
-            where contype = 'f'
-              and conname like '%CaveRevisions%'
+            select source.relname,
+                   target.relname,
+                   fk.confdeltype,
+                   array_agg(source_column.attname order by source_key.ordinality),
+                   array_agg(target_column.attname order by source_key.ordinality)
+            from pg_constraint fk
+            join pg_class source on source.oid = fk.conrelid
+            join pg_class target on target.oid = fk.confrelid
+            join lateral unnest(fk.conkey) with ordinality source_key(attnum, ordinality) on true
+            join pg_attribute source_column on source_column.attrelid = source.oid and source_column.attnum = source_key.attnum
+            join lateral unnest(fk.confkey) with ordinality target_key(attnum, ordinality)
+                on target_key.ordinality = source_key.ordinality
+            join pg_attribute target_column on target_column.attrelid = target.oid and target_column.attnum = target_key.attnum
+            where fk.contype = 'f'
+            group by source.relname, target.relname, fk.oid, fk.confdeltype
             """, connection);
         await using var reader = await command.ExecuteReaderAsync();
-        var foreignKeyNames = new List<string>();
-        while (await reader.ReadAsync()) foreignKeyNames.Add(reader.GetString(0));
+        var foreignKeys = new List<ForeignKeyShape>();
+        while (await reader.ReadAsync())
+            foreignKeys.Add(new(reader.GetString(0), reader.GetString(1), reader.GetChar(2).ToString(),
+                reader.GetFieldValue<string[]>(3), reader.GetFieldValue<string[]>(4)));
 
-        Assert.Contains(foreignKeyNames, name => name.Contains("AccountId_Id_CurrentRevisionId", StringComparison.Ordinal));
-        Assert.Contains(foreignKeyNames, name => name.Contains("CaveChangeRequests_AccountId_CaveId_", StringComparison.Ordinal));
+        AssertForeignKey(foreignKeys, "Caves", ["AccountId", "Id", "CurrentRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "CaveId", "PreviousRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "CaveId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "CaveId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveRevisions", ["AccountId", "ImportBatchId"], "CaveImportBatches", ["AccountId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "BaseRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "ApprovedRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "Id", "CurrentProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "ChangeRequestId", "PreviousProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "FileId"], "Files", ["AccountId", "Id"]);
     }
+
+    [Fact]
+    public async Task StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(nameof(StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile));
+        var a = await IntegrationTestData.SeedTenantAsync(database, 'a');
+        var b = await IntegrationTestData.SeedTenantAsync(database, 'b');
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using (var sameAccount = new NpgsqlCommand("""
+            insert into "Files" ("Id", "AccountId", "FileTypeTagId", "FileName", "CreatedOn")
+            select 'samefile02', @account, "FileTypeTagId", 'same-account.pdf', now()
+            from "Files" where "Id" = @existing_file;
+
+            insert into "CaveChangeRequestStagedFiles" ("Id", "AccountId", "ChangeRequestId", "FileId", "CreatedOn")
+            values ('samefile01', @account, @request, 'samefile02', now())
+            """, connection))
+        {
+            sameAccount.Parameters.AddWithValue("account", a.AccountId);
+            sameAccount.Parameters.AddWithValue("request", a.ChangeRequestId);
+            sameAccount.Parameters.AddWithValue("existing_file", a.FileId);
+            Assert.Equal(2, await sameAccount.ExecuteNonQueryAsync());
+        }
+
+        await using var foreignAccount = new NpgsqlCommand("""
+            insert into "CaveChangeRequestStagedFiles" ("Id", "AccountId", "ChangeRequestId", "FileId", "CreatedOn")
+            values ('foreignf01', @account, @request, @file, now())
+            """, connection);
+        foreignAccount.Parameters.AddWithValue("account", a.AccountId);
+        foreignAccount.Parameters.AddWithValue("request", a.ChangeRequestId);
+        foreignAccount.Parameters.AddWithValue("file", b.FileId);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => foreignAccount.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
+    }
+
+    private static void AssertForeignKey(IEnumerable<ForeignKeyShape> foreignKeys, string sourceTable,
+        string[] sourceColumns, string targetTable, string[] targetColumns)
+    {
+        Assert.Contains(foreignKeys, key => key.SourceTable == sourceTable && key.TargetTable == targetTable &&
+            key.DeleteAction == "r" && key.SourceColumns.SequenceEqual(sourceColumns) && key.TargetColumns.SequenceEqual(targetColumns));
+    }
+
+    private sealed record ForeignKeyShape(string SourceTable, string TargetTable, string DeleteAction,
+        string[] SourceColumns, string[] TargetColumns);
 
     [Fact]
     public async Task CaveXminRejectsStaleWriterAndVersionChanges()

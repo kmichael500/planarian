@@ -33,6 +33,12 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet restore Planarian/Planarian.sln
       - run: dotnet build Planarian/Planarian.sln --configuration Release --no-restore
+      - name: Verify EF migrations match the model
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
+          --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
+          --context PlanarianDbContext
       - name: Run .NET tests
         id: dotnet_tests
         continue-on-error: true

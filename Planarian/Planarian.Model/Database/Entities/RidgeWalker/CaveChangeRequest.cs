@@ -113,7 +113,8 @@ public class CaveChangeRequestStagedFileConfiguration : BaseEntityTypeConfigurat
             .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<File>().WithMany()
-            .HasForeignKey(e => e.FileId)
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.FileId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(e => new { e.ChangeRequestId, e.FileId }).IsUnique();
     }
