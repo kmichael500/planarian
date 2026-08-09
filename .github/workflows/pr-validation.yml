@@ -40,6 +40,8 @@ jobs:
           --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
           --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
           --context PlanarianDbContext
+          --configuration Release
+          --no-build
       - name: Run .NET tests
         id: dotnet_tests
         continue-on-error: true
