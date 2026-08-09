@@ -1,11 +1,7 @@
 using System.Globalization;
-using CsvHelper;
-using CsvHelper.Configuration;
-using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
-using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Import.Models;
@@ -19,21 +15,12 @@ namespace Planarian.Modules.Import.Planning;
 /// </summary>
 public sealed class EntranceImportPlanner
 {
-    private readonly PlanarianDbContext _db;
-    private readonly AccountExecutionScope _scope;
-
-    public EntranceImportPlanner(PlanarianDbContext db, RequestUser requestUser)
-    {
-        _db = db;
-        _scope = AccountExecutionScope.Require(requestUser);
-    }
-
-    public async Task<EntranceImportPlan> PlanAsync(Stream stream, bool syncExisting,
+    public EntranceImportPlan Plan(IReadOnlyList<EntranceCsvModel> records, EntranceImportPlanningState state,
+        bool syncExisting,
         CancellationToken cancellationToken = default)
     {
         var failedRecords = new List<FailedCaveCsvRecord<EntranceCsvModel>>();
-        var records = await ParseAsync(stream, failedRecords, cancellationToken);
-        var tagSets = await ResolveTagsAsync(records, cancellationToken);
+        var tagSets = ResolveTags(records, state, cancellationToken);
 
         var parsed = new List<NormalizedEntranceRow>(records.Count);
         for (var index = 0; index < records.Count; index++)
@@ -109,20 +96,7 @@ public sealed class EntranceImportPlanner
 
         ThrowIfInvalid(failedRecords);
 
-        var keys = parsed.Select(row => (row.CountyDisplayId, row.CountyCaveNumber)).Distinct().ToList();
-        var countyCodes = keys.Select(k => k.CountyDisplayId).Distinct(StringComparer.Ordinal).ToList();
-        var caveNumbers = keys.Select(k => k.CountyCaveNumber).Distinct().ToList();
-
-        var candidateCaves = await _db.Caves.IgnoreQueryFilters()
-            .Where(c => c.AccountId == _scope.AccountId &&
-                        countyCodes.Contains(c.County.DisplayId) && caveNumbers.Contains(c.CountyNumber))
-            .AsNoTracking()
-            .Select(c => new
-            {
-                c.Id, c.Name, CountyDisplayId = c.County.DisplayId, c.CountyNumber,
-                c.Version, c.CurrentRevisionId
-            })
-            .ToListAsync(cancellationToken);
+        var candidateCaves = state.Caves;
         var caveByKey = candidateCaves.ToDictionary(c => (c.CountyDisplayId, c.CountyNumber));
 
         foreach (var row in parsed)
@@ -133,24 +107,8 @@ public sealed class EntranceImportPlanner
         }
         ThrowIfInvalid(failedRecords);
 
-        var caveIds = candidateCaves.Select(c => c.Id).Distinct().ToList();
-        var existingCounts = caveIds.Count == 0
-            ? new Dictionary<string, int>()
-            : await _db.Entrances.IgnoreQueryFilters()
-                .Where(e => caveIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
-                .AsNoTracking()
-                .GroupBy(e => e.CaveId)
-                .Select(g => new { CaveId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(e => e.CaveId, e => e.Count, cancellationToken);
-        var existingPrimaryCounts = caveIds.Count == 0
-            ? new Dictionary<string, int>()
-            : await _db.Entrances.IgnoreQueryFilters()
-                .Where(e => caveIds.Contains(e.CaveId) && e.IsPrimary &&
-                            e.Cave != null && e.Cave.AccountId == _scope.AccountId)
-                .AsNoTracking()
-                .GroupBy(e => e.CaveId)
-                .Select(g => new { CaveId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(e => e.CaveId, e => e.Count, cancellationToken);
+        var existingCounts = state.ExistingEntranceCounts;
+        var existingPrimaryCounts = state.ExistingPrimaryCounts;
 
         var planned = new List<PlannedEntrance>(parsed.Count);
         foreach (var row in parsed)
@@ -174,8 +132,9 @@ public sealed class EntranceImportPlanner
         ValidatePrimaryCounts(planned, existingPrimaryCounts, syncExisting, failedRecords);
         ThrowIfInvalid(failedRecords);
 
+        var plannedCaveIds = planned.Select(row => row.CaveId).ToHashSet(StringComparer.Ordinal);
         var targets = candidateCaves
-            .Where(c => planned.Any(row => row.CaveId == c.Id))
+            .Where(c => plannedCaveIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => new EntranceImportCaveTarget(
                 c.Id, c.Name, c.CountyDisplayId, c.CountyNumber, c.Version, c.CurrentRevisionId,
                 existingCounts.GetValueOrDefault(c.Id), existingPrimaryCounts.GetValueOrDefault(c.Id)),
@@ -184,7 +143,7 @@ public sealed class EntranceImportPlanner
             .GroupBy(t => t.Id)
             .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
 
-        return new EntranceImportPlan(_scope.AccountId, syncExisting, planned,
+        return new EntranceImportPlan(state.AccountId, syncExisting, planned,
             tagSets.Creations.ToList(), tagNamesById, targets);
     }
 
@@ -220,8 +179,8 @@ public sealed class EntranceImportPlanner
         }
     }
 
-    private Task<ImportTagResolutionSet> ResolveTagsAsync(IReadOnlyList<EntranceCsvModel> records,
-        CancellationToken cancellationToken)
+    private static ImportTagResolutionSet ResolveTags(IReadOnlyList<EntranceCsvModel> records,
+        EntranceImportPlanningState state, CancellationToken cancellationToken)
     {
         var requested = new List<(string Key, IEnumerable<string?> Names)>
         {
@@ -231,7 +190,7 @@ public sealed class EntranceImportPlanner
             (TagTypeKeyConstant.FieldIndication, records.SelectMany(r => r.FieldIndication.SplitAndTrim())),
             (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
         };
-        return ImportTagResolver.ResolveAsync(_db, _scope.AccountId, requested, cancellationToken);
+        return ImportTagResolver.Resolve(state.AccountId, state.EligibleTags, requested, cancellationToken);
     }
 
     private static ImportTagLookup? ResolveTag(ImportTagResolutionSet set, string key, string name) =>
@@ -263,58 +222,6 @@ public sealed class EntranceImportPlanner
     {
         if (failedRecords.Count == 0) return;
         throw ApiExceptionDictionary.InvalidImport(failedRecords.OrderBy(e => e.RowNumber).ToList(), ImportType.Entrance);
-    }
-
-    private static async Task<List<EntranceCsvModel>> ParseAsync(Stream stream,
-        List<FailedCaveCsvRecord<EntranceCsvModel>> failedRecords, CancellationToken cancellationToken)
-    {
-        var records = new List<EntranceCsvModel>();
-        using var reader = new StreamReader(stream);
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
-        using var csv = new CsvReader(reader, config);
-        csv.Context.RegisterClassMap<EntranceCsvModelMap>();
-        if (!await csv.ReadAsync()) return records;
-        csv.ReadHeader();
-        var rowNumber = 1;
-        while (await csv.ReadAsync())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            rowNumber++;
-            var record = new EntranceCsvModel();
-            var errors = new List<string>();
-            TryGet(csv, nameof(record.CountyCode), true, errors, out string? countyCode); record.CountyCode = countyCode;
-            TryGet(csv, nameof(record.CountyCaveNumber), true, errors, out string? countyCaveNumber); record.CountyCaveNumber = countyCaveNumber;
-            TryGet(csv, nameof(record.EntranceName), false, errors, out string? name); record.EntranceName = name;
-            TryGet(csv, nameof(record.DecimalLatitude), true, errors, out double latitude); record.DecimalLatitude = latitude;
-            TryGet(csv, nameof(record.DecimalLongitude), true, errors, out double longitude); record.DecimalLongitude = longitude;
-            TryGet(csv, nameof(record.EntranceElevationFt), true, errors, out double elevation); record.EntranceElevationFt = elevation;
-            TryGet(csv, nameof(record.LocationQuality), true, errors, out string? locationQuality); record.LocationQuality = locationQuality ?? string.Empty;
-            TryGet(csv, nameof(record.EntranceDescription), false, errors, out string? description); record.EntranceDescription = description;
-            TryGet(csv, nameof(record.EntrancePitDepth), false, errors, out double? pit); record.EntrancePitDepth = pit;
-            TryGet(csv, nameof(record.EntranceStatuses), false, errors, out string? status); record.EntranceStatuses = status;
-            TryGet(csv, nameof(record.EntranceHydrology), false, errors, out string? hydrology); record.EntranceHydrology = hydrology;
-            TryGet(csv, nameof(record.FieldIndication), false, errors, out string? field); record.FieldIndication = field;
-            TryGet(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOn); record.ReportedOnDate = reportedOn;
-            TryGet(csv, nameof(record.ReportedByNames), false, errors, out string? reportedBy); record.ReportedByNames = reportedBy;
-            TryGet(csv, nameof(record.IsPrimaryEntrance), false, errors, out bool primary); record.IsPrimaryEntrance = primary;
-            if (errors.Count == 0) records.Add(record);
-            else foreach (var error in errors) failedRecords.Add(new(record, rowNumber, error));
-        }
-        ThrowIfInvalid(failedRecords);
-        return records;
-    }
-
-    private static bool TryGet<T>(IReaderRow csv, string fieldName, bool required, ICollection<string> errors,
-        out T? value)
-    {
-        var hasValue = csv.TryGetField(fieldName, out value);
-        if (!hasValue || (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(value?.ToString())))
-        {
-            if (required) errors.Add($"{fieldName} is required.");
-            return false;
-        }
-        if (typeof(T) == typeof(string) && value != null) value = (T)(object)value.ToString()!.Trim();
-        return true;
     }
 
     private sealed record NormalizedEntranceRow(

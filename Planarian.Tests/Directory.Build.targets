@@ -1,5 +1,0 @@
-<Project>
-  <ItemGroup>
-    <ProjectReference Include="../Planarian/Planarian/Planarian.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
-using Planarian.Model.Database;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 
@@ -8,9 +6,10 @@ namespace Planarian.Modules.Import.Planning;
 
 internal static class ImportTagResolver
 {
-    public static async Task<ImportTagResolutionSet> ResolveAsync(PlanarianDbContext db, string accountId,
+    public static ImportTagResolutionSet Resolve(string accountId,
+        IReadOnlyList<ImportTagLookup> eligibleTags,
         IEnumerable<(string Key, IEnumerable<string?> Names)> requests,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var normalized = new List<(string Key, string Name)>();
         var seen = new HashSet<TagIdentity>(TagIdentityComparer.Instance);
@@ -22,17 +21,14 @@ internal static class ImportTagResolver
             normalized.Add((key, name));
         }
 
-        var keys = normalized.Select(request => request.Key).Distinct(StringComparer.Ordinal).ToList();
-        var existing = await db.TagTypes
-            .Where(tag => keys.Contains(tag.Key) && (tag.AccountId == accountId || tag.IsDefault))
-            .AsNoTracking()
-            .Select(tag => new ImportTagLookup(tag.Id, tag.Key, tag.Name, tag.AccountId, tag.IsDefault, false))
-            .ToListAsync(cancellationToken);
+        var keys = normalized.Select(request => request.Key).ToHashSet(StringComparer.Ordinal);
+        var existing = eligibleTags.Where(tag => keys.Contains(tag.Key)).ToList();
 
         var selected = new Dictionary<TagIdentity, ImportTagLookup>(TagIdentityComparer.Instance);
         var creations = new List<ImportTagCreationIntent>();
         foreach (var (key, name) in normalized)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var match = existing
                 .Where(tag => tag.Key == key && tag.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))
                 .OrderByDescending(tag => tag.Name.Equals(name, StringComparison.Ordinal))
@@ -93,7 +89,7 @@ internal static class ImportTagResolver
     }
 }
 
-internal sealed record ImportTagLookup(
+public sealed record ImportTagLookup(
     string Id, string Key, string Name, string? AccountId, bool IsDefault, bool IsCreation);
 
 internal sealed record ImportTagResolutionSet(

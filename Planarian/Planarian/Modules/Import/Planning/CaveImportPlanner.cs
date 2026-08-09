@@ -1,12 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using CsvHelper;
-using CsvHelper.Configuration;
-using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
-using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
@@ -21,86 +17,55 @@ namespace Planarian.Modules.Import.Planning;
 /// </summary>
 public sealed class CaveImportPlanner
 {
-    private readonly PlanarianDbContext _db;
-    private readonly AccountExecutionScope _scope;
-
-    public CaveImportPlanner(PlanarianDbContext db, RequestUser requestUser)
-    {
-        _db = db;
-        _scope = AccountExecutionScope.Require(requestUser);
-    }
-
-    public async Task<CaveImportPlan> PlanAsync(Stream stream, bool syncExisting,
+    public CaveImportPlan Plan(IReadOnlyList<CaveCsvModel> records, CaveImportPlanningState planningState, bool syncExisting,
         CancellationToken cancellationToken = default)
     {
         var failedRecords = new List<FailedCaveCsvRecord<CaveCsvModel>>();
-        var records = await ParseAsync(stream, failedRecords, cancellationToken);
-
         var stateInputs = records.Select(r => r.State.Trim()).Distinct().ToList();
-        var stateCandidates = await _db.States
-            .Where(s => stateInputs.Contains(s.Name) || stateInputs.Contains(s.Abbreviation))
-            .AsNoTracking()
-            .Select(s => new StateLookup(s.Id, s.Name, s.Abbreviation))
-            .ToListAsync(cancellationToken);
-        var statesByInput = new Dictionary<string, StateLookup>(StringComparer.Ordinal);
+        var statesByInput = new Dictionary<string, CaveImportStateLookup>(StringComparer.Ordinal);
         foreach (var input in stateInputs)
         {
-            var state = stateCandidates.FirstOrDefault(s => s.Name == input || s.Abbreviation == input)
+            var resolvedState = planningState.States.FirstOrDefault(s => s.Name == input || s.Abbreviation == input)
                         ?? throw ApiExceptionDictionary.NotFound("State");
-            statesByInput[input] = state;
+            statesByInput[input] = resolvedState;
         }
-
-        var existingAccountStateIds = await _db.AccountStates
-            .Where(a => a.AccountId == _scope.AccountId)
-            .AsNoTracking()
-            .Select(a => a.StateId)
-            .ToListAsync(cancellationToken);
         var accountStateCreations = statesByInput.Values.DistinctBy(s => s.Id)
-            .Where(s => !existingAccountStateIds.Contains(s.Id))
-            .Select(s => new AccountStateCreationIntent(IdGenerator.Generate(), _scope.AccountId, s.Id))
+            .Where(s => !planningState.AccountStateIds.Contains(s.Id))
+            .Select(s => new AccountStateCreationIntent(IdGenerator.Generate(), planningState.AccountId, s.Id))
             .ToList();
 
-        var tagSet = await ResolveTagsAsync(records, cancellationToken);
+        var tagSet = ResolveTags(records, planningState, cancellationToken);
         var tagNamesById = tagSet.All
             .GroupBy(tag => tag.Id)
             .ToDictionary(group => group.Key, group => group.First().Name, StringComparer.Ordinal);
 
-        var existingCounties = await _db.Counties
-            .Where(c => c.AccountId == _scope.AccountId)
-            .AsNoTracking()
-            .Select(c => new CountyLookup(c.Id, c.StateId, c.DisplayId, c.Name, false))
-            .ToListAsync(cancellationToken);
-        var countyCandidates = new List<CountyLookup>();
+        var existingCounties = planningState.Counties.ToList();
+        var countyCandidates = new List<CaveImportCountyLookup>();
         var seenCountyDisplayIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var record in records)
         {
             var displayId = record.CountyCode.Trim();
             if (!seenCountyDisplayIds.Add(displayId)) continue;
             var state = statesByInput[record.State.Trim()];
-            countyCandidates.Add(new CountyLookup(IdGenerator.Generate(), state.Id, displayId,
-                record.CountyName.Trim(), true));
+            countyCandidates.Add(new CaveImportCountyLookup(IdGenerator.Generate(), state.Id, displayId,
+                record.CountyName.Trim()));
         }
         var countyCreations = countyCandidates
             .Where(candidate => existingCounties.All(existing => existing.DisplayId != candidate.DisplayId))
-            .Select(c => new CountyCreationIntent(c.Id, _scope.AccountId, c.StateId, c.DisplayId, c.Name))
+            .Select(c => new CountyCreationIntent(c.Id, planningState.AccountId, c.StateId, c.DisplayId, c.Name))
             .ToList();
         var allCounties = existingCounties.Concat(countyCreations.Select(c =>
-                new CountyLookup(c.Id, c.StateId, c.DisplayId, c.Name, true)))
+                new CaveImportCountyLookup(c.Id, c.StateId, c.DisplayId, c.Name)))
             .ToList();
 
         var existingCaves = syncExisting
-            ? await LoadExistingCavesAsync(cancellationToken)
+            ? planningState.ExistingCaves
             : [];
         var existingByKey = existingCaves.ToDictionary(
             c => $"{c.StateId}:{c.CountyId}:{c.CountyNumber}", StringComparer.Ordinal);
         var deleteIds = existingCaves.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
         var seenCsvKeys = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
-        var usedCountyNumbers = (await _db.Caves.IgnoreQueryFilters()
-                .Where(c => c.AccountId == _scope.AccountId)
-                .AsNoTracking()
-                .Select(c => new UsedCountyNumber(c.CountyId, c.CountyNumber))
-                .ToListAsync(cancellationToken))
-            .ToHashSet();
+        var usedCountyNumbers = planningState.UsedCountyNumbers.ToHashSet();
 
         var planned = new List<PlannedCave>(records.Count);
         for (var index = 0; index < records.Count; index++)
@@ -128,7 +93,7 @@ public sealed class CaveImportPlanner
                     continue;
                 }
 
-                ExistingCave? existing = null;
+                CaveImportExistingCave? existing = null;
                 if (syncExisting)
                 {
                     var key = $"{state.Id}:{county.Id}:{record.CountyCaveNumber}";
@@ -149,7 +114,7 @@ public sealed class CaveImportPlanner
                 {
                     Id = caveId,
                     Name = record.CaveName.Trim(),
-                    AccountId = _scope.AccountId,
+                    AccountId = planningState.AccountId,
                     LengthFeet = record.CaveLengthFt,
                     DepthFeet = record.CaveDepthFt,
                     MaxPitDepthFeet = record.MaxPitDepthFt,
@@ -238,35 +203,13 @@ public sealed class CaveImportPlanner
             c.Id, c.Version, c.CurrentRevisionId, c.StateId, c.CountyId, c.CountyDisplayId, c.CountyNumber, c.Name),
             StringComparer.Ordinal);
 
-        return new CaveImportPlan(_scope.AccountId, syncExisting, planned, deletions,
+        return new CaveImportPlan(planningState.AccountId, syncExisting, planned, deletions,
             accountStateCreations, countyCreations, tagSet.Creations,
             tagNamesById, targets);
     }
 
-    private async Task<List<ExistingCave>> LoadExistingCavesAsync(CancellationToken cancellationToken)
-    {
-        return await _db.Caves.IgnoreQueryFilters()
-            .Where(c => c.AccountId == _scope.AccountId)
-            .AsNoTracking()
-            .Select(c => new ExistingCave(
-                c.Id, c.Version, c.CurrentRevisionId,
-                c.StateId, c.State.Abbreviation, c.CountyId, c.County.Name, c.County.DisplayId,
-                c.CountyNumber, c.Name, c.AlternateNames, c.LengthFeet, c.DepthFeet,
-                c.MaxPitDepthFeet, c.NumberOfPits, c.Narrative, c.ReportedOn, c.IsArchived,
-                c.GeologyTags.Select(t => t.TagTypeId).ToList(),
-                c.GeologicAgeTags.Select(t => t.TagTypeId).ToList(),
-                c.MapStatusTags.Select(t => t.TagTypeId).ToList(),
-                c.PhysiographicProvinceTags.Select(t => t.TagTypeId).ToList(),
-                c.ArcheologyTags.Select(t => t.TagTypeId).ToList(),
-                c.BiologyTags.Select(t => t.TagTypeId).ToList(),
-                c.CaveOtherTags.Select(t => t.TagTypeId).ToList(),
-                c.CartographerNameTags.Select(t => t.TagTypeId).ToList(),
-                c.CaveReportedByNameTags.Select(t => t.TagTypeId).ToList()))
-            .ToListAsync(cancellationToken);
-    }
-
-    private Task<ImportTagResolutionSet> ResolveTagsAsync(IReadOnlyList<CaveCsvModel> records,
-        CancellationToken cancellationToken)
+    private static ImportTagResolutionSet ResolveTags(IReadOnlyList<CaveCsvModel> records,
+        CaveImportPlanningState state, CancellationToken cancellationToken)
     {
         var requests = new List<(string Key, IEnumerable<string?> Names)>
         {
@@ -280,13 +223,13 @@ public sealed class CaveImportPlanner
             (TagTypeKeyConstant.People, records.SelectMany(r =>
                 r.CartographerNames.SplitAndTrim().Concat(r.ReportedByNames.SplitAndTrim())))
         };
-        return ImportTagResolver.ResolveAsync(_db, _scope.AccountId, requests, cancellationToken);
+        return ImportTagResolver.Resolve(state.AccountId, state.EligibleTags, requests, cancellationToken);
     }
 
     private static List<ImportTagLookup> ResolveMany(ImportTagResolutionSet set, string key, string? raw) =>
         ImportTagResolver.ResolveMany(set, key, raw.SplitAndTrim());
 
-    private static bool ValidateCave(Cave cave, HashSet<UsedCountyNumber> usedCountyNumbers,
+    private static bool ValidateCave(Cave cave, HashSet<CaveImportUsedCountyNumber> usedCountyNumbers,
         CaveCsvModel currentRecord, int rowNumber, List<FailedCaveCsvRecord<CaveCsvModel>> failures,
         bool skipCountyNumberConflictCheck)
     {
@@ -303,7 +246,7 @@ public sealed class CaveImportPlanner
         }
         if (!skipCountyNumberConflictCheck)
         {
-            var key = new UsedCountyNumber(cave.CountyId, cave.CountyNumber);
+            var key = new CaveImportUsedCountyNumber(cave.CountyId, cave.CountyNumber);
             if (usedCountyNumbers.Contains(key))
             {
                 failures.Add(new(currentRecord, rowNumber, "County number is already used"));
@@ -334,7 +277,7 @@ public sealed class CaveImportPlanner
         return valid;
     }
 
-    private static string? BuildChangeSummary(ExistingCave existing, Cave imported,
+    private static string? BuildChangeSummary(CaveImportExistingCave existing, Cave imported,
         IReadOnlyDictionary<CaveImportTagRole, IReadOnlyList<ImportTagLookup>> importedTags,
         IReadOnlyDictionary<string, string> names)
     {
@@ -397,82 +340,10 @@ public sealed class CaveImportPlanner
     private static string FormatDate(DateTime? value) => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "blank";
     private static string FormatBool(bool value) => value ? "Yes" : "No";
 
-    private static async Task<List<CaveCsvModel>> ParseAsync(Stream stream,
-        List<FailedCaveCsvRecord<CaveCsvModel>> failures, CancellationToken cancellationToken)
-    {
-        var records = new List<CaveCsvModel>();
-        using var reader = new StreamReader(stream);
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
-        using var csv = new CsvReader(reader, config);
-        csv.Context.RegisterClassMap<CaveCsvModelMap>();
-        if (!await csv.ReadAsync()) return records;
-        csv.ReadHeader();
-        var rowNumber = 1;
-        while (await csv.ReadAsync())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            rowNumber++;
-            var record = new CaveCsvModel();
-            var errors = new List<string>();
-            TryGet(csv, nameof(record.CaveName), true, errors, out string? caveName); if (!string.IsNullOrWhiteSpace(caveName)) record.CaveName = caveName;
-            TryGet(csv, nameof(record.AlternateNames), false, errors, out string? alternate); record.AlternateNames = alternate;
-            TryGet(csv, nameof(record.State), true, errors, out string? state); if (!string.IsNullOrWhiteSpace(state)) record.State = state;
-            TryGet(csv, nameof(record.CountyCode), true, errors, out string? countyCode); if (!string.IsNullOrWhiteSpace(countyCode)) record.CountyCode = countyCode;
-            TryGet(csv, nameof(record.CountyName), true, errors, out string? countyName); if (!string.IsNullOrWhiteSpace(countyName)) record.CountyName = countyName;
-            TryGet(csv, nameof(record.CountyCaveNumber), true, errors, out int countyNumber); record.CountyCaveNumber = countyNumber;
-            TryGet(csv, nameof(record.MapStatuses), false, errors, out string? map); record.MapStatuses = map;
-            TryGet(csv, nameof(record.CartographerNames), false, errors, out string? cartographers); record.CartographerNames = cartographers;
-            TryGet(csv, nameof(record.CaveLengthFt), false, errors, out double? length); record.CaveLengthFt = length;
-            TryGet(csv, nameof(record.CaveDepthFt), false, errors, out double? depth); record.CaveDepthFt = depth;
-            TryGet(csv, nameof(record.MaxPitDepthFt), false, errors, out double? pit); record.MaxPitDepthFt = pit;
-            TryGet(csv, nameof(record.NumberOfPits), false, errors, out int? pits); record.NumberOfPits = pits;
-            TryGet(csv, nameof(record.Narrative), false, errors, out string? narrative); record.Narrative = narrative;
-            TryGet(csv, nameof(record.Geology), false, errors, out string? geology); record.Geology = geology;
-            TryGet(csv, nameof(record.GeologicAges), false, errors, out string? ages); record.GeologicAges = ages;
-            TryGet(csv, nameof(record.PhysiographicProvinces), false, errors, out string? provinces); record.PhysiographicProvinces = provinces;
-            TryGet(csv, nameof(record.Archeology), false, errors, out string? archaeology); record.Archeology = archaeology;
-            TryGet(csv, nameof(record.Biology), false, errors, out string? biology); record.Biology = biology;
-            TryGet(csv, nameof(record.IsArchived), false, errors, out bool archived); record.IsArchived = archived;
-            TryGet(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOn); record.ReportedOnDate = reportedOn;
-            TryGet(csv, nameof(record.ReportedByNames), false, errors, out string? reportedBy); record.ReportedByNames = reportedBy;
-            TryGet(csv, nameof(record.OtherTags), false, errors, out string? other); record.OtherTags = other;
-            if (errors.Count == 0) records.Add(record);
-            else foreach (var error in errors) failures.Add(new(record, rowNumber, error));
-        }
-        ThrowIfInvalid(failures);
-        return records;
-    }
-
-    private static bool TryGet<T>(IReaderRow csv, string fieldName, bool required, ICollection<string> errors,
-        out T? value)
-    {
-        var hasValue = csv.TryGetField(fieldName, out value);
-        if (!hasValue || (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(value?.ToString())))
-        {
-            if (required) errors.Add($"{fieldName} is required.");
-            return false;
-        }
-        if (typeof(T) == typeof(string) && value != null) value = (T)(object)value.ToString()!.Trim();
-        return true;
-    }
-
     private static void ThrowIfInvalid(List<FailedCaveCsvRecord<CaveCsvModel>> failures)
     {
         if (failures.Count == 0) return;
         throw ApiExceptionDictionary.InvalidImport(failures.OrderBy(f => f.RowNumber).ToList(), ImportType.Cave);
     }
 
-    private sealed record StateLookup(string Id, string Name, string Abbreviation);
-    private sealed record CountyLookup(string Id, string StateId, string DisplayId, string Name, bool IsCreation);
-    private sealed record UsedCountyNumber(string CountyId, int CountyNumber);
-    private sealed record ExistingCave(
-        string Id, uint Version, string? CurrentRevisionId,
-        string StateId, string StateAbbreviation, string CountyId, string CountyName, string CountyDisplayId,
-        int CountyNumber, string Name, string? AlternateNames, double? LengthFeet, double? DepthFeet,
-        double? MaxPitDepthFeet, int? NumberOfPits, string? Narrative, DateTime? ReportedOn, bool IsArchived,
-        IReadOnlyList<string> GeologyTagIds, IReadOnlyList<string> GeologicAgeTagIds,
-        IReadOnlyList<string> MapStatusTagIds, IReadOnlyList<string> PhysiographicProvinceTagIds,
-        IReadOnlyList<string> ArcheologyTagIds, IReadOnlyList<string> BiologyTagIds,
-        IReadOnlyList<string> OtherTagIds, IReadOnlyList<string> CartographerNameTagIds,
-        IReadOnlyList<string> ReportedByNameTagIds);
 }

@@ -17,7 +17,7 @@ end-to-end review feature exists.
   derives semantic differences from complete snapshots.
 - Authorized manager create/edit, archive/unarchive, hard delete, and published
   file mutations publish through `CaveMutationCoordinator`.
-- Cave and Entrance imports publish through `ImportRevisionPublisher`, with
+- Cave and Entrance import execution repositories publish through the import revision repository, with
   provenance stored in `CaveImportBatch`.
 - Both publication paths suppress semantic no-ops and commit relational state,
   the revision, and the current-revision pointer atomically.
@@ -52,8 +52,8 @@ This is persistence/model foundation only. It is not a complete user workflow.
 
 ### Data access and import publication
 
-Planarian uses EF Core 8 with Npgsql/PostGIS. CSV parsing and immutable planning
-occur outside the write transaction. Executors lock affected Caves in stable ID
+Planarian uses EF Core 8 with Npgsql/PostGIS. Database-free CSV parsers and pure planners consume immutable,
+repository-loaded planning state outside the write transaction. Execution repositories lock affected Caves in stable ID
 order, verify planned revision state, apply bounded EF batches, and publish
 revisions once inside the transaction. Entrance rows are typed in-memory data;
 the former temporary staging table, linq2db, and EFCore.BulkExtensions paths are
@@ -67,7 +67,7 @@ original error. Temporary, hard-delete, and import-sync blob deletion occurs
 only after relational commit.
 
 PostgreSQL/PostGIS integration tests run through Testcontainers. Local macOS
-Colima socket detection is test-fixture behavior only and does not affect CI.
+Colima socket detection is test-fixture behavior only and does not affect CI or automatically disable Ryuk.
 
 ## Not implemented yet
 

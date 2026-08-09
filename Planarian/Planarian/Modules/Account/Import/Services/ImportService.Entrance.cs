@@ -1,6 +1,5 @@
 using Planarian.Library.Exceptions;
 using Planarian.Modules.Account.Import.Models;
-using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
 
 namespace Planarian.Modules.Account.Import.Services;
@@ -20,8 +19,9 @@ public partial class ImportService
         EntranceImportPlan plan;
         await using (var stream = await _fileService.GetFileStream(temporaryFileId))
         {
-            var planner = new EntranceImportPlanner(_dbContext, RequestUser);
-            plan = await planner.PlanAsync(stream, syncExisting, cancellationToken);
+            var records = await _entranceParser.ParseAsync(stream, cancellationToken);
+            var state = await _entrancePlanningRepository.LoadAsync(records, cancellationToken);
+            plan = _entrancePlanner.Plan(records, state, syncExisting, cancellationToken);
         }
 
         var preview = plan.CreatePreview();
@@ -32,10 +32,7 @@ public partial class ImportService
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying entrance import");
-        var snapshots = new CavePublishedSnapshotReader(_dbContext, RequestUser);
-        var publisher = new ImportRevisionPublisher(_dbContext, RequestUser);
-        var executor = new EntranceImportExecutor(_dbContext, RequestUser, snapshots, publisher);
-        await executor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
+        await _entranceExecutor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished entrance import");
         return preview;

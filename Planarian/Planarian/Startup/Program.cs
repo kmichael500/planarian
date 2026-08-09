@@ -35,6 +35,9 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Import.Data;
+using Planarian.Modules.Import.Parsing;
+using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Map.Controllers;
 using Planarian.Modules.Map.Services;
 using Planarian.Modules.Notifications.Hubs;
@@ -219,11 +222,18 @@ builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
-builder.Services.AddScoped<CavePublishedSnapshotReader>();
+builder.Services.AddScoped<CavePublishedSnapshotRepository>();
 builder.Services.AddScoped<CaveMutationCoordinator>();
+builder.Services.AddScoped<CaveMutationRepository>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
+builder.Services.AddSingleton<CaveImportCsvParser>();
+builder.Services.AddSingleton<EntranceImportCsvParser>();
+builder.Services.AddSingleton<CaveImportPlanner>();
+builder.Services.AddSingleton<EntranceImportPlanner>();
+builder.Services.AddScoped<CaveImportExecutionRepository>();
+builder.Services.AddScoped<EntranceImportExecutionRepository>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
@@ -257,6 +267,8 @@ builder.Services.AddScoped(typeof(FileRepository<>));
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
 builder.Services.AddScoped<FeatureSettingRepository>();
+builder.Services.AddScoped<CaveImportPlanningRepository>();
+builder.Services.AddScoped<EntranceImportPlanningRepository>();
 
 
 #endregion

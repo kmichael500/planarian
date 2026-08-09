@@ -7,8 +7,8 @@
 | Manager create/edit | `CaveMutationCoordinator` | `ManagerEdit` |
 | Archive/unarchive | `CaveMutationCoordinator` | `ManagerEdit` |
 | Hard delete | `CaveMutationCoordinator` | `ManagerEdit`; final tombstone |
-| Cave CSV import | `ImportRevisionPublisher` in executor transaction | `Import` |
-| Entrance CSV import | `ImportRevisionPublisher` in executor transaction | `Import` |
+| Cave CSV import | import revision repository in execution-repository transaction | `Import` |
+| Entrance CSV import | import revision repository in execution-repository transaction | `Import` |
 | Published Cave file association/metadata | `CaveMutationCoordinator` | `ManagerEdit` or authorized writer |
 
 These paths publish actual normalized state, suppress semantic no-ops, and

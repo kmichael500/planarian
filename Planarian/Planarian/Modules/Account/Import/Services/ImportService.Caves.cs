@@ -1,7 +1,5 @@
 using Planarian.Library.Exceptions;
 using Planarian.Modules.Account.Import.Models;
-using Planarian.Modules.Caves.Revisions;
-using Planarian.Modules.Import.Planning;
 
 namespace Planarian.Modules.Account.Import.Services;
 
@@ -17,11 +15,12 @@ public partial class ImportService
         var signalRGroup = temporaryFileId;
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Started planning cave import");
 
-        CaveImportPlan plan;
+        Planarian.Modules.Import.Planning.CaveImportPlan plan;
         await using (var stream = await _fileService.GetFileStream(temporaryFileId))
         {
-            var planner = new CaveImportPlanner(_dbContext, RequestUser);
-            plan = await planner.PlanAsync(stream, syncExisting, cancellationToken);
+            var records = await _caveParser.ParseAsync(stream, cancellationToken);
+            var state = await _cavePlanningRepository.LoadAsync(records, syncExisting, cancellationToken);
+            plan = _cavePlanner.Plan(records, state, syncExisting, cancellationToken);
         }
 
         var preview = plan.CreatePreview(omitNoChange: isDryRun);
@@ -32,10 +31,7 @@ public partial class ImportService
         if (isDryRun) return preview;
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying cave import");
-        var snapshots = new CavePublishedSnapshotReader(_dbContext, RequestUser);
-        var publisher = new ImportRevisionPublisher(_dbContext, RequestUser);
-        var executor = new CaveImportExecutor(_dbContext, RequestUser, snapshots, publisher);
-        var result = await executor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
+        var result = await _caveExecutor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
 
         // Relational state and revision history commit atomically inside the
         // executor. Blob deletion is intentionally deferred until after commit.

@@ -6,6 +6,8 @@ on:
       - "Planarian.Web/**"
       - "Planarian/**"
       - "Planarian.Tests/**"
+      - "Planarian.Tests.Unit/**"
+      - "Planarian.Tests.Integration/**"
       - "scripts/**"
       - ".github/workflows/pr-validation.yml"
 
@@ -42,15 +44,21 @@ jobs:
           --context PlanarianDbContext
           --configuration Release
           --no-build
-      - name: Run .NET tests
+      - name: Run unit and architecture tests
+        run: >-
+          dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj
+          --configuration Release --no-restore
+          --logger "trx;LogFileName=unit-results.trx"
+          --results-directory Planarian.Tests.Unit/TestResults
+      - name: Run PostgreSQL/PostGIS integration tests (including migrations, golden, and supported scale)
         id: dotnet_tests
         continue-on-error: true
         run: >-
-          dotnet test Planarian.Tests/Planarian.Tests.csproj
+          dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj
           --configuration Release
           --no-restore
           --logger "trx;LogFileName=test-results.trx"
-          --results-directory Planarian.Tests/TestResults
+          --results-directory Planarian.Tests.Integration/TestResults
       - name: Surface .NET test failures
         if: always()
         shell: python
@@ -59,7 +67,7 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
 
-          path = "Planarian.Tests/TestResults/test-results.trx"
+          path = "Planarian.Tests.Integration/TestResults/test-results.trx"
           test_step_failed = "${{ steps.dotnet_tests.outcome }}" == "failure"
 
           def escape(value: str) -> str:

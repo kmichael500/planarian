@@ -47,9 +47,9 @@ rolls the transaction back. This feature replaces that design deliberately for
 **architecture, performance, and simplicity**, not because the baseline is
 being declared incorrect.
 
-The replacement parses and resolves the file into an immutable, read-only plan
-before opening the write transaction. Preview is produced directly from that
-plan. Commit applies the same plan after concurrency/ownership verification.
+The replacement uses database-free CSV parsers, account-qualified planning repositories, and pure planners to produce
+an immutable, read-only plan before opening the write transaction. Preview is produced directly from that plan. A
+feature execution repository applies the same plan after concurrency/ownership verification.
 This avoids temporary writes during preview, shortens the write transaction,
 and removes the need to maintain two conceptually different representations of
 what preview and commit intend to do. Compatibility is defined by the resulting
