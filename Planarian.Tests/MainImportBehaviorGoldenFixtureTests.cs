@@ -243,17 +243,68 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresIntegrationFixt
         if (target.ApprovedDifferenceId != "case-insensitive-tag-creation-deduplication") return errors;
 
         var baselinePreview = item.BaselinePreview!;
+        var remainingBaselineCreations = baselinePreview.TagCreations.ToList();
+        foreach (var creation in target.Preview.TagCreations)
+        {
+            var index = remainingBaselineCreations.FindIndex(value => value == creation);
+            if (index < 0)
+            {
+                errors.Add($"Override {item.Area}/{item.Behavior} adds or changes a tag creation outside the approved correction.");
+                break;
+            }
+            remainingBaselineCreations.RemoveAt(index);
+        }
+        if (remainingBaselineCreations.Count == 0)
+            errors.Add($"Override {item.Area}/{item.Behavior} does not exercise the approved tag-case correction.");
+        var associatedTags = AssociatedTags(baselinePreview).ToList();
+        foreach (var removed in remainingBaselineCreations)
+        {
+            var (key, name) = SplitTagCreation(removed);
+            if (!associatedTags.Any(tag => tag.Key == key &&
+                    tag.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase) && tag.Name != name))
+                errors.Add($"Override {item.Area}/{item.Behavior} suppresses tag creation '{removed}' without an associated case-only canonical match.");
+        }
         var permittedPreview = baselinePreview with { TagCreations = target.Preview.TagCreations };
         if (GoldenJson(permittedPreview) != GoldenJson(target.Preview))
             errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated preview semantics.");
 
         var baselineCommitted = item.BaselineCommitted!.WithExpectedTagTypes(baselinePreview.TagCreations);
         var targetCommitted = target.Committed.WithExpectedTagTypes(target.Preview.TagCreations);
+        if (GoldenJson(targetCommitted.TagTypes) != GoldenJson(ExpectedTagTypes(target.Preview.TagCreations)))
+            errors.Add($"Override {item.Area}/{item.Behavior} supplies a committed TagType delta not derived from its approved tag creations.");
         var permittedCommitted = baselineCommitted with { TagTypes = targetCommitted.TagTypes };
         if (GoldenJson(permittedCommitted) != GoldenJson(targetCommitted))
             errors.Add($"Override {item.Area}/{item.Behavior} changes unrelated committed semantics.");
         return errors;
     }
+
+    private static IEnumerable<(string Key, string Name)> AssociatedTags(GoldenPreview preview)
+    {
+        foreach (var cave in preview.Caves)
+        foreach (var tag in cave.Tags)
+        foreach (var name in tag.Value)
+            yield return (tag.Key is "Cartographer" or "CaveReportedBy" ? TagTypeKeyConstant.People : tag.Key, name);
+        foreach (var entrance in preview.Entrances)
+        {
+            yield return (TagTypeKeyConstant.LocationQuality, entrance.LocationQuality);
+            foreach (var tag in entrance.Tags)
+            foreach (var name in tag.Value)
+                yield return (tag.Key == "EntranceReportedBy" ? TagTypeKeyConstant.People : tag.Key, name);
+        }
+    }
+
+    private static (string Key, string Name) SplitTagCreation(string creation)
+    {
+        var separator = creation.IndexOf(':');
+        return (creation[..separator], creation[(separator + 1)..]);
+    }
+
+    private static GoldenTagTypeDelta ExpectedTagTypes(IEnumerable<string> creations) => new(
+        creations.Select(creation =>
+        {
+            var (key, name) = SplitTagCreation(creation);
+            return new GoldenTagType(key, name, "account");
+        }).OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ToList(), []);
 
     private static string GoldenJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
 
