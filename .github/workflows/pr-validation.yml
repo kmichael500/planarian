@@ -31,11 +31,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - run: dotnet tool restore
       - run: dotnet restore Planarian/Planarian.sln
       - run: dotnet build Planarian/Planarian.sln --configuration Release --no-restore
       - name: Verify EF migrations match the model
         run: >-
-          dotnet ef migrations has-pending-model-changes
+          dotnet tool run dotnet-ef migrations has-pending-model-changes
           --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
           --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj
           --context PlanarianDbContext

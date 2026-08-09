@@ -6,6 +6,7 @@ namespace Planarian.Tests;
 
 public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture fixture) : IClassFixture<PostgresIntegrationFixture>
 {
+    private const string MainBaselineMigration = "20260423021136_v29";
     [Fact]
     public async Task EmptyDatabaseMigratesToLatest()
     {
@@ -19,8 +20,12 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture 
     public async Task ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData()
     {
         await using var database=await fixture.CreateUnmigratedDatabaseAsync(nameof(ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData));
-        var migrations=database.GetMigrationNames().ToList(); var foundation=migrations.FindIndex(m=>m.EndsWith("_CaveRevisionImportFoundation",StringComparison.Ordinal)); Assert.True(foundation>0);
-        await database.MigrateAsync(migrations[foundation-1]);
+        var migrations=database.GetMigrationNames().ToList();
+        var baseline=migrations.FindIndex(m=>m.EndsWith(MainBaselineMigration,StringComparison.Ordinal));
+        var foundation=migrations.FindIndex(m=>m.EndsWith("_CaveRevisionImportFoundation",StringComparison.Ordinal));
+        Assert.True(baseline >= 0, $"Expected main baseline migration {MainBaselineMigration} was not found.");
+        Assert.Equal(baseline + 1, foundation);
+        await database.MigrateAsync(migrations[baseline]);
         await using(var connection=new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync(); await using var c=connection.CreateCommand(); c.CommandText="""
@@ -28,12 +33,19 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresIntegrationFixture 
             insert into "Accounts"("Id","Name","CountyIdDelimiter","DefaultViewAccessAllCaves","ExportEnabled","CreatedOn") values('mainacct01','Existing Main Account','-',false,true,now());
             insert into "Counties"("Id","AccountId","StateId","DisplayId","Name","CreatedOn") values('maincnty01','mainacct01','mainstate1','MAIN','Existing County',now());
             insert into "Caves"("Id","AccountId","StateId","CountyId","Name","AlternateNames","CountyNumber","IsArchived","CreatedOn") values('maincave01','mainacct01','mainstate1','maincnty01','Existing Main Cave','[]',42,false,now());
+            insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values('mainfile01','mainacct01','file','Existing file',false,now());
+            insert into "Files"("Id","AccountId","CaveId","FileTypeTagId","FileName","BlobKey","BlobContainer","CreatedOn") values
+              ('mainfiler1','mainacct01','maincave01','mainfile01','existing-cave.pdf','caves/maincave01/files/mainfiler1.pdf','main',now()),
+              ('mainfilet1','mainacct01',null,'mainfile01','temporary.csv','temp/import/caves/mainfilet1.csv','main',now());
             """; await c.ExecuteNonQueryAsync();
         }
         await database.MigrateAsync(null);
         await using(var verify=database.CreateDbContext("main","mainacct01"))
         {
             var cave=await verify.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); Assert.Equal("Existing Main Cave",cave.Name); Assert.Equal("mainacct01",cave.AccountId); Assert.Null(cave.CurrentRevisionId);
+            var files=await verify.Files.OrderBy(f=>f.Id).ToListAsync(); Assert.Equal(2,files.Count);
+            Assert.Equal(("mainacct01","maincave01","existing-cave.pdf"),(files[0].AccountId,files[0].CaveId,files[0].FileName));
+            Assert.Equal(("mainacct01",(string?)null,"temporary.csv"),(files[1].AccountId,files[1].CaveId,files[1].FileName));
         }
         await using var a=database.CreateDbContext("a","mainacct01"); await using var b=database.CreateDbContext("b","mainacct01");
         var ca=await a.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); var cb=await b.Caves.IgnoreQueryFilters().SingleAsync(c=>c.Id=="maincave01"); var version=ca.Version;

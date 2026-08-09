@@ -54,6 +54,22 @@ Both publish snapshots from actual relational state, enforce expected revision
 state, create no revision for semantic no-ops, and advance history atomically
 with the corresponding relational change.
 
+## File ownership and provider validation
+
+Every persisted `File` is account-owned. This includes temporary import files,
+which have no `CaveId` but are owned by the uploading account. The
+tenant-qualified `Files(AccountId, Id)` key allows PostgreSQL to enforce that a
+staged change-request file belongs to the same account as its request. The
+migration backfills a legacy cave file from its Cave's account and fails with a
+diagnostic if any remaining legacy row has no determinable owner; it never
+assigns a synthetic empty account ID.
+
+Provider-specific tests require PostgreSQL/PostGIS through Testcontainers. On
+local macOS Colima installations that reject Ryuk's socket bind, run tests with
+`DOCKER_HOST=unix:///Users/michaelketzner/.colima/default/docker.sock` and
+`TESTCONTAINERS_RYUK_DISABLED=true`. This is a local workaround only, not a CI
+default.
+
 Manager Cave create/edit/archive/unarchive/hard-delete and published Cave-file
 upload, staged publication, and metadata edits are routed through
 `CaveMutationCoordinator`. For short mutations the coordinator owns the

@@ -26,13 +26,30 @@ namespace Planarian.Migrations.Migrations
                 name: "IX_CaveChangeRequestStagedFiles_FileId",
                 table: "CaveChangeRequestStagedFiles");
 
+            // Historic cave files predate File.AccountId being a domain invariant.
+            // Their owner is unambiguous and can be recovered from the cave. Do not
+            // manufacture an empty or arbitrary account for any other legacy row.
+            migrationBuilder.Sql("""
+                update "Files" as file
+                set "AccountId" = cave."AccountId"
+                from "Caves" as cave
+                where file."AccountId" is null
+                  and file."CaveId" = cave."Id";
+
+                do $$
+                begin
+                    if exists (select 1 from "Files" where "AccountId" is null) then
+                        raise exception 'Cannot migrate Files.AccountId: legacy file rows without a determinable account owner exist.';
+                    end if;
+                end $$;
+                """);
+
             migrationBuilder.AlterColumn<string>(
                 name: "AccountId",
                 table: "Files",
                 type: "character varying(10)",
                 maxLength: 10,
                 nullable: false,
-                defaultValue: "",
                 oldClrType: typeof(string),
                 oldType: "character varying(10)",
                 oldMaxLength: 10,
