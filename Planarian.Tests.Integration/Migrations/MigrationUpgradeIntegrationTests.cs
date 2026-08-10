@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Planarian.Tests;
 
+[Collection(MigrationIntegrationCollection.Name)]
 public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     private const string MainBaselineMigration = "20260423021136_v29";
@@ -11,6 +12,14 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     public async Task EmptyDatabaseMigratesToLatest()
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(nameof(EmptyDatabaseMigratesToLatest));
+
+        await using (var pristine = new NpgsqlConnection(database.ConnectionString))
+        {
+            await pristine.OpenAsync();
+            await using var history = new NpgsqlCommand(
+                "select to_regclass('public.\"__EFMigrationsHistory\"') is null", pristine);
+            Assert.True((bool)(await history.ExecuteScalarAsync())!);
+        }
 
         await database.MigrateAsync(null);
 

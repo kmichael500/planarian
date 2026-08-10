@@ -25,9 +25,37 @@ changed, which test proves it, which regression would previously fail where appl
 
 Production uses PostgreSQL/PostGIS, so database behavior is tested against PostgreSQL/PostGIS—not EF InMemory or
 SQLite. Integration tests share one pinned `postgis/postgis:16-3.4` Testcontainers server and create a random isolated
-database per test, migrate it, clear Npgsql pools, and drop it on disposal. Parallel execution is safe where each test
-owns its database. Colima socket discovery does not disable Ryuk. If a developer explicitly disables Ryuk, that
-environment owns external Docker cleanup.
+database per test. Per-test databases provide correctness isolation: ordinary tests cannot interfere through tenant or
+domain data. They do not provide resource isolation. Every database still consumes the same container's memory, CPU,
+I/O, connections, and catalog/schema resources, so database-heavy integration concurrency is intentionally bounded.
+
+At process startup, the fixture creates one data-free database from PostgreSQL `template0`, applies the complete EF
+migration chain once, verifies that no migrations are pending, clears its Npgsql pools and backend sessions, and seals
+it as a PostgreSQL template with ordinary connections disabled. Ordinary integration tests verify application and
+repository behavior against the current PostgreSQL/PostGIS schema, so each receives a fresh clone of that template.
+They do not need to replay Planarian's migration history. Dedicated migration tests instead create pristine databases
+from `template0` and explicitly apply latest or historical migrations, preserving genuine migration coverage.
+
+The checked-in integration runner policy is:
+
+```text
+Ordinary integration collections: max 2 concurrent
+Database provisioning:            serialized template clone creation
+Scale tests:                       non-parallel
+Migration tests:                   non-parallel
+Ordinary latest-schema database:  clone pre-migrated Planarian template
+Migration-test database:          pristine template0 + explicit EF migration
+```
+
+The provisioning gate covers only the short `CREATE DATABASE ... TEMPLATE ...` operation; cloned databases may run
+test logic concurrently. This retains real PostgreSQL/PostGIS semantics and per-test isolation while avoiding repeated
+migration work, reducing memory/CPU pressure, improving local iteration, and making bounded parallel execution
+reliable. A developer with a larger PostgreSQL environment may intentionally override runner settings for throughput
+benchmarking, but the repository default is deterministic and independent of CPU count.
+
+Each test clears only its own Npgsql pool and drops its database with `DROP DATABASE ... WITH (FORCE)`. Colima socket
+discovery does not disable Ryuk. If a developer explicitly disables Ryuk, that environment owns external Docker
+cleanup.
 
 ## Test data and raw SQL
 

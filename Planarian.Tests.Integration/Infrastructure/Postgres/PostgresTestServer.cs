@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +20,19 @@ namespace Planarian.Tests;
 /// </summary>
 public sealed class PostgresTestServer : IAsyncLifetime
 {
-    private static readonly SemaphoreSlim SharedGate = new(1, 1);
+    private const string LatestSchemaTemplateDatabaseName = "planarian_test_template";
+    private static readonly SemaphoreSlim SharedInitializationGate = new(1, 1);
+    private static readonly SemaphoreSlim DatabaseProvisioningGate = new(1, 1);
     private static PostgreSqlContainer? _sharedContainer;
-    private static bool _sharedDatabaseMigrated;
+    private static bool _latestSchemaTemplateCreated;
+    private static TimeSpan _templateCreationDuration;
 
     public string ConnectionString => _sharedContainer?.GetConnectionString()
         ?? throw new InvalidOperationException("PostgreSQL integration fixture has not been initialized.");
+
+    public TimeSpan TemplateCreationDuration => _latestSchemaTemplateCreated
+        ? _templateCreationDuration
+        : throw new InvalidOperationException("Latest-schema template has not been created.");
 
     public async Task InitializeAsync() => await EnsureSharedContainerAsync();
 
@@ -37,12 +45,12 @@ public sealed class PostgresTestServer : IAsyncLifetime
         CreateDbContext(ConnectionString, userId, accountId);
 
     public Task<PostgresTestDatabase> CreateDatabaseAsync(string testName) =>
-        CreateDatabaseCoreAsync(testName, migrateToLatest: true);
+        CreateDatabaseCoreAsync(testName, LatestSchemaTemplateDatabaseName);
 
     public Task<PostgresTestDatabase> CreateUnmigratedDatabaseAsync(string testName) =>
-        CreateDatabaseCoreAsync(testName, migrateToLatest: false);
+        CreateDatabaseCoreAsync(testName, "template0");
 
-    private async Task<PostgresTestDatabase> CreateDatabaseCoreAsync(string testName, bool migrateToLatest)
+    private async Task<PostgresTestDatabase> CreateDatabaseCoreAsync(string testName, string templateDatabaseName)
     {
         await EnsureSharedContainerAsync();
 
@@ -52,31 +60,31 @@ public sealed class PostgresTestServer : IAsyncLifetime
         if (prefix.Length > maxPrefixLength) prefix = prefix[..maxPrefixLength];
         var databaseName = $"planarian_{prefix}_{suffix}";
 
-        await using (var connection = new NpgsqlConnection(ConnectionString))
-        {
-            await connection.OpenAsync();
-            await using var command = connection.CreateCommand();
-            command.CommandText = $"CREATE DATABASE {QuoteIdentifier(databaseName)}";
-            await command.ExecuteNonQueryAsync();
-        }
-
-        var builder = new NpgsqlConnectionStringBuilder(ConnectionString) { Database = databaseName };
-        var database = new PostgresTestDatabase(builder.ConnectionString, databaseName, ConnectionString);
+        var provisioning = Stopwatch.StartNew();
+        await DatabaseProvisioningGate.WaitAsync();
         try
         {
-            if (migrateToLatest) await database.MigrateAsync(null);
-            return database;
+            await using var connection = new NpgsqlConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"CREATE DATABASE {QuoteIdentifier(databaseName)} TEMPLATE {QuoteIdentifier(templateDatabaseName)}";
+            await command.ExecuteNonQueryAsync();
         }
-        catch
+        finally
         {
-            await database.DisposeAsync();
-            throw;
+            DatabaseProvisioningGate.Release();
         }
+        provisioning.Stop();
+
+        var builder = new NpgsqlConnectionStringBuilder(ConnectionString) { Database = databaseName };
+        return new PostgresTestDatabase(builder.ConnectionString, databaseName, ConnectionString,
+            provisioning.Elapsed);
     }
 
     private static async Task EnsureSharedContainerAsync()
     {
-        await SharedGate.WaitAsync();
+        await SharedInitializationGate.WaitAsync();
         try
         {
             if (_sharedContainer is null)
@@ -92,17 +100,66 @@ public sealed class PostgresTestServer : IAsyncLifetime
                 _sharedContainer = container;
             }
 
-            if (!_sharedDatabaseMigrated)
+            if (!_latestSchemaTemplateCreated)
             {
-                await using var db = CreateDbContext(_sharedContainer.GetConnectionString(), "fixture-user", null);
-                await db.Database.MigrateAsync();
-                _sharedDatabaseMigrated = true;
+                var stopwatch = Stopwatch.StartNew();
+                await CreateLatestSchemaTemplateAsync(_sharedContainer.GetConnectionString());
+                stopwatch.Stop();
+                _templateCreationDuration = stopwatch.Elapsed;
+                _latestSchemaTemplateCreated = true;
             }
         }
         finally
         {
-            SharedGate.Release();
+            SharedInitializationGate.Release();
         }
+    }
+
+    private static async Task CreateLatestSchemaTemplateAsync(string adminConnectionString)
+    {
+        await using (var admin = new NpgsqlConnection(adminConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var create = admin.CreateCommand();
+            create.CommandText =
+                $"CREATE DATABASE {QuoteIdentifier(LatestSchemaTemplateDatabaseName)} TEMPLATE template0";
+            await create.ExecuteNonQueryAsync();
+        }
+
+        var templateConnectionString = new NpgsqlConnectionStringBuilder(adminConnectionString)
+        {
+            Database = LatestSchemaTemplateDatabaseName
+        }.ConnectionString;
+
+        await using (var db = CreateDbContext(templateConnectionString, "fixture-user", null))
+        {
+            await db.Database.MigrateAsync();
+            var pending = await db.Database.GetPendingMigrationsAsync();
+            if (pending.Any())
+                throw new InvalidOperationException(
+                    $"Latest-schema test template still has pending migrations: {string.Join(", ", pending)}");
+        }
+
+        using (var templateConnection = new NpgsqlConnection(templateConnectionString))
+            NpgsqlConnection.ClearPool(templateConnection);
+
+        await using var sealConnection = new NpgsqlConnection(adminConnectionString);
+        await sealConnection.OpenAsync();
+        await using (var terminate = sealConnection.CreateCommand())
+        {
+            terminate.CommandText = """
+                select pg_terminate_backend(pid)
+                from pg_stat_activity
+                where datname = @database and pid <> pg_backend_pid()
+                """;
+            terminate.Parameters.AddWithValue("database", LatestSchemaTemplateDatabaseName);
+            await terminate.ExecuteNonQueryAsync();
+        }
+
+        await using var seal = sealConnection.CreateCommand();
+        seal.CommandText =
+            $"ALTER DATABASE {QuoteIdentifier(LatestSchemaTemplateDatabaseName)} WITH IS_TEMPLATE true ALLOW_CONNECTIONS false";
+        await seal.ExecuteNonQueryAsync();
     }
 
     /// <summary>
@@ -162,14 +219,17 @@ public sealed class PostgresTestDatabase : IAsyncDisposable
     private readonly string _adminConnectionString;
     private int _disposed;
 
-    internal PostgresTestDatabase(string connectionString, string databaseName, string adminConnectionString)
+    internal PostgresTestDatabase(string connectionString, string databaseName, string adminConnectionString,
+        TimeSpan provisioningDuration)
     {
         ConnectionString = connectionString;
         _databaseName = databaseName;
         _adminConnectionString = adminConnectionString;
+        ProvisioningDuration = provisioningDuration;
     }
 
     public string ConnectionString { get; }
+    public TimeSpan ProvisioningDuration { get; }
 
     public PlanarianDbContext CreateDbContext(string userId, string? accountId)
     {

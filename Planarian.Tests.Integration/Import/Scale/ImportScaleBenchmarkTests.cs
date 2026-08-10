@@ -5,6 +5,7 @@ using Xunit.Abstractions;
 
 namespace Planarian.Tests;
 
+[Collection(ScaleIntegrationCollection.Name)]
 public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestOutputHelper output)
     : IClassFixture<PostgresTestServer>
 {

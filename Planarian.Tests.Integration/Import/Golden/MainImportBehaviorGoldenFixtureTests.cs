@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using Planarian.Library.Exceptions;
@@ -19,6 +20,27 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
     : IClassFixture<PostgresTestServer>
 {
     private const string BaselineCommit = "11cdd9edc58d85bcf14a9d82c797f715d3a0e2ae";
+    private static readonly IReadOnlyDictionary<string, string> RelocatedCoverageTests =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["RequiredCaveNameIsRejected"] = "MissingCaveNameIsRejected",
+            ["NegativeNumbersRemainInvalid"] = "NegativeMeasurementsAreRejected",
+            ["ExistingAccountTagIsReusedCaseInsensitivelyWithCanonicalName"] =
+                "ExistingTagIsReusedCaseInsensitivelyWithCanonicalSpelling",
+            ["FullInsertOwnsCaveScalarsAndAllSupportedTagRoles"] = "NewCaveProjectsScalarsAndInsertIntent",
+            ["SyncNoChangeIsOmittedAndCreatesNoRevision"] =
+                "SemanticallyEqualExistingCavePlansNoChangeAndPreviewCanOmitIt",
+            ["MissingLatitudeIsRejectedIndependently"] = "LatitudeAndLongitudeAreRequiredIndependently",
+            ["NumericValidationMatchesMain"] = "CoordinateBoundsAreValidated",
+            ["ExistingLocationQualityAndMultiValueTagAreReusedCaseInsensitively"] =
+                "ExistingLocationQualityAndMultiValueTagsAreReusedCaseInsensitively",
+            ["FullInsertPersistsScalarsTagsAndPostgisXYZ"] = "FullInsertPersistsScalarsTagsAndPostgisXyz",
+            ["ExistingAndImportedPrimaryConflictIsRejected"] =
+                "AppendRejectsImportedPrimaryWhenExistingPrimaryExists",
+            ["SyncReplacementUsesImportedFinalPrimaryAndReplacesExisting"] =
+                "SyncReplacementIgnoresExistingPrimaryAndReportsFinalCountDelta",
+            ["SyncPreservesUnrelatedCave"] = "SyncPreservesUnrelatedCaveAggregateAndRevisionPointer"
+        };
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -79,11 +101,13 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
             .Select(method => method.Name)
             .ToHashSet(StringComparer.Ordinal);
+        methods.UnionWith(PlannerUnitTestMethodNames());
         foreach (var item in golden.Cases)
         {
             Assert.False(string.IsNullOrWhiteSpace(item.InputCsv));
             Assert.Contains(item.Validation.Outcome, new[] { "success", "error" });
-            Assert.Contains(item.CoverageTest, methods);
+            var currentCoverageTest = RelocatedCoverageTests.GetValueOrDefault(item.CoverageTest, item.CoverageTest);
+            Assert.Contains(currentCoverageTest, methods);
             if (item.Validation.Outcome == "success")
             {
                 Assert.NotNull(item.BaselinePreview);
@@ -313,6 +337,22 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "import-main-11cdd9e.json");
         return JsonSerializer.Deserialize<GoldenFixture>(System.IO.File.ReadAllText(path), JsonOptions)
                ?? throw new InvalidOperationException("Golden fixture could not be deserialized.");
+    }
+
+    private static IEnumerable<string> PlannerUnitTestMethodNames()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null &&
+               !System.IO.File.Exists(Path.Combine(directory.FullName, "Planarian", "Planarian.sln")))
+            directory = directory.Parent;
+        if (directory is null)
+            throw new DirectoryNotFoundException("Could not locate repository root for planner test traceability.");
+
+        var plannerTestDirectory = Path.Combine(directory.FullName, "Planarian.Tests.Unit", "Import");
+        return Directory.EnumerateFiles(plannerTestDirectory, "*PlannerTests.cs", SearchOption.AllDirectories)
+            .SelectMany(path => Regex.Matches(System.IO.File.ReadAllText(path),
+                    @"public\s+(?:async\s+)?(?:Task|void)\s+(?<name>[A-Za-z0-9_]+)\s*\(")
+                .Select(match => match.Groups["name"].Value));
     }
 
     private static async Task ApplySetupAsync(PostgresTestDatabase database, PublishedCaveTestData tenant, string setup)

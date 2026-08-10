@@ -17,5 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Update="Fixtures/import-main-11cdd9e.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
