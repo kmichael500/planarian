@@ -1,10 +1,8 @@
 # .NET/backend rules
 
-- Follow `../docs/data-access-architecture.md` and `../docs/testing.md`.
-- Services/planners/coordinators do not own DbContext or Npgsql objects; repositories own persistence and transactions.
-- Database-dependent tests use real PostgreSQL/PostGIS. Behavior changes are not done until their tests run.
-- Preserve tenant predicates, import locking/atomicity, bounded tracking, and normal 10k-Cave scalability.
-- Raw SQL is limited to provider contracts, historical migration setup, specialized observation, or scale seeding.
-- Before completion, build the solution, run unit and relevant integration/golden/scale suites, and check pending models.
-- Use the narrowest correct test layer and small scenario-specific builders, never a universal mega-seed. Report the
-  behavior, its proving test, the regression protected, and every validation suite run.
+- Application services, planners, workflow coordinators, and similar orchestration types do not directly own `PlanarianDbContext`, `DbContext`, `DbSet`, `NpgsqlConnection`, or `NpgsqlCommand` objects.
+- Feature-oriented repository and data-access infrastructure owns persistence; repositories return materialized results, never `IQueryable`.
+- Every `IgnoreQueryFilters` use remains explicitly account/tenant qualified.
+- Published mutation and revision workflows preserve their required transaction, concurrency, and relational atomicity boundaries.
+- Large imports remain set-oriented or intentionally bounded/chunked. Fully populated imports of 10,000 Caves and roughly 15,000 Entrances are a normal supported workload.
+- See `../docs/data-access-architecture.md` for the reasoning and detailed persistence contract.

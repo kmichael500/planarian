@@ -27,11 +27,9 @@ A typical workflow looks like this:
 5. Members can suggest updates when they notice something wrong.
 6. Managers/admins review changes so the data stays accurate.
 
-Implementation is staged: immutable Cave revision/history and the
-change-request persistence model exist, while the request submission, review,
-approval, and frontend workflows remain future work. See
-[`docs/cave-revisions-and-review.md`](docs/cave-revisions-and-review.md) for the
-exact current/future boundary.
+Published Cave changes are recorded as immutable revisions, while pending proposals remain separate from published
+state and pass through a controlled review and publication boundary. See
+[`docs/cave-revisions.md`](docs/cave-revisions.md) for the durable architecture contract.
 
 ## Data
 
