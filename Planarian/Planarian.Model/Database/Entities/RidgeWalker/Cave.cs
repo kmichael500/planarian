@@ -30,6 +30,9 @@ public class Cave : EntityBase
     public DateTime? ReportedOn { get; set; }
     public bool IsArchived { get; set; } = false;
 
+    [MaxLength(PropertyLength.Id)] public string? CurrentRevisionId { get; set; }
+    public uint Version { get; private set; }
+
     public NpgsqlTsVector NarrativeSearchVector { get; set; } = null!;
 
 
@@ -101,10 +104,22 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasIndex(e => new { e.CountyNumber, e.CountyId }).IsUnique();
+        builder.HasAlternateKey(e => new { e.AccountId, e.Id });
         builder.HasIndex(e => e.LengthFeet);
         builder.HasIndex(e => e.DepthFeet);
         builder.HasIndex(e => e.CountyNumber);
         builder.HasIndex(e => e.Name);
+
+        builder.Property(e => e.Version)
+            .HasColumnName("xmin")
+            .IsRowVersion()
+            .ValueGeneratedOnAddOrUpdate();
+
+        builder.HasOne<CaveRevision>()
+            .WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.Id, e.CurrentRevisionId })
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasGeneratedTsVectorColumn<Cave>(
             e => e.NarrativeSearchVector, // The computed column property

@@ -1,7 +1,4 @@
 using System.Linq.Expressions;
-using LinqToDB;
-using LinqToDB.EntityFrameworkCore;
-using LinqToDB.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
@@ -26,6 +23,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         const int batchSize = 500;
 
+        // Revision/workflow rows deliberately use restrictive relationships so
+        // accepted history survives an ordinary Cave delete.  An account purge
+        // is the explicit exception: sever nullable workflow pointers first,
+        // then remove the dependent graph in an order that cannot cross the
+        // trusted account boundary.
+        await DeleteRevisionWorkflowForAccountAsync(cancellationToken);
+
         int deletedCount = 0;
         int totalDeleted = 0;
 
@@ -34,11 +38,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.EntranceStatusTags
+            deletedCount = await DeleteBatchAsync(DbContext.EntranceStatusTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
-                 .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance status tags.");
@@ -49,11 +51,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.EntranceHydrologyTags
+            deletedCount = await DeleteBatchAsync(DbContext.EntranceHydrologyTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance hydrology tags.");
@@ -63,11 +63,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.FieldIndicationTags
+            deletedCount = await DeleteBatchAsync(DbContext.FieldIndicationTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} field indication tags.");
@@ -77,11 +75,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.EntranceReportedByNameTags
+            deletedCount = await DeleteBatchAsync(DbContext.EntranceReportedByNameTags
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance reported by name tags.");
@@ -91,11 +87,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.EntranceOtherTag
+            deletedCount = await DeleteBatchAsync(DbContext.EntranceOtherTag
                 .Where(tag => tag.Entrance.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrance other tags.");
@@ -108,11 +102,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.Entrances
+            deletedCount = await DeleteBatchAsync(DbContext.Entrances
                 .Where(e => e.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} entrances.");
@@ -126,11 +118,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         totalDeleted = 0;
         do
         {
-            deletedCount = await DbContext.GeologyTags
+            deletedCount = await DeleteBatchAsync(DbContext.GeologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} geology tags.");
@@ -141,12 +131,10 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         do
         {
 
-            // the tag.account.accountUsers is only needed to force linq2sql to generate a delete statement that works with take
-            deletedCount = await DbContext.Files
+            // Keep file cleanup scoped to files that belong to an active account user.
+            deletedCount = await DeleteBatchAsync(DbContext.Files
                 .Where(tag => tag.AccountId == RequestUser.AccountId && tag.Account.AccountUsers.Any())
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} files.");
@@ -156,11 +144,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.MapStatusTags
+            deletedCount = await DeleteBatchAsync(DbContext.MapStatusTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} map status tags.");
@@ -170,11 +156,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.GeologicAgeTags
+            deletedCount = await DeleteBatchAsync(DbContext.GeologicAgeTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} geologic age tags.");
@@ -184,11 +168,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.PhysiographicProvinceTags
+            deletedCount = await DeleteBatchAsync(DbContext.PhysiographicProvinceTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} physiographic province tags.");
@@ -198,11 +180,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.BiologyTags
+            deletedCount = await DeleteBatchAsync(DbContext.BiologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} biology tags.");
@@ -212,11 +192,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.ArcheologyTags
+            deletedCount = await DeleteBatchAsync(DbContext.ArcheologyTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} archeology tags.");
@@ -226,11 +204,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.CartographerNameTags
+            deletedCount = await DeleteBatchAsync(DbContext.CartographerNameTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} cartographer name tags.");
@@ -240,11 +216,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.CaveReportedByNameTags
+            deletedCount = await DeleteBatchAsync(DbContext.CaveReportedByNameTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} cave reported by name tags.");
@@ -254,11 +228,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.CaveOtherTags
+            deletedCount = await DeleteBatchAsync(DbContext.CaveOtherTags
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} cave other tags.");
@@ -272,17 +244,59 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DbContext.Caves
+            deletedCount = await DeleteBatchAsync(DbContext.Caves
                 .Where(c => c.AccountId == RequestUser.AccountId && c.Account.AccountUsers.Any())
-                .Take(batchSize)
-                .IgnoreQueryFilters()
-                .DeleteAsync(cancellationToken);
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} caves.");
         } while (deletedCount == batchSize);
 
         progress.Report("Deleted all caves.");
+    }
+
+    private async Task DeleteRevisionWorkflowForAccountAsync(CancellationToken cancellationToken)
+    {
+        var accountId = RequestUser.AccountId
+            ?? throw new InvalidOperationException("Account scope is required for cave data deletion.");
+
+        await DbContext.Caves.IgnoreQueryFilters()
+            .Where(c => c.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.CurrentRevisionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveChangeRequests.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.CurrentProposalVersionId, (string?)null)
+                .SetProperty(r => r.BaseRevisionId, (string?)null)
+                .SetProperty(r => r.ApprovedRevisionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveRevisions.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.PreviousRevisionId, (string?)null)
+                .SetProperty(r => r.ChangeRequestId, (string?)null)
+                .SetProperty(r => r.ImportBatchId, (string?)null), cancellationToken);
+
+        await DbContext.CaveProposalVersions.IgnoreQueryFilters()
+            .Where(v => v.AccountId == accountId)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.PreviousProposalVersionId, (string?)null), cancellationToken);
+
+        await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+            .Where(link => link.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveProposalVersions.IgnoreQueryFilters()
+            .Where(v => v.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveRevisions.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveChangeRequests.IgnoreQueryFilters()
+            .Where(r => r.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await DbContext.CaveImportBatches.IgnoreQueryFilters()
+            .Where(b => b.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
 
@@ -296,10 +310,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         // Batch delete for TagTypes
         var tagTypesCount =
-            await AsyncExtensions.CountAsync(DbContext.TagTypes,
-                e => e.AccountId == RequestUser.AccountId && e.IsDefault == false &&
-                     !string.IsNullOrWhiteSpace(e.AccountId),
-                cancellationToken);
+            await DbContext.TagTypes.CountAsync(e => e.AccountId == RequestUser.AccountId && e.IsDefault == false &&
+                     !string.IsNullOrWhiteSpace(e.AccountId), cancellationToken);
 
         do
         {
@@ -310,7 +322,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .Take(batchSize)
                     .Select(w => w.Id)
                     .Contains(tt.Id) && tt.AccountId == RequestUser.AccountId)
-                .DeleteAsync(cancellationToken);
+                .ExecuteDeleteAsync(cancellationToken);
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} of {tagTypesCount} tags.");
@@ -319,7 +331,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     public async Task DeleteAllCounties()
     {
-        await DbContext.Counties.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
+        await DbContext.Counties.Where(c => c.AccountId == RequestUser.AccountId).ExecuteDeleteAsync();
     }
 
     // deletes all cave permissions except view all
@@ -327,23 +339,22 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         await DbContext.CavePermissions.Where(c =>
             c.AccountId == RequestUser.AccountId &&
-            !(string.IsNullOrWhiteSpace(c.CaveId) && string.IsNullOrWhiteSpace(c.CountyId))).DeleteAsync();
+            !(string.IsNullOrWhiteSpace(c.CaveId) && string.IsNullOrWhiteSpace(c.CountyId))).ExecuteDeleteAsync();
     }
 
     public async Task DeleteAllAccountStates()
     {
-        await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).DeleteAsync();
+        await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).ExecuteDeleteAsync();
     }
 
     public async Task<IEnumerable<AccountState>> GetAllAccountStates()
     {
-        return await AsyncExtensions.ToListAsync(
-            DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId));
+        return await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).ToListAsync();
     }
 
     public async Task<IEnumerable<TagTypeTableVm>> GetTagsForTable(string key, CancellationToken cancellationToken)
     {
-        var result = await AsyncExtensions.ToListAsync(DbContext.TagTypes
+        var result = await DbContext.TagTypes
             .Where(e => e.Key == key)
             .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault)
             .Select(e => new TagTypeTableVm
@@ -371,7 +382,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                               e.ArcheologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
                               e.CaveOtherTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId)
             })
-            .OrderBy(e => e.Name), cancellationToken);
+            .OrderBy(e => e.Name).ToListAsync(cancellationToken);
 
         if (key.Equals(TagTypeKeyConstant.File) || key.Equals(TagTypeKeyConstant.LocationQuality))
             foreach (var tag in result)
@@ -381,7 +392,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     public async Task<int> GetNumberOfOccurrences(string tagTypeId)
     {
-        var result = await AsyncExtensions.FirstOrDefaultAsync(DbContext.TagTypes
+        var result = await DbContext.TagTypes
             .Where(e => e.Id == tagTypeId)
             .Select(e => e.TripTags.Count +
                          e.LeadTags.Count +
@@ -400,7 +411,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                          e.BiologyTags.Count +
                          e.ArcheologyTags.Count +
                          e.CaveOtherTags.Count
-            ));
+            ).FirstOrDefaultAsync();
         return result;
     }
 
@@ -415,7 +426,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 deletedRecords += await DbContext.TagTypes
                     .Where(e => e.AccountId == RequestUser.AccountId)
                     .Where(e => batch.Contains(e.Id))
-                    .DeleteAsync(cancellationToken);
+                    .ExecuteDeleteAsync(cancellationToken);
 
             await SaveChangesAsync(cancellationToken);
 
@@ -440,7 +451,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         {
             var destinationTagType = await DbContext.TagTypes
                 .Where(e => e.Id == destinationTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
-                .FirstOrDefaultAsyncEF(cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (destinationTagType == null)
             {
@@ -457,7 +468,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
                 var sourceTagType = await DbContext.TagTypes
                     .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
-                    .FirstOrDefaultAsyncEF(cancellationToken);
+                    .FirstOrDefaultAsync(cancellationToken);
 
                 if (sourceTagType == null)
                 {
@@ -595,9 +606,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
             .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
 
-        await tags
-            .IgnoreQueryFilters()
-            .Set(tagTypeSelector, destinationTagTypeId).UpdateAsync(cancellationToken);
+        var tagProperty = tagTypeSelector.Body is MemberExpression member
+            ? member.Member.Name
+            : throw new ArgumentException("tagTypeSelector must be a member access expression.");
+        var matchingTags = await tags.IgnoreQueryFilters().ToListAsync(cancellationToken);
+        foreach (var tag in matchingTags)
+            DbContext.Entry(tag).Property(tagProperty).CurrentValue = destinationTagTypeId;
+        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task DeleteDuplicateTags<TEntity, TTag>(IQueryable<TEntity> parentSet,
@@ -654,7 +669,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
         CancellationToken cancellationToken)
     {
-        var result = await AsyncExtensions.ToListAsync(DbContext.Counties
+        var result = await DbContext.Counties
             .Where(e => e.AccountId == RequestUser.AccountId && e.StateId == stateId)
             .Select(e => new TagTypeTableCountyVm
             {
@@ -665,25 +680,25 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 Occurrences = e.Caves.Count()
 
             })
-            .OrderBy(e => e.Name), cancellationToken);
+            .OrderBy(e => e.Name).ToListAsync(cancellationToken);
 
         return result;
     }
 
     public async Task<County?> GetCounty(string? countyId, CancellationToken cancellationToken)
     {
-        return await AsyncExtensions.FirstOrDefaultAsync(DbContext.Counties, e => e.Id == countyId);
+        return await DbContext.Counties.FirstOrDefaultAsync(e => e.Id == countyId, cancellationToken);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
     {
-        return await AsyncExtensions.ToListAsync(DbContext.States
+        return await DbContext.States
             .Select(e => new SelectListItem<string>
             {
                 Value = e.Id,
                 Display = e.Abbreviation
             })
-            .OrderBy(e => e.Display), cancellationToken);
+            .OrderBy(e => e.Display).ToListAsync(cancellationToken);
     }
 
     public async Task<bool> IsDuplicateCountyCode(string countyDisplayId, string stateId,
@@ -707,10 +722,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         {
             if (countyId == destinationCountyId) continue;
 
-            await DbContext.Caves
-                .Where(e => e.CountyId == countyId)
-                .Set(e => e.CountyId, destinationCountyId)
-                .UpdateAsync();
+            await DbContext.Caves.Where(e => e.CountyId == countyId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.CountyId, destinationCountyId));
         }
 
         await DbContext.SaveChangesAsync();
@@ -728,7 +741,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 DefaultViewAccessAllCaves = e.DefaultViewAccessAllCaves,
                 ExportEnabled = e.ExportEnabled
             })
-            .FirstOrDefaultAsyncEF(cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
         return account;
     }
@@ -738,13 +751,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.Accounts
             .Include(e => e.AccountStates)
-            .FirstOrDefaultAsyncEF(e => e.Id == RequestUser.AccountId, cancellationToken);
+            .FirstOrDefaultAsync(e => e.Id == RequestUser.AccountId, cancellationToken);
     }
 
     public async Task<int> GetNumberOfCavesForState(string deletedStateId, CancellationToken cancellationToken)
     {
         return await DbContext.Caves.Where(e => e.StateId == deletedStateId && e.AccountId == RequestUser.AccountId)
-            .CountAsyncEF(cancellationToken);
+            .CountAsync(cancellationToken);
     }
 
 
@@ -752,7 +765,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.AccountStates
             .Where(e => e.AccountId == accountId && e.StateId == deletedStateId)
-            .FirstOrDefaultAsyncEF();
+            .FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<string>> GetCavesBatch(int cavesBatchSize, CancellationToken cancellationToken)
@@ -761,14 +774,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Where(e => e.AccountId == RequestUser.AccountId)
             .Take(cavesBatchSize)
             .Select(e => e.Id)
-            .ToListAsyncEF(cancellationToken);
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<int> GetCavesCount(CancellationToken cancellationToken)
     {
         return await DbContext.Caves
             .Where(e => e.AccountId == RequestUser.AccountId)
-            .CountAsyncEF(cancellationToken);
+            .CountAsync(cancellationToken);
     }
 
     public async Task<string?> GetAccountName(string accountId)
@@ -776,7 +789,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return await DbContext.Accounts
             .Where(e => e.Id == accountId)
             .Select(e => e.Name)
-            .FirstOrDefaultAsyncEF();
+            .FirstOrDefaultAsync();
     }
 
     #region Archive
@@ -837,7 +850,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .OrderBy(tag => tag.TagType.Name)
                     .Select(tag => tag.TagType.Name)),
             })
-            .ToListAsyncEF(cancellationToken);
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<List<ArchiveEntranceByCaveCsvModel>> GetArchiveEntrances(string accountId, CancellationToken cancellationToken)
@@ -882,7 +895,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .Select(tag => tag.TagType.Name)),
                 IsPrimaryEntrance = entrance.IsPrimary
             })
-            .ToListAsyncEF(cancellationToken);
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<List<ArchiveFileByCaveModel>> GetArchiveFiles(string accountId, CancellationToken cancellationToken)
@@ -905,7 +918,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 BlobKey = file.BlobKey,
                 FileTypeDisplayName = file.FileTypeTag.Name
             })
-            .ToListAsyncEF(cancellationToken);
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<List<ArchiveGeoJsonByCaveModel>> GetArchiveGeoJsons(string accountId, CancellationToken cancellationToken)
@@ -926,7 +939,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 Name = geoJson.Name,
                 GeoJson = geoJson.GeoJson
             })
-            .ToListAsyncEF(cancellationToken);
+            .ToListAsync(cancellationToken);
     }
 
     #endregion
@@ -935,14 +948,14 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         return await DbContext.AccountUsers
             .Where(e => e.UserId == userId && e.AccountId == accountId)
-            .FirstOrDefaultAsyncEF();
+            .FirstOrDefaultAsync();
     }
 
     public async Task<bool> GetDefaultViewAccess()
     {
         return await DbContext.Accounts.Where(e => e.Id == RequestUser.AccountId)
             .Select(e => e.DefaultViewAccessAllCaves)
-            .FirstOrDefaultAsyncEF();
+            .FirstOrDefaultAsync();
     }
 }
 

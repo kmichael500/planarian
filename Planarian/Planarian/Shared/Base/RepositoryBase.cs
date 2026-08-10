@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Planarian.Library.Exceptions;
@@ -40,32 +39,26 @@ public abstract class RepositoryBase<TDbContext> where TDbContext : PlanarianDbC
         return await DbContext.Database.BeginTransactionAsync(cancellationToken);
     }
 
-    public async Task BulkInsertAsync(IEnumerable<EntityBase> entities, BulkConfig? bulkConfig = null,
-        Action<int, int>? onBatchProcessed = null,
-        int batchSize = 1000,
-        CancellationToken cancellationToken = default)
-    {
-        entities = entities.ToList();
-        var totalEntities = entities.Count();
+    public void AddRange(IEnumerable<EntityBase> entities) => DbContext.AddRange(entities);
 
-        var processed = 0;
-        foreach (var batch in entities.Chunk(batchSize))
-        {
-            await DbContext.BulkInsertAsync(batch, bulkConfig, cancellationToken: cancellationToken);
-            processed += batch.Length;
-            onBatchProcessed?.Invoke(processed, totalEntities);
-        }
+    protected async Task<int> DeleteBatchAsync<TEntity>(IQueryable<TEntity> query, int batchSize,
+        CancellationToken cancellationToken = default) where TEntity : EntityBase
+    {
+        var ids = await query.AsNoTracking().Take(batchSize).Select(entity => entity.Id)
+            .ToListAsync(cancellationToken);
+        if (ids.Count == 0) return 0;
+
+        // Reuse the original scoped query for the DELETE. This is important:
+        // selecting tenant-scoped IDs and then deleting by IDs alone would
+        // turn a safe lookup into an unscoped mutation.
+        return await query.Where(entity => ids.Contains(entity.Id))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
 
     public async Task<int> ExecuteRawSql(string sql, CancellationToken cancellationToken = default)
     {
         return await DbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
-    }
-
-    public async Task BulkSaveChangesAsync()
-    {
-        await DbContext.BulkSaveChangesAsync();
     }
 
     public void Add(EntityBase entity)

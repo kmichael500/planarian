@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Text.Json;
-using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
@@ -1050,6 +1049,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.CaveOtherTags)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Favorites)
+            .Include(e => e.CavePermissions)
             .Include(e => e.Files)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)
@@ -1063,6 +1063,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.Entrances)
             .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task DeleteStagedFileReferencesAsync(IEnumerable<string> fileIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return;
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to delete staged file references.");
+
+        await DbContext.Set<CaveChangeRequestStagedFile>()
+            .IgnoreQueryFilters()
+            .Where(staged => staged.AccountId == RequestUser.AccountId && ids.Contains(staged.FileId))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task<Cave?> GetCaveWithLinePlots(string caveId)
@@ -1129,26 +1143,31 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         var scopedCaves = caves.Where(e => scopedCaveIds.Contains(e.Id)).ToList();
         if (!scopedCaves.Any()) return;
 
-        var config = new BulkConfig
-        {
-            PropertiesToInclude = new List<string>
-            {
-                nameof(Cave.Name),
-                nameof(Cave.AlternateNames),
-                nameof(Cave.CountyId),
-                nameof(Cave.CountyNumber),
-                nameof(Cave.StateId),
-                nameof(Cave.LengthFeet),
-                nameof(Cave.DepthFeet),
-                nameof(Cave.MaxPitDepthFeet),
-                nameof(Cave.NumberOfPits),
-                nameof(Cave.Narrative),
-                nameof(Cave.ReportedOn),
-                nameof(Cave.IsArchived)
-            }
-        };
+        var ids = scopedCaves.Select(e => e.Id).ToList();
+        var currentCaves = await DbContext.Caves
+            .IgnoreQueryFilters()
+            .Where(e => ids.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
+            .ToListAsync(cancellationToken);
 
-        await DbContext.BulkUpdateAsync(scopedCaves, config, cancellationToken: cancellationToken);
+        var incoming = scopedCaves.ToDictionary(e => e.Id);
+        foreach (var current in currentCaves)
+        {
+            var update = incoming[current.Id];
+            current.Name = update.Name;
+            current.SetAlternateNamesList(update.AlternateNamesList);
+            current.CountyId = update.CountyId;
+            current.CountyNumber = update.CountyNumber;
+            current.StateId = update.StateId;
+            current.LengthFeet = update.LengthFeet;
+            current.DepthFeet = update.DepthFeet;
+            current.MaxPitDepthFeet = update.MaxPitDepthFeet;
+            current.NumberOfPits = update.NumberOfPits;
+            current.Narrative = update.Narrative;
+            current.ReportedOn = update.ReportedOn;
+            current.IsArchived = update.IsArchived;
+        }
+
+        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteImportSyncCaveTags(List<string> caveIds, CancellationToken cancellationToken)
@@ -1206,7 +1225,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
         var entranceIds = await DbContext.Entrances
             .IgnoreQueryFilters()
-            .Where(e => e.CaveId == caveId)
+            .Where(e => e.CaveId == caveId && e.Cave.AccountId == RequestUser.AccountId)
             .Select(e => e.Id)
             .ToListAsync(cancellationToken);
 
@@ -1233,7 +1252,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 .ExecuteDeleteAsync(cancellationToken);
             await DbContext.Entrances
                 .IgnoreQueryFilters()
-                .Where(e => entranceIds.Contains(e.Id))
+                .Where(e => entranceIds.Contains(e.Id) && e.Cave.AccountId == RequestUser.AccountId)
                 .ExecuteDeleteAsync(cancellationToken);
         }
 

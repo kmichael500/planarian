@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
 using System.Text.Json.Serialization;
-using LinqToDB.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +29,15 @@ using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
-using Planarian.Modules.Import.Repositories;
 using Planarian.Modules.Leads.Repositories;
 using Planarian.Modules.Leads.Services;
+using Planarian.Modules.Import.Data;
+using Planarian.Modules.Import.Parsing;
+using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Map.Controllers;
 using Planarian.Modules.Map.Services;
 using Planarian.Modules.Notifications.Hubs;
@@ -58,6 +60,7 @@ using Planarian.Shared.Attributes;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
 using Planarian.Shared.Services;
+using Planarian.Shared.Repositories;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.MailGun;
 using FileOptions = Planarian.Shared.Options.FileOptions;
@@ -206,6 +209,7 @@ builder.Services.AddSingleton<AuthCookieService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<ChunkedUploadService>();
+builder.Services.AddScoped<ThrottleEventLogRepository>();
 builder.Services.AddScoped<ThrottleEventLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<BlobService>();
@@ -220,9 +224,18 @@ builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<CaveService>();
+builder.Services.AddScoped<CavePublishedSnapshotRepository>();
+builder.Services.AddScoped<CaveMutationCoordinator>();
+builder.Services.AddScoped<CaveMutationRepository>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
+builder.Services.AddSingleton<CaveImportCsvParser>();
+builder.Services.AddSingleton<EntranceImportCsvParser>();
+builder.Services.AddSingleton<CaveImportPlanner>();
+builder.Services.AddSingleton<EntranceImportPlanner>();
+builder.Services.AddScoped<CaveImportExecutionRepository>();
+builder.Services.AddScoped<EntranceImportExecutionRepository>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
@@ -255,8 +268,9 @@ builder.Services.AddScoped<FileRepository>();
 builder.Services.AddScoped(typeof(FileRepository<>));
 builder.Services.AddScoped<MapService>();
 builder.Services.AddScoped<MapRepository>();
-builder.Services.AddScoped<TemporaryEntranceRepository>();
 builder.Services.AddScoped<FeatureSettingRepository>();
+builder.Services.AddScoped<CaveImportPlanningRepository>();
+builder.Services.AddScoped<EntranceImportPlanningRepository>();
 
 
 #endregion
@@ -288,6 +302,7 @@ builder.Services.AddDbContext<PlanarianDbContext>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 });
 
@@ -297,6 +312,7 @@ builder.Services.AddDbContextFactory<PlanarianDbContext>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 }, ServiceLifetime.Scoped);
 
@@ -306,10 +322,10 @@ builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
     {
         e.MigrationsAssembly("Planarian.Migrations");
         e.UseNetTopologySuite();
+        e.MaxBatchSize(1000);
     });
 });
 
-LinqToDBForEFTools.Initialize();
 //
 // // Convert NetTopologySuite Point to SqlGeometry
 // MappingSchema.Default.SetConverter<Point, SqlGeometry>(p =>

@@ -12,7 +12,7 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Database;
 
-public class PlanarianDbContextBase : DbContext
+public partial class PlanarianDbContextBase : DbContext
 {
     protected readonly SaveChangesInterceptor ChangesInterceptor = new();
     public RequestUser RequestUser = null!;
@@ -66,11 +66,16 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
     public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<CaveRevision> CaveRevisions { get; set; } = null!;
+    public DbSet<CaveImportBatch> CaveImportBatches { get; set; } = null!;
+    public DbSet<CaveChangeRequest> CaveChangeRequests { get; set; } = null!;
+    public DbSet<CaveProposalVersion> CaveProposalVersions { get; set; } = null!;
+    public DbSet<CaveChangeRequestStagedFile> CaveChangeRequestStagedFiles { get; set; } = null!;
     public DbSet<CaveGeoJson> CaveGeoJsons { get; set; } = null!;
     public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
-    
+
     public DbSet<CavePermission> CavePermissions { get; set; } = null!;
-    
+
     public DbSet<CaveReportedByNameTag> CaveReportedByNameTags { get; set; } = null!;
     public DbSet<County> Counties { get; set; } = null!;
     public DbSet<Entrance> Entrances { get; set; } = null!;
@@ -92,21 +97,20 @@ public class PlanarianDbContextBase : DbContext
     #endregion
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-    { 
+    {
         modelBuilder.HasPostgresExtension("postgis");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContextBase).Assembly);
-        
+
         var tsSimple = typeof(FullTextSearchExtensions).GetMethod(
             nameof(FullTextSearchExtensions.TsHeadlineSimple),
             new[] { typeof(string), typeof(string), typeof(string), typeof(string) });
-        
+
         if (tsSimple == null)
             throw new InvalidOperationException("Could not find ts_headline_simple method.");
-        
-        modelBuilder.HasDbFunction(tsSimple)       
-            .HasName("ts_headline_simple")     
-            .HasSchema("public");            
-        
+
+        modelBuilder.HasDbFunction(tsSimple)
+            .HasName("ts_headline_simple")
+            .HasSchema("public");
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -149,18 +153,34 @@ public class PlanarianDbContext : PlanarianDbContextBase
     {
     }
 
-    // on model creating
+    // Query filters intentionally use scalar context properties. EF parameterizes
+    // DbContext members per context instance, so account changes do not get captured
+    // into the cached model. A missing account fails closed for all tenant-owned data.
+    private string? CurrentAccountId => RequestUser?.AccountId;
+    private string? CurrentUserId => RequestUser?.Id;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<Cave>().HasQueryFilter(c =>
-            c.AccountId == RequestUser.AccountId &&
+            CurrentAccountId != null &&
+            CurrentUserId != null &&
+            c.AccountId == CurrentAccountId &&
             UserCavePermissionView.Any(ucp =>
-                ucp.AccountId == RequestUser.AccountId &&
-                ucp.UserId == RequestUser.Id &&
-                ucp.CaveId == c.Id)
-        );
+                ucp.AccountId == CurrentAccountId &&
+                ucp.UserId == CurrentUserId &&
+                ucp.CaveId == c.Id));
 
+        modelBuilder.Entity<CaveRevision>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveImportBatch>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveChangeRequest>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveProposalVersion>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveChangeRequestStagedFile>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
     }
 }
