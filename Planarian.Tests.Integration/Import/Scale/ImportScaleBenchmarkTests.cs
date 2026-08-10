@@ -26,6 +26,7 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             "initial",
             ImportScaleDataFactory.BuildCaves(Enumerable.Range(1, CaveCount), _ => false),
             syncExisting: false);
+        WritePhase(initial);
         Assert.Equal(CaveCount, initial.Inserts);
         AssertCaveStructure(initial, 600, 400, 550, 50, 40, 40_000);
 
@@ -39,8 +40,11 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             "entrances",
             ImportScaleDataFactory.BuildEntrances(Enumerable.Range(1, CaveCount), replacement: false),
             syncExisting: false);
-        Assert.Equal(13_200, entrances.Rows);
-        AssertEntranceStructure(entrances, 250, 200, 200, 50, 40, 50_000);
+        WritePhase(entrances);
+        Assert.Equal(15_000, entrances.Rows);
+        // Compared with the previous 13,200-row workload, 1,800 additional Entrances require one additional
+        // 1,500-Entrance chunk and their associations require two additional 4,000-association chunks.
+        AssertEntranceStructure(entrances, 270, 200, 200, 50, 45, 50_000);
 
         var before = await ReadVersionsAsync(database, accountId);
         var revisionsBefore = await CountRevisionsAsync(database, accountId);
@@ -48,6 +52,7 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             "mostly",
             ImportScaleDataFactory.BuildCaves(Enumerable.Range(1, CaveCount), number => number % 20 == 0),
             syncExisting: true);
+        WritePhase(mostly);
         Assert.Equal(500, mostly.Updates);
         Assert.Equal(9500, mostly.NoChange);
         AssertCaveStructure(mostly, 250, 150, 180, 20, 40, 40_000);
@@ -58,6 +63,7 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             "churn",
             ImportScaleDataFactory.BuildCaves(churnNumbers, number => number % 10 == 0, churn: true),
             syncExisting: true);
+        WritePhase(churn);
         Assert.Equal(100, churn.Deletes);
         Assert.Equal(100, churn.Inserts);
         AssertCaveStructure(churn, 300, 200, 220, 25, 50, 40_000);
@@ -67,6 +73,7 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             "entrance-churn",
             ImportScaleDataFactory.BuildEntrances(replacementNumbers, replacement: true),
             syncExisting: true);
+        WritePhase(entranceChurn);
         Assert.Equal(1000, entranceChurn.Targets);
         AssertEntranceStructure(entranceChurn, 250, 150, 180, 25, 40, 30_000);
         await AssertChurnStateAsync(database, accountId, replacementNumbers);
@@ -86,6 +93,9 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             peakWorkingSetBytes = process.PeakWorkingSet64 > 0 ? process.PeakWorkingSet64 : (long?)null
         }));
     }
+
+    private void WritePhase(object metrics) =>
+        output.WriteLine("SCALE_PHASE " + System.Text.Json.JsonSerializer.Serialize(metrics));
 
     private static async Task<Dictionary<int, (uint Version, string? Revision)>> ReadVersionsAsync(
         PostgresTestDatabase database, string accountId)

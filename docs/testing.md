@@ -96,19 +96,59 @@ execution live separately in `ImportScaleDataFactory`, `ImportScaleSeeder`, `Imp
 ## Running tests
 
 Docker must be available for integration tests. Local Colima is discovered automatically when `DOCKER_HOST` is unset.
-Some Colima versions cannot mount the host socket into Ryuk. In that environment, a developer may explicitly run with
-`TESTCONTAINERS_RYUK_DISABLED=true`; that developer is then responsible for cleaning orphaned Docker resources.
+For that detected Colima socket, the fixture also defaults `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` to
+`/var/run/docker.sock`, which is the Docker socket path inside the Colima VM used by Ryuk. Explicit developer-provided
+values for either setting are preserved. Ryuk remains enabled by default.
+
+### Validation tiers
+
+Run the narrowest suite that covers the risk of the change. Fast tests belong in the normal edit loop; PostgreSQL,
+migration, golden, and scale tests add fidelity at increasing cost. A broader suite supersedes its filtered subsets
+for that validation pass: running full integration and then separately running Migration, Golden, and Scale repeats
+tests that already passed. Likewise, `dotnet test Planarian/Planarian.sln` is an alternative aggregate invocation,
+not an additional requirement after both test projects have already passed.
+
+Use a focused filter while developing:
+
+```bash
+dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj \
+  --configuration Release \
+  --no-restore \
+  --filter FullyQualifiedName~RelevantTestOrNamespace
+
+dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
+  --configuration Release \
+  --no-restore \
+  --filter FullyQualifiedName~RelevantTestOrNamespace
+```
+
+Before completion, choose validation by affected behavior:
+
+- Pure domain, parsing, or planning changes: run the unit project and the relevant focused tests during development.
+- PostgreSQL repository, transaction, tenant, locking, or PostGIS changes: run unit tests plus the relevant integration
+  subset. Run full integration once when the change crosses several database features or is ready for PR validation.
+- Migration or model changes: run the Migration subset and the EF pending-model check.
+- Golden compatibility changes: run the Golden subset. Do not update the fixture merely to make it pass.
+- Import batching, execution, structural metrics, or supported-workload changes: run the Scale subset once after the
+  focused correctness tests pass. Scale is intentionally not part of every local edit cycle.
+- Testcontainers lifecycle, database provisioning, parallel scheduling, or suspected flaky resource behavior: run
+  full integration. Repeat it only when the purpose is specifically to establish reliability across independent
+  processes, or when an acceptance criterion explicitly requires repetition.
+
+The normal comprehensive PR/release gate is one pass through each distinct layer:
 
 ```bash
 dotnet restore Planarian/Planarian.sln
 dotnet build Planarian/Planarian.sln --configuration Release --no-restore
 dotnet test Planarian.Tests.Unit/Planarian.Tests.Unit.csproj --configuration Release --no-restore
 dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj --configuration Release --no-restore
-dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj --filter FullyQualifiedName~Migration
-dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj --filter FullyQualifiedName~Golden
-dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj --filter FullyQualifiedName~Scale
-dotnet test Planarian/Planarian.sln --configuration Release --no-restore
 dotnet tool run dotnet-ef migrations has-pending-model-changes --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj --context PlanarianDbContext --configuration Release --no-build
 ```
+
+The full integration invocation already includes ordinary PostgreSQL, Migration, Golden, and Scale tests. Filtered
+commands remain useful for targeted work, but should not be appended to the comprehensive gate. CI follows this
+single-pass model. If PR latency becomes materially worse, move unaffected large tests to a scheduled gate while
+keeping them required for changes to the behavior they protect; do not gain speed by weakening their workload or
+assertions.
 
 xUnit v2 is intentionally retained. A v3 migration is a future, separate testing-infrastructure change.

@@ -117,66 +117,132 @@ public sealed class PostgresTestServer : IAsyncLifetime
 
     private static async Task CreateLatestSchemaTemplateAsync(string adminConnectionString)
     {
-        await using (var admin = new NpgsqlConnection(adminConnectionString))
+        await CreateTemplateDatabaseAsync(adminConnectionString, LatestSchemaTemplateDatabaseName,
+            async templateConnectionString =>
+            {
+                await using (var db = CreateDbContext(templateConnectionString, "fixture-user", null))
+                {
+                    await db.Database.MigrateAsync();
+                    var pending = await db.Database.GetPendingMigrationsAsync();
+                    if (pending.Any())
+                        throw new InvalidOperationException(
+                            $"Latest-schema test template still has pending migrations: {string.Join(", ", pending)}");
+                }
+
+                using (var templateConnection = new NpgsqlConnection(templateConnectionString))
+                    NpgsqlConnection.ClearPool(templateConnection);
+
+                await using var sealConnection = new NpgsqlConnection(adminConnectionString);
+                await sealConnection.OpenAsync();
+                await TerminateDatabaseConnectionsAsync(sealConnection, LatestSchemaTemplateDatabaseName);
+
+                await using var seal = sealConnection.CreateCommand();
+                seal.CommandText =
+                    $"ALTER DATABASE {QuoteIdentifier(LatestSchemaTemplateDatabaseName)} WITH IS_TEMPLATE true ALLOW_CONNECTIONS false";
+                await seal.ExecuteNonQueryAsync();
+            });
+    }
+
+    internal static async Task CreateTemplateDatabaseAsync(string adminConnectionString, string databaseName,
+        Func<string, Task> initializeAsync)
+    {
+        var databaseCreated = false;
+        try
         {
+            await using (var admin = new NpgsqlConnection(adminConnectionString))
+            {
+                await admin.OpenAsync();
+                await using var create = admin.CreateCommand();
+                create.CommandText = $"CREATE DATABASE {QuoteIdentifier(databaseName)} TEMPLATE template0";
+                await create.ExecuteNonQueryAsync();
+                databaseCreated = true;
+            }
+
+            var templateConnectionString = new NpgsqlConnectionStringBuilder(adminConnectionString)
+            {
+                Database = databaseName
+            }.ConnectionString;
+            await initializeAsync(templateConnectionString);
+        }
+        catch
+        {
+            if (databaseCreated)
+                await DropTemplateDatabaseBestEffortAsync(adminConnectionString, databaseName);
+            throw;
+        }
+    }
+
+    private static async Task DropTemplateDatabaseBestEffortAsync(string adminConnectionString, string databaseName)
+    {
+        try
+        {
+            using (var templateConnection = new NpgsqlConnection(
+                       new NpgsqlConnectionStringBuilder(adminConnectionString) { Database = databaseName }
+                           .ConnectionString))
+                NpgsqlConnection.ClearPool(templateConnection);
+        }
+        catch
+        {
+            // Continue with server-side cleanup even if local pool cleanup fails.
+        }
+
+        try
+        {
+            await using var admin = new NpgsqlConnection(adminConnectionString);
             await admin.OpenAsync();
-            await using var create = admin.CreateCommand();
-            create.CommandText =
-                $"CREATE DATABASE {QuoteIdentifier(LatestSchemaTemplateDatabaseName)} TEMPLATE template0";
-            await create.ExecuteNonQueryAsync();
+            try
+            {
+                await TerminateDatabaseConnectionsAsync(admin, databaseName);
+            }
+            catch
+            {
+                // DROP may still succeed when termination itself fails or no sessions remain.
+            }
+
+            await using var drop = admin.CreateCommand();
+            drop.CommandText = $"DROP DATABASE IF EXISTS {QuoteIdentifier(databaseName)}";
+            await drop.ExecuteNonQueryAsync();
         }
-
-        var templateConnectionString = new NpgsqlConnectionStringBuilder(adminConnectionString)
+        catch
         {
-            Database = LatestSchemaTemplateDatabaseName
-        }.ConnectionString;
-
-        await using (var db = CreateDbContext(templateConnectionString, "fixture-user", null))
-        {
-            await db.Database.MigrateAsync();
-            var pending = await db.Database.GetPendingMigrationsAsync();
-            if (pending.Any())
-                throw new InvalidOperationException(
-                    $"Latest-schema test template still has pending migrations: {string.Join(", ", pending)}");
+            // Cleanup must never replace the template initialization exception.
         }
+    }
 
-        using (var templateConnection = new NpgsqlConnection(templateConnectionString))
-            NpgsqlConnection.ClearPool(templateConnection);
-
-        await using var sealConnection = new NpgsqlConnection(adminConnectionString);
-        await sealConnection.OpenAsync();
-        await using (var terminate = sealConnection.CreateCommand())
-        {
-            terminate.CommandText = """
-                select pg_terminate_backend(pid)
-                from pg_stat_activity
-                where datname = @database and pid <> pg_backend_pid()
-                """;
-            terminate.Parameters.AddWithValue("database", LatestSchemaTemplateDatabaseName);
-            await terminate.ExecuteNonQueryAsync();
-        }
-
-        await using var seal = sealConnection.CreateCommand();
-        seal.CommandText =
-            $"ALTER DATABASE {QuoteIdentifier(LatestSchemaTemplateDatabaseName)} WITH IS_TEMPLATE true ALLOW_CONNECTIONS false";
-        await seal.ExecuteNonQueryAsync();
+    private static async Task TerminateDatabaseConnectionsAsync(NpgsqlConnection admin, string databaseName)
+    {
+        await using var terminate = admin.CreateCommand();
+        terminate.CommandText = """
+            select pg_terminate_backend(pid)
+            from pg_stat_activity
+            where datname = @database and pid <> pg_backend_pid()
+            """;
+        terminate.Parameters.AddWithValue("database", databaseName);
+        await terminate.ExecuteNonQueryAsync();
     }
 
     /// <summary>
     /// Docker contexts are not consumed by Testcontainers. Colima exposes its
-    /// socket below the macOS user profile. Configure the endpoint only when
-    /// the caller did not provide one. Resource-reaper policy remains owned by
-    /// Testcontainers or an explicit developer environment setting.
+    /// host socket below the macOS user profile, while containers inside its VM
+    /// reach Docker through /var/run/docker.sock. Configure each supported
+    /// endpoint only when the caller did not provide one. Resource-reaper policy
+    /// remains owned by Testcontainers or an explicit developer environment setting.
     /// </summary>
     private static void ConfigureColimaForTestcontainers()
     {
-        if (!OperatingSystem.IsMacOS() || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOCKER_HOST")))
-            return;
+        if (!OperatingSystem.IsMacOS()) return;
 
         var socket = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".colima", "default", "docker.sock");
-        if (!Directory.Exists(Path.GetDirectoryName(socket))) return;
+        var dockerHost = Environment.GetEnvironmentVariable("DOCKER_HOST");
+        if (string.IsNullOrWhiteSpace(dockerHost) && File.Exists(socket))
+        {
+            dockerHost = $"unix://{socket}";
+            Environment.SetEnvironmentVariable("DOCKER_HOST", dockerHost);
+        }
 
-        Environment.SetEnvironmentVariable("DOCKER_HOST", $"unix://{socket}");
+        if (string.Equals(dockerHost, $"unix://{socket}", StringComparison.Ordinal) &&
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE")))
+            Environment.SetEnvironmentVariable("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock");
     }
 
     internal static PlanarianDbContext CreateDbContext(string connectionString, string userId, string? accountId,

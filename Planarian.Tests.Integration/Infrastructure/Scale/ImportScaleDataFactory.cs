@@ -48,10 +48,10 @@ internal static class ImportScaleDataFactory
 
     private static int EntranceCount(int number) => number switch
     {
-        <= 8000 => 1,
-        <= 9500 => 2,
+        <= 7400 => 1,
+        <= 9300 => 2,
         <= 9900 => 3,
-        _ => 10
+        _ => 20
     };
 
     private static string Row(params object?[] values) => string.Join(',', values.Select(value =>

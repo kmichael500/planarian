@@ -93,6 +93,32 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
         Assert.Equal(0, await CountRowsAsync(subsequent, "Caves"));
     }
 
+    [Fact]
+    public async Task FailedTemplateInitializationPreservesOriginalFailureAndDropsPartialDatabase()
+    {
+        var databaseName = $"planarian_failed_template_{Guid.NewGuid():N}";
+        NpgsqlConnection? partialConnection = null;
+        var expected = new InvalidOperationException("deliberate template initialization failure");
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PostgresTestServer.CreateTemplateDatabaseAsync(fixture.ConnectionString, databaseName,
+                async connectionString =>
+                {
+                    partialConnection = new NpgsqlConnection(connectionString);
+                    await partialConnection.OpenAsync();
+                    throw expected;
+                }));
+
+        Assert.Same(expected, actual);
+        await using var admin = new NpgsqlConnection(fixture.ConnectionString);
+        await admin.OpenAsync();
+        await using var exists = new NpgsqlCommand(
+            "select exists(select 1 from pg_database where datname = @database)", admin);
+        exists.Parameters.AddWithValue("database", databaseName);
+        Assert.False((bool)(await exists.ExecuteScalarAsync())!);
+        await partialConnection!.DisposeAsync();
+    }
+
     private static async Task<long> CountRowsAsync(PostgresTestDatabase database, string table)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
