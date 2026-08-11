@@ -71,6 +71,9 @@ public class CaveProposalVersion : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string ChangeRequestId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string CaveId { get; set; } = null!;
+    /// <summary>The immutable published Cave revision this proposal version was authored against.</summary>
+    [MaxLength(PropertyLength.Id)] public string BaseRevisionId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? PreviousProposalVersionId { get; set; }
     public int SchemaVersion { get; set; } = 1;
     public string ProposalJson { get; set; } = null!;
@@ -88,6 +91,10 @@ public class CaveProposalVersionConfiguration : BaseEntityTypeConfiguration<Cave
         builder.HasOne<CaveChangeRequest>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
             .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CaveRevision>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.CaveId, e.BaseRevisionId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveProposalVersion>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.ChangeRequestId, e.Id })

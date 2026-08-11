@@ -8,7 +8,7 @@ import { AddCaveComponent } from "../Components/AddCaveComponent";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
 import { caveToForm } from "../Helpers/CaveFormMapper";
 import { AddCaveVm } from "../Models/AddCaveVm";
-import { CaveRevisionDiffVm } from "../Models/CaveRevisionVm";
+import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveService } from "../Service/CaveService";
 
@@ -19,7 +19,7 @@ export const SuggestCaveChangesPage = () => {
   const [form] = Form.useForm<AddCaveVm>();
   const [cave, setCave] = useState<CaveVm>();
   const [draft, setDraft] = useState<AddCaveVm>();
-  const [diff, setDiff] = useState<CaveRevisionDiffVm>();
+  const [previewResult, setPreviewResult] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,7 +40,7 @@ export const SuggestCaveChangesPage = () => {
     setLoading(true);
     try {
       setDraft(values);
-      setDiff(await CaveService.PreviewChanges(caveId, values));
+      setPreviewResult(await CaveService.PreviewChanges(caveId, values));
     } catch {
       message.error("The proposed changes could not be previewed.");
     } finally {
@@ -64,17 +64,17 @@ export const SuggestCaveChangesPage = () => {
 
   return (
     <Space direction="vertical" style={{ width: "100%" }}>
-      {diff && draft && (
+      {previewResult && draft && (
         <Card title="Review your changes">
           <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
-          <CaveRevisionDiff diff={diff} />
+          <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed} />
           <Space style={{ marginTop: 16 }}>
             <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}>Submit for review</PlanarianButton>
-            <PlanarianButton icon={undefined} onClick={() => { setDiff(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
+            <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
           </Space>
         </Card>
       )}
-      <Card loading={loading} style={{ display: diff ? "none" : undefined }}>
+      <Card loading={loading} style={{ display: previewResult ? "none" : undefined }}>
         {cave && <Form form={form} layout="vertical" onFinish={preview}>
           <Typography.Paragraph type="secondary">Use the normal Cave editor. You will review the field-level changes before submission.</Typography.Paragraph>
           <AddCaveComponent isEditing form={form} cave={cave} />

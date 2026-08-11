@@ -24,6 +24,60 @@ export interface SnapshotTagReference {
   nameAtRevision: string;
 }
 
+export interface SnapshotReferenceVm {
+  id: string;
+  nameAtRevision: string;
+  displayIdAtRevision?: string;
+  abbreviationAtRevision?: string;
+}
+
+export interface CaveEntranceSnapshotVm {
+  id: string;
+  name?: string;
+  isPrimary: boolean;
+  description?: string;
+  reportedByUserId?: string;
+  reportedByNameAtRevision?: string;
+  latitude?: number;
+  longitude?: number;
+  elevation?: number;
+  srid: number;
+  locationQualityTagId: string;
+  locationQualityNameAtRevision: string;
+  reportedOn?: string;
+  pitDepthFeet?: number;
+  tags: SnapshotTagReference[];
+}
+
+export interface CaveFileSnapshotVm {
+  id: string;
+  fileTypeTagId: string;
+  fileTypeNameAtRevision: string;
+  fileName: string;
+  displayName?: string;
+}
+
+export interface CaveSnapshotVm {
+  caveId: string;
+  accountId: string;
+  name: string;
+  alternateNames: string[];
+  state: SnapshotReferenceVm;
+  county: SnapshotReferenceVm;
+  countyNumber: number;
+  reportedByUserId?: string;
+  lengthFeet?: number;
+  depthFeet?: number;
+  maxPitDepthFeet?: number;
+  numberOfPits?: number;
+  narrative?: string;
+  reportedOn?: string;
+  isArchived: boolean;
+  tags: SnapshotTagReference[];
+  entrances: CaveEntranceSnapshotVm[];
+  files: CaveFileSnapshotVm[];
+}
+
 export interface CaveScalarChangeVm {
   path: string;
   previous: unknown;
@@ -52,7 +106,7 @@ export interface CaveRevisionDiffVm {
 export interface CaveRevisionComparisonVm {
   revision: CaveRevisionListItemVm;
   previousRevision?: CaveRevisionListItemVm;
-  previous?: Record<string, unknown>;
-  current: Record<string, unknown>;
+  previous?: CaveSnapshotVm;
+  current: CaveSnapshotVm;
   diff?: CaveRevisionDiffVm;
 }

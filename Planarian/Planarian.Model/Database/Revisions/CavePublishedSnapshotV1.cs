@@ -45,6 +45,7 @@ public sealed record CaveEntranceSnapshotV1
     public bool IsPrimary { get; init; }
     public string? Description { get; init; }
     public string? ReportedByUserId { get; init; }
+    public string? ReportedByNameAtRevision { get; init; }
     public double? Latitude { get; init; }
     public double? Longitude { get; init; }
     public double? Elevation { get; init; }

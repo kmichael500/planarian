@@ -61,6 +61,7 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "ApprovedRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "Id", "CurrentProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "ChangeRequestId", "PreviousProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "CaveId", "BaseRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "FileId"], "Files", ["AccountId", "Id"]);
     }

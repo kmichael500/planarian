@@ -10,7 +10,7 @@ namespace Planarian.Modules.Caves.Revisions;
 public sealed record CaveChangeRequestReadRow(
     CaveChangeRequest Request,
     CaveProposalVersion ProposalVersion,
-    CaveRevision BaseRevision,
+    CaveRevision ProposalBaseRevision,
     CaveRevision? CurrentRevision,
     string CaveName,
     string? SubmitterName,
@@ -58,7 +58,7 @@ public sealed class CaveChangeRequestRepository
         };
         _db.CaveChangeRequests.Add(request);
         await _db.SaveChangesAsync(cancellationToken);
-        var version = NewVersion(request, null, proposal);
+        var version = NewVersion(request, baseRevisionId, null, proposal);
         _db.CaveProposalVersions.Add(version);
         await _db.SaveChangesAsync(cancellationToken);
         request.CurrentProposalVersionId = version.Id;
@@ -71,8 +71,8 @@ public sealed class CaveChangeRequestRepository
         _db.Caves.Where(cave => cave.AccountId == _scope.AccountId && cave.Id == caveId)
             .Select(cave => cave.CurrentRevisionId).SingleOrDefaultAsync(cancellationToken);
 
-    public async Task<string> AddVersionAsync(string requestId, CaveProposalSnapshotV1 proposal,
-        bool reviewer, CancellationToken cancellationToken)
+    public async Task<string> AddVersionAsync(string requestId, string baseRevisionId,
+        CaveProposalSnapshotV1 proposal, bool reviewer, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await _db.CaveChangeRequests.FromSqlInterpolated(
@@ -83,7 +83,12 @@ public sealed class CaveChangeRequestRepository
         if (!reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only revise your own request.");
 
-        var version = NewVersion(request, request.CurrentProposalVersionId, proposal);
+        var currentRevisionId = await _db.Caves.Where(cave => cave.AccountId == _scope.AccountId &&
+                cave.Id == request.CaveId).Select(cave => cave.CurrentRevisionId).SingleAsync(cancellationToken);
+        if (currentRevisionId != baseRevisionId)
+            throw new CaveRevisionConflictException(request.CaveId, baseRevisionId, currentRevisionId);
+
+        var version = NewVersion(request, baseRevisionId, request.CurrentProposalVersionId, proposal);
         _db.CaveProposalVersions.Add(version);
         await _db.SaveChangesAsync(cancellationToken);
         request.CurrentProposalVersionId = version.Id;
@@ -95,13 +100,13 @@ public sealed class CaveChangeRequestRepository
     }
 
     public async Task StageFileAsync(string requestId, string fileId, string fileTypeTagId, string? displayName,
-        CancellationToken cancellationToken)
+        bool reviewer, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
         if (request.Status != CaveChangeRequestStatus.Pending)
             throw ApiExceptionDictionary.BadRequest("Only pending requests can receive files.");
-        if (request.CreatedByUserId != _user.Id)
+        if (!reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only add files to your own request.");
 
         var fileExists = await _db.Files.AnyAsync(file => file.AccountId == _scope.AccountId && file.Id == fileId &&
@@ -115,7 +120,7 @@ public sealed class CaveChangeRequestRepository
         var files = proposal.Files.Where(file => file.FileId != fileId).Append(
             new ProposalFileIntent(fileId, ProposalFileDisposition.PublishStaged, fileTypeTagId, displayName)).ToList();
         var nextProposal = proposal with { Files = files };
-        var nextVersion = NewVersion(request, request.CurrentProposalVersionId, nextProposal);
+        var nextVersion = NewVersion(request, current.BaseRevisionId, request.CurrentProposalVersionId, nextProposal);
         _db.CaveChangeRequestStagedFiles.Add(new CaveChangeRequestStagedFile
         {
             AccountId = _scope.AccountId,
@@ -152,16 +157,16 @@ public sealed class CaveChangeRequestRepository
             staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId && staged.FileId == fileId,
             cancellationToken);
 
-    public Task<List<CaveChangeRequestReadRow>> ListMineAsync(CancellationToken cancellationToken) =>
-        Query().Where(row => row.Request.CreatedByUserId == _user.Id)
-            .OrderByDescending(row => row.Request.CreatedOn).ToListAsync(cancellationToken);
+    public async Task<List<CaveChangeRequestReadRow>> ListMineAsync(CancellationToken cancellationToken) =>
+        (await Query(createdByUserId: _user.Id).ToListAsync(cancellationToken))
+        .OrderByDescending(row => row.Request.CreatedOn).ToList();
 
-    public Task<List<CaveChangeRequestReadRow>> ListForReviewAsync(CancellationToken cancellationToken) =>
-        Query().Where(row => row.Request.Status == CaveChangeRequestStatus.Pending)
-            .OrderBy(row => row.Request.CreatedOn).ToListAsync(cancellationToken);
+    public async Task<List<CaveChangeRequestReadRow>> ListForReviewAsync(CancellationToken cancellationToken) =>
+        (await Query(status: CaveChangeRequestStatus.Pending).ToListAsync(cancellationToken))
+        .OrderBy(row => row.Request.CreatedOn).ToList();
 
     public Task<CaveChangeRequestReadRow?> GetAsync(string requestId, CancellationToken cancellationToken) =>
-        Query().SingleOrDefaultAsync(row => row.Request.Id == requestId, cancellationToken);
+        Query(requestId: requestId).SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<CaveProposalVersionReadRow>> ListVersionsAsync(string requestId,
         CancellationToken cancellationToken) =>
@@ -231,15 +236,17 @@ public sealed class CaveChangeRequestRepository
                 $"SELECT *, xmin FROM \"CaveChangeRequests\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {requestId} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken) ?? throw ApiExceptionDictionary.NotFound("Change request");
 
-    private IQueryable<CaveChangeRequestReadRow> Query() =>
+    private IQueryable<CaveChangeRequestReadRow> Query(string? requestId = null, string? createdByUserId = null,
+        CaveChangeRequestStatus? status = null) =>
         from request in _db.CaveChangeRequests.AsNoTracking()
         join proposal in _db.CaveProposalVersions.AsNoTracking()
             on new { request.AccountId, ChangeRequestId = request.Id, Id = request.CurrentProposalVersionId }
             equals new { proposal.AccountId, proposal.ChangeRequestId, Id = (string?)proposal.Id }
         join cave in _db.Caves.AsNoTracking() on new { request.AccountId, Id = request.CaveId }
             equals new { cave.AccountId, cave.Id }
-        join baseRevision in _db.CaveRevisions.AsNoTracking()
-            on new { request.AccountId, Id = request.BaseRevisionId } equals new { baseRevision.AccountId, Id = (string?)baseRevision.Id }
+        join proposalBaseRevision in _db.CaveRevisions.AsNoTracking()
+            on new { proposal.AccountId, proposal.CaveId, Id = proposal.BaseRevisionId }
+            equals new { proposalBaseRevision.AccountId, proposalBaseRevision.CaveId, Id = proposalBaseRevision.Id }
         join currentRevisionValue in _db.CaveRevisions.AsNoTracking()
             on new { request.AccountId, Id = cave.CurrentRevisionId } equals new { currentRevisionValue.AccountId, Id = (string?)currentRevisionValue.Id } into currentRevisions
         from currentRevision in currentRevisions.DefaultIfEmpty()
@@ -247,16 +254,21 @@ public sealed class CaveChangeRequestRepository
         from submitter in submitters.DefaultIfEmpty()
         join reviewerValue in _db.Users.AsNoTracking() on request.ReviewerUserId equals reviewerValue.Id into reviewers
         from reviewer in reviewers.DefaultIfEmpty()
-        where request.AccountId == _scope.AccountId
-        select new CaveChangeRequestReadRow(request, proposal, baseRevision, currentRevision, cave.Name,
+        where request.AccountId == _scope.AccountId &&
+              (requestId == null || request.Id == requestId) &&
+              (createdByUserId == null || request.CreatedByUserId == createdByUserId) &&
+              (status == null || request.Status == status)
+        select new CaveChangeRequestReadRow(request, proposal, proposalBaseRevision, currentRevision, cave.Name,
             submitter == null ? null : submitter.FirstName + " " + submitter.LastName,
             reviewer == null ? null : reviewer.FirstName + " " + reviewer.LastName);
 
-    private static CaveProposalVersion NewVersion(CaveChangeRequest request, string? previousId,
+    private static CaveProposalVersion NewVersion(CaveChangeRequest request, string baseRevisionId, string? previousId,
         CaveProposalSnapshotV1 proposal) => new()
     {
         AccountId = request.AccountId,
         ChangeRequestId = request.Id,
+        CaveId = request.CaveId,
+        BaseRevisionId = baseRevisionId,
         PreviousProposalVersionId = previousId,
         SchemaVersion = proposal.SchemaVersion,
         ProposalJson = CaveProposalJson.Serialize(proposal)

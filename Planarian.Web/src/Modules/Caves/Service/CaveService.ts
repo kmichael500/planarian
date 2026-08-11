@@ -17,13 +17,13 @@ import { FavoriteVm } from "../Models/FavoriteCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import {
   CaveRevisionComparisonVm,
-  CaveRevisionDiffVm,
   CaveRevisionHistoryVm,
 } from "../Models/CaveRevisionVm";
 import {
   CaveChangeRequestDecisionVm,
   CaveChangeRequestDetailVm,
   CaveChangeRequestSummaryVm,
+  CaveChangePreviewVm,
 } from "../Models/CaveChangeRequestVm";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 
@@ -100,8 +100,8 @@ const CaveService = {
     );
     return response.data;
   },
-  async PreviewChanges(caveId: string, cave: AddCaveVm) {
-    const response = await HttpClient.post<CaveRevisionDiffVm>(
+  async PreviewChanges(caveId: string, cave: AddCaveVm): Promise<CaveChangePreviewVm> {
+    const response = await HttpClient.post<CaveChangePreviewVm>(
       `${changeRequestUrl}/caves/${caveId}/preview`, cave
     );
     return response.data;
@@ -112,9 +112,15 @@ const CaveService = {
     );
     return response.data;
   },
-  async ReviseChanges(requestId: string, cave: AddCaveVm): Promise<string> {
+  async PreviewRevisedChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean): Promise<CaveChangePreviewVm> {
+    const response = await HttpClient.post<CaveChangePreviewVm>(
+      `${changeRequestUrl}/${requestId}/versions/preview?againstCurrent=${againstCurrent}`, cave
+    );
+    return response.data;
+  },
+  async ReviseChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean): Promise<string> {
     const response = await HttpClient.post<string>(
-      `${changeRequestUrl}/${requestId}/versions`, cave
+      `${changeRequestUrl}/${requestId}/versions?againstCurrent=${againstCurrent}`, cave
     );
     return response.data;
   },

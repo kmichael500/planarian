@@ -286,13 +286,13 @@ internal static class TestDataBuilder
         }
 
         var proposalId = addProposalVersion
-            ? await AddProposalVersionAsync(database, cave.AccountId, requestId)
+            ? await AddProposalVersionAsync(database, cave.AccountId, requestId, cave.CaveId, cave.RevisionId)
             : null;
         return new PendingChangeRequestTestData(requestId, proposalId);
     }
 
     public static async Task<string> AddProposalVersionAsync(PostgresTestDatabase database, string accountId,
-        string changeRequestId)
+        string changeRequestId, string caveId, string baseRevisionId)
     {
         var id = $"proposal0{accountId[^1]}";
         await using var db = database.CreateDbContext("proposal-seed", accountId);
@@ -301,6 +301,8 @@ internal static class TestDataBuilder
             Id = id,
             AccountId = accountId,
             ChangeRequestId = changeRequestId,
+            CaveId = caveId,
+            BaseRevisionId = baseRevisionId,
             SchemaVersion = 1,
             ProposalJson = "{\"schemaVersion\":1}"
         });

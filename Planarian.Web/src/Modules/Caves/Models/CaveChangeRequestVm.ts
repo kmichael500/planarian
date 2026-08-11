@@ -1,4 +1,4 @@
-import { CaveRevisionDiffVm } from "./CaveRevisionVm";
+import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 
 export type CaveChangeRequestStatus = "Pending" | "Approved" | "Rejected";
 
@@ -15,17 +15,20 @@ export interface CaveChangeRequestSummaryVm {
   reviewerUserId?: string;
   reviewerName?: string;
   reviewerNotes?: string;
-  baseRevisionId: string;
+  originalBaseRevisionId: string;
+  proposalBaseRevisionId: string;
   currentRevisionId?: string;
   currentProposalVersionId: string;
   isStale: boolean;
   approvedRevisionId?: string;
   canEdit: boolean;
+  canReview: boolean;
 }
 
 export interface CaveProposalVersionVm {
   id: string;
   previousProposalVersionId?: string;
+  baseRevisionId: string;
   createdByUserId?: string;
   createdByName?: string;
   createdOn: string;
@@ -34,9 +37,9 @@ export interface CaveProposalVersionVm {
 
 export interface CaveChangeRequestDetailVm {
   request: CaveChangeRequestSummaryVm;
-  base: Record<string, unknown>;
-  proposed: Record<string, unknown>;
-  current: Record<string, unknown>;
+  base: CaveSnapshotVm;
+  proposed: CaveSnapshotVm;
+  current: CaveSnapshotVm;
   diff: CaveRevisionDiffVm;
   publishedSinceBase?: CaveRevisionDiffVm;
   versions: CaveProposalVersionVm[];
@@ -47,4 +50,10 @@ export interface CaveChangeRequestDecisionVm {
   requestId: string;
   publishedRevisionId?: string;
   currentRevisionId?: string;
+}
+
+export interface CaveChangePreviewVm {
+  base: CaveSnapshotVm;
+  proposed: CaveSnapshotVm;
+  diff: CaveRevisionDiffVm;
 }

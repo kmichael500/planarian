@@ -16,12 +16,14 @@ public sealed record CaveChangeRequestSummaryVm(
     string? ReviewerUserId,
     string? ReviewerName,
     string? ReviewerNotes,
-    string BaseRevisionId,
+    string OriginalBaseRevisionId,
+    string ProposalBaseRevisionId,
     string? CurrentRevisionId,
     string CurrentProposalVersionId,
     bool IsStale,
     string? ApprovedRevisionId,
-    bool CanEdit);
+    bool CanEdit,
+    bool CanReview);
 
 public sealed record CaveChangeRequestDetailVm(
     CaveChangeRequestSummaryVm Request,
@@ -32,8 +34,11 @@ public sealed record CaveChangeRequestDetailVm(
     CaveRevisionDiffVm? PublishedSinceBase,
     IReadOnlyList<CaveProposalVersionVm> Versions);
 
+public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
+    CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff);
+
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
-    string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
+    string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
 
 public sealed record RejectCaveChangeRequestVm(string? Notes);
 

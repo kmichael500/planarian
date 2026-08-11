@@ -38,6 +38,51 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
+    public async Task ProposalVersionBaseMigrationBackfillsExistingVersionFromItsRequest()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(ProposalVersionBaseMigrationBackfillsExistingVersionFromItsRequest));
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_StagedFileTenantForeignKey", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "CaveChangeRequests"
+                    ("Id", "AccountId", "CaveId", "BaseRevisionId", "Status", "CreatedOn")
+                values ('oldreq0001', @account, @cave, @revision, 'Pending', now());
+
+                insert into "CaveProposalVersions"
+                    ("Id", "AccountId", "ChangeRequestId", "SchemaVersion", "ProposalJson", "CreatedOn")
+                values ('oldver0001', @account, 'oldreq0001', 1, '{}'::jsonb, now());
+
+                update "CaveChangeRequests" set "CurrentProposalVersionId" = 'oldver0001'
+                where "Id" = 'oldreq0001';
+                """, connection);
+            seed.Parameters.AddWithValue("account", tenant.AccountId);
+            seed.Parameters.AddWithValue("cave", tenant.CaveId);
+            seed.Parameters.AddWithValue("revision", tenant.RevisionId);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using var verifyConnection = new NpgsqlConnection(database.ConnectionString);
+        await verifyConnection.OpenAsync();
+        await using var verify = new NpgsqlCommand("""
+            select "CaveId", "BaseRevisionId"
+            from "CaveProposalVersions" where "Id" = 'oldver0001'
+            """, verifyConnection);
+        await using var reader = await verify.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(tenant.CaveId, reader.GetString(0));
+        Assert.Equal(tenant.RevisionId, reader.GetString(1));
+    }
+
+    [Fact]
     public async Task ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData()
     {
         // Arrange the exact pre-foundation production schema and representative data.

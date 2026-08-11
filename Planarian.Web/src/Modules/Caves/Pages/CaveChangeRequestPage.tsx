@@ -6,7 +6,6 @@ import { Link, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
 import { CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
@@ -19,8 +18,8 @@ export const CaveChangeRequestPage = () => {
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState(false);
 
-  const stagedFiles = detail ? (((detail.proposed as any).files ?? []) as any[]).filter(file =>
-    !(((detail.base as any).files ?? []) as any[]).some(baseFile => baseFile.id === file.id)) : [];
+  const stagedFiles = detail ? detail.proposed.files.filter(file =>
+    !detail.base.files.some(baseFile => baseFile.id === file.id)) : [];
 
   useEffect(() => {
     setHeaderTitle(["Cave Change Request"]);
@@ -38,7 +37,7 @@ export const CaveChangeRequestPage = () => {
       const result = approve ? await CaveService.ApproveChangeRequest(requestId, notes)
         : await CaveService.RejectChangeRequest(requestId, notes);
       if (result.result === "Conflict") {
-        message.warning("The Cave changed after this request was submitted. Review the newer publication before creating a replacement request.");
+        message.warning("The Cave changed again. Revise the proposal against the current Cave before approval.");
         setDetail(await CaveService.GetChangeRequest(requestId));
       } else {
         message.success(approve ? "Changes approved and published." : "Change request rejected.");
@@ -53,20 +52,26 @@ export const CaveChangeRequestPage = () => {
   };
 
   return <Spin spinning={loading}>{detail && <Space direction="vertical" style={{ width: "100%" }}>
-    {detail.request.isStale && <Alert type="warning" showIcon message="This request is based on an older Cave revision." description="The proposal is still compared with its original base. It cannot be approved over the newer published Cave." />}
+    {detail.request.isStale && <Alert type="warning" showIcon message="This proposal version is based on an older Cave revision." description="Review both comparisons, then create a new proposal version from the current published Cave." />}
     <Card title={detail.request.caveName} extra={<Link to={`/caves/${detail.request.caveId}`}>Open Cave</Link>}>
       <Space direction="vertical">
         <Space><Tag>{detail.request.status}</Tag>{detail.request.isStale && <Tag color="warning">Conflict</Tag>}</Space>
         <Typography.Text>Submitted by {detail.request.submitterName ?? "Unknown user"}</Typography.Text>
         {detail.request.reviewerName && <Typography.Text>Reviewed by {detail.request.reviewerName}</Typography.Text>}
         {detail.request.reviewerNotes && <Alert message={detail.request.reviewerNotes} type={detail.request.status === "Rejected" ? "error" : "info"} />}
+        {detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview) &&
+          <Link to={`/caves/requests/${detail.request.id}/revise`}>
+            <PlanarianButton icon={undefined} type={detail.request.isStale ? "primary" : "default"}>
+              {detail.request.isStale ? "Revise against current Cave" : "Revise proposal"}
+            </PlanarianButton>
+          </Link>}
       </Space>
     </Card>
     <Card title="Base → proposed"><CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed} /></Card>
-    {detail.request.status === "Pending" && (detail.request.canEdit || stagedFiles.length > 0) && <Card title="Proposal files">
+    {detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview || stagedFiles.length > 0) && <Card title="Proposal files">
       <Typography.Paragraph type="secondary">Uploaded files remain staged and unpublished until this request is approved.</Typography.Paragraph>
       {stagedFiles.map(file => <div key={file.id}><Typography.Link href={`/api/cave-change-requests/${detail.request.id}/files/${file.id}`}>{file.displayName ?? file.fileName}</Typography.Link></div>)}
-      {detail.request.canEdit && <Upload showUploadList={false} customRequest={async ({ file, onSuccess, onError, onProgress }) => {
+      {(detail.request.canEdit || detail.request.canReview) && <Upload showUploadList={false} customRequest={async ({ file, onSuccess, onError, onProgress }) => {
         try {
           await CaveService.StageChangeRequestFile(requestId!, file as RcFile, (file as RcFile).uid, event => {
             onProgress?.({ percent: Math.round(100 * event.loaded / (event.total ?? event.loaded)) });
@@ -83,11 +88,17 @@ export const CaveChangeRequestPage = () => {
       </Upload>}
     </Card>}
     {detail.request.isStale && detail.publishedSinceBase && <Card title="What changed in the published Cave after submission"><CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} /></Card>}
-    {detail.request.status === "Pending" && <Card title="Review decision">
+    {detail.versions.length > 1 && <Card title="Proposal versions">
+      <Space direction="vertical">{detail.versions.slice().reverse().map(version =>
+        <Typography.Text key={version.id}>
+          {version.isCurrent ? "Current: " : ""}{version.id} · based on revision {version.baseRevisionId} · {version.createdByName ?? "Unknown user"} · {new Date(version.createdOn).toLocaleString()}
+        </Typography.Text>)}</Space>
+    </Card>}
+    {detail.request.status === "Pending" && detail.request.canReview && <Card title="Review decision">
       <Input.TextArea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Reason or reviewer notes" rows={3} />
       <Space style={{ marginTop: 12 }}>
-        <PlanarianButton icon={undefined} permissionKey={PermissionKey.Manager} type="primary" disabled={detail.request.isStale} loading={deciding} onClick={() => decide(true)}>Approve and publish</PlanarianButton>
-        <PlanarianButton icon={undefined} permissionKey={PermissionKey.Manager} loading={deciding} onClick={() => decide(false)}>Reject</PlanarianButton>
+        <PlanarianButton icon={undefined} type="primary" disabled={detail.request.isStale} loading={deciding} onClick={() => decide(true)}>Approve and publish</PlanarianButton>
+        <PlanarianButton icon={undefined} loading={deciding} onClick={() => decide(false)}>Reject</PlanarianButton>
       </Space>
     </Card>}
   </Space>}</Spin>;

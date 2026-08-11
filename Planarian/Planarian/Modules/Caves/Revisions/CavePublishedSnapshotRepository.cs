@@ -70,6 +70,7 @@ public sealed class CavePublishedSnapshotRepository
                             IsPrimary = e.IsPrimary,
                             Description = e.Description,
                             ReportedByUserId = e.ReportedByUserId,
+                            ReportedByNameAtRevision = e.ReportedByName,
                             Latitude = e.Location?.Y,
                             Longitude = e.Location?.X,
                             Elevation = e.Location?.Z,
@@ -179,6 +180,7 @@ public sealed class CavePublishedSnapshotRepository
             .Where(e => caveIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
             .AsNoTracking()
             .Select(e => new EntranceRow(e.Id, e.CaveId, e.Name, e.IsPrimary, e.Description, e.ReportedByUserId,
+                e.ReportedByUser == null ? null : e.ReportedByUser.FirstName + " " + e.ReportedByUser.LastName,
                 e.Location, e.LocationQualityTagId, e.LocationQualityTag.Name, e.ReportedOn, e.PitDepthFeet))
             .ToListAsync(cancellationToken);
 
@@ -232,7 +234,7 @@ public sealed class CavePublishedSnapshotRepository
 
     private sealed record EntranceRow(
         string Id, string CaveId, string? Name, bool IsPrimary, string? Description, string? ReportedByUserId,
-        Point? Location, string LocationQualityTagId, string LocationQualityName, DateTime? ReportedOn,
+        string? ReportedByName, Point? Location, string LocationQualityTagId, string LocationQualityName, DateTime? ReportedOn,
         double? PitDepthFeet);
 
     private sealed record EntranceTagRow(string EntranceId, SnapshotTagRole Role, string TagTypeId, string Name);

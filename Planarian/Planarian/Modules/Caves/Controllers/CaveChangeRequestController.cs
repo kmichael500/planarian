@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 
 namespace Planarian.Modules.Caves.Controllers;
@@ -20,14 +21,39 @@ public sealed class CaveChangeRequestController : ControllerBase
         new JsonResult(await _service.CreateAsync(caveId, cave, cancellationToken));
 
     [HttpPost("caves/{caveId:length(10)}/preview")]
-    public async Task<ActionResult<CaveRevisionDiffVm>> Preview(string caveId, AddCaveVm cave,
+    public async Task<ActionResult<CaveChangePreviewVm>> Preview(string caveId, AddCaveVm cave,
         CancellationToken cancellationToken) =>
         new JsonResult(await _service.PreviewAsync(caveId, cave, cancellationToken));
 
+    [HttpPost("{requestId:length(10)}/versions/preview")]
+    public async Task<ActionResult<CaveChangePreviewVm>> PreviewVersion(string requestId, AddCaveVm cave,
+        bool againstCurrent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.PreviewVersionAsync(requestId, cave, againstCurrent,
+                cancellationToken));
+        }
+        catch (CaveRevisionConflictException conflict)
+        {
+            return Conflict(new { conflict.ExpectedRevisionId, conflict.ActualRevisionId });
+        }
+    }
+
     [HttpPost("{requestId:length(10)}/versions")]
     public async Task<ActionResult<string>> AddVersion(string requestId, AddCaveVm cave,
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.AddVersionAsync(requestId, cave, cancellationToken));
+        bool againstCurrent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.AddVersionAsync(requestId, cave, againstCurrent,
+                cancellationToken));
+        }
+        catch (CaveRevisionConflictException conflict)
+        {
+            return Conflict(new { conflict.ExpectedRevisionId, conflict.ActualRevisionId });
+        }
+    }
 
     [HttpPost("{requestId:length(10)}/files")]
     [RequestSizeLimit(550L * 1024 * 1024)]

@@ -1,5 +1,6 @@
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
+import { CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 
 export const caveToForm = (cave: CaveVm): AddCaveVm => ({
   id: cave.id,
@@ -44,4 +45,57 @@ export const caveToForm = (cave: CaveVm): AddCaveVm => ({
   geologicAgeTagIds: cave.geologicAgeTagIds,
   physiographicProvinceTagIds: cave.physiographicProvinceTagIds,
   otherTagIds: cave.otherTagIds,
+});
+
+const tagIds = (tags: SnapshotTagReference[], role: string) =>
+  tags.filter((tag) => tag.role === role).map((tag) => tag.tagTypeId);
+
+export const snapshotToForm = (snapshot: CaveSnapshotVm): AddCaveVm => ({
+  id: snapshot.caveId,
+  name: snapshot.name,
+  alternateNames: snapshot.alternateNames,
+  countyId: snapshot.county.id,
+  stateId: snapshot.state.id,
+  countyDisplayId: snapshot.county.displayIdAtRevision,
+  countyNumber: snapshot.countyNumber,
+  isCountyNumberManuallySet: true,
+  useFirstAvailableCountyNumber: false,
+  lengthFeet: snapshot.lengthFeet ?? 0,
+  depthFeet: snapshot.depthFeet ?? 0,
+  maxPitDepthFeet: snapshot.maxPitDepthFeet ?? 0,
+  numberOfPits: snapshot.numberOfPits ?? 0,
+  narrative: snapshot.narrative ?? null,
+  reportedOn: snapshot.reportedOn ?? null,
+  entrances: snapshot.entrances.map((entrance) => ({
+    id: entrance.id,
+    isPrimary: entrance.isPrimary,
+    locationQualityTagId: entrance.locationQualityTagId,
+    name: entrance.name ?? null,
+    description: entrance.description ?? null,
+    latitude: entrance.latitude ?? 0,
+    longitude: entrance.longitude ?? 0,
+    elevationFeet: entrance.elevation ?? 0,
+    reportedOn: entrance.reportedOn ?? null,
+    pitFeet: entrance.pitDepthFeet ?? null,
+    entranceStatusTagIds: tagIds(entrance.tags, "EntranceStatus"),
+    fieldIndicationTagIds: tagIds(entrance.tags, "FieldIndication"),
+    entranceHydrologyTagIds: tagIds(entrance.tags, "EntranceHydrology"),
+    reportedByNameTagIds: tagIds(entrance.tags, "EntranceReportedBy"),
+    entranceOtherTagIds: tagIds(entrance.tags, "EntranceOther"),
+  })),
+  geologyTagIds: tagIds(snapshot.tags, "Geology"),
+  files: snapshot.files.map((file) => ({
+    id: file.id,
+    fileTypeTagId: file.fileTypeTagId,
+    displayName: file.displayName ?? null,
+    fileTypeKey: file.fileTypeNameAtRevision,
+  })),
+  reportedByNameTagIds: tagIds(snapshot.tags, "CaveReportedBy"),
+  biologyTagIds: tagIds(snapshot.tags, "Biology"),
+  archeologyTagIds: tagIds(snapshot.tags, "Archeology"),
+  cartographerNameTagIds: tagIds(snapshot.tags, "Cartographer"),
+  mapStatusTagIds: tagIds(snapshot.tags, "MapStatus"),
+  geologicAgeTagIds: tagIds(snapshot.tags, "GeologicAge"),
+  physiographicProvinceTagIds: tagIds(snapshot.tags, "PhysiographicProvince"),
+  otherTagIds: tagIds(snapshot.tags, "CaveOther"),
 });

@@ -15,8 +15,10 @@ concurrency/locking requirements, and relational/revision atomicity.
 
 A pending proposal or change request is not published state and must not create a `CaveRevision`. Proposal versions are
 immutable and append-only; `CurrentProposalVersionId` identifies the current version. An update proposal is based on a
-specific published revision. If that base is stale or incompatible, approval enters an explicit conflict and re-review
-path rather than silently applying the proposal to newer state.
+specific published revision recorded immutably on each proposal version. The request retains its original submission
+base separately. If the active version's base is stale, explicit re-review starts from the current published Cave and
+creates another immutable proposal version against that revision rather than silently applying or rebasing the older
+proposal state.
 
 ## Review outcomes
 

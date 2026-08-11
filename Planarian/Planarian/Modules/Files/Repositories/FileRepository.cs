@@ -103,7 +103,10 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     public async Task<IEnumerable<File>> GetExpiredFiles()
     {
-        return await DbContext.Files.Where(e => e.ExpiresOn < DateTime.UtcNow && e.AccountId == RequestUser.AccountId)
+        return await DbContext.Files.Where(e => e.ExpiresOn < DateTime.UtcNow &&
+                                                e.AccountId == RequestUser.AccountId &&
+                                                !DbContext.CaveChangeRequestStagedFiles.Any(staged =>
+                                                    staged.AccountId == e.AccountId && staged.FileId == e.Id))
             .ToListAsync();
     }
 

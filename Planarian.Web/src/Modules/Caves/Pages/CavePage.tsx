@@ -33,6 +33,7 @@ const CavePage = () => {
   }
 
   const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
+  const [isPermissionResolved, setIsPermissionResolved] = useState(false);
 
   const screens = Grid.useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -43,18 +44,18 @@ const CavePage = () => {
     setHeaderButtons([
       <FavoriteCave caveId={caveId} />,
       <CaveHistoryModal caveId={caveId} />,
-      ...(hasEditPermission ? [
+      ...(isPermissionResolved && hasEditPermission ? [
         <Link to={`/caves/${caveId}/edit`}>
-          <PlanarianButton permissionKey={PermissionKey.Manager} icon={<EditOutlined />} type="primary">Edit</PlanarianButton>
+          <PlanarianButton icon={<EditOutlined />} type="primary">Edit</PlanarianButton>
         </Link>,
-      ] : [
+      ] : isPermissionResolved ? [
         <Link to={`/caves/${caveId}/suggest`}>
           <PlanarianButton icon={<FormOutlined />} type="primary">Suggest Changes</PlanarianButton>
         </Link>,
-      ]),
+      ] : []),
       <BackButtonComponent to={"./.."} />,
     ]);
-  }, [cave, hasEditPermission]);
+  }, [cave, hasEditPermission, isPermissionResolved]);
 
   if (caveId === undefined) {
     throw new NotFoundError("caveid");
@@ -87,6 +88,7 @@ const CavePage = () => {
         caveId
       );
       setHasEditPermission(hasEditPermission);
+      setIsPermissionResolved(true);
       setIsLoading(false);
     };
     getCave();
