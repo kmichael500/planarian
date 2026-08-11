@@ -479,7 +479,20 @@ public class CaveService : ServiceBase<CaveRepository>
         return memoryStream.ToArray();
     }
 
-    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
+    public Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken) =>
+        SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, null, null, null, cancellationToken);
+
+    public Task<string> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId, string changeRequestId,
+        IReadOnlyList<string> stagedFileIds,
+        Func<CaveMutationResult, CancellationToken, Task> beforeCommit, CancellationToken cancellationToken) =>
+        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId, stagedFileIds,
+            beforeCommit,
+            cancellationToken);
+
+    private async Task<string> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
+        string? changeRequestId, string? expectedRevisionId,
+        IReadOnlyList<string>? stagedFileIds,
+        Func<CaveMutationResult, CancellationToken, Task>? beforeCommit, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
@@ -540,11 +553,19 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
+            if (changeRequestId is not null && stagedFileIds is { Count: > 0 })
+            {
+                var stagedFiles = await Repository.AttachStagedFilesAsync(changeRequestId, entity.Id,
+                    stagedFileIds, cancellationToken);
+                foreach (var stagedFile in stagedFiles)
+                    if (entity.Files.All(file => file.Id != stagedFile.Id)) entity.Files.Add(stagedFile);
+            }
+
             CaveMutationPreparation? revisionPreparation = null;
             if (!isNew)
             {
                 revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
-                    entity.Id, entity.CurrentRevisionId, cancellationToken);
+                    entity.Id, expectedRevisionId ?? entity.CurrentRevisionId, cancellationToken);
             }
 
             var isNewCounty = entity.CountyId != values.CountyId;
@@ -836,18 +857,21 @@ public class CaveService : ServiceBase<CaveRepository>
 
             await Repository.SaveChangesAsync(cancellationToken);
 
+            CaveMutationResult mutationResult;
             if (isNew)
             {
-                await _caveMutationCoordinator.PublishPersistedNewAsync(
-                    entity.Id, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Create,
+                mutationResult = await _caveMutationCoordinator.PublishPersistedNewAsync(
+                    entity.Id, revisionSource, CaveRevisionOperation.Create, changeRequestId,
                     cancellationToken: cancellationToken);
             }
             else
             {
-                await _caveMutationCoordinator.PublishPreparedAsync(
-                    revisionPreparation!, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                mutationResult = await _caveMutationCoordinator.PublishPreparedAsync(
+                    revisionPreparation!, revisionSource, CaveRevisionOperation.Update, changeRequestId,
                     cancellationToken: cancellationToken);
             }
+
+            if (beforeCommit is not null) await beforeCommit(mutationResult, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
 

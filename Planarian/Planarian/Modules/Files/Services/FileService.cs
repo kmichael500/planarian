@@ -280,6 +280,78 @@ public class FileService : ServiceBase<FileRepository>
         return fileInformation;
     }
 
+    public async Task<FileVm> StageCaveChangeRequestFile(Stream stream, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
+    {
+        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+
+        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
+        var autoTagType = allFileTypes.FirstOrDefault(tag =>
+            fileName.Contains(tag.Display, StringComparison.InvariantCultureIgnoreCase));
+        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
+        if (tagTypeId == null) throw ApiExceptionDictionary.NotFound("File type");
+
+        var entity = new File
+        {
+            FileName = fileName,
+            DisplayName = Path.GetFileNameWithoutExtension(fileName),
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId,
+            ExpiresOn = DateTime.UtcNow.AddDays(10)
+        };
+        var blobKey = $"temp/cave-change-requests/{entity.Id}{Path.GetExtension(fileName)}";
+
+        try
+        {
+            stream.Position = 0;
+            await AddToBlobStorage(stream, blobKey, RequestUser.AccountContainerName, cancellationToken);
+            entity.BlobKey = blobKey;
+            entity.BlobContainer = RequestUser.AccountContainerName;
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await BestEffortDeleteBlobAsync(blobKey, RequestUser.AccountContainerName);
+            throw;
+        }
+
+        return new FileVm
+        {
+            Id = entity.Id,
+            FileName = entity.FileName,
+            DisplayName = entity.DisplayName,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid
+        };
+    }
+
+    public async Task DeleteUnpublishedFileAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var entity = await Repository.GetFileById(fileId);
+        if (entity is null || !string.IsNullOrWhiteSpace(entity.CaveId)) return;
+        var blobKey = entity.BlobKey;
+        var blobContainer = entity.BlobContainer;
+        Repository.Delete(entity);
+        await Repository.SaveChangesAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(blobKey) && !string.IsNullOrWhiteSpace(blobContainer))
+            await BestEffortDeleteBlobAsync(blobKey, blobContainer);
+    }
+
+    public async Task<(Stream Stream, string FileName)> OpenUnpublishedFileAsync(string fileId,
+        CancellationToken cancellationToken)
+    {
+        var file = await Repository.GetFileAccessInfo(fileId);
+        if (file is null || !string.IsNullOrWhiteSpace(file.CaveId) ||
+            string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
+            throw ApiExceptionDictionary.NotFound("Staged file");
+        var container = await GetBlobContainerClient(file.ContainerName, createIfNotExists: false);
+        return (await OpenBlobReadStream(container, file.BlobKey, cancellationToken), file.FileName);
+    }
+
     private async Task<List<BlobDeleteTarget>> RemoveExpiredFiles(CancellationToken cancellationToken)
     {
         var expiredFiles = await Repository.GetExpiredFiles();

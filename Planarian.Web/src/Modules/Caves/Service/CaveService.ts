@@ -15,9 +15,20 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
 import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
+import {
+  CaveRevisionComparisonVm,
+  CaveRevisionDiffVm,
+  CaveRevisionHistoryVm,
+} from "../Models/CaveRevisionVm";
+import {
+  CaveChangeRequestDecisionVm,
+  CaveChangeRequestDetailVm,
+  CaveChangeRequestSummaryVm,
+} from "../Models/CaveChangeRequestVm";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 
 const baseUrl = "api/caves";
+const changeRequestUrl = "api/cave-change-requests";
 const CaveService = {
   async GetCaves(
     queryBuilder: QueryBuilder<CaveSearchParamsVm>
@@ -73,6 +84,69 @@ const CaveService = {
   async GetCave(id: string): Promise<CaveVm> {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
     return response.data;
+  },
+  async GetRevisionHistory(id: string): Promise<CaveRevisionHistoryVm> {
+    const response = await HttpClient.get<CaveRevisionHistoryVm>(
+      `${baseUrl}/${id}/revisions`
+    );
+    return response.data;
+  },
+  async GetRevision(
+    caveId: string,
+    revisionId: string
+  ): Promise<CaveRevisionComparisonVm> {
+    const response = await HttpClient.get<CaveRevisionComparisonVm>(
+      `${baseUrl}/${caveId}/revisions/${revisionId}`
+    );
+    return response.data;
+  },
+  async PreviewChanges(caveId: string, cave: AddCaveVm) {
+    const response = await HttpClient.post<CaveRevisionDiffVm>(
+      `${changeRequestUrl}/caves/${caveId}/preview`, cave
+    );
+    return response.data;
+  },
+  async SubmitChanges(caveId: string, cave: AddCaveVm): Promise<string> {
+    const response = await HttpClient.post<string>(
+      `${changeRequestUrl}/caves/${caveId}`, cave
+    );
+    return response.data;
+  },
+  async ReviseChanges(requestId: string, cave: AddCaveVm): Promise<string> {
+    const response = await HttpClient.post<string>(
+      `${changeRequestUrl}/${requestId}/versions`, cave
+    );
+    return response.data;
+  },
+  async StageChangeRequestFile(
+    requestId: string,
+    file: string | Blob | RcFile,
+    uuid: string,
+    onProgress: (progressEvent: AxiosProgressEvent) => void
+  ): Promise<FileVm> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await HttpClient.post<FileVm>(
+      `${changeRequestUrl}/${requestId}/files?uuid=${uuid}`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" }, onUploadProgress: onProgress }
+    );
+    return response.data;
+  },
+  async GetMyChangeRequests(): Promise<CaveChangeRequestSummaryVm[]> {
+    return (await HttpClient.get<CaveChangeRequestSummaryVm[]>(`${changeRequestUrl}/mine`)).data;
+  },
+  async GetReviewQueue(): Promise<CaveChangeRequestSummaryVm[]> {
+    return (await HttpClient.get<CaveChangeRequestSummaryVm[]>(`${changeRequestUrl}/review`)).data;
+  },
+  async GetChangeRequest(id: string): Promise<CaveChangeRequestDetailVm> {
+    return (await HttpClient.get<CaveChangeRequestDetailVm>(`${changeRequestUrl}/${id}`)).data;
+  },
+  async ApproveChangeRequest(id: string, notes?: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/approve`, { notes })).data;
+  },
+  async RejectChangeRequest(id: string, notes?: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/reject`, { notes })).data;
   },
   async GetNextCountyNumber(
     countyId: string,

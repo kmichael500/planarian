@@ -18,12 +18,14 @@ namespace Planarian.Modules.Caves.Controllers;
 public class CaveController : PlanarianControllerBase<CaveService>
 {
     private readonly FileService _fileService;
+    private readonly CaveRevisionService _revisionService;
 
     public CaveController(RequestUser requestUser, TokenService tokenService, CaveService service,
-        FileService fileService) : base(requestUser,
+        FileService fileService, CaveRevisionService revisionService) : base(requestUser,
         tokenService, service)
     {
         _fileService = fileService;
+        _revisionService = revisionService;
     }
 
     [HttpGet]
@@ -77,6 +79,16 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
         return new JsonResult(cave);
     }
+
+    [HttpGet("{caveId:length(10)}/revisions")]
+    public async Task<ActionResult<CaveRevisionHistoryVm>> GetRevisions(string caveId,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await _revisionService.ListAsync(caveId, cancellationToken));
+
+    [HttpGet("{caveId:length(10)}/revisions/{revisionId:length(36)}")]
+    public async Task<ActionResult<CaveRevisionComparisonVm>> GetRevision(string caveId, string revisionId,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await _revisionService.CompareAsync(caveId, revisionId, cancellationToken));
 
     [HttpGet("counties/{countyId:length(10)}/next-number")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]

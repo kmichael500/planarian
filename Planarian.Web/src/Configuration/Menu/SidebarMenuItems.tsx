@@ -7,6 +7,8 @@ import {
   SettingOutlined,
   UserAddOutlined,
   UserOutlined,
+  FormOutlined,
+  AuditOutlined,
 } from "@ant-design/icons";
 import { Divider } from "antd";
 import { useContext, useMemo } from "react";
@@ -40,6 +42,19 @@ const useSideBarMenuItems = () => {
         ),
         label: "Map",
         isVisible: hasAccount,
+      },
+      {
+        key: "/caves/requests",
+        icon: <Link to="/caves/requests"><FormOutlined /></Link>,
+        label: "My Cave Requests",
+        isVisible: hasAccount,
+      },
+      {
+        key: "/caves/review",
+        icon: <Link to="/caves/review"><AuditOutlined /></Link>,
+        label: "Review Cave Changes",
+        isVisible: hasAccount,
+        permissionKey: PermissionKey.Manager,
       },
       {
         key: "/account",

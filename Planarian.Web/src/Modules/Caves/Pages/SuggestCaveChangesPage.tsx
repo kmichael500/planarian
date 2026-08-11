@@ -1,0 +1,85 @@
+import { useContext, useEffect, useState } from "react";
+import { Alert, Card, Form, message, Space, Typography } from "antd";
+import { useNavigate, useParams } from "react-router-dom";
+import { AppContext } from "../../../Configuration/Context/AppContext";
+import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { AddCaveComponent } from "../Components/AddCaveComponent";
+import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
+import { caveToForm } from "../Helpers/CaveFormMapper";
+import { AddCaveVm } from "../Models/AddCaveVm";
+import { CaveRevisionDiffVm } from "../Models/CaveRevisionVm";
+import { CaveVm } from "../Models/CaveVm";
+import { CaveService } from "../Service/CaveService";
+
+export const SuggestCaveChangesPage = () => {
+  const { caveId } = useParams();
+  const navigate = useNavigate();
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const [form] = Form.useForm<AddCaveVm>();
+  const [cave, setCave] = useState<CaveVm>();
+  const [draft, setDraft] = useState<AddCaveVm>();
+  const [diff, setDiff] = useState<CaveRevisionDiffVm>();
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!caveId) return;
+    setHeaderTitle(["Suggest Changes"]);
+    setHeaderButtons([<BackButtonComponent to={`/caves/${caveId}`} />]);
+    CaveService.GetCave(caveId).then((loaded) => {
+      setCave(loaded);
+      form.setFieldsValue(caveToForm(loaded));
+    }).catch(() => message.error("The Cave could not be loaded."))
+      .finally(() => setLoading(false));
+  }, [caveId]);
+
+  if (!caveId) return null;
+
+  const preview = async (values: AddCaveVm) => {
+    setLoading(true);
+    try {
+      setDraft(values);
+      setDiff(await CaveService.PreviewChanges(caveId, values));
+    } catch {
+      message.error("The proposed changes could not be previewed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submit = async () => {
+    if (!draft) return;
+    setSubmitting(true);
+    try {
+      const id = await CaveService.SubmitChanges(caveId, draft);
+      message.success("Your changes were submitted for review.");
+      navigate(`/caves/requests/${id}`);
+    } catch {
+      message.error("The change request could not be submitted. Reload the Cave if it changed while you were editing.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      {diff && draft && (
+        <Card title="Review your changes">
+          <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
+          <CaveRevisionDiff diff={diff} />
+          <Space style={{ marginTop: 16 }}>
+            <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}>Submit for review</PlanarianButton>
+            <PlanarianButton icon={undefined} onClick={() => { setDiff(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
+          </Space>
+        </Card>
+      )}
+      <Card loading={loading} style={{ display: diff ? "none" : undefined }}>
+        {cave && <Form form={form} layout="vertical" onFinish={preview}>
+          <Typography.Paragraph type="secondary">Use the normal Cave editor. You will review the field-level changes before submission.</Typography.Paragraph>
+          <AddCaveComponent isEditing form={form} cave={cave} />
+        </Form>}
+      </Card>
+    </Space>
+  );
+};

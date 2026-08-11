@@ -7,12 +7,13 @@ import { NotFoundError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { CaveService } from "../Service/CaveService";
 import { CaveComponent } from "../Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, FormOutlined } from "@ant-design/icons";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { Grid, Typography } from "antd";
 import { AppService } from "../../../Shared/Services/AppService";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import FavoriteCave from "../Components/FavoriteCave";
+import { CaveHistoryModal } from "../Components/CaveHistoryModal";
 
 const CavePage = () => {
   const [cave, setCave] = useState<CaveVm>();
@@ -41,17 +42,16 @@ const CavePage = () => {
   useEffect(() => {
     setHeaderButtons([
       <FavoriteCave caveId={caveId} />,
-
-      <Link to={`/caves/${caveId}/edit`}>
-        <PlanarianButton
-          permissionKey={PermissionKey.Manager}
-          disabled={!hasEditPermission}
-          icon={<EditOutlined />}
-          type="primary"
-        >
-          Edit
-        </PlanarianButton>
-      </Link>,
+      <CaveHistoryModal caveId={caveId} />,
+      ...(hasEditPermission ? [
+        <Link to={`/caves/${caveId}/edit`}>
+          <PlanarianButton permissionKey={PermissionKey.Manager} icon={<EditOutlined />} type="primary">Edit</PlanarianButton>
+        </Link>,
+      ] : [
+        <Link to={`/caves/${caveId}/suggest`}>
+          <PlanarianButton icon={<FormOutlined />} type="primary">Suggest Changes</PlanarianButton>
+        </Link>,
+      ]),
       <BackButtonComponent to={"./.."} />,
     ]);
   }, [cave, hasEditPermission]);

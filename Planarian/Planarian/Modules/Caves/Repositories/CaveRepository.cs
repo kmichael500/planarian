@@ -1079,6 +1079,38 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ExecuteDeleteAsync(cancellationToken);
     }
 
+    public async Task<List<Planarian.Model.Database.Entities.RidgeWalker.File>> AttachStagedFilesAsync(
+        string changeRequestId, string caveId, IEnumerable<string> fileIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to publish staged files.");
+        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return [];
+
+        var stagedIds = await DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
+            .Where(staged => staged.AccountId == RequestUser.AccountId &&
+                             staged.ChangeRequestId == changeRequestId && ids.Contains(staged.FileId))
+            .Select(staged => staged.FileId).ToListAsync(cancellationToken);
+        if (stagedIds.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
+
+        var files = await DbContext.Files.IgnoreQueryFilters()
+            .Where(file => file.AccountId == RequestUser.AccountId && stagedIds.Contains(file.Id) && file.CaveId == null)
+            .ToListAsync(cancellationToken);
+        if (files.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
+        foreach (var file in files)
+        {
+            file.CaveId = caveId;
+            file.ExpiresOn = null;
+        }
+
+        await DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
+            .Where(staged => staged.AccountId == RequestUser.AccountId &&
+                             staged.ChangeRequestId == changeRequestId && stagedIds.Contains(staged.FileId))
+            .ExecuteDeleteAsync(cancellationToken);
+        return files;
+    }
+
     public async Task<Cave?> GetCaveWithLinePlots(string caveId)
     {
         return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
