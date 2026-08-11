@@ -1162,6 +1162,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("AccountId", "CaveId", "BaseRevisionId");
 
+                    b.HasIndex("AccountId", "CaveId", "ChangeRequestId");
+
                     b.HasIndex("AccountId", "ChangeRequestId", "PreviousProposalVersionId");
 
                     b.ToTable("CaveProposalVersions");
@@ -2901,8 +2903,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
                         .WithMany()
-                        .HasForeignKey("AccountId", "ChangeRequestId")
-                        .HasPrincipalKey("AccountId", "Id")
+                        .HasForeignKey("AccountId", "CaveId", "ChangeRequestId")
+                        .HasPrincipalKey("AccountId", "CaveId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

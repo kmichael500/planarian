@@ -32,10 +32,28 @@ public sealed record CaveChangeRequestDetailVm(
     CavePublishedSnapshotV1 Current,
     CaveRevisionDiffVm Diff,
     CaveRevisionDiffVm? PublishedSinceBase,
-    IReadOnlyList<CaveProposalVersionVm> Versions);
+    IReadOnlyList<CaveProposalVersionVm> Versions,
+    CountyNumberIntent CountyNumberIntent,
+    int? RequestedCountyNumber,
+    IReadOnlyList<CaveFileSnapshotV1> ActiveStagedFiles);
 
 public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
-    CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff);
+    CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
+    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber);
+
+public sealed record CreateCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId);
+
+public sealed record ReviseCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId,
+    string ExpectedProposalVersionId, bool AgainstCurrent);
+
+public enum CaveProposalAuthoringConflictKind
+{
+    PublishedCaveChanged,
+    ActiveProposalVersionChanged
+}
+
+public sealed record CaveProposalAuthoringConflictVm(CaveProposalAuthoringConflictKind ConflictKind,
+    string ExpectedId, string? ActualId);
 
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
     string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);

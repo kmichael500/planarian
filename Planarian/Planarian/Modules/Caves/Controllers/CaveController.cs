@@ -85,7 +85,7 @@ public class CaveController : PlanarianControllerBase<CaveService>
         CancellationToken cancellationToken) =>
         new JsonResult(await _revisionService.ListAsync(caveId, cancellationToken));
 
-    [HttpGet("{caveId:length(10)}/revisions/{revisionId:length(36)}")]
+    [HttpGet("{caveId:length(10)}/revisions/{revisionId:length(10)}")]
     public async Task<ActionResult<CaveRevisionComparisonVm>> GetRevision(string caveId, string revisionId,
         CancellationToken cancellationToken) =>
         new JsonResult(await _revisionService.CompareAsync(caveId, revisionId, cancellationToken));

@@ -1,0 +1,28 @@
+import { snapshotToForm } from "./CaveFormMapper";
+import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
+
+const snapshot: CaveSnapshotVm = {
+  caveId: "cave", accountId: "account", name: "Cave", alternateNames: [],
+  state: { id: "state", nameAtRevision: "State" },
+  county: { id: "county", nameAtRevision: "County", displayIdAtRevision: "001" },
+  countyNumber: 12, isArchived: false, tags: [], entrances: [], files: [],
+};
+
+it.each([
+  ["AutomaticNext", false, false, 12],
+  ["FirstAvailable", false, true, 12],
+  ["Manual", true, false, 42],
+] as const)("round-trips %s county-number intent", (intent, manual, firstAvailable, number) => {
+  const form = snapshotToForm(snapshot, intent, intent === "Manual" ? 42 : undefined);
+  expect(form.isCountyNumberManuallySet).toBe(manual);
+  expect(form.useFirstAvailableCountyNumber).toBe(firstAvailable);
+  expect(form.countyNumber).toBe(number);
+});
+
+it("adds active staged files to a current-Cave stale rereview baseline", () => {
+  const form = snapshotToForm(snapshot, undefined, undefined, [{
+    id: "staged", fileName: "staged.pdf", displayName: "Staged",
+    fileTypeTagId: "document", fileTypeNameAtRevision: "Document",
+  }]);
+  expect(form.files).toEqual([expect.objectContaining({ id: "staged", displayName: "Staged" })]);
+});

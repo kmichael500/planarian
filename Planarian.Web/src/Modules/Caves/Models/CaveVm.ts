@@ -3,6 +3,7 @@ import { EntranceVm } from "./EntranceVm";
 
 export interface CaveVm {
   id: string;
+  currentRevisionId: string;
   displayId: string;
   reportedByUserId: string | null;
   countyId: string;

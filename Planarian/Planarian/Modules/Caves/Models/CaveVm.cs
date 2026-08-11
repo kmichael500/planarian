@@ -57,6 +57,7 @@ public class CaveVm
     }
 
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? CurrentRevisionId { get; set; }
     [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;

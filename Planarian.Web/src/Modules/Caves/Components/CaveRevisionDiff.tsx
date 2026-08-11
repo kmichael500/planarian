@@ -8,6 +8,7 @@ import {
   SnapshotTagReference,
 } from "../Models/CaveRevisionVm";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
+import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 
 const labels: Record<string, string> = {
   Name: "Name", AlternateNames: "Alternative Names", "State.Id": "State", "County.Id": "County",
@@ -99,10 +100,20 @@ const FileChanges = ({ previous, current }: { previous: CaveFileSnapshotVm; curr
     </Descriptions>
   </Card>;
 
-export const CaveRevisionDiff = ({ diff, previous, current }: {
+const referenceMetadataLabel = (path: string, property: string) => {
+  if (path === "State") return "State label";
+  if (path === "County") return "County label";
+  if (path.includes("Entrances") && property.includes("LocationQuality")) return "Entrance Location Quality";
+  if (path.includes("Files") && property.includes("FileType")) return "File Type";
+  const role = Object.keys(roleLabels).find(candidate => path.includes(candidate));
+  return role ? `${roleLabels[role]} label` : "Historical reference label";
+};
+
+export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent }: {
   diff?: CaveRevisionDiffVm;
   previous?: CaveSnapshotVm;
   current?: CaveSnapshotVm;
+  countyNumberIntent?: CountyNumberIntent;
 }) => {
   if (!diff) return <Typography.Text type="secondary">Initial publication</Typography.Text>;
 
@@ -119,8 +130,12 @@ export const CaveRevisionDiff = ({ diff, previous, current }: {
     {!!diff.scalars.length && <Descriptions bordered column={1} size="small">
       {diff.scalars.map(change => {
         const isLocation = change.path === "State.Id" || change.path === "County.Id";
+        const countyIntent = change.path === "CountyNumber" && countyNumberIntent !== undefined &&
+          countyNumberIntent !== "Manual"
+          ? countyNumberIntent === "FirstAvailable" ? "First available on approval" : "Auto-assigned on approval"
+          : undefined;
         return <Descriptions.Item label={labels[change.path] ?? change.path} key={change.path}>
-          <div>{isLocation ? referenceLabel(current, change.path) : displayValue(change.path, change.current)}</div>
+          <div>{isLocation ? referenceLabel(current, change.path) : countyIntent ?? displayValue(change.path, change.current)}</div>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             Previous: {isLocation ? referenceLabel(previous, change.path) : displayValue(change.path, change.previous)}
           </Typography.Text>
@@ -152,7 +167,7 @@ export const CaveRevisionDiff = ({ diff, previous, current }: {
     })}
 
     {diff.referenceMetadataChanges.map(change => <Typography.Text key={`${change.path}-${change.property}`}>
-      Historical label updated: {change.currentValue ?? "—"}
+      {referenceMetadataLabel(change.path, change.property)} updated: {change.currentValue ?? "—"}
       <Typography.Text type="secondary"> (previously {change.previousValue ?? "—"})</Typography.Text>
     </Typography.Text>)}
   </Space>;

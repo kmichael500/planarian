@@ -100,27 +100,31 @@ const CaveService = {
     );
     return response.data;
   },
-  async PreviewChanges(caveId: string, cave: AddCaveVm): Promise<CaveChangePreviewVm> {
+  async PreviewChanges(caveId: string, cave: AddCaveVm, expectedBaseRevisionId: string): Promise<CaveChangePreviewVm> {
     const response = await HttpClient.post<CaveChangePreviewVm>(
-      `${changeRequestUrl}/caves/${caveId}/preview`, cave
+      `${changeRequestUrl}/caves/${caveId}/preview`, { cave, expectedBaseRevisionId }
     );
     return response.data;
   },
-  async SubmitChanges(caveId: string, cave: AddCaveVm): Promise<string> {
+  async SubmitChanges(caveId: string, cave: AddCaveVm, expectedBaseRevisionId: string): Promise<string> {
     const response = await HttpClient.post<string>(
-      `${changeRequestUrl}/caves/${caveId}`, cave
+      `${changeRequestUrl}/caves/${caveId}`, { cave, expectedBaseRevisionId }
     );
     return response.data;
   },
-  async PreviewRevisedChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean): Promise<CaveChangePreviewVm> {
+  async PreviewRevisedChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean,
+    expectedBaseRevisionId: string, expectedProposalVersionId: string): Promise<CaveChangePreviewVm> {
     const response = await HttpClient.post<CaveChangePreviewVm>(
-      `${changeRequestUrl}/${requestId}/versions/preview?againstCurrent=${againstCurrent}`, cave
+      `${changeRequestUrl}/${requestId}/versions/preview`,
+      { cave, againstCurrent, expectedBaseRevisionId, expectedProposalVersionId }
     );
     return response.data;
   },
-  async ReviseChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean): Promise<string> {
+  async ReviseChanges(requestId: string, cave: AddCaveVm, againstCurrent: boolean,
+    expectedBaseRevisionId: string, expectedProposalVersionId: string): Promise<string> {
     const response = await HttpClient.post<string>(
-      `${changeRequestUrl}/${requestId}/versions?againstCurrent=${againstCurrent}`, cave
+      `${changeRequestUrl}/${requestId}/versions`,
+      { cave, againstCurrent, expectedBaseRevisionId, expectedProposalVersionId }
     );
     return response.data;
   },

@@ -40,9 +40,11 @@ export const SuggestCaveChangesPage = () => {
     setLoading(true);
     try {
       setDraft(values);
-      setPreviewResult(await CaveService.PreviewChanges(caveId, values));
-    } catch {
-      message.error("The proposed changes could not be previewed.");
+      setPreviewResult(await CaveService.PreviewChanges(caveId, values, cave!.currentRevisionId));
+    } catch (error: any) {
+      if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+        message.warning("The Cave changed while you were editing. Reload and review the current Cave before continuing.");
+      else message.error("The proposed changes could not be previewed.");
     } finally {
       setLoading(false);
     }
@@ -52,11 +54,13 @@ export const SuggestCaveChangesPage = () => {
     if (!draft) return;
     setSubmitting(true);
     try {
-      const id = await CaveService.SubmitChanges(caveId, draft);
+      const id = await CaveService.SubmitChanges(caveId, draft, cave!.currentRevisionId);
       message.success("Your changes were submitted for review.");
       navigate(`/caves/requests/${id}`);
-    } catch {
-      message.error("The change request could not be submitted. Reload the Cave if it changed while you were editing.");
+    } catch (error: any) {
+      if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+        message.warning("The Cave changed after your preview. Reload and review it before submitting.");
+      else message.error("The change request could not be submitted.");
     } finally {
       setSubmitting(false);
     }
@@ -67,7 +71,8 @@ export const SuggestCaveChangesPage = () => {
       {previewResult && draft && (
         <Card title="Review your changes">
           <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
-          <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed} />
+          <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed}
+            countyNumberIntent={previewResult.countyNumberIntent} />
           <Space style={{ marginTop: 16 }}>
             <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}>Submit for review</PlanarianButton>
             <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>

@@ -16,42 +16,72 @@ public sealed class CaveChangeRequestController : ControllerBase
     public CaveChangeRequestController(CaveChangeRequestService service) => _service = service;
 
     [HttpPost("caves/{caveId:length(10)}")]
-    public async Task<ActionResult<string>> Create(string caveId, AddCaveVm cave,
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.CreateAsync(caveId, cave, cancellationToken));
-
-    [HttpPost("caves/{caveId:length(10)}/preview")]
-    public async Task<ActionResult<CaveChangePreviewVm>> Preview(string caveId, AddCaveVm cave,
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.PreviewAsync(caveId, cave, cancellationToken));
-
-    [HttpPost("{requestId:length(10)}/versions/preview")]
-    public async Task<ActionResult<CaveChangePreviewVm>> PreviewVersion(string requestId, AddCaveVm cave,
-        bool againstCurrent, CancellationToken cancellationToken)
+    public async Task<ActionResult<string>> Create(string caveId, CreateCaveChangeRequestVm request,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return new JsonResult(await _service.PreviewVersionAsync(requestId, cave, againstCurrent,
+            return new JsonResult(await _service.CreateAsync(caveId, request.Cave,
+                request.ExpectedBaseRevisionId, cancellationToken));
+        }
+        catch (CaveRevisionConflictException conflict)
+        {
+            return PublishedCaveConflict(conflict);
+        }
+    }
+
+    [HttpPost("caves/{caveId:length(10)}/preview")]
+    public async Task<ActionResult<CaveChangePreviewVm>> Preview(string caveId, CreateCaveChangeRequestVm request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.PreviewAsync(caveId, request.Cave,
+                request.ExpectedBaseRevisionId, cancellationToken));
+        }
+        catch (CaveRevisionConflictException conflict)
+        {
+            return PublishedCaveConflict(conflict);
+        }
+    }
+
+    [HttpPost("{requestId:length(10)}/versions/preview")]
+    public async Task<ActionResult<CaveChangePreviewVm>> PreviewVersion(string requestId,
+        ReviseCaveChangeRequestVm request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.PreviewVersionAsync(requestId, request.Cave,
+                request.AgainstCurrent, request.ExpectedBaseRevisionId, request.ExpectedProposalVersionId,
                 cancellationToken));
         }
         catch (CaveRevisionConflictException conflict)
         {
-            return Conflict(new { conflict.ExpectedRevisionId, conflict.ActualRevisionId });
+            return PublishedCaveConflict(conflict);
+        }
+        catch (CaveProposalVersionConflictException conflict)
+        {
+            return ProposalVersionConflict(conflict);
         }
     }
 
     [HttpPost("{requestId:length(10)}/versions")]
-    public async Task<ActionResult<string>> AddVersion(string requestId, AddCaveVm cave,
-        bool againstCurrent, CancellationToken cancellationToken)
+    public async Task<ActionResult<string>> AddVersion(string requestId, ReviseCaveChangeRequestVm request,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return new JsonResult(await _service.AddVersionAsync(requestId, cave, againstCurrent,
+            return new JsonResult(await _service.AddVersionAsync(requestId, request.Cave,
+                request.AgainstCurrent, request.ExpectedBaseRevisionId, request.ExpectedProposalVersionId,
                 cancellationToken));
         }
         catch (CaveRevisionConflictException conflict)
         {
-            return Conflict(new { conflict.ExpectedRevisionId, conflict.ActualRevisionId });
+            return PublishedCaveConflict(conflict);
+        }
+        catch (CaveProposalVersionConflictException conflict)
+        {
+            return ProposalVersionConflict(conflict);
         }
     }
 
@@ -98,4 +128,12 @@ public sealed class CaveChangeRequestController : ControllerBase
     public async Task<ActionResult<CaveChangeRequestDecisionVm>> Reject(string requestId,
         RejectCaveChangeRequestVm request, CancellationToken cancellationToken) =>
         new JsonResult(await _service.RejectAsync(requestId, request.Notes, cancellationToken));
+
+    private ConflictObjectResult PublishedCaveConflict(CaveRevisionConflictException conflict) =>
+        Conflict(new CaveProposalAuthoringConflictVm(CaveProposalAuthoringConflictKind.PublishedCaveChanged,
+            conflict.ExpectedRevisionId ?? string.Empty, conflict.ActualRevisionId));
+
+    private ConflictObjectResult ProposalVersionConflict(CaveProposalVersionConflictException conflict) =>
+        Conflict(new CaveProposalAuthoringConflictVm(CaveProposalAuthoringConflictKind.ActiveProposalVersionChanged,
+            conflict.ExpectedProposalVersionId, conflict.ActualProposalVersionId));
 }

@@ -18,6 +18,149 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
     : IClassFixture<PostgresTestServer>
 {
     [Fact]
+    public async Task InitialAuthoringRejectsCaveChangedBeforePreviewOrAfterSuccessfulPreview()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(InitialAuthoringRejectsCaveChangedBeforePreviewOrAfterSuccessfulPreview));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await GrantViewAsync(database, tenant, "contributor");
+        var values = PublishableValues(tenant, locationTag.Id, "Expected B");
+
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            await CreateChangeRequestService(contributor).PreviewAsync(tenant.CaveId, values,
+                tenant.RevisionId, default);
+        }
+
+        await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
+        {
+            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
+                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
+                CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Narrative = "C");
+        }
+
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            var service = CreateChangeRequestService(contributor);
+            await Assert.ThrowsAsync<CaveRevisionConflictException>(() =>
+                service.PreviewAsync(tenant.CaveId, values, tenant.RevisionId, default));
+            await Assert.ThrowsAsync<CaveRevisionConflictException>(() =>
+                service.CreateAsync(tenant.CaveId, values, tenant.RevisionId, default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Empty(await verify.CaveChangeRequests.ToListAsync());
+    }
+
+    [Fact]
+    public async Task StaleRereviewRejectsCaveChangedBetweenPreviewAndSave()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(StaleRereviewRejectsCaveChangedBetweenPreviewAndSave));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await GrantViewAsync(database, tenant, "contributor");
+        string requestId;
+        string versionOneId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var repository = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                PublishableProposal(tenant, locationTag.Id, "V1"), default);
+            versionOneId = (await contributor.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
+                .CurrentProposalVersionId!;
+        }
+
+        string revisionB;
+        await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
+        {
+            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
+                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            revisionB = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
+                CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update, cave => cave.Narrative = "B"))
+                .RevisionId!;
+        }
+
+        var values = PublishableValues(tenant, locationTag.Id, "V2", "B");
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            await CreateChangeRequestService(contributor).PreviewVersionAsync(requestId, values, true,
+                revisionB, versionOneId, default);
+        }
+
+        await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
+        {
+            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
+                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            await mutations.PublishExistingAsync(tenant.CaveId, revisionB, CaveRevisionSource.ManagerEdit,
+                CaveRevisionOperation.Update, cave => cave.Narrative = "C");
+        }
+
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            var service = CreateChangeRequestService(contributor);
+            await Assert.ThrowsAsync<CaveRevisionConflictException>(() => service.PreviewVersionAsync(requestId,
+                values, true, revisionB, versionOneId, default));
+            await Assert.ThrowsAsync<CaveRevisionConflictException>(() => service.AddVersionAsync(requestId,
+                values, true, revisionB, versionOneId, default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Single(await verify.CaveProposalVersions.Where(row => row.ChangeRequestId == requestId).ToListAsync());
+    }
+
+    [Fact]
+    public async Task ConcurrentProposalEditorCannotAppendFromSupersededVersion()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ConcurrentProposalEditorCannotAppendFromSupersededVersion));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await GrantViewAsync(database, tenant, "contributor");
+        string requestId;
+        string versionOneId;
+        await using (var seed = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var repository = new CaveChangeRequestRepository(seed, seed.RequestUser);
+            requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                PublishableProposal(tenant, locationTag.Id, "V1"), default);
+            versionOneId = (await seed.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
+                .CurrentProposalVersionId!;
+        }
+
+        string versionTwoId;
+        await using (var actorA = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(actorA, tenant.AccountId);
+            versionTwoId = await CreateChangeRequestService(actorA).AddVersionAsync(requestId,
+                PublishableValues(tenant, locationTag.Id, "A created V2"), false,
+                tenant.RevisionId, versionOneId, default);
+        }
+        await using (var actorB = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await AuthenticateAsync(actorB, tenant.AccountId);
+            await Assert.ThrowsAsync<CaveProposalVersionConflictException>(() =>
+                CreateChangeRequestService(actorB).AddVersionAsync(requestId,
+                    PublishableValues(tenant, locationTag.Id, "B stale values"), false,
+                    tenant.RevisionId, versionOneId, default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Equal(2, await verify.CaveProposalVersions.CountAsync(row => row.ChangeRequestId == requestId));
+        Assert.Equal(versionTwoId, (await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
+            .CurrentProposalVersionId);
+    }
+
+    [Fact]
     public async Task ApplicationApprovalPublishesNormalizedCaveAndExactlyOneLinkedRevision()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -111,7 +254,8 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
             await AuthenticateAsync(contributor, tenant.AccountId);
             versionTwoId = await CreateChangeRequestService(contributor).AddVersionAsync(requestId,
                 PublishableValues(tenant, locationTag.Id, "Contributor proposal v2", "Unrelated manager change"),
-                againstCurrent: true, default);
+                againstCurrent: true, expectedBaseRevisionId: revisionB,
+                expectedProposalVersionId: versionOneId, default);
             Assert.False((await CreateChangeRequestService(contributor).GetAsync(requestId, default)).Request.IsStale);
         }
 
@@ -169,9 +313,14 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
             await requests.StageFileAsync(requestId, file.FileId, file.FileTypeId, "Survey attachment",
                 reviewer: false, default);
             await AuthenticateAsync(contributor, tenant.AccountId);
+            var stagedVersionId = (await contributor.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
+                .CurrentProposalVersionId!;
+            var values = PublishableValues(tenant, locationTag.Id, "Proposal with staged file");
+            values.Files = [new EditFileMetadataVm
+                { Id = file.FileId, FileTypeTagId = file.FileTypeId, DisplayName = "Survey attachment" }];
             await CreateChangeRequestService(contributor).AddVersionAsync(requestId,
-                PublishableValues(tenant, locationTag.Id, "Proposal with staged file"),
-                againstCurrent: false, default);
+                values, againstCurrent: false, expectedBaseRevisionId: tenant.RevisionId,
+                expectedProposalVersionId: stagedVersionId, default);
         }
 
         await using (var pending = database.CreateDbContext("verify", tenant.AccountId))
@@ -321,9 +470,9 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
                 Proposal(tenant, "First proposal"), default);
             firstVersionId = (await contributor.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
                 .CurrentProposalVersionId!;
-            secondVersionId = await repository.AddVersionAsync(requestId, tenant.RevisionId,
+            secondVersionId = await repository.AddVersionAsync(requestId, tenant.RevisionId, firstVersionId,
                 Proposal(tenant, "Accepted proposal"),
-                reviewer: false, default);
+                reviewer: false, againstCurrent: false, default);
         }
 
         string publishedRevisionId;
@@ -461,6 +610,139 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
         Assert.Equal(tenant.CaveId, published.CaveId);
         Assert.Null(published.ExpiresOn);
         Assert.False(await verify.CaveChangeRequestStagedFiles.AnyAsync(row => row.FileId == fileId));
+    }
+
+    [Fact]
+    public async Task RemovedStagedFileIsNotPublishedAndTerminalApprovalClearsAllStagingLinks()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RemovedStagedFileIsNotPublishedAndTerminalApprovalClearsAllStagingLinks));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var removed = await TestDataBuilder.AddFileAsync(database, tenant);
+        var retained = new TestFileData("retain0001", removed.FileTypeId);
+        await using (var seed = database.CreateDbContext("file-seed", tenant.AccountId))
+        {
+            seed.Files.Add(new Planarian.Model.Database.Entities.RidgeWalker.File
+            {
+                Id = retained.FileId, AccountId = tenant.AccountId, FileTypeTagId = retained.FileTypeId,
+                FileName = "retained.pdf", BlobKey = "retained", BlobContainer = "test"
+            });
+            await seed.SaveChangesAsync();
+        }
+        await GrantViewAsync(database, tenant, "contributor");
+        await GrantManagerAsync(database, tenant, "reviewer");
+        string requestId;
+
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var repository = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                PublishableProposal(tenant, locationTag.Id, "File choices"), default);
+            foreach (var fileId in new[] { removed.FileId, retained.FileId })
+            {
+                var file = await contributor.Files.SingleAsync(row => row.Id == fileId);
+                file.ExpiresOn = DateTime.UtcNow.AddDays(-1);
+                await contributor.SaveChangesAsync();
+                await repository.StageFileAsync(requestId, fileId, file.FileTypeTagId, file.DisplayName,
+                    reviewer: false, default);
+            }
+            var expectedVersionId = (await contributor.CaveChangeRequests.SingleAsync(row => row.Id == requestId))
+                .CurrentProposalVersionId!;
+            var values = PublishableValues(tenant, locationTag.Id, "File choices");
+            values.Files = [new EditFileMetadataVm
+                { Id = retained.FileId, FileTypeTagId = retained.FileTypeId, DisplayName = "Retained" }];
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            await CreateChangeRequestService(contributor).AddVersionAsync(requestId, values, false,
+                tenant.RevisionId, expectedVersionId, default);
+            var detail = await CreateChangeRequestService(contributor).GetAsync(requestId, default);
+            Assert.DoesNotContain(detail.Proposed.Files, file => file.Id == removed.FileId);
+            Assert.Contains(detail.Proposed.Files, file => file.Id == retained.FileId);
+        }
+
+        await using (var pending = database.CreateDbContext("verify", tenant.AccountId))
+        {
+            var request = await pending.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+            var version = await pending.CaveProposalVersions.SingleAsync(row => row.Id == request.CurrentProposalVersionId);
+            var proposal = CaveProposalJson.Deserialize(version.ProposalJson, version.SchemaVersion);
+            Assert.DoesNotContain(proposal.Files, intent => intent.FileId == removed.FileId);
+            Assert.Contains(proposal.Files, intent => intent.FileId == retained.FileId &&
+                intent.Disposition == ProposalFileDisposition.PublishStaged);
+        }
+
+        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await AuthenticateAsync(reviewer, tenant.AccountId);
+            Assert.Equal(CaveChangeRequestDecisionResult.Approved,
+                (await CreateChangeRequestService(reviewer).ApproveAsync(requestId, null, default)).Result);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Null((await verify.Files.SingleAsync(row => row.Id == removed.FileId)).CaveId);
+        Assert.Equal(tenant.CaveId, (await verify.Files.SingleAsync(row => row.Id == retained.FileId)).CaveId);
+        Assert.False(await verify.CaveChangeRequestStagedFiles.AnyAsync(row => row.ChangeRequestId == requestId));
+        var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(row =>
+            row.ChangeRequestId == requestId)).SnapshotJson, 1);
+        Assert.DoesNotContain(accepted.Files, file => file.Id == removed.FileId);
+        Assert.Contains(accepted.Files, file => file.Id == retained.FileId);
+        Assert.Contains(await new FileRepository(verify, verify.RequestUser).GetExpiredFiles(),
+            file => file.Id == removed.FileId);
+    }
+
+    [Fact]
+    public async Task AutomaticCountyMovePublishesAllocatedNumberAndRevisionRecordsIt()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(AutomaticCountyMovePublishesAllocatedNumberAndRevisionRecordsIt));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        const string newCountyId = "county999a";
+        await using (var seed = database.CreateDbContext("county-seed", tenant.AccountId))
+        {
+            seed.Counties.Add(new County
+            {
+                Id = newCountyId, AccountId = tenant.AccountId, StateId = tenant.StateId,
+                DisplayId = "A99", Name = "New County"
+            });
+            await seed.SaveChangesAsync();
+        }
+        await GrantViewAsync(database, tenant, "contributor");
+        await GrantManagerAsync(database, tenant, "reviewer");
+        string requestId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var proposal = PublishableProposal(tenant, locationTag.Id, "Moved Cave") with
+            {
+                CountyId = newCountyId,
+                CountyNumberIntent = CountyNumberIntent.AutomaticNext,
+                RequestedCountyNumber = null
+            };
+            requestId = await new CaveChangeRequestRepository(contributor, contributor.RequestUser)
+                .CreateAsync(tenant.CaveId, tenant.RevisionId, proposal, default);
+            await AuthenticateAsync(contributor, tenant.AccountId);
+            var detail = await CreateChangeRequestService(contributor).GetAsync(requestId, default);
+            Assert.Equal(CountyNumberIntent.AutomaticNext, detail.CountyNumberIntent);
+            Assert.Null(detail.RequestedCountyNumber);
+        }
+
+        string revisionId;
+        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await AuthenticateAsync(reviewer, tenant.AccountId);
+            revisionId = (await CreateChangeRequestService(reviewer).ApproveAsync(requestId, null, default))
+                .PublishedRevisionId!;
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var cave = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+        Assert.Equal(newCountyId, cave.CountyId);
+        Assert.Equal(1, cave.CountyNumber);
+        var snapshot = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(row => row.Id == revisionId))
+            .SnapshotJson, 1);
+        Assert.Equal(newCountyId, snapshot.County.Id);
+        Assert.Equal(1, snapshot.CountyNumber);
     }
 
     private static CaveProposalSnapshotV1 Proposal(PublishedCaveTestData cave, string name) => new()

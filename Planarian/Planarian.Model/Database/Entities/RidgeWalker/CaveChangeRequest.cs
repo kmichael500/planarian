@@ -89,8 +89,8 @@ public class CaveProposalVersionConfiguration : BaseEntityTypeConfiguration<Cave
         builder.Property(e => e.ProposalJson).HasColumnType("jsonb");
         builder.HasIndex(e => new { e.ChangeRequestId, e.CreatedOn });
         builder.HasOne<CaveChangeRequest>().WithMany()
-            .HasPrincipalKey(e => new { e.AccountId, e.Id })
-            .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
+            .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.CaveId, e.ChangeRequestId })
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CaveRevision>().WithMany()
             .HasPrincipalKey(e => new { e.AccountId, e.CaveId, e.Id })

@@ -75,3 +75,15 @@ it("shows the actual nested and reference values needed for review", () => {
     "Survey Map", "Survey", "survey-map.pdf", "survey.pdf", "Map", "Report",
   ]) expect(document.body).toHaveTextContent(text);
 });
+
+it.each([
+  ["AutomaticNext", "Auto-assigned on approval"],
+  ["FirstAvailable", "First available on approval"],
+] as const)("presents %s county-number intent without a fake zero", (countyNumberIntent, label) => {
+  render(<CaveRevisionDiff
+    diff={{ ...diff, scalars: [{ path: "CountyNumber", previous: 12, current: 0 }] }}
+    previous={snapshot(false)} current={{ ...snapshot(true), countyNumber: 0 }}
+    countyNumberIntent={countyNumberIntent} />);
+  expect(document.body).toHaveTextContent(label);
+  expect(document.body).not.toHaveTextContent("County Number0");
+});

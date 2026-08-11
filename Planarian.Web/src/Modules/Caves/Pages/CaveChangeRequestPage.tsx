@@ -67,7 +67,8 @@ export const CaveChangeRequestPage = () => {
           </Link>}
       </Space>
     </Card>
-    <Card title="Base → proposed"><CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed} /></Card>
+    <Card title="Base → proposed"><CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed}
+      countyNumberIntent={detail.countyNumberIntent} /></Card>
     {detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview || stagedFiles.length > 0) && <Card title="Proposal files">
       <Typography.Paragraph type="secondary">Uploaded files remain staged and unpublished until this request is approved.</Typography.Paragraph>
       {stagedFiles.map(file => <div key={file.id}><Typography.Link href={`/api/cave-change-requests/${detail.request.id}/files/${file.id}`}>{file.displayName ?? file.fileName}</Typography.Link></div>)}

@@ -61,9 +61,35 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "CaveId", "ApprovedRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequests", ["AccountId", "Id", "CurrentProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "ChangeRequestId", "PreviousProposalVersionId"], "CaveProposalVersions", ["AccountId", "ChangeRequestId", "Id"]);
+        AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "CaveId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveProposalVersions", ["AccountId", "CaveId", "BaseRevisionId"], "CaveRevisions", ["AccountId", "CaveId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "ChangeRequestId"], "CaveChangeRequests", ["AccountId", "Id"]);
         AssertForeignKey(foreignKeys, "CaveChangeRequestStagedFiles", ["AccountId", "FileId"], "Files", ["AccountId", "Id"]);
+    }
+
+    [Fact]
+    public async Task ProposalVersionForeignKeyRejectsRequestFromAnotherCaveInSameAccount()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ProposalVersionForeignKeyRejectsRequestFromAnotherCaveInSameAccount));
+        var caveA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var caveBSeed = await TestDataBuilder.AddCaveAsync(database, caveA, "cave00000b", "Cave B", 2);
+        var caveB = await TestDataBuilder.PublishBaselineRevisionAsync(database, caveBSeed, "revision0b");
+        var request = await TestDataBuilder.CreateChangeRequestAsync(database, caveA);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            insert into "CaveProposalVersions"
+                ("Id", "AccountId", "ChangeRequestId", "CaveId", "BaseRevisionId", "SchemaVersion", "ProposalJson", "CreatedOn")
+            values ('wrongcave1', @account, @request, @cave, @revision, 1, '{}'::jsonb, now())
+            """, connection);
+        command.Parameters.AddWithValue("account", caveA.AccountId);
+        command.Parameters.AddWithValue("request", request.ChangeRequestId);
+        command.Parameters.AddWithValue("cave", caveB.CaveId);
+        command.Parameters.AddWithValue("revision", caveB.RevisionId);
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
     }
 
     [Fact]

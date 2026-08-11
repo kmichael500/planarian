@@ -10,6 +10,10 @@ namespace Planarian.Migrations.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "FK_CaveProposalVersions_CaveChangeRequests_AccountId_ChangeReq~",
+                table: "CaveProposalVersions");
+
             migrationBuilder.AddColumn<string>(
                 name: "BaseRevisionId",
                 table: "CaveProposalVersions",
@@ -60,6 +64,19 @@ namespace Planarian.Migrations.Migrations
                 table: "CaveProposalVersions",
                 columns: new[] { "AccountId", "CaveId", "BaseRevisionId" });
 
+            migrationBuilder.CreateIndex(
+                name: "IX_CaveProposalVersions_AccountId_CaveId_ChangeRequestId",
+                table: "CaveProposalVersions",
+                columns: new[] { "AccountId", "CaveId", "ChangeRequestId" });
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_CaveProposalVersions_CaveChangeRequests_AccountId_CaveId_~",
+                table: "CaveProposalVersions",
+                columns: new[] { "AccountId", "CaveId", "ChangeRequestId" },
+                principalTable: "CaveChangeRequests",
+                principalColumns: new[] { "AccountId", "CaveId", "Id" },
+                onDelete: ReferentialAction.Restrict);
+
             migrationBuilder.AddForeignKey(
                 name: "FK_CaveProposalVersions_CaveRevisions_AccountId_CaveId_BaseRev~",
                 table: "CaveProposalVersions",
@@ -73,11 +90,19 @@ namespace Planarian.Migrations.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
+                name: "FK_CaveProposalVersions_CaveChangeRequests_AccountId_CaveId_~",
+                table: "CaveProposalVersions");
+
+            migrationBuilder.DropForeignKey(
                 name: "FK_CaveProposalVersions_CaveRevisions_AccountId_CaveId_BaseRev~",
                 table: "CaveProposalVersions");
 
             migrationBuilder.DropIndex(
                 name: "IX_CaveProposalVersions_AccountId_CaveId_BaseRevisionId",
+                table: "CaveProposalVersions");
+
+            migrationBuilder.DropIndex(
+                name: "IX_CaveProposalVersions_AccountId_CaveId_ChangeRequestId",
                 table: "CaveProposalVersions");
 
             migrationBuilder.DropColumn(
@@ -87,6 +112,14 @@ namespace Planarian.Migrations.Migrations
             migrationBuilder.DropColumn(
                 name: "CaveId",
                 table: "CaveProposalVersions");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_CaveProposalVersions_CaveChangeRequests_AccountId_ChangeReq~",
+                table: "CaveProposalVersions",
+                columns: new[] { "AccountId", "ChangeRequestId" },
+                principalTable: "CaveChangeRequests",
+                principalColumns: new[] { "AccountId", "Id" },
+                onDelete: ReferentialAction.Restrict);
         }
     }
 }

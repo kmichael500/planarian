@@ -1,5 +1,7 @@
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 
+export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
+
 export type CaveChangeRequestStatus = "Pending" | "Approved" | "Rejected";
 
 export interface CaveChangeRequestSummaryVm {
@@ -43,6 +45,9 @@ export interface CaveChangeRequestDetailVm {
   diff: CaveRevisionDiffVm;
   publishedSinceBase?: CaveRevisionDiffVm;
   versions: CaveProposalVersionVm[];
+  countyNumberIntent: CountyNumberIntent;
+  requestedCountyNumber?: number;
+  activeStagedFiles: CaveSnapshotVm["files"];
 }
 
 export interface CaveChangeRequestDecisionVm {
@@ -56,4 +61,12 @@ export interface CaveChangePreviewVm {
   base: CaveSnapshotVm;
   proposed: CaveSnapshotVm;
   diff: CaveRevisionDiffVm;
+  countyNumberIntent: CountyNumberIntent;
+  requestedCountyNumber?: number;
+}
+
+export interface CaveProposalAuthoringConflictVm {
+  conflictKind: "PublishedCaveChanged" | "ActiveProposalVersionChanged";
+  expectedId: string;
+  actualId?: string;
 }

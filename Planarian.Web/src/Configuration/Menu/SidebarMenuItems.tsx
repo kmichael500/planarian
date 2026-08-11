@@ -54,6 +54,7 @@ const useSideBarMenuItems = () => {
         icon: <Link to="/caves/review"><AuditOutlined /></Link>,
         label: "Review Cave Changes",
         isVisible: hasAccount,
+        permissionKey: PermissionKey.Manager,
       },
       {
         key: "/account",

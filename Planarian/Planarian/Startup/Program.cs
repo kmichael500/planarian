@@ -238,6 +238,7 @@ builder.Services.AddSingleton<CaveImportCsvParser>();
 builder.Services.AddSingleton<EntranceImportCsvParser>();
 builder.Services.AddSingleton<CaveImportPlanner>();
 builder.Services.AddSingleton<EntranceImportPlanner>();
+builder.Services.AddScoped<CaveImportRevisionRepository>();
 builder.Services.AddScoped<CaveImportExecutionRepository>();
 builder.Services.AddScoped<EntranceImportExecutionRepository>();
 builder.Services.AddScoped<NotificationService>();

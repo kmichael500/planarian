@@ -963,6 +963,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new CaveVm
             {
                 Id = e.Id,
+                CurrentRevisionId = e.CurrentRevisionId,
                 IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
                 ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
