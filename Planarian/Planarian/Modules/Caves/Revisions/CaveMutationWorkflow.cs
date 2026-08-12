@@ -10,6 +10,9 @@ public sealed class CaveMutationCoordinator
 
     public CaveMutationCoordinator(CaveMutationRepository repository) => _repository = repository;
 
+    public Task<string> EnsureBaselineAsync(string caveId, CancellationToken cancellationToken = default) =>
+        _repository.EnsureBaselineAsync(caveId, cancellationToken);
+
     public Task<CaveMutationResult> PublishExistingAsync(string caveId, string? expectedRevisionId,
         CaveRevisionSource source, CaveRevisionOperation operation, Action<Cave> write,
         string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default) =>

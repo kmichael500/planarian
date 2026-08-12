@@ -341,6 +341,11 @@ const CaveComponent = ({
           {generateTags(entrance.entranceHydrologyTagIds)}
         </Descriptions.Item>
       ),
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceOtherTags) && (
+        <Descriptions.Item label="Other" key="entrance-other">
+          {generateTags(entrance.entranceOtherTagIds)}
+        </Descriptions.Item>
+      ),
       <Descriptions.Item label="Land Access" span={3}>
         <PublicAccessDetails lat={entrance.latitude} lng={entrance.longitude} />
       </Descriptions.Item>,

@@ -1,12 +1,36 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Xunit;
 
 namespace Planarian.Tests;
 
 public class CaveRevisionFoundationTests
 {
+    [Fact]
+    public void ProposalJsonWithoutOptionalFilePresentationMetadataRemainsReadable()
+    {
+        const string json = """
+            {"schemaVersion":1,"caveId":"c","accountId":"a","name":"Cave","stateId":"s","countyId":"co","files":[{"fileId":"f","disposition":0,"fileTypeTagId":"report","displayName":"Survey"}]}
+            """;
+
+        var file = Assert.Single(CaveProposalJson.Deserialize(json, 1).Files);
+
+        Assert.Null(file.FileName);
+        Assert.Null(file.FileTypeName);
+    }
+
+    [Theory]
+    [InlineData("survey.pdf", "Survey", "Survey Map", "Survey Map.pdf")]
+    [InlineData("survey.pdf", "Survey", "Survey", "survey.pdf")]
+    [InlineData("survey.pdf", "Survey", null, "survey.pdf")]
+    [InlineData("survey", null, "Renamed", "Renamed")]
+    public void EffectiveProposalFileNameMatchesPublicationSemantics(string existingFileName,
+        string? existingDisplayName, string? proposedDisplayName, string expected) =>
+        Assert.Equal(expected, CaveFileNamePolicy.GetEffectiveFileName(existingFileName,
+            existingDisplayName, proposedDisplayName));
+
     [Fact]
     public void RoundTripUnchangedSnapshotIsSemanticNoOp()
     {

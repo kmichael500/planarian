@@ -38,5 +38,6 @@ export enum FeatureKey {
   EnabledFieldEntranceStatusTags = "EnabledFieldEntranceStatusTags",
   EnabledFieldEntranceFieldIndicationTags = "EnabledFieldEntranceFieldIndicationTags",
   EnabledFieldEntranceHydrologyTags = "EnabledFieldEntranceHydrologyTags",
+  EnabledFieldEntranceOtherTags = "EnabledFieldEntranceOtherTags",
   EnabledFieldEntranceDescription = "EnabledFieldEntranceDescription",
 }

@@ -35,11 +35,12 @@ import { InputDistanceComponent } from "../../../Shared/Components/Inputs/InputD
 import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { groupBy } from "../../../Shared/Helpers/ArrayHelpers";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
-import { ShouldDisplay } from "../../../Shared/Permissioning/Components/ShouldDisplay";
+import { ShouldDisplay, useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { SettingsService } from "../../Setting/Services/SettingsService";
 import { CaveService } from "../Service/CaveService";
+import { fileAtFormListIndex } from "../Helpers/CaveFileListHelpers";
 
 export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
@@ -47,6 +48,7 @@ export interface AddCaveComponentProps {
   cave?: AddCaveVm | CaveVm;
 }
 const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
+  const { isFeatureEnabled } = useFeatureEnabled();
   const editingCave = isEditing ? (cave as CaveVm | undefined) : undefined;
   const [selectedStateId, setSelectedStateId] = useState<string>();
   const [selectedCountyId, setSelectedCountyId] = useState<string>();
@@ -185,22 +187,15 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
     }
   };
 
-  // let groupedByFileTypes: {
-  //   [key: string]: EditFileMetadataVm[];
-  // } = {};
-  const [groupedByFileTypes, setGroupedByFiles] = useState<{
-    [key: string]: EditFileMetadataVm[];
-  }>({});
+  const watchedFiles = Form.useWatch<EditFileMetadataVm[]>(
+    nameof<AddCaveVm>("files"),
+    form
+  );
+  const currentFiles: EditFileMetadataVm[] = watchedFiles ?? caveState?.files ?? [];
+  const groupedByFileTypes = groupBy(currentFiles, (file) => file.fileTypeKey);
   const [autoCountyNumber, setAutoCountyNumber] = useState<number>();
   const [isCountyNumberLoading, setIsCountyNumberLoading] =
     useState<boolean>(false);
-
-  useEffect(() => {
-    if (caveState?.files) {
-      const temp = groupBy(caveState.files, (file) => file.fileTypeKey);
-      setGroupedByFiles(temp);
-    }
-  }, [caveState]);
 
   useEffect(() => {
     if (isNullOrWhiteSpace(selectedCountyId)) {
@@ -592,12 +587,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Form.Item
             label="Length"
             name={nameof<AddCaveVm>("lengthFeet")}
-            rules={[
-              {
-                required: true,
-                message: "Please enter the length in feet",
-              },
-            ]}
           >
             <InputDistanceComponent />
           </Form.Item>
@@ -608,9 +597,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Form.Item
             label="Depth"
             name={nameof<AddCaveVm>("depthFeet")}
-            rules={[
-              { required: true, message: "Please enter the depth in feet" },
-            ]}
           >
             <InputDistanceComponent />
           </Form.Item>
@@ -621,12 +607,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Form.Item
             label="Max Pit Depth"
             name={nameof<AddCaveVm>("maxPitDepthFeet")}
-            rules={[
-              {
-                required: true,
-                message: "Please enter the max pit depth in feet",
-              },
-            ]}
           >
             <InputDistanceComponent />
           </Form.Item>
@@ -637,12 +617,6 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Form.Item
             label="Number of Pits"
             name={nameof<AddCaveVm>("numberOfPits")}
-            rules={[
-              {
-                required: true,
-                message: "Please enter the number of pits",
-              },
-            ]}
           >
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>
@@ -847,6 +821,34 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                             </Form.Item>
                           </Col>
                         </ShouldDisplay>
+                        {isFeatureEnabled(FeatureKey.EnabledFieldEntranceOtherTags) ? (
+                          <Col {...twoColProps}>
+                            <Form.Item
+                              {...field}
+                              label="Other"
+                              name={[
+                                field.name,
+                                nameof<AddEntranceVm>("entranceOtherTagIds"),
+                              ]}
+                            >
+                              <TagSelectComponent
+                                tagType={TagType.CaveOther}
+                                mode="multiple"
+                              />
+                            </Form.Item>
+                          </Col>
+                        ) : (
+                          <Form.Item
+                            name={[
+                              field.name,
+                              nameof<AddEntranceVm>("entranceOtherTagIds"),
+                            ]}
+                            hidden
+                            preserve
+                          >
+                            <Input />
+                          </Form.Item>
+                        )}
                         <ShouldDisplay
                           featureKey={
                             FeatureKey.EnabledFieldEntranceCoordinates
@@ -1064,12 +1066,11 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           <Form.List name={nameof<AddCaveVm>("files")}>
             {(fields, { add, remove }, { errors }) => (
               <Collapse accordion>
-                {Object.entries(groupedByFileTypes).map(([fileType, files]) => (
+                {Object.entries(groupedByFileTypes).map(([fileType]) => (
                   <Collapse.Panel header={`${fileType}`} key={fileType}>
                     <Row gutter={16}>
                       {fields.map((field) => {
-                        // Get the file at the index
-                        const f = caveState?.files?.[field.key];
+                        const f = fileAtFormListIndex(currentFiles, field.name);
 
                         if (f?.fileTypeKey === fileType) {
                           return (
@@ -1083,25 +1084,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                                       "Are you sure? This cannot be undone!"
                                     }
                                     onConfirm={() => {
-                                      if (caveState?.files) {
-                                        remove(field.name);
-
-                                        const filteredFiles =
-                                          caveState.files.filter(
-                                            (file, index) =>
-                                              index !== field.key &&
-                                              fields.some(
-                                                (formField) =>
-                                                  formField.key === index
-                                              )
-                                          );
-
-                                        const temp = groupBy(
-                                          filteredFiles,
-                                          (file) => file.fileTypeKey
-                                        );
-                                        setGroupedByFiles(temp);
-                                      }
+                                      remove(field.name);
                                     }}
                                   />,
                                 ]}

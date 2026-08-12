@@ -454,10 +454,19 @@ public class FileService : ServiceBase<FileRepository>
         var revisionPreparations = new Dictionary<string, CaveMutationPreparation>(StringComparer.Ordinal);
         foreach (var value in values)
         {
-            await EnsureFileManagerAccess(value.Id);
+            // File state and staging ownership must come from one READ COMMITTED
+            // statement. If approval commits before this read, CaveId is visible;
+            // if it has not committed, the staging association is still visible.
+            // Separate reads could observe opposite sides of that transition.
+            var mutationContext = await Repository.GetFileMetadataMutationContextAsync(value.Id, cancellationToken);
+            if (mutationContext == null) throw ApiExceptionDictionary.NotFound("File");
 
-            var file = await Repository.GetFileById(value.Id);
-            if (file == null) throw ApiExceptionDictionary.NotFound("File");
+            await EnsureFileManagerAccess(mutationContext);
+            if (mutationContext.IsChangeRequestStaged)
+                throw ApiExceptionDictionary.BadRequest(
+                    "This file is staged in a Cave change request. Edit it through the change request instead.");
+
+            var file = mutationContext.File;
 
             if (!string.IsNullOrWhiteSpace(file.CaveId) && !revisionPreparations.ContainsKey(file.CaveId))
             {
@@ -520,15 +529,12 @@ public class FileService : ServiceBase<FileRepository>
             MimeTypes.GetMimeType(Path.GetExtension(fileName)));
     }
 
-    private async Task EnsureFileManagerAccess(string fileId)
+    private async Task EnsureFileManagerAccess(FileRepository.FileMetadataMutationContextResult fileContext)
     {
-        var fileContext = await Repository.GetFileAuthorizationContext(fileId);
-        if (fileContext == null)
-            throw ApiExceptionDictionary.NotFound("File");
-
-        if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
+        if (!string.IsNullOrWhiteSpace(fileContext.File.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
         {
-            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId, fileContext.CountyId, fileContext.StateId);
+            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.File.CaveId,
+                fileContext.CountyId, fileContext.StateId);
             return;
         }
 

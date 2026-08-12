@@ -11,7 +11,8 @@ import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
 const sourceLabel = (revision: CaveRevisionListItemVm) => {
   if (revision.changeRequestId) return "Approved change request";
   if (revision.source === "Import") return "Imported";
-  if (revision.operation === "Create" || revision.source === "SystemBaseline") return "Created";
+  if (revision.source === "SystemBaseline") return "Revision tracking initialized";
+  if (revision.operation === "Create") return "Created";
   if (revision.operation === "Archive") return "Archived";
   if (revision.operation === "Unarchive") return "Restored";
   return "Edited";
@@ -50,7 +51,7 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
       <PlanarianModal header="Cave History" open={open} onClose={() => setOpen(false)} width={900}>
         <Spin spinning={loading}>
           {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-          {!loading && history?.revisions.length === 0 && <Typography.Text type="secondary">No published revisions yet.</Typography.Text>}
+          {!loading && history?.revisions.length === 0 && <Typography.Text type="secondary">Revision tracking has not started yet.</Typography.Text>}
           <Timeline
             items={history?.revisions.map((revision) => ({
               color: revision.isCurrent ? "green" : "blue",

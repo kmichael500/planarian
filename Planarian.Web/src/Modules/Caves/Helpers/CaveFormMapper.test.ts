@@ -1,5 +1,6 @@
-import { snapshotToForm } from "./CaveFormMapper";
+import { caveToForm, snapshotToForm } from "./CaveFormMapper";
 import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
+import { CaveVm } from "../Models/CaveVm";
 
 const snapshot: CaveSnapshotVm = {
   caveId: "cave", accountId: "account", name: "Cave", alternateNames: [],
@@ -25,4 +26,39 @@ it("adds active staged files to a current-Cave stale rereview baseline", () => {
     fileTypeTagId: "document", fileTypeNameAtRevision: "Document",
   }]);
   expect(form.files).toEqual([expect.objectContaining({ id: "staged", displayName: "Staged" })]);
+});
+
+it("preserves null, zero, and positive Cave measurements in proposal editor state", () => {
+  const form = snapshotToForm({
+    ...snapshot,
+    lengthFeet: null,
+    depthFeet: 0,
+    maxPitDepthFeet: 42,
+    numberOfPits: null,
+  });
+
+  expect(form.lengthFeet).toBeNull();
+  expect(form.depthFeet).toBe(0);
+  expect(form.maxPitDepthFeet).toBe(42);
+  expect(form.numberOfPits).toBeNull();
+});
+
+it("retains Entrance Other tags when mapping a Cave into the editor", () => {
+  const cave: CaveVm = {
+    id: "cave", currentRevisionId: null, displayId: "A-1", reportedByUserId: null,
+    countyId: "county", stateId: "state", countyDisplayId: "A", countyNumber: 1,
+    name: "Cave", alternateNames: [], lengthFeet: 0, depthFeet: 0, maxPitDepthFeet: 0,
+    numberOfPits: 0, narrative: null, reportedOn: null, isArchived: false, primaryEntrance: null,
+    mapIds: [], geologyTagIds: [], files: [], reportedByNameTagIds: [], biologyTagIds: [],
+    archeologyTagIds: [], cartographerNameTagIds: [], mapStatusTagIds: [], geologicAgeTagIds: [],
+    physiographicProvinceTagIds: [], otherTagIds: [],
+    entrances: [{
+      id: "entrance", isPrimary: true, reportedByUserId: null, locationQualityTagId: "quality",
+      name: null, description: null, latitude: 35, longitude: -86, elevationFeet: 500,
+      reportedOn: null, pitFeet: null, entranceStatusTagIds: [], fieldIndicationTagIds: [],
+      entranceHydrologyTagIds: [], reportedByNameTagIds: [], entranceOtherTagIds: ["other-tag"],
+    }],
+  };
+
+  expect(caveToForm(cave).entrances[0].entranceOtherTagIds).toEqual(["other-tag"]);
 });

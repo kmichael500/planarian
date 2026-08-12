@@ -11,6 +11,7 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveService } from "../Service/CaveService";
+import { isCaveRevisionDiffEmpty } from "../Helpers/CaveRevisionDiffHelpers";
 
 export const SuggestCaveChangesPage = () => {
   const { caveId } = useParams();
@@ -18,6 +19,7 @@ export const SuggestCaveChangesPage = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const [form] = Form.useForm<AddCaveVm>();
   const [cave, setCave] = useState<CaveVm>();
+  const [expectedBaseRevisionId, setExpectedBaseRevisionId] = useState<string>();
   const [draft, setDraft] = useState<AddCaveVm>();
   const [previewResult, setPreviewResult] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
@@ -27,9 +29,10 @@ export const SuggestCaveChangesPage = () => {
     if (!caveId) return;
     setHeaderTitle(["Suggest Changes"]);
     setHeaderButtons([<BackButtonComponent to={`/caves/${caveId}`} />]);
-    CaveService.GetCave(caveId).then((loaded) => {
-      setCave(loaded);
-      form.setFieldsValue(caveToForm(loaded));
+    CaveService.GetProposalAuthoringContext(caveId).then((context) => {
+      setCave(context.cave);
+      setExpectedBaseRevisionId(context.expectedBaseRevisionId);
+      form.setFieldsValue(caveToForm(context.cave));
     }).catch(() => message.error("The Cave could not be loaded."))
       .finally(() => setLoading(false));
   }, [caveId]);
@@ -40,7 +43,7 @@ export const SuggestCaveChangesPage = () => {
     setLoading(true);
     try {
       setDraft(values);
-      setPreviewResult(await CaveService.PreviewChanges(caveId, values, cave!.currentRevisionId));
+      setPreviewResult(await CaveService.PreviewChanges(caveId, values, expectedBaseRevisionId!));
     } catch (error: any) {
       if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed while you were editing. Reload and review the current Cave before continuing.");
@@ -51,10 +54,10 @@ export const SuggestCaveChangesPage = () => {
   };
 
   const submit = async () => {
-    if (!draft) return;
+    if (!draft || !previewResult || isCaveRevisionDiffEmpty(previewResult.diff)) return;
     setSubmitting(true);
     try {
-      const id = await CaveService.SubmitChanges(caveId, draft, cave!.currentRevisionId);
+      const id = await CaveService.SubmitChanges(caveId, draft, expectedBaseRevisionId!);
       message.success("Your changes were submitted for review.");
       navigate(`/caves/requests/${id}`);
     } catch (error: any) {
@@ -71,10 +74,13 @@ export const SuggestCaveChangesPage = () => {
       {previewResult && draft && (
         <Card title="Review your changes">
           <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
+          {isCaveRevisionDiffEmpty(previewResult.diff) &&
+            <Alert message="Make at least one change before submitting this proposal." type="warning" showIcon style={{ marginBottom: 16 }} />}
           <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed}
             countyNumberIntent={previewResult.countyNumberIntent} />
           <Space style={{ marginTop: 16 }}>
-            <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}>Submit for review</PlanarianButton>
+            <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}
+              disabled={isCaveRevisionDiffEmpty(previewResult.diff)}>Submit for review</PlanarianButton>
             <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
           </Space>
         </Card>

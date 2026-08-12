@@ -11,10 +11,10 @@ export interface AddCaveVm {
   countyNumber?: number | null;
   isCountyNumberManuallySet: boolean;
   useFirstAvailableCountyNumber: boolean;
-  lengthFeet: number;
-  depthFeet: number;
-  maxPitDepthFeet: number;
-  numberOfPits: number;
+  lengthFeet: number | null;
+  depthFeet: number | null;
+  maxPitDepthFeet: number | null;
+  numberOfPits: number | null;
   narrative: string | null;
   reportedOn: string | null;
   entrances: AddEntranceVm[];

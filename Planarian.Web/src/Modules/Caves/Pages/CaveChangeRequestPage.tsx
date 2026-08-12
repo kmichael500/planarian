@@ -7,8 +7,13 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
-import { CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
+import { CaveChangeRequestDetailVm, CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
+
+export const CaveAvailability = ({ request }: { request: CaveChangeRequestSummaryVm }) =>
+  request.caveExists
+    ? <Link to={`/caves/${request.caveId}`}>Open Cave</Link>
+    : <Typography.Text type="secondary">Cave no longer available</Typography.Text>;
 
 export const CaveChangeRequestPage = () => {
   const { requestId } = useParams();
@@ -17,6 +22,8 @@ export const CaveChangeRequestPage = () => {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState(false);
+  const [versionDetails, setVersionDetails] = useState<Record<string, CaveProposalVersionDetailVm>>({});
+  const [loadingVersionId, setLoadingVersionId] = useState<string>();
 
   const stagedFiles = detail ? detail.proposed.files.filter(file =>
     !detail.base.files.some(baseFile => baseFile.id === file.id)) : [];
@@ -34,18 +41,17 @@ export const CaveChangeRequestPage = () => {
     if (!requestId) return;
     setDeciding(true);
     try {
-      const result = approve ? await CaveService.ApproveChangeRequest(requestId, notes)
-        : await CaveService.RejectChangeRequest(requestId, notes);
-      if (result.result === "Conflict") {
-        message.warning("The Cave changed again. Revise the proposal against the current Cave before approval.");
-        setDetail(await CaveService.GetChangeRequest(requestId));
-      } else {
-        message.success(approve ? "Changes approved and published." : "Change request rejected.");
-        setDetail(await CaveService.GetChangeRequest(requestId));
-      }
+      const expectedProposalVersionId = detail!.request.currentProposalVersionId;
+      if (approve) await CaveService.ApproveChangeRequest(requestId, expectedProposalVersionId, notes);
+      else await CaveService.RejectChangeRequest(requestId, expectedProposalVersionId, notes);
+      message.success(approve ? "Changes approved and published." : "Change request rejected.");
+      setDetail(await CaveService.GetChangeRequest(requestId));
     } catch (error: any) {
-      if (error?.response?.status === 409) {
-        message.warning("This request is stale and cannot be approved over the current Cave.");
+      if (error?.response?.data?.conflictKind === "ActiveProposalVersionChanged") {
+        message.warning("The proposal changed while you were reviewing it. Review the current version before making a decision.");
+        setDetail(await CaveService.GetChangeRequest(requestId));
+      } else if (error?.response?.data?.conflictKind === "PublishedCaveChanged") {
+        message.warning("The published Cave changed. Revise the proposal against the current Cave before approval.");
         setDetail(await CaveService.GetChangeRequest(requestId));
       } else message.error("The review decision could not be saved.");
     } finally { setDeciding(false); }
@@ -53,7 +59,7 @@ export const CaveChangeRequestPage = () => {
 
   return <Spin spinning={loading}>{detail && <Space direction="vertical" style={{ width: "100%" }}>
     {detail.request.isStale && <Alert type="warning" showIcon message="This proposal version is based on an older Cave revision." description="Review both comparisons, then create a new proposal version from the current published Cave." />}
-    <Card title={detail.request.caveName} extra={<Link to={`/caves/${detail.request.caveId}`}>Open Cave</Link>}>
+    <Card title={detail.request.caveName} extra={<CaveAvailability request={detail.request} />}>
       <Space direction="vertical">
         <Space><Tag>{detail.request.status}</Tag>{detail.request.isStale && <Tag color="warning">Conflict</Tag>}</Space>
         <Typography.Text>Submitted by {detail.request.submitterName ?? "Unknown user"}</Typography.Text>
@@ -71,7 +77,7 @@ export const CaveChangeRequestPage = () => {
       countyNumberIntent={detail.countyNumberIntent} /></Card>
     {detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview || stagedFiles.length > 0) && <Card title="Proposal files">
       <Typography.Paragraph type="secondary">Uploaded files remain staged and unpublished until this request is approved.</Typography.Paragraph>
-      {stagedFiles.map(file => <div key={file.id}><Typography.Link href={`/api/cave-change-requests/${detail.request.id}/files/${file.id}`}>{file.displayName ?? file.fileName}</Typography.Link></div>)}
+      {stagedFiles.map(file => <div key={file.id}><Typography.Link href={CaveService.GetStagedChangeRequestFileUrl(detail.request.id, file.id)}>{file.displayName ?? file.fileName}</Typography.Link></div>)}
       {(detail.request.canEdit || detail.request.canReview) && <Upload showUploadList={false} customRequest={async ({ file, onSuccess, onError, onProgress }) => {
         try {
           await CaveService.StageChangeRequestFile(requestId!, file as RcFile, (file as RcFile).uid, event => {
@@ -90,10 +96,33 @@ export const CaveChangeRequestPage = () => {
     </Card>}
     {detail.request.isStale && detail.publishedSinceBase && <Card title="What changed in the published Cave after submission"><CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} /></Card>}
     {detail.versions.length > 1 && <Card title="Proposal versions">
-      <Space direction="vertical">{detail.versions.slice().reverse().map(version =>
-        <Typography.Text key={version.id}>
-          {version.isCurrent ? "Current: " : ""}{version.id} · based on revision {version.baseRevisionId} · {version.createdByName ?? "Unknown user"} · {new Date(version.createdOn).toLocaleString()}
-        </Typography.Text>)}</Space>
+      <Space direction="vertical" style={{ width: "100%" }}>{detail.versions.slice().reverse().map(version =>
+        <Card key={version.id} size="small" title={`${version.isCurrent ? "Current: " : ""}${version.id}`}
+          extra={<PlanarianButton icon={undefined} loading={loadingVersionId === version.id} onClick={async () => {
+            if (versionDetails[version.id]) {
+              setVersionDetails(current => { const next = { ...current }; delete next[version.id]; return next; });
+              return;
+            }
+            setLoadingVersionId(version.id);
+            try {
+              const loadedVersion = await CaveService.GetProposalVersion(requestId!, version.id);
+              setVersionDetails(current => ({ ...current, [version.id]: loadedVersion }));
+            } catch { message.error("That proposal version could not be loaded."); }
+            finally { setLoadingVersionId(undefined); }
+          }}>{versionDetails[version.id] ? "Hide changes" : "View changes"}</PlanarianButton>}>
+          <Typography.Text type="secondary">Based on revision {version.baseRevisionId} · {version.createdByName ?? "Unknown user"} · {new Date(version.createdOn).toLocaleString()}</Typography.Text>
+          {versionDetails[version.id] && <>
+            {versionDetails[version.id].unavailableStagedFileIds.length > 0 &&
+              <Alert type="warning" showIcon message="Historical attachment unavailable"
+                description={versionDetails[version.id].unavailableStagedFileIds.map(fileId => {
+                  const file = versionDetails[version.id].proposed.files.find(candidate => candidate.id === fileId);
+                  return file?.displayName ?? file?.fileName ?? fileId;
+                }).join(", ")} />}
+            <CaveRevisionDiff diff={versionDetails[version.id].diff}
+              previous={versionDetails[version.id].base} current={versionDetails[version.id].proposed}
+              countyNumberIntent={versionDetails[version.id].countyNumberIntent} />
+          </>}
+        </Card>)}</Space>
     </Card>}
     {detail.request.status === "Pending" && detail.request.canReview && <Card title="Review decision">
       <Input.TextArea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Reason or reviewer notes" rows={3} />

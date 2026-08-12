@@ -66,10 +66,10 @@ export interface CaveSnapshotVm {
   county: SnapshotReferenceVm;
   countyNumber: number;
   reportedByUserId?: string;
-  lengthFeet?: number;
-  depthFeet?: number;
-  maxPitDepthFeet?: number;
-  numberOfPits?: number;
+  lengthFeet?: number | null;
+  depthFeet?: number | null;
+  maxPitDepthFeet?: number | null;
+  numberOfPits?: number | null;
   narrative?: string;
   reportedOn?: string;
   isArchived: boolean;
@@ -94,6 +94,16 @@ export interface CaveRevisionDiffVm {
   addedFiles: string[];
   removedFiles: string[];
   changedFiles: string[];
+  entranceChanges: Array<{
+    entranceId: string;
+    scalars: CaveScalarChangeVm[];
+    addedTags: SnapshotTagReference[];
+    removedTags: SnapshotTagReference[];
+  }>;
+  fileChanges: Array<{
+    fileId: string;
+    scalars: CaveScalarChangeVm[];
+  }>;
   referenceMetadataChanges: Array<{
     path: string;
     stableId: string;

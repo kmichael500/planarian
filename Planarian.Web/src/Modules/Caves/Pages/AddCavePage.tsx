@@ -47,6 +47,7 @@ const AddCavesPage: React.FC = () => {
         entranceStatusTagIds: [],
         fieldIndicationTagIds: [],
         entranceHydrologyTagIds: [],
+        entranceOtherTagIds: [],
       },
     ],
     geologyTagIds: [],

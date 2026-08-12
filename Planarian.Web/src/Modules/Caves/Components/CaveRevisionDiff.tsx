@@ -1,113 +1,131 @@
 import { ReactNode } from "react";
-import { Card, Descriptions, Space, Tag, Typography } from "antd";
-import {
-  CaveEntranceSnapshotVm,
-  CaveFileSnapshotVm,
-  CaveRevisionDiffVm,
-  CaveSnapshotVm,
-  SnapshotTagReference,
-} from "../Models/CaveRevisionVm";
-import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
+import { Alert, Card, Descriptions, Grid, Space, Tag, theme, Typography } from "antd";
+import { CaveRevisionDiffVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
+import {
+  AffectedEntrancePresentation,
+  AffectedFilePresentation,
+  buildCaveRevisionDiffPresentation,
+  ChangedFieldPresentation,
+  DiffValueFormat,
+  ReferenceMetadataPresentation,
+  roleLabels,
+  TagChangeGroup,
+} from "./CaveRevisionDiffPresentation";
+import { CaveTextDiff } from "./CaveTextDiff";
+import {
+  defaultIfEmpty,
+  DistanceFormat,
+  formatCoordinates,
+  formatDate,
+  formatDistance,
+  formatNumber,
+} from "../../../Shared/Helpers/StringHelpers";
 
-const labels: Record<string, string> = {
-  Name: "Name", AlternateNames: "Alternative Names", "State.Id": "State", "County.Id": "County",
-  CountyNumber: "County Number", ReportedByUserId: "Reported By", LengthFeet: "Length",
-  DepthFeet: "Depth", MaxPitDepthFeet: "Max Pit Depth", NumberOfPits: "Number of Pits",
-  Narrative: "Narrative", ReportedOn: "Reported On", IsArchived: "Archived",
-};
-
-const roleLabels: Record<string, string> = {
-  Geology: "Geology", GeologicAge: "Geologic Age", MapStatus: "Map Status",
-  PhysiographicProvince: "Physiographic Province", Archeology: "Archaeology", Biology: "Biology",
-  CaveOther: "Other", Cartographer: "Cartographer", CaveReportedBy: "Reported By",
-  EntranceStatus: "Entrance Status", EntranceHydrology: "Hydrology", FieldIndication: "Field Indication",
-  EntranceReportedBy: "Reported By", EntranceOther: "Other",
-};
-
-const displayValue = (path: string, value: unknown): ReactNode => {
+const formatValue = (value: unknown, format: DiffValueFormat): ReactNode => {
+  if (format === "coordinates") {
+    const coordinates = Array.isArray(value) ? value : [];
+    return defaultIfEmpty(formatCoordinates(coordinates[0] as number | undefined, coordinates[1] as number | undefined));
+  }
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (Array.isArray(value)) return value.join(", ") || "—";
-  if (path.toLowerCase().includes("reportedon")) return new Date(String(value)).toLocaleDateString();
-  if (path === "Narrative" || path === "Description") return <ParagraphDisplayComponent text={String(value)} />;
+  if (format === "boolean") return value ? "Yes" : "No";
+  if (format === "distance") return defaultIfEmpty(formatDistance(Number(value), DistanceFormat.feet));
+  if (format === "number" && typeof value === "number") return formatNumber(value) ?? "—";
+  if (format === "date") return formatDate(String(value)) ?? "—";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   return String(value);
 };
 
-const referenceLabel = (snapshot: CaveSnapshotVm | undefined, path: string) => {
-  const reference = path === "State.Id" ? snapshot?.state : snapshot?.county;
-  if (!reference) return undefined;
-  const code = path === "State.Id" ? reference.abbreviationAtRevision : reference.displayIdAtRevision;
-  return code ? `${reference.nameAtRevision} (${code})` : reference.nameAtRevision;
+const MetadataChanges = ({ changes }: { changes: ReferenceMetadataPresentation[] }) => changes.length ? <Space direction="vertical" size={2}>
+  {changes.map(change => <div key={`${change.path}-${change.property}`}>
+    <Typography.Text>Label updated</Typography.Text>
+    <div><Typography.Text type="secondary">{change.previousLabel ?? "—"} → {change.currentLabel ?? "—"}</Typography.Text></div>
+    <Typography.Text type="secondary" style={{ fontSize: 12 }}>Same referenced value</Typography.Text>
+  </div>)}
+</Space> : null;
+
+const ChangedValue = ({ field, name }: { field: ChangedFieldPresentation; name: string }) => {
+  const { token } = theme.useToken();
+  if (field.textDiff) return <CaveTextDiff name={name} previous={field.previous == null ? "" : String(field.previous)} proposed={field.current == null ? "" : String(field.current)} />;
+  return <Space direction="vertical" size={4} style={{ width: "100%" }}>
+    {(field.previous !== undefined || field.current !== undefined) && <>
+      <div style={{ background: token.colorErrorBg, border: `1px solid ${token.colorErrorBorder}`, borderRadius: token.borderRadiusSM, padding: `${token.paddingXXS}px ${token.paddingXS}px` }}>
+        <Typography.Text type="danger">− Previous</Typography.Text> <span>{formatValue(field.previous, field.format)}</span>
+      </div>
+      <div style={{ background: token.colorSuccessBg, border: `1px solid ${token.colorSuccessBorder}`, borderRadius: token.borderRadiusSM, padding: `${token.paddingXXS}px ${token.paddingXS}px` }}>
+        <Typography.Text type="success">+ Proposed</Typography.Text> <span>{formatValue(field.current, field.format)}</span>
+      </div>
+    </>}
+    <MetadataChanges changes={field.metadata} />
+  </Space>;
 };
 
-const tagKey = (tag: SnapshotTagReference) => `${tag.role}:${tag.tagTypeId}`;
-const tagsByRole = (tags: SnapshotTagReference[]) => new Map(Object.entries(
-  tags.reduce<Record<string, SnapshotTagReference[]>>((groups, tag) => {
-    (groups[tag.role] ??= []).push(tag);
-    return groups;
-  }, {})
-));
+const TagChanges = ({ group }: { group: TagChangeGroup }) => <Space direction="vertical" size={4}>
+  {group.removed.map(tag => <Tag color="error" key={`removed-${tag.role}-${tag.tagTypeId}`}>− Removed&nbsp;&nbsp;{tag.nameAtRevision}</Tag>)}
+  {group.added.map(tag => <Tag color="success" key={`added-${tag.role}-${tag.tagTypeId}`}>+ Added&nbsp;&nbsp;{tag.nameAtRevision}</Tag>)}
+  <MetadataChanges changes={group.metadata} />
+</Space>;
 
-const changedValue = (label: string, previous: unknown, current: unknown, path = label) =>
-  previous === current ? null : <Descriptions.Item label={label} key={label}>
-  <div>{displayValue(path, current)}</div>
-  <Typography.Text type="secondary" style={{ fontSize: 12 }}>Previous: {displayValue(path, previous)}</Typography.Text>
-</Descriptions.Item>;
+const SnapshotTagGroups = ({ tags }: { tags: SnapshotTagReference[] }) => {
+  const groups = tags.reduce<Record<string, SnapshotTagReference[]>>((result, tag) => {
+    (result[tag.role] ??= []).push(tag);
+    return result;
+  }, {});
+  const roleOrder = ["EntranceStatus", "FieldIndication", "EntranceHydrology", "EntranceReportedBy", "EntranceOther"];
+  return <>{Object.keys(groups).sort((a, b) => {
+    const ai = roleOrder.indexOf(a); const bi = roleOrder.indexOf(b);
+    return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi) || a.localeCompare(b);
+  }).map(role => <Descriptions.Item label={roleLabels[role] ?? role} key={role}>
+    <Space wrap>{groups[role].sort((a, b) => a.nameAtRevision.localeCompare(b.nameAtRevision)).map(tag => <Tag key={tag.tagTypeId}>{tag.nameAtRevision}</Tag>)}</Space>
+  </Descriptions.Item>)}</>;
+};
 
-const EntranceChanges = ({ previous, current }: {
-  previous: CaveEntranceSnapshotVm; current: CaveEntranceSnapshotVm;
-}) => {
-  const oldTags = new Map(previous.tags.map(tag => [tagKey(tag), tag]));
-  const newTags = new Map(current.tags.map(tag => [tagKey(tag), tag]));
-  const roles = new Set([...tagsByRole(previous.tags).keys(), ...tagsByRole(current.tags).keys()]);
-  return <Card size="small" title={current.name || previous.name || "Unnamed entrance"}>
-    <Descriptions bordered column={1} size="small">
-      {changedValue("Name", previous.name, current.name)}
-      {changedValue("Primary", previous.isPrimary, current.isPrimary)}
-      {changedValue("Description", previous.description, current.description, "Description")}
-      {changedValue("Reported By",
-        previous.reportedByNameAtRevision ?? previous.reportedByUserId,
-        current.reportedByNameAtRevision ?? current.reportedByUserId)}
-      {changedValue("Latitude", previous.latitude, current.latitude)}
-      {changedValue("Longitude", previous.longitude, current.longitude)}
-      {changedValue("Elevation", previous.elevation, current.elevation)}
-      {changedValue("Coordinate Reference System", previous.srid, current.srid)}
-      {changedValue("Location Quality", previous.locationQualityNameAtRevision, current.locationQualityNameAtRevision)}
-      {changedValue("Reported On", previous.reportedOn, current.reportedOn, "ReportedOn")}
-      {changedValue("Pit Depth", previous.pitDepthFeet, current.pitDepthFeet)}
-      {[...roles].sort().map(role => {
-        const removed = previous.tags.filter(tag => tag.role === role && !newTags.has(tagKey(tag)));
-        const added = current.tags.filter(tag => tag.role === role && !oldTags.has(tagKey(tag)));
-        if (!removed.length && !added.length) return null;
-        return <Descriptions.Item label={roleLabels[role] ?? role} key={role}>
-          <Space wrap>
-            {removed.map(tag => <Tag color="error" key={`removed-${tagKey(tag)}`}>Removed: {tag.nameAtRevision}</Tag>)}
-            {added.map(tag => <Tag color="success" key={`added-${tagKey(tag)}`}>Added: {tag.nameAtRevision}</Tag>)}
-          </Space>
-        </Descriptions.Item>;
-      })}
-    </Descriptions>
+const statusLabel = { added: "Added", removed: "Removed", changed: "Changed" } as const;
+
+const Entrance = ({ entrance, layout }: { entrance: AffectedEntrancePresentation; layout: "horizontal" | "vertical" }) => {
+  const snapshot = entrance.snapshot;
+  const statusColor = entrance.status === "added" ? "success" : entrance.status === "removed" ? "error" : "processing";
+  return <Card size="small" title={<Space><span>{entrance.heading.toLocaleUpperCase()}</span><Tag color={statusColor}>{statusLabel[entrance.status]}</Tag></Space>}>
+    {!entrance.detailsAvailable && <Alert type="warning" showIcon message="Entrance details unavailable" description={`Entrance ID: ${entrance.id}`} />}
+    {entrance.detailsAvailable && entrance.status === "changed" && <Descriptions bordered column={1} size="small" layout={layout}>
+      {entrance.fields.map(field => <Descriptions.Item label={field.label} key={field.key}>
+        <ChangedValue field={field} name={`entrance-${entrance.id}-${field.key}`} />
+      </Descriptions.Item>)}
+      {entrance.tagGroups.map(group => <Descriptions.Item label={group.label} key={group.role}><TagChanges group={group} /></Descriptions.Item>)}
+    </Descriptions>}
+    {entrance.detailsAvailable && entrance.status !== "changed" && snapshot && <Descriptions bordered column={1} size="small" layout={layout}>
+      <Descriptions.Item label="Coordinates">{defaultIfEmpty(formatCoordinates(snapshot.latitude, snapshot.longitude))}</Descriptions.Item>
+      <Descriptions.Item label="Description"><Typography.Paragraph style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", marginBottom: 0 }}>{defaultIfEmpty(snapshot.description)}</Typography.Paragraph></Descriptions.Item>
+      <Descriptions.Item label="Elevation">{defaultIfEmpty(formatDistance(snapshot.elevation, DistanceFormat.feet))}</Descriptions.Item>
+      <Descriptions.Item label="Location Quality">{defaultIfEmpty(snapshot.locationQualityNameAtRevision)}</Descriptions.Item>
+      <Descriptions.Item label="Name">{defaultIfEmpty(snapshot.name)}</Descriptions.Item>
+      <Descriptions.Item label="Primary">{snapshot.isPrimary ? "Yes" : "No"}</Descriptions.Item>
+      <Descriptions.Item label="Reported On">{formatDate(snapshot.reportedOn) ?? "—"}</Descriptions.Item>
+      <Descriptions.Item label="Reported By">{defaultIfEmpty(snapshot.reportedByNameAtRevision ?? snapshot.reportedByUserId)}</Descriptions.Item>
+      <Descriptions.Item label="Pit Depth">{defaultIfEmpty(formatDistance(snapshot.pitDepthFeet, DistanceFormat.feet))}</Descriptions.Item>
+      <Descriptions.Item label="Coordinate Reference System">{formatNumber(snapshot.srid) ?? "—"}</Descriptions.Item>
+      <SnapshotTagGroups tags={snapshot.tags} />
+    </Descriptions>}
   </Card>;
 };
 
-const FileChanges = ({ previous, current }: { previous: CaveFileSnapshotVm; current: CaveFileSnapshotVm }) =>
-  <Card size="small" title={current.displayName || current.fileName}>
-    <Descriptions bordered column={1} size="small">
-      {changedValue("Display Name", previous.displayName, current.displayName)}
-      {changedValue("Filename", previous.fileName, current.fileName)}
-      {changedValue("File Type", previous.fileTypeNameAtRevision, current.fileTypeNameAtRevision)}
-    </Descriptions>
+const File = ({ file, layout }: { file: AffectedFilePresentation; layout: "horizontal" | "vertical" }) => {
+  const snapshot = file.snapshot;
+  const statusColor = file.status === "added" ? "success" : file.status === "removed" ? "error" : "processing";
+  return <Card size="small" title={<Space><span>{file.heading}</span><Tag color={statusColor}>{statusLabel[file.status]}</Tag></Space>}>
+    {!file.detailsAvailable && <Alert type="warning" showIcon message="File details unavailable" description={`File ID: ${file.id}`} />}
+    {file.detailsAvailable && file.status === "changed" && <Descriptions bordered column={1} size="small" layout={layout}>
+      {file.fields.map(field => <Descriptions.Item label={field.label} key={field.key}><ChangedValue field={field} name={`file-${file.id}-${field.key}`} /></Descriptions.Item>)}
+    </Descriptions>}
+    {file.detailsAvailable && file.status !== "changed" && snapshot && <Descriptions bordered column={1} size="small" layout={layout}>
+      <Descriptions.Item label="Display Name">{defaultIfEmpty(snapshot.displayName)}</Descriptions.Item>
+      <Descriptions.Item label="Filename">{defaultIfEmpty(snapshot.fileName)}</Descriptions.Item>
+      <Descriptions.Item label="File Type">{defaultIfEmpty(snapshot.fileTypeNameAtRevision)}</Descriptions.Item>
+    </Descriptions>}
   </Card>;
-
-const referenceMetadataLabel = (path: string, property: string) => {
-  if (path === "State") return "State label";
-  if (path === "County") return "County label";
-  if (path.includes("Entrances") && property.includes("LocationQuality")) return "Entrance Location Quality";
-  if (path.includes("Files") && property.includes("FileType")) return "File Type";
-  const role = Object.keys(roleLabels).find(candidate => path.includes(candidate));
-  return role ? `${roleLabels[role]} label` : "Historical reference label";
 };
+
+const SectionTitle = ({ children }: { children: ReactNode }) => <Typography.Title level={5} style={{ margin: 0 }}>{children}</Typography.Title>;
 
 export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent }: {
   diff?: CaveRevisionDiffVm;
@@ -115,60 +133,58 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent }
   current?: CaveSnapshotVm;
   countyNumberIntent?: CountyNumberIntent;
 }) => {
+  const screens = Grid.useBreakpoint();
+  const { token } = theme.useToken();
+  const layout = screens.md ? "horizontal" : "vertical";
   if (!diff) return <Typography.Text type="secondary">Initial publication</Typography.Text>;
 
-  const previousEntrances = new Map(previous?.entrances.map(item => [item.id, item]) ?? []);
-  const currentEntrances = new Map(current?.entrances.map(item => [item.id, item]) ?? []);
-  const previousFiles = new Map(previous?.files.map(item => [item.id, item]) ?? []);
-  const currentFiles = new Map(current?.files.map(item => [item.id, item]) ?? []);
-  const hasChanges = diff.scalars.length || diff.addedTags.length || diff.removedTags.length ||
-    diff.addedEntrances.length || diff.removedEntrances.length || diff.changedEntrances.length ||
-    diff.addedFiles.length || diff.removedFiles.length || diff.changedFiles.length || diff.referenceMetadataChanges.length;
+  const model = buildCaveRevisionDiffPresentation(diff, previous, current, countyNumberIntent);
+  const hasChanges = model.caveInformation.length || model.entrances.length || model.narrative || model.files.length ||
+    model.fallbackScalars.length || model.fallbackMetadata.length;
   if (!hasChanges) return <Typography.Text type="secondary">No visible field changes</Typography.Text>;
 
-  return <Space direction="vertical" style={{ width: "100%" }}>
-    {!!diff.scalars.length && <Descriptions bordered column={1} size="small">
-      {diff.scalars.map(change => {
-        const isLocation = change.path === "State.Id" || change.path === "County.Id";
-        const countyIntent = change.path === "CountyNumber" && countyNumberIntent !== undefined &&
-          countyNumberIntent !== "Manual"
-          ? countyNumberIntent === "FirstAvailable" ? "First available on approval" : "Auto-assigned on approval"
-          : undefined;
-        return <Descriptions.Item label={labels[change.path] ?? change.path} key={change.path}>
-          <div>{isLocation ? referenceLabel(current, change.path) : countyIntent ?? displayValue(change.path, change.current)}</div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Previous: {isLocation ? referenceLabel(previous, change.path) : displayValue(change.path, change.previous)}
-          </Typography.Text>
-        </Descriptions.Item>;
-      })}
-    </Descriptions>}
+  return <Space direction="vertical" size="large" style={{ width: "100%" }}>
+    {!!model.caveInformation.length && <section>
+      <SectionTitle>Cave Information</SectionTitle>
+      <Descriptions bordered column={1} size="small" layout={layout} style={{ marginTop: token.marginXS }}>
+        {model.caveInformation.map(field => <Descriptions.Item label={field.label} key={field.key}>
+          {field.change && <ChangedValue field={field.change} name={`cave-${field.key}`} />}
+          {field.tags && <TagChanges group={field.tags} />}
+          {!field.change && !field.tags && <MetadataChanges changes={field.metadata} />}
+        </Descriptions.Item>)}
+      </Descriptions>
+    </section>}
 
-    {(!!diff.addedTags.length || !!diff.removedTags.length) && <Space wrap>
-      {diff.removedTags.map(tag => <Tag color="error" key={`removed-${tagKey(tag)}`}>Removed {roleLabels[tag.role] ?? tag.role}: {tag.nameAtRevision}</Tag>)}
-      {diff.addedTags.map(tag => <Tag color="success" key={`added-${tagKey(tag)}`}>Added {roleLabels[tag.role] ?? tag.role}: {tag.nameAtRevision}</Tag>)}
-    </Space>}
+    {!!model.entrances.length && <section>
+      <SectionTitle>Entrances</SectionTitle>
+      <Space direction="vertical" style={{ width: "100%", marginTop: token.marginXS }}>
+        {model.entrances.map(entrance => <Entrance key={`${entrance.status}-${entrance.id}`} entrance={entrance} layout={layout} />)}
+      </Space>
+    </section>}
 
-    {(!!diff.addedEntrances.length || !!diff.removedEntrances.length) && <Space wrap>
-      {diff.removedEntrances.map(id => <Tag color="error" key={`removed-${id}`}>Removed entrance: {previousEntrances.get(id)?.name || "Unnamed entrance"}</Tag>)}
-      {diff.addedEntrances.map(id => <Tag color="success" key={`added-${id}`}>Added entrance: {currentEntrances.get(id)?.name || "Unnamed entrance"}</Tag>)}
-    </Space>}
-    {diff.changedEntrances.map(id => {
-      const oldEntrance = previousEntrances.get(id); const newEntrance = currentEntrances.get(id);
-      return oldEntrance && newEntrance ? <EntranceChanges key={id} previous={oldEntrance} current={newEntrance} /> : null;
-    })}
+    {model.narrative && <section>
+      <SectionTitle>Narrative</SectionTitle>
+      <Card size="small" style={{ marginTop: token.marginXS }}><ChangedValue field={model.narrative} name="cave-narrative" /></Card>
+    </section>}
 
-    {(!!diff.addedFiles.length || !!diff.removedFiles.length) && <Space wrap>
-      {diff.removedFiles.map(id => <Tag color="error" key={`removed-${id}`}>Removed file: {previousFiles.get(id)?.displayName || previousFiles.get(id)?.fileName || "File"}</Tag>)}
-      {diff.addedFiles.map(id => <Tag color="success" key={`added-${id}`}>Added file: {currentFiles.get(id)?.displayName || currentFiles.get(id)?.fileName || "File"}</Tag>)}
-    </Space>}
-    {diff.changedFiles.map(id => {
-      const oldFile = previousFiles.get(id); const newFile = currentFiles.get(id);
-      return oldFile && newFile ? <FileChanges key={id} previous={oldFile} current={newFile} /> : null;
-    })}
+    {!!model.files.length && <section>
+      <SectionTitle>Files</SectionTitle>
+      <Space direction="vertical" style={{ width: "100%", marginTop: token.marginXS }}>
+        {model.files.map(file => <File key={`${file.status}-${file.id}`} file={file} layout={layout} />)}
+      </Space>
+    </section>}
 
-    {diff.referenceMetadataChanges.map(change => <Typography.Text key={`${change.path}-${change.property}`}>
-      {referenceMetadataLabel(change.path, change.property)} updated: {change.currentValue ?? "—"}
-      <Typography.Text type="secondary"> (previously {change.previousValue ?? "—"})</Typography.Text>
-    </Typography.Text>)}
+    {(!!model.fallbackScalars.length || !!model.fallbackMetadata.length) && <section>
+      <SectionTitle>Other changes</SectionTitle>
+      <Descriptions bordered column={1} size="small" layout={layout} style={{ marginTop: token.marginXS }}>
+        {model.fallbackScalars.map(field => <Descriptions.Item label={field.label} key={field.key}>
+          <ChangedValue field={field} name={`fallback-${field.key}`} />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Path: {field.key}</Typography.Text>
+        </Descriptions.Item>)}
+        {model.fallbackMetadata.map(change => <Descriptions.Item label="Other reference change" key={`${change.path}-${change.property}`}>
+          <Typography.Text code>{change.path}</Typography.Text><div>Property: {change.property}</div><MetadataChanges changes={[change]} />
+        </Descriptions.Item>)}
+      </Descriptions>
+    </section>}
   </Space>;
 };

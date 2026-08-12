@@ -59,6 +59,7 @@ public class EntranceVm
     public IEnumerable<string> EntranceStatusTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> FieldIndicationTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
+    public IEnumerable<string> EntranceOtherTagIds { get; set; } = new HashSet<string>();
 
     public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
 }

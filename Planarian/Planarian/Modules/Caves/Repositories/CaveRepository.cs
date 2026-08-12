@@ -993,7 +993,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId).ToList(),
                         FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
                         EntranceHydrologyTagIds =
-                            ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId).ToList()
+                            ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId).ToList(),
+                        EntranceOtherTagIds = ee.EntranceOtherTags.Select(eee => eee.TagTypeId).ToList()
                     }).FirstOrDefault(),
                 MapIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
@@ -1012,6 +1013,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId),
                     FieldIndicationTagIds = ee.FieldIndicationTags.Select(eee => eee.TagTypeId),
                     EntranceHydrologyTagIds = ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId),
+                    EntranceOtherTagIds = ee.EntranceOtherTags.Select(eee => eee.TagTypeId),
                     ReportedByNameTagIds = ee.EntranceReportedByNameTags.Select(eee => eee.TagTypeId)
                 })
                     .OrderByDescending(ee => ee.IsPrimary)
@@ -1035,6 +1037,19 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             })
             .AsSplitQuery()
             .FirstOrDefaultAsync();
+    }
+
+    public Task<bool> HasPendingChangeRequestsAsync(string caveId, CancellationToken cancellationToken = default) =>
+        DbContext.CaveChangeRequests.AsNoTracking().AnyAsync(request =>
+            request.AccountId == RequestUser.AccountId && request.CaveId == caveId &&
+            request.Status == CaveChangeRequestStatus.Pending, cancellationToken);
+
+    public async Task LockForHardDeleteAsync(string caveId, CancellationToken cancellationToken = default)
+    {
+        var cave = await DbContext.Caves.FromSqlInterpolated(
+                $"SELECT *, xmin FROM \"Caves\" WHERE \"AccountId\" = {RequestUser.AccountId} AND \"Id\" = {caveId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+        if (cave is null) throw ApiExceptionDictionary.NotFound("Cave");
     }
 
     public async Task<Cave?> GetAsync(string? id)

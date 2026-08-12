@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
@@ -34,6 +35,35 @@ public sealed class CaveMutationRepository
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
+    }
+
+    /// <summary>
+    /// Initializes revision tracking for an existing Cave without otherwise mutating it.
+    /// The Cave row lock makes concurrent authoring-context requests converge on one baseline.
+    /// </summary>
+    public async Task<string> EnsureBaselineAsync(string caveId, CancellationToken cancellationToken = default)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var cave = await GetLockedOwnedCaveAsync(caveId, cancellationToken);
+                var baseline = await EstablishBaselineIfNeededAsync(cave, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return baseline.Revision.Id;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < 2)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                _db.ChangeTracker.Clear();
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
     }
 
     /// <summary>
@@ -190,6 +220,12 @@ public sealed class CaveMutationRepository
         await _db.Caves.IgnoreQueryFilters()
             .SingleOrDefaultAsync(c => c.Id == caveId && c.AccountId == _scope.AccountId, cancellationToken)
         ?? throw new InvalidOperationException("Cave is not owned by the current account.");
+
+    private async Task<Cave> GetLockedOwnedCaveAsync(string caveId, CancellationToken cancellationToken) =>
+        await _db.Caves.FromSqlInterpolated(
+                $"SELECT *, xmin FROM \"Caves\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {caveId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken)
+        ?? throw ApiExceptionDictionary.NotFound("Cave");
 
     private async Task<(CaveRevision Revision, CavePublishedSnapshotV1 Snapshot)> EstablishBaselineIfNeededAsync(
         Cave cave, CancellationToken cancellationToken)

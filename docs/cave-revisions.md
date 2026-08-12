@@ -20,12 +20,21 @@ base separately. If the active version's base is stale, explicit re-review start
 creates another immutable proposal version against that revision rather than silently applying or rebasing the older
 proposal state.
 
+Every persisted proposal version must have an authoritative semantic difference from its base snapshot. File additions,
+removals, and metadata changes are semantic differences, so a file-only proposal is valid; a version with no field,
+relationship, or file difference is rejected before request/version persistence. Nullable Cave measurements preserve
+unknown (`null`) separately from an explicitly known zero throughout authoring, revision, and publication.
+
 ## Review outcomes
 
 Approval passes through the normal published mutation boundary rather than independently writing Cave tables. The
 relational transaction atomically persists validated normalized state, the revision describing the actual resulting
 state, request/provenance linkage, request status, and reviewer metadata. The accepted revision is built from the
 validated result, never copied blindly from proposal JSON.
+
+The Cave `xmin` concurrency token remains authoritative during approval. If a published edit races after approval has
+loaded the Cave, the approval transaction rolls back and reports the same explicit published-revision conflict used for
+an already-stale base; it is never retried or applied as last-write-wins.
 
 Rejection preserves the request, proposal versions, decision, and reviewer audit data, but does not alter published
 Cave state or create a Cave revision.
@@ -36,3 +45,7 @@ Proposal files remain staged and account-owned while pending. They become publis
 approval. File association and revision publication are relationally atomic. Because blob storage cannot participate in
 the PostgreSQL transaction, newly written blobs use failure compensation and destructive cleanup is deferred until the
 relational commit succeeds.
+
+Browser downloads for staged proposal files use the same API-origin-aware, account-qualified URL construction as
+published-file downloads. Request, version, revision, and staged-file access remains permission-filtered and tenant
+qualified, including guessed and mismatched identifiers.

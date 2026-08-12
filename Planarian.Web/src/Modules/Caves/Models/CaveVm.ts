@@ -3,7 +3,7 @@ import { EntranceVm } from "./EntranceVm";
 
 export interface CaveVm {
   id: string;
-  currentRevisionId: string;
+  currentRevisionId: string | null;
   displayId: string;
   reportedByUserId: string | null;
   countyId: string;
@@ -13,10 +13,10 @@ export interface CaveVm {
   countyNumber: number;
   name: string;
   alternateNames: string[];
-  lengthFeet: number;
-  depthFeet: number;
-  maxPitDepthFeet: number;
-  numberOfPits: number;
+  lengthFeet: number | null;
+  depthFeet: number | null;
+  maxPitDepthFeet: number | null;
+  numberOfPits: number | null;
   narrative: string | null;
   reportedOn: string | null;
   isArchived: boolean;

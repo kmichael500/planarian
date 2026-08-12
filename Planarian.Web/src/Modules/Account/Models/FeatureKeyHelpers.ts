@@ -64,6 +64,8 @@ const getFeatureKeyLabel = (key: FeatureKey): string => {
       return "Entrance: Field Indication Tags";
     case FeatureKey.EnabledFieldEntranceHydrologyTags:
       return "Entrance: Hydrology Tags";
+    case FeatureKey.EnabledFieldEntranceOtherTags:
+      return "Entrance: Other Tags";
     case FeatureKey.EnabledFieldEntranceDescription:
       return "Entrance: Description";
     default:

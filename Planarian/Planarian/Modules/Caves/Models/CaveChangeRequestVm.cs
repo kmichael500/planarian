@@ -7,6 +7,7 @@ public sealed record CaveChangeRequestSummaryVm(
     string Id,
     string CaveId,
     string CaveName,
+    bool CaveExists,
     CaveChangeRequestStatus Status,
     string SubmitterUserId,
     string? SubmitterName,
@@ -43,6 +44,8 @@ public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
 
 public sealed record CreateCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId);
 
+public sealed record CaveProposalAuthoringContextVm(CaveVm Cave, string ExpectedBaseRevisionId);
+
 public sealed record ReviseCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId,
     string ExpectedProposalVersionId, bool AgainstCurrent);
 
@@ -58,7 +61,12 @@ public sealed record CaveProposalAuthoringConflictVm(CaveProposalAuthoringConfli
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
     string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
 
-public sealed record RejectCaveChangeRequestVm(string? Notes);
+public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
+    CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
+    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber,
+    IReadOnlyList<string> UnavailableStagedFileIds);
+
+public sealed record CaveChangeRequestDecisionRequestVm(string? Notes, string ExpectedProposalVersionId);
 
 public enum CaveChangeRequestDecisionResult
 {

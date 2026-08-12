@@ -10,6 +10,7 @@ import { snapshotToForm } from "../Helpers/CaveFormMapper";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
+import { isCaveRevisionDiffEmpty } from "../Helpers/CaveRevisionDiffHelpers";
 
 export const ReviseCaveChangeRequestPage = () => {
   const { requestId } = useParams();
@@ -56,7 +57,7 @@ export const ReviseCaveChangeRequestPage = () => {
   };
 
   const save = async () => {
-    if (!draft) return;
+    if (!draft || !preview || isCaveRevisionDiffEmpty(preview.diff)) return;
     setSaving(true);
     try {
       await CaveService.ReviseChanges(requestId, draft, againstCurrent,
@@ -85,10 +86,14 @@ export const ReviseCaveChangeRequestPage = () => {
       </Card>}
     </>}
     {preview && draft && <Card title="Review revised proposal">
+      {isCaveRevisionDiffEmpty(preview.diff) &&
+        <Alert type="warning" showIcon message="Make at least one change before saving a proposal version."
+          style={{ marginBottom: 16 }} />}
       <CaveRevisionDiff diff={preview.diff} previous={preview.base} current={preview.proposed}
         countyNumberIntent={preview.countyNumberIntent} />
       <Space style={{ marginTop: 16 }}>
-        <PlanarianButton icon={undefined} type="primary" loading={saving} onClick={save}>Save proposal version</PlanarianButton>
+        <PlanarianButton icon={undefined} type="primary" loading={saving} onClick={save}
+          disabled={isCaveRevisionDiffEmpty(preview.diff)}>Save proposal version</PlanarianButton>
         <PlanarianButton icon={undefined} onClick={() => { setPreview(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
       </Space>
     </Card>}

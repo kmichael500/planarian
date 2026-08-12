@@ -8,6 +8,7 @@ export interface CaveChangeRequestSummaryVm {
   id: string;
   caveId: string;
   caveName: string;
+  caveExists: boolean;
   status: CaveChangeRequestStatus;
   submitterUserId: string;
   submitterName?: string;
@@ -35,6 +36,20 @@ export interface CaveProposalVersionVm {
   createdByName?: string;
   createdOn: string;
   isCurrent: boolean;
+}
+
+export interface CaveProposalAuthoringContextVm {
+  cave: import("./CaveVm").CaveVm;
+  expectedBaseRevisionId: string;
+}
+
+export interface CaveProposalVersionDetailVm {
+  base: CaveSnapshotVm;
+  proposed: CaveSnapshotVm;
+  diff: CaveRevisionDiffVm;
+  countyNumberIntent: CountyNumberIntent;
+  requestedCountyNumber?: number;
+  unavailableStagedFileIds: string[];
 }
 
 export interface CaveChangeRequestDetailVm {

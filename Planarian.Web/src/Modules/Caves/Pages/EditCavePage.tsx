@@ -9,11 +9,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
 import {
-  formatDate,
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import dayjs from "dayjs";
+import { caveToForm } from "../Helpers/CaveFormMapper";
 
 const EditCavePage: React.FC = () => {
   const { caveId } = useParams();
@@ -61,49 +61,7 @@ const EditCavePage: React.FC = () => {
         }
       });
       setCave(caveResponse);
-      const formValues: AddCaveVm = {
-        id: caveResponse.id,
-        name: caveResponse.name,
-        alternateNames: caveResponse.alternateNames,
-        countyId: caveResponse.countyId,
-        stateId: caveResponse.stateId,
-        countyDisplayId: caveResponse.countyDisplayId,
-        countyNumber: caveResponse.countyNumber,
-        useFirstAvailableCountyNumber: false,
-        lengthFeet: caveResponse.lengthFeet,
-        depthFeet: caveResponse.depthFeet,
-        maxPitDepthFeet: caveResponse.maxPitDepthFeet,
-        numberOfPits: caveResponse.numberOfPits,
-        narrative: caveResponse.narrative,
-        reportedOn: caveResponse.reportedOn,
-        entrances: caveResponse.entrances.map((entrance) => ({
-          id: entrance.id,
-          isPrimary: entrance.isPrimary,
-          locationQualityTagId: entrance.locationQualityTagId,
-          name: entrance.name,
-          description: entrance.description,
-          latitude: entrance.latitude,
-          longitude: entrance.longitude,
-          elevationFeet: entrance.elevationFeet,
-          reportedOn: entrance.reportedOn,
-          pitFeet: entrance.pitFeet,
-          entranceStatusTagIds: entrance.entranceStatusTagIds,
-          fieldIndicationTagIds: entrance.fieldIndicationTagIds,
-          entranceHydrologyTagIds: entrance.entranceHydrologyTagIds,
-          reportedByNameTagIds: entrance.reportedByNameTagIds,
-        })),
-        geologyTagIds: caveResponse.geologyTagIds,
-        files: caveResponse.files,
-        reportedByNameTagIds: caveResponse.reportedByNameTagIds,
-        biologyTagIds: caveResponse.biologyTagIds,
-        archeologyTagIds: caveResponse.archeologyTagIds,
-        cartographerNameTagIds: caveResponse.cartographerNameTagIds,
-        mapStatusTagIds: caveResponse.mapStatusTagIds,
-        geologicAgeTagIds: caveResponse.geologicAgeTagIds,
-        physiographicProvinceTagIds: caveResponse.physiographicProvinceTagIds,
-        otherTagIds: caveResponse.otherTagIds,
-        isCountyNumberManuallySet: false,
-      };
+      const formValues = caveToForm(caveResponse);
 
       form.setFieldsValue(formValues);
 

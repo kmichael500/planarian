@@ -24,8 +24,11 @@ import {
   CaveChangeRequestDetailVm,
   CaveChangeRequestSummaryVm,
   CaveChangePreviewVm,
+  CaveProposalAuthoringContextVm,
+  CaveProposalVersionDetailVm,
 } from "../Models/CaveChangeRequestVm";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const baseUrl = "api/caves";
 const changeRequestUrl = "api/cave-change-requests";
@@ -85,6 +88,11 @@ const CaveService = {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
     return response.data;
   },
+  async GetProposalAuthoringContext(id: string): Promise<CaveProposalAuthoringContextVm> {
+    return (await HttpClient.post<CaveProposalAuthoringContextVm>(
+      `${changeRequestUrl}/caves/${id}/authoring-context`
+    )).data;
+  },
   async GetRevisionHistory(id: string): Promise<CaveRevisionHistoryVm> {
     const response = await HttpClient.get<CaveRevisionHistoryVm>(
       `${baseUrl}/${id}/revisions`
@@ -143,6 +151,11 @@ const CaveService = {
     );
     return response.data;
   },
+  GetStagedChangeRequestFileUrl(requestId: string, fileId: string): string {
+    return HttpHelpers.BuildAuthenticatedApiUrl(
+      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}`
+    );
+  },
   async GetMyChangeRequests(): Promise<CaveChangeRequestSummaryVm[]> {
     return (await HttpClient.get<CaveChangeRequestSummaryVm[]>(`${changeRequestUrl}/mine`)).data;
   },
@@ -152,11 +165,20 @@ const CaveService = {
   async GetChangeRequest(id: string): Promise<CaveChangeRequestDetailVm> {
     return (await HttpClient.get<CaveChangeRequestDetailVm>(`${changeRequestUrl}/${id}`)).data;
   },
-  async ApproveChangeRequest(id: string, notes?: string): Promise<CaveChangeRequestDecisionVm> {
-    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/approve`, { notes })).data;
+  async GetProposalVersion(requestId: string, versionId: string): Promise<CaveProposalVersionDetailVm> {
+    return (await HttpClient.get<CaveProposalVersionDetailVm>(
+      `${changeRequestUrl}/${requestId}/versions/${versionId}`
+    )).data;
   },
-  async RejectChangeRequest(id: string, notes?: string): Promise<CaveChangeRequestDecisionVm> {
-    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/reject`, { notes })).data;
+  async ApproveChangeRequest(id: string, expectedProposalVersionId: string,
+    notes?: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/approve`,
+      { notes, expectedProposalVersionId })).data;
+  },
+  async RejectChangeRequest(id: string, expectedProposalVersionId: string,
+    notes?: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/reject`,
+      { notes, expectedProposalVersionId })).data;
   },
   async GetNextCountyNumber(
     countyId: string,

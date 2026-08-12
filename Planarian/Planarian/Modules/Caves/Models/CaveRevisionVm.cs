@@ -27,6 +27,9 @@ public sealed record CaveRevisionComparisonVm(
     CaveRevisionDiffVm? Diff);
 
 public sealed record CaveScalarChangeVm(string Path, object? Previous, object? Current);
+public sealed record CaveEntranceChangeVm(string EntranceId, IReadOnlyList<CaveScalarChangeVm> Scalars,
+    IReadOnlyList<SnapshotTagReference> AddedTags, IReadOnlyList<SnapshotTagReference> RemovedTags);
+public sealed record CaveFileChangeVm(string FileId, IReadOnlyList<CaveScalarChangeVm> Scalars);
 
 public sealed record CaveRevisionDiffVm(
     IReadOnlyList<CaveScalarChangeVm> Scalars,
@@ -38,4 +41,6 @@ public sealed record CaveRevisionDiffVm(
     IReadOnlyList<string> AddedFiles,
     IReadOnlyList<string> RemovedFiles,
     IReadOnlyList<string> ChangedFiles,
+    IReadOnlyList<CaveEntranceChangeVm> EntranceChanges,
+    IReadOnlyList<CaveFileChangeVm> FileChanges,
     IReadOnlyList<ReferenceMetadataChange> ReferenceMetadataChanges);

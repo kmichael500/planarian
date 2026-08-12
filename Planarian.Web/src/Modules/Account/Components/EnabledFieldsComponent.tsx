@@ -41,6 +41,7 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldEntrancePitDepth: "Pit Depth",
   EnabledFieldEntranceStatusTags: "Status",
   EnabledFieldEntranceHydrologyTags: "Hydrology",
+  EnabledFieldEntranceOtherTags: "Other",
   EnabledFieldEntranceFieldIndicationTags: "Field Indication",
   EnabledFieldEntranceReportedByNameTags: "Reported By",
 };

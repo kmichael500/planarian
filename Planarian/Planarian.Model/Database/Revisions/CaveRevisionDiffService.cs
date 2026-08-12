@@ -9,6 +9,16 @@ namespace Planarian.Model.Database.Revisions;
 public sealed record ReferenceMetadataChange(string Path, string StableId, string Property,
     string? PreviousValue, string? CurrentValue);
 
+public sealed record CaveEntranceChange(
+    string EntranceId,
+    IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars,
+    IReadOnlyList<SnapshotTagReference> AddedTags,
+    IReadOnlyList<SnapshotTagReference> RemovedTags);
+
+public sealed record CaveFileChange(
+    string FileId,
+    IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars);
+
 public sealed record CaveRevisionDiff(
     IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars,
     IReadOnlyList<SnapshotTagReference> AddedTags,
@@ -19,6 +29,8 @@ public sealed record CaveRevisionDiff(
     IReadOnlyList<string> AddedFiles,
     IReadOnlyList<string> RemovedFiles,
     IReadOnlyList<string> ChangedFiles,
+    IReadOnlyList<CaveEntranceChange> EntranceChanges,
+    IReadOnlyList<CaveFileChange> FileChanges,
     IReadOnlyList<ReferenceMetadataChange> ReferenceMetadataChanges);
 
 public sealed class CaveRevisionDiffService
@@ -52,27 +64,32 @@ public sealed class CaveRevisionDiffService
 
         var oldEntrances = previous.Entrances.ToDictionary(e => e.Id);
         var newEntrances = current.Entrances.ToDictionary(e => e.Id);
-        var changedEntrances = new List<string>();
+        var entranceChanges = new List<CaveEntranceChange>();
         foreach (var id in oldEntrances.Keys.Intersect(newEntrances.Keys).Order())
         {
             var metadataBefore = metadata.Count;
-            if (!EntranceSemanticEquals(oldEntrances[id], newEntrances[id], id))
-                changedEntrances.Add(id);
-            // The predicate intentionally records nested reference metadata. This
-            // local is retained to make that side effect explicit to maintainers.
-            _ = metadataBefore;
+            var change = CompareEntrance(oldEntrances[id], newEntrances[id], id);
+            if (change.Scalars.Count != 0 || change.AddedTags.Count != 0 || change.RemovedTags.Count != 0 ||
+                metadata.Count != metadataBefore)
+                entranceChanges.Add(change);
         }
 
         var oldFiles = previous.Files.ToDictionary(e => e.Id);
         var newFiles = current.Files.ToDictionary(e => e.Id);
-        var changedFiles = new List<string>();
+        var fileChanges = new List<CaveFileChange>();
         foreach (var id in oldFiles.Keys.Intersect(newFiles.Keys).Order())
-            if (!FileSemanticEquals(oldFiles[id], newFiles[id], id)) changedFiles.Add(id);
+        {
+            var metadataBefore = metadata.Count;
+            var change = CompareFile(oldFiles[id], newFiles[id], id);
+            if (change.Scalars.Count != 0 || metadata.Count != metadataBefore)
+                fileChanges.Add(change);
+        }
 
         return new CaveRevisionDiff(scalars, addedTags, removedTags,
             newEntrances.Keys.Except(oldEntrances.Keys).Order().ToList(),
-            oldEntrances.Keys.Except(newEntrances.Keys).Order().ToList(), changedEntrances,
-            newFiles.Keys.Except(oldFiles.Keys).Order().ToList(), oldFiles.Keys.Except(newFiles.Keys).Order().ToList(), changedFiles,
+            oldEntrances.Keys.Except(newEntrances.Keys).Order().ToList(), entranceChanges.Select(change => change.EntranceId).ToList(),
+            newFiles.Keys.Except(oldFiles.Keys).Order().ToList(), oldFiles.Keys.Except(newFiles.Keys).Order().ToList(), fileChanges.Select(change => change.FileId).ToList(),
+            entranceChanges, fileChanges,
             metadata.OrderBy(change => change.Path).ThenBy(change => change.Property).ToList());
 
         void AddScalar(string name, object? oldValue, object? newValue)
@@ -114,14 +131,21 @@ public sealed class CaveRevisionDiffService
                 metadata.Add(new ReferenceMetadataChange(path, oldTag.TagTypeId, nameof(SnapshotTagReference.NameAtRevision), oldTag.NameAtRevision, newTag.NameAtRevision));
         }
 
-        bool EntranceSemanticEquals(CaveEntranceSnapshotV1 oldEntrance, CaveEntranceSnapshotV1 newEntrance, string entranceId)
+        CaveEntranceChange CompareEntrance(CaveEntranceSnapshotV1 oldEntrance, CaveEntranceSnapshotV1 newEntrance, string entranceId)
         {
-            var equivalent = oldEntrance.Id == newEntrance.Id && oldEntrance.Name == newEntrance.Name &&
-                             oldEntrance.IsPrimary == newEntrance.IsPrimary && oldEntrance.Description == newEntrance.Description &&
-                             oldEntrance.ReportedByUserId == newEntrance.ReportedByUserId && oldEntrance.Latitude == newEntrance.Latitude &&
-                             oldEntrance.Longitude == newEntrance.Longitude && oldEntrance.Elevation == newEntrance.Elevation &&
-                             oldEntrance.Srid == newEntrance.Srid && oldEntrance.LocationQualityTagId == newEntrance.LocationQualityTagId &&
-                             oldEntrance.ReportedOn == newEntrance.ReportedOn && oldEntrance.PitDepthFeet == newEntrance.PitDepthFeet;
+            var nestedScalars = new Dictionary<string, (object?, object?)>();
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Name), oldEntrance.Name, newEntrance.Name);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.IsPrimary), oldEntrance.IsPrimary, newEntrance.IsPrimary);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Description), oldEntrance.Description, newEntrance.Description);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.ReportedByUserId), oldEntrance.ReportedByUserId, newEntrance.ReportedByUserId);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Latitude), oldEntrance.Latitude, newEntrance.Latitude);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Longitude), oldEntrance.Longitude, newEntrance.Longitude);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Elevation), oldEntrance.Elevation, newEntrance.Elevation);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.Srid), oldEntrance.Srid, newEntrance.Srid);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.LocationQualityTagId), oldEntrance.LocationQualityTagId, newEntrance.LocationQualityTagId);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.ReportedOn), oldEntrance.ReportedOn, newEntrance.ReportedOn);
+            AddNestedScalar(nameof(CaveEntranceSnapshotV1.PitDepthFeet), oldEntrance.PitDepthFeet, newEntrance.PitDepthFeet);
+
             if (oldEntrance.LocationQualityTagId == newEntrance.LocationQualityTagId &&
                 oldEntrance.LocationQualityNameAtRevision != newEntrance.LocationQualityNameAtRevision)
                 metadata.Add(new ReferenceMetadataChange($"Entrances/{entranceId}/LocationQuality", oldEntrance.LocationQualityTagId,
@@ -131,19 +155,32 @@ public sealed class CaveRevisionDiffService
             var newTags = newEntrance.Tags.ToDictionary(t => (t.Role, t.TagTypeId));
             foreach (var key in oldTags.Keys.Intersect(newTags.Keys))
                 AddTagMetadata($"Entrances/{entranceId}/Tags/{key.Role}", oldTags[key], newTags[key]);
-            return equivalent && oldTags.Keys.Order().SequenceEqual(newTags.Keys.Order()) &&
-                   oldTags.All(pair => newTags.TryGetValue(pair.Key, out var tag) && pair.Value.NameAtRevision == tag.NameAtRevision) &&
-                   oldEntrance.LocationQualityNameAtRevision == newEntrance.LocationQualityNameAtRevision;
+
+            return new CaveEntranceChange(entranceId, nestedScalars,
+                newEntrance.Tags.Where(tag => !oldTags.ContainsKey((tag.Role, tag.TagTypeId))).OrderBy(tag => tag.Role).ThenBy(tag => tag.TagTypeId).ToList(),
+                oldEntrance.Tags.Where(tag => !newTags.ContainsKey((tag.Role, tag.TagTypeId))).OrderBy(tag => tag.Role).ThenBy(tag => tag.TagTypeId).ToList());
+
+            void AddNestedScalar(string name, object? oldValue, object? newValue)
+            {
+                if (!SemanticEquals(oldValue, newValue)) nestedScalars[name] = (oldValue, newValue);
+            }
         }
 
-        bool FileSemanticEquals(CaveFileSnapshotV1 oldFile, CaveFileSnapshotV1 newFile, string fileId)
+        CaveFileChange CompareFile(CaveFileSnapshotV1 oldFile, CaveFileSnapshotV1 newFile, string fileId)
         {
+            var nestedScalars = new Dictionary<string, (object?, object?)>();
+            AddNestedScalar(nameof(CaveFileSnapshotV1.FileTypeTagId), oldFile.FileTypeTagId, newFile.FileTypeTagId);
+            AddNestedScalar(nameof(CaveFileSnapshotV1.FileName), oldFile.FileName, newFile.FileName);
+            AddNestedScalar(nameof(CaveFileSnapshotV1.DisplayName), oldFile.DisplayName, newFile.DisplayName);
             if (oldFile.FileTypeTagId == newFile.FileTypeTagId && oldFile.FileTypeNameAtRevision != newFile.FileTypeNameAtRevision)
                 metadata.Add(new ReferenceMetadataChange($"Files/{fileId}/FileType", oldFile.FileTypeTagId,
                     nameof(CaveFileSnapshotV1.FileTypeNameAtRevision), oldFile.FileTypeNameAtRevision, newFile.FileTypeNameAtRevision));
-            return oldFile.Id == newFile.Id && oldFile.FileTypeTagId == newFile.FileTypeTagId &&
-                   oldFile.FileTypeNameAtRevision == newFile.FileTypeNameAtRevision && oldFile.FileName == newFile.FileName &&
-                   oldFile.DisplayName == newFile.DisplayName;
+            return new CaveFileChange(fileId, nestedScalars);
+
+            void AddNestedScalar(string name, object? oldValue, object? newValue)
+            {
+                if (!SemanticEquals(oldValue, newValue)) nestedScalars[name] = (oldValue, newValue);
+            }
         }
 
         static bool SemanticEquals(object? oldValue, object? newValue) =>

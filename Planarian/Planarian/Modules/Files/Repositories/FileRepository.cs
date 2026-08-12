@@ -25,6 +25,26 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public sealed record FileMetadataMutationContextResult(
+        File File,
+        bool IsChangeRequestStaged,
+        string? CountyId,
+        string? StateId);
+
+    public async Task<FileMetadataMutationContextResult?> GetFileMetadataMutationContextAsync(
+        string id, CancellationToken cancellationToken)
+    {
+        return await DbContext.Files
+            .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId)
+            .Select(file => new FileMetadataMutationContextResult(
+                file,
+                DbContext.CaveChangeRequestStagedFiles.Any(staged =>
+                    staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id),
+                file.Cave != null ? file.Cave.CountyId : null,
+                file.Cave != null ? file.Cave.StateId : null))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public sealed record FileAuthorizationContextResult(string Id, string? CaveId, string? CountyId, string? StateId);
 
     public async Task<FileAuthorizationContextResult?> GetFileAuthorizationContext(string id)

@@ -16,6 +16,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
@@ -827,8 +828,9 @@ public class CaveService : ServiceBase<CaveRepository>
                     if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
                         !string.Equals(file.DisplayName, fileEntity.DisplayName))
                     {
+                        fileEntity.FileName = CaveFileNamePolicy.GetEffectiveFileName(fileEntity.FileName,
+                            fileEntity.DisplayName, file.DisplayName);
                         fileEntity.DisplayName = file.DisplayName;
-                        fileEntity.FileName = $"{file.DisplayName}{Path.GetExtension(fileEntity.FileName)}";
                     }
 
                     if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
@@ -855,7 +857,15 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (isNew) Repository.Add(entity);
 
-            await Repository.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await Repository.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException exception) when (changeRequestId is not null &&
+                exception.Entries.Any(entry => entry.Entity is Cave))
+            {
+                throw new CaveRevisionConflictException(entity.Id, expectedRevisionId, null);
+            }
 
             CaveMutationResult mutationResult;
             if (isNew)
@@ -909,10 +919,14 @@ public class CaveService : ServiceBase<CaveRepository>
         var isSuccessful = false;
         try
         {
+            await Repository.LockForHardDeleteAsync(caveId, cancellationToken);
             var entity = await Repository.GetAsync(caveId);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
             await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
+            if (await Repository.HasPendingChangeRequestsAsync(caveId, cancellationToken))
+                throw ApiExceptionDictionary.BadRequest(
+                    "Pending proposed changes must be approved or rejected before this Cave can be deleted.");
 
             var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
                 entity.Id, entity.CurrentRevisionId, cancellationToken);
