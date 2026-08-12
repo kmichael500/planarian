@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Alert, Card, Input, message, Space, Spin, Tag, Typography, Upload } from "antd";
+import { Alert, Card, Collapse, Input, message, Space, Spin, Tag, Typography, Upload } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { RcFile } from "antd/lib/upload";
 import { Link, useParams } from "react-router-dom";
@@ -14,6 +14,38 @@ export const CaveAvailability = ({ request }: { request: CaveChangeRequestSummar
   request.caveExists
     ? <Link to={`/caves/${request.caveId}`}>Open Cave</Link>
     : <Typography.Text type="secondary">Cave no longer available</Typography.Text>;
+
+export const ProposalVersionComparison = ({ detail }: { detail: CaveProposalVersionDetailVm }) => <>
+  {detail.unavailableStagedFileIds.length > 0 &&
+    <Alert type="warning" showIcon message="Historical attachment unavailable"
+      description={detail.unavailableStagedFileIds.map(fileId => {
+        const file = detail.proposed.files.find(candidate => candidate.id === fileId)
+          ?? detail.previousProposed?.files.find(candidate => candidate.id === fileId);
+        return file?.displayName ?? file?.fileName ?? fileId;
+      }).join(", ")} />}
+  {detail.baseRevisionChanged &&
+    <Alert type="info" showIcon message="This proposal version is based on a newer published Cave revision."
+      description={`Previous base: ${detail.previousBaseRevisionId}. This base: ${detail.baseRevisionId}. The comparison below shows effective proposal state, not author attribution.`} />}
+  {detail.diffFromPreviousVersion && detail.previousProposed ? <>
+    <Typography.Title level={5}>Changes from previous proposal version</Typography.Title>
+    <CaveRevisionDiff diff={detail.diffFromPreviousVersion}
+      previous={detail.previousProposed} current={detail.proposed}
+      countyNumberIntent={detail.countyNumberIntent} />
+    <Collapse ghost items={[{
+      key: "base",
+      label: "This version vs published base",
+      children: <CaveRevisionDiff diff={detail.diffFromBase}
+        previous={detail.base} current={detail.proposed}
+        countyNumberIntent={detail.countyNumberIntent} />,
+    }]} />
+  </> : <>
+    <Typography.Title level={5}>Initial proposal</Typography.Title>
+    <Typography.Text type="secondary">Published base → proposal</Typography.Text>
+    <CaveRevisionDiff diff={detail.diffFromBase}
+      previous={detail.base} current={detail.proposed}
+      countyNumberIntent={detail.countyNumberIntent} />
+  </>}
+</>;
 
 export const CaveChangeRequestPage = () => {
   const { requestId } = useParams();
@@ -109,19 +141,9 @@ export const CaveChangeRequestPage = () => {
               setVersionDetails(current => ({ ...current, [version.id]: loadedVersion }));
             } catch { message.error("That proposal version could not be loaded."); }
             finally { setLoadingVersionId(undefined); }
-          }}>{versionDetails[version.id] ? "Hide changes" : "View changes"}</PlanarianButton>}>
+          }}>{versionDetails[version.id] ? "Hide version details" : version.previousProposalVersionId ? "View changes from previous version" : "View initial proposal"}</PlanarianButton>}>
           <Typography.Text type="secondary">Based on revision {version.baseRevisionId} · {version.createdByName ?? "Unknown user"} · {new Date(version.createdOn).toLocaleString()}</Typography.Text>
-          {versionDetails[version.id] && <>
-            {versionDetails[version.id].unavailableStagedFileIds.length > 0 &&
-              <Alert type="warning" showIcon message="Historical attachment unavailable"
-                description={versionDetails[version.id].unavailableStagedFileIds.map(fileId => {
-                  const file = versionDetails[version.id].proposed.files.find(candidate => candidate.id === fileId);
-                  return file?.displayName ?? file?.fileName ?? fileId;
-                }).join(", ")} />}
-            <CaveRevisionDiff diff={versionDetails[version.id].diff}
-              previous={versionDetails[version.id].base} current={versionDetails[version.id].proposed}
-              countyNumberIntent={versionDetails[version.id].countyNumberIntent} />
-          </>}
+          {versionDetails[version.id] && <ProposalVersionComparison detail={versionDetails[version.id]} />}
         </Card>)}</Space>
     </Card>}
     {detail.request.status === "Pending" && detail.request.canReview && <Card title="Review decision">

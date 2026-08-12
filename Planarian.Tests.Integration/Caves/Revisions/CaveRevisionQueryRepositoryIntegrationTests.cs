@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
+using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
+using Planarian.Modules.Caves.Services;
 using Xunit;
 
 namespace Planarian.Tests;
@@ -10,9 +12,10 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
     : IClassFixture<PostgresTestServer>
 {
     [Fact]
-    public async Task ListOrdersRevisionsAndIdentifiesCurrentWithinTenant()
+    public async Task ListOrdersRevisionsByExplicitChainAndIdentifiesCurrentWithinTenant()
     {
-        await using var database = await fixture.CreateDatabaseAsync(nameof(ListOrdersRevisionsAndIdentifiesCurrentWithinTenant));
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ListOrdersRevisionsByExplicitChainAndIdentifiesCurrentWithinTenant));
         var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
         var other = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
         await GrantViewAsync(database, tenant, "user-a");
@@ -36,6 +39,9 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
                 SnapshotJson = CaveSnapshotJson.Serialize(snapshot)
             });
             await seed.SaveChangesAsync();
+            first.CreatedOn = new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc);
+            (await seed.CaveRevisions.SingleAsync(row => row.Id == secondId)).CreatedOn =
+                first.CreatedOn.AddHours(-1);
             var cave = await seed.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
             cave.CurrentRevisionId = secondId;
             await seed.SaveChangesAsync();
@@ -48,8 +54,31 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
         Assert.NotNull(result);
         Assert.Equal(secondId, result.Value.CurrentRevisionId);
         Assert.Equal([tenant.RevisionId, secondId], result.Value.Item2.Select(row => row.Revision.Id));
+        var comparison = await new CaveRevisionService(new CaveRepository(db, db.RequestUser), repository)
+            .CompareAsync(tenant.CaveId, secondId, default);
+        Assert.Equal(tenant.RevisionId, comparison.PreviousRevision!.Id);
+        Assert.Equal("Cave A", comparison.Previous!.Name);
+        Assert.Equal("Changed cave", comparison.Current.Name);
         Assert.Null(await repository.ListAsync(other.CaveId, default));
         Assert.Null(await repository.GetAsync(tenant.CaveId, other.RevisionId, default));
+    }
+
+    [Fact]
+    public async Task ListRejectsACyclicRevisionChain()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(nameof(ListRejectsACyclicRevisionChain));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await GrantViewAsync(database, tenant, "user-a");
+        await using (var seed = database.CreateDbContext("user-a", tenant.AccountId))
+        {
+            var revision = await seed.CaveRevisions.SingleAsync(row => row.Id == tenant.RevisionId);
+            revision.PreviousRevisionId = revision.Id;
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = database.CreateDbContext("user-a", tenant.AccountId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new CaveRevisionQueryRepository(db, db.RequestUser).ListAsync(tenant.CaveId, default));
     }
 
     private static async Task GrantViewAsync(PostgresTestDatabase database, PublishedCaveTestData cave, string userId)

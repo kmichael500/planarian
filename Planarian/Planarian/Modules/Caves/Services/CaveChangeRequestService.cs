@@ -191,9 +191,25 @@ public sealed class CaveChangeRequestService
         var proposal = CaveProposalJson.Deserialize(row.Version.ProposalJson, row.Version.SchemaVersion);
         var presentation = await PresentAsync(proposal, baseSnapshot, cancellationToken,
             preserveUnavailableStagedFiles: true);
+        CavePublishedSnapshotV1? previousProposed = null;
+        CaveRevisionDiffVm? diffFromPreviousVersion = null;
+        var unavailableStagedFileIds = presentation.UnavailableStagedFileIds.ToHashSet(StringComparer.Ordinal);
+        if (row.PreviousVersion is not null && row.PreviousBaseRevision is not null)
+        {
+            var previousBase = Deserialize(row.PreviousBaseRevision);
+            var previousProposal = CaveProposalJson.Deserialize(row.PreviousVersion.ProposalJson,
+                row.PreviousVersion.SchemaVersion);
+            var previousPresentation = await PresentAsync(previousProposal, previousBase, cancellationToken,
+                preserveUnavailableStagedFiles: true);
+            previousProposed = previousPresentation.Snapshot;
+            diffFromPreviousVersion = Map(_diff.Compare(previousProposed, presentation.Snapshot));
+            unavailableStagedFileIds.UnionWith(previousPresentation.UnavailableStagedFileIds);
+        }
         return new CaveProposalVersionDetailVm(baseSnapshot, presentation.Snapshot,
-            Map(_diff.Compare(baseSnapshot, presentation.Snapshot)), proposal.CountyNumberIntent,
-            proposal.RequestedCountyNumber, presentation.UnavailableStagedFileIds);
+            Map(_diff.Compare(baseSnapshot, presentation.Snapshot)), previousProposed, diffFromPreviousVersion,
+            row.PreviousVersion is not null && row.PreviousVersion.BaseRevisionId != row.Version.BaseRevisionId,
+            row.PreviousVersion?.BaseRevisionId, row.Version.BaseRevisionId, proposal.CountyNumberIntent,
+            proposal.RequestedCountyNumber, unavailableStagedFileIds.ToList());
     }
 
     public async Task<CaveChangeRequestDecisionVm> ApproveAsync(string requestId,
@@ -316,6 +332,8 @@ public sealed class CaveChangeRequestService
             .Concat(values.Entrances.Select(entrance => entrance.LocationQualityTagId))
             .Concat((values.Files ?? []).Select(file => file.FileTypeTagId));
         var names = await _requests.GetTagNamesAsync(ids, cancellationToken);
+        var locationLabels = await _requests.GetLocationLabelsAsync(values.StateId, values.CountyId,
+            cancellationToken);
         string Name(string id) => names.GetValueOrDefault(id, id);
 
         var selectedFiles = (values.Files ?? []).ToDictionary(file => file.Id, StringComparer.Ordinal);
@@ -348,7 +366,11 @@ public sealed class CaveChangeRequestService
             Name = values.Name.Trim(),
             AlternateNames = values.AlternateNames.Select(name => name.Trim()).ToList(),
             StateId = values.StateId,
+            StateNameAtRevision = locationLabels.StateName,
+            StateAbbreviationAtRevision = locationLabels.StateAbbreviation,
             CountyId = values.CountyId,
+            CountyNameAtRevision = locationLabels.CountyName,
+            CountyDisplayIdAtRevision = locationLabels.CountyDisplayId,
             CountyNumberIntent = values.IsCountyNumberManuallySet ? CountyNumberIntent.Manual
                 : values.UseFirstAvailableCountyNumber ? CountyNumberIntent.FirstAvailable : CountyNumberIntent.AutomaticNext,
             RequestedCountyNumber = values.IsCountyNumberManuallySet ? values.CountyNumber : null,
@@ -374,6 +396,7 @@ public sealed class CaveChangeRequestService
                 Longitude = entrance.Longitude,
                 Elevation = entrance.ElevationFeet,
                 LocationQualityTagId = entrance.LocationQualityTagId,
+                LocationQualityNameAtRevision = Name(entrance.LocationQualityTagId),
                 ReportedOn = entrance.ReportedOn,
                 PitDepthFeet = entrance.PitFeet,
                 Tags = EntranceTagGroups(entrance).SelectMany(group => group.Ids.Select(id =>
@@ -393,8 +416,16 @@ public sealed class CaveChangeRequestService
     private async Task<ProposalPresentation> PresentAsync(CaveProposalSnapshotV1 proposal,
         CavePublishedSnapshotV1 @base, CancellationToken cancellationToken, bool preserveUnavailableStagedFiles)
     {
-        var labels = await _requests.GetLocationLabelsAsync(proposal.StateId, proposal.CountyId, cancellationToken);
-        var tagNames = await _requests.GetTagNamesAsync(proposal.Entrances.Select(entrance => entrance.LocationQualityTagId), cancellationToken);
+        var needsLocationFallback = proposal.StateNameAtRevision is null ||
+                                    proposal.CountyNameAtRevision is null;
+        var labels = needsLocationFallback
+            ? await _requests.GetLocationLabelsAsync(proposal.StateId, proposal.CountyId, cancellationToken)
+            : (proposal.StateNameAtRevision!, proposal.StateAbbreviationAtRevision,
+                proposal.CountyNameAtRevision!, proposal.CountyDisplayIdAtRevision ?? proposal.CountyId);
+        var missingLocationQualityIds = proposal.Entrances
+            .Where(entrance => entrance.LocationQualityNameAtRevision is null)
+            .Select(entrance => entrance.LocationQualityTagId);
+        var tagNames = await _requests.GetTagNamesAsync(missingLocationQualityIds, cancellationToken);
         var baseFiles = @base.Files.ToDictionary(file => file.Id);
         var baseEntrances = @base.Entrances.ToDictionary(entrance => entrance.Id);
         var stagedFiles = await _requests.GetFileSnapshotsAsync(proposal.Files
@@ -410,8 +441,8 @@ public sealed class CaveChangeRequestService
             AccountId = proposal.AccountId,
             Name = proposal.Name,
             AlternateNames = proposal.AlternateNames,
-            State = new SnapshotReference(proposal.StateId, labels.StateName, null, labels.StateAbbreviation),
-            County = new SnapshotReference(proposal.CountyId, labels.CountyName, labels.CountyDisplayId),
+            State = new SnapshotReference(proposal.StateId, labels.Item1, null, labels.Item2),
+            County = new SnapshotReference(proposal.CountyId, labels.Item3, labels.Item4),
             CountyNumber = proposal.RequestedCountyNumber ?? (@base.County.Id == proposal.CountyId ? @base.CountyNumber : 0),
             ReportedByUserId = @base.ReportedByUserId,
             LengthFeet = proposal.LengthFeet,
@@ -430,8 +461,9 @@ public sealed class CaveChangeRequestService
                 Latitude = entrance.Latitude, Longitude = entrance.Longitude,
                 Elevation = entrance.Elevation, Srid = entrance.Srid,
                 LocationQualityTagId = entrance.LocationQualityTagId,
-                LocationQualityNameAtRevision = tagNames.GetValueOrDefault(entrance.LocationQualityTagId,
-                    entrance.LocationQualityTagId), ReportedOn = entrance.ReportedOn,
+                LocationQualityNameAtRevision = entrance.LocationQualityNameAtRevision ??
+                    tagNames.GetValueOrDefault(entrance.LocationQualityTagId, entrance.LocationQualityTagId),
+                ReportedOn = entrance.ReportedOn,
                 PitDepthFeet = entrance.PitDepthFeet, Tags = entrance.Tags
             }).ToList(),
             Files = proposal.Files.Select(file => file.Disposition switch

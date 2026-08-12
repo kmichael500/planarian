@@ -26,13 +26,22 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    if (!open || history) return;
+    setHistory(undefined);
+    setComparisons({});
+    setError(undefined);
+  }, [caveId]);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
     setLoading(true);
+    setError(undefined);
     CaveService.GetRevisionHistory(caveId)
-      .then(setHistory)
-      .catch(() => setError("Cave history could not be loaded."))
-      .finally(() => setLoading(false));
-  }, [open, caveId, history]);
+      .then((loaded) => { if (active) setHistory(loaded); })
+      .catch(() => { if (active) setError("Cave history could not be loaded."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [open, caveId]);
 
   const loadRevision = async (revisionId?: string | string[]) => {
     const id = Array.isArray(revisionId) ? revisionId[0] : revisionId;

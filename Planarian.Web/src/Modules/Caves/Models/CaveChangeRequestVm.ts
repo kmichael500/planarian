@@ -46,7 +46,12 @@ export interface CaveProposalAuthoringContextVm {
 export interface CaveProposalVersionDetailVm {
   base: CaveSnapshotVm;
   proposed: CaveSnapshotVm;
-  diff: CaveRevisionDiffVm;
+  diffFromBase: CaveRevisionDiffVm;
+  previousProposed?: CaveSnapshotVm;
+  diffFromPreviousVersion?: CaveRevisionDiffVm;
+  baseRevisionChanged: boolean;
+  previousBaseRevisionId?: string;
+  baseRevisionId: string;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
   unavailableStagedFileIds: string[];

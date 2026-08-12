@@ -16,6 +16,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
@@ -595,39 +596,18 @@ public class CaveService : ServiceBase<CaveRepository>
             entity.ReportedOn = values.ReportedOn?.ToUtcKind();
             entity.AccountId = RequestUser.AccountId;
 
-            entity.GeologyTags.Clear();
-            foreach (var tagId in values.GeologyTagIds)
-            {
-                var tag = new GeologyTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.GeologyTags.Add(tag);
-            }
+            SyncTags(entity.GeologyTags, values.GeologyTagIds, tag => tag.TagTypeId,
+                tagId => new GeologyTag { TagTypeId = tagId });
+            SyncTags(entity.ArcheologyTags, values.ArcheologyTagIds, tag => tag.TagTypeId,
+                tagId => new ArcheologyTag { TagTypeId = tagId });
+            SyncTags(entity.BiologyTags, values.BiologyTagIds, tag => tag.TagTypeId,
+                tagId => new BiologyTag { TagTypeId = tagId });
 
-            entity.ArcheologyTags.Clear();
-            foreach (var tagId in values.ArcheologyTagIds)
-            {
-                var tag = new ArcheologyTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.ArcheologyTags.Add(tag);
-            }
-
-            entity.BiologyTags.Clear();
-            foreach (var tagId in values.BiologyTagIds)
-            {
-                var tag = new BiologyTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.BiologyTags.Add(tag);
-            }
-
-            entity.CartographerNameTags.Clear();
+            RemoveUnselected(entity.CartographerNameTags, values.CartographerNameTagIds,
+                tag => tag.TagTypeId);
             foreach (var personTagTypeId in values.CartographerNameTagIds)
             {
+                if (entity.CartographerNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
 
                 var tagType = await _tagRepository.GetTag(personTagTypeId);
                 tagType ??= new TagType
@@ -644,49 +624,20 @@ public class CaveService : ServiceBase<CaveRepository>
                 entity.CartographerNameTags.Add(tag);
             }
 
-            entity.MapStatusTags.Clear();
-            foreach (var tagId in values.MapStatusTagIds)
-            {
-                var tag = new MapStatusTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.MapStatusTags.Add(tag);
-            }
+            SyncTags(entity.MapStatusTags, values.MapStatusTagIds, tag => tag.TagTypeId,
+                tagId => new MapStatusTag { TagTypeId = tagId });
+            SyncTags(entity.GeologicAgeTags, values.GeologicAgeTagIds, tag => tag.TagTypeId,
+                tagId => new GeologicAgeTag { TagTypeId = tagId });
+            SyncTags(entity.PhysiographicProvinceTags, values.PhysiographicProvinceTagIds,
+                tag => tag.TagTypeId, tagId => new PhysiographicProvinceTag { TagTypeId = tagId });
+            SyncTags(entity.CaveOtherTags, values.OtherTagIds, tag => tag.TagTypeId,
+                tagId => new CaveOtherTag { TagTypeId = tagId });
 
-            entity.GeologicAgeTags.Clear();
-            foreach (var tagId in values.GeologicAgeTagIds)
-            {
-                var tag = new GeologicAgeTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.GeologicAgeTags.Add(tag);
-            }
-
-            entity.PhysiographicProvinceTags.Clear();
-            foreach (var tagId in values.PhysiographicProvinceTagIds)
-            {
-                var tag = new PhysiographicProvinceTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.PhysiographicProvinceTags.Add(tag);
-            }
-
-            entity.CaveOtherTags.Clear();
-            foreach (var tagId in values.OtherTagIds)
-            {
-                var tag = new CaveOtherTag()
-                {
-                    TagTypeId = tagId
-                };
-                entity.CaveOtherTags.Add(tag);
-            }
-
-            entity.CaveReportedByNameTags.Clear();
+            RemoveUnselected(entity.CaveReportedByNameTags, values.ReportedByNameTagIds,
+                tag => tag.TagTypeId);
             foreach (var personTagTypeId in values.ReportedByNameTagIds)
             {
+                if (entity.CaveReportedByNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
                 var tagType = await _tagRepository.GetTag(personTagTypeId);
                 tagType ??= new TagType
                 {
@@ -700,6 +651,24 @@ public class CaveService : ServiceBase<CaveRepository>
                 };
 
                 entity.CaveReportedByNameTags.Add(tag);
+            }
+
+            void RemoveUnselected<T>(ICollection<T> current, IEnumerable<string> selectedIds,
+                Func<T, string> getTagTypeId) where T : EntityBase
+            {
+                var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
+                foreach (var removed in current.Where(tag => !selected.Contains(getTagTypeId(tag))).ToList())
+                    Repository.Delete(removed);
+            }
+
+            void SyncTags<T>(ICollection<T> current, IEnumerable<string> selectedIds,
+                Func<T, string> getTagTypeId, Func<string, T> create) where T : EntityBase
+            {
+                var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
+                RemoveUnselected(current, selected, getTagTypeId);
+                var existing = current.Select(getTagTypeId).ToHashSet(StringComparer.Ordinal);
+                foreach (var tagId in selected.Where(tagId => !existing.Contains(tagId)))
+                    current.Add(create(tagId));
             }
 
             if (values.IsCountyNumberManuallySet && countyNumber.HasValue)
@@ -753,49 +722,20 @@ public class CaveService : ServiceBase<CaveRepository>
                     Repository.SetPropertiesModified(entrance, e => e.Location);
                 }
 
-                entrance.EntranceStatusTags.Clear();
-                foreach (var tagId in entranceValue.EntranceStatusTagIds)
-                {
-                    var tag = new EntranceStatusTag()
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.EntranceStatusTags.Add(tag);
-                }
+                SyncTags(entrance.EntranceStatusTags, entranceValue.EntranceStatusTagIds,
+                    tag => tag.TagTypeId, tagId => new EntranceStatusTag { TagTypeId = tagId });
+                SyncTags(entrance.FieldIndicationTags, entranceValue.FieldIndicationTagIds,
+                    tag => tag.TagTypeId, tagId => new FieldIndicationTag { TagTypeId = tagId });
+                SyncTags(entrance.EntranceOtherTags, entranceValue.EntranceOtherTagIds,
+                    tag => tag.TagTypeId, tagId => new EntranceOtherTag { TagTypeId = tagId });
+                SyncTags(entrance.EntranceHydrologyTags, entranceValue.EntranceHydrologyTagIds,
+                    tag => tag.TagTypeId, tagId => new EntranceHydrologyTag { TagTypeId = tagId });
 
-                entrance.FieldIndicationTags.Clear();
-                foreach (var tagId in entranceValue.FieldIndicationTagIds)
-                {
-                    var tag = new FieldIndicationTag()
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.FieldIndicationTags.Add(tag);
-                }
-
-                entrance.EntranceOtherTags.Clear();
-                foreach (var tagId in entranceValue.EntranceOtherTagIds)
-                {
-                    var tag = new EntranceOtherTag
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.EntranceOtherTags.Add(tag);
-                }
-
-                entrance.EntranceHydrologyTags.Clear();
-                foreach (var tagId in entranceValue.EntranceHydrologyTagIds)
-                {
-                    var tag = new EntranceHydrologyTag()
-                    {
-                        TagTypeId = tagId
-                    };
-                    entrance.EntranceHydrologyTags.Add(tag);
-                }
-
-                entrance.EntranceReportedByNameTags.Clear();
+                RemoveUnselected(entrance.EntranceReportedByNameTags, entranceValue.ReportedByNameTagIds,
+                    tag => tag.TagTypeId);
                 foreach (var personTagTypeId in entranceValue.ReportedByNameTagIds)
                 {
+                    if (entrance.EntranceReportedByNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
                     var peopleTag = await _tagRepository.GetTag(personTagTypeId);
                     peopleTag ??= new TagType
                     {

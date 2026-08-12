@@ -106,8 +106,8 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
             fileOnlyVersionId = await service.AddVersionAsync(requestId, fileOnlyValues, false,
                 tenant.RevisionId, stagedVersionId, default);
             var detail = await service.GetVersionAsync(requestId, fileOnlyVersionId, default);
-            Assert.Equal([file.FileId], detail.Diff.AddedFiles);
-            Assert.Empty(detail.Diff.Scalars);
+            Assert.Equal([file.FileId], detail.DiffFromBase.AddedFiles);
+            Assert.Empty(detail.DiffFromBase.Scalars);
         }
 
         CaveChangeRequestDecisionVm decision;
@@ -475,10 +475,238 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
             var service = CreateChangeRequestService(contributor);
             var historical = await service.GetVersionAsync(requestId, versionOneId, default);
             Assert.Equal("Original contributor proposal", historical.Proposed.Name);
-            Assert.Contains(historical.Diff.Scalars, change => change.Path == "Name");
+            Assert.Contains(historical.DiffFromBase.Scalars, change => change.Path == "Name");
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 service.GetVersionAsync(otherRequestId, versionOneId, default));
         }
+    }
+
+    [Fact]
+    public async Task ProposalVersionHistoryReportsTagEntranceTagAndFileReversalsFromLinkedPredecessor()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ProposalVersionHistoryReportsTagEntranceTagAndFileReversalsFromLinkedPredecessor));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var biology = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.Biology, "Cricket", "biology00a");
+        var hydrology = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.EntranceHydrology, "Wet", "hydrologya");
+        var location = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var file = await TestDataBuilder.AddFileAsync(database, tenant, fileId: "versionf0a");
+        await GrantViewAsync(database, tenant, "contributor");
+
+        CaveProposalSnapshotV1 Version(string name, bool includeReversibleItems) => Proposal(tenant, name) with
+        {
+            Tags = includeReversibleItems
+                ? [new SnapshotTagReference(SnapshotTagRole.Biology, biology.Id, biology.Name)] : [],
+            Entrances = [new CaveProposalEntranceV1
+            {
+                EntranceId = "proposalena", Name = "Proposed entrance", IsPrimary = true,
+                Latitude = 35, Longitude = -86, Elevation = 500,
+                LocationQualityTagId = location.Id,
+                Tags = includeReversibleItems
+                    ? [new SnapshotTagReference(SnapshotTagRole.EntranceHydrology, hydrology.Id, hydrology.Name)] : []
+            }],
+            Files = includeReversibleItems
+                ? [new ProposalFileIntent(file.FileId, ProposalFileDisposition.PublishStaged,
+                    file.FileTypeId, "Version file", "Version file.pdf", "Document")] : []
+        };
+
+        await using var contributor = database.CreateDbContext("contributor", tenant.AccountId);
+        var repository = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+        var requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId,
+            Version("Proposed name", true), default);
+        var versionOneId = await CurrentVersionAsync(contributor, requestId);
+        var versionTwoId = await repository.AddVersionAsync(requestId, tenant.RevisionId, versionOneId,
+            Version("Revised proposed name", false), false, false, default);
+        var versionThreeId = await repository.AddVersionAsync(requestId, tenant.RevisionId, versionTwoId,
+            Version("Final proposed name", true), false, false, default);
+
+        var versions = await contributor.CaveProposalVersions
+            .Where(version => version.ChangeRequestId == requestId).ToListAsync();
+        foreach (var version in versions) version.CreatedOn = new DateTime(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc);
+        await contributor.SaveChangesAsync();
+        await AuthenticateAsync(contributor, tenant.AccountId);
+        var service = CreateChangeRequestService(contributor);
+
+        var request = await service.GetAsync(requestId, default);
+        Assert.Equal([versionOneId, versionTwoId, versionThreeId], request.Versions.Select(version => version.Id));
+
+        var removed = await service.GetVersionAsync(requestId, versionTwoId, default);
+        Assert.DoesNotContain(removed.DiffFromBase.AddedTags.Concat(removed.DiffFromBase.RemovedTags),
+            tag => tag.Role == SnapshotTagRole.Biology);
+        Assert.Contains(removed.DiffFromPreviousVersion!.RemovedTags,
+            tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == biology.Id);
+        var removedEntrance = Assert.Single(removed.DiffFromPreviousVersion.EntranceChanges,
+            change => change.EntranceId == "proposalena");
+        Assert.Contains(removedEntrance.RemovedTags,
+            tag => tag.Role == SnapshotTagRole.EntranceHydrology && tag.TagTypeId == hydrology.Id);
+        Assert.Contains(file.FileId, removed.DiffFromPreviousVersion.RemovedFiles);
+
+        var restored = await service.GetVersionAsync(requestId, versionThreeId, default);
+        Assert.Contains(restored.DiffFromPreviousVersion!.AddedTags,
+            tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == biology.Id);
+        var restoredEntrance = Assert.Single(restored.DiffFromPreviousVersion.EntranceChanges,
+            change => change.EntranceId == "proposalena");
+        Assert.Contains(restoredEntrance.AddedTags,
+            tag => tag.Role == SnapshotTagRole.EntranceHydrology && tag.TagTypeId == hydrology.Id);
+        Assert.Contains(file.FileId, restored.DiffFromPreviousVersion.AddedFiles);
+
+        (await contributor.CaveProposalVersions.SingleAsync(version => version.Id == versionThreeId))
+            .PreviousProposalVersionId = versionThreeId;
+        await contributor.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetAsync(requestId, default));
+    }
+
+    [Fact]
+    public async Task HistoricalProposalVersionKeepsStateCountyAndLocationQualityLabelsCapturedAtCreation()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(HistoricalProposalVersionKeepsStateCountyAndLocationQualityLabelsCapturedAtCreation));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var location = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade A", "locqual00a");
+        await GrantViewAsync(database, tenant, "contributor");
+
+        await using var contributor = database.CreateDbContext("contributor", tenant.AccountId);
+        await AuthenticateAsync(contributor, tenant.AccountId);
+        var service = CreateChangeRequestService(contributor);
+        var firstValues = PublishableValues(tenant, location.Id, "Proposal version one");
+        var requestId = await service.CreateAsync(tenant.CaveId, firstValues, tenant.RevisionId, default);
+        var versionOneId = await CurrentVersionAsync(contributor, requestId);
+
+        await GlobalStateTestData.RenameAsync(database, tenant.StateId, "State B", "BB");
+        await using (var rename = database.CreateDbContext("manager", tenant.AccountId))
+        {
+            var county = await rename.Counties.SingleAsync(row => row.Id == tenant.CountyId);
+            county.Name = "County B";
+            county.DisplayId = "BB02";
+            (await rename.TagTypes.SingleAsync(tag => tag.Id == location.Id)).Name = "Survey Grade B";
+            await rename.SaveChangesAsync();
+        }
+
+        var historical = await service.GetVersionAsync(requestId, versionOneId, default);
+        Assert.Equal((tenant.StateName, tenant.StateAbbreviation),
+            (historical.Proposed.State.NameAtRevision, historical.Proposed.State.AbbreviationAtRevision));
+        Assert.Equal((tenant.CountyName, tenant.CountyDisplayId),
+            (historical.Proposed.County.NameAtRevision, historical.Proposed.County.DisplayIdAtRevision));
+        Assert.Equal("Survey Grade A", Assert.Single(historical.Proposed.Entrances)
+            .LocationQualityNameAtRevision);
+
+        var secondValues = PublishableValues(tenant, location.Id, "Proposal version two");
+        var versionTwoId = await service.AddVersionAsync(requestId, secondValues, false,
+            tenant.RevisionId, versionOneId, default);
+        var later = await service.GetVersionAsync(requestId, versionTwoId, default);
+        Assert.Equal(("State B", "BB"),
+            (later.Proposed.State.NameAtRevision, later.Proposed.State.AbbreviationAtRevision));
+        Assert.Equal(("County B", "BB02"),
+            (later.Proposed.County.NameAtRevision, later.Proposed.County.DisplayIdAtRevision));
+        Assert.Equal("Survey Grade B", Assert.Single(later.Proposed.Entrances)
+            .LocationQualityNameAtRevision);
+    }
+
+    [Fact]
+    public async Task RemovedCaveTagAppearsAsRemovedWhenApprovedRevisionIsLoadedFromHistory()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RemovedCaveTagAppearsAsRemovedWhenApprovedRevisionIsLoadedFromHistory));
+        var tagged = await CreateTaggedPublishedCaveAsync(database);
+        await GrantViewAsync(database, tagged.Cave, "contributor");
+        await GrantManagerAsync(database, tagged.Cave, "reviewer");
+        string requestId;
+
+        await using (var contributor = database.CreateDbContext("contributor", tagged.Cave.AccountId))
+        {
+            await AuthenticateAsync(contributor, tagged.Cave.AccountId);
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tagged.Cave.CaveId);
+            var values = ValuesFromCave(cave!);
+            values.BiologyTagIds = [];
+            var service = CreateChangeRequestService(contributor);
+            var preview = await service.PreviewAsync(tagged.Cave.CaveId, values, tagged.Cave.RevisionId, default);
+            Assert.Contains(preview.Diff.RemovedTags,
+                tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
+            requestId = await service.CreateAsync(tagged.Cave.CaveId, values, tagged.Cave.RevisionId, default);
+            var detail = await service.GetAsync(requestId, default);
+            Assert.Contains(detail.Diff.RemovedTags,
+                tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
+            var stored = CaveProposalJson.Deserialize((await contributor.CaveProposalVersions.SingleAsync(version =>
+                version.Id == detail.Request.CurrentProposalVersionId)).ProposalJson, 1);
+            Assert.DoesNotContain(stored.Tags,
+                tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
+        }
+
+        string approvedRevisionId;
+        await using (var reviewer = database.CreateDbContext("reviewer", tagged.Cave.AccountId))
+        {
+            await AuthenticateAsync(reviewer, tagged.Cave.AccountId);
+            var requestService = CreateChangeRequestService(reviewer);
+            approvedRevisionId = (await requestService.ApproveAsync(requestId,
+                await CurrentVersionAsync(reviewer, requestId), null, default)).PublishedRevisionId!;
+            var history = await new CaveRevisionService(new CaveRepository(reviewer, reviewer.RequestUser),
+                new CaveRevisionQueryRepository(reviewer, reviewer.RequestUser))
+                .CompareAsync(tagged.Cave.CaveId, approvedRevisionId, default);
+            Assert.Contains(history.Diff!.RemovedTags,
+                tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
+            Assert.DoesNotContain(history.Diff.AddedTags,
+                tag => tag.Role == SnapshotTagRole.Biology && tag.TagTypeId == tagged.BiologyTagId);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tagged.Cave.AccountId);
+        Assert.False(await verify.BiologyTags.AnyAsync(tag => tag.CaveId == tagged.Cave.CaveId &&
+            tag.TagTypeId == tagged.BiologyTagId));
+        var approved = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == approvedRevisionId)).SnapshotJson, 1);
+        Assert.DoesNotContain(approved.Tags, tag => tag.TagTypeId == tagged.BiologyTagId);
+        var previous = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == tagged.Cave.RevisionId)).SnapshotJson, 1);
+        Assert.Contains(previous.Tags, tag => tag.TagTypeId == tagged.BiologyTagId);
+    }
+
+    [Fact]
+    public async Task RemovedEntranceTagAppearsAsRemovedWhenPublishedRevisionIsLoadedFromHistory()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RemovedEntranceTagAppearsAsRemovedWhenPublishedRevisionIsLoadedFromHistory));
+        var tagged = await CreateTaggedPublishedCaveAsync(database);
+        await GrantManagerAsync(database, tagged.Cave, "reviewer");
+        string revisionId;
+
+        await using (var manager = database.CreateDbContext("reviewer", tagged.Cave.AccountId))
+        {
+            await AuthenticateAsync(manager, tagged.Cave.AccountId);
+            var cave = await new CaveRepository(manager, manager.RequestUser).GetCave(tagged.Cave.CaveId);
+            var values = ValuesFromCave(cave!);
+            Assert.Equal([tagged.HydrologyTagId], Assert.Single(values.Entrances).EntranceHydrologyTagIds);
+            Assert.Single(values.BiologyTagIds);
+            Assert.Single(values.Entrances);
+            Assert.Single(values.Entrances.Single().EntranceHydrologyTagIds);
+            values.Entrances.Single().EntranceHydrologyTagIds = [];
+            await CreateCaveService(manager).AddCave(values, default);
+            manager.ChangeTracker.Clear();
+            Assert.False(await manager.EntranceHydrologyTags.AnyAsync(tag =>
+                tag.EntranceId == tagged.EntranceId && tag.TagTypeId == tagged.HydrologyTagId));
+            revisionId = (await manager.Caves.IgnoreQueryFilters().SingleAsync(caveRow =>
+                caveRow.Id == tagged.Cave.CaveId)).CurrentRevisionId!;
+            var history = await new CaveRevisionService(new CaveRepository(manager, manager.RequestUser),
+                new CaveRevisionQueryRepository(manager, manager.RequestUser))
+                .CompareAsync(tagged.Cave.CaveId, revisionId, default);
+            Assert.Contains(tagged.EntranceId, history.Diff!.ChangedEntrances);
+            var entrance = Assert.Single(history.Diff.EntranceChanges,
+                change => change.EntranceId == tagged.EntranceId);
+            Assert.Contains(entrance.RemovedTags,
+                tag => tag.Role == SnapshotTagRole.EntranceHydrology && tag.TagTypeId == tagged.HydrologyTagId);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tagged.Cave.AccountId);
+        Assert.False(await verify.EntranceHydrologyTags.AnyAsync(tag => tag.EntranceId == tagged.EntranceId &&
+            tag.TagTypeId == tagged.HydrologyTagId));
+        var current = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == revisionId)).SnapshotJson, 1);
+        Assert.DoesNotContain(current.Entrances.Single().Tags, tag => tag.TagTypeId == tagged.HydrologyTagId);
+        var previous = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == tagged.Cave.RevisionId)).SnapshotJson, 1);
+        Assert.Contains(previous.Entrances.Single().Tags, tag => tag.TagTypeId == tagged.HydrologyTagId);
     }
 
     [Fact]
@@ -2322,6 +2550,35 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
         await using var verifyInvisible = database.CreateDbContext("verify", invisible.AccountId);
         Assert.Empty(await verifyInvisible.CaveChangeRequests.ToListAsync());
         Assert.Empty(await verifyInvisible.CaveProposalVersions.ToListAsync());
+    }
+
+    private sealed record TaggedPublishedCave(PublishedCaveTestData Cave, string BiologyTagId,
+        string HydrologyTagId, string EntranceId);
+
+    private static async Task<TaggedPublishedCave> CreateTaggedPublishedCaveAsync(PostgresTestDatabase database)
+    {
+        var cave = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var biology = await TestDataBuilder.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.Biology, "Cricket", "biology00a");
+        var hydrology = await TestDataBuilder.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.EntranceHydrology, "Wet", "hydrologya");
+        var location = await TestDataBuilder.AddTagAsync(database, cave.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        const string entranceId = "entrance0a";
+        await TestDataBuilder.AddEntranceAsync(database, cave, entranceId,
+            locationQualityTagId: location.Id);
+        await using var seed = database.CreateDbContext("tagged-cave-seed", cave.AccountId);
+        seed.BiologyTags.Add(new BiologyTag
+            { Id = "biolink00a", CaveId = cave.CaveId, TagTypeId = biology.Id });
+        seed.EntranceHydrologyTags.Add(new EntranceHydrologyTag
+            { Id = "hydrolinkA", EntranceId = entranceId, TagTypeId = hydrology.Id });
+        await seed.SaveChangesAsync();
+        var revision = await new CaveMutationRepository(seed, seed.RequestUser,
+                new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+            .PublishExistingAsync(cave.CaveId, cave.RevisionId, CaveRevisionSource.ManagerEdit,
+                CaveRevisionOperation.Update, _ => { });
+        return new TaggedPublishedCave(cave with { RevisionId = revision.RevisionId! }, biology.Id,
+            hydrology.Id, entranceId);
     }
 
     private static CaveProposalSnapshotV1 Proposal(PublishedCaveTestData cave, string name) => new()

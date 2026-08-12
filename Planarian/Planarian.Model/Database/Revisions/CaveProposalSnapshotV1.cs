@@ -17,7 +17,11 @@ public sealed record CaveProposalSnapshotV1
     public string Name { get; init; } = null!;
     public IReadOnlyList<string> AlternateNames { get; init; } = [];
     public string StateId { get; init; } = null!;
+    public string? StateNameAtRevision { get; init; }
+    public string? StateAbbreviationAtRevision { get; init; }
     public string CountyId { get; init; } = null!;
+    public string? CountyNameAtRevision { get; init; }
+    public string? CountyDisplayIdAtRevision { get; init; }
     public CountyNumberIntent CountyNumberIntent { get; init; }
     public int? RequestedCountyNumber { get; init; }
     public double? LengthFeet { get; init; }
@@ -48,6 +52,7 @@ public sealed record CaveProposalEntranceV1
     public double? Elevation { get; init; }
     public int Srid { get; init; } = 4326;
     public string LocationQualityTagId { get; init; } = null!;
+    public string? LocationQualityNameAtRevision { get; init; }
     public DateTime? ReportedOn { get; init; }
     public double? PitDepthFeet { get; init; }
     public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];

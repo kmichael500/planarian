@@ -17,4 +17,13 @@ internal static class GlobalStateTestData
             values ({id}, {name}, {abbreviation}, now())
             """);
     }
+
+    public static async Task RenameAsync(PostgresTestDatabase database, string id, string name,
+        string abbreviation)
+    {
+        await using var db = database.CreateDbContext("state-rename", accountId: null);
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            update "States" set "Name" = {name}, "Abbreviation" = {abbreviation} where "Id" = {id}
+            """);
+    }
 }

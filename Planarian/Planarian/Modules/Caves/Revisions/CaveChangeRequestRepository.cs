@@ -19,7 +19,8 @@ public sealed record CaveChangeRequestReadRow(
     string? ReviewerName);
 
 public sealed record CaveProposalVersionReadRow(CaveProposalVersion Version, string? ActorName);
-public sealed record CaveProposalVersionDetailReadRow(CaveProposalVersion Version, CaveRevision BaseRevision);
+public sealed record CaveProposalVersionDetailReadRow(CaveProposalVersion Version, CaveRevision BaseRevision,
+    CaveProposalVersion? PreviousVersion, CaveRevision? PreviousBaseRevision);
 
 public sealed class CaveChangeRequestRepository
 {
@@ -201,26 +202,56 @@ public sealed class CaveChangeRequestRepository
         Query(requestId: requestId).SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyList<CaveProposalVersionReadRow>> ListVersionsAsync(string requestId,
-        CancellationToken cancellationToken) =>
-        await (from version in _db.CaveProposalVersions.AsNoTracking()
+        CancellationToken cancellationToken)
+    {
+        var currentVersionId = await _db.CaveChangeRequests.AsNoTracking()
+            .Where(request => request.AccountId == _scope.AccountId && request.Id == requestId)
+            .Select(request => request.CurrentProposalVersionId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (currentVersionId is null) return [];
+
+        var rows = await (from version in _db.CaveProposalVersions.AsNoTracking()
                 join actor in _db.Users.AsNoTracking() on version.CreatedByUserId equals actor.Id into actors
                 from actor in actors.DefaultIfEmpty()
                 where version.AccountId == _scope.AccountId && version.ChangeRequestId == requestId
-                orderby version.CreatedOn
                 select new CaveProposalVersionReadRow(version,
                     actor == null ? null : actor.FirstName + " " + actor.LastName))
             .ToListAsync(cancellationToken);
+        return OrderVersionsByChain(currentVersionId, rows);
+    }
 
-    public Task<CaveProposalVersionDetailReadRow?> GetVersionAsync(string requestId, string versionId,
-        CancellationToken cancellationToken) =>
-        (from version in _db.CaveProposalVersions.AsNoTracking()
+    public async Task<CaveProposalVersionDetailReadRow?> GetVersionAsync(string requestId, string versionId,
+        CancellationToken cancellationToken)
+    {
+        var current = await (from version in _db.CaveProposalVersions.AsNoTracking()
             join revision in _db.CaveRevisions.AsNoTracking()
                 on new { version.AccountId, version.CaveId, Id = version.BaseRevisionId }
                 equals new { revision.AccountId, revision.CaveId, revision.Id }
             where version.AccountId == _scope.AccountId && version.ChangeRequestId == requestId &&
                   version.Id == versionId
-            select new CaveProposalVersionDetailReadRow(version, revision))
+            select new { Version = version, BaseRevision = revision })
         .SingleOrDefaultAsync(cancellationToken);
+        if (current is null) return null;
+
+        CaveProposalVersion? previousVersion = null;
+        CaveRevision? previousBaseRevision = null;
+        if (current.Version.PreviousProposalVersionId is not null)
+        {
+            previousVersion = await _db.CaveProposalVersions.AsNoTracking().SingleOrDefaultAsync(version =>
+                version.AccountId == _scope.AccountId && version.ChangeRequestId == requestId &&
+                version.CaveId == current.Version.CaveId &&
+                version.Id == current.Version.PreviousProposalVersionId, cancellationToken);
+            if (previousVersion is null)
+                throw new InvalidOperationException("The proposal version history has a missing predecessor.");
+            previousBaseRevision = await _db.CaveRevisions.AsNoTracking().SingleOrDefaultAsync(revision =>
+                revision.AccountId == _scope.AccountId && revision.CaveId == previousVersion.CaveId &&
+                revision.Id == previousVersion.BaseRevisionId, cancellationToken)
+                ?? throw new InvalidOperationException("The previous proposal version has a missing base revision.");
+        }
+
+        return new CaveProposalVersionDetailReadRow(current.Version, current.BaseRevision,
+            previousVersion, previousBaseRevision);
+    }
 
     public async Task<Dictionary<string, string>> GetTagNamesAsync(IEnumerable<string> ids,
         CancellationToken cancellationToken)
@@ -329,6 +360,30 @@ public sealed class CaveChangeRequestRepository
         SchemaVersion = proposal.SchemaVersion,
         ProposalJson = CaveProposalJson.Serialize(proposal)
     };
+
+    private static IReadOnlyList<CaveProposalVersionReadRow> OrderVersionsByChain(string currentVersionId,
+        IReadOnlyList<CaveProposalVersionReadRow> rows)
+    {
+        var byId = rows.ToDictionary(row => row.Version.Id, StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var newestFirst = new List<CaveProposalVersionReadRow>(rows.Count);
+        string? nextId = currentVersionId;
+        while (nextId is not null)
+        {
+            if (!visited.Add(nextId))
+                throw new InvalidOperationException("The proposal version history contains a cycle.");
+            if (!byId.TryGetValue(nextId, out var row))
+                throw new InvalidOperationException($"The proposal version history is missing version '{nextId}'.");
+            newestFirst.Add(row);
+            nextId = row.Version.PreviousProposalVersionId;
+        }
+
+        if (visited.Count != rows.Count)
+            throw new InvalidOperationException("The proposal version history contains versions outside the current chain.");
+
+        newestFirst.Reverse();
+        return newestFirst;
+    }
 }
 
 public sealed class CaveProposalVersionConflictException : InvalidOperationException
