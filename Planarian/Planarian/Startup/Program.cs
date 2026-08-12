@@ -443,7 +443,8 @@ builder.Services.AddResponseCompression(options =>
     {
         "application/json",      // all your normal JSON
         "application/geo+json",  // GeoJSON
-        "application/gpx+xml"    // GPX files
+        "application/gpx+xml",   // GPX files
+        "application/vnd.mapbox-vector-tile"
     };
     options.Providers.Add<BrotliCompressionProvider>();
     options.Providers.Add<GzipCompressionProvider>();
