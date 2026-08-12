@@ -341,7 +341,7 @@ public class FileService : ServiceBase<FileRepository>
             await BestEffortDeleteBlobAsync(blobKey, blobContainer);
     }
 
-    public async Task<(Stream Stream, string FileName)> OpenUnpublishedFileAsync(string fileId,
+    public virtual async Task<(Stream Stream, string FileName)> OpenUnpublishedFileAsync(string fileId,
         CancellationToken cancellationToken)
     {
         var file = await Repository.GetFileAccessInfo(fileId);
@@ -367,7 +367,7 @@ public class FileService : ServiceBase<FileRepository>
         return blobs;
     }
 
-    private async Task BestEffortDeleteBlobAsync(string blobKey, string blobContainer)
+    protected virtual async Task BestEffortDeleteBlobAsync(string blobKey, string blobContainer)
     {
         try
         {
@@ -386,7 +386,7 @@ public class FileService : ServiceBase<FileRepository>
 
     #region Blob Storage
 
-    private async Task AddToBlobStorage(Stream stream, string key, string containerName,
+    protected virtual async Task AddToBlobStorage(Stream stream, string key, string containerName,
         CancellationToken cancellationToken)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.BadRequest("Account Id is null");

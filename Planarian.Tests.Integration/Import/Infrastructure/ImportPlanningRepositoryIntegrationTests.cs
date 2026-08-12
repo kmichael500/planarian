@@ -16,13 +16,13 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveProjectionIsAccountSafeCompleteAndUntracked));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var local = await TestDataBuilder.AddTagAsync(database, accountA.AccountId,
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var local = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
             TagTypeKeyConstant.Geology, "Local", "localtag01");
-        var global = await TestDataBuilder.AddTagAsync(database, accountA.AccountId,
+        var global = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
             TagTypeKeyConstant.Geology, "Default", "default001", isDefault: true);
-        var foreign = await TestDataBuilder.AddTagAsync(database, accountB.AccountId,
+        var foreign = await ReferenceTestData.AddTagAsync(database, accountB.AccountId,
             TagTypeKeyConstant.Geology, "Foreign", "foreign001");
         await using (var seed = database.CreateDbContext("seed", accountA.AccountId))
         {
@@ -62,11 +62,11 @@ public sealed class ImportPlanningRepositoryIntegrationTests(PostgresTestServer 
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceProjectionIsAccountSafeAndLargeTargetLoadIsSetOriented));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var quality = await TestDataBuilder.AddTagAsync(database, accountA.AccountId,
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var quality = await ReferenceTestData.AddTagAsync(database, accountA.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "quality001");
-        var foreign = await TestDataBuilder.AddTagAsync(database, accountB.AccountId,
+        var foreign = await ReferenceTestData.AddTagAsync(database, accountB.AccountId,
             TagTypeKeyConstant.EntranceStatus, "Foreign", "foreign002");
 
         const int targetCount = 300;

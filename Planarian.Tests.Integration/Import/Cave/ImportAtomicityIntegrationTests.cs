@@ -20,7 +20,7 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CaveSecondRecordLateFailureRollsBackCompleteState));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         CaveImportPlan plan;
         await using (var planningDb = database.CreateDbContext("a", tenant.AccountId))
         {
@@ -56,10 +56,10 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceSecondRecordLateFailureRollsBackCompleteState));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        await TestDataBuilder.AddCaveAsync(database, tenant, caveId: "secondcav0", countyNumber: 2,
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CaveTestDataFactory.AddCaveAsync(database, tenant, caveId: "secondcav0", countyNumber: 2,
             name: "Second");
-        await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade");
 
         EntranceImportPlan plan;

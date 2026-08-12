@@ -4,7 +4,7 @@ using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
 using Xunit;
 
-namespace Planarian.Tests;
+namespace Planarian.Tests.Unit.Caves.Revisions;
 
 public class CaveRevisionFoundationTests
 {

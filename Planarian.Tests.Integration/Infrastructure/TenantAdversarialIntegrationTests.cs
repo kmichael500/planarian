@@ -13,8 +13,8 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
     public async Task AccountACannotSnapshotAccountBCave()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(AccountACannotSnapshotAccountBCave));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
@@ -27,8 +27,8 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
     public async Task AccountACannotMutateAccountBCave()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(AccountACannotMutateAccountBCave));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
@@ -51,9 +51,9 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
     {
         await using var database = await fixture.CreateDatabaseAsync(
             $"{nameof(AccountACannotReferenceAccountBRevision)}_{relation}");
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var requestA = await TestDataBuilder.CreateChangeRequestAsync(database, accountA);
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var requestA = await CaveChangeRequestTestDataFactory.CreateChangeRequestAsync(database, accountA);
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         if (relation == "PreviousRevisionId")
@@ -84,10 +84,10 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
     public async Task AccountACannotAttachAccountBFileToStagedRequest()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(AccountACannotAttachAccountBFileToStagedRequest));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var requestA = await TestDataBuilder.CreateChangeRequestAsync(database, accountA);
-        var reviewB = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, accountB);
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var requestA = await CaveChangeRequestTestDataFactory.CreateChangeRequestAsync(database, accountA);
+        var reviewB = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, accountB);
 
         await using (var db = database.CreateDbContext("a", accountA.AccountId))
         {
@@ -110,10 +110,10 @@ public sealed class TenantAdversarialIntegrationTests(PostgresTestServer fixture
     public async Task WorkflowFiltersHideAllAccountBRowsFromAccountA()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(WorkflowFiltersHideAllAccountBRowsFromAccountA));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var batchB = await TestDataBuilder.AddImportBatchAsync(database, accountB);
-        var reviewB = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, accountB);
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var batchB = await ImportTestData.AddImportBatchAsync(database, accountB);
+        var reviewB = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, accountB);
 
         await using var db = database.CreateDbContext("a", accountA.AccountId);
 

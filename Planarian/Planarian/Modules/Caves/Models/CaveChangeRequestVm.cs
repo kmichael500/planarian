@@ -71,6 +71,24 @@ public enum CaveProposalCountyNumberMode
 
 public sealed record CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode Mode, int? Number = null);
 
+public static class CaveProposalCountyNumberPresentation
+{
+    public static CaveProposalCountyNumberStateVm Resolve(CaveProposalSnapshotV1 proposal,
+        CavePublishedSnapshotV1 baseSnapshot)
+    {
+        if (proposal.CountyNumberIntent == CountyNumberIntent.Manual)
+            return new CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode.Manual,
+                proposal.RequestedCountyNumber);
+        if (proposal.CountyId == baseSnapshot.County.Id)
+            return new CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode.PreserveExisting,
+                baseSnapshot.CountyNumber);
+        return new CaveProposalCountyNumberStateVm(
+            proposal.CountyNumberIntent == CountyNumberIntent.FirstAvailable
+                ? CaveProposalCountyNumberMode.FirstAvailable
+                : CaveProposalCountyNumberMode.AutomaticNext);
+    }
+}
+
 public sealed record CaveProposalCountyNumberChangeVm(
     CaveProposalCountyNumberStateVm Previous,
     CaveProposalCountyNumberStateVm Current);

@@ -22,7 +22,7 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             $"{nameof(CaveDryRunPlanningAndPreviewPersistNothing)}_{sync}");
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var writes = new RejectWriteCommandInterceptor();
 
@@ -52,7 +52,7 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             $"{nameof(EntranceDryRunPlanningAndPreviewPersistNothing)}_{sync}");
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var before = await NormalizedDatabaseState.CaptureAllAsync(database);
         var writes = new RejectWriteCommandInterceptor();
 

@@ -15,7 +15,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task CaveNameOverModelMaximumIsRejected()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(CaveNameOverModelMaximumIsRejected));
-        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
+        var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
         var planner = new CaveImportTestHarness(db, db.RequestUser);
         var name = new string('x', PropertyLength.Name + 1);
@@ -28,7 +28,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task EntranceNameOverModelMaximumIsRejected()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(EntranceNameOverModelMaximumIsRejected));
-        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
+        var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
         var planner = new EntranceImportTestHarness(db, db.RequestUser);
         var name = new string('x', PropertyLength.Name + 1);
@@ -41,7 +41,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task DuplicateEntranceTagInputProducesOneSemanticAssociation()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(DuplicateEntranceTagInputProducesOneSemanticAssociation));
-        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
+        var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
         await using var db = d.CreateDbContext("a", t.AccountId);
         var planner = new EntranceImportTestHarness(db, db.RequestUser);
         await using var csv = ImportDryRunIntegrationTests.CsvStream(ImportDryRunIntegrationTests.EntranceHeader + "\n" +
@@ -59,8 +59,8 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task CaveSyncDeleteReturnsBlobCleanupOnlyAfterRelationalCommit()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(CaveSyncDeleteReturnsBlobCleanupOnlyAfterRelationalCommit));
-        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
-        var testFile = await TestDataBuilder.AddFileAsync(d, t);
+        var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
+        var testFile = await FileTestDataFactory.AddFileAsync(d, t);
         await using (var seed = d.CreateDbContext("a", t.AccountId))
         {
             var file = await seed.Files.SingleAsync(f => f.Id == testFile.FileId);
@@ -86,7 +86,7 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
     public async Task DefaultEntranceTagIsReusable()
     {
         await using var d = await fixture.CreateDatabaseAsync(nameof(DefaultEntranceTagIsReusable));
-        var t = await TestDataBuilder.CreatePublishedCaveAsync(d, 'a');
+        var t = await CaveTestDataFactory.CreatePublishedCaveAsync(d, 'a');
         string id;
         await using (var seed = d.CreateDbContext("a", t.AccountId))
         {

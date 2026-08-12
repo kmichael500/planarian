@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Modules.Caves.Repositories;
 using Xunit;
 
-namespace Planarian.Tests;
+using Planarian.Tests;
+
+namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveDeleteStagedFileCleanupIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
@@ -12,10 +14,10 @@ public sealed class CaveDeleteStagedFileCleanupIntegrationTests(PostgresTestServ
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(StagedFileCleanupRemovesOnlyCurrentAccountReferences));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var reviewA = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, accountA);
-        var reviewB = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, accountB);
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var reviewA = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, accountA);
+        var reviewB = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, accountB);
 
         await using (var db = database.CreateDbContext("manager", accountA.AccountId))
         {

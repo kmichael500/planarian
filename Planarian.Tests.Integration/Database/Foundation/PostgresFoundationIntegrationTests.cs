@@ -72,10 +72,10 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ProposalVersionForeignKeyRejectsRequestFromAnotherCaveInSameAccount));
-        var caveA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var caveBSeed = await TestDataBuilder.AddCaveAsync(database, caveA, "cave00000b", "Cave B", 2);
-        var caveB = await TestDataBuilder.PublishBaselineRevisionAsync(database, caveBSeed, "revision0b");
-        var request = await TestDataBuilder.CreateChangeRequestAsync(database, caveA);
+        var caveA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var caveBSeed = await CaveTestDataFactory.AddCaveAsync(database, caveA, "cave00000b", "Cave B", 2);
+        var caveB = await CaveTestDataFactory.PublishBaselineRevisionAsync(database, caveBSeed, "revision0b");
+        var request = await CaveChangeRequestTestDataFactory.CreateChangeRequestAsync(database, caveA);
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
@@ -96,11 +96,11 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(StagedFileForeignKeyRejectsForeignFileAndAllowsSameAccountFile));
-        var a = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var b = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var request = await TestDataBuilder.CreateChangeRequestAsync(database, a);
-        var aFile = await TestDataBuilder.AddFileAsync(database, a);
-        var bFile = await TestDataBuilder.AddFileAsync(database, b);
+        var a = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var b = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var request = await CaveChangeRequestTestDataFactory.CreateChangeRequestAsync(database, a);
+        var aFile = await FileTestDataFactory.AddFileAsync(database, a);
+        var bFile = await FileTestDataFactory.AddFileAsync(database, b);
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
@@ -144,7 +144,7 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task CaveXminRejectsStaleWriterAndVersionChanges()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveXminRejectsStaleWriterAndVersionChanges));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
 
         await using var first = database.CreateDbContext("first", tenant.AccountId);
         await using var stale = database.CreateDbContext("stale", tenant.AccountId);
@@ -164,8 +164,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
     public async Task CaveChangeRequestXminRejectsStaleWriterAndVersionChanges()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveChangeRequestXminRejectsStaleWriterAndVersionChanges));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var request = await TestDataBuilder.CreateChangeRequestAsync(database, tenant);
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var request = await CaveChangeRequestTestDataFactory.CreateChangeRequestAsync(database, tenant);
 
         await using var first = database.CreateDbContext("first", tenant.AccountId);
         await using var stale = database.CreateDbContext("stale", tenant.AccountId);

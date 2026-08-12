@@ -13,8 +13,8 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveSyncCannotUpdateForeignCollidingCave));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         await MakeCountyCodeCollideAsync(database, accountB, "A01");
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
         await using var db = database.CreateDbContext("a", accountA.AccountId);
@@ -37,8 +37,8 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveSyncCannotDeleteForeignCave));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
@@ -60,8 +60,8 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(EntranceCannotAssociateToForeignCave));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
@@ -80,8 +80,8 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ForeignPrimaryEntranceDoesNotAffectAccountAPrimaryCount));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         await AddPrimaryEntranceAsync(database, accountB, "bprimary00");
         await MakeCountyCodeCollideAsync(database, accountB, "A01");
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
@@ -106,8 +106,8 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceSyncDoesNotDeleteForeignEntrancesOrTags));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         await AddPrimaryEntranceAsync(database, accountA, "aprimary00");
         await AddPrimaryEntranceAsync(database, accountB, "bprimary00");
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
@@ -130,9 +130,9 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(ForeignCustomTagIsNeverReusable));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var foreignTag = await TestDataBuilder.AddTagAsync(database, accountB.AccountId,
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var foreignTag = await ReferenceTestData.AddTagAsync(database, accountB.AccountId,
             TagTypeKeyConstant.EntranceStatus, "Foreign Status");
         var accountBBefore = await NormalizedDatabaseState.CaptureTenantAsync(database, accountB.AccountId);
         await using var db = database.CreateDbContext("a", accountA.AccountId);
@@ -164,11 +164,11 @@ public sealed class ImportTenantAdversarialIntegrationTests(PostgresTestServer f
     private static async Task AddPrimaryEntranceAsync(
         PostgresTestDatabase database, PublishedCaveTestData tenant, string entranceId)
     {
-        var quality = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade");
-        var status = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        var status = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.EntranceStatus, "Open");
-        await TestDataBuilder.AddEntranceAsync(database, tenant, entranceId,
+        await EntranceTestData.AddEntranceAsync(database, tenant, entranceId,
             isPrimary: true, locationQualityTagId: quality.Id, entranceStatusTagId: status.Id);
     }
 }

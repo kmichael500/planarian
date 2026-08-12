@@ -1,7 +1,7 @@
 using Planarian.Model.Database.Revisions;
 using Xunit;
 
-namespace Planarian.Tests;
+namespace Planarian.Tests.Unit.Caves.Revisions;
 
 public sealed class CaveRevisionMetadataDiffTests
 {

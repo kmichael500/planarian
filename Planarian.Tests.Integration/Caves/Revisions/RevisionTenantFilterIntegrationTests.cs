@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace Planarian.Tests;
+using Planarian.Tests;
+
+namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class RevisionTenantFilterIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
@@ -10,12 +12,12 @@ public sealed class RevisionTenantFilterIntegrationTests(PostgresTestServer fixt
     public async Task NormalWorkflowQueriesExposeOnlyActiveAccountRows()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(NormalWorkflowQueriesExposeOnlyActiveAccountRows));
-        var a = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var b = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var aBatch = await TestDataBuilder.AddImportBatchAsync(database, a);
-        var bBatch = await TestDataBuilder.AddImportBatchAsync(database, b);
-        var aReview = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, a);
-        var bReview = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, b);
+        var a = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var b = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var aBatch = await ImportTestData.AddImportBatchAsync(database, a);
+        var bBatch = await ImportTestData.AddImportBatchAsync(database, b);
+        var aReview = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, a);
+        var bReview = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, b);
 
         await using var db = database.CreateDbContext("user-a", a.AccountId);
         Assert.True(await db.CaveRevisions.AnyAsync(r => r.Id == a.RevisionId));
@@ -34,9 +36,9 @@ public sealed class RevisionTenantFilterIntegrationTests(PostgresTestServer fixt
     public async Task NullAccountWorkflowQueriesFailClosed()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(NullAccountWorkflowQueriesFailClosed));
-        var cave = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        await TestDataBuilder.AddImportBatchAsync(database, cave);
-        await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, cave);
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await ImportTestData.AddImportBatchAsync(database, cave);
+        await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, cave);
         await using var db = database.CreateDbContext("anonymous", null);
         Assert.Empty(await db.CaveRevisions.ToListAsync());
         Assert.Empty(await db.CaveImportBatches.ToListAsync());
@@ -49,12 +51,12 @@ public sealed class RevisionTenantFilterIntegrationTests(PostgresTestServer fixt
     public async Task TrustedBypassRestoresExplicitAccountPredicate()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(TrustedBypassRestoresExplicitAccountPredicate));
-        var a = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var b = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var aBatch = await TestDataBuilder.AddImportBatchAsync(database, a);
-        await TestDataBuilder.AddImportBatchAsync(database, b);
-        var aReview = await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, a);
-        await TestDataBuilder.CreatePendingReviewWithStagedFileAsync(database, b);
+        var a = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var b = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var aBatch = await ImportTestData.AddImportBatchAsync(database, a);
+        await ImportTestData.AddImportBatchAsync(database, b);
+        var aReview = await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, a);
+        await CaveChangeRequestTestDataFactory.CreatePendingReviewWithStagedFileAsync(database, b);
         await using var db = database.CreateDbContext("trusted-a", a.AccountId);
 
         Assert.Equal([a.RevisionId], await db.CaveRevisions.IgnoreQueryFilters()

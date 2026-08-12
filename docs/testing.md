@@ -24,6 +24,28 @@ Raw SQL in tests is reserved for provider contracts and observations (catalogs, 
 or exact no-write checks), historical migration setup, and dedicated scale seeding. Routine domain arrangement uses
 typed builders.
 
+## Readable test architecture
+
+Tests are executable documentation. An ordinary test should make its starting state, actor, primary operation, and
+expected outcome apparent without requiring the reader to follow several helpers. Shared helpers hide mechanical
+plumbing such as database creation, authentication, and valid service composition; business-significant setup such as
+permission grants, file staging, reference removal, stale-base creation, and competing transactions remains visible.
+
+Keep test classes cohesive by behavior. Prefer one primary act per ordinary test, split independently meaningful
+failures, and use theories when several inputs exercise the same rule. Longer multi-actor transaction tests are the
+exception when their visible interleaving is the behavior under test.
+
+Production services used as systems under test must have complete, non-null dependency graphs. Service integration
+tests use real repositories and the current test `PlanarianDbContext`, with explicit test implementations only at true
+external boundaries. Never pass `null!` for a required dependency because one test path is believed not to use it.
+
+Each ordinary integration test owns an isolated database. The PostgreSQL/PostGIS server may be shared across test
+classes, but mutable scenario state may not be shared. Do not serialize a whole feature to compensate for hidden shared
+state; use an existing nonparallel collection only for the smallest resource that genuinely requires it.
+
+Prefer small typed factories, actor setup, permission helpers, and focused assertions over a general scenario DSL.
+Readable duplication is better than an abstraction that conceals why the behavior occurs.
+
 Unit-test pure parsing, planning, validation, matching, defaults, preview, and domain rules. Integration-test real
 translation, tenant isolation, transaction/atomicity behavior, locking/concurrency, PostGIS, revision publication,
 and deferred cleanup. Import harnesses may remove wiring while keeping CSV inputs and persistence expectations visible.

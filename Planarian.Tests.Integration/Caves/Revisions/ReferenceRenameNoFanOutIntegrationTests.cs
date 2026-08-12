@@ -6,7 +6,9 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Xunit;
 
-namespace Planarian.Tests;
+using Planarian.Tests;
+
+namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
@@ -15,7 +17,7 @@ public sealed class ReferenceRenameNoFanOutIntegrationTests(PostgresTestServer f
     public async Task SharedTagRenameDoesNotFanOutButNextLegitimateRevisionCapturesRename()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(SharedTagRenameDoesNotFanOutButNextLegitimateRevisionCapturesRename));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var caveIds = new[] { tenant.CaveId, "cave00000b", "cave00000c" };
         string tagId;
 

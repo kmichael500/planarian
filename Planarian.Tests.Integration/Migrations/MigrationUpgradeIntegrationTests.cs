@@ -10,6 +10,7 @@ using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Tags.Repositories;
 using Xunit;
+using Planarian.Tests.Integration.Infrastructure.Services;
 
 namespace Planarian.Tests;
 
@@ -54,7 +55,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         var previousMigration = database.GetMigrationNames().Single(migration =>
             migration.EndsWith("_StagedFileTenantForeignKey", StringComparison.Ordinal));
         await database.MigrateAsync(previousMigration);
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
@@ -196,7 +197,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         {
             await using var db = database.CreateDbContext(contextName, accountId);
             await db.RequestUser.Initialize(accountId, contributorId);
-            return await CreateChangeRequestService(db).GetAuthoringContextAsync(caveId, default);
+            return await IntegrationTestServices.For(db).CaveChangeRequests.GetAuthoringContextAsync(caveId, default);
         }
 
         var contexts = await Task.WhenAll(InitializeAsync("legacy-init-a"), InitializeAsync("legacy-init-b"));
@@ -207,7 +208,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         await using (var contributor = database.CreateDbContext(contributorId, accountId))
         {
             await contributor.RequestUser.Initialize(accountId, contributorId);
-            var service = CreateChangeRequestService(contributor);
+            var service = IntegrationTestServices.For(contributor).CaveChangeRequests;
             var authoring = await service.GetAuthoringContextAsync(caveId, default);
             var values = LegacyValues(authoring.Cave);
             values.Name = "Proposed legacy Cave name";
@@ -294,19 +295,6 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         Assert.True(await reader.ReadAsync());
         Assert.True(reader.GetBoolean(0));
         Assert.Equal("YES", reader.GetString(1));
-    }
-
-    private static CaveChangeRequestService CreateChangeRequestService(
-        Planarian.Model.Database.PlanarianDbContext db)
-    {
-        var user = db.RequestUser;
-        var snapshots = new CavePublishedSnapshotRepository(db, user);
-        var mutations = new CaveMutationCoordinator(new CaveMutationRepository(db, user, snapshots));
-        var caveService = new CaveService(new CaveRepository(db, user), user, null!,
-            new TagRepository(db, user), null!, null!, mutations);
-        return new CaveChangeRequestService(new CaveChangeRequestRepository(db, user),
-            new CaveRepository(db, user), caveService, new CaveRevisionQueryRepository(db, user),
-            mutations, null!, user);
     }
 
     private static AddCaveVm LegacyValues(CaveVm cave) => new()

@@ -67,7 +67,7 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
         await using var databaseB = await fixture.CreateDatabaseAsync(
             nameof(TwoLatestSchemaClonesKeepTenantDataIsolated) + "_b");
 
-        await TestDataBuilder.CreatePublishedCaveAsync(databaseA, 'a');
+        await CaveTestDataFactory.CreatePublishedCaveAsync(databaseA, 'a');
 
         Assert.Equal(1, await CountRowsAsync(databaseA, "Accounts"));
         Assert.Equal(1, await CountRowsAsync(databaseA, "Caves"));
@@ -81,7 +81,7 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
         await using (var mutated = await fixture.CreateDatabaseAsync(
                          nameof(MutatingCloneDoesNotDirtyTemplateOrSubsequentClone) + "_mutated"))
         {
-            await TestDataBuilder.CreatePublishedCaveAsync(mutated, 't');
+            await CaveTestDataFactory.CreatePublishedCaveAsync(mutated, 't');
             Assert.Equal(1, await CountRowsAsync(mutated, "Accounts"));
         }
 

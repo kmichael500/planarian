@@ -8,7 +8,9 @@ using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Xunit;
 
-namespace Planarian.Tests;
+using Planarian.Tests;
+
+namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
@@ -17,8 +19,8 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
     public async Task ProjectionReaderMatchesLegacyIncludeReaderForRepresentativeAggregate()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(ProjectionReaderMatchesLegacyIncludeReaderForRepresentativeAggregate));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var testFile = await TestDataBuilder.AddFileAsync(database, tenant);
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var testFile = await FileTestDataFactory.AddFileAsync(database, tenant);
         await using (var db = database.CreateDbContext("manager", tenant.AccountId))
         {
             var geology = Tag(tenant.AccountId, "geology", "Limestone");

@@ -18,10 +18,10 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ExistingLocationQualityAndStatusAreReusedAndPersistCanonicalNames));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var quality = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade");
-        var status = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        var status = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.EntranceStatus, "Open");
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
@@ -50,7 +50,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaseVariantsAcrossRowsCreateAndPersistOneEntranceTag));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
         var csv = EntranceCsv(
@@ -74,9 +74,9 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(ForeignCustomEntranceTagIsNotAssociatedAndLocalIntentPersists));
-        var accountA = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        var accountB = await TestDataBuilder.CreatePublishedCaveAsync(database, 'b');
-        var foreign = await TestDataBuilder.AddTagAsync(database, accountB.AccountId,
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var foreign = await ReferenceTestData.AddTagAsync(database, accountB.AccountId,
             TagTypeKeyConstant.EntranceStatus, "Open");
         await using var db = database.CreateDbContext("a", accountA.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
@@ -99,7 +99,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(FullInsertPersistsScalarsTagsAndPostgisXyz));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
         var csv = EntranceCsv("Main,A01,1,true,35.123456,-86.654321,612.5,Survey Grade,22.5," +
@@ -134,8 +134,8 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncReplacementPersistsOnePrimaryAndPublishesRevision));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        await TestDataBuilder.AddEntranceAsync(database, tenant, "existing00");
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await EntranceTestData.AddEntranceAsync(database, tenant, "existing00");
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var priorRevision = (await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId))
             .CurrentRevisionId;
@@ -171,13 +171,13 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(SyncPreservesUnrelatedCaveAggregateAndRevisionPointer));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
-        await TestDataBuilder.AddEntranceAsync(database, tenant, "existing00");
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await EntranceTestData.AddEntranceAsync(database, tenant, "existing00");
         var accountCounty = new AccountCountyTestData(tenant.AccountId, tenant.StateId, tenant.StateName,
             tenant.StateAbbreviation, tenant.CountyId, tenant.CountyName, tenant.CountyDisplayId);
-        var unrelated = await TestDataBuilder.AddCaveAsync(database, accountCounty, "secondcav0", "Second", 2);
-        var unrelatedPublished = await TestDataBuilder.PublishBaselineRevisionAsync(database, unrelated, "revision02");
-        var secondQuality = await TestDataBuilder.AddTagAsync(database, tenant.AccountId,
+        var unrelated = await CaveTestDataFactory.AddCaveAsync(database, accountCounty, "secondcav0", "Second", 2);
+        var unrelatedPublished = await CaveTestDataFactory.PublishBaselineRevisionAsync(database, unrelated, "revision02");
+        var secondQuality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Second Quality");
         await using (var seed = database.CreateDbContext("a", tenant.AccountId))
         {
@@ -220,7 +220,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CommitAbortsIfTargetCaveChangesAfterPlanning));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         EntranceImportPlan plan;
         await using (var planningDb = database.CreateDbContext("a", tenant.AccountId))
         {

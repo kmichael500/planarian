@@ -1,39 +1,50 @@
 using Planarian.Model.Database.Revisions;
 using Xunit;
 
-namespace Planarian.Tests;
+namespace Planarian.Tests.Unit.Caves.Revisions;
 
 public sealed class CaveRevisionNestedDiffTests
 {
     private readonly CaveRevisionDiffService _diff = new();
 
-    [Fact]
-    public void EntranceScalarDetailsComeFromTheAuthoritativeComparison()
+    [Theory]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Name))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.IsPrimary))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Description))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.ReportedByUserId))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Latitude))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Longitude))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Elevation))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.Srid))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.LocationQualityTagId))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.ReportedOn))]
+    [InlineData(nameof(CaveEntranceSnapshotV1.PitDepthFeet))]
+    public void EntranceScalarDetailsComeFromTheAuthoritativeComparison(string path)
     {
         var original = Entrance();
-        var cases = new (string Path, CaveEntranceSnapshotV1 Changed)[]
+        var changed = path switch
         {
-            (nameof(CaveEntranceSnapshotV1.Name), original with { Name = "North" }),
-            (nameof(CaveEntranceSnapshotV1.IsPrimary), original with { IsPrimary = true }),
-            (nameof(CaveEntranceSnapshotV1.Description), original with { Description = "Changed" }),
-            (nameof(CaveEntranceSnapshotV1.ReportedByUserId), original with { ReportedByUserId = "user-2" }),
-            (nameof(CaveEntranceSnapshotV1.Latitude), original with { Latitude = 36 }),
-            (nameof(CaveEntranceSnapshotV1.Longitude), original with { Longitude = -87 }),
-            (nameof(CaveEntranceSnapshotV1.Elevation), original with { Elevation = 0 }),
-            (nameof(CaveEntranceSnapshotV1.Srid), original with { Srid = 4269 }),
-            (nameof(CaveEntranceSnapshotV1.LocationQualityTagId), original with { LocationQualityTagId = "estimated", LocationQualityNameAtRevision = "Estimated" }),
-            (nameof(CaveEntranceSnapshotV1.ReportedOn), original with { ReportedOn = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc) }),
-            (nameof(CaveEntranceSnapshotV1.PitDepthFeet), original with { PitDepthFeet = 0 })
+            nameof(CaveEntranceSnapshotV1.Name) => original with { Name = "North" },
+            nameof(CaveEntranceSnapshotV1.IsPrimary) => original with { IsPrimary = true },
+            nameof(CaveEntranceSnapshotV1.Description) => original with { Description = "Changed" },
+            nameof(CaveEntranceSnapshotV1.ReportedByUserId) => original with { ReportedByUserId = "user-2" },
+            nameof(CaveEntranceSnapshotV1.Latitude) => original with { Latitude = 36 },
+            nameof(CaveEntranceSnapshotV1.Longitude) => original with { Longitude = -87 },
+            nameof(CaveEntranceSnapshotV1.Elevation) => original with { Elevation = 0 },
+            nameof(CaveEntranceSnapshotV1.Srid) => original with { Srid = 4269 },
+            nameof(CaveEntranceSnapshotV1.LocationQualityTagId) => original with
+                { LocationQualityTagId = "estimated", LocationQualityNameAtRevision = "Estimated" },
+            nameof(CaveEntranceSnapshotV1.ReportedOn) => original with
+                { ReportedOn = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc) },
+            nameof(CaveEntranceSnapshotV1.PitDepthFeet) => original with { PitDepthFeet = 0 },
+            _ => throw new ArgumentOutOfRangeException(nameof(path), path, null)
         };
 
-        foreach (var (path, changed) in cases)
-        {
-            var diff = _diff.Compare(Snapshot(original), Snapshot(changed));
-            var detail = Assert.Single(diff.EntranceChanges);
-            var scalar = Assert.Single(detail.Scalars);
-            Assert.Equal(path, scalar.Key);
-            Assert.Equal([original.Id], diff.ChangedEntrances);
-        }
+        var diff = _diff.Compare(Snapshot(original), Snapshot(changed));
+        var detail = Assert.Single(diff.EntranceChanges);
+        var scalar = Assert.Single(detail.Scalars);
+        Assert.Equal(path, scalar.Key);
+        Assert.Equal([original.Id], diff.ChangedEntrances);
     }
 
     [Fact]
@@ -81,24 +92,26 @@ public sealed class CaveRevisionNestedDiffTests
         Assert.Equal(detail.EntranceId, Assert.Single(diff.ChangedEntrances));
     }
 
-    [Fact]
-    public void FileScalarDetailsComeFromTheAuthoritativeComparison()
+    [Theory]
+    [InlineData(nameof(CaveFileSnapshotV1.FileTypeTagId))]
+    [InlineData(nameof(CaveFileSnapshotV1.FileName))]
+    [InlineData(nameof(CaveFileSnapshotV1.DisplayName))]
+    public void FileScalarDetailsComeFromTheAuthoritativeComparison(string path)
     {
         var original = File();
-        var cases = new (string Path, CaveFileSnapshotV1 Changed)[]
+        var changed = path switch
         {
-            (nameof(CaveFileSnapshotV1.FileTypeTagId), original with { FileTypeTagId = "photo", FileTypeNameAtRevision = "Photo" }),
-            (nameof(CaveFileSnapshotV1.FileName), original with { FileName = "new.pdf" }),
-            (nameof(CaveFileSnapshotV1.DisplayName), original with { DisplayName = "New map" })
+            nameof(CaveFileSnapshotV1.FileTypeTagId) => original with
+                { FileTypeTagId = "photo", FileTypeNameAtRevision = "Photo" },
+            nameof(CaveFileSnapshotV1.FileName) => original with { FileName = "new.pdf" },
+            nameof(CaveFileSnapshotV1.DisplayName) => original with { DisplayName = "New map" },
+            _ => throw new ArgumentOutOfRangeException(nameof(path), path, null)
         };
 
-        foreach (var (path, changed) in cases)
-        {
-            var diff = _diff.Compare(Snapshot(files: [original]), Snapshot(files: [changed]));
-            var detail = Assert.Single(diff.FileChanges);
-            Assert.Equal(path, Assert.Single(detail.Scalars).Key);
-            Assert.Equal([original.Id], diff.ChangedFiles);
-        }
+        var diff = _diff.Compare(Snapshot(files: [original]), Snapshot(files: [changed]));
+        var detail = Assert.Single(diff.FileChanges);
+        Assert.Equal(path, Assert.Single(detail.Scalars).Key);
+        Assert.Equal([original.Id], diff.ChangedFiles);
     }
 
     [Fact]

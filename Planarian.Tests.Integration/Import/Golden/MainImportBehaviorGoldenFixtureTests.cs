@@ -14,7 +14,9 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
 using Xunit;
 
-namespace Planarian.Tests;
+using Planarian.Tests;
+
+namespace Planarian.Tests.Integration.Import.Golden;
 
 public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
@@ -58,7 +60,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         var item = Assert.Single(LoadFixture().Cases,
             value => value.Area == area && value.Behavior == behavior);
         await using var database = await fixture.CreateDatabaseAsync($"golden_{area}_{behavior}");
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await ApplySetupAsync(database, tenant, item.Setup);
 
         var beforeDatabase = await NormalizedDatabaseState.CaptureAllAsync(database);
@@ -377,7 +379,7 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
                 return;
             case "existing-entrance-and-file":
                 await SeedEntranceAsync(database, tenant, "preserved0", "Preserved", true);
-                var testFile = await TestDataBuilder.AddFileAsync(database, tenant);
+                var testFile = await FileTestDataFactory.AddFileAsync(database, tenant);
                 await using (var db = database.CreateDbContext("a", tenant.AccountId))
                 {
                     var file = await db.Files.SingleAsync(value => value.Id == testFile.FileId);
@@ -455,209 +457,4 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
         return tags.Select(tag => GoldenTagType.From(tag, accountId))
             .OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ThenBy(tag => tag.Ownership).ToList();
     }
-}
-
-internal sealed class GoldenFixture
-{
-    public string BaselineCommit { get; init; } = string.Empty;
-    public List<ApprovedSemanticDifference> ApprovedSemanticDifferences { get; init; } = [];
-    public List<GoldenCase> Cases { get; init; } = [];
-}
-
-internal sealed record ApprovedSemanticDifference(string Id, string BaselineCommit, List<string> AffectedAreas,
-    string HistoricalBehavior, string TargetBehavior, string Rationale);
-
-internal sealed class GoldenCase
-{
-    public string Area { get; init; } = string.Empty;
-    public string Behavior { get; init; } = string.Empty;
-    public string Setup { get; init; } = "default";
-    public string InputCsv { get; init; } = string.Empty;
-    public bool Sync { get; init; }
-    public GoldenValidation Validation { get; init; } = new();
-    public GoldenPreview? BaselinePreview { get; init; }
-    public GoldenCommittedState? BaselineCommitted { get; init; }
-    public GoldenTargetOverride? TargetOverride { get; init; }
-    public string CoverageTest { get; init; } = string.Empty;
-    public GoldenPreview TargetPreview => TargetOverride?.Preview ?? BaselinePreview!;
-    public GoldenCommittedState TargetCommitted
-    {
-        get
-        {
-            var preview = TargetPreview;
-            var committed = TargetOverride?.Committed ?? BaselineCommitted!;
-            return committed.WithExpectedTagTypes(preview.TagCreations);
-        }
-    }
-}
-
-internal sealed record GoldenTargetOverride(string ApprovedDifferenceId, GoldenPreview Preview,
-    GoldenCommittedState Committed);
-
-internal sealed record GoldenValidation(string Outcome = "", int StatusCode = 0, string? ErrorCode = null,
-    string? Message = null, string? ReasonContains = null);
-
-internal sealed record GoldenPreview(
-    List<GoldenCavePreview> Caves,
-    List<GoldenEntrancePreview> Entrances,
-    List<string> CountyCreations,
-    List<string> TagCreations)
-{
-    public static GoldenPreview From(CaveImportPlan plan) => new(
-        plan.CreatePreview(omitNoChange: true).Select(GoldenCavePreview.From).ToList(), [],
-        plan.CountyCreations.Select(value => $"{value.DisplayId}:{value.Name}").Order().ToList(),
-        plan.TagCreations.Select(value => $"{value.Key}:{value.Name}").Order().ToList());
-
-    public static GoldenPreview From(EntranceImportPlan plan) => new([], plan.CreatePreview()
-            .Select(GoldenEntrancePreview.From).ToList(), [],
-        plan.TagCreations.Select(value => $"{value.Key}:{value.Name}").Order().ToList());
-}
-
-internal sealed record GoldenCavePreview(
-    string Action, string Key, string Name, string State, string CountyName,
-    List<string> AlternateNames, double? LengthFeet, double? DepthFeet, double? MaxPitDepthFeet,
-    int? NumberOfPits, string? ReportedOn, bool IsArchived, string? Narrative,
-    SortedDictionary<string, List<string>> Tags)
-{
-    public static GoldenCavePreview From(Planarian.Modules.Account.Import.Models.CaveDryRunRecord value) => new(
-        value.Action, $"{value.CountyCode}-{value.CountyCaveNumber}", value.CaveName, value.State,
-        value.CountyName, value.AlternateNames.Order().ToList(), value.CaveLengthFeet, value.CaveDepthFeet,
-        value.MaxPitDepthFeet, value.NumberOfPits, GoldenSemantic.Date(value.ReportedOnDate), value.IsArchived,
-        value.Narrative, GoldenSemantic.CaveTags(value.Geology, value.GeologicAges, value.MapStatuses,
-            value.PhysiographicProvinces, value.Archeology, value.Biology, value.OtherTags,
-            value.CartographerNames, value.ReportedByNames));
-}
-
-internal sealed record GoldenEntrancePreview(
-    string CaveKey, int CountChange, string? Name, bool IsPrimary, double Latitude, double Longitude,
-    double Elevation, string LocationQuality, double? PitDepthFeet, string? ReportedOn, string? Description,
-    SortedDictionary<string, List<string>> Tags)
-{
-    public static GoldenEntrancePreview From(Planarian.Modules.Account.Import.Models.EntranceDryRun value)
-    {
-        var caveKey = value.AssociatedCave.Split(' ', 2)[0];
-        return new GoldenEntrancePreview(caveKey, value.EntranceCountChange, value.EntranceName,
-            value.IsPrimaryEntrance, value.DecimalLatitude, value.DecimalLongitude, value.EntranceElevationFt,
-            value.LocationQuality, value.EntrancePitDepth, GoldenSemantic.Date(value.ReportedOnDate),
-            value.EntranceDescription, GoldenSemantic.EntranceTags(value.EntranceStatuses,
-                value.EntranceHydrology, value.FieldIndication, value.ReportedByNames));
-    }
-}
-
-internal sealed record CaveMarker(uint Version, string? RevisionId);
-
-internal sealed record GoldenCommittedState(
-    List<string> TenantCaveKeys,
-    List<string> TenantCountyCodes,
-    List<GoldenCommittedCave> Caves,
-    GoldenTagTypeDelta? TagTypes = null)
-{
-    public GoldenCommittedState WithExpectedTagTypes(IEnumerable<string> tagCreations) => TagTypes is not null
-        ? this
-        : this with
-        {
-            TagTypes = new GoldenTagTypeDelta(tagCreations.Select(value =>
-            {
-                var separator = value.IndexOf(':');
-                return new GoldenTagType(value[..separator], value[(separator + 1)..], "account");
-            }).OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ToList(), [])
-        };
-
-    public static async Task<GoldenCommittedState> CaptureAsync(Planarian.Model.Database.PlanarianDbContext db,
-        string accountId, IReadOnlyDictionary<string, CaveMarker> before,
-        IReadOnlyList<GoldenTagType> beforeTags)
-    {
-        var caveRows = await db.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == accountId)
-            .Include(cave => cave.County).Include(cave => cave.State).AsNoTracking().ToListAsync();
-        var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        var caves = new List<GoldenCommittedCave>();
-        foreach (var cave in caveRows.OrderBy(value => value.County.DisplayId).ThenBy(value => value.CountyNumber))
-        {
-            var snapshot = await reader.BuildAsync(cave.Id);
-            var markerChanged = !before.TryGetValue(cave.Id, out var marker) ||
-                                marker.Version != cave.Version || marker.RevisionId != cave.CurrentRevisionId;
-            string? operation = null;
-            if (markerChanged && cave.CurrentRevisionId is not null)
-                operation = (await db.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
-                    .SingleAsync(value => value.Id == cave.CurrentRevisionId)).Operation.ToString();
-            var fileNames = await db.Files.IgnoreQueryFilters().Where(file => file.CaveId == cave.Id)
-                .OrderBy(file => file.FileName).Select(file => file.FileName).ToListAsync();
-            caves.Add(GoldenCommittedCave.From(snapshot, markerChanged, operation, fileNames));
-        }
-
-        var counties = await db.Counties.IgnoreQueryFilters().Where(county => county.AccountId == accountId)
-            .OrderBy(county => county.DisplayId).Select(county => $"{county.DisplayId}:{county.Name}").ToListAsync();
-        var afterTagRows = await db.TagTypes.IgnoreQueryFilters()
-            .Where(tag => tag.AccountId == accountId || tag.IsDefault)
-            .AsNoTracking().ToListAsync();
-        var afterTags = afterTagRows.Select(tag => GoldenTagType.From(tag, accountId))
-            .OrderBy(tag => tag.Key).ThenBy(tag => tag.Name).ThenBy(tag => tag.Ownership).ToList();
-        return new GoldenCommittedState(caves.Select(cave => cave.Key).ToList(), counties, caves,
-            new GoldenTagTypeDelta(afterTags.Except(beforeTags).ToList(), beforeTags.Except(afterTags).ToList()));
-    }
-}
-
-internal sealed record GoldenTagType(string Key, string Name, string Ownership)
-{
-    public static GoldenTagType From(TagType tag, string accountId) =>
-        new(tag.Key, tag.Name, tag.AccountId == accountId ? "account" : "default");
-}
-
-internal sealed record GoldenTagTypeDelta(List<GoldenTagType> Added, List<GoldenTagType> Removed);
-
-internal sealed record GoldenCommittedCave(
-    string Key, string Name, string State, string CountyName, List<string> AlternateNames,
-    double? LengthFeet, double? DepthFeet, double? MaxPitDepthFeet, int? NumberOfPits,
-    string? ReportedOn, bool IsArchived, string? Narrative, SortedDictionary<string, List<string>> Tags,
-    List<GoldenCommittedEntrance> Entrances, List<string> FileNames,
-    bool VersionOrRevisionChanged, string? LatestRevisionOperation)
-{
-    public static GoldenCommittedCave From(CavePublishedSnapshotV1 value, bool changed, string? operation,
-        List<string> fileNames) => new(
-        $"{value.County.DisplayIdAtRevision}-{value.CountyNumber}", value.Name,
-        value.State.AbbreviationAtRevision ?? string.Empty, value.County.NameAtRevision,
-        value.AlternateNames.Order().ToList(), value.LengthFeet, value.DepthFeet, value.MaxPitDepthFeet,
-        value.NumberOfPits, GoldenSemantic.Date(value.ReportedOn), value.IsArchived, value.Narrative,
-        GoldenSemantic.SnapshotTags(value.Tags), value.Entrances.Select(GoldenCommittedEntrance.From)
-            .OrderBy(entrance => entrance.Name).ThenBy(entrance => entrance.Latitude).ToList(),
-        fileNames, changed, operation);
-}
-
-internal sealed record GoldenCommittedEntrance(
-    string? Name, bool IsPrimary, double? Latitude, double? Longitude, double? Elevation, int? Srid,
-    string? LocationQuality, double? PitDepthFeet, string? ReportedOn, string? Description,
-    SortedDictionary<string, List<string>> Tags)
-{
-    public static GoldenCommittedEntrance From(CaveEntranceSnapshotV1 value) => new(
-        value.Name, value.IsPrimary, value.Latitude, value.Longitude, value.Elevation, value.Srid,
-        value.LocationQualityNameAtRevision, value.PitDepthFeet, GoldenSemantic.Date(value.ReportedOn),
-        value.Description, GoldenSemantic.SnapshotTags(value.Tags));
-}
-
-internal static class GoldenSemantic
-{
-    public static string? Date(DateTime? value) => value?.ToString("yyyy-MM-dd");
-
-    public static SortedDictionary<string, List<string>> CaveTags(
-        IEnumerable<string> geology, IEnumerable<string> ages, IEnumerable<string> map,
-        IEnumerable<string> provinces, IEnumerable<string> archeology, IEnumerable<string> biology,
-        IEnumerable<string> other, IEnumerable<string> cartographers, IEnumerable<string> reporters) =>
-        NonEmpty(("Geology", geology), ("GeologicAge", ages), ("MapStatus", map),
-            ("PhysiographicProvince", provinces), ("Archeology", archeology), ("Biology", biology),
-            ("CaveOther", other), ("Cartographer", cartographers), ("CaveReportedBy", reporters));
-
-    public static SortedDictionary<string, List<string>> EntranceTags(
-        IEnumerable<string> statuses, IEnumerable<string> hydrology, IEnumerable<string> field,
-        IEnumerable<string> reporters) => NonEmpty(("EntranceStatus", statuses),
-        ("EntranceHydrology", hydrology), ("FieldIndication", field), ("EntranceReportedBy", reporters));
-
-    public static SortedDictionary<string, List<string>> SnapshotTags(IEnumerable<SnapshotTagReference> tags) =>
-        new(tags.GroupBy(tag => tag.Role.ToString()).OrderBy(group => group.Key)
-            .ToDictionary(group => group.Key, group => group.Select(tag => tag.NameAtRevision).Order().ToList()));
-
-    private static SortedDictionary<string, List<string>> NonEmpty(
-        params (string Role, IEnumerable<string> Values)[] groups) => new(groups
-        .Select(group => (group.Role, Values: group.Values.Order().ToList()))
-        .Where(group => group.Values.Count > 0)
-        .ToDictionary(group => group.Role, group => group.Values));
 }

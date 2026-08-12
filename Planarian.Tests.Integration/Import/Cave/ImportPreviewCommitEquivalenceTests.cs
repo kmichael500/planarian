@@ -31,7 +31,7 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(CaveNoChangePreviewAndCommitAreEquivalent));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
         var csv = ImportDryRunIntegrationTests.CaveHeader +
@@ -60,7 +60,7 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync(nameof(CaveSyncDeletionPreviewMatchesCommit));
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
         var csv = ImportDryRunIntegrationTests.CaveHeader +
@@ -100,7 +100,7 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync($"preview_cave_{scenario}");
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new CaveImportTestHarness(db, db.RequestUser);
 
@@ -128,9 +128,9 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     {
         // Arrange
         await using var database = await fixture.CreateDatabaseAsync($"preview_entrance_{scenario}");
-        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         if (seedExisting)
-            await TestDataBuilder.AddEntranceAsync(database, tenant, "existing00", isPrimary: true);
+            await EntranceTestData.AddEntranceAsync(database, tenant, "existing00", isPrimary: true);
 
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
