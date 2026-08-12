@@ -88,3 +88,22 @@ it("shows when a proposal version changed published bases", () => {
   expect(document.body).toHaveTextContent("This proposal version is based on a newer published Cave revision.");
   expect(document.body).toHaveTextContent("Previous base: revision-one. This base: revision-two.");
 });
+
+it("renders the authoritative proposal County Number transition without a duplicate effective row", () => {
+  const detail = versionDetail(true);
+  detail.diffFromPreviousVersion!.scalars.push({ path: "CountyNumber", previous: 1, current: 123 });
+  detail.countyNumberIntent = "Manual";
+  detail.requestedCountyNumber = 123;
+  detail.countyNumberChange = {
+    previousIntent: "FirstAvailable",
+    currentIntent: "Manual",
+    currentRequestedCountyNumber: 123,
+  };
+
+  render(<ProposalVersionComparison detail={detail} />);
+
+  expect(document.body).toHaveTextContent("− Previous First available on approval");
+  expect(document.body).toHaveTextContent("+ Proposed 123");
+  expect([...document.querySelectorAll(".ant-descriptions-item-label")]
+    .filter(element => element.textContent === "County Number")).toHaveLength(1);
+});

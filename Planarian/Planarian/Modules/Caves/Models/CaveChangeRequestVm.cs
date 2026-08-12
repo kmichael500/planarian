@@ -61,9 +61,16 @@ public sealed record CaveProposalAuthoringConflictVm(CaveProposalAuthoringConfli
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
     string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
 
+public sealed record CaveProposalCountyNumberChangeVm(
+    CountyNumberIntent PreviousIntent,
+    int? PreviousRequestedCountyNumber,
+    CountyNumberIntent CurrentIntent,
+    int? CurrentRequestedCountyNumber);
+
 public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm DiffFromBase,
     CavePublishedSnapshotV1? PreviousProposed, CaveRevisionDiffVm? DiffFromPreviousVersion,
+    CaveProposalCountyNumberChangeVm? CountyNumberChange,
     bool BaseRevisionChanged, string? PreviousBaseRevisionId, string BaseRevisionId,
     CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber,
     IReadOnlyList<string> UnavailableStagedFileIds);

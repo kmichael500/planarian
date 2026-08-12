@@ -1,4 +1,4 @@
-import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
+import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 import {
   CaveEntranceSnapshotVm,
   CaveFileSnapshotVm,
@@ -203,6 +203,7 @@ export const buildCaveRevisionDiffPresentation = (
   previous?: CaveSnapshotVm,
   current?: CaveSnapshotVm,
   countyNumberIntent?: CountyNumberIntent,
+  proposalCountyNumberChange?: CaveProposalCountyNumberChangeVm,
 ): CaveRevisionDiffPresentation => {
   const caveMetadata = new Map<string, ReferenceMetadataPresentation[]>();
   const entranceMetadata = new Map<string, Map<string, ReferenceMetadataPresentation[]>>();
@@ -228,6 +229,7 @@ export const buildCaveRevisionDiffPresentation = (
   const fallbackScalars: ChangedFieldPresentation[] = [];
   const caveFields = new Map<string, CaveInformationFieldPresentation>();
   diff.scalars.forEach(change => {
+    if (change.path === "CountyNumber" && proposalCountyNumberChange) return;
     if (change.path === "Narrative") {
       narrative = { ...scalarField(change, { label: "Narrative", format: "text", textDiff: true }) };
       return;
@@ -249,6 +251,24 @@ export const buildCaveRevisionDiffPresentation = (
     caveFields.set(change.path, { key: change.path, label: definition.label,
       change: { ...scalarField(change, definition, metadata), previous: previousValue, current: currentValue }, metadata });
   });
+  if (proposalCountyNumberChange) {
+    const proposalValue = (intent: CountyNumberIntent, requested?: number) => {
+      if (intent === "FirstAvailable") return "First available on approval";
+      if (intent === "AutomaticNext") return "Auto-assigned on approval";
+      return requested;
+    };
+    const metadata = caveMetadata.get("CountyNumber") ?? [];
+    caveFields.set("CountyNumber", {
+      key: "CountyNumber", label: "County Number", metadata,
+      change: {
+        key: "CountyNumber", label: "County Number", format: "number", metadata,
+        previous: proposalValue(proposalCountyNumberChange.previousIntent,
+          proposalCountyNumberChange.previousRequestedCountyNumber),
+        current: proposalValue(proposalCountyNumberChange.currentIntent,
+          proposalCountyNumberChange.currentRequestedCountyNumber),
+      },
+    });
+  }
 
   const caveRoles = new Set([...diff.addedTags.map(tag => tag.role), ...diff.removedTags.map(tag => tag.role)]);
   caveMetadata.forEach((_changes, key) => { if (!caveScalarDefinitions[key]) caveRoles.add(key); });

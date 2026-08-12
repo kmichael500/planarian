@@ -30,7 +30,8 @@ export const ProposalVersionComparison = ({ detail }: { detail: CaveProposalVers
     <Typography.Title level={5}>Changes from previous proposal version</Typography.Title>
     <CaveRevisionDiff diff={detail.diffFromPreviousVersion}
       previous={detail.previousProposed} current={detail.proposed}
-      countyNumberIntent={detail.countyNumberIntent} />
+      countyNumberIntent={detail.countyNumberIntent}
+      proposalCountyNumberChange={detail.countyNumberChange} />
     <Collapse ghost items={[{
       key: "base",
       label: "This version vs published base",

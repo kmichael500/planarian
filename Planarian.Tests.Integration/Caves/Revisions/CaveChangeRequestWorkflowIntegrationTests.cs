@@ -557,6 +557,92 @@ public sealed class CaveChangeRequestWorkflowIntegrationTests(PostgresTestServer
             .PreviousProposalVersionId = versionThreeId;
         await contributor.SaveChangesAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetAsync(requestId, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetVersionAsync(requestId, versionThreeId, default));
+
+        (await contributor.CaveProposalVersions.SingleAsync(version => version.Id == versionThreeId))
+            .PreviousProposalVersionId = versionTwoId;
+        (await contributor.CaveProposalVersions.SingleAsync(version => version.Id == versionTwoId))
+            .PreviousProposalVersionId = versionThreeId;
+        await contributor.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetAsync(requestId, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.GetVersionAsync(requestId, versionTwoId, default));
+    }
+
+    [Fact]
+    public async Task ProposalVersionHistoryReportsCountyNumberProposalSemantics()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ProposalVersionHistoryReportsCountyNumberProposalSemantics));
+        var tenant = await TestDataBuilder.CreatePublishedCaveAsync(database, 'a');
+        await GrantViewAsync(database, tenant, "contributor");
+
+        await using var contributor = database.CreateDbContext("contributor", tenant.AccountId);
+        var repository = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+
+        async Task<(string RequestId, string CurrentVersionId)> CreateTransitionAsync(string scenario,
+            CountyNumberIntent previousIntent, int? previousNumber,
+            CountyNumberIntent currentIntent, int? currentNumber)
+        {
+            var first = Proposal(tenant, $"{scenario} proposal one") with
+            {
+                CountyNumberIntent = previousIntent,
+                RequestedCountyNumber = previousNumber
+            };
+            var requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId, first, default);
+            var firstVersionId = await CurrentVersionAsync(contributor, requestId);
+            var second = first with
+            {
+                Name = $"{scenario} proposal two",
+                CountyNumberIntent = currentIntent,
+                RequestedCountyNumber = currentNumber
+            };
+            var currentVersionId = await repository.AddVersionAsync(requestId, tenant.RevisionId,
+                firstVersionId, second, false, false, default);
+            return (requestId, currentVersionId);
+        }
+
+        var firstToAutomatic = await CreateTransitionAsync("First to automatic",
+            CountyNumberIntent.FirstAvailable, null, CountyNumberIntent.AutomaticNext, null);
+        var firstToManual = await CreateTransitionAsync("First to manual",
+            CountyNumberIntent.FirstAvailable, null, CountyNumberIntent.Manual, 123);
+        var manualToAutomatic = await CreateTransitionAsync("Manual to automatic",
+            CountyNumberIntent.Manual, 123, CountyNumberIntent.AutomaticNext, null);
+        var unchanged = await CreateTransitionAsync("Unchanged intent",
+            CountyNumberIntent.FirstAvailable, null, CountyNumberIntent.FirstAvailable, null);
+
+        await AuthenticateAsync(contributor, tenant.AccountId);
+        var service = CreateChangeRequestService(contributor);
+
+        var automaticDetail = await service.GetVersionAsync(firstToAutomatic.RequestId,
+            firstToAutomatic.CurrentVersionId, default);
+        Assert.DoesNotContain(automaticDetail.DiffFromPreviousVersion!.Scalars,
+            change => change.Path == nameof(CavePublishedSnapshotV1.CountyNumber));
+        Assert.Equal((CountyNumberIntent.FirstAvailable, null, CountyNumberIntent.AutomaticNext, null),
+            (automaticDetail.CountyNumberChange!.PreviousIntent,
+                automaticDetail.CountyNumberChange.PreviousRequestedCountyNumber,
+                automaticDetail.CountyNumberChange.CurrentIntent,
+                automaticDetail.CountyNumberChange.CurrentRequestedCountyNumber));
+
+        var manualDetail = await service.GetVersionAsync(firstToManual.RequestId,
+            firstToManual.CurrentVersionId, default);
+        Assert.Equal((CountyNumberIntent.FirstAvailable, null, CountyNumberIntent.Manual, 123),
+            (manualDetail.CountyNumberChange!.PreviousIntent,
+                manualDetail.CountyNumberChange.PreviousRequestedCountyNumber,
+                manualDetail.CountyNumberChange.CurrentIntent,
+                manualDetail.CountyNumberChange.CurrentRequestedCountyNumber));
+
+        var automaticAfterManualDetail = await service.GetVersionAsync(manualToAutomatic.RequestId,
+            manualToAutomatic.CurrentVersionId, default);
+        Assert.Equal((CountyNumberIntent.Manual, 123, CountyNumberIntent.AutomaticNext, null),
+            (automaticAfterManualDetail.CountyNumberChange!.PreviousIntent,
+                automaticAfterManualDetail.CountyNumberChange.PreviousRequestedCountyNumber,
+                automaticAfterManualDetail.CountyNumberChange.CurrentIntent,
+                automaticAfterManualDetail.CountyNumberChange.CurrentRequestedCountyNumber));
+
+        Assert.Null((await service.GetVersionAsync(unchanged.RequestId, unchanged.CurrentVersionId, default))
+            .CountyNumberChange);
     }
 
     [Fact]

@@ -193,6 +193,7 @@ public sealed class CaveChangeRequestService
             preserveUnavailableStagedFiles: true);
         CavePublishedSnapshotV1? previousProposed = null;
         CaveRevisionDiffVm? diffFromPreviousVersion = null;
+        CaveProposalCountyNumberChangeVm? countyNumberChange = null;
         var unavailableStagedFileIds = presentation.UnavailableStagedFileIds.ToHashSet(StringComparer.Ordinal);
         if (row.PreviousVersion is not null && row.PreviousBaseRevision is not null)
         {
@@ -203,10 +204,16 @@ public sealed class CaveChangeRequestService
                 preserveUnavailableStagedFiles: true);
             previousProposed = previousPresentation.Snapshot;
             diffFromPreviousVersion = Map(_diff.Compare(previousProposed, presentation.Snapshot));
+            if (previousProposal.CountyNumberIntent != proposal.CountyNumberIntent ||
+                previousProposal.RequestedCountyNumber != proposal.RequestedCountyNumber)
+                countyNumberChange = new CaveProposalCountyNumberChangeVm(
+                    previousProposal.CountyNumberIntent, previousProposal.RequestedCountyNumber,
+                    proposal.CountyNumberIntent, proposal.RequestedCountyNumber);
             unavailableStagedFileIds.UnionWith(previousPresentation.UnavailableStagedFileIds);
         }
         return new CaveProposalVersionDetailVm(baseSnapshot, presentation.Snapshot,
             Map(_diff.Compare(baseSnapshot, presentation.Snapshot)), previousProposed, diffFromPreviousVersion,
+            countyNumberChange,
             row.PreviousVersion is not null && row.PreviousVersion.BaseRevisionId != row.Version.BaseRevisionId,
             row.PreviousVersion?.BaseRevisionId, row.Version.BaseRevisionId, proposal.CountyNumberIntent,
             proposal.RequestedCountyNumber, unavailableStagedFileIds.ToList());

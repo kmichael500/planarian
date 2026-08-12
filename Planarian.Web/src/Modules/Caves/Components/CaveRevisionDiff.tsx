@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Alert, Card, Descriptions, Grid, Space, Tag, theme, Typography } from "antd";
 import { CaveRevisionDiffVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
-import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
+import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 import {
   AffectedEntrancePresentation,
   AffectedFilePresentation,
@@ -127,18 +127,20 @@ const File = ({ file, layout }: { file: AffectedFilePresentation; layout: "horiz
 
 const SectionTitle = ({ children }: { children: ReactNode }) => <Typography.Title level={5} style={{ margin: 0 }}>{children}</Typography.Title>;
 
-export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent }: {
+export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, proposalCountyNumberChange }: {
   diff?: CaveRevisionDiffVm;
   previous?: CaveSnapshotVm;
   current?: CaveSnapshotVm;
   countyNumberIntent?: CountyNumberIntent;
+  proposalCountyNumberChange?: CaveProposalCountyNumberChangeVm;
 }) => {
   const screens = Grid.useBreakpoint();
   const { token } = theme.useToken();
   const layout = screens.md ? "horizontal" : "vertical";
   if (!diff) return <Typography.Text type="secondary">Initial publication</Typography.Text>;
 
-  const model = buildCaveRevisionDiffPresentation(diff, previous, current, countyNumberIntent);
+  const model = buildCaveRevisionDiffPresentation(diff, previous, current, countyNumberIntent,
+    proposalCountyNumberChange);
   const hasChanges = model.caveInformation.length || model.entrances.length || model.narrative || model.files.length ||
     model.fallbackScalars.length || model.fallbackMetadata.length;
   if (!hasChanges) return <Typography.Text type="secondary">No visible field changes</Typography.Text>;

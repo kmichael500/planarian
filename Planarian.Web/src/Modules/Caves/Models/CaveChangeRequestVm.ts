@@ -49,12 +49,20 @@ export interface CaveProposalVersionDetailVm {
   diffFromBase: CaveRevisionDiffVm;
   previousProposed?: CaveSnapshotVm;
   diffFromPreviousVersion?: CaveRevisionDiffVm;
+  countyNumberChange?: CaveProposalCountyNumberChangeVm;
   baseRevisionChanged: boolean;
   previousBaseRevisionId?: string;
   baseRevisionId: string;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
   unavailableStagedFileIds: string[];
+}
+
+export interface CaveProposalCountyNumberChangeVm {
+  previousIntent: CountyNumberIntent;
+  previousRequestedCountyNumber?: number;
+  currentIntent: CountyNumberIntent;
+  currentRequestedCountyNumber?: number;
 }
 
 export interface CaveChangeRequestDetailVm {
