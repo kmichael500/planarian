@@ -1104,6 +1104,7 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                 id="entrances"
                 type="vector"
                 tiles={entranceTiles}
+                maxzoom={15}
                 attribution={`© ${accountName}`}
               >
                 <Layer

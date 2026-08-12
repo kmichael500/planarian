@@ -229,13 +229,10 @@ public class MapRepository : RepositoryBase
                     SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
                     FROM (
                         SELECT 
-                            "Entrances"."ReportedByUserId",
                             "Entrances"."CaveId",
                             "Caves"."Name" as CaveName,
-                            "Entrances"."LocationQualityTagId",
                             "Entrances"."Name",
                             "Entrances"."IsPrimary",
-                            "Entrances"."Description",
                             (SELECT EXISTS(
                                 SELECT 1 
                                 FROM "Favorites"
@@ -255,14 +252,18 @@ public class MapRepository : RepositoryBase
                             "Entrances"
                         JOIN 
                             "Caves" ON "Entrances"."CaveId" = "Caves"."Id"
-                        JOIN 
-                            "UserCavePermissions" ucp ON "Caves"."Id" = ucp."CaveId"
-                                                          AND "Caves"."AccountId" = ucp."AccountId"
                         , tile
                         WHERE 
-                            ST_Intersects("Entrances"."Location", tile.bbox_native)
+                            "Entrances"."Location" && tile.bbox_native
                             AND "Caves"."AccountId" = @accountId
-                            AND ucp."UserId" = @userId
+                            AND EXISTS (
+                                SELECT 1
+                                FROM "UserCavePermissions" ucp
+                                WHERE
+                                    ucp."CaveId" = "Caves"."Id"
+                                    AND ucp."AccountId" = "Caves"."AccountId"
+                                    AND ucp."UserId" = @userId
+                            )
                             {3}
                     ) AS tile_geom
                     """;
