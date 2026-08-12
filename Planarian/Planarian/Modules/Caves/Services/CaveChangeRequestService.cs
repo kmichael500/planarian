@@ -204,11 +204,11 @@ public sealed class CaveChangeRequestService
                 preserveUnavailableStagedFiles: true);
             previousProposed = previousPresentation.Snapshot;
             diffFromPreviousVersion = Map(_diff.Compare(previousProposed, presentation.Snapshot));
-            if (previousProposal.CountyNumberIntent != proposal.CountyNumberIntent ||
-                previousProposal.RequestedCountyNumber != proposal.RequestedCountyNumber)
-                countyNumberChange = new CaveProposalCountyNumberChangeVm(
-                    previousProposal.CountyNumberIntent, previousProposal.RequestedCountyNumber,
-                    proposal.CountyNumberIntent, proposal.RequestedCountyNumber);
+            var previousCountyNumber = ResolveCountyNumberState(previousProposal, previousBase);
+            var currentCountyNumber = ResolveCountyNumberState(proposal, baseSnapshot);
+            if (previousCountyNumber != currentCountyNumber)
+                countyNumberChange = new CaveProposalCountyNumberChangeVm(previousCountyNumber,
+                    currentCountyNumber);
             unavailableStagedFileIds.UnionWith(previousPresentation.UnavailableStagedFileIds);
         }
         return new CaveProposalVersionDetailVm(baseSnapshot, presentation.Snapshot,
@@ -217,6 +217,21 @@ public sealed class CaveChangeRequestService
             row.PreviousVersion is not null && row.PreviousVersion.BaseRevisionId != row.Version.BaseRevisionId,
             row.PreviousVersion?.BaseRevisionId, row.Version.BaseRevisionId, proposal.CountyNumberIntent,
             proposal.RequestedCountyNumber, unavailableStagedFileIds.ToList());
+    }
+
+    private static CaveProposalCountyNumberStateVm ResolveCountyNumberState(
+        CaveProposalSnapshotV1 proposal, CavePublishedSnapshotV1 baseSnapshot)
+    {
+        if (proposal.CountyNumberIntent == CountyNumberIntent.Manual)
+            return new CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode.Manual,
+                proposal.RequestedCountyNumber);
+        if (proposal.CountyId == baseSnapshot.County.Id)
+            return new CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode.PreserveExisting,
+                baseSnapshot.CountyNumber);
+        return new CaveProposalCountyNumberStateVm(
+            proposal.CountyNumberIntent == CountyNumberIntent.FirstAvailable
+                ? CaveProposalCountyNumberMode.FirstAvailable
+                : CaveProposalCountyNumberMode.AutomaticNext);
     }
 
     public async Task<CaveChangeRequestDecisionVm> ApproveAsync(string requestId,

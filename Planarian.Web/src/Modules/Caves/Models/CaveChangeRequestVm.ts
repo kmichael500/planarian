@@ -59,10 +59,13 @@ export interface CaveProposalVersionDetailVm {
 }
 
 export interface CaveProposalCountyNumberChangeVm {
-  previousIntent: CountyNumberIntent;
-  previousRequestedCountyNumber?: number;
-  currentIntent: CountyNumberIntent;
-  currentRequestedCountyNumber?: number;
+  previous: CaveProposalCountyNumberStateVm;
+  current: CaveProposalCountyNumberStateVm;
+}
+
+export interface CaveProposalCountyNumberStateVm {
+  mode: "PreserveExisting" | "Manual" | "FirstAvailable" | "AutomaticNext";
+  number?: number;
 }
 
 export interface CaveChangeRequestDetailVm {

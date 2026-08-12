@@ -252,20 +252,18 @@ export const buildCaveRevisionDiffPresentation = (
       change: { ...scalarField(change, definition, metadata), previous: previousValue, current: currentValue }, metadata });
   });
   if (proposalCountyNumberChange) {
-    const proposalValue = (intent: CountyNumberIntent, requested?: number) => {
-      if (intent === "FirstAvailable") return "First available on approval";
-      if (intent === "AutomaticNext") return "Auto-assigned on approval";
-      return requested;
+    const proposalValue = (state: CaveProposalCountyNumberChangeVm["previous"]) => {
+      if (state.mode === "FirstAvailable") return "First available on approval";
+      if (state.mode === "AutomaticNext") return "Auto-assigned on approval";
+      return state.number;
     };
     const metadata = caveMetadata.get("CountyNumber") ?? [];
     caveFields.set("CountyNumber", {
       key: "CountyNumber", label: "County Number", metadata,
       change: {
         key: "CountyNumber", label: "County Number", format: "number", metadata,
-        previous: proposalValue(proposalCountyNumberChange.previousIntent,
-          proposalCountyNumberChange.previousRequestedCountyNumber),
-        current: proposalValue(proposalCountyNumberChange.currentIntent,
-          proposalCountyNumberChange.currentRequestedCountyNumber),
+        previous: proposalValue(proposalCountyNumberChange.previous),
+        current: proposalValue(proposalCountyNumberChange.current),
       },
     });
   }

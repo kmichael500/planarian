@@ -61,11 +61,19 @@ public sealed record CaveProposalAuthoringConflictVm(CaveProposalAuthoringConfli
 public sealed record CaveProposalVersionVm(string Id, string? PreviousProposalVersionId,
     string BaseRevisionId, string? CreatedByUserId, string? CreatedByName, DateTime CreatedOn, bool IsCurrent);
 
+public enum CaveProposalCountyNumberMode
+{
+    PreserveExisting,
+    Manual,
+    FirstAvailable,
+    AutomaticNext
+}
+
+public sealed record CaveProposalCountyNumberStateVm(CaveProposalCountyNumberMode Mode, int? Number = null);
+
 public sealed record CaveProposalCountyNumberChangeVm(
-    CountyNumberIntent PreviousIntent,
-    int? PreviousRequestedCountyNumber,
-    CountyNumberIntent CurrentIntent,
-    int? CurrentRequestedCountyNumber);
+    CaveProposalCountyNumberStateVm Previous,
+    CaveProposalCountyNumberStateVm Current);
 
 public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm DiffFromBase,

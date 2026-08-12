@@ -95,15 +95,32 @@ it("renders the authoritative proposal County Number transition without a duplic
   detail.countyNumberIntent = "Manual";
   detail.requestedCountyNumber = 123;
   detail.countyNumberChange = {
-    previousIntent: "FirstAvailable",
-    currentIntent: "Manual",
-    currentRequestedCountyNumber: 123,
+    previous: { mode: "FirstAvailable" },
+    current: { mode: "Manual", number: 123 },
   };
 
   render(<ProposalVersionComparison detail={detail} />);
 
   expect(document.body).toHaveTextContent("− Previous First available on approval");
   expect(document.body).toHaveTextContent("+ Proposed 123");
+  expect([...document.querySelectorAll(".ant-descriptions-item-label")]
+    .filter(element => element.textContent === "County Number")).toHaveLength(1);
+});
+
+it("renders a rebased proposal as preserving its County Number", () => {
+  const detail = versionDetail(true);
+  detail.diffFromPreviousVersion!.scalars.push({ path: "CountyNumber", previous: 0, current: 47 });
+  detail.countyNumberIntent = "AutomaticNext";
+  detail.countyNumberChange = {
+    previous: { mode: "FirstAvailable" },
+    current: { mode: "PreserveExisting", number: 47 },
+  };
+
+  render(<ProposalVersionComparison detail={detail} />);
+
+  expect(document.body).toHaveTextContent("− Previous First available on approval");
+  expect(document.body).toHaveTextContent("+ Proposed 47");
+  expect(document.body).not.toHaveTextContent("Auto-assigned on approval");
   expect([...document.querySelectorAll(".ant-descriptions-item-label")]
     .filter(element => element.textContent === "County Number")).toHaveLength(1);
 });
