@@ -12,7 +12,10 @@ import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "../../../Shared/Models/ApiErrorResponse";
 
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
@@ -34,6 +37,7 @@ const LoginPage: React.FC = () => {
 
   let redirectUrl = "/";
   if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
+    // TODO: Validate redirectUrl as a local Planarian path before navigating to prevent open redirects.
     redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
   }
 
@@ -54,7 +58,22 @@ const LoginPage: React.FC = () => {
       }
     } catch (e) {
       const error = e as ApiErrorResponse;
-      message.error(error.message);
+      if (error.errorCode === ApiExceptionType.EmailNotConfirmed) {
+        navigate(
+          {
+            pathname: "/confirm-email/pending",
+            search: location.search,
+          },
+          {
+            state: {
+              emailAddress: values.emailAddress,
+              confirmationEmailJustSent: false,
+            },
+          }
+        );
+      } else {
+        message.error(error.message);
+      }
     } finally {
       setIsLoading(false);
     }

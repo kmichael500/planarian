@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Users.Models;
@@ -26,6 +27,20 @@ public class UserController : PlanarianControllerBase<UserService>
     {
         await Service.ConfirmEmail(code);
 
+        return new OkResult();
+    }
+
+    [AllowAnonymous]
+    [HttpPost("confirm-email/resend")]
+    [Throttle]
+    public async Task<ActionResult> ResendEmailConfirmation([FromBody] ResendEmailConfirmationVm? request)
+    {
+        // TODO: Move Planarian controllers to [ApiController] after preserving the existing ApiErrorResponse contract.
+        // Until then, model validation must be enforced explicitly.
+        if (request == null || !ModelState.IsValid)
+            throw ApiExceptionDictionary.BadRequest("Please enter a valid email address.");
+
+        await Service.ResendEmailConfirmation(request.EmailAddress);
         return new OkResult();
     }
 

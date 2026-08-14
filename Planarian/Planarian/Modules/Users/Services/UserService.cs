@@ -264,6 +264,23 @@ public class UserService : ServiceBase<UserRepository>
         await Repository.SaveChangesAsync();
     }
 
+    public async Task ResendEmailConfirmation(string emailAddress)
+    {
+        var normalizedEmail = emailAddress.Trim();
+        await _requestThrottleService.CountAttempt(ThrottleProfile.EmailConfirmation, normalizedEmail);
+
+        var user = await Repository.GetUserByEmail(normalizedEmail);
+        if (user == null || user.EmailConfirmedOn != null || string.IsNullOrWhiteSpace(user.EmailConfirmationCode))
+        {
+            return;
+        }
+
+        await _emailService.SendEmailConfirmationEmail(
+            user.EmailAddress,
+            user.FullName,
+            user.EmailConfirmationCode);
+    }
+
     public async Task<AcceptInvitationVm?> GetInvitation(string code)
     {
         var invitation = await Repository.GetInvitation(code);

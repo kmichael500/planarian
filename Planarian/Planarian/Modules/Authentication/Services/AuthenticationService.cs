@@ -5,27 +5,24 @@ using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
-using Planarian.Shared.Email.Services;
 
 namespace Planarian.Modules.Authentication.Services;
 
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
     private readonly AuthCookieService _authCookieService;
-    private readonly EmailService _emailService;
     private readonly RequestThrottleService _requestThrottleService;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
-        TokenService tokenService, UserRepository userRepository, EmailService emailService, AuthCookieService authCookieService,
+        TokenService tokenService, UserRepository userRepository, AuthCookieService authCookieService,
         RequestThrottleService requestThrottleService) :
         base(repository, requestUser)
     {
         _authCookieService = authCookieService;
         _tokenService = tokenService;
         _userRepository = userRepository;
-        _emailService = emailService;
         _requestThrottleService = requestThrottleService;
     }
 
@@ -46,17 +43,6 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         
-        if (user.EmailConfirmedOn == null)
-        {
-            await Repository.SaveChangesAsync();
-            if (user.EmailConfirmationCode != null)
-                await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
-            else
-                throw ApiExceptionDictionary.InternalServerError("Email confirmation code is does not exist.");
-
-            throw ApiExceptionDictionary.EmailNotConfirmed;
-        }
-
         if (string.IsNullOrWhiteSpace(user.HashedPassword))
         {
             throw ApiExceptionDictionary.InvalidPassword;
@@ -66,6 +52,11 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         if (!isValid)
         {
             throw ApiExceptionDictionary.InvalidPassword;
+        }
+
+        if (user.EmailConfirmedOn == null)
+        {
+            throw ApiExceptionDictionary.EmailNotConfirmed;
         }
 
         var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();

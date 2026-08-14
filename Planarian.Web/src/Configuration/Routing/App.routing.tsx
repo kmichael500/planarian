@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AccountSettingsPage } from "../../Modules/Account/Pages/AccountSettingsPage";
 import { ProtectedRoutesComponent } from "../../Modules/Authentication/Components/ProtectedRoutesComponent";
 import { ConfirmEmailPage } from "../../Modules/Authentication/Pages/ConfirmEmailPage";
+import { EmailConfirmationPendingPage } from "../../Modules/Authentication/Pages/EmailConfirmationPendingPage";
 import { LoginPage } from "../../Modules/Authentication/Pages/LoginPage";
 import { ResetPasswordPage } from "../../Modules/Authentication/Pages/ResetPasswordPage";
 import { RegisterPage } from "../../Modules/Authentication/Register/Components/RegisterPage";
@@ -39,6 +40,10 @@ export const AppRouting: React.FC = () => {
       <Route path="/register" element={<RegisterPage />}></Route>
       <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
       <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
+      <Route
+        path="/confirm-email/pending"
+        element={<EmailConfirmationPendingPage />}
+      ></Route>
       <Route path="/not-found" element={<NotFoundPage />}></Route>
       <Route path="/unauthorized" element={<UnauthorizedPage />}></Route>
 

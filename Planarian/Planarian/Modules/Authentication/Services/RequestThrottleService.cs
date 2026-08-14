@@ -240,6 +240,15 @@ public class RequestThrottleService
                     RequestThrottleKeyType.PasswordResetEmail, _options.PasswordResetEmailLimit,
                     TimeSpan.FromMinutes(_options.PasswordResetWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
             ],
+            ThrottleProfile.EmailConfirmation =>
+            [
+                new(profile,
+                    RequestThrottleKeyType.EmailConfirmationIp, _options.EmailConfirmationIpLimit,
+                    TimeSpan.FromMinutes(_options.EmailConfirmationWindowMinutes), normalizedIdentifier, [RequestThrottleKeyHelper.GetClientIpAddress(_httpContextAccessor.HttpContext)]),
+                new(profile,
+                    RequestThrottleKeyType.EmailConfirmationEmail, _options.EmailConfirmationEmailLimit,
+                    TimeSpan.FromMinutes(_options.EmailConfirmationWindowMinutes), normalizedIdentifier, [normalizedIdentifier])
+            ],
             ThrottleProfile.FileAccess =>
             [
                 new(profile,
@@ -289,7 +298,7 @@ public class RequestThrottleService
     {
         return profile switch
         {
-            ThrottleProfile.Login or ThrottleProfile.PasswordReset => identifier?.Trim().ToLowerInvariant() ?? string.Empty,
+            ThrottleProfile.Login or ThrottleProfile.PasswordReset or ThrottleProfile.EmailConfirmation => identifier?.Trim().ToLowerInvariant() ?? string.Empty,
             ThrottleProfile.FileAccess => identifier?.Trim() ?? string.Empty,
             _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
         };

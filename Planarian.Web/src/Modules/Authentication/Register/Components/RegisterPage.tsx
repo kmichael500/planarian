@@ -54,7 +54,6 @@ const RegisterPage: React.FC = () => {
     undefined
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmissionSuccsess, setIsSubmissionSuccsess] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -104,10 +103,13 @@ const RegisterPage: React.FC = () => {
       const payload = { ...values, invitationCode };
 
       await RegisterService.RegisterUser(payload);
-      message.success(
-        "Thanks! Please check your email to confirm your account!"
-      );
-      navigate("../login");
+      navigate("/confirm-email/pending", {
+        replace: true,
+        state: {
+          emailAddress: values.emailAddress,
+          confirmationEmailJustSent: true,
+        },
+      });
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
