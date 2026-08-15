@@ -24,18 +24,21 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
     private readonly AccountRepository _accountRepository;
     private readonly PermissionRepository _permissionRepository;
     private readonly UserRepository _userRepository;
+    private readonly ILogger<AccountUserManagerService> _logger;
 
     public AccountUserManagerService(
         UserRepository repository,
         RequestUser requestUser,
         EmailService emailService,
         ServerOptions serverOptions, AccountRepository accountRepository,
-        PermissionRepository permissionRepository, UserRepository userRepository) : base(repository, requestUser)
+        PermissionRepository permissionRepository, UserRepository userRepository,
+        ILogger<AccountUserManagerService> logger) : base(repository, requestUser)
     {
         _emailService = emailService;
         _accountRepository = accountRepository;
         _permissionRepository = permissionRepository;
         _userRepository = userRepository;
+        _logger = logger;
     }
 
     #region User Manager
@@ -117,7 +120,19 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             user, accountUser, accountName, CancellationToken.None);
         if (sendResult.WasSubmitted)
         {
-            await Repository.SaveChangesAsync(CancellationToken.None);
+            try
+            {
+                await Repository.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                // The invitation itself is already committed and Mailgun accepted the message.
+                // Do not turn a successful create into a retryable API failure just because
+                // the convenience InvitationSentOn timestamp could not be persisted.
+                _logger.LogError(exception,
+                    "Unable to persist InvitationSentOn after invitation {UserId} was submitted to the email provider.",
+                    user.Id);
+            }
         }
 
         return new InviteUserResultVm

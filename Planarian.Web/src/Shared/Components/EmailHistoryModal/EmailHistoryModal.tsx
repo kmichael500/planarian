@@ -1,6 +1,9 @@
 import React from "react";
 import { Spin, Typography } from "antd";
-import { MessageDeliveryEventType } from "../../Models/MessageDeliveryEventType";
+import {
+  MessageDeliveryEventType,
+  MessageDeliveryEventTypeDisplay,
+} from "../../Models/MessageDeliveryEventType";
 import {
   MessageDeliveryStatus,
   MessageDeliveryStatusDisplay,
@@ -86,7 +89,7 @@ const EmailHistoryModal: React.FC<EmailHistoryModalProps> = ({
                       type="secondary"
                       key={`${attempt.messageLogId}-${event.occurredOn}-${eventIndex}`}
                     >
-                      {event.eventType} · {formatDateTime(event.occurredOn)}
+                      {MessageDeliveryEventTypeDisplay[event.eventType]} · {formatDateTime(event.occurredOn)}
                       {event.bot ? ` · automated (${event.bot})` : ""}
                       {event.attemptNumber != null
                         ? ` · delivery attempt ${event.attemptNumber}`

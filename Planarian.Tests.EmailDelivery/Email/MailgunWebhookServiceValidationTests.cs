@@ -82,23 +82,23 @@ public sealed class MailgunWebhookServiceValidationTests
     }
 
     [Fact]
-    public async Task MissingSigningKeyRequestsRetryRatherThanAcceptingWebhook()
+    public async Task MissingSigningKeyIsRejectedRatherThanPretendingDeliveryEventsWillRetry()
     {
         var payload = CreatePayload();
         var service = CreateService(signingKey: null);
 
-        Assert.Equal(MailgunWebhookProcessingResult.Retry, await service.Process(payload));
+        Assert.Equal(MailgunWebhookProcessingResult.Rejected, await service.Process(payload));
     }
 
     [Fact]
-    public async Task MissingConfiguredDomainRequestsRetry()
+    public async Task MissingConfiguredDomainIsRejectedRatherThanPretendingDeliveryEventsWillRetry()
     {
         var payload = CreatePayload();
         payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
         var options = new EmailOptions { WebhookSigningKey = SigningKey, Domain = "" };
 
         Assert.Equal(
-            MailgunWebhookProcessingResult.Retry,
+            MailgunWebhookProcessingResult.Rejected,
             await new MailgunWebhookService(options, null!).Process(payload));
     }
 

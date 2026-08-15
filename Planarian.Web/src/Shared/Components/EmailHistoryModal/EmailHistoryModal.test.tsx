@@ -68,7 +68,8 @@ describe("EmailHistoryModal", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Email history")).toBeInTheDocument();
     expect(screen.getByText(/Attempt 2/)).toBeInTheDocument();
-    expect(screen.getByText(/Permanent failure/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Permanent failure/)).toHaveLength(2);
+    expect(screen.queryByText(/PermanentFailed/)).not.toBeInTheDocument();
     expect(screen.getByText(/automated \(apple\)/)).toBeInTheDocument();
     expect(screen.getByText(/delivery attempt 3/)).toHaveTextContent("bounce");
     expect(screen.getByText(/delivery attempt 3/)).toHaveTextContent(

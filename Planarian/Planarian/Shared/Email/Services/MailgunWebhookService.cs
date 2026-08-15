@@ -33,11 +33,11 @@ public class MailgunWebhookService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_emailOptions.WebhookSigningKey))
-            return MailgunWebhookProcessingResult.Retry;
+            return MailgunWebhookProcessingResult.Rejected;
 
         var configuredDomain = _emailOptions.Domain?.Trim();
         if (string.IsNullOrWhiteSpace(configuredDomain))
-            return MailgunWebhookProcessingResult.Retry;
+            return MailgunWebhookProcessingResult.Rejected;
 
         if (payload?.Signature == null || !VerifySignature(payload.Signature))
             return MailgunWebhookProcessingResult.Rejected;

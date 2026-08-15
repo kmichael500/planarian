@@ -180,6 +180,7 @@ builder.Services.AddSingleton(blobOptions);
 
 var emailOptions = builder.Configuration.GetSection(EmailOptions.Key).Get<EmailOptions>();
 if (emailOptions == null) throw new Exception("Email options not found");
+EmailConfigurationValidator.Validate(emailOptions, isHostedDeployment);
 
 var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOptions>();
 if (fileOptions == null) throw new Exception("Email options not found");
