@@ -1,9 +1,10 @@
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Planarian.Shared.Routing;
 
 namespace Planarian.Shared.Email.Models;
 
-public static class MessageLogSubstitutionSerializer
+public static partial class MessageLogSubstitutionSerializer
 {
     public const string RedactedPathSegment = "[redacted]";
 
@@ -26,24 +27,48 @@ public static class MessageLogSubstitutionSerializer
             (string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
              string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
         {
+            var originalPath = absoluteUri.AbsolutePath;
             var builder = new UriBuilder(absoluteUri)
             {
-                Query = string.Empty,
+                Path = SanitizePath(originalPath),
+                Query = SanitizeQuery(originalPath, absoluteUri.Query),
                 Fragment = string.Empty
             };
-            builder.Path = SanitizePath(builder.Path);
             return builder.Uri.AbsoluteUri;
         }
 
-        var queryOrFragmentIndex = buttonUrl.IndexOfAny(['?', '#']);
-        var path = queryOrFragmentIndex >= 0 ? buttonUrl[..queryOrFragmentIndex] : buttonUrl;
-        return SanitizePath(path);
+        var fragmentIndex = buttonUrl.IndexOf('#');
+        var withoutFragment = fragmentIndex >= 0 ? buttonUrl[..fragmentIndex] : buttonUrl;
+        var queryIndex = withoutFragment.IndexOf('?');
+        var path = queryIndex >= 0 ? withoutFragment[..queryIndex] : withoutFragment;
+        var query = queryIndex >= 0 ? withoutFragment[queryIndex..] : string.Empty;
+        return SanitizePath(path) + SanitizeQuery(path, query);
+    }
+
+    private static string SanitizeQuery(string path, string query)
+    {
+        if (string.IsNullOrEmpty(query) || !IsCredentialQueryRoute(path)) return query;
+        return CodeQueryParameterRegex().Replace(query, match =>
+            $"{match.Groups[1].Value}{match.Groups[2].Value}={RedactedPathSegment}");
+    }
+
+    private static bool IsCredentialQueryRoute(string path)
+    {
+        return string.Equals(path, ClientRoutes.EmailConfirmation.Path, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(path, ClientRoutes.PasswordReset.Path, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string SanitizePath(string path)
     {
         if (!path.StartsWith(ClientRoutes.Invitation.Prefix, StringComparison.OrdinalIgnoreCase)) return path;
         if (path.Length <= ClientRoutes.Invitation.Prefix.Length) return path;
-        return ClientRoutes.Invitation.Prefix + RedactedPathSegment;
+
+        var credentialEnd = path.IndexOf('/', ClientRoutes.Invitation.Prefix.Length);
+        return credentialEnd < 0
+            ? ClientRoutes.Invitation.Prefix + RedactedPathSegment
+            : ClientRoutes.Invitation.Prefix + RedactedPathSegment + path[credentialEnd..];
     }
+
+    [GeneratedRegex(@"(^|[?&])(code)=([^&#]*)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CodeQueryParameterRegex();
 }

@@ -12,8 +12,9 @@ namespace Planarian.Migrations.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // MessageLogs historically persisted the complete substitutions JSON, including credential-bearing CTA URLs.
-            // Preserve a useful safe target: strip query/fragment data and redact invitation codes embedded in the path.
-            // Malformed historical JSON is skipped rather than blocking the schema upgrade.
+            // Match MessageLogSubstitutionSerializer: redact only known credential locations, preserve unrelated query
+            // parameters, and remove fragments. Malformed historical JSON is skipped rather than blocking the upgrade.
+            // This block intentionally uses only PostgreSQL 15-compatible functions.
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -21,6 +22,10 @@ namespace Planarian.Migrations.Migrations
                     substitutions_json jsonb;
                     button_url text;
                     sanitized_button_url text;
+                    url_without_fragment text;
+                    url_without_query text;
+                    query_string text;
+                    route_path text;
                 BEGIN
                     FOR message_log IN
                         SELECT "Id", "Substitutions"
@@ -32,12 +37,35 @@ namespace Planarian.Migrations.Migrations
                             button_url := substitutions_json ->> 'buttonUrl';
 
                             IF button_url IS NOT NULL THEN
-                                sanitized_button_url := regexp_replace(button_url, '[?#].*$', '');
-                                sanitized_button_url := regexp_replace(
-                                    sanitized_button_url,
-                                    '/user/invitations/[^/]+$',
-                                    '/user/invitations/[redacted]',
-                                    'i');
+                                url_without_fragment := regexp_replace(button_url, '#.*$', '');
+                                url_without_query := split_part(url_without_fragment, '?', 1);
+                                query_string := CASE
+                                    WHEN strpos(url_without_fragment, '?') > 0
+                                        THEN substring(url_without_fragment FROM strpos(url_without_fragment, '?') + 1)
+                                    ELSE NULL
+                                END;
+
+                                route_path := regexp_replace(url_without_query, '^https?://[^/]+', '', 'i');
+
+                                IF lower(route_path) IN ('/confirm-email', '/reset-password') AND query_string IS NOT NULL THEN
+                                    query_string := regexp_replace(
+                                        query_string,
+                                        '(^|&)(code)=([^&]*)',
+                                        E'\1\2=[redacted]',
+                                        'gi');
+                                    sanitized_button_url := url_without_query || '?' || query_string;
+                                ELSE
+                                    sanitized_button_url := url_without_fragment;
+                                END IF;
+
+                                IF lower(route_path) LIKE '/user/invitations/%' AND
+                                   length(route_path) > length('/user/invitations/') THEN
+                                    sanitized_button_url := regexp_replace(
+                                        sanitized_button_url,
+                                        '^(https?://[^/]+)?/user/invitations/[^/?#]+',
+                                        E'\1/user/invitations/[redacted]',
+                                        'i');
+                                END IF;
 
                                 UPDATE "MessageLogs"
                                 SET "Substitutions" = jsonb_set(

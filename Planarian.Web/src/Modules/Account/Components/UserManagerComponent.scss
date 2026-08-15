@@ -148,6 +148,16 @@
   overflow-wrap: anywhere;
 }
 
+.user-manager-grid-card__history {
+  display: flex;
+  margin-top: 2px;
+}
+
+.user-manager-grid-card__history .ant-btn {
+  height: auto;
+  padding: 0;
+}
+
 .user-manager-search {
   flex: 1 1 220px;
   min-width: 160px;
@@ -273,26 +283,4 @@
   .user-manager-invite-button.ant-btn {
     width: 100%;
   }
-}
-
-.user-manager-email-history {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.user-manager-email-history__attempt {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-}
-
-.user-manager-email-history__events {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-left: 12px;
 }

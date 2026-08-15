@@ -1,5 +1,3 @@
-import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
-
 export interface UserManagerGridVm {
   userId: string;
   emailAddress: string;
@@ -9,10 +7,4 @@ export interface UserManagerGridVm {
   lastActiveOn: string | null;
   hasActiveInvitation: boolean;
   invitationEmailAttemptCount: number;
-  invitationEmailDeliveryStatus?: MessageDeliveryStatus | null;
-  invitationEmailDeliveryStatusOn?: string | null;
-  invitationEmailOpenCount: number;
-  invitationEmailAutomatedOpenCount: number;
-  invitationEmailClickCount: number;
-  invitationEmailAutomatedClickCount: number;
 }

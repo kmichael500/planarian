@@ -21,15 +21,18 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly MessageLogRepository _messageLogRepository;
     private readonly EmailOptions _emailOptions;
+    private readonly IHostEnvironment _hostEnvironment;
 
     public EmailService(MessageTypeRepository repository, RequestUser requestUser,
         IEmailMessageFactory emailMessageFactory, ClientUrlBuilder clientUrlBuilder,
-        MessageLogRepository messageLogRepository, EmailOptions emailOptions) : base(repository, requestUser)
+        MessageLogRepository messageLogRepository, EmailOptions emailOptions,
+        IHostEnvironment hostEnvironment) : base(repository, requestUser)
     {
         _emailMessageFactory = emailMessageFactory;
         _clientUrlBuilder = clientUrlBuilder;
         _messageLogRepository = messageLogRepository;
         _emailOptions = emailOptions;
+        _hostEnvironment = hostEnvironment;
     }
 
     private async Task<EmailSendResult> SendGenericEmail(MessagePurpose purpose, string subject, string toEmailAddress,
@@ -64,7 +67,8 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             .SetHtml(html)
             .SetSubject(subject)
             .AddToAddress(toEmailAddress, toName)
-            .AddCustomArgument(EmailDeliveryMetadata.MessageIdArgument, providerCorrelationId);
+            .AddCustomArgument(EmailDeliveryMetadata.MessageIdArgument, providerCorrelationId)
+            .AddCustomArgument(EmailDeliveryMetadata.EnvironmentArgument, _hostEnvironment.EnvironmentName);
 
         if (message is IMailGunMessage mailGunMessage)
         {

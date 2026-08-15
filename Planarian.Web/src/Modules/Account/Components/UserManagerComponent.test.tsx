@@ -3,7 +3,6 @@ import { message } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { MessageDeliveryEventType } from "../../../Shared/Models/MessageDeliveryEventType";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
@@ -15,6 +14,30 @@ jest.mock("../../../Shared/Components/Buttons/DeleteButtonComponent", () => ({
     <button type="button">{children}</button>
   ),
 }));
+
+jest.mock(
+  "../../../Shared/Components/EmailHistoryModal/EmailHistoryModal",
+  () => ({
+    EmailHistoryModal: ({
+      open,
+      title,
+      attempts,
+      emptyText,
+    }: {
+      open: boolean;
+      title?: React.ReactNode;
+      attempts: unknown[];
+      emptyText?: React.ReactNode;
+    }) =>
+      open ? (
+        <div role="dialog">
+          <span>{title}</span>
+          <span>{attempts.length} attempts</span>
+          {attempts.length === 0 ? emptyText : null}
+        </div>
+      ) : null,
+  })
+);
 
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -52,47 +75,15 @@ const pendingUser: UserManagerGridVm = {
   lastActiveOn: null,
   hasActiveInvitation: true,
   invitationEmailAttemptCount: 2,
-  invitationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
-  invitationEmailDeliveryStatusOn: "2026-08-14T13:00:00Z",
-  invitationEmailOpenCount: 2,
-  invitationEmailAutomatedOpenCount: 1,
-  invitationEmailClickCount: 1,
-  invitationEmailAutomatedClickCount: 0,
 };
 
 const history: InvitationEmailAttemptVm[] = [
-  {
-    messageLogId: "message002",
-    createdOn: "2026-08-14T13:00:00Z",
-    deliveryStatus: MessageDeliveryStatus.PermanentFailed,
-    deliveryStatusOn: "2026-08-14T13:03:00Z",
-    events: [
-      {
-        eventType: MessageDeliveryEventType.PermanentFailed,
-        occurredOn: "2026-08-14T13:03:00Z",
-        isDelayedBounce: true,
-        severity: "permanent",
-        reason: "bounce",
-        attemptNumber: 3,
-      },
-    ],
-  },
   {
     messageLogId: "message001",
     createdOn: "2026-08-14T12:00:00Z",
     deliveryStatus: MessageDeliveryStatus.Delivered,
     deliveryStatusOn: "2026-08-14T12:01:00Z",
-    events: [
-      {
-        eventType: MessageDeliveryEventType.Opened,
-        occurredOn: "2026-08-14T12:02:00Z",
-        bot: "apple",
-      },
-      {
-        eventType: MessageDeliveryEventType.Clicked,
-        occurredOn: "2026-08-14T12:03:00Z",
-      },
-    ],
+    events: [],
   },
 ];
 
@@ -148,9 +139,9 @@ describe("UserManagerComponent invitation delivery status", () => {
     expect(screen.getByText("Pending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resend$/ })).toBeInTheDocument();
     expect(screen.getByText("Invitation Sent")).toBeInTheDocument();
+    expect(screen.getByText("Invitation Accepted")).toBeInTheDocument();
+    expect(screen.getByText("Last Active")).toBeInTheDocument();
     expect(screen.getAllByText("Not recorded")).toHaveLength(3);
-    expect(screen.getByText("Latest Email Delivery")).toBeInTheDocument();
-    expect(screen.getByText(/Send failed/)).toBeInTheDocument();
   });
 
   it("shows legacy invitations as untracked while keeping resend available", async () => {
@@ -159,22 +150,16 @@ describe("UserManagerComponent invitation delivery status", () => {
         ...pendingUser,
         invitationSentOn: "2026-08-01T12:00:00Z",
         invitationEmailAttemptCount: 0,
-        invitationEmailDeliveryStatus: null,
-        invitationEmailDeliveryStatusOn: null,
-        invitationEmailOpenCount: 0,
-        invitationEmailAutomatedOpenCount: 0,
-        invitationEmailClickCount: 0,
-        invitationEmailAutomatedClickCount: 0,
       },
     ]);
 
     renderManager();
     await screen.findByText("Invited User");
 
-    expect(screen.getByText("Latest Email Delivery")).toBeInTheDocument();
-    expect(screen.getByText("Not tracked")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resend$/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Email History$/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Email History$/ })
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a newly created invitation when its first email submission fails", async () => {
@@ -210,7 +195,9 @@ describe("UserManagerComponent invitation delivery status", () => {
   });
 
   it("reports resend failure without refreshing stale delivery state", async () => {
-    resendInvitation.mockRejectedValue({ message: "Mail provider unavailable." });
+    resendInvitation.mockRejectedValue({
+      message: "Mail provider unavailable.",
+    });
     renderManager();
     await screen.findByText("Invited User");
     expect(getUsers).toHaveBeenCalledTimes(1);
@@ -251,45 +238,31 @@ describe("UserManagerComponent invitation delivery status", () => {
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 
-  it("summarizes attempts and distinguishes automated engagement", async () => {
+  it("puts email history inside the card body", async () => {
     renderManager();
     await screen.findByText("Invited User");
 
-    expect(screen.getByText("Email Attempts")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("Open Events")).toBeInTheDocument();
-    expect(screen.getByText("2 recorded (1 automated)")).toBeInTheDocument();
-    expect(screen.getByText("Click Events")).toBeInTheDocument();
-    expect(screen.getByText("1 recorded")).toBeInTheDocument();
+    const emailHistoryButton = screen.getByRole("button", {
+      name: /Email History$/,
+    });
+    expect(
+      emailHistoryButton.closest(".planarian-grid-card__body")
+    ).not.toBeNull();
+    expect(
+      emailHistoryButton.closest(".planarian-grid-card__actions")
+    ).toBeNull();
   });
 
-  it("loads resend history on demand and labels bot activity and delayed bounces", async () => {
+  it("loads invitation email history on demand", async () => {
     renderManager();
     await screen.findByText("Invited User");
 
     fireEvent.click(screen.getByRole("button", { name: /Email History$/ }));
 
-    await waitFor(() =>
-      expect(getHistory).toHaveBeenCalledWith("user123456")
-    );
+    await waitFor(() => expect(getHistory).toHaveBeenCalledWith("user123456"));
     expect(
       await screen.findByText(/Invitation email history — Invited User/)
     ).toBeInTheDocument();
-    const openedEvent = await screen.findByText((_, element) =>
-      element?.tagName === "SPAN" &&
-      element.textContent?.includes("Opened") === true &&
-      element.textContent.includes("automated (apple)")
-    );
-    expect(openedEvent).toBeInTheDocument();
-
-    const delayedBounce = await screen.findByText((_, element) =>
-      element?.tagName === "SPAN" &&
-      element.textContent?.includes("PermanentFailed") === true &&
-      element.textContent.includes("delayed bounce")
-    );
-    expect(delayedBounce).toBeInTheDocument();
-    expect(delayedBounce).toHaveTextContent("delivery attempt 3");
-    expect(delayedBounce).toHaveTextContent("bounce");
   });
 
   it("does not offer resend after the invitation has been accepted", async () => {
@@ -305,7 +278,11 @@ describe("UserManagerComponent invitation delivery status", () => {
     await screen.findByText("Invited User");
 
     expect(screen.queryByText("Pending")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Resend$/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Email History$/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Resend$/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Email History$/ })
+    ).toBeInTheDocument();
   });
 });

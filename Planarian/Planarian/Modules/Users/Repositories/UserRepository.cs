@@ -321,29 +321,7 @@ public class UserRepository : RepositoryBase
             InvitationAcceptedOn = e.InvitationAcceptedOn,
             LastActiveOn = e.User.LastActiveOn,
             HasActiveInvitation = e.InvitationAcceptedOn == null && e.InvitationCode != null,
-            InvitationEmailAttemptCount = e.InvitationMessageLogs.Count,
-            InvitationEmailDeliveryStatus = e.InvitationMessageLogs
-                .OrderByDescending(m => m.CreatedOn)
-                .ThenByDescending(m => m.Id)
-                .Select(m => m.DeliveryStatus)
-                .FirstOrDefault(),
-            InvitationEmailDeliveryStatusOn = e.InvitationMessageLogs
-                .OrderByDescending(m => m.CreatedOn)
-                .ThenByDescending(m => m.Id)
-                .Select(m => m.DeliveryStatusOn)
-                .FirstOrDefault(),
-            InvitationEmailOpenCount = e.InvitationMessageLogs
-                .SelectMany(m => m.Events)
-                .Count(evt => evt.EventType == MessageDeliveryEventType.Opened),
-            InvitationEmailAutomatedOpenCount = e.InvitationMessageLogs
-                .SelectMany(m => m.Events)
-                .Count(evt => evt.EventType == MessageDeliveryEventType.Opened && evt.Bot != null),
-            InvitationEmailClickCount = e.InvitationMessageLogs
-                .SelectMany(m => m.Events)
-                .Count(evt => evt.EventType == MessageDeliveryEventType.Clicked),
-            InvitationEmailAutomatedClickCount = e.InvitationMessageLogs
-                .SelectMany(m => m.Events)
-                .Count(evt => evt.EventType == MessageDeliveryEventType.Clicked && evt.Bot != null)
+            InvitationEmailAttemptCount = e.InvitationMessageLogs.Count
         });
     }
 
