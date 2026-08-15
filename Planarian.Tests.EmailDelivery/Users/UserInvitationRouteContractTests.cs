@@ -8,7 +8,7 @@ using Planarian.Modules.Users.Controllers;
 using Planarian.Shared.Routing;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Email;
+namespace Planarian.Tests.EmailDelivery.Users;
 
 public sealed class UserInvitationRouteContractTests
 {

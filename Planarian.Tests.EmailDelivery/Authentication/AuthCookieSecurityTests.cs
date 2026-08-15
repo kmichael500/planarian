@@ -3,7 +3,7 @@ using Planarian.Library.Options;
 using Planarian.Modules.Authentication.Services;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Email;
+namespace Planarian.Tests.EmailDelivery.Authentication;
 
 public sealed class AuthCookieSecurityTests
 {
@@ -65,4 +65,22 @@ public sealed class AuthCookieSecurityTests
         Assert.Contains("samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("domain=", setCookie, StringComparison.OrdinalIgnoreCase);
     }
+    [Fact]
+    public void ClearingAntiforgeryCookieUsesTheSameHostCompatibleCookieScope()
+    {
+        var service = new AuthCookieService(new AuthOptions());
+        var context = new DefaultHttpContext();
+
+        service.ClearAntiforgeryCookies(context);
+
+        var setCookie = context.Response.Headers.SetCookie.ToString();
+        Assert.StartsWith($"{AuthCookieService.AntiforgeryCookieName}=;", setCookie);
+        Assert.Contains("expires=", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("path=/", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("secure", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=lax", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("domain=", setCookie, StringComparison.OrdinalIgnoreCase);
+    }
+
 }

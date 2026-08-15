@@ -1,7 +1,7 @@
 using Planarian.Model.Shared;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Migrations;
 
 public sealed class AuthenticationMigrationContractTests
 {

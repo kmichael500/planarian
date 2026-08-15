@@ -9,7 +9,7 @@ using Planarian.Modules.Users.Controllers;
 using Planarian.Shared.Email.Controllers;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Architecture;
 
 public sealed class ControllerSecurityContractTests
 {
@@ -23,6 +23,7 @@ public sealed class ControllerSecurityContractTests
     [
         Endpoint<AppController>(nameof(AppController.Initialize)),
         Endpoint<AuthenticationController>(nameof(AuthenticationController.Login)),
+        Endpoint<AuthenticationController>(nameof(AuthenticationController.Logout)),
         Endpoint<AuthenticationController>(nameof(AuthenticationController.Token)),
         Endpoint<RegisterController>(nameof(RegisterController.Register)),
         Endpoint<UserController>(nameof(UserController.ConfirmEmail)),

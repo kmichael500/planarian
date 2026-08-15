@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Planarian.Modules.Authentication.Services;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Email;
+namespace Planarian.Tests.EmailDelivery.Authentication;
 
 public sealed class RegistrationContinuationServiceTests
 {

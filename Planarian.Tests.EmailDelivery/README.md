@@ -37,6 +37,8 @@ These cases matter, but this temporary project does not have the application-hos
 - Verify cave-file, profile-photo, and trip-photo reads cannot cross their account/project authorization boundary when a caller supplies another tenant's file or user identifier.
 - Verify successful login of a legacy password hash persists the upgraded hash, while a concurrent password change cannot be overwritten by the login rehash.
 - Verify stale or deleted-user JWT sessions are rejected by the request pipeline, while pre-v31 JWTs without a session-version claim remain valid for users still at version `0`.
+- Verify a stale or deleted-user auth cookie can still POST logout with a valid antiforgery token and clears both auth/antiforgery cookies, while a missing or invalid antiforgery token is rejected.
+- Verify PostgreSQL-backed email identity lookups trim surrounding whitespace and behave culture-independently, including under a Turkish current culture.
 - Verify Settings password changes require the current password, increment `SessionVersion`, refresh the initiating session, invalidate older sessions, and attempt the password-changed notification without rolling back the password change when email submission fails.
 - Verify Forgot Password completion does not require the old password, increments `SessionVersion`, invalidates existing sessions, and attempts the same password-changed notification.
 - Verify anonymous user mutations allow only registration, invitation cleanup, email confirmation, password-reset issuance, and password-reset completion field sets; unrelated anonymous user mutations must fail.

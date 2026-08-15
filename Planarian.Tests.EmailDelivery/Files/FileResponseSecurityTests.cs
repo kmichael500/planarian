@@ -6,7 +6,7 @@ using Planarian.Shared.Models;
 using Planarian.Shared.Services;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Files;
 
 public sealed class FileResponseSecurityTests
 {

@@ -6,7 +6,7 @@ using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Archive.Services;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Exports;
 
 public sealed class CsvExportSecurityTests
 {

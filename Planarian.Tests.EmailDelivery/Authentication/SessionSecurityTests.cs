@@ -5,7 +5,7 @@ using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Services;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Authentication;
 
 public sealed class SessionSecurityTests
 {

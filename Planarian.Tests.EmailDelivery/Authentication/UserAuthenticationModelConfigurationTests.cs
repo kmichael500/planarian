@@ -5,7 +5,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Shared;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Authentication;
 
 public sealed class UserAuthenticationModelConfigurationTests
 {

@@ -1,3 +1,4 @@
+using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.Projects;
 using Planarian.Model.Shared;
@@ -56,7 +57,7 @@ public class ProjectService : ServiceBase<ProjectRepository>
         var isNew = string.IsNullOrWhiteSpace(values.Id);
         var project = isNew
             ? new Project()
-            : await Repository.GetProject(values.Id!) ?? throw new NullReferenceException("Project not found");
+            : await Repository.GetProject(values.Id!) ?? throw ApiExceptionDictionary.NotFound("Project");
 
         project.Name = values.Name;
         if (isNew)

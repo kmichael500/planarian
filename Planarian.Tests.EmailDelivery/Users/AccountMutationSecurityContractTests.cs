@@ -6,7 +6,7 @@ using Planarian.Modules.Users.Controllers;
 using Planarian.Modules.Users.Models;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Users;
 
 public sealed class AccountMutationSecurityContractTests
 {

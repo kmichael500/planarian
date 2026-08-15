@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Planarian.Library.Constants;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.String;
@@ -322,7 +324,19 @@ public class UserService : ServiceBase<UserRepository>
         user.EmailConfirmationCode = null;
         user.EmailConfirmedOn = DateTime.UtcNow;
 
-        await Repository.SaveChangesAsync();
+        // The pre-check above is for a friendly fast failure; the unique index remains authoritative
+        // when two pending-email confirmations race. Translate only that specific constraint violation.
+        try
+        {
+            await Repository.SaveChangesAsync();
+        }
+        catch (DbUpdateException exception) when
+            (exception.InnerException is PostgresException
+             { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Users_EmailAddress" })
+        {
+            throw ApiExceptionDictionary.EmailAlreadyExists;
+        }
+
         return new EmailConfirmationResult(user.EmailAddress, user.Id, sessionVersionChanged);
     }
 

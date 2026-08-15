@@ -2,7 +2,7 @@ using System.Text;
 using Planarian.Library.Helpers;
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Security;
+namespace Planarian.Tests.EmailDelivery.Files;
 
 public sealed class FileUploadValidationTests
 {
