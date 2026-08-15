@@ -5,8 +5,8 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class AuthCookieService
 {
-    public const string AuthCookieName = "planarian_auth";
-    public const string AntiforgeryCookieName = "planarian_csrf";
+    public const string AuthCookieName = "__Host-planarian_auth";
+    public const string AntiforgeryCookieName = "__Host-planarian_csrf";
     public const string RequestTokenHeaderName = "X-XSRF-TOKEN";
 
     private readonly AuthOptions _authOptions;
