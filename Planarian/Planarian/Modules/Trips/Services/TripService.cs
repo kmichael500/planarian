@@ -122,7 +122,7 @@ public class TripService : ServiceBase<TripRepository>
         var isNew = string.IsNullOrWhiteSpace(values.Id);
         var trip = isNew
             ? new Trip()
-            : await Repository.GetTrip(values.Id!) ?? throw new NullReferenceException("Trip not found");
+            : await Repository.GetTrip(values.Id!) ?? throw Planarian.Library.Exceptions.ApiExceptionDictionary.NotFound("Trip");
 
         trip.ProjectId = values.ProjectId;
 
