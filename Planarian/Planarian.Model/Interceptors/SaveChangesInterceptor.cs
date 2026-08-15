@@ -144,7 +144,10 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
                     var isInvitationCleanup = entityState == EntityState.Deleted && user.IsTemporary;
 
                     var isEmailConfirmation = modifiedPropertyNames.Count > 0 &&
-                                              modifiedPropertyNames.All(p => p is nameof(User.EmailConfirmedOn)
+                                              modifiedPropertyNames.All(p => p is nameof(User.EmailAddress)
+                                                  or nameof(User.PendingEmailAddress)
+                                                  or nameof(User.SessionVersion)
+                                                  or nameof(User.EmailConfirmedOn)
                                                   or nameof(User.EmailConfirmationCode)
                                                   or nameof(User.EmailConfirmationMessageLogId));
 
@@ -154,6 +157,7 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
                     var isPasswordResetCompletion = modifiedPropertyNames.Count > 0 &&
                                                     modifiedPropertyNames.All(p => p is nameof(User.HashedPassword)
+                                                        or nameof(User.SessionVersion)
                                                         or nameof(User.PasswordResetCode)
                                                         or nameof(User.PasswordResetCodeExpiration)) &&
                                                     string.IsNullOrWhiteSpace(user.PasswordResetCode) &&

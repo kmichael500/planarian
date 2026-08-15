@@ -473,6 +473,9 @@ var app = builder.Build();
 if (isAzureAppService)
     app.UseForwardedHeaders();
 
+if (!isDevelopment)
+    app.UseHsts();
+
 app.UseResponseCompression();
 
 if (false)

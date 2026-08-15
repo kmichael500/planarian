@@ -1,27 +1,14 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import React, { useContext } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import { LoginPage } from "./LoginPage";
 
-const mockNavigate = jest.fn();
-let mockLocationSearch = "";
 const mockLogin = jest.fn();
 
-jest.mock("react-router-dom", () => ({
-  ...jest.requireActual("react-router-dom"),
-  useLocation: () => ({
-    pathname: "/login",
-    search: mockLocationSearch,
-    hash: "",
-    state: null,
-    key: "test",
-  }),
-  useNavigate: () => mockNavigate,
-}));
-
-const AppContextOverride: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AppContextOverride: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const defaultValue = useContext(AppContext);
   return (
     <AppContext.Provider value={{ ...defaultValue, login: mockLogin }}>
@@ -29,6 +16,16 @@ const AppContextOverride: React.FC<{ children: React.ReactNode }> = ({ children 
     </AppContext.Provider>
   );
 };
+
+const DestinationProbe = () => {
+  const location = useLocation();
+  return (
+    <div data-testid="destination">
+      {`${location.pathname}${location.search}${location.hash}`}
+    </div>
+  );
+};
+
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -44,21 +41,24 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  jest.restoreAllMocks();
-  mockNavigate.mockReset();
   mockLogin.mockReset();
   mockLogin.mockResolvedValue(undefined);
-  mockLocationSearch = "";
 });
 
-const renderLogin = () =>
+const renderLogin = (redirectUrl: string) =>
   render(
-    <MemoryRouter>
+    <MemoryRouter
+      initialEntries={[`/login?redirectUrl=${encodeURIComponent(redirectUrl)}`]}
+    >
       <AppContextOverride>
-        <LoginPage />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<DestinationProbe />} />
+        </Routes>
       </AppContextOverride>
     </MemoryRouter>
   );
+
 const submitCredentials = () => {
   fireEvent.change(screen.getByLabelText("Email Address"), {
     target: { value: "user@example.com" },
@@ -70,18 +70,22 @@ const submitCredentials = () => {
 };
 
 describe("LoginPage post-login redirect safety", () => {
-  it("navigates to the redirect sanitized by HttpHelpers", async () => {
-    mockLocationSearch = "?redirectUrl=%2F%2Fevil.example%2Fphish";
-    const redirectSpy = jest
-      .spyOn(HttpHelpers, "GetLocalRedirectUrl")
-      .mockReturnValue("/safe-destination");
-    renderLogin();
+  it.each([
+    ["//evil.example/phish", "/"],
+    ["https://evil.example/phish", "/"],
+    ["javascript:alert(1)", "/"],
+    ["/caves/ABC?tab=files#history", "/caves/ABC?tab=files#history"],
+  ])(
+    "navigates redirect %p only to the sanitized local destination",
+    async (redirectUrl, expected) => {
+      renderLogin(redirectUrl);
 
-    submitCredentials();
+      submitCredentials();
 
-    await waitFor(() => {
-      expect(redirectSpy).toHaveBeenCalledWith("//evil.example/phish");
-      expect(mockNavigate).toHaveBeenCalledWith("/safe-destination");
-    });
-  });
+      expect(await screen.findByTestId("destination")).toHaveTextContent(
+        expected
+      );
+      expect(mockLogin).toHaveBeenCalledTimes(1);
+    }
+  );
 });

@@ -24,7 +24,8 @@ public class RequestUser
     public string FullName => $"{FirstName} {LastName}";
     public bool IsAuthenticated { get; private set; }
 
-    public async Task Initialize(string? accountId, string? userId, bool throwOnInvalidAccountId = true)
+    public async Task Initialize(string? accountId, string? userId, int sessionVersion = 0,
+        bool throwOnInvalidAccountId = true)
     {
         var user = await _dbContext.Users
             .AsNoTracking()
@@ -35,11 +36,18 @@ public class RequestUser
                 e.FirstName,
                 e.LastName,
                 e.LastActiveOn,
+                e.SessionVersion,
                 IsValidAccountId = e.AccountUsers.Any(au => au.AccountId == accountId)
             })
             .FirstOrDefaultAsync();
 
         if (user == null)
+        {
+            IsAuthenticated = false;
+            return;
+        }
+
+        if (user.SessionVersion != sessionVersion)
         {
             IsAuthenticated = false;
             return;

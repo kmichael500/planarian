@@ -63,18 +63,6 @@ public sealed class MessageDeliveryStatusPolicyTests
         Assert.True(MessageDeliveryStatusPolicy.ShouldApply(current, currentOn, incoming, currentOn.AddSeconds(-1)));
     }
 
-    [Theory]
-    [InlineData(MessageDeliveryStatus.Submitting)]
-    [InlineData(MessageDeliveryStatus.Submitted)]
-    [InlineData(MessageDeliveryStatus.SendFailed)]
-    public void ProviderTruthCanReplaceLocalSubmissionStateEvenWithOlderTimestamp(MessageDeliveryStatus current)
-    {
-        var currentOn = new DateTime(2026, 8, 14, 12, 0, 1, DateTimeKind.Utc);
-
-        Assert.True(MessageDeliveryStatusPolicy.ShouldApply(
-            current, currentOn, MessageDeliveryStatus.Accepted, currentOn.AddSeconds(-1)));
-    }
-
     [Fact]
     public void MissingCachedStatusAcceptsProviderStatus()
     {

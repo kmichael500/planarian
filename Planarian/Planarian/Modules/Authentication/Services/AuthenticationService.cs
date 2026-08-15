@@ -43,6 +43,9 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (user == null)
         {
+            // SECURITY/PRODUCT DECISION: Planarian intentionally distinguishes an unknown email
+            // for usability. Do not replace this with a generic login error without explicit product approval.
+            // Login throttling still limits automated discovery.
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         
@@ -51,10 +54,27 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw ApiExceptionDictionary.InvalidPassword;
         }
 
-        var (isValid, _) = PasswordService.Check(user.HashedPassword, password);
-        if (!isValid)
+        var passwordCheck = PasswordService.Check(user.HashedPassword, password);
+        if (!passwordCheck.Verified)
         {
             throw ApiExceptionDictionary.InvalidPassword;
+        }
+
+        if (passwordCheck.NeedsUpgrade)
+        {
+            var upgradedHash = PasswordService.Hash(password);
+            var upgraded = await _userRepository.UpgradePasswordHash(user.Id, user.HashedPassword, upgradedHash);
+            if (!upgraded)
+            {
+                var currentUser = await _userRepository.GetUserByEmail(email);
+                if (currentUser == null || string.IsNullOrWhiteSpace(currentUser.HashedPassword) ||
+                    !PasswordService.Check(currentUser.HashedPassword, password).Verified)
+                {
+                    throw ApiExceptionDictionary.InvalidPassword;
+                }
+
+                user = currentUser;
+            }
         }
 
         if (user.EmailConfirmedOn == null)
@@ -68,7 +88,7 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw exception;
         }
 
-        return await BuildTokenForUser(user.FullName, user.Id);
+        return await BuildTokenForUser(user.FullName, user.Id, user.SessionVersion);
     }
 
     internal async Task SetAuthenticatedSessionForConfirmedUser(HttpContext httpContext, string emailAddress)
@@ -77,15 +97,24 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
         if (user == null) throw ApiExceptionDictionary.NotFound("User");
         if (user.EmailConfirmedOn == null) throw ApiExceptionDictionary.EmailNotConfirmed;
 
-        var token = await BuildTokenForUser(user.FullName, user.Id);
+        var token = await BuildTokenForUser(user.FullName, user.Id, user.SessionVersion);
         _authCookieService.SetAuthCookie(httpContext, token, rememberMe: false);
     }
 
-    private async Task<string> BuildTokenForUser(string fullName, string userId)
+    internal async Task RefreshAuthenticatedSessionForUser(HttpContext httpContext, string userId)
+    {
+        var user = await _userRepository.Get(userId);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+
+        var token = await BuildTokenForUser(user.FullName, user.Id, user.SessionVersion);
+        _authCookieService.SetAuthCookie(httpContext, token, rememberMe: false);
+    }
+
+    private async Task<string> BuildTokenForUser(string fullName, string userId, int sessionVersion)
     {
         var accounts = (await Repository.GetAccountIdsByUserId(userId)).ToList();
         var accountId = accounts.FirstOrDefault();
-        return _tokenService.BuildToken(new UserToken(fullName, userId, accountId));
+        return _tokenService.BuildToken(new UserToken(fullName, userId, accountId, sessionVersion));
     }
 
     public void Logout(HttpContext httpContext)

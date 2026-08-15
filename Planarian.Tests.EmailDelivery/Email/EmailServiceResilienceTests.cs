@@ -16,7 +16,7 @@ public sealed class EmailServiceResilienceTests
     [Fact]
     public async Task ConfirmationUrlSetupFailureBecomesSendFailedResult()
     {
-        await using var dbContext = CreateUnavailableDatabaseContext();
+        await using var dbContext = CreateUnconfiguredDatabaseContext();
         var service = CreateService(dbContext, new ThrowingClientRequestOrigin());
 
         var result = await service.SendEmailConfirmationEmail(
@@ -29,7 +29,7 @@ public sealed class EmailServiceResilienceTests
     [Fact]
     public async Task InvitationUrlSetupFailureBecomesSendFailedResult()
     {
-        await using var dbContext = CreateUnavailableDatabaseContext();
+        await using var dbContext = CreateUnconfiguredDatabaseContext();
         var service = CreateService(dbContext, new ThrowingClientRequestOrigin());
         var user = new User("Test", "Person", "person@example.com");
         var accountUser = new AccountUser { InvitationCode = "Ab3xZ91Qwe" };
@@ -43,7 +43,7 @@ public sealed class EmailServiceResilienceTests
     [Fact]
     public async Task ConfirmationTrackingSetupFailureBecomesSendFailedResult()
     {
-        await using var dbContext = CreateUnavailableDatabaseContext();
+        await using var dbContext = CreateUnconfiguredDatabaseContext();
         var service = CreateService(dbContext, new FixedClientRequestOrigin());
 
         var result = await service.SendEmailConfirmationEmail(
@@ -53,13 +53,18 @@ public sealed class EmailServiceResilienceTests
         Assert.False(result.WasAttempted);
     }
 
-    private static PlanarianDbContext CreateUnavailableDatabaseContext()
+    [Fact]
+    public async Task PasswordChangedNotificationFailureIsBestEffort()
     {
-        var options = new DbContextOptionsBuilder<PlanarianDbContext>()
-            .UseNpgsql(
-                "Host=127.0.0.1;Port=1;Database=unavailable;Username=unused;Password=unused;Timeout=1",
-                options => options.UseNetTopologySuite())
-            .Options;
+        await using var dbContext = CreateUnconfiguredDatabaseContext();
+        var service = CreateService(dbContext, new FixedClientRequestOrigin());
+
+        await service.SendPasswordChangedEmail("person@example.com", "Test Person");
+    }
+
+    private static PlanarianDbContext CreateUnconfiguredDatabaseContext()
+    {
+        var options = new DbContextOptionsBuilder<PlanarianDbContext>().Options;
         return new PlanarianDbContext(options);
     }
 

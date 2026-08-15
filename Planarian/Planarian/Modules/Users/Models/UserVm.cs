@@ -26,9 +26,9 @@ public class UserVm
         EmailAddress = emailAddress.Trim();
     }
 
-    public UserVm(User firstName) : this(firstName.FirstName, firstName.LastName, firstName.EmailAddress,
-        firstName.PhoneNumber)
+    public UserVm(User user) : this(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
     {
+        PendingEmailAddress = user.PendingEmailAddress;
     }
 
     public UserVm()
@@ -36,6 +36,7 @@ public class UserVm
     }
 
     [Required] public string EmailAddress { get; set; }
+    public string? PendingEmailAddress { get; set; }
     [Required] public string FirstName { get; set; }
     [Required] public string LastName { get; set; }
 
