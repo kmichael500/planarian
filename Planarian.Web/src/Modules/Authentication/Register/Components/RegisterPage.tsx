@@ -17,6 +17,7 @@ import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionCon
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../../Shared/Models/MessageDeliveryStatus";
 import { AppContext } from "../../../../Configuration/Context/AppContext";
 import { SubmitButtonComponent } from "../../../../Shared/Components/Buttons/SubmitButtonComponent";
 import { LoginButtonComponent } from "../../../../Shared/Components/Buttons/LoginButtonComponent";
@@ -102,12 +103,16 @@ const RegisterPage: React.FC = () => {
       // Append invitationCode if it exists
       const payload = { ...values, invitationCode };
 
-      await RegisterService.RegisterUser(payload);
+      const result = await RegisterService.RegisterUser(payload);
       navigate("/confirm-email/pending", {
         replace: true,
         state: {
           emailAddress: values.emailAddress,
-          confirmationEmailJustSent: true,
+          confirmationEmailJustSent:
+            result.confirmationEmailDeliveryStatus ===
+            MessageDeliveryStatus.Submitted,
+          confirmationEmailDeliveryStatus:
+            result.confirmationEmailDeliveryStatus,
         },
       });
     } catch (e) {

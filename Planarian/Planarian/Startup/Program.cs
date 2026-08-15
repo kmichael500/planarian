@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.Routing;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
 using System.Text.Json.Serialization;
@@ -57,6 +58,7 @@ using Planarian.Modules.Users.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
+using Planarian.Shared.Routing;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.MailGun;
@@ -108,6 +110,11 @@ builder.Services.AddControllers(options =>
         options.JsonSerializerOptions.MaxDepth = 64; // Increase max depth for complex GeoJSON
         options.JsonSerializerOptions.DefaultBufferSize = 16 * 1024; // 16KB buffer
     });
+
+builder.Services.Configure<RouteOptions>(options =>
+{
+    options.ConstraintMap[UserInvitationRoutes.CodeConstraint] = typeof(InvitationCodeRouteConstraint);
+});
 
 // Configure form options for large file uploads
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
@@ -246,6 +253,7 @@ builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped(typeof(TagRepository<>));
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
+builder.Services.AddScoped<MessageLogRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped(typeof(AccountRepository<>));
 builder.Services.AddScoped<PlanarianSettingsRepository>();

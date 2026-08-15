@@ -1,4 +1,5 @@
 using Planarian.Shared.Helpers;
+using Planarian.Shared.Routing;
 
 namespace Planarian.Shared.Services;
 
@@ -26,22 +27,17 @@ public class ClientUrlBuilder
 
     public string BuildPasswordResetUrl(string resetCode)
     {
-        return BuildPathWithCode("/reset-password", resetCode);
+        return BuildPath(UserPasswordResetRoutes.Client.Get(resetCode));
     }
 
     public string BuildEmailConfirmationUrl(string confirmationCode)
     {
-        return BuildPathWithCode("/confirm-email", confirmationCode);
+        return BuildPath(UserEmailConfirmationRoutes.Client.Get(confirmationCode));
     }
 
     public string BuildInvitationUrl(string invitationCode)
     {
-        return BuildPath($"/user/invitations/{Uri.EscapeDataString(invitationCode)}");
-    }
-
-    private string BuildPathWithCode(string path, string code)
-    {
-        return BuildPath($"{path}?code={Uri.EscapeDataString(code)}");
+        return BuildPath(UserInvitationRoutes.Client.Get(invitationCode));
     }
 
     private string BuildPath(string path)

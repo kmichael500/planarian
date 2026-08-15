@@ -7,6 +7,7 @@ using Planarian.Modules.Users.Models;
 using Planarian.Modules.Users.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
+using Planarian.Shared.Routing;
 
 namespace Planarian.Modules.Users.Controllers;
 
@@ -22,7 +23,7 @@ public class UserController : PlanarianControllerBase<UserService>
     #region Confirm
 
     [AllowAnonymous]
-    [HttpPost("confirm-email")]
+    [HttpPost(UserEmailConfirmationRoutes.Api.Confirm, Name = UserEmailConfirmationRoutes.Api.Names.Confirm)]
     public async Task<ActionResult> ConfirmEmail(string code)
     {
         await Service.ConfirmEmail(code);
@@ -31,16 +32,17 @@ public class UserController : PlanarianControllerBase<UserService>
     }
 
     [AllowAnonymous]
-    [HttpPost("confirm-email/resend")]
+    [HttpPost(UserEmailConfirmationRoutes.Api.Resend, Name = UserEmailConfirmationRoutes.Api.Names.Resend)]
     [Throttle]
-    public async Task<ActionResult> ResendEmailConfirmation([FromBody] ResendEmailConfirmationVm? request)
+    public async Task<ActionResult> ResendEmailConfirmation([FromBody] ResendEmailConfirmationVm? request,
+        CancellationToken cancellationToken)
     {
         // TODO: Move Planarian controllers to [ApiController] after preserving the existing ApiErrorResponse contract.
         // Until then, model validation must be enforced explicitly.
         if (request == null || !ModelState.IsValid)
             throw ApiExceptionDictionary.BadRequest("Please enter a valid email address.");
 
-        await Service.ResendEmailConfirmation(request.EmailAddress);
+        await Service.ResendEmailConfirmation(request.EmailAddress, cancellationToken);
         return new OkResult();
     }
 
@@ -89,7 +91,7 @@ public class UserController : PlanarianControllerBase<UserService>
 
     #region Invitations
 
-    [HttpGet("invitations")]
+    [HttpGet(UserInvitationRoutes.Api.Pending, Name = UserInvitationRoutes.Api.Names.Pending)]
     public async Task<ActionResult<IEnumerable<AcceptInvitationVm>>> GetPendingInvitations()
     {
         var result = await Service.GetPendingInvitationsForCurrentUser();
@@ -97,14 +99,14 @@ public class UserController : PlanarianControllerBase<UserService>
         return new JsonResult(result);
     }
 
-    [HttpPost("invitations/{code:length(10)}/accept")]
+    [HttpPost(UserInvitationRoutes.Api.Accept, Name = UserInvitationRoutes.Api.Names.Accept)]
     public async Task<ActionResult> AcceptInvitation(string code, CancellationToken cancellationToken)
     {
         await Service.AcceptInvitation(code, cancellationToken);
         return new OkResult();
     }
 
-    [HttpPost("invitations/{code:length(10)}/decline")]
+    [HttpPost(UserInvitationRoutes.Api.Decline, Name = UserInvitationRoutes.Api.Names.Decline)]
     public async Task<ActionResult> DeclineInvitation(string code)
     {
         await Service.DeclineInvitation(code);
@@ -113,7 +115,7 @@ public class UserController : PlanarianControllerBase<UserService>
     }
     
     [AllowAnonymous]
-    [HttpGet("invitations/{code:length(10)}")]
+    [HttpGet(UserInvitationRoutes.Api.ByCode, Name = UserInvitationRoutes.Api.Names.Get)]
     public async Task<ActionResult<AcceptInvitationVm>> GetInvitation(string code)
     {
         var result = await Service.GetInvitation(code);
@@ -125,7 +127,7 @@ public class UserController : PlanarianControllerBase<UserService>
     #region Password Reset
 
     [AllowAnonymous]
-    [HttpPost("reset-password/email/{email}")]
+    [HttpPost(UserPasswordResetRoutes.Api.SendEmail, Name = UserPasswordResetRoutes.Api.Names.SendEmail)]
     [Throttle]
     public async Task<ActionResult> SendPasswordReset(string email)
     {
@@ -135,7 +137,7 @@ public class UserController : PlanarianControllerBase<UserService>
     }
 
     [AllowAnonymous]
-    [HttpPost("reset-password")]
+    [HttpPost(UserPasswordResetRoutes.Api.Reset, Name = UserPasswordResetRoutes.Api.Names.Reset)]
     public async Task<ActionResult> ResetPassword(string code, [FromBody] string password)
     {
         await Service.ResetPassword(code, password);

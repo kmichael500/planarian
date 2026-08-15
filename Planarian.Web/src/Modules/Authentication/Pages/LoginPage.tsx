@@ -16,6 +16,7 @@ import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
@@ -60,7 +61,7 @@ const LoginPage: React.FC = () => {
       const error = e as ApiErrorResponse;
       if (error.errorCode === ApiExceptionType.EmailNotConfirmed) {
         const emailNotConfirmedData = error.data as
-          | { confirmationEmailDeliveryFailed?: boolean }
+          | { confirmationEmailDeliveryStatus?: MessageDeliveryStatus }
           | undefined;
         navigate(
           {
@@ -71,8 +72,8 @@ const LoginPage: React.FC = () => {
             state: {
               emailAddress: values.emailAddress,
               confirmationEmailJustSent: false,
-              confirmationEmailDeliveryFailed:
-                emailNotConfirmedData?.confirmationEmailDeliveryFailed === true,
+              confirmationEmailDeliveryStatus:
+                emailNotConfirmedData?.confirmationEmailDeliveryStatus,
             },
           }
         );

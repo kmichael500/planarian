@@ -5,6 +5,7 @@ using Planarian.Modules.Authentication.Models;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
 using Planarian.Shared.Base;
+using Planarian.Shared.Email.Services;
 
 namespace Planarian.Modules.Authentication.Services;
 
@@ -14,16 +15,18 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
     private readonly RequestThrottleService _requestThrottleService;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
+    private readonly MessageLogRepository _messageLogRepository;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
         TokenService tokenService, UserRepository userRepository, AuthCookieService authCookieService,
-        RequestThrottleService requestThrottleService) :
+        RequestThrottleService requestThrottleService, MessageLogRepository messageLogRepository) :
         base(repository, requestUser)
     {
         _authCookieService = authCookieService;
         _tokenService = tokenService;
         _userRepository = userRepository;
         _requestThrottleService = requestThrottleService;
+        _messageLogRepository = messageLogRepository;
     }
 
     public async Task AuthenticateEmailPassword(HttpContext httpContext, string email, string password, bool rememberMe)
@@ -59,7 +62,8 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             var exception = ApiExceptionDictionary.EmailNotConfirmed;
             exception.Data = new EmailNotConfirmedDataVm
             {
-                ConfirmationEmailDeliveryFailed = user.EmailConfirmationDeliveryFailedOn != null
+                ConfirmationEmailDeliveryStatus = await _messageLogRepository.GetDeliveryStatus(
+                    user.EmailConfirmationMessageLogId)
             };
             throw exception;
         }

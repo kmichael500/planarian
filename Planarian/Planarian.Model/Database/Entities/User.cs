@@ -56,9 +56,8 @@ public class User : EntityBase
     [MaxLength(PropertyLength.InvitationCode)]
     public string? EmailConfirmationCode { get; set; }
 
-    [MaxLength(PropertyLength.Key)]
-    public string? EmailConfirmationDeliveryId { get; set; }
-    public DateTime? EmailConfirmationDeliveryFailedOn { get; set; }
+    [MaxLength(PropertyLength.Id)]
+    public string? EmailConfirmationMessageLogId { get; set; }
     public DateTime? EmailConfirmedOn { get; set; }
 
     public bool IsTemporary { get; set; } = false; // Used to invite users to Planarian. The entire user record will be deleted once the user accepts the invitation.
@@ -74,6 +73,7 @@ public class User : EntityBase
     public virtual ICollection<CavePermission> CavePermissions { get; set; } = new HashSet<CavePermission>();
     public virtual ICollection<UserPermission> UserPermissions { get; set; } = new HashSet<UserPermission>();
     public virtual ICollection<Favorite> Favorites { get; set; } = new HashSet<Favorite>();
+    public virtual MessageLog? EmailConfirmationMessageLog { get; set; }
 
     public DateTime? LastActiveOn { get; set; }
 
@@ -92,5 +92,10 @@ public class UserConfiguration : BaseEntityTypeConfiguration<User>
         builder.HasIndex(e => e.EmailAddress)
             .IsUnique()
             .HasFilter("\"IsTemporary\" = false");
+
+        builder.HasOne(e => e.EmailConfirmationMessageLog)
+            .WithMany()
+            .HasForeignKey(e => e.EmailConfirmationMessageLogId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -8,6 +8,7 @@ import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { UserService } from "../../User/UserService";
 
 const { Paragraph, Text, Title } = Typography;
@@ -15,7 +16,7 @@ const { Paragraph, Text, Title } = Typography;
 interface EmailConfirmationPendingLocationState {
   emailAddress?: string;
   confirmationEmailJustSent?: boolean;
-  confirmationEmailDeliveryFailed?: boolean;
+  confirmationEmailDeliveryStatus?: MessageDeliveryStatus;
 }
 
 interface ResendFormValues {
@@ -34,13 +35,13 @@ const EmailConfirmationPendingPage: React.FC = () => {
     return {
       emailAddress: state?.emailAddress?.trim() || undefined,
       confirmationEmailJustSent: state?.confirmationEmailJustSent === true,
-      confirmationEmailDeliveryFailed:
-        state?.confirmationEmailDeliveryFailed === true,
+      confirmationEmailDeliveryStatus:
+        state?.confirmationEmailDeliveryStatus,
     };
   });
   const { emailAddress, confirmationEmailJustSent } = pendingContext;
-  const [confirmationEmailDeliveryFailed, setConfirmationEmailDeliveryFailed] =
-    useState(pendingContext.confirmationEmailDeliveryFailed);
+  const [confirmationEmailDeliveryStatus, setConfirmationEmailDeliveryStatus] =
+    useState(pendingContext.confirmationEmailDeliveryStatus);
 
   useEffect(() => {
     setHeaderTitle(["Confirm Email"]);
@@ -63,7 +64,7 @@ const EmailConfirmationPendingPage: React.FC = () => {
     setIsResending(true);
     try {
       await UserService.ResendEmailConfirmation(address.trim());
-      setConfirmationEmailDeliveryFailed(false);
+      setConfirmationEmailDeliveryStatus(undefined);
       message.success(
         "If an unconfirmed account exists for that email address, a confirmation email has been sent."
       );
@@ -97,7 +98,22 @@ const EmailConfirmationPendingPage: React.FC = () => {
         <Title level={2} style={{ marginBottom: 0 }}>
           Confirm your email
         </Title>
-        {emailAddress && confirmationEmailJustSent ? (
+        {emailAddress &&
+        confirmationEmailDeliveryStatus === MessageDeliveryStatus.SendFailed ? (
+          <Paragraph>
+            Your account was created, but Planarian could not submit a confirmation
+            email to <Text strong>{emailAddress}</Text>. Request another confirmation
+            email below.
+          </Paragraph>
+        ) : emailAddress &&
+          confirmationEmailDeliveryStatus ===
+            MessageDeliveryStatus.PermanentFailed ? (
+          <Paragraph>
+            Your email address still needs to be confirmed, and the most recent
+            confirmation message to <Text strong>{emailAddress}</Text> could not be
+            delivered.
+          </Paragraph>
+        ) : emailAddress && confirmationEmailJustSent ? (
           <Paragraph>
             We sent a confirmation link to <Text strong>{emailAddress}</Text>.
             Open the link in that email to verify your email address before signing in.
@@ -114,21 +130,51 @@ const EmailConfirmationPendingPage: React.FC = () => {
             from your email, or enter your email address below to request another one.
           </Paragraph>
         )}
-        {confirmationEmailDeliveryFailed && emailAddress && (
-          <Alert
-            type="error"
-            showIcon
-            message="We couldn't deliver your confirmation email."
-            description={
-              <>
-                The email provider reported that a confirmation message to{" "}
-                <Text strong>{emailAddress}</Text> could not be delivered. Verify
-                that the address is correct. If it is correct and delivery keeps
-                failing, contact Planarian support.
-              </>
-            }
-          />
-        )}
+        {confirmationEmailDeliveryStatus === MessageDeliveryStatus.SendFailed &&
+          emailAddress && (
+            <Alert
+              type="error"
+              showIcon
+              message="We couldn't send your confirmation email."
+              description="The email provider did not accept the latest submission. Request another confirmation email below."
+            />
+          )}
+        {confirmationEmailDeliveryStatus ===
+          MessageDeliveryStatus.TemporaryFailed &&
+          emailAddress && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Your confirmation email is temporarily delayed."
+              description="The email provider reported a temporary delivery problem and may retry. You can wait or request another confirmation email below."
+            />
+          )}
+        {confirmationEmailDeliveryStatus ===
+          MessageDeliveryStatus.PermanentFailed &&
+          emailAddress && (
+            <Alert
+              type="error"
+              showIcon
+              message="We couldn't deliver your confirmation email."
+              description={
+                <>
+                  The email provider reported that the confirmation message to{" "}
+                  <Text strong>{emailAddress}</Text> could not be delivered. Verify
+                  that the address is correct. If it is correct and delivery keeps
+                  failing, contact Planarian support.
+                </>
+              }
+            />
+          )}
+        {confirmationEmailDeliveryStatus === MessageDeliveryStatus.Delivered &&
+          emailAddress && (
+            <Alert
+              type="success"
+              showIcon
+              message="Your email provider accepted the confirmation email."
+              description="The recipient mail server accepted the message. If you do not see it, check your spam or junk folder."
+            />
+          )}
         <Paragraph type="secondary">
           If you do not see the message, check your spam or junk folder. You can
           request another confirmation email below.

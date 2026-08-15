@@ -1,6 +1,6 @@
 namespace Planarian.Shared.Email.Models;
 
-public class MessageKeyConstant
+public class TemplateKeyConstant
 {
     public const string GenericEmail = "GenericEmail";
 }

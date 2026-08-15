@@ -8,6 +8,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { ApiExceptionType } from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { UserService } from "../../User/UserService";
 import { EmailConfirmationPendingPage } from "./EmailConfirmationPendingPage";
 
@@ -52,7 +53,7 @@ const renderPage = (
   state?: {
     emailAddress?: string;
     confirmationEmailJustSent?: boolean;
-    confirmationEmailDeliveryFailed?: boolean;
+    confirmationEmailDeliveryStatus?: MessageDeliveryStatus;
   },
   search = ""
 ) =>
@@ -137,7 +138,7 @@ describe("EmailConfirmationPendingPage", () => {
     renderPage({
       emailAddress: "user@example.com",
       confirmationEmailJustSent: false,
-      confirmationEmailDeliveryFailed: true,
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.PermanentFailed,
     });
 
     expect(
@@ -145,16 +146,61 @@ describe("EmailConfirmationPendingPage", () => {
     ).toBeInTheDocument();
     const alert = screen.getByRole("alert");
     expect(
-      within(alert).getByText(/email provider reported that a confirmation message to/)
+      within(alert).getByText(/email provider reported that the confirmation message to/)
     ).toBeInTheDocument();
     expect(within(alert).getByText("user@example.com")).toBeInTheDocument();
+  });
+
+  it("shows a submission failure when the provider did not accept the registration email", () => {
+    renderPage({
+      emailAddress: "user@example.com",
+      confirmationEmailJustSent: false,
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
+    });
+
+    expect(
+      screen.getByText(/account was created, but Planarian could not submit/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("We couldn't send your confirmation email.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows a temporary-delay warning without claiming permanent failure", () => {
+    renderPage({
+      emailAddress: "user@example.com",
+      confirmationEmailJustSent: false,
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.TemporaryFailed,
+    });
+
+    expect(
+      screen.getByText("Your confirmation email is temporarily delayed.")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("We couldn't deliver your confirmation email.")
+    ).not.toBeInTheDocument();
+  });
+
+  it("describes Delivered as recipient-server acceptance rather than a confirmed read", () => {
+    renderPage({
+      emailAddress: "user@example.com",
+      confirmationEmailJustSent: false,
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.Delivered,
+    });
+
+    expect(
+      screen.getByText("Your email provider accepted the confirmation email.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/recipient mail server accepted the message/)
+    ).toBeInTheDocument();
   });
 
   it("clears an old delivery warning after a resend request succeeds", async () => {
     renderPage({
       emailAddress: "user@example.com",
       confirmationEmailJustSent: false,
-      confirmationEmailDeliveryFailed: true,
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.PermanentFailed,
     });
 
     expect(screen.getByRole("alert")).toBeInTheDocument();

@@ -48,7 +48,17 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         return await Repository.GetAccountUsers(RequestUser.AccountId);
     }
 
-    public async Task<string> InviteUser(InviteUserRequest request, CancellationToken cancellationToken)
+    public async Task<List<InvitationEmailAttemptVm>> GetInvitationEmailHistory(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null) throw ApiExceptionDictionary.NotFound("User");
+
+        return await Repository.GetInvitationEmailHistory(RequestUser.AccountId, userId);
+    }
+
+    public async Task<InviteUserResultVm> InviteUser(InviteUserRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
@@ -67,48 +77,53 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("Last name is required.");
         }
 
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        try
+        var user = new User(request.FirstName, request.LastName, request.EmailAddress) { IsTemporary = true };
+        var accountUser = new AccountUser
         {
-            var user = new User(request.FirstName, request.LastName, request.EmailAddress) { IsTemporary = true };
-            Repository.Add(user);
+            User = user,
+            AccountId = RequestUser.AccountId,
+            InvitationCode = IdGenerator.Generate(PropertyLength.InvitationCode)
+        };
+        string? accountName;
 
-            var invitationCode = IdGenerator.Generate(PropertyLength.InvitationCode);
-
-            var accountUser = new AccountUser
+        await using (var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken))
+        {
+            try
             {
-                User = user,
-                AccountId = RequestUser.AccountId,
-                InvitationCode = invitationCode,
-                InvitationSentOn = DateTime.UtcNow,
-            };
+                Repository.Add(user);
+                Repository.Add(accountUser);
+                await Repository.SaveChangesAsync(cancellationToken);
 
-            Repository.Add(accountUser);
-
-            await Repository.SaveChangesAsync(cancellationToken);
-            
-            var defaultAccessViewAll = await _accountRepository.GetDefaultViewAccess();
-            if (defaultAccessViewAll)
-            {
-                await UpdateCavePermissions(user.Id, PermissionKey.View, new CreateUserCavePermissionsVm
+                var defaultAccessViewAll = await _accountRepository.GetDefaultViewAccess();
+                if (defaultAccessViewAll)
                 {
-                    HasAllLocations = true
-                }, cancellationToken, dbTransaction: dbTransaction);
+                    await UpdateCavePermissions(user.Id, PermissionKey.View, new CreateUserCavePermissionsVm
+                    {
+                        HasAllLocations = true
+                    }, cancellationToken, dbTransaction: dbTransaction);
+                }
+
+                accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
+                await dbTransaction.CommitAsync(cancellationToken);
             }
-
-            var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
-
-            await _emailService.SendAccountInvitationEmail(user, accountUser,
-                accountName);
-            await dbTransaction.CommitAsync(cancellationToken);
-            
-            return user.Id;
+            catch
+            {
+                await dbTransaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch (Exception)
+
+        var sendResult = await _emailService.SendAccountInvitationEmail(user, accountUser, accountName, cancellationToken);
+        if (sendResult.WasSubmitted)
         {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
+            await Repository.SaveChangesAsync(cancellationToken);
         }
+
+        return new InviteUserResultVm
+        {
+            UserId = user.Id,
+            InvitationEmailDeliveryStatus = sendResult.DeliveryStatus
+        };
     }
 
     public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
@@ -154,9 +169,9 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.BadRequest("User has already accepted the invitation.");
         }
 
-        if (!accountUser.InvitationSentOn.HasValue)
+        if (string.IsNullOrWhiteSpace(accountUser.InvitationCode))
         {
-            throw ApiExceptionDictionary.BadRequest("The user was not invited in the first place.");
+            throw ApiExceptionDictionary.BadRequest("The user does not have an active invitation.");
         }
 
         var user = await Repository.Get(userId);
@@ -165,13 +180,12 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NotFound("User");
         }
 
-        accountUser.InvitationSentOn = DateTime.UtcNow;
-        await Repository.SaveChangesAsync();
-
         var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
 
-        await _emailService.SendAccountInvitationEmail(user, accountUser,
-            accountName);
+        var sendResult = await _emailService.SendAccountInvitationEmail(user, accountUser, accountName);
+        if (!sendResult.WasSubmitted) throw ApiExceptionDictionary.EmailFailedToSend;
+
+        await Repository.SaveChangesAsync();
     }
 
     #endregion

@@ -11,6 +11,7 @@ import {
 import { RegisterPage } from "./RegisterPage";
 import { RegisterService } from "../Services/RegisterService";
 import { UserService } from "../../../User/UserService";
+import { MessageDeliveryStatus } from "../../../../Shared/Models/MessageDeliveryStatus";
 
 let registerSpy: jest.SpyInstance;
 let getInvitationSpy: jest.SpyInstance;
@@ -38,11 +39,13 @@ const PendingProbe = () => {
   const state = location.state as {
     emailAddress?: string;
     confirmationEmailJustSent?: boolean;
+    confirmationEmailDeliveryStatus?: MessageDeliveryStatus;
   } | null;
   return (
     <>
       <div>Pending email: {state?.emailAddress}</div>
       <div>Pending sent: {String(state?.confirmationEmailJustSent)}</div>
+      <div>Pending delivery status: {String(state?.confirmationEmailDeliveryStatus)}</div>
       <div data-testid="pending-path">{location.pathname}</div>
       <div data-testid="pending-search">{location.search}</div>
       <button onClick={() => navigate(-1)}>Back history</button>
@@ -85,7 +88,9 @@ describe("RegisterPage confirmation-pending navigation", () => {
   beforeEach(() => {
     registerSpy = jest
       .spyOn(RegisterService, "RegisterUser")
-      .mockResolvedValue();
+      .mockResolvedValue({
+        confirmationEmailDeliveryStatus: MessageDeliveryStatus.Submitted,
+      });
     getInvitationSpy = jest.spyOn(UserService, "GetInvitation");
     successSpy = jest
       .spyOn(message, "success")
@@ -113,6 +118,7 @@ describe("RegisterPage confirmation-pending navigation", () => {
       expect.objectContaining({ emailAddress: "user@example.com" })
     );
     expect(screen.getByText("Pending sent: true")).toBeInTheDocument();
+    expect(screen.getByText("Pending delivery status: Submitted")).toBeInTheDocument();
     expect(screen.getByTestId("pending-search")).toBeEmptyDOMElement();
     expect(successSpy).not.toHaveBeenCalled();
 
@@ -156,6 +162,23 @@ describe("RegisterPage confirmation-pending navigation", () => {
       })
     );
     expect(screen.getByText("Pending sent: true")).toBeInTheDocument();
+    expect(screen.getByText("Pending delivery status: Submitted")).toBeInTheDocument();
     expect(screen.getByTestId("pending-search")).toBeEmptyDOMElement();
+  });
+
+  it("routes a created account to pending with SendFailed when confirmation submission fails", async () => {
+    registerSpy.mockResolvedValue({
+      confirmationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
+    });
+    renderRegister();
+    fillRegistration();
+
+    fireEvent.click(screen.getByRole("button", { name: /Submit$/ }));
+
+    expect(
+      await screen.findByText("Pending email: user@example.com")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Pending sent: false")).toBeInTheDocument();
+    expect(screen.getByText("Pending delivery status: SendFailed")).toBeInTheDocument();
   });
 });

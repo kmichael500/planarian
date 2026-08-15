@@ -1,7 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Planarian.Modules.Users.Repositories;
+using Planarian.Model.Database.Entities;
+using Planarian.Model.Shared;
 using Planarian.Shared.Email.Models;
 using Planarian.Shared.Options;
 
@@ -16,13 +19,14 @@ public enum MailgunWebhookProcessingResult
 
 public class MailgunWebhookService
 {
+    private static readonly TimeSpan SignatureAgeLimit = TimeSpan.FromHours(24);
     private readonly EmailOptions _emailOptions;
-    private readonly UserRepository _userRepository;
+    private readonly MessageLogRepository _messageLogRepository;
 
-    public MailgunWebhookService(EmailOptions emailOptions, UserRepository userRepository)
+    public MailgunWebhookService(EmailOptions emailOptions, MessageLogRepository messageLogRepository)
     {
         _emailOptions = emailOptions;
-        _userRepository = userRepository;
+        _messageLogRepository = messageLogRepository;
     }
 
     public async Task<MailgunWebhookProcessingResult> Process(MailgunWebhookVm? payload,
@@ -31,63 +35,110 @@ public class MailgunWebhookService
         if (string.IsNullOrWhiteSpace(_emailOptions.WebhookSigningKey))
             return MailgunWebhookProcessingResult.Retry;
 
+        var configuredDomain = _emailOptions.Domain?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredDomain))
+            return MailgunWebhookProcessingResult.Retry;
+
         if (payload?.Signature == null || !VerifySignature(payload.Signature))
             return MailgunWebhookProcessingResult.Rejected;
 
         var eventData = payload.EventData;
-        if (eventData == null || !string.Equals(eventData.Event, "failed", StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(eventData.Severity, "permanent", StringComparison.OrdinalIgnoreCase))
+        if (eventData == null || string.IsNullOrWhiteSpace(eventData.Event) || string.IsNullOrWhiteSpace(eventData.Id) ||
+            !TryGetEventTimestamp(eventData.Timestamp, out var occurredOn))
+        {
+            return MailgunWebhookProcessingResult.Rejected;
+        }
+
+        var providerDomain = eventData.Domain?.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(providerDomain)) return MailgunWebhookProcessingResult.Rejected;
+
+        if (!string.Equals(providerDomain, configuredDomain, StringComparison.OrdinalIgnoreCase))
             return MailgunWebhookProcessingResult.Accepted;
 
-        if (eventData.Tags?.Any(tag => string.Equals(tag, EmailDeliveryMetadata.EmailConfirmationMessageType,
-                StringComparison.OrdinalIgnoreCase)) != true)
+        if (!TryGetUserVariable(eventData.UserVariables, EmailDeliveryMetadata.MessageIdArgument,
+                out var providerCorrelationId) || !IsProviderCorrelationId(providerCorrelationId))
+        {
+            // Legacy and externally-generated messages have no Planarian correlation metadata.
             return MailgunWebhookProcessingResult.Accepted;
+        }
 
-        if (string.IsNullOrWhiteSpace(eventData.Recipient) ||
-            !TryGetUserVariable(eventData.UserVariables, EmailDeliveryMetadata.MessageTypeArgument, out var messageType) ||
-            !string.Equals(messageType, EmailDeliveryMetadata.EmailConfirmationMessageType,
-                StringComparison.OrdinalIgnoreCase) ||
-            !TryGetUserVariable(eventData.UserVariables, EmailDeliveryMetadata.DeliveryIdArgument, out var deliveryId) ||
-            string.IsNullOrWhiteSpace(deliveryId))
-            return MailgunWebhookProcessingResult.Accepted;
+        var classification = MailgunWebhookEventClassifier.Classify(eventData.Event, eventData.Severity);
+        var messageEvent = new MessageLogEvent
+        {
+            Provider = MessageProvider.Mailgun,
+            ProviderDomain = providerDomain,
+            EventType = classification.EventType,
+            OccurredOn = occurredOn,
+            ProviderEventType = eventData.Event,
+            ProviderEventId = eventData.Id,
+            ProviderEventDay = DateOnly.FromDateTime(occurredOn),
+            WebhookToken = payload.Signature.Token,
+            Severity = eventData.Severity,
+            Reason = eventData.Reason,
+            DeliveryCode = GetJsonScalar(eventData.DeliveryStatus?.Code),
+            EnhancedDeliveryCode = eventData.DeliveryStatus?.EnhancedCode,
+            DeliveryMessage = eventData.DeliveryStatus?.Message,
+            AttemptNumber = eventData.DeliveryStatus?.AttemptNumber,
+            IsDelayedBounce = eventData.IsDelayedBounce ?? eventData.Flags?.IsDelayedBounce ??
+                              eventData.DeliveryStatus?.IsDelayedBounce,
+            Bot = NormalizeOptional(eventData.ClientInfo?.Bot)
+        };
 
-        var user = await _userRepository.GetUserByEmail(eventData.Recipient);
-        if (user == null)
-            return MailgunWebhookProcessingResult.Accepted;
+        var result = await _messageLogRepository.RecordProviderEvent(
+            providerCorrelationId,
+            eventData.Message?.Headers?.MessageId,
+            messageEvent,
+            classification.DeliveryStatus,
+            cancellationToken);
 
-        if (user.EmailConfirmedOn != null ||
-            !string.Equals(user.EmailConfirmationDeliveryId, deliveryId, StringComparison.Ordinal))
-            return MailgunWebhookProcessingResult.Accepted;
-
-        var failedOn = GetEventTimestamp(eventData.Timestamp);
-        var recorded = await _userRepository.RecordEmailConfirmationDeliveryFailure(
-            eventData.Recipient, deliveryId, failedOn, cancellationToken);
-
-        // A zero-row update means the user confirmed or a newer resend won after the read above.
-        // In either case this delivery event is stale and should not be retried.
-        return MailgunWebhookProcessingResult.Accepted;
+        return result switch
+        {
+            MessageLogEventRecordResult.Recorded => MailgunWebhookProcessingResult.Accepted,
+            MessageLogEventRecordResult.Duplicate => MailgunWebhookProcessingResult.Accepted,
+            MessageLogEventRecordResult.MessageNotFound => MailgunWebhookProcessingResult.Accepted,
+            _ => MailgunWebhookProcessingResult.Retry
+        };
     }
 
     private bool VerifySignature(MailgunWebhookSignatureVm signature)
     {
         if (string.IsNullOrWhiteSpace(signature.Timestamp) || string.IsNullOrWhiteSpace(signature.Token) ||
-            string.IsNullOrWhiteSpace(signature.Signature))
-            return false;
-
-        byte[] providedSignature;
-        try
+            signature.Token.Length != PropertyLength.MailgunWebhookToken ||
+            (string.IsNullOrWhiteSpace(signature.Signature) && string.IsNullOrWhiteSpace(signature.ParentSignature)) ||
+            !long.TryParse(signature.Timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out var timestamp) ||
+            timestamp <= 0)
         {
-            providedSignature = Convert.FromHexString(signature.Signature);
+            return false;
         }
-        catch (FormatException)
+
+        var currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var signatureAgeLimitSeconds = checked((long)SignatureAgeLimit.TotalSeconds);
+        if (timestamp < currentTimestamp - signatureAgeLimitSeconds ||
+            timestamp > currentTimestamp + signatureAgeLimitSeconds)
         {
             return false;
         }
 
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_emailOptions.WebhookSigningKey!));
         var expectedSignature = hmac.ComputeHash(Encoding.UTF8.GetBytes(signature.Timestamp + signature.Token));
-        return providedSignature.Length == expectedSignature.Length &&
-               CryptographicOperations.FixedTimeEquals(providedSignature, expectedSignature);
+        return MatchesSignature(signature.Signature, expectedSignature) ||
+               MatchesSignature(signature.ParentSignature, expectedSignature);
+    }
+
+    private static bool MatchesSignature(string? signature, byte[] expectedSignature)
+    {
+        if (string.IsNullOrWhiteSpace(signature)) return false;
+
+        try
+        {
+            var providedSignature = Convert.FromHexString(signature);
+            return providedSignature.Length == expectedSignature.Length &&
+                   CryptographicOperations.FixedTimeEquals(providedSignature, expectedSignature);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static bool TryGetUserVariable(JsonElement userVariables, string key, out string? value)
@@ -95,28 +146,54 @@ public class MailgunWebhookService
         value = null;
         if (userVariables.ValueKind != JsonValueKind.Object || !userVariables.TryGetProperty(key, out var property) ||
             property.ValueKind != JsonValueKind.String)
+        {
             return false;
+        }
 
         value = property.GetString();
         return true;
     }
 
-    private static DateTime GetEventTimestamp(double timestamp)
+    private static bool IsProviderCorrelationId([NotNullWhen(true)] string? value)
     {
-        if (!double.IsFinite(timestamp) || timestamp <= 0)
-            return DateTime.UtcNow;
+        return value is { Length: PropertyLength.Id } && value.All(character =>
+            character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9');
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static bool TryGetEventTimestamp(double timestamp, out DateTime occurredOn)
+    {
+        occurredOn = default;
+        if (!double.IsFinite(timestamp) || timestamp <= 0) return false;
 
         try
         {
-            return DateTimeOffset.FromUnixTimeMilliseconds(checked((long)(timestamp * 1000))).UtcDateTime;
+            occurredOn = DateTimeOffset.FromUnixTimeMilliseconds(checked((long)(timestamp * 1000))).UtcDateTime;
+            return true;
         }
         catch (ArgumentOutOfRangeException)
         {
-            return DateTime.UtcNow;
+            return false;
         }
         catch (OverflowException)
         {
-            return DateTime.UtcNow;
+            return false;
         }
+    }
+
+    private static string? GetJsonScalar(JsonElement? element)
+    {
+        if (element == null) return null;
+
+        return element.Value.ValueKind switch
+        {
+            JsonValueKind.String => element.Value.GetString(),
+            JsonValueKind.Number => element.Value.GetRawText(),
+            _ => null
+        };
     }
 }

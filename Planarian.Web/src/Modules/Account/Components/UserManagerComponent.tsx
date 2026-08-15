@@ -7,10 +7,12 @@ import {
   Row,
   Col,
   Select,
+  Spin,
   Typography,
 } from "antd";
 import {
   EditOutlined,
+  MailOutlined,
   RedoOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
@@ -18,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
+import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
@@ -32,6 +35,7 @@ import {
 } from "../../../Shared/Components/CardGrid/GridCard";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
@@ -56,6 +60,13 @@ const UserManagerComponent: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
   const [sortDescending, setSortDescending] = useState(true);
+  const [invitationHistoryVisible, setInvitationHistoryVisible] = useState(false);
+  const [invitationHistoryLoading, setInvitationHistoryLoading] = useState(false);
+  const [invitationHistoryUser, setInvitationHistoryUser] =
+    useState<UserManagerGridVm | null>(null);
+  const [invitationEmailHistory, setInvitationEmailHistory] = useState<
+    InvitationEmailAttemptVm[]
+  >([]);
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const toolbarVisibility = useScrollRevealVisibility({
@@ -83,18 +94,43 @@ const UserManagerComponent: React.FC = () => {
   const handleInviteUser = async (values: InviteUserRequest) => {
     try {
       setLoading(true);
-      const userId = await AccountUserManagerService.InviteUser(values);
-      message.success("Invitation sent successfully.");
+      const result = await AccountUserManagerService.InviteUser(values);
+      if (
+        result.invitationEmailDeliveryStatus === MessageDeliveryStatus.SendFailed
+      ) {
+        message.warning(
+          "Invitation created, but the email could not be sent. You can resend it from the user list."
+        );
+      } else {
+        message.success("Invitation sent successfully.");
+      }
       setInviteModalVisible(false);
       form.resetFields();
       // Navigate to userId/permissions/View relative to this page
-      navigate(`${userId}/permissions/${PermissionKey.View}`);
+      navigate(`${result.userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     }
     setLoading(false);
+  };
+
+  const handleShowInvitationHistory = async (user: UserManagerGridVm) => {
+    setInvitationHistoryUser(user);
+    setInvitationHistoryVisible(true);
+    setInvitationHistoryLoading(true);
+    try {
+      setInvitationEmailHistory(
+        await AccountUserManagerService.GetInvitationEmailHistory(user.userId)
+      );
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+      setInvitationEmailHistory([]);
+    } finally {
+      setInvitationHistoryLoading(false);
+    }
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
@@ -184,8 +220,36 @@ const UserManagerComponent: React.FC = () => {
   const renderDate = (value?: string | null) =>
     value ? formatDateTime(value) : "Not recorded";
 
+  const renderDeliveryStatus = (status?: MessageDeliveryStatus | null) => {
+    switch (status) {
+      case MessageDeliveryStatus.SendFailed:
+        return "Send failed";
+      case MessageDeliveryStatus.TemporaryFailed:
+        return "Temporary failure";
+      case MessageDeliveryStatus.PermanentFailed:
+        return "Permanent failure";
+      case MessageDeliveryStatus.Submitting:
+        return "Submitting";
+      case MessageDeliveryStatus.Submitted:
+        return "Submitted";
+      case MessageDeliveryStatus.Accepted:
+        return "Accepted";
+      case MessageDeliveryStatus.Delivered:
+        return "Delivered";
+      default:
+        return "Not tracked";
+    }
+  };
+
+  const renderEngagementCount = (count: number, automatedCount: number) => {
+    if (count === 0) return "Not recorded";
+    return automatedCount > 0
+      ? `${count} recorded (${automatedCount} automated)`
+      : `${count} recorded`;
+  };
+
   const renderUserCard = (user: UserManagerGridVm) => {
-    const isPending = user.invitationSentOn && !user.invitationAcceptedOn;
+    const isPending = user.hasActiveInvitation;
     const actions: GridCardAction[] = [
       {
         key: "edit",
@@ -195,6 +259,15 @@ const UserManagerComponent: React.FC = () => {
         type: "primary",
       },
     ];
+
+    if (user.invitationEmailAttemptCount > 0) {
+      actions.push({
+        key: "email-history",
+        label: "Email History",
+        icon: <MailOutlined />,
+        onClick: () => handleShowInvitationHistory(user),
+      });
+    }
 
     if (isPending) {
       actions.push({
@@ -251,6 +324,37 @@ const UserManagerComponent: React.FC = () => {
           <div className="user-manager-grid-card__detail">
             <Text type="secondary">Invitation Sent</Text>
             <span>{renderDate(user.invitationSentOn)}</span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Latest Email Delivery</Text>
+            <span>
+              {renderDeliveryStatus(user.invitationEmailDeliveryStatus)}
+              {user.invitationEmailDeliveryStatusOn
+                ? ` · ${formatDateTime(user.invitationEmailDeliveryStatusOn)}`
+                : ""}
+            </span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Email Attempts</Text>
+            <span>{user.invitationEmailAttemptCount}</span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Open Events</Text>
+            <span>
+              {renderEngagementCount(
+                user.invitationEmailOpenCount,
+                user.invitationEmailAutomatedOpenCount
+              )}
+            </span>
+          </div>
+          <div className="user-manager-grid-card__detail">
+            <Text type="secondary">Click Events</Text>
+            <span>
+              {renderEngagementCount(
+                user.invitationEmailClickCount,
+                user.invitationEmailAutomatedClickCount
+              )}
+            </span>
           </div>
           <div className="user-manager-grid-card__detail">
             <Text type="secondary">Invitation Accepted</Text>
@@ -332,6 +436,69 @@ const UserManagerComponent: React.FC = () => {
           </SpinnerCardComponent>
         </div>
       </div>
+
+      <Modal
+        title={
+          invitationHistoryUser
+            ? `Invitation email history — ${invitationHistoryUser.fullName}`
+            : "Invitation email history"
+        }
+        open={invitationHistoryVisible}
+        footer={null}
+        width={720}
+        onCancel={() => setInvitationHistoryVisible(false)}
+      >
+        <Spin spinning={invitationHistoryLoading}>
+          <div className="user-manager-email-history">
+            {!invitationHistoryLoading && invitationEmailHistory.length === 0 ? (
+              <Text type="secondary">No tracked invitation emails.</Text>
+            ) : (
+              invitationEmailHistory.map((attempt, index) => (
+                <div
+                  className="user-manager-email-history__attempt"
+                  key={attempt.messageLogId}
+                >
+                  <Text strong>
+                    Attempt {invitationEmailHistory.length - index} · {renderDate(attempt.createdOn)}
+                  </Text>
+                  <Text>
+                    Delivery: {renderDeliveryStatus(attempt.deliveryStatus)}
+                    {attempt.deliveryStatusOn
+                      ? ` · ${formatDateTime(attempt.deliveryStatusOn)}`
+                      : ""}
+                  </Text>
+                  {attempt.events.length === 0 ? (
+                    <Text type="secondary">No provider events recorded yet.</Text>
+                  ) : (
+                    <div className="user-manager-email-history__events">
+                      {attempt.events.map((event, eventIndex) => (
+                        <Text
+                          type="secondary"
+                          key={`${attempt.messageLogId}-${event.occurredOn}-${eventIndex}`}
+                        >
+                          {event.eventType} · {formatDateTime(event.occurredOn)}
+                          {event.bot ? ` · automated (${event.bot})` : ""}
+                          {event.attemptNumber != null
+                            ? ` · delivery attempt ${event.attemptNumber}`
+                            : ""}
+                          {event.severity ? ` · ${event.severity}` : ""}
+                          {event.reason ? ` · ${event.reason}` : ""}
+                          {event.enhancedDeliveryCode
+                            ? ` · ${event.enhancedDeliveryCode}`
+                            : event.deliveryCode
+                            ? ` · ${event.deliveryCode}`
+                            : ""}
+                          {event.isDelayedBounce ? " · delayed bounce" : ""}
+                        </Text>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </Spin>
+      </Modal>
 
       <Modal
         title="Invite User"

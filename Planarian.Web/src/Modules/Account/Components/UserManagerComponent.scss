@@ -274,3 +274,25 @@
     width: 100%;
   }
 }
+
+.user-manager-email-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-manager-email-history__attempt {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.user-manager-email-history__events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+}

@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ApiExceptionType } from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { LoginPage } from "./LoginPage";
 
 const loginMock = jest.fn();
@@ -46,13 +47,13 @@ const PendingProbe = () => {
   const state = location.state as {
     emailAddress?: string;
     confirmationEmailJustSent?: boolean;
-    confirmationEmailDeliveryFailed?: boolean;
+    confirmationEmailDeliveryStatus?: MessageDeliveryStatus;
   } | null;
   return (
     <>
       <div>Pending email: {state?.emailAddress}</div>
       <div>Pending sent: {String(state?.confirmationEmailJustSent)}</div>
-      <div>Pending delivery failed: {String(state?.confirmationEmailDeliveryFailed)}</div>
+      <div>Pending delivery status: {String(state?.confirmationEmailDeliveryStatus)}</div>
       <div data-testid="pending-search">{location.search}</div>
     </>
   );
@@ -115,22 +116,24 @@ describe("LoginPage email confirmation routing", () => {
       await screen.findByText("Pending email: user@example.com")
     ).toBeInTheDocument();
     expect(screen.getByText("Pending sent: false")).toBeInTheDocument();
-    expect(screen.getByText("Pending delivery failed: false")).toBeInTheDocument();
+    expect(screen.getByText("Pending delivery status: undefined")).toBeInTheDocument();
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  it("carries a recorded confirmation delivery failure to the pending page", async () => {
+  it("carries the latest confirmation delivery status to the pending page", async () => {
     loginMock.mockRejectedValue({
       message: "Please confirm your email address before logging in.",
       errorCode: ApiExceptionType.EmailNotConfirmed,
-      data: { confirmationEmailDeliveryFailed: true },
+      data: {
+        confirmationEmailDeliveryStatus: MessageDeliveryStatus.PermanentFailed,
+      },
     });
     renderLogin();
 
     submitCredentials();
 
     expect(
-      await screen.findByText("Pending delivery failed: true")
+      await screen.findByText("Pending delivery status: PermanentFailed")
     ).toBeInTheDocument();
     expect(errorSpy).not.toHaveBeenCalled();
   });
