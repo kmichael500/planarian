@@ -129,7 +129,7 @@ public class TripService : ServiceBase<TripRepository>
         foreach (var tripTagId in values.TripTagTypeIds)
         {
             var tripTag = Repository.GetAvailableTripTag(tripTagId, values.ProjectId);
-            if (tripTag == null) throw new NullReferenceException("Tag not found");
+            if (tripTag == null) throw Planarian.Library.Exceptions.ApiExceptionDictionary.NotFound("Tag");
 
             var entity = new TripTag
             {
