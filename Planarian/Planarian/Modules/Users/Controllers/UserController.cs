@@ -106,6 +106,7 @@ public class UserController : PlanarianControllerBase<UserService>
         return new OkResult();
     }
 
+    [AllowAnonymous]
     [HttpPost(UserInvitationRoutes.Api.Decline, Name = UserInvitationRoutes.Api.Names.Decline)]
     public async Task<ActionResult> DeclineInvitation(string code)
     {

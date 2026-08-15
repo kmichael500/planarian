@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Routing;
 using Planarian.Model.Shared;
@@ -26,6 +28,21 @@ public sealed class UserInvitationRouteContractTests
 
         Assert.Equal(template, attribute.Template);
         Assert.Equal(routeName, attribute.Name);
+    }
+
+
+    [Fact]
+    public void DeclineInvitationAllowsAnonymousCapabilityUseWithoutWeakeningOtherInvitationProtection()
+    {
+        var declineAction = typeof(UserController).GetMethod(nameof(UserController.DeclineInvitation));
+        var acceptAction = typeof(UserController).GetMethod(nameof(UserController.AcceptInvitation));
+
+        Assert.NotNull(declineAction);
+        Assert.Single(declineAction!.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false));
+        Assert.Empty(declineAction.GetCustomAttributes(typeof(IgnoreAntiforgeryTokenAttribute), inherit: false));
+
+        Assert.NotNull(acceptAction);
+        Assert.Empty(acceptAction!.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false));
     }
 
 
