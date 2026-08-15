@@ -22,6 +22,44 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
+    public async Task<bool> BeginEmailConfirmationDelivery(string userId, string? expectedDeliveryId, string deliveryId,
+        CancellationToken cancellationToken = default)
+    {
+        var updated = await DbContext.Users
+            .Where(e => e.Id == userId && !e.IsTemporary && e.EmailConfirmedOn == null &&
+                        e.EmailConfirmationCode != null && e.EmailConfirmationDeliveryId == expectedDeliveryId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.EmailConfirmationDeliveryId, deliveryId)
+                .SetProperty(e => e.EmailConfirmationDeliveryFailedOn, (DateTime?)null), cancellationToken);
+
+        return updated > 0;
+    }
+
+    public async Task<bool> RecordEmailConfirmationDeliveryFailure(string emailAddress, string deliveryId,
+        DateTime failedOn, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = emailAddress.Trim().ToLowerInvariant();
+        var updated = await DbContext.Users
+            .Where(e => !e.IsTemporary && e.EmailConfirmedOn == null &&
+                        e.EmailAddress.ToLower() == normalizedEmail &&
+                        e.EmailConfirmationDeliveryId == deliveryId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.EmailConfirmationDeliveryFailedOn, failedOn), cancellationToken);
+
+        return updated > 0;
+    }
+
+    public async Task RestoreEmailConfirmationDelivery(string userId, string attemptedDeliveryId,
+        string? previousDeliveryId, DateTime? previousFailedOn, CancellationToken cancellationToken = default)
+    {
+        await DbContext.Users
+            .Where(e => e.Id == userId && !e.IsTemporary && e.EmailConfirmedOn == null &&
+                        e.EmailConfirmationDeliveryId == attemptedDeliveryId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.EmailConfirmationDeliveryId, previousDeliveryId)
+                .SetProperty(e => e.EmailConfirmationDeliveryFailedOn, previousFailedOn), cancellationToken);
+    }
+
     public async Task<User?> Get(string id)
     {
         return await DbContext.Users.Where(e => e.Id == id && e.Id == id).FirstOrDefaultAsync();

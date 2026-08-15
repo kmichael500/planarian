@@ -56,7 +56,12 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
 
         if (user.EmailConfirmedOn == null)
         {
-            throw ApiExceptionDictionary.EmailNotConfirmed;
+            var exception = ApiExceptionDictionary.EmailNotConfirmed;
+            exception.Data = new EmailNotConfirmedDataVm
+            {
+                ConfirmationEmailDeliveryFailed = user.EmailConfirmationDeliveryFailedOn != null
+            };
+            throw exception;
         }
 
         var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();

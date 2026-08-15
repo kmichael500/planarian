@@ -1,5 +1,5 @@
 import { LoginOutlined, MailOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Card, Form, Input, message, Space, Typography } from "antd";
+import { Alert, Card, Form, Input, message, Space, Typography } from "antd";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
@@ -15,6 +15,7 @@ const { Paragraph, Text, Title } = Typography;
 interface EmailConfirmationPendingLocationState {
   emailAddress?: string;
   confirmationEmailJustSent?: boolean;
+  confirmationEmailDeliveryFailed?: boolean;
 }
 
 interface ResendFormValues {
@@ -33,9 +34,13 @@ const EmailConfirmationPendingPage: React.FC = () => {
     return {
       emailAddress: state?.emailAddress?.trim() || undefined,
       confirmationEmailJustSent: state?.confirmationEmailJustSent === true,
+      confirmationEmailDeliveryFailed:
+        state?.confirmationEmailDeliveryFailed === true,
     };
   });
   const { emailAddress, confirmationEmailJustSent } = pendingContext;
+  const [confirmationEmailDeliveryFailed, setConfirmationEmailDeliveryFailed] =
+    useState(pendingContext.confirmationEmailDeliveryFailed);
 
   useEffect(() => {
     setHeaderTitle(["Confirm Email"]);
@@ -58,6 +63,7 @@ const EmailConfirmationPendingPage: React.FC = () => {
     setIsResending(true);
     try {
       await UserService.ResendEmailConfirmation(address.trim());
+      setConfirmationEmailDeliveryFailed(false);
       message.success(
         "If an unconfirmed account exists for that email address, a confirmation email has been sent."
       );
@@ -107,6 +113,21 @@ const EmailConfirmationPendingPage: React.FC = () => {
             Confirm your email address before signing in. Use the confirmation link
             from your email, or enter your email address below to request another one.
           </Paragraph>
+        )}
+        {confirmationEmailDeliveryFailed && emailAddress && (
+          <Alert
+            type="error"
+            showIcon
+            message="We couldn't deliver your confirmation email."
+            description={
+              <>
+                The email provider reported that a confirmation message to{" "}
+                <Text strong>{emailAddress}</Text> could not be delivered. Verify
+                that the address is correct. If it is correct and delivery keeps
+                failing, contact Planarian support.
+              </>
+            }
+          />
         )}
         <Paragraph type="secondary">
           If you do not see the message, check your spam or junk folder. You can

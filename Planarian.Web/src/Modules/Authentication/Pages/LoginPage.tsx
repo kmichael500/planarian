@@ -59,6 +59,9 @@ const LoginPage: React.FC = () => {
     } catch (e) {
       const error = e as ApiErrorResponse;
       if (error.errorCode === ApiExceptionType.EmailNotConfirmed) {
+        const emailNotConfirmedData = error.data as
+          | { confirmationEmailDeliveryFailed?: boolean }
+          | undefined;
         navigate(
           {
             pathname: "/confirm-email/pending",
@@ -68,6 +71,8 @@ const LoginPage: React.FC = () => {
             state: {
               emailAddress: values.emailAddress,
               confirmationEmailJustSent: false,
+              confirmationEmailDeliveryFailed:
+                emailNotConfirmedData?.confirmationEmailDeliveryFailed === true,
             },
           }
         );

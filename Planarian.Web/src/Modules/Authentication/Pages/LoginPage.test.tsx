@@ -46,11 +46,13 @@ const PendingProbe = () => {
   const state = location.state as {
     emailAddress?: string;
     confirmationEmailJustSent?: boolean;
+    confirmationEmailDeliveryFailed?: boolean;
   } | null;
   return (
     <>
       <div>Pending email: {state?.emailAddress}</div>
       <div>Pending sent: {String(state?.confirmationEmailJustSent)}</div>
+      <div>Pending delivery failed: {String(state?.confirmationEmailDeliveryFailed)}</div>
       <div data-testid="pending-search">{location.search}</div>
     </>
   );
@@ -113,6 +115,23 @@ describe("LoginPage email confirmation routing", () => {
       await screen.findByText("Pending email: user@example.com")
     ).toBeInTheDocument();
     expect(screen.getByText("Pending sent: false")).toBeInTheDocument();
+    expect(screen.getByText("Pending delivery failed: false")).toBeInTheDocument();
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("carries a recorded confirmation delivery failure to the pending page", async () => {
+    loginMock.mockRejectedValue({
+      message: "Please confirm your email address before logging in.",
+      errorCode: ApiExceptionType.EmailNotConfirmed,
+      data: { confirmationEmailDeliveryFailed: true },
+    });
+    renderLogin();
+
+    submitCredentials();
+
+    expect(
+      await screen.findByText("Pending delivery failed: true")
+    ).toBeInTheDocument();
     expect(errorSpy).not.toHaveBeenCalled();
   });
 

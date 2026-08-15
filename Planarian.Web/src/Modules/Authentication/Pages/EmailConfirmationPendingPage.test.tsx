@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { message } from "antd";
 import React from "react";
 import {
@@ -49,7 +49,11 @@ const LoginDestinationProbe = () => {
 };
 
 const renderPage = (
-  state?: { emailAddress?: string; confirmationEmailJustSent?: boolean },
+  state?: {
+    emailAddress?: string;
+    confirmationEmailJustSent?: boolean;
+    confirmationEmailDeliveryFailed?: boolean;
+  },
   search = ""
 ) =>
   render(
@@ -127,6 +131,39 @@ describe("EmailConfirmationPendingPage", () => {
       screen.getByText(/still needs to be confirmed before you can sign in/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/We sent a confirmation link to/)).not.toBeInTheDocument();
+  });
+
+  it("shows a delivery warning when a correct-password login reports a permanent failure", () => {
+    renderPage({
+      emailAddress: "user@example.com",
+      confirmationEmailJustSent: false,
+      confirmationEmailDeliveryFailed: true,
+    });
+
+    expect(
+      screen.getByText("We couldn't deliver your confirmation email.")
+    ).toBeInTheDocument();
+    const alert = screen.getByRole("alert");
+    expect(
+      within(alert).getByText(/email provider reported that a confirmation message to/)
+    ).toBeInTheDocument();
+    expect(within(alert).getByText("user@example.com")).toBeInTheDocument();
+  });
+
+  it("clears an old delivery warning after a resend request succeeds", async () => {
+    renderPage({
+      emailAddress: "user@example.com",
+      confirmationEmailJustSent: false,
+      confirmationEmailDeliveryFailed: true,
+    });
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Resend confirmation email$/ })
+    );
+
+    await waitFor(() => expect(resendSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("keeps the login continuation query while consuming transient router state", async () => {

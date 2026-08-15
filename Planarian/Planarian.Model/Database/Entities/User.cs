@@ -56,6 +56,9 @@ public class User : EntityBase
     [MaxLength(PropertyLength.InvitationCode)]
     public string? EmailConfirmationCode { get; set; }
 
+    [MaxLength(PropertyLength.Key)]
+    public string? EmailConfirmationDeliveryId { get; set; }
+    public DateTime? EmailConfirmationDeliveryFailedOn { get; set; }
     public DateTime? EmailConfirmedOn { get; set; }
 
     public bool IsTemporary { get; set; } = false; // Used to invite users to Planarian. The entire user record will be deleted once the user accepts the invitation.

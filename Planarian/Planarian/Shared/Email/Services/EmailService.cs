@@ -10,6 +10,7 @@ using Planarian.Shared.Email.Models;
 using Planarian.Shared.Email.Substitutions;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
+using Southport.Messaging.Email.MailGun;
 
 namespace Planarian.Shared.Email.Services;
 
@@ -26,7 +27,7 @@ public class EmailService : ServiceBase<MessageTypeRepository>
     }
 
     public async Task SendGenericEmail(string subject, string toEmailAddress, string toName,
-        GenericEmailSubstitutions substitutions)
+        GenericEmailSubstitutions substitutions, Action<IEmailMessageCore>? configureMessage = null)
     {
         var messageType =
             await Repository.GetMessageTypeVm(MessageKeyConstant.GenericEmail, MessageTypeKeyConstant.Email);
@@ -36,12 +37,14 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         substitutions.Substitutions["websiteUrl"] = _clientUrlBuilder.GetOrigin();
         var html = Handlebars.Compile(messageType.Html)(substitutions.Substitutions);
 
-        var results = await _emailMessageFactory.Create()
+        var message = _emailMessageFactory.Create()
             .SetFromAddress(messageType.FromEmail, messageType.FromName)
             .SetHtml(html)
             .SetSubject(subject)
-            .AddToAddress(toEmailAddress, toName)
-            .Send();
+            .AddToAddress(toEmailAddress, toName);
+
+        configureMessage?.Invoke(message);
+        var results = await message.Send();
 
         if (results.Any(e => !e.IsSuccessful)) throw ApiExceptionDictionary.EmailFailedToSend;
 
@@ -65,7 +68,8 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             new GenericEmailSubstitutions(message, "Password Reset", "Reset Password", link));
     }
 
-    public async Task SendEmailConfirmationEmail(string emailAddress, string fullName, string emailConfirmationCode)
+    public async Task SendEmailConfirmationEmail(string emailAddress, string fullName, string emailConfirmationCode,
+        string deliveryId)
     {
         var link = _clientUrlBuilder.BuildEmailConfirmationUrl(emailConfirmationCode);
 
@@ -77,7 +81,17 @@ public class EmailService : ServiceBase<MessageTypeRepository>
 
         await SendGenericEmail("Confirm your email address", emailAddress, fullName,
             new GenericEmailSubstitutions(paragraphs,
-                "Confirm your email address", "Confirm Email", link));
+                "Confirm your email address", "Confirm Email", link), message =>
+            {
+                message.AddCustomArgument(EmailDeliveryMetadata.MessageTypeArgument,
+                    EmailDeliveryMetadata.EmailConfirmationMessageType);
+                message.AddCustomArgument(EmailDeliveryMetadata.DeliveryIdArgument, deliveryId);
+
+                if (message is IMailGunMessage mailGunMessage)
+                {
+                    mailGunMessage.SetTag(EmailDeliveryMetadata.EmailConfirmationMessageType);
+                }
+            });
     }
     
     public async Task SendAccountInvitationEmail(User user, AccountUser accountUser, string? accountName)

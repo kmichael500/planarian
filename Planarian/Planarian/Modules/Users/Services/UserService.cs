@@ -122,10 +122,12 @@ public class UserService : ServiceBase<UserRepository>
 
         try
         {
+            var deliveryId = Guid.NewGuid().ToString("N");
             var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
             {
                 HashedPassword = PasswordService.Hash(user.Password),
-                EmailConfirmationCode = IdGenerator.Generate(PropertyLength.InvitationCode)
+                EmailConfirmationCode = IdGenerator.Generate(PropertyLength.InvitationCode),
+                EmailConfirmationDeliveryId = deliveryId
             };
 
             Repository.Add(entity);
@@ -137,7 +139,7 @@ public class UserService : ServiceBase<UserRepository>
             }
 
             await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
-                entity.EmailConfirmationCode);
+                entity.EmailConfirmationCode, deliveryId);
 
             await dbTransaction.CommitAsync(cancellationToken);
         }
@@ -259,6 +261,8 @@ public class UserService : ServiceBase<UserRepository>
         if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
 
         user.EmailConfirmationCode = null;
+        user.EmailConfirmationDeliveryId = null;
+        user.EmailConfirmationDeliveryFailedOn = null;
         user.EmailConfirmedOn = DateTime.UtcNow;
 
         await Repository.SaveChangesAsync();
@@ -275,10 +279,28 @@ public class UserService : ServiceBase<UserRepository>
             return;
         }
 
-        await _emailService.SendEmailConfirmationEmail(
-            user.EmailAddress,
-            user.FullName,
-            user.EmailConfirmationCode);
+        var previousDeliveryId = user.EmailConfirmationDeliveryId;
+        var previousFailedOn = user.EmailConfirmationDeliveryFailedOn;
+        var deliveryId = Guid.NewGuid().ToString("N");
+        if (!await Repository.BeginEmailConfirmationDelivery(user.Id, previousDeliveryId, deliveryId))
+        {
+            return;
+        }
+
+        try
+        {
+            await _emailService.SendEmailConfirmationEmail(
+                user.EmailAddress,
+                user.FullName,
+                user.EmailConfirmationCode,
+                deliveryId);
+        }
+        catch
+        {
+            await Repository.RestoreEmailConfirmationDelivery(
+                user.Id, deliveryId, previousDeliveryId, previousFailedOn);
+            throw;
+        }
     }
 
     public async Task<AcceptInvitationVm?> GetInvitation(string code)

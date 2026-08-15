@@ -219,6 +219,7 @@ builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<MailgunWebhookService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
