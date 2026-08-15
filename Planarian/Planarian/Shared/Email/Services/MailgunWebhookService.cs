@@ -22,11 +22,14 @@ public class MailgunWebhookService
     private static readonly TimeSpan SignatureAgeLimit = TimeSpan.FromHours(24);
     private readonly EmailOptions _emailOptions;
     private readonly MessageLogRepository _messageLogRepository;
+    private readonly IHostEnvironment _hostEnvironment;
 
-    public MailgunWebhookService(EmailOptions emailOptions, MessageLogRepository messageLogRepository)
+    public MailgunWebhookService(EmailOptions emailOptions, MessageLogRepository messageLogRepository,
+        IHostEnvironment hostEnvironment)
     {
         _emailOptions = emailOptions;
         _messageLogRepository = messageLogRepository;
+        _hostEnvironment = hostEnvironment;
     }
 
     public async Task<MailgunWebhookProcessingResult> Process(MailgunWebhookVm? payload,
@@ -59,6 +62,15 @@ public class MailgunWebhookService
                 out var providerCorrelationId) || !IsProviderCorrelationId(providerCorrelationId))
         {
             // Legacy and externally-generated messages have no Planarian correlation metadata.
+            return MailgunWebhookProcessingResult.Accepted;
+        }
+
+        if (!TryGetUserVariable(eventData.UserVariables, EmailDeliveryMetadata.EnvironmentArgument,
+                out var messageEnvironment) ||
+            !string.Equals(messageEnvironment, _hostEnvironment.EnvironmentName, StringComparison.Ordinal))
+        {
+            // The same Mailgun domain can fan out to multiple Planarian environments.
+            // Each deployment records only events for messages that it sent.
             return MailgunWebhookProcessingResult.Accepted;
         }
 
