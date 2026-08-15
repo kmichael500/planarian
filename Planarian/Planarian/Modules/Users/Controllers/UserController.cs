@@ -34,14 +34,21 @@ public class UserController : PlanarianControllerBase<UserService>
     [HttpPost(UserEmailConfirmationRoutes.Api.Confirm, Name = UserEmailConfirmationRoutes.Api.Names.Confirm)]
     public async Task<ActionResult> ConfirmEmail(string code)
     {
-        var confirmedEmail = await Service.ConfirmEmail(code);
+        var confirmation = await Service.ConfirmEmail(code);
 
-        if (User.Identity?.IsAuthenticated != true &&
-            _registrationContinuationService.TryConsume(HttpContext, confirmedEmail))
+        if (User.Identity?.IsAuthenticated == true &&
+            confirmation.SessionVersionChanged &&
+            string.Equals(RequestUser.Id, confirmation.UserId, StringComparison.Ordinal))
+        {
+            await _authenticationService.RefreshAuthenticatedSessionForUser(HttpContext, confirmation.UserId);
+        }
+        else if (User.Identity?.IsAuthenticated != true &&
+                 _registrationContinuationService.TryConsume(HttpContext, confirmation.EmailAddress))
         {
             try
             {
-                await _authenticationService.SetAuthenticatedSessionForConfirmedUser(HttpContext, confirmedEmail);
+                await _authenticationService.SetAuthenticatedSessionForConfirmedUser(
+                    HttpContext, confirmation.EmailAddress);
             }
             catch (Exception exception)
             {
@@ -96,17 +103,19 @@ public class UserController : PlanarianControllerBase<UserService>
     }
 
     [HttpPut("current")]
-    public async Task<ActionResult> UpdateCurrentUser([FromBody] UserVm user)
+    public async Task<ActionResult> UpdateCurrentUser([FromBody] UpdateCurrentUserVm user,
+        CancellationToken cancellationToken)
     {
-        await Service.UpdateCurrentUser(user);
+        await Service.UpdateCurrentUser(user, cancellationToken);
 
         return new OkResult();
     }
 
     [HttpPut("current/password")]
-    public async Task<ActionResult> UpdateCurrentUserPassword([FromBody] string password)
+    public async Task<ActionResult> UpdateCurrentUserPassword([FromBody] UpdateCurrentUserPasswordVm request)
     {
-        await Service.UpdateCurrentUserPassword(password);
+        await Service.UpdateCurrentUserPassword(request);
+        await _authenticationService.RefreshAuthenticatedSessionForUser(HttpContext, RequestUser.Id);
 
         return new OkResult();
     }

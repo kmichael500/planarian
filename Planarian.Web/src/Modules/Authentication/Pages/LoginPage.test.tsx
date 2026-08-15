@@ -70,6 +70,15 @@ const LoginProbe = () => {
   );
 };
 
+const DestinationProbe = () => {
+  const location = useLocation();
+  return (
+    <div data-testid="destination">
+      {`${location.pathname}${location.search}${location.hash}`}
+    </div>
+  );
+};
+
 const renderLogin = (initialEntry = "/login") =>
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -77,6 +86,7 @@ const renderLogin = (initialEntry = "/login") =>
         <Routes>
           <Route path="/login" element={<LoginProbe />} />
           <Route path={ClientRoutes.emailConfirmationPending.path} element={<PendingProbe />} />
+          <Route path="*" element={<DestinationProbe />} />
         </Routes>
       </AppContextOverride>
     </MemoryRouter>
@@ -207,4 +217,28 @@ describe("LoginPage email confirmation routing", () => {
     );
     expect(screen.getByTestId("login-path").textContent).toBe("/login");
   });
+});
+
+describe("LoginPage post-login redirect safety", () => {
+  beforeEach(() => {
+    loginMock.mockReset();
+    loginMock.mockResolvedValue(undefined);
+  });
+
+  it.each([
+    ["//evil.example/phish", "/"],
+    ["https://evil.example/phish", "/"],
+    ["javascript:alert(1)", "/"],
+    ["/caves/ABC?tab=files#history", "/caves/ABC?tab=files#history"],
+  ])(
+    "navigates redirect %p only to the sanitized local destination",
+    async (redirectUrl, expected) => {
+      renderLogin(`/login?redirectUrl=${encodeURIComponent(redirectUrl)}`);
+
+      submitCredentials();
+
+      expect(await screen.findByTestId("destination")).toHaveTextContent(expected);
+      expect(loginMock).toHaveBeenCalledTimes(1);
+    }
+  );
 });

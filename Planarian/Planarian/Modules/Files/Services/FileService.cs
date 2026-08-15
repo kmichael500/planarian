@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
@@ -59,6 +60,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
         CancellationToken cancellationToken, string? uuid = null)
     {
+        fileName = FileValidation.NormalizeUploadedFileName(fileName);
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 

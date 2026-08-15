@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Planarian.Tests.EmailDelivery.Email;
+namespace Planarian.Tests.EmailDelivery.Architecture;
 
 public sealed class TemporaryTestProjectLifecycleTests
 {

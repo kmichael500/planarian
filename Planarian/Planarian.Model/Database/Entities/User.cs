@@ -44,13 +44,16 @@ public class User : EntityBase
     [MaxLength(PropertyLength.EmailAddress)]
     public string EmailAddress { get; set; } = null!;
 
+    [MaxLength(PropertyLength.EmailAddress)]
+    public string? PendingEmailAddress { get; set; }
+
     [MaxLength(PropertyLength.PhoneNumber)]
     public string? PhoneNumber { get; set; }
 
     [MaxLength(PropertyLength.PasswordHash)]
     public string? HashedPassword { get; set; }
 
-    [MaxLength(PropertyLength.InvitationCode)]
+    [MaxLength(PropertyLength.PasswordResetCode)]
     public string? PasswordResetCode { get; set; }
 
     [MaxLength(PropertyLength.InvitationCode)]
@@ -59,6 +62,7 @@ public class User : EntityBase
     [MaxLength(PropertyLength.Id)]
     public string? EmailConfirmationMessageLogId { get; set; }
     public DateTime? EmailConfirmedOn { get; set; }
+    public int SessionVersion { get; set; }
 
     public bool IsTemporary { get; set; } = false; // Used to invite users to Planarian. The entire user record will be deleted once the user accepts the invitation.
 

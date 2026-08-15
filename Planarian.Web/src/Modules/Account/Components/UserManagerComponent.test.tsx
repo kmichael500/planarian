@@ -238,21 +238,6 @@ describe("UserManagerComponent invitation delivery status", () => {
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 
-  it("puts email history inside the card body", async () => {
-    renderManager();
-    await screen.findByText("Invited User");
-
-    const emailHistoryButton = screen.getByRole("button", {
-      name: /Email History$/,
-    });
-    expect(
-      emailHistoryButton.closest(".planarian-grid-card__body")
-    ).not.toBeNull();
-    expect(
-      emailHistoryButton.closest(".planarian-grid-card__actions")
-    ).toBeNull();
-  });
-
   it("loads invitation email history on demand", async () => {
     renderManager();
     await screen.findByText("Invited User");

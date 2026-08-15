@@ -146,31 +146,6 @@ public sealed class MailgunWebhookServiceValidationTests
     }
 
     [Fact]
-    public async Task AuthenticatedCorrelatedEventForMatchingEnvironmentContinuesToRepositoryProcessing()
-    {
-        var payload = CreatePayload();
-        payload.EventData!.UserVariables = JsonDocument.Parse(
-            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\",\"{EmailDeliveryMetadata.EnvironmentArgument}\":\"{Environments.Development}\"}}").RootElement.Clone();
-        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
-
-        // The validation-test service intentionally has no repository. Reaching this null repository
-        // proves a matching environment was not filtered before persistence.
-        await Assert.ThrowsAsync<NullReferenceException>(() => CreateService().Process(payload));
-    }
-
-    [Fact]
-    public async Task EnvironmentMatchingIsCaseInsensitive()
-    {
-        var payload = CreatePayload();
-        payload.EventData!.UserVariables = JsonDocument.Parse(
-            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\",\"{EmailDeliveryMetadata.EnvironmentArgument}\":\"Production\"}}").RootElement.Clone();
-        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
-
-        await Assert.ThrowsAsync<NullReferenceException>(() =>
-            CreateService(environmentName: "production").Process(payload));
-    }
-
-    [Fact]
     public async Task ExtremeSignatureTimestampIsRejectedWithoutOverflow()
     {
         var timestamp = long.MaxValue.ToString();

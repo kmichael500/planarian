@@ -213,16 +213,17 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         }
     }
 
-    public async Task SendPasswordChangedEmail(string emailAddress, string fullName,
+    public async Task<EmailSendResult> SendPasswordChangedEmail(string emailAddress, string fullName,
         CancellationToken cancellationToken = default)
     {
         const string message =
-            "You're password was just changed. If you did not make this request, please contact us immediately.";
+            "Your password was just changed. If you did not make this request, please contact us immediately.";
 
-        var result = await SendGenericEmail(MessagePurpose.PasswordChanged, "Planarian Password Changed", emailAddress,
-            fullName, new GenericEmailSubstitutions(message, "Planarian Password Changed"),
-            cancellationToken: cancellationToken);
-        EnsureSubmitted(result);
+        return await SendCommittedOperationEmail(MessagePurpose.PasswordChanged,
+            () => SendGenericEmail(MessagePurpose.PasswordChanged, "Planarian Password Changed", emailAddress,
+                fullName, new GenericEmailSubstitutions(message, "Planarian Password Changed"),
+                cancellationToken: cancellationToken),
+            cancellationToken);
     }
 
     private static string? TryGetProviderMessageId(string? providerResponse)

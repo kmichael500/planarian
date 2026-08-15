@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Card, Col, ColProps, Form, Input, message, Row } from "antd";
+import { Alert, Card, Col, ColProps, Form, Input, message, Row } from "antd";
 import { EditOutlined, KeyOutlined } from "@ant-design/icons";
 import { UserVm } from "../Models/UserVm";
 import {
@@ -9,6 +9,7 @@ import {
 import { UserService } from "../UserService";
 import { MaskedInput } from "antd-mask-input";
 import { PasswordRegex } from "../../../Shared/Constants/RegularExpressionConstants";
+import { UpdateCurrentUserVm } from "../Models/UpdateCurrentUserVm";
 import { UpdatePasswordVm } from "../Models/UpdatePasswordVm";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
@@ -24,6 +25,11 @@ const UserUpdateComponent: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const { refreshSession } = useContext(AppContext);
+  const emailAddress = Form.useWatch(nameof<UserVm>("emailAddress"), form);
+  const isChangingEmail =
+    !!user?.emailAddress &&
+    !!emailAddress &&
+    user.emailAddress.trim().toLowerCase() !== emailAddress.trim().toLowerCase();
 
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
@@ -35,6 +41,7 @@ const UserUpdateComponent: React.FC = () => {
         const response = await UserService.GetCurrentUser();
         response.phoneNumber = formatPhoneNumber(response.phoneNumber);
         setUser(response);
+        form.setFieldsValue(response);
       } catch (error) {
         console.error(error);
       }
@@ -42,15 +49,37 @@ const UserUpdateComponent: React.FC = () => {
     }
 
     fetchUser();
-  }, []);
+  }, [form]);
 
-  const onFinish = async (values: UserVm) => {
+  const onFinish = async (values: UpdateCurrentUserVm) => {
     setIsSubmitting(true);
     try {
+      const emailChanged = isChangingEmail;
       await UserService.UpdateCurrentUser(values);
       await refreshSession();
 
-      message.success("Updated successfully");
+      if (user) {
+        const updatedUser: UserVm = {
+          ...user,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          phoneNumber: values.phoneNumber,
+          pendingEmailAddress: emailChanged
+            ? values.emailAddress
+            : user.pendingEmailAddress,
+        };
+        setUser(updatedUser);
+        form.setFieldsValue({
+          ...updatedUser,
+          currentPassword: undefined,
+        });
+      }
+
+      message.success(
+        emailChanged
+          ? `Confirmation email sent to ${values.emailAddress}. Your current email remains active until you confirm the new address.`
+          : "Updated successfully"
+      );
     } catch (e) {
       const error = e as ApiErrorResponse;
 
@@ -63,7 +92,10 @@ const UserUpdateComponent: React.FC = () => {
   const onChangePassword = async (values: UpdatePasswordVm) => {
     setIsSubmitting(true);
     try {
-      await UserService.UpdateCurrentUserPassword(values.password);
+      await UserService.UpdateCurrentUserPassword({
+        currentPassword: values.currentPassword,
+        password: values.password,
+      });
       message.success("Updated successfully");
       setIsChangingPassword(false);
       passwordForm.resetFields();
@@ -135,7 +167,19 @@ const UserUpdateComponent: React.FC = () => {
             onFinish={onChangePassword}
           >
             <Form.Item
-              label="Password"
+              label="Current Password"
+              name={nameof<UpdatePasswordVm>("currentPassword")}
+              rules={[
+                {
+                  required: true,
+                  message: "Please enter your current password.",
+                },
+              ]}
+            >
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            <Form.Item
+              label="New Password"
               name={nameof<UpdatePasswordVm>("password")}
               rules={[
                 {
@@ -217,9 +261,33 @@ const UserUpdateComponent: React.FC = () => {
                   name={nameof<UserVm>("emailAddress")}
                   rules={[{ required: true, type: "email" }]}
                 >
-                  <Input type="email" />
+                  <Input type="email" autoComplete="email" />
                 </Form.Item>
+                {user?.pendingEmailAddress && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    message={`Pending confirmation: ${user.pendingEmailAddress}`}
+                    description="Your current email remains active until the new address is confirmed."
+                  />
+                )}
               </Col>
+              {isChangingEmail && (
+                <Col {...twoPerColProps}>
+                  <Form.Item
+                    label="Current Password"
+                    name={nameof<UpdateCurrentUserVm>("currentPassword")}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Please enter your current password to change your email address.",
+                      },
+                    ]}
+                  >
+                    <Input.Password autoComplete="current-password" />
+                  </Form.Item>
+                </Col>
+              )}
               <Col {...twoPerColProps}>
                 <Form.Item
                   label="Phone Number"

@@ -2164,11 +2164,15 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordResetCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("PasswordResetCodeExpiration")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PendingEmailAddress")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(20)
@@ -2177,6 +2181,9 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("ProfilePhotoBlobKey")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 

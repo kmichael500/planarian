@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import DOMPurify from "dompurify";
 import {
   Collapse,
   Descriptions,
@@ -17,6 +18,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { MapService, GeologicMapResult } from "../Services/MapService";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const { Panel } = Collapse;
 const { Text, Paragraph } = Typography;
@@ -46,6 +48,22 @@ interface MacrostratProps {
   lng: number;
   openByDefault?: boolean;
 }
+
+interface ExternalHttpLinkProps {
+  url: string | null | undefined;
+  children: React.ReactNode;
+}
+
+const ExternalHttpLink: React.FC<ExternalHttpLinkProps> = ({ url, children }) => {
+  const safeUrl = HttpHelpers.GetSafeExternalHttpUrl(url);
+  return safeUrl ? (
+    <a href={safeUrl} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ) : (
+    <>{children}</>
+  );
+};
 
 interface ExpandableTextProps {
   text: string;
@@ -544,9 +562,9 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                 </Descriptions.Item>
                 <Descriptions.Item label="Source">
                   {ref ? (
-                    <a href={ref.url} target="_blank" rel="noreferrer">
+                    <ExternalHttpLink url={ref.url}>
                       {ref.name} ({ref.ref_source}, {ref.ref_year})
-                    </a>
+                    </ExternalHttpLink>
                   ) : (
                     defaultIfEmpty("")
                   )}
@@ -676,7 +694,12 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                               <List.Item key={hIdx}>
                                 <span
                                   dangerouslySetInnerHTML={{
-                                    __html: highlight,
+                                    __html: DOMPurify.sanitize(highlight, {
+                                      ALLOWED_TAGS: ["mark", "em", "br"],
+                                      ALLOWED_ATTR: [],
+                                      ALLOW_DATA_ATTR: false,
+                                      ALLOW_ARIA_ATTR: false,
+                                    }),
                                   }}
                                 />
                               </List.Item>
@@ -716,13 +739,9 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                         </Descriptions.Item>
                         {region.wiki_link && (
                           <Descriptions.Item label="Wiki Link">
-                            <a
-                              href={region.wiki_link}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
+                            <ExternalHttpLink url={region.wiki_link}>
                               {region.wiki_link}
-                            </a>
+                            </ExternalHttpLink>
                           </Descriptions.Item>
                         )}
                       </Descriptions>

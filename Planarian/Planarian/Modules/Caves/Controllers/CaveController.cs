@@ -116,7 +116,9 @@ public class CaveController : PlanarianControllerBase<CaveService>
         return new JsonResult(result);
     }
 
-    [DisableRequestSizeLimit] //TODO
+    // TODO(security): Remove the unlimited request-size bypass when cave attachments move to bounded
+    // streaming/chunked uploads. Large buffered multipart requests can exhaust server resources.
+    [DisableRequestSizeLimit]
     [HttpPost("{caveId:length(10)}/files")]
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, IFormFile file,

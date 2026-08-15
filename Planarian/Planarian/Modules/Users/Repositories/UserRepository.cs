@@ -16,18 +16,43 @@ public class UserRepository : RepositoryBase
     {
     }
 
+    private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
     public async Task<User?> GetUserByEmail(string email)
     {
-        return await DbContext.Users.Where(e => e.EmailAddress.ToLower() == email.ToLower() && !e.IsTemporary)
+        var normalizedEmail = NormalizeEmail(email);
+        return await DbContext.Users
+            .Where(e => e.EmailAddress.ToLower() == normalizedEmail && !e.IsTemporary)
             .FirstOrDefaultAsync();
     }
 
-    public async Task<bool> TrySetEmailConfirmationMessageLog(string userId, string? expectedMessageLogId,
-        string messageLogId, CancellationToken cancellationToken = default)
+    public async Task<bool> UpgradePasswordHash(string userId, string expectedHash, string upgradedHash,
+        CancellationToken cancellationToken = default)
     {
         var updated = await DbContext.Users
-            .Where(e => e.Id == userId && !e.IsTemporary && e.EmailConfirmedOn == null &&
-                        e.EmailConfirmationCode != null &&
+            .Where(e => e.Id == userId && e.HashedPassword == expectedHash && !e.IsTemporary)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.HashedPassword, upgradedHash), cancellationToken);
+
+        return updated == 1;
+    }
+
+    public async Task<User?> GetUserByConfirmationEmail(string email)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        return await DbContext.Users
+            .Where(e => !e.IsTemporary && e.EmailConfirmationCode != null &&
+                        ((e.EmailConfirmedOn == null && e.EmailAddress.ToLower() == normalizedEmail) ||
+                         (e.PendingEmailAddress != null && e.PendingEmailAddress.ToLower() == normalizedEmail)))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> TrySetEmailConfirmationMessageLog(string userId, string expectedConfirmationCode,
+        string? expectedMessageLogId, string messageLogId, CancellationToken cancellationToken = default)
+    {
+        var updated = await DbContext.Users
+            .Where(e => e.Id == userId && !e.IsTemporary &&
+                        (e.EmailConfirmedOn == null || e.PendingEmailAddress != null) &&
+                        e.EmailConfirmationCode == expectedConfirmationCode &&
                         e.EmailConfirmationMessageLogId == expectedMessageLogId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.EmailConfirmationMessageLogId, messageLogId), cancellationToken);
@@ -53,7 +78,8 @@ public class UserRepository : RepositoryBase
 
     public async Task<bool> EmailExists(string email, bool ignoreCurrentUser = false)
     {
-        var query = DbContext.Users.Where(e => e.EmailAddress == email && !e.IsTemporary);
+        var normalizedEmail = NormalizeEmail(email);
+        var query = DbContext.Users.Where(e => !e.IsTemporary && e.EmailAddress.ToLower() == normalizedEmail);
         if (ignoreCurrentUser) query = query.Where(e => e.Id != RequestUser.Id);
 
         return await query.AnyAsync();
@@ -130,13 +156,14 @@ public class UserRepository : RepositoryBase
             return new List<AcceptInvitationVm>();
         }
 
+        var normalizedEmail = NormalizeEmail(email);
         return await DbContext.AccountUsers
             .Where(e =>
                 !string.IsNullOrWhiteSpace(e.InvitationCode) &&
                 e.InvitationAcceptedOn == null &&
                 e.User != null &&
                 e.User.IsTemporary &&
-                e.User.EmailAddress.ToLower() == email.ToLower())
+                e.User.EmailAddress.ToLower() == normalizedEmail)
             .OrderByDescending(e => e.InvitationSentOn)
             .Select(e => new AcceptInvitationVm
             {
