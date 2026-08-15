@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Hosting;
 using Planarian.Shared.Email.Models;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
@@ -99,7 +100,7 @@ public sealed class MailgunWebhookServiceValidationTests
 
         Assert.Equal(
             MailgunWebhookProcessingResult.Rejected,
-            await new MailgunWebhookService(options, null!).Process(payload));
+            await CreateService(options).Process(payload));
     }
 
     [Fact]
@@ -120,6 +121,53 @@ public sealed class MailgunWebhookServiceValidationTests
         payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
 
         Assert.Equal(MailgunWebhookProcessingResult.Accepted, await CreateService().Process(payload));
+    }
+
+    [Fact]
+    public async Task AuthenticatedCorrelatedEventForDifferentEnvironmentIsIgnoredWithoutRepositoryLookup()
+    {
+        var payload = CreatePayload();
+        payload.EventData!.UserVariables = JsonDocument.Parse(
+            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\",\"{EmailDeliveryMetadata.EnvironmentArgument}\":\"OtherEnvironment\"}}").RootElement.Clone();
+        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
+
+        Assert.Equal(MailgunWebhookProcessingResult.Accepted, await CreateService().Process(payload));
+    }
+
+    [Fact]
+    public async Task AuthenticatedCorrelatedEventWithoutEnvironmentMetadataIsIgnoredWithoutRepositoryLookup()
+    {
+        var payload = CreatePayload();
+        payload.EventData!.UserVariables = JsonDocument.Parse(
+            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\"}}").RootElement.Clone();
+        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
+
+        Assert.Equal(MailgunWebhookProcessingResult.Accepted, await CreateService().Process(payload));
+    }
+
+    [Fact]
+    public async Task AuthenticatedCorrelatedEventForMatchingEnvironmentContinuesToRepositoryProcessing()
+    {
+        var payload = CreatePayload();
+        payload.EventData!.UserVariables = JsonDocument.Parse(
+            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\",\"{EmailDeliveryMetadata.EnvironmentArgument}\":\"{Environments.Development}\"}}").RootElement.Clone();
+        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
+
+        // The validation-test service intentionally has no repository. Reaching this null repository
+        // proves a matching environment was not filtered before persistence.
+        await Assert.ThrowsAsync<NullReferenceException>(() => CreateService().Process(payload));
+    }
+
+    [Fact]
+    public async Task EnvironmentMatchingIsCaseInsensitive()
+    {
+        var payload = CreatePayload();
+        payload.EventData!.UserVariables = JsonDocument.Parse(
+            $"{{\"{EmailDeliveryMetadata.MessageIdArgument}\":\"Abc123Def4\",\"{EmailDeliveryMetadata.EnvironmentArgument}\":\"Production\"}}").RootElement.Clone();
+        payload.Signature!.Signature = Sign(payload.Signature.Timestamp!, Token);
+
+        await Assert.ThrowsAsync<NullReferenceException>(() =>
+            CreateService(environmentName: "production").Process(payload));
     }
 
     [Fact]
@@ -199,17 +247,24 @@ public sealed class MailgunWebhookServiceValidationTests
 
         Assert.Equal(
             MailgunWebhookProcessingResult.Accepted,
-            await new MailgunWebhookService(options, null!).Process(payload));
+            await CreateService(options).Process(payload));
     }
 
-    private static MailgunWebhookService CreateService(string? signingKey = SigningKey)
+    private static MailgunWebhookService CreateService(string? signingKey = SigningKey,
+        string? environmentName = null)
     {
         var options = new EmailOptions
         {
             Domain = Domain,
             WebhookSigningKey = signingKey
         };
-        return new MailgunWebhookService(options, null!);
+        return CreateService(options, environmentName);
+    }
+
+    private static MailgunWebhookService CreateService(EmailOptions options,
+        string? environmentName = null)
+    {
+        return new MailgunWebhookService(options, null!, new TestHostEnvironment { EnvironmentName = environmentName ?? Environments.Development });
     }
 
     private static MailgunWebhookVm CreatePayload(string? signatureTimestamp = null)
@@ -238,5 +293,13 @@ public sealed class MailgunWebhookServiceValidationTests
     {
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(SigningKey));
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(timestamp + token))).ToLowerInvariant();
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = string.Empty;
+        public string ContentRootPath { get; set; } = string.Empty;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
     }
 }
