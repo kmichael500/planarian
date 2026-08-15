@@ -15,9 +15,17 @@ namespace Planarian.Modules.Users.Controllers;
 [Authorize]
 public class UserController : PlanarianControllerBase<UserService>
 {
-    public UserController(RequestUser requestUser, UserService service, TokenService tokenService) : base(requestUser,
-        tokenService, service)
+    private readonly AuthenticationService _authenticationService;
+    private readonly RegistrationContinuationService _registrationContinuationService;
+    private readonly ILogger<UserController> _logger;
+
+    public UserController(RequestUser requestUser, UserService service, TokenService tokenService,
+        AuthenticationService authenticationService, RegistrationContinuationService registrationContinuationService,
+        ILogger<UserController> logger) : base(requestUser, tokenService, service)
     {
+        _authenticationService = authenticationService;
+        _registrationContinuationService = registrationContinuationService;
+        _logger = logger;
     }
 
     #region Confirm
@@ -26,7 +34,23 @@ public class UserController : PlanarianControllerBase<UserService>
     [HttpPost(UserEmailConfirmationRoutes.Api.Confirm, Name = UserEmailConfirmationRoutes.Api.Names.Confirm)]
     public async Task<ActionResult> ConfirmEmail(string code)
     {
-        await Service.ConfirmEmail(code);
+        var confirmedEmail = await Service.ConfirmEmail(code);
+
+        if (User.Identity?.IsAuthenticated != true &&
+            _registrationContinuationService.TryConsume(HttpContext, confirmedEmail))
+        {
+            try
+            {
+                await _authenticationService.SetAuthenticatedSessionForConfirmedUser(HttpContext, confirmedEmail);
+            }
+            catch (Exception exception)
+            {
+                // Email confirmation is the primary operation. Automatic login is a best-effort
+                // continuation of the recent registration and must not turn a successful confirmation
+                // into an error if session issuance fails.
+                _logger.LogError(exception, "Unable to continue the recently registered user session after email confirmation.");
+            }
+        }
 
         return new OkResult();
     }

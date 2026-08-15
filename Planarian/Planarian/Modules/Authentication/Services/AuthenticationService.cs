@@ -68,12 +68,24 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw exception;
         }
 
-        var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();
+        return await BuildTokenForUser(user.FullName, user.Id);
+    }
+
+    internal async Task SetAuthenticatedSessionForConfirmedUser(HttpContext httpContext, string emailAddress)
+    {
+        var user = await _userRepository.GetUserByEmail(emailAddress);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+        if (user.EmailConfirmedOn == null) throw ApiExceptionDictionary.EmailNotConfirmed;
+
+        var token = await BuildTokenForUser(user.FullName, user.Id);
+        _authCookieService.SetAuthCookie(httpContext, token, rememberMe: false);
+    }
+
+    private async Task<string> BuildTokenForUser(string fullName, string userId)
+    {
+        var accounts = (await Repository.GetAccountIdsByUserId(userId)).ToList();
         var accountId = accounts.FirstOrDefault();
-
-        var userForToken = new UserToken(user.FullName, user.Id, accountId);
-
-        return _tokenService.BuildToken(userForToken);
+        return _tokenService.BuildToken(new UserToken(fullName, userId, accountId));
     }
 
     public void Logout(HttpContext httpContext)

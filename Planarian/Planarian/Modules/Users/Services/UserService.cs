@@ -266,7 +266,7 @@ public class UserService : ServiceBase<UserRepository>
         await _emailService.SendPasswordChangedEmail(user.EmailAddress, user.FullName);
     }
 
-    public async Task ConfirmEmail(string code)
+    public async Task<string> ConfirmEmail(string code)
     {
         var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);
         if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
@@ -275,6 +275,7 @@ public class UserService : ServiceBase<UserRepository>
         user.EmailConfirmedOn = DateTime.UtcNow;
 
         await Repository.SaveChangesAsync();
+        return user.EmailAddress;
     }
 
     public async Task ResendEmailConfirmation(string emailAddress, CancellationToken cancellationToken = default)

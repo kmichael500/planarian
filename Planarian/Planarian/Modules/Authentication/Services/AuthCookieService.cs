@@ -18,7 +18,7 @@ public class AuthCookieService
 
     public void SetAuthCookie(HttpContext httpContext, string token, bool rememberMe)
     {
-        var options = BuildCookieOptions(httpOnly: true);
+        var options = PlanarianCookieOptions.CreateHttpOnlyEssential();
         if (rememberMe)
         {
             options.Expires = DateTimeOffset.UtcNow.AddSeconds(_authOptions.JwtExpiryDurationSeconds);
@@ -30,23 +30,11 @@ public class AuthCookieService
 
     public void ClearAuthCookie(HttpContext httpContext)
     {
-        httpContext.Response.Cookies.Delete(AuthCookieName, BuildCookieOptions(httpOnly: true));
+        httpContext.Response.Cookies.Delete(AuthCookieName, PlanarianCookieOptions.CreateHttpOnlyEssential());
     }
 
     public void ClearAntiforgeryCookies(HttpContext httpContext)
     {
-        httpContext.Response.Cookies.Delete(AntiforgeryCookieName, BuildCookieOptions(httpOnly: true));
-    }
-
-    private static CookieOptions BuildCookieOptions(bool httpOnly)
-    {
-        return new CookieOptions
-        {
-            HttpOnly = httpOnly,
-            IsEssential = true,
-            Path = "/",
-            SameSite = SameSiteMode.Lax,
-            Secure = true
-        };
+        httpContext.Response.Cookies.Delete(AntiforgeryCookieName, PlanarianCookieOptions.CreateHttpOnlyEssential());
     }
 }

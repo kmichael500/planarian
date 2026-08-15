@@ -192,13 +192,11 @@ builder.Services.AddSingleton(requestThrottleOptions);
 
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
+builder.Services.AddDataProtection();
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = AuthCookieService.AntiforgeryCookieName;
-    options.Cookie.HttpOnly = true;
-    options.Cookie.Path = "/";
-    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    PlanarianCookieOptions.ConfigureHttpOnlyEssential(options.Cookie);
     options.HeaderName = AuthCookieService.RequestTokenHeaderName;
 });
 
@@ -210,6 +208,7 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<AuthCookieService>();
+builder.Services.AddSingleton<RegistrationContinuationService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<ChunkedUploadService>();

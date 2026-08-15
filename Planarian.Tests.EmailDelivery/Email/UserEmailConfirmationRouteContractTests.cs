@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Planarian.Modules.Users.Controllers;
 using Planarian.Shared.Routing;
@@ -23,6 +25,16 @@ public sealed class UserEmailConfirmationRouteContractTests
         Assert.Equal(routeName, attribute.Name);
     }
 
+    [Fact]
+    public void ConfirmEmailRemainsAnonymousWithoutBypassingAntiforgeryValidation()
+    {
+        var action = typeof(UserController).GetMethod(nameof(UserController.ConfirmEmail));
+        Assert.NotNull(action);
+
+        var attributes = action!.GetCustomAttributes(inherit: false);
+        Assert.Single(attributes.OfType<AllowAnonymousAttribute>());
+        Assert.Empty(attributes.OfType<IgnoreAntiforgeryTokenAttribute>());
+    }
 
     private static IRouteTemplateProvider GetRouteAttribute(string actionName)
     {

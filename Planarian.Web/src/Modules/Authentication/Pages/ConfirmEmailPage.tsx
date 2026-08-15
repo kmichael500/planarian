@@ -1,6 +1,7 @@
 import { message, Spin } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { UserService } from "../../User/UserService";
 
@@ -8,6 +9,7 @@ function ConfirmEmailPage() {
   const [isVerifing, setIsVerifing] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { refreshSession } = useContext(AppContext);
   const code = new URLSearchParams(location.search).get("code");
   // Confirmation is intentionally automatic on page load. React StrictMode re-runs mount
   // effects in development, so remember the attempted code for this mounted page to avoid
@@ -28,14 +30,23 @@ function ConfirmEmailPage() {
       } catch (e) {
         const error = e as ApiErrorResponse;
         message.error(error.message);
-      } finally {
         setIsVerifing(false);
-        navigate("/login");
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      try {
+        await refreshSession();
+        setIsVerifing(false);
+        navigate("/", { replace: true });
+      } catch {
+        setIsVerifing(false);
+        navigate("/login", { replace: true });
       }
     };
 
-    confirmEmail();
-  }, [code, navigate]);
+    void confirmEmail();
+  }, [code, navigate, refreshSession]);
 
   return <Spin spinning={isVerifing}></Spin>;
 }
