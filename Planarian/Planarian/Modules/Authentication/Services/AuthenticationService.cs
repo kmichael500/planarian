@@ -12,21 +12,21 @@ namespace Planarian.Modules.Authentication.Services;
 public class AuthenticationService : ServiceBase<AuthenticationRepository>
 {
     private readonly AuthCookieService _authCookieService;
-    private readonly EmailService _emailService;
     private readonly RequestThrottleService _requestThrottleService;
     private readonly TokenService _tokenService;
     private readonly UserRepository _userRepository;
+    private readonly MessageLogRepository _messageLogRepository;
 
     public AuthenticationService(AuthenticationRepository repository, RequestUser requestUser,
-        TokenService tokenService, UserRepository userRepository, EmailService emailService, AuthCookieService authCookieService,
-        RequestThrottleService requestThrottleService) :
+        TokenService tokenService, UserRepository userRepository, AuthCookieService authCookieService,
+        RequestThrottleService requestThrottleService, MessageLogRepository messageLogRepository) :
         base(repository, requestUser)
     {
         _authCookieService = authCookieService;
         _tokenService = tokenService;
         _userRepository = userRepository;
-        _emailService = emailService;
         _requestThrottleService = requestThrottleService;
+        _messageLogRepository = messageLogRepository;
     }
 
     public async Task AuthenticateEmailPassword(HttpContext httpContext, string email, string password, bool rememberMe)
@@ -46,17 +46,6 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw ApiExceptionDictionary.EmailDoesNotExist;
         }
         
-        if (user.EmailConfirmedOn == null)
-        {
-            await Repository.SaveChangesAsync();
-            if (user.EmailConfirmationCode != null)
-                await _emailService.SendEmailConfirmationEmail(email, user.FullName, user.EmailConfirmationCode);
-            else
-                throw ApiExceptionDictionary.InternalServerError("Email confirmation code is does not exist.");
-
-            throw ApiExceptionDictionary.EmailNotConfirmed;
-        }
-
         if (string.IsNullOrWhiteSpace(user.HashedPassword))
         {
             throw ApiExceptionDictionary.InvalidPassword;
@@ -68,12 +57,35 @@ public class AuthenticationService : ServiceBase<AuthenticationRepository>
             throw ApiExceptionDictionary.InvalidPassword;
         }
 
-        var accounts = (await Repository.GetAccountIdsByUserId(user.Id)).ToList();
+        if (user.EmailConfirmedOn == null)
+        {
+            var exception = ApiExceptionDictionary.EmailNotConfirmed;
+            exception.Data = new EmailNotConfirmedDataVm
+            {
+                ConfirmationEmailDeliveryStatus = await _messageLogRepository.GetDeliveryStatus(
+                    user.EmailConfirmationMessageLogId)
+            };
+            throw exception;
+        }
+
+        return await BuildTokenForUser(user.FullName, user.Id);
+    }
+
+    internal async Task SetAuthenticatedSessionForConfirmedUser(HttpContext httpContext, string emailAddress)
+    {
+        var user = await _userRepository.GetUserByEmail(emailAddress);
+        if (user == null) throw ApiExceptionDictionary.NotFound("User");
+        if (user.EmailConfirmedOn == null) throw ApiExceptionDictionary.EmailNotConfirmed;
+
+        var token = await BuildTokenForUser(user.FullName, user.Id);
+        _authCookieService.SetAuthCookie(httpContext, token, rememberMe: false);
+    }
+
+    private async Task<string> BuildTokenForUser(string fullName, string userId)
+    {
+        var accounts = (await Repository.GetAccountIdsByUserId(userId)).ToList();
         var accountId = accounts.FirstOrDefault();
-
-        var userForToken = new UserToken(user.FullName, user.Id, accountId);
-
-        return _tokenService.BuildToken(userForToken);
+        return _tokenService.BuildToken(new UserToken(fullName, userId, accountId));
     }
 
     public void Logout(HttpContext httpContext)

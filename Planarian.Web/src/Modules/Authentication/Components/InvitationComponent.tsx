@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useRef, useState } from "react";
 import { Card, Typography, Button, Space, message } from "antd";
 import {
   CheckCircleOutlined,
@@ -22,30 +22,32 @@ interface InvitationComponentProps {
   invitation?: AcceptInvitationVm;
   invitationCode: string;
   isLoading: boolean;
-  updateInvitation: () => Promise<void>;
 }
 
 const InvitationComponent = ({
   invitation,
   isLoading,
-  updateInvitation,
   invitationCode,
 }: InvitationComponentProps) => {
   const [status, setStatus] = useState<"pending" | "accepted" | "declined">(
     "pending"
   );
-  const { isAuthenticated, switchAccount } = useContext(AppContext);
+  const { isAuthenticated, switchAccount, refreshPendingInvitations } =
+    useContext(AppContext);
 
   const navigate = useNavigate();
 
   const [isDeclining, setIsDeclining] = useState<boolean>(false);
   const [isAccepting, setIsAccepting] = useState<boolean>(false);
+  const invitationActionInFlightRef = useRef(false);
   const [showSwitchAccountModal, setShowSwitchAccountModal] = useState(false);
 
   const handleAccept = async () => {
+    if (invitation === undefined || invitationActionInFlightRef.current) return;
+
+    invitationActionInFlightRef.current = true;
+    setIsAccepting(true);
     try {
-      if (invitation === undefined) return;
-      setIsAccepting(true);
       await UserService.AcceptInvitation(invitationCode);
       setStatus("accepted");
       message.success("You have accepted the invitation.");
@@ -54,21 +56,29 @@ const InvitationComponent = ({
     } catch (error) {
       const err = error as ApiErrorResponse;
       message.error(err.message);
+    } finally {
+      invitationActionInFlightRef.current = false;
+      setIsAccepting(false);
     }
-    setIsAccepting(false);
   };
 
   const handleDecline = async () => {
+    if (invitationActionInFlightRef.current) return;
+
+    invitationActionInFlightRef.current = true;
+    setIsDeclining(true);
     try {
-      setIsDeclining(true);
       await UserService.DeclineInvitation(invitationCode);
       setStatus("declined");
       message.warning("You have declined the invitation.");
+      void refreshPendingInvitations().catch(() => {});
     } catch (error) {
       const err = error as ApiErrorResponse;
       message.error(err.message);
+    } finally {
+      invitationActionInFlightRef.current = false;
+      setIsDeclining(false);
     }
-    setIsDeclining(false);
   };
   const handleCreateAccount = () => {
     navigate(`/register?invitationCode=${invitationCode}`);
@@ -145,11 +155,13 @@ const InvitationComponent = ({
                 icon={<CheckCircleOutlined />}
                 onClick={handleAccept}
                 loading={isAccepting}
+                disabled={isAccepting || isDeclining}
               >
                 Accept
               </Button>
               <DeleteButtonComponent
                 loading={isDeclining}
+                disabled={isAccepting || isDeclining}
                 title={`Are you sure you want to decline the invitation?`}
                 onConfirm={() => {
                   handleDecline();
@@ -180,15 +192,16 @@ const InvitationComponent = ({
               >
                 I Have an Account
               </PlanarianButton>
-
               <DeleteButtonComponent
                 loading={isDeclining}
-                title={`Are you sure you want to decline the invitation?`}
+                disabled={isDeclining}
+                title="Are you sure you want to decline the invitation?"
                 onConfirm={() => {
-                  handleDecline();
+                  void handleDecline();
                 }}
                 okText="Yes"
                 cancelText="No"
+                block
                 alwaysShowChildren
               >
                 Decline

@@ -11,18 +11,21 @@ namespace Planarian.Modules.Register.Controllers;
 public class RegisterController : PlanarianControllerBase
 {
     private readonly UserService _userService;
+    private readonly RegistrationContinuationService _registrationContinuationService;
 
-    public RegisterController(RequestUser requestUser, UserService userService, TokenService tokenService) : base(
-        requestUser, tokenService)
+    public RegisterController(RequestUser requestUser, UserService userService, TokenService tokenService,
+        RegistrationContinuationService registrationContinuationService) : base(requestUser, tokenService)
     {
         _userService = userService;
+        _registrationContinuationService = registrationContinuationService;
     }
 
     [HttpPost]
-    public async Task<ActionResult<string>> Register([FromBody] RegisterUserVm user,
+    public async Task<ActionResult<RegisterUserResultVm>> Register([FromBody] RegisterUserVm user,
         CancellationToken cancellationToken)
     {
-        await _userService.RegisterUser(user, cancellationToken);
-        return Ok();
+        var result = await _userService.RegisterUser(user, cancellationToken);
+        _registrationContinuationService.Issue(HttpContext, user.EmailAddress);
+        return Ok(result);
     }
 }

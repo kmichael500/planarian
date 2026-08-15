@@ -145,7 +145,8 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
 
                     var isEmailConfirmation = modifiedPropertyNames.Count > 0 &&
                                               modifiedPropertyNames.All(p => p is nameof(User.EmailConfirmedOn)
-                                                  or nameof(User.EmailConfirmationCode));
+                                                  or nameof(User.EmailConfirmationCode)
+                                                  or nameof(User.EmailConfirmationMessageLogId));
 
                     var isPasswordResetEmail = modifiedPropertyNames.Count > 0 &&
                                                modifiedPropertyNames.All(p => p is nameof(User.PasswordResetCode)

@@ -5,6 +5,7 @@ on:
     paths:
       - "Planarian.Web/**"
       - "Planarian/**"
+      - "Contracts/**"
       - "scripts/**"
       - ".github/workflows/pr-validation.yml"
 
@@ -19,6 +20,8 @@ jobs:
           cache: npm
           cache-dependency-path: Planarian.Web/package-lock.json
       - run: npm ci
+        working-directory: Planarian.Web
+      - run: npm run check:client-routes
         working-directory: Planarian.Web
       - run: scripts/validate-env-example.sh
       - run: npm test -- --watchAll=false --runInBand

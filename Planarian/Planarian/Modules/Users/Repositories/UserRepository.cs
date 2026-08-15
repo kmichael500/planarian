@@ -22,6 +22,30 @@ public class UserRepository : RepositoryBase
             .FirstOrDefaultAsync();
     }
 
+    public async Task<bool> TrySetEmailConfirmationMessageLog(string userId, string? expectedMessageLogId,
+        string messageLogId, CancellationToken cancellationToken = default)
+    {
+        var updated = await DbContext.Users
+            .Where(e => e.Id == userId && !e.IsTemporary && e.EmailConfirmedOn == null &&
+                        e.EmailConfirmationCode != null &&
+                        e.EmailConfirmationMessageLogId == expectedMessageLogId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.EmailConfirmationMessageLogId, messageLogId), cancellationToken);
+
+        return updated > 0;
+    }
+
+    public async Task ReassignInvitationMessageLogs(string accountId, string fromUserId, string toUserId,
+        CancellationToken cancellationToken = default)
+    {
+        await DbContext.MessageLogs
+            .Where(e => e.AccountInvitationAccountId == accountId &&
+                        e.AccountInvitationUserId == fromUserId &&
+                        e.Purpose == MessagePurpose.AccountInvitation)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(e => e.AccountInvitationUserId, toUserId), cancellationToken);
+    }
+
     public async Task<User?> Get(string id)
     {
         return await DbContext.Users.Where(e => e.Id == id && e.Id == id).FirstOrDefaultAsync();
@@ -288,14 +312,50 @@ public class UserRepository : RepositoryBase
 
     private static IQueryable<UserManagerGridVm> ToUserGridVmQuery(IQueryable<AccountUser> query)
     {
-        return query.Select(e => new UserManagerGridVm(
-            e.UserId,
-            e.User!.EmailAddress,
-            e.User.FullName,
-            e.InvitationSentOn,
-            e.InvitationAcceptedOn,
-            e.User.LastActiveOn
-        ));
+        return query.Select(e => new UserManagerGridVm
+        {
+            UserId = e.UserId,
+            EmailAddress = e.User!.EmailAddress,
+            FullName = e.User.FullName,
+            InvitationSentOn = e.InvitationSentOn,
+            InvitationAcceptedOn = e.InvitationAcceptedOn,
+            LastActiveOn = e.User.LastActiveOn,
+            HasActiveInvitation = e.InvitationAcceptedOn == null && e.InvitationCode != null,
+            InvitationEmailAttemptCount = e.InvitationMessageLogs.Count
+        });
+    }
+
+    public async Task<List<InvitationEmailAttemptVm>> GetInvitationEmailHistory(string accountId, string userId)
+    {
+        return await DbContext.MessageLogs
+            .Where(e => e.AccountInvitationAccountId == accountId &&
+                        e.AccountInvitationUserId == userId &&
+                        e.Purpose == MessagePurpose.AccountInvitation)
+            .OrderByDescending(e => e.CreatedOn)
+            .ThenByDescending(e => e.Id)
+            .Select(e => new InvitationEmailAttemptVm
+            {
+                MessageLogId = e.Id,
+                CreatedOn = e.CreatedOn,
+                DeliveryStatus = e.DeliveryStatus,
+                DeliveryStatusOn = e.DeliveryStatusOn,
+                Events = e.Events
+                    .OrderBy(evt => evt.OccurredOn)
+                    .ThenBy(evt => evt.Id)
+                    .Select(evt => new InvitationEmailEventVm
+                    {
+                        EventType = evt.EventType,
+                        OccurredOn = evt.OccurredOn,
+                        Bot = evt.Bot,
+                        Severity = evt.Severity,
+                        Reason = evt.Reason,
+                        DeliveryCode = evt.DeliveryCode,
+                        EnhancedDeliveryCode = evt.EnhancedDeliveryCode,
+                        AttemptNumber = evt.AttemptNumber,
+                        IsDelayedBounce = evt.IsDelayedBounce
+                    }).ToList()
+            })
+            .ToListAsync();
     }
 
     /// <summary>

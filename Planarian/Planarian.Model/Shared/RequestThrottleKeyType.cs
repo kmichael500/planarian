@@ -8,5 +8,7 @@ public enum RequestThrottleKeyType
     LoginIp,
     LoginEmail,
     PasswordResetIp,
-    PasswordResetEmail
+    PasswordResetEmail,
+    EmailConfirmationIp,
+    EmailConfirmationEmail
 }

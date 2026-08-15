@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AccountSettingsPage } from "../../Modules/Account/Pages/AccountSettingsPage";
 import { ProtectedRoutesComponent } from "../../Modules/Authentication/Components/ProtectedRoutesComponent";
 import { ConfirmEmailPage } from "../../Modules/Authentication/Pages/ConfirmEmailPage";
+import { EmailConfirmationPendingPage } from "../../Modules/Authentication/Pages/EmailConfirmationPendingPage";
 import { LoginPage } from "../../Modules/Authentication/Pages/LoginPage";
 import { ResetPasswordPage } from "../../Modules/Authentication/Pages/ResetPasswordPage";
 import { RegisterPage } from "../../Modules/Authentication/Register/Components/RegisterPage";
@@ -27,24 +28,29 @@ import { InvitationsPage } from "../../Modules/Authentication/Pages/InvitationsP
 import { UserPage } from "../../Modules/Account/Pages/UserPage";
 import { UserPermissionManagementPage } from "../../Modules/Account/Pages/UserPermissionManagementPage";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
+import { ClientRoutes } from "./ClientRoutes.generated";
 
 export const AppRouting: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />}></Route>
       <Route
-        path="/user/invitations/:invitationCode"
+        path={ClientRoutes.invitation.path}
         element={<AcceptInvitationPage />}
       ></Route>
       <Route path="/register" element={<RegisterPage />}></Route>
-      <Route path="/reset-password" element={<ResetPasswordPage />}></Route>
-      <Route path="/confirm-email" element={<ConfirmEmailPage />}></Route>
+      <Route path={ClientRoutes.passwordReset.path} element={<ResetPasswordPage />}></Route>
+      <Route path={ClientRoutes.emailConfirmation.path} element={<ConfirmEmailPage />}></Route>
+      <Route
+        path={ClientRoutes.emailConfirmationPending.path}
+        element={<EmailConfirmationPendingPage />}
+      ></Route>
       <Route path="/not-found" element={<NotFoundPage />}></Route>
       <Route path="/unauthorized" element={<UnauthorizedPage />}></Route>
 
       <Route element={<ProtectedRoutesComponent />}>
         <Route path="/" element={<AppRederect />} />
-        <Route path="/user/invitations" element={<InvitationsPage />} />
+        <Route path={ClientRoutes.invitationList.path} element={<InvitationsPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />

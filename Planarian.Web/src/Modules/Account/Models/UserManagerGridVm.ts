@@ -5,4 +5,6 @@ export interface UserManagerGridVm {
   invitationAcceptedOn: string | null;
   invitationSentOn: string | null;
   lastActiveOn: string | null;
+  hasActiveInvitation: boolean;
+  invitationEmailAttemptCount: number;
 }

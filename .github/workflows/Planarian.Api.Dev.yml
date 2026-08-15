@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - "Planarian/Planarian/**"
+      - "Contracts/**"
   # pull_request:
   #   branches:
   #     - main
@@ -21,6 +22,15 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
+
+      - name: Setup Node for shared client routes
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare shared client routes
+        run: npm run prepare:client-routes
+        working-directory: Planarian.Web
 
       - name: Extract .NET Version
         id: get-dotnet-version

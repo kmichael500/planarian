@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.Routing;
 using System.IO.Compression;
 using System.Threading.RateLimiting;
 using System.Text.Json.Serialization;
@@ -57,6 +58,7 @@ using Planarian.Modules.Users.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Email.Services;
 using Planarian.Shared.Options;
+using Planarian.Shared.Routing;
 using Planarian.Shared.Services;
 using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.MailGun;
@@ -108,6 +110,11 @@ builder.Services.AddControllers(options =>
         options.JsonSerializerOptions.MaxDepth = 64; // Increase max depth for complex GeoJSON
         options.JsonSerializerOptions.DefaultBufferSize = 16 * 1024; // 16KB buffer
     });
+
+builder.Services.Configure<RouteOptions>(options =>
+{
+    options.ConstraintMap[UserInvitationRoutes.CodeConstraint] = typeof(InvitationCodeRouteConstraint);
+});
 
 // Configure form options for large file uploads
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
@@ -173,6 +180,7 @@ builder.Services.AddSingleton(blobOptions);
 
 var emailOptions = builder.Configuration.GetSection(EmailOptions.Key).Get<EmailOptions>();
 if (emailOptions == null) throw new Exception("Email options not found");
+EmailConfigurationValidator.Validate(emailOptions, isHostedDeployment);
 
 var fileOptions = builder.Configuration.GetSection(FileOptions.Key).Get<FileOptions>();
 if (fileOptions == null) throw new Exception("Email options not found");
@@ -185,13 +193,11 @@ builder.Services.AddSingleton(requestThrottleOptions);
 
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
+builder.Services.AddDataProtection();
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = AuthCookieService.AntiforgeryCookieName;
-    options.Cookie.HttpOnly = true;
-    options.Cookie.Path = "/";
-    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    PlanarianCookieOptions.ConfigureHttpOnlyEssential(options.Cookie);
     options.HeaderName = AuthCookieService.RequestTokenHeaderName;
 });
 
@@ -203,6 +209,7 @@ builder.Services.AddScoped<ProjectService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<AuthCookieService>();
+builder.Services.AddSingleton<RegistrationContinuationService>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<RequestThrottleService>();
 builder.Services.AddScoped<ChunkedUploadService>();
@@ -219,6 +226,7 @@ builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<MailgunWebhookService>();
 builder.Services.AddScoped<CaveService>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
@@ -245,6 +253,7 @@ builder.Services.AddScoped<TagRepository>();
 builder.Services.AddScoped(typeof(TagRepository<>));
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<MessageTypeRepository>();
+builder.Services.AddScoped<MessageLogRepository>();
 builder.Services.AddScoped<AccountRepository>();
 builder.Services.AddScoped(typeof(AccountRepository<>));
 builder.Services.AddScoped<PlanarianSettingsRepository>();

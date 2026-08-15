@@ -106,7 +106,7 @@ public class UserService : ServiceBase<UserRepository>
         await Repository.SaveChangesAsync();
     }
 
-    public async Task RegisterUser(RegisterUserVm user, CancellationToken cancellationToken)
+    public async Task<RegisterUserResultVm> RegisterUser(RegisterUserVm user, CancellationToken cancellationToken)
     {
         var exists = await Repository.EmailExists(user.EmailAddress);
 
@@ -118,34 +118,44 @@ public class UserService : ServiceBase<UserRepository>
 
         if (!user.Password.IsValidPassword()) throw ApiExceptionDictionary.InvalidPasswordComplexity;
 
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-
-        try
+        var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
         {
-            var entity = new User(user.FirstName, user.LastName, user.EmailAddress, user.PhoneNumber)
-            {
-                HashedPassword = PasswordService.Hash(user.Password),
-                EmailConfirmationCode = IdGenerator.Generate(PropertyLength.InvitationCode)
-            };
+            HashedPassword = PasswordService.Hash(user.Password),
+            EmailConfirmationCode = IdGenerator.Generate(PropertyLength.InvitationCode)
+        };
 
-            Repository.Add(entity);
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            if (!user.InvitationCode.IsNullOrWhiteSpace())
+        await using (var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken))
+        {
+            try
             {
-                await ClaimInvitation(entity, user.InvitationCode, cancellationToken);
+                Repository.Add(entity);
+                await Repository.SaveChangesAsync(cancellationToken);
+
+                if (!user.InvitationCode.IsNullOrWhiteSpace())
+                {
+                    await ClaimInvitation(entity, user.InvitationCode, cancellationToken);
+                }
+
+                await dbTransaction.CommitAsync(cancellationToken);
             }
-
-            await _emailService.SendEmailConfirmationEmail(entity.EmailAddress, entity.FullName,
-                entity.EmailConfirmationCode);
-
-            await dbTransaction.CommitAsync(cancellationToken);
+            catch
+            {
+                await dbTransaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch (Exception)
+
+        var sendResult = await _emailService.SendEmailConfirmationEmail(
+            entity.EmailAddress,
+            entity.FullName,
+            entity.EmailConfirmationCode,
+            (messageLogId, token) => Repository.TrySetEmailConfirmationMessageLog(entity.Id, null, messageLogId, token),
+            CancellationToken.None);
+
+        return new RegisterUserResultVm
         {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            ConfirmationEmailDeliveryStatus = sendResult.DeliveryStatus
+        };
     }
     
     
@@ -207,6 +217,9 @@ public class UserService : ServiceBase<UserRepository>
         
         await Repository.SaveChangesAsync(cancellationToken);
 
+        await Repository.ReassignInvitationMessageLogs(
+            invitation.AccountUser.AccountId, invitation.AccountUser.UserId, existingUser.Id, cancellationToken);
+
         await DeleteInvitation(invitation.AccountUser, invitation.User);
 
         await Repository.SaveChangesAsync(cancellationToken);
@@ -253,7 +266,7 @@ public class UserService : ServiceBase<UserRepository>
         await _emailService.SendPasswordChangedEmail(user.EmailAddress, user.FullName);
     }
 
-    public async Task ConfirmEmail(string code)
+    public async Task<string> ConfirmEmail(string code)
     {
         var user = await Repository.GetUserByPasswordEmailConfirmationCode(code);
         if (user == null) throw ApiExceptionDictionary.InvalidEmailConfirmationCode;
@@ -262,6 +275,28 @@ public class UserService : ServiceBase<UserRepository>
         user.EmailConfirmedOn = DateTime.UtcNow;
 
         await Repository.SaveChangesAsync();
+        return user.EmailAddress;
+    }
+
+    public async Task ResendEmailConfirmation(string emailAddress, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = emailAddress.Trim();
+        await _requestThrottleService.CountAttempt(ThrottleProfile.EmailConfirmation, normalizedEmail);
+
+        var user = await Repository.GetUserByEmail(normalizedEmail);
+        if (user == null || user.EmailConfirmedOn != null || string.IsNullOrWhiteSpace(user.EmailConfirmationCode))
+        {
+            return;
+        }
+
+        var expectedMessageLogId = user.EmailConfirmationMessageLogId;
+        await _emailService.SendEmailConfirmationEmail(
+            user.EmailAddress,
+            user.FullName,
+            user.EmailConfirmationCode,
+            (messageLogId, token) => Repository.TrySetEmailConfirmationMessageLog(
+                user.Id, expectedMessageLogId, messageLogId, token),
+            CancellationToken.None);
     }
 
     public async Task<AcceptInvitationVm?> GetInvitation(string code)

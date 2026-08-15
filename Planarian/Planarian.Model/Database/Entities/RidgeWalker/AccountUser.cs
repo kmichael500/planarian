@@ -19,6 +19,7 @@ public class AccountUser : EntityBase
 
     public Account? Account { get; set; }
     public User? User { get; set; }
+    public ICollection<MessageLog> InvitationMessageLogs { get; set; } = new HashSet<MessageLog>();
 }
 
 public class AccountUserConfiguration : IEntityTypeConfiguration<AccountUser>

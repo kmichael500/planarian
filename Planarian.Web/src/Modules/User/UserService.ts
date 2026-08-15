@@ -43,13 +43,16 @@ const UserService = {
     );
   },
   async ConfirmEmail(code: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/confirm-email?code=${code}`,
       {},
       {
         headers: { "Content-Type": "application/json" },
       }
     );
+  },
+  async ResendEmailConfirmation(emailAddress: string): Promise<void> {
+    await HttpClient.post(`${baseUrl}/confirm-email/resend`, { emailAddress });
   },
   async GetInvitation(invitationCode: string): Promise<AcceptInvitationVm> {
     const response = await HttpClient.get<AcceptInvitationVm>(

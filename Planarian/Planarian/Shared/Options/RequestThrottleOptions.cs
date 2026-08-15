@@ -1,7 +1,7 @@
 namespace Planarian.Shared.Options;
 
 /// <summary>
-/// Controls request throttling behavior for login and password reset flows.
+/// Controls request throttling behavior for login, password reset, email confirmation, and file access flows.
 /// </summary>
 public class RequestThrottleOptions
 {
@@ -41,6 +41,21 @@ public class RequestThrottleOptions
     /// Maximum number of password reset requests allowed for a single email address within the password reset throttling window.
     /// </summary>
     public int PasswordResetEmailLimit { get; set; } = 12;
+
+    /// <summary>
+    /// Length of the throttling window, in minutes, for confirmation-email resend requests.
+    /// </summary>
+    public int EmailConfirmationWindowMinutes { get; set; } = 15;
+
+    /// <summary>
+    /// Maximum confirmation-email resend requests allowed from a single IP address within the window.
+    /// </summary>
+    public int EmailConfirmationIpLimit { get; set; } = 12;
+
+    /// <summary>
+    /// Maximum confirmation-email resend requests allowed for a single email address within the window.
+    /// </summary>
+    public int EmailConfirmationEmailLimit { get; set; } = 5;
 
     /// <summary>
     /// Length of the throttling window, in minutes, for repeated file access tracked by user and file.
