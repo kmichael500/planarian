@@ -52,10 +52,18 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "prepare:client-routes": "npm run test:client-routes-generator && npm run generate:client-routes",
+    "prestart": "npm run prepare:client-routes",
     "start": "react-scripts start",
+    "prebuild": "npm run prepare:client-routes",
     "build": "CI=false react-scripts build",
+    "pretest": "npm run prepare:client-routes",
     "test": "react-scripts test",
+    "generate:client-routes": "node ../scripts/generate-client-routes.mjs",
+    "test:client-routes-generator": "node --test ../scripts/generate-client-routes.test.mjs",
+    "check:client-routes": "npm run test:client-routes-generator && node ../scripts/generate-client-routes.mjs --check",
     "eject": "react-scripts eject",
+    "predeploy": "npm run build",
     "deploy": "swa deploy --env production"
   },
   "eslintConfig": {

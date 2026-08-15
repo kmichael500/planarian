@@ -23,12 +23,6 @@ public sealed class UserEmailConfirmationRouteContractTests
         Assert.Equal(routeName, attribute.Name);
     }
 
-    [Fact]
-    public void ClientRouteBuildsAndEscapesConfirmationCode()
-    {
-        Assert.Equal("/confirm-email?code=code%2F%3F%23%26%3D",
-            UserEmailConfirmationRoutes.Client.Get("code/?#&="));
-    }
 
     private static IRouteTemplateProvider GetRouteAttribute(string actionName)
     {

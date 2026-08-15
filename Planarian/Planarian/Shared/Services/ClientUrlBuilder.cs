@@ -27,17 +27,17 @@ public class ClientUrlBuilder
 
     public string BuildPasswordResetUrl(string resetCode)
     {
-        return BuildPath(UserPasswordResetRoutes.Client.Get(resetCode));
+        return BuildPath(ClientRoutes.PasswordReset.Get(resetCode));
     }
 
     public string BuildEmailConfirmationUrl(string confirmationCode)
     {
-        return BuildPath(UserEmailConfirmationRoutes.Client.Get(confirmationCode));
+        return BuildPath(ClientRoutes.EmailConfirmation.Get(confirmationCode));
     }
 
     public string BuildInvitationUrl(string invitationCode)
     {
-        return BuildPath(UserInvitationRoutes.Client.Get(invitationCode));
+        return BuildPath(ClientRoutes.Invitation.Get(invitationCode));
     }
 
     private string BuildPath(string path)

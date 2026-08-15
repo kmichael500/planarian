@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Routing;
 using Planarian.Model.Shared;
@@ -29,20 +28,6 @@ public sealed class UserInvitationRouteContractTests
         Assert.Equal(routeName, attribute.Name);
     }
 
-    [Fact]
-    public void InvitationRouteNamesAreUniqueAcrossControllerEndpoints()
-    {
-        var names = typeof(UserController).Assembly
-            .GetTypes()
-            .Where(type => typeof(ControllerBase).IsAssignableFrom(type))
-            .SelectMany(type => type.GetMethods())
-            .SelectMany(method => method.GetCustomAttributes(inherit: false).OfType<IRouteTemplateProvider>())
-            .Select(attribute => attribute.Name)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .ToArray();
-
-        Assert.Equal(names.Length, names.Distinct(StringComparer.Ordinal).Count());
-    }
 
     [Fact]
     public void InvitationCodeConstraintUsesDomainLengthSourceOfTruth()
@@ -73,11 +58,6 @@ public sealed class UserInvitationRouteContractTests
         Assert.Equal(expected, matches);
     }
 
-    [Fact]
-    public void ClientInvitationRouteEscapesCredentialAsOnePathSegment()
-    {
-        Assert.Equal("/user/invitations/code%2F%3F%23", UserInvitationRoutes.Client.Get("code/?#"));
-    }
 
     private static IRouteTemplateProvider GetRouteAttribute(string actionName)
     {

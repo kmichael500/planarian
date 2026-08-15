@@ -24,11 +24,4 @@ public static class UserInvitationRoutes
             public const string Decline = "UserInvitation.Decline";
         }
     }
-
-    public static class Client
-    {
-        public const string Prefix = "/user/" + UserInvitationRoutes.Segment + "/";
-
-        public static string Get(string code) => Prefix + Uri.EscapeDataString(code);
-    }
 }

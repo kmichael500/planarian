@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import { ApiExceptionType } from "../../../Shared/Models/ApiErrorResponse";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { UserService } from "../../User/UserService";
 import { EmailConfirmationPendingPage } from "./EmailConfirmationPendingPage";
 
@@ -61,7 +62,7 @@ const renderPage = (
     <MemoryRouter
       initialEntries={[
         {
-          pathname: "/confirm-email/pending",
+          pathname: ClientRoutes.emailConfirmationPending.path,
           search,
           state,
         },
@@ -69,7 +70,7 @@ const renderPage = (
     >
       <Routes>
         <Route
-          path="/confirm-email/pending"
+          path={ClientRoutes.emailConfirmationPending.path}
           element={
             <>
               <EmailConfirmationPendingPage />

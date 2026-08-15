@@ -8,6 +8,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { ApiExceptionType } from "../../../Shared/Models/ApiErrorResponse";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { LoginPage } from "./LoginPage";
@@ -75,7 +76,7 @@ const renderLogin = (initialEntry = "/login") =>
       <AppContextOverride>
         <Routes>
           <Route path="/login" element={<LoginProbe />} />
-          <Route path="/confirm-email/pending" element={<PendingProbe />} />
+          <Route path={ClientRoutes.emailConfirmationPending.path} element={<PendingProbe />} />
         </Routes>
       </AppContextOverride>
     </MemoryRouter>

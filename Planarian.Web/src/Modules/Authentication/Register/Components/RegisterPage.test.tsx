@@ -12,6 +12,7 @@ import { RegisterPage } from "./RegisterPage";
 import { RegisterService } from "../Services/RegisterService";
 import { UserService } from "../../../User/UserService";
 import { MessageDeliveryStatus } from "../../../../Shared/Models/MessageDeliveryStatus";
+import { ClientRoutes } from "../../../../Configuration/Routing/ClientRoutes.generated";
 
 let registerSpy: jest.SpyInstance;
 let getInvitationSpy: jest.SpyInstance;
@@ -58,7 +59,7 @@ const renderRegister = (initialEntry = "/register") =>
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/confirm-email/pending" element={<PendingProbe />} />
+        <Route path={ClientRoutes.emailConfirmationPending.path} element={<PendingProbe />} />
       </Routes>
     </MemoryRouter>
   );
@@ -125,7 +126,7 @@ describe("RegisterPage confirmation-pending navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back history" }));
     await waitFor(() =>
       expect(screen.getByTestId("pending-path").textContent).toBe(
-        "/confirm-email/pending"
+        ClientRoutes.emailConfirmationPending.path
       )
     );
   });

@@ -17,6 +17,7 @@ import {
   ApiExceptionType,
 } from "../../../Shared/Models/ApiErrorResponse";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
@@ -53,7 +54,7 @@ const LoginPage: React.FC = () => {
       await login(values, invitationCode);
 
       if (!isNullOrWhiteSpace(invitationCode)) {
-        navigate(`/user/invitations/${invitationCode}`);
+        navigate(ClientRoutes.invitation.get(invitationCode));
       } else {
         navigate(redirectUrl);
       }
@@ -65,7 +66,7 @@ const LoginPage: React.FC = () => {
           | undefined;
         navigate(
           {
-            pathname: "/confirm-email/pending",
+            pathname: ClientRoutes.emailConfirmationPending.path,
             search: location.search,
           },
           {
@@ -110,7 +111,7 @@ const LoginPage: React.FC = () => {
             Register
           </PlanarianButton>
         </Link>,
-        <Link to={"../reset-password"}>
+        <Link to={ClientRoutes.passwordReset.path}>
           <PlanarianButton
             tooltip="Forgot Password"
             icon={<QuestionCircleOutlined />}

@@ -42,8 +42,8 @@ public static class MessageLogSubstitutionSerializer
 
     private static string SanitizePath(string path)
     {
-        if (!path.StartsWith(UserInvitationRoutes.Client.Prefix, StringComparison.OrdinalIgnoreCase)) return path;
-        if (path.Length <= UserInvitationRoutes.Client.Prefix.Length) return path;
-        return UserInvitationRoutes.Client.Prefix + RedactedPathSegment;
+        if (!path.StartsWith(ClientRoutes.Invitation.Prefix, StringComparison.OrdinalIgnoreCase)) return path;
+        if (path.Length <= ClientRoutes.Invitation.Prefix.Length) return path;
+        return ClientRoutes.Invitation.Prefix + RedactedPathSegment;
     }
 }

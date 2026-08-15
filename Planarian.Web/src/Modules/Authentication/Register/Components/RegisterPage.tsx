@@ -24,6 +24,7 @@ import { LoginButtonComponent } from "../../../../Shared/Components/Buttons/Logi
 import { UserService } from "../../../User/UserService";
 import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
 import { AcceptInvitationVm } from "../../../User/Models/AcceptInvitationVm";
+import { ClientRoutes } from "../../../../Configuration/Routing/ClientRoutes.generated";
 
 const { Text } = Typography;
 
@@ -104,7 +105,7 @@ const RegisterPage: React.FC = () => {
       const payload = { ...values, invitationCode };
 
       const result = await RegisterService.RegisterUser(payload);
-      navigate("/confirm-email/pending", {
+      navigate(ClientRoutes.emailConfirmationPending.path, {
         replace: true,
         state: {
           emailAddress: values.emailAddress,

@@ -17,6 +17,7 @@ import {
 } from "./PlanarianMenuComponent";
 import { StringHelpers } from "../../Shared/Helpers/StringHelpers";
 import { useTheme } from "../../ThemeProvider";
+import { ClientRoutes } from "../Routing/ClientRoutes.generated";
 
 function ProfileMenu() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ function ProfileMenu() {
 
   const menuItems = [
     {
-      key: "/user/invitations",
+      key: ClientRoutes.invitationList.path,
       icon: <MailOutlined />,
       label: `Invitations (${pendingInvitationCount})`,
       requiresAuthentication: true,

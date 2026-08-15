@@ -14,7 +14,7 @@ public sealed class ClientUrlBuilderTests
         var url = _builder.BuildInvitationUrl("code/?#");
 
         Assert.Equal(
-            $"https://app.example.com{UserInvitationRoutes.Client.Get("code/?#")}",
+            $"https://app.example.com{ClientRoutes.Invitation.Get("code/?#")}",
             url);
     }
 
@@ -23,7 +23,7 @@ public sealed class ClientUrlBuilderTests
     {
         var url = _builder.BuildEmailConfirmationUrl("code/?#");
 
-        Assert.Equal("https://app.example.com/confirm-email?code=code%2F%3F%23", url);
+        Assert.Equal($"https://app.example.com{ClientRoutes.EmailConfirmation.Get("code/?#")}", url);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public sealed class ClientUrlBuilderTests
     {
         var url = _builder.BuildPasswordResetUrl("code/?#");
 
-        Assert.Equal("https://app.example.com/reset-password?code=code%2F%3F%23", url);
+        Assert.Equal($"https://app.example.com{ClientRoutes.PasswordReset.Get("code/?#")}", url);
     }
 
     private sealed class StubClientRequestOrigin(string origin) : IClientRequestOrigin

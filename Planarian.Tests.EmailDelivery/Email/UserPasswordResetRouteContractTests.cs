@@ -23,12 +23,6 @@ public sealed class UserPasswordResetRouteContractTests
         Assert.Equal(routeName, attribute.Name);
     }
 
-    [Fact]
-    public void ClientRouteBuildsAndEscapesResetCode()
-    {
-        Assert.Equal("/reset-password?code=code%2F%3F%23%26%3D",
-            UserPasswordResetRoutes.Client.Get("code/?#&="));
-    }
 
     private static IRouteTemplateProvider GetRouteAttribute(string actionName)
     {

@@ -6,7 +6,7 @@
 
 `TemporaryTestProjectLifecycleTests` intentionally fails as soon as either `Planarian.Tests.Unit/Planarian.Tests.Unit.csproj` or `Planarian.Tests.Integration/Planarian.Tests.Integration.csproj` exists. At that point:
 
-1. Move pure/model-contract tests into the canonical unit-test project.
+1. Move pure/model-contract tests into the canonical unit-test project. Keep architecture-wide contract tests (for example route-name uniqueness) under the canonical unit project’s `Architecture` area.
 2. Implement the deferred PostgreSQL-backed tests below in the canonical integration-test project.
 3. Delete `Planarian.Tests.EmailDelivery` and `.github/workflows/email-delivery-tests.yml`.
 
