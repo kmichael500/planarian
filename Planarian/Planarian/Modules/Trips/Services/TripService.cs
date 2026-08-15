@@ -118,8 +118,7 @@ public class TripService : ServiceBase<TripRepository>
     public async Task<TripVm> CreateOrUpdateTrip(CreateOrEditTripVm values)
     {
         if (!await Repository.CanAccessProject(values.ProjectId))
-            throw new NullReferenceException("Project not found");
-
+            throw Planarian.Library.Exceptions.ApiExceptionDictionary.NotFound("Project");
         var isNew = string.IsNullOrWhiteSpace(values.Id);
         var trip = isNew
             ? new Trip()
