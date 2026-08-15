@@ -67,7 +67,7 @@ public class MailgunWebhookService
 
         if (!TryGetUserVariable(eventData.UserVariables, EmailDeliveryMetadata.EnvironmentArgument,
                 out var messageEnvironment) ||
-            !string.Equals(messageEnvironment, _hostEnvironment.EnvironmentName, StringComparison.Ordinal))
+            !_hostEnvironment.IsEnvironment(messageEnvironment))
         {
             // The same Mailgun domain can fan out to multiple Planarian environments.
             // Each deployment records only events for messages that it sent.
