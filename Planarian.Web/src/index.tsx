@@ -28,6 +28,9 @@ function showBootstrapError(): void {
 }
 
 function configureBootstrap(): void {
+  // Remove bearer credentials left by the pre-cookie browser authentication flow.
+  localStorage.removeItem("token");
+
   const baseUrl = resolveApiBaseUrl({
     hostname: window.location.hostname,
     nodeEnv: process.env.NODE_ENV,

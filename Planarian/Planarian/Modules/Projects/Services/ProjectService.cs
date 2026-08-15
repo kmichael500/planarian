@@ -54,16 +54,15 @@ public class ProjectService : ServiceBase<ProjectRepository>
     public async Task<ProjectVm> CreateOrUpdateProject(CreateOrEditProject values)
     {
         var isNew = string.IsNullOrWhiteSpace(values.Id);
-        var project = values.Id != null
-            ? await Repository.GetProject(values.Id) ?? new Project()
-            : new Project();
+        var project = isNew
+            ? new Project()
+            : await Repository.GetProject(values.Id!) ?? throw new NullReferenceException("Project not found");
 
         project.Name = values.Name;
         if (isNew)
         {
+            project.Members.Add(new Member { UserId = RequestUser.Id });
             Repository.Add(project);
-            await Repository.SaveChangesAsync();
-            await AddProjectMember(project.Id, RequestUser.Id, false);
         }
 
         await Repository.SaveChangesAsync();

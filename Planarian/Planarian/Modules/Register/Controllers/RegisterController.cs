@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Models;
@@ -20,6 +21,7 @@ public class RegisterController : PlanarianControllerBase
         _registrationContinuationService = registrationContinuationService;
     }
 
+    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<RegisterUserResultVm>> Register([FromBody] RegisterUserVm user,
         CancellationToken cancellationToken)

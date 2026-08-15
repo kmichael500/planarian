@@ -663,7 +663,12 @@ const CavesComponent: React.FC = () => {
                                   ? cave.narrativeSnippet
                                   : cave.narrativeSnippet.substring(0, 400) +
                                   "…",
-                                { ALLOWED_TAGS: ["mark", "br"] }
+                                {
+                                  ALLOWED_TAGS: ["mark", "br"],
+                                  ALLOWED_ATTR: [],
+                                  ALLOW_DATA_ATTR: false,
+                                  ALLOW_ARIA_ATTR: false,
+                                }
                               ),
                             }}
                           />

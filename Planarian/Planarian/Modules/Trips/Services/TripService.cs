@@ -7,7 +7,6 @@ using Planarian.Modules.Invitations.Models;
 using Planarian.Modules.Photos.Models;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
-using Planarian.Modules.Tags.Repositories;
 using Planarian.Modules.Trips.Models;
 using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Users.Repositories;
@@ -20,16 +19,14 @@ namespace Planarian.Modules.Trips.Services;
 public class TripService : ServiceBase<TripRepository>
 {
     private readonly BlobService _blobService;
-    private readonly TagRepository _tagRepository;
     private readonly UserRepository _userRepository;
     private readonly IApiRequestOrigin _apiRequestOrigin;
 
     public TripService(TripRepository repository, RequestUser requestUser, BlobService blobService,
-        TagRepository tagRepository, UserRepository userRepository, IApiRequestOrigin apiRequestOrigin) :
+        UserRepository userRepository, IApiRequestOrigin apiRequestOrigin) :
         base(repository, requestUser)
     {
         _blobService = blobService;
-        _tagRepository = tagRepository;
         _userRepository = userRepository;
         _apiRequestOrigin = apiRequestOrigin;
     }
@@ -117,16 +114,19 @@ public class TripService : ServiceBase<TripRepository>
 
     public async Task<TripVm> CreateOrUpdateTrip(CreateOrEditTripVm values)
     {
+        if (!await Repository.CanAccessProject(values.ProjectId))
+            throw new NullReferenceException("Project not found");
+
         var isNew = string.IsNullOrWhiteSpace(values.Id);
-        var trip = values.Id != null
-            ? await Repository.GetTrip(values.Id) ?? new Trip()
-            : new Trip();
+        var trip = isNew
+            ? new Trip()
+            : await Repository.GetTrip(values.Id!) ?? throw new NullReferenceException("Trip not found");
 
         trip.ProjectId = values.ProjectId;
 
         foreach (var tripTagId in values.TripTagTypeIds)
         {
-            var tripTag = Repository.GetTripTag(tripTagId);
+            var tripTag = Repository.GetAvailableTripTag(tripTagId, values.ProjectId);
             if (tripTag == null) throw new NullReferenceException("Tag not found");
 
             var entity = new TripTag
@@ -249,6 +249,8 @@ public class TripService : ServiceBase<TripRepository>
 
     public async Task AddTripLeads(IEnumerable<CreateLeadVm> leads, string tripId)
     {
+        if (await Repository.GetTrip(tripId) == null) throw new NullReferenceException("Trip not found");
+
         foreach (var lead in leads)
         {
             var entity = new Lead(lead, tripId, RequestUser.Id);
@@ -269,13 +271,11 @@ public class TripService : ServiceBase<TripRepository>
 
     public async Task AddTripTag(string tagTypeId, string tripId)
     {
-        var tagType = await _tagRepository.GetTag(tagTypeId);
-
-        if (tagType == null) throw new NullReferenceException("Tag type does not exist");
-
         var trip = await Repository.GetTrip(tripId);
-
         if (trip == null) throw new NullReferenceException("Trip does not exist");
+
+        var tagType = Repository.GetAvailableTripTag(tagTypeId, trip.ProjectId);
+        if (tagType == null) throw new NullReferenceException("Tag type does not exist");
 
         var tripTag = new TripTag
         {

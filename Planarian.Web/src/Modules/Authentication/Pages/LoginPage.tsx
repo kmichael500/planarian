@@ -18,6 +18,7 @@ import {
 } from "../../../Shared/Models/ApiErrorResponse";
 import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
@@ -33,19 +34,9 @@ const LoginPage: React.FC = () => {
   }, []);
 
   const location = useLocation();
-  const encodedRedirectUrl = new URLSearchParams(location.search).get(
-    "redirectUrl"
-  );
-
-  let redirectUrl = "/";
-  if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
-    // TODO: Validate redirectUrl as a local Planarian path before navigating to prevent open redirects.
-    redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
-  }
-
   const navigate = useNavigate();
-
   const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = HttpHelpers.GetLocalRedirectUrl(queryParams.get("redirectUrl"));
   const invitationCode = queryParams.get("invitationCode") || undefined;
 
   const onSubmit = async (values: BrowserLoginVm) => {

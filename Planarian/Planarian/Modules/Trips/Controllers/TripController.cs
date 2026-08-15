@@ -95,7 +95,6 @@ public class TripController : PlanarianControllerBase<TripService>
         return new OkResult();
     }
 
-    [IgnoreAntiforgeryToken]
     [HttpPost("{tripId:length(10)}/photos")]
     public async Task<ActionResult> UploadTripPhotos([FromForm] IEnumerable<PhotoUpload> formData,
         string tripId)

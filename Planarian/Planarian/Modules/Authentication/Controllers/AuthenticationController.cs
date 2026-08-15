@@ -43,6 +43,7 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
         return Ok(new ApiTokenLoginResultVm(accessToken));
     }
 
+    [Authorize]
     [HttpPost("logout")]
     public IActionResult Logout()
     {
