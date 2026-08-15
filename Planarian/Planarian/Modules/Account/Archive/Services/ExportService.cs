@@ -11,6 +11,7 @@ using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Archive.Services;
 
@@ -322,22 +323,13 @@ public class ExportService
             return;
         }
 
-        var contentBuilder = new StringBuilder();
-        contentBuilder.AppendLine("CaveDisplayId,CaveName,EntryPath,BlobKey,Reason");
-
-        foreach (var missingFile in missingFiles.OrderBy(file => file.EntryPath, StringComparer.OrdinalIgnoreCase))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            contentBuilder.AppendLine(string.Join(",",
-                EscapeCsv(missingFile.CaveDisplayId),
-                EscapeCsv(missingFile.CaveName),
-                EscapeCsv(missingFile.EntryPath),
-                EscapeCsv(missingFile.BlobKey),
-                EscapeCsv(missingFile.Reason)));
-        }
-
-        await WriteTextEntry(archive, "missing-files.csv", contentBuilder.ToString(), cancellationToken);
+        await using var entryStream = new MemoryStream();
+        await using var writer = new StreamWriter(entryStream, new UTF8Encoding(false), 1024, true);
+        await using var csv = CsvExportPolicy.CreateWriter(writer);
+        csv.WriteRecords(missingFiles.OrderBy(file => file.EntryPath, StringComparer.OrdinalIgnoreCase));
+        await writer.FlushAsync(cancellationToken);
+        entryStream.Position = 0;
+        await WriteStreamEntry(archive, "missing-files.csv", entryStream, DateTimeOffset.UtcNow, cancellationToken);
     }
 
     private static async Task WriteTextEntry(
@@ -479,11 +471,6 @@ public class ExportService
         await reportStatus(message);
     }
 
-    private static string EscapeCsv(string value)
-    {
-        return $"\"{value.Replace("\"", "\"\"")}\"";
-    }
-
     private static List<CaveCsvModel> BuildCaveCsvRows(IEnumerable<ArchiveCaveCsvModel> caves)
     {
         return caves.Select(cave => new CaveCsvModel
@@ -545,7 +532,7 @@ public class ExportService
     {
         await using var entryStream = new MemoryStream();
         await using var writer = new StreamWriter(entryStream, new UTF8Encoding(false), 1024, true);
-        await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        await using var csv = CsvExportPolicy.CreateWriter(writer);
         csv.Context.RegisterClassMap<TMap>();
         csv.WriteRecords(records);
         await writer.FlushAsync(cancellationToken);

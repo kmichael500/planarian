@@ -70,7 +70,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestLineSize = 1024 * 1024; // 1MB for entire request line query params on searching with polygons
     serverOptions.Limits.MaxRequestHeadersTotalSize = 1024 * 1024; // 1MB for headers
-    serverOptions.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 200MB for large GeoJSON files
+    serverOptions.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500MB
 });
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
@@ -116,7 +116,9 @@ builder.Services.Configure<RouteOptions>(options =>
     options.ConstraintMap[UserInvitationRoutes.CodeConstraint] = typeof(InvitationCodeRouteConstraint);
 });
 
-// Configure form options for large file uploads
+// TODO(security): Replace these broad buffered-upload settings with endpoint-specific bounded
+// streaming/chunked upload policies, then reduce/remove the global limits and in-memory threshold.
+// The current values are retained temporarily for compatibility with existing large uploads.
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 500 * 1024 * 1024; // 500MB

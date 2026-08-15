@@ -92,17 +92,20 @@ public class TripService : ServiceBase<TripRepository>
 
         foreach (var photo in photos)
         {
-            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : photo.File.FileName;
+            var fileName = FileValidation.NormalizeUploadedFileName(photo.File.FileName);
+            var fileType = Path.GetExtension(fileName);
 
-            var fileType = Path.GetExtension(photo.File.FileName);
+            await using var validationStream = photo.File.OpenReadStream();
+            if (!FileValidation.IsValidPhotoFile(validationStream, fileName)) continue;
 
-            if (!FileValidation.IsValidPhotoFileType(fileType)) continue;
+            var title = !string.IsNullOrWhiteSpace(photo.Title) ? photo.Title : fileName;
             // TODO: don't throw exception but alert user
             var entity = new Photo(tripId, title, photo.Description, fileType);
             Repository.Add(entity);
             await Repository.SaveChangesAsync();
+            await using var uploadStream = photo.File.OpenReadStream();
             var blobKey = await _blobService.AddTripPhoto(ids.ProjectId, ids.TripId, entity.Id,
-                photo.File.OpenReadStream(), fileType);
+                uploadStream, fileType);
             entity.BlobKey = blobKey;
             await Repository.SaveChangesAsync();
         }

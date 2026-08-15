@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using CsvHelper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
@@ -467,7 +466,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
         using var memoryStream = new MemoryStream();
         using var writer = new StreamWriter(memoryStream);
-        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        using var csv = CsvExportPolicy.CreateWriter(writer);
         csv.Context.RegisterClassMap(new CaveEntranceCsvModelMap(featureDict, exportFieldSet));
         csv.WriteRecords(csvRecords);
         writer.Flush();
