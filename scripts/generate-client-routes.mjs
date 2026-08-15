@@ -141,7 +141,7 @@ export function validateManifest(manifest) {
   return routes;
 }
 
-function buildPathExpression(routePath, encoder) {
+function buildPathExpression(routePath, encoder, staticSuffix = "") {
   const parts = [];
   let cursor = 0;
   for (const match of routePath.matchAll(/\/:([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g)) {
@@ -151,8 +151,12 @@ function buildPathExpression(routePath, encoder) {
     parts.push(`${encoder}(${match[1]})`);
     cursor = match.index + match[0].length;
   }
-  if (cursor < routePath.length) parts.push(JSON.stringify(routePath.slice(cursor)));
-  return parts.length ? parts.join(" + ") : JSON.stringify(routePath);
+  if (cursor < routePath.length) {
+    parts.push(JSON.stringify(routePath.slice(cursor) + staticSuffix));
+  } else if (staticSuffix) {
+    parts.push(JSON.stringify(staticSuffix));
+  }
+  return parts.length ? parts.join(" + ") : JSON.stringify(routePath + staticSuffix);
 }
 
 function routeParameters(route) {
@@ -165,11 +169,17 @@ function buildGet(route, language) {
   const parameters = routeParameters(route)
     .map((name) => (language === "typescript" ? `${name}${type}` : `${type}${name}`))
     .join(", ");
-  let expression = buildPathExpression(route.path, encoder);
+  const queryParameters = route.queryParameters ?? [];
+  const firstQueryParameter = queryParameters.at(0);
+  let expression = buildPathExpression(
+    route.path,
+    encoder,
+    firstQueryParameter ? `?${firstQueryParameter}=` : ""
+  );
 
-  (route.queryParameters ?? []).forEach((name, index) => {
-    const separator = index === 0 ? "?" : "&";
-    expression += ` + ${JSON.stringify(`${separator}${name}=`)} + ${encoder}(${name})`;
+  queryParameters.forEach((name, index) => {
+    if (index > 0) expression += ` + ${JSON.stringify(`&${name}=`)}`;
+    expression += ` + ${encoder}(${name})`;
   });
 
   return language === "typescript"

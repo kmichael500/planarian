@@ -66,7 +66,7 @@ const EmailConfirmationPendingPage: React.FC = () => {
       await UserService.ResendEmailConfirmation(address.trim());
       setConfirmationEmailDeliveryStatus(undefined);
       message.success(
-        "If an unconfirmed account exists for that email address, a confirmation email has been sent."
+        "We've processed your request. If an unconfirmed account exists for that email address, check your inbox and spam or junk folder shortly."
       );
     } catch (e) {
       const error = e as ApiErrorResponse;

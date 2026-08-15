@@ -150,7 +150,7 @@ public class UserService : ServiceBase<UserRepository>
             entity.FullName,
             entity.EmailConfirmationCode,
             (messageLogId, token) => Repository.TrySetEmailConfirmationMessageLog(entity.Id, null, messageLogId, token),
-            cancellationToken);
+            CancellationToken.None);
 
         return new RegisterUserResultVm
         {
@@ -295,7 +295,7 @@ public class UserService : ServiceBase<UserRepository>
             user.EmailConfirmationCode,
             (messageLogId, token) => Repository.TrySetEmailConfirmationMessageLog(
                 user.Id, expectedMessageLogId, messageLogId, token),
-            cancellationToken);
+            CancellationToken.None);
     }
 
     public async Task<AcceptInvitationVm?> GetInvitation(string code)

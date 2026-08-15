@@ -53,9 +53,9 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             accountInvitation);
         await _messageLogRepository.Create(messageLog, cancellationToken);
 
-        if (beforeSend != null && !await beforeSend(messageLog.Id, cancellationToken))
+        if (beforeSend != null && !await beforeSend(messageLog.Id, CancellationToken.None))
         {
-            await _messageLogRepository.Delete(messageLog, cancellationToken);
+            await _messageLogRepository.Delete(messageLog, CancellationToken.None);
             return new EmailSendResult(null, null);
         }
 
@@ -93,14 +93,14 @@ public class EmailService : ServiceBase<MessageTypeRepository>
         {
             var failure = string.Join(Environment.NewLine,
                 failedResults.Select(e => e.Message).Where(e => !string.IsNullOrWhiteSpace(e)));
-            await _messageLogRepository.MarkSubmissionFailed(messageLog.Id, failure, cancellationToken);
+            await _messageLogRepository.MarkSubmissionFailed(messageLog.Id, failure, CancellationToken.None);
             return new EmailSendResult(messageLog.Id, MessageDeliveryStatus.SendFailed);
         }
 
         var providerResponse = results.Select(e => e.Message).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
         var providerMessageId = TryGetProviderMessageId(providerResponse);
         await _messageLogRepository.MarkSubmissionSucceeded(messageLog.Id, providerMessageId, providerResponse,
-            cancellationToken);
+            CancellationToken.None);
         return new EmailSendResult(messageLog.Id, MessageDeliveryStatus.Submitted);
     }
 

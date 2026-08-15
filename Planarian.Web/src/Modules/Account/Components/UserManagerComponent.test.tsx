@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { message } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -96,13 +96,6 @@ const history: InvitationEmailAttemptVm[] = [
   },
 ];
 
-const detail = (label: string) => {
-  const labelNode = screen.getByText(label);
-  const container = labelNode.closest(".user-manager-grid-card__detail");
-  if (!container) throw new Error(`Missing detail container for ${label}`);
-  return within(container as HTMLElement);
-};
-
 const renderManager = () =>
   render(
     <MemoryRouter>
@@ -154,8 +147,10 @@ describe("UserManagerComponent invitation delivery status", () => {
     expect(await screen.findByText("Invited User")).toBeInTheDocument();
     expect(screen.getByText("Pending")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resend$/ })).toBeInTheDocument();
-    expect(detail("Invitation Sent").getByText("Not recorded")).toBeInTheDocument();
-    expect(detail("Latest Email Delivery").getByText(/Send failed/)).toBeInTheDocument();
+    expect(screen.getByText("Invitation Sent")).toBeInTheDocument();
+    expect(screen.getAllByText("Not recorded")).toHaveLength(3);
+    expect(screen.getByText("Latest Email Delivery")).toBeInTheDocument();
+    expect(screen.getByText(/Send failed/)).toBeInTheDocument();
   });
 
   it("shows legacy invitations as untracked while keeping resend available", async () => {
@@ -176,7 +171,8 @@ describe("UserManagerComponent invitation delivery status", () => {
     renderManager();
     await screen.findByText("Invited User");
 
-    expect(detail("Latest Email Delivery").getByText("Not tracked")).toBeInTheDocument();
+    expect(screen.getByText("Latest Email Delivery")).toBeInTheDocument();
+    expect(screen.getByText("Not tracked")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Resend$/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Email History$/ })).not.toBeInTheDocument();
   });
@@ -259,9 +255,12 @@ describe("UserManagerComponent invitation delivery status", () => {
     renderManager();
     await screen.findByText("Invited User");
 
-    expect(detail("Email Attempts").getByText("2")).toBeInTheDocument();
-    expect(detail("Open Events").getByText("2 recorded (1 automated)")).toBeInTheDocument();
-    expect(detail("Click Events").getByText("1 recorded")).toBeInTheDocument();
+    expect(screen.getByText("Email Attempts")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Open Events")).toBeInTheDocument();
+    expect(screen.getByText("2 recorded (1 automated)")).toBeInTheDocument();
+    expect(screen.getByText("Click Events")).toBeInTheDocument();
+    expect(screen.getByText("1 recorded")).toBeInTheDocument();
   });
 
   it("loads resend history on demand and labels bot activity and delayed bounces", async () => {

@@ -80,6 +80,28 @@ test("rejects unsupported or non-canonical path patterns explicitly", () => {
   );
 });
 
+test("folds the first query parameter into a static route literal", () => {
+  const input = manifest({
+    confirm: {
+      path: "/confirm-email",
+      queryParameters: ["code", "redirect"],
+    },
+  });
+
+  const typescript = buildTypescript(input);
+  assert.match(
+    typescript,
+    /return "\/confirm-email\?code=" \+ encodeURIComponent\(code\) \+ "&redirect=" \+ encodeURIComponent\(redirect\);/
+  );
+  assert.doesNotMatch(typescript, /"\/confirm-email" \+ "\?code="/);
+
+  const csharp = buildCsharp(input);
+  assert.match(
+    csharp,
+    /=> "\/confirm-email\?code=" \+ Uri\.EscapeDataString\(code\) \+ "&redirect=" \+ Uri\.EscapeDataString\(redirect\);/
+  );
+});
+
 test("generates builders for multiple path and query parameters", () => {
   const input = manifest({
     sample: {

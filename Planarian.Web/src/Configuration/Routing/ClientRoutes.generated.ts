@@ -13,7 +13,7 @@ export const ClientRoutes = {
   },
   emailConfirmation: {
     path: "/confirm-email",
-    get(code: string): string { return "/confirm-email" + "?code=" + encodeURIComponent(code); },
+    get(code: string): string { return "/confirm-email?code=" + encodeURIComponent(code); },
   },
   emailConfirmationPending: {
     path: "/confirm-email/pending",
@@ -21,6 +21,6 @@ export const ClientRoutes = {
   },
   passwordReset: {
     path: "/reset-password",
-    get(code: string): string { return "/reset-password" + "?code=" + encodeURIComponent(code); },
+    get(code: string): string { return "/reset-password?code=" + encodeURIComponent(code); },
   },
 } as const;

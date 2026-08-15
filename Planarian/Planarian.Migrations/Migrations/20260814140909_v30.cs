@@ -11,11 +11,6 @@ namespace Planarian.Migrations.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.RenameColumn(
-                name: "MessageKey",
-                table: "MessageLogs",
-                newName: "TemplateKey");
-
             // MessageLogs historically persisted the complete substitutions JSON, including credential-bearing CTA URLs.
             // Preserve a useful safe target: strip query/fragment data and redact invitation codes embedded in the path.
             // Malformed historical JSON is skipped rather than blocking the schema upgrade.
@@ -313,10 +308,6 @@ namespace Planarian.Migrations.Migrations
                 name: "Purpose",
                 table: "MessageLogs");
 
-            migrationBuilder.RenameColumn(
-                name: "TemplateKey",
-                table: "MessageLogs",
-                newName: "MessageKey");
         }
     }
 }

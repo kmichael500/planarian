@@ -113,10 +113,11 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             }
         }
 
-        var sendResult = await _emailService.SendAccountInvitationEmail(user, accountUser, accountName, cancellationToken);
+        var sendResult = await _emailService.SendAccountInvitationEmail(
+            user, accountUser, accountName, CancellationToken.None);
         if (sendResult.WasSubmitted)
         {
-            await Repository.SaveChangesAsync(cancellationToken);
+            await Repository.SaveChangesAsync(CancellationToken.None);
         }
 
         return new InviteUserResultVm

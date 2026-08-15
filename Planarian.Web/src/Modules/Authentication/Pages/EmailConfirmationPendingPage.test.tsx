@@ -260,11 +260,9 @@ describe("EmailConfirmationPendingPage", () => {
       screen.getByRole("button", { name: /Resend confirmation email$/ })
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByText("Please enter a valid email address.")
-      ).toBeInTheDocument()
-    );
+    expect(
+      await screen.findByText("Please enter a valid email address.")
+    ).toBeInTheDocument();
     expect(resendSpy).not.toHaveBeenCalled();
   });
 
@@ -282,8 +280,9 @@ describe("EmailConfirmationPendingPage", () => {
       expect(resendSpy).toHaveBeenCalledWith("user@example.com")
     );
     expect(successSpy).toHaveBeenCalledWith(
-      "If an unconfirmed account exists for that email address, a confirmation email has been sent."
+      "We've processed your request. If an unconfirmed account exists for that email address, check your inbox and spam or junk folder shortly."
     );
+    expect(String(successSpy.mock.calls[0]?.[0])).not.toMatch(/has been sent/i);
   });
 
   it("resends the trimmed transition email captured from router state", async () => {

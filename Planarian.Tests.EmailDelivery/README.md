@@ -23,3 +23,7 @@ These require the real PostgreSQL integration-test harness; do not replace them 
 - Verify invitation acceptance/reassignment preserves historical invitation `MessageLogs` before the temporary invited user is deleted and that the composite `SetNull` relationship behaves as intended.
 - Verify account-user projections choose the latest invitation attempt deterministically and count human/automated opens and clicks from persisted events correctly.
 - Verify a failed first invitation send remains retryable, and a successful resend updates `InvitationSentOn` without creating a second invitation identity.
+- Verify a request cancellation after registration has durably committed does not cancel the started confirmation-email attempt or its `EmailConfirmationMessageLogId` claim/status reconciliation.
+- Verify a request cancellation after invitation creation has durably committed does not cancel the started invitation-email attempt, and a successful submission still persists `InvitationSentOn`.
+- Verify cancellation after a `MessageLog` is created cannot leave the attempt `Submitting` solely because link/delete/submission-status reconciliation observed the original request-abort token.
+- Verify a losing confirmation-resend compare-and-swap deletes its unused `MessageLog` coherently even when the originating HTTP request is canceled.

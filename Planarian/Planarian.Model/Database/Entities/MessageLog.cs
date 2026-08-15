@@ -78,6 +78,9 @@ public class MessageLogConfiguration : BaseEntityTypeConfiguration<MessageLog>
         ConfigureEnum(builder, e => e.Provider);
         ConfigureEnum(builder, e => e.DeliveryStatus);
 
+        builder.Property(e => e.TemplateKey)
+            .HasColumnName("MessageKey");
+
         builder.HasIndex(e => e.ProviderCorrelationId)
             .IsUnique()
             .HasFilter("\"ProviderCorrelationId\" IS NOT NULL");

@@ -239,7 +239,8 @@ namespace Planarian.Migrations.Migrations
 
                     b.Property<string>("TemplateKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("MessageKey");
 
                     b.Property<string>("ToEmailAddress")
                         .IsRequired()

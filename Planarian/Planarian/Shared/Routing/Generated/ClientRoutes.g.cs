@@ -22,7 +22,7 @@ public static class ClientRoutes
     public static class EmailConfirmation
     {
         public const string Path = "/confirm-email";
-        public static string Get(string code) => "/confirm-email" + "?code=" + Uri.EscapeDataString(code);
+        public static string Get(string code) => "/confirm-email?code=" + Uri.EscapeDataString(code);
     }
 
     public static class EmailConfirmationPending
@@ -34,7 +34,7 @@ public static class ClientRoutes
     public static class PasswordReset
     {
         public const string Path = "/reset-password";
-        public static string Get(string code) => "/reset-password" + "?code=" + Uri.EscapeDataString(code);
+        public static string Get(string code) => "/reset-password?code=" + Uri.EscapeDataString(code);
     }
 
 }
