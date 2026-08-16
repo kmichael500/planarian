@@ -103,6 +103,7 @@ export interface CaveChangePreviewVm {
   diff: CaveRevisionDiffVm;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
+  hasMeaningfulChanges: boolean;
 }
 
 export interface CaveProposalAuthoringConflictVm {

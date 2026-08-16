@@ -41,7 +41,7 @@ public sealed record CaveChangeRequestDetailVm(
 
 public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
-    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber);
+    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber, bool HasMeaningfulChanges);
 
 public sealed record CreateCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId);
 

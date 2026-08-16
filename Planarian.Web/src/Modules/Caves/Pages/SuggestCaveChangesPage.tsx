@@ -11,7 +11,6 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveService } from "../Service/CaveService";
-import { isCaveRevisionDiffEmpty } from "../Helpers/CaveRevisionDiffHelpers";
 
 export const SuggestCaveChangesPage = () => {
   const { caveId } = useParams();
@@ -54,7 +53,7 @@ export const SuggestCaveChangesPage = () => {
   };
 
   const submit = async () => {
-    if (!draft || !previewResult || isCaveRevisionDiffEmpty(previewResult.diff)) return;
+    if (!draft || !previewResult?.hasMeaningfulChanges) return;
     setSubmitting(true);
     try {
       const id = await CaveService.SubmitChanges(caveId, draft, expectedBaseRevisionId!);
@@ -74,13 +73,13 @@ export const SuggestCaveChangesPage = () => {
       {previewResult && draft && (
         <Card title="Review your changes">
           <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
-          {isCaveRevisionDiffEmpty(previewResult.diff) &&
-            <Alert message="Make at least one change before submitting this proposal." type="warning" showIcon style={{ marginBottom: 16 }} />}
+          {!previewResult.hasMeaningfulChanges &&
+            <Alert message="Make at least one meaningful change before submitting this proposal." type="warning" showIcon style={{ marginBottom: 16 }} />}
           <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed}
             countyNumberIntent={previewResult.countyNumberIntent} />
           <Space style={{ marginTop: 16 }}>
             <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}
-              disabled={isCaveRevisionDiffEmpty(previewResult.diff)}>Submit for review</PlanarianButton>
+              disabled={!previewResult.hasMeaningfulChanges}>Submit for review</PlanarianButton>
             <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
           </Space>
         </Card>

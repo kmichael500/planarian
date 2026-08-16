@@ -63,11 +63,11 @@ public sealed class CaveChangeRequestService
                        ?? throw ApiExceptionDictionary.NotFound("Cave revision");
         var current = Deserialize(revision.Revision);
         var proposal = await BuildProposalAsync(values, caveId, cancellationToken, expectedBaseRevisionId);
-        var proposed = await PresentAsync(proposal, current,
-            cancellationToken);
+        var (proposed, hasMeaningfulChanges) = await EvaluateMeaningfulChangesAsync(
+            proposal, current, null, cancellationToken);
         await RequireCurrentRevisionAsync(caveId, expectedBaseRevisionId, cancellationToken);
         return new CaveChangePreviewVm(current, proposed, Map(_diff.Compare(current, proposed)),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, hasMeaningfulChanges);
     }
 
     public async Task<CaveChangePreviewVm> PreviewVersionAsync(string requestId, AddCaveVm values,
@@ -86,12 +86,16 @@ public sealed class CaveChangeRequestService
         if (row.CurrentRevision?.Id != baseRevision.Id)
             throw new CaveRevisionConflictException(row.Request.CaveId, baseRevision.Id, row.CurrentRevision?.Id);
         var baseSnapshot = Deserialize(baseRevision);
+        var previous = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson,
+            row.ProposalVersion.SchemaVersion);
+        var semanticPrevious = row.ProposalVersion.BaseRevisionId == expectedBaseRevisionId ? previous : null;
         var proposal = await BuildVersionProposalAsync(row, values, baseRevision.Id, cancellationToken);
-        var proposed = await PresentAsync(proposal, baseSnapshot, cancellationToken);
+        var (proposed, hasMeaningfulChanges) = await EvaluateMeaningfulChangesAsync(
+            proposal, baseSnapshot, semanticPrevious, cancellationToken);
         var latest = await RequireReadableAsync(requestId, cancellationToken);
         RequireExpectedEditorState(latest, expectedBaseRevisionId, expectedProposalVersionId, againstCurrent);
         return new CaveChangePreviewVm(baseSnapshot, proposed, Map(_diff.Compare(baseSnapshot, proposed)),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, hasMeaningfulChanges);
     }
 
     public async Task<string> CreateAsync(string caveId, AddCaveVm values, string expectedBaseRevisionId,
@@ -367,16 +371,23 @@ public sealed class CaveChangeRequestService
         var revision = await _revisions.GetAsync(caveId, baseRevisionId, cancellationToken)
                        ?? throw ApiExceptionDictionary.NotFound("Cave revision");
         var baseSnapshot = Deserialize(revision.Revision);
-        var proposedSnapshot = await PresentAsync(proposal, baseSnapshot, cancellationToken);
-        if (_diff.IsSemanticEqual(baseSnapshot, proposedSnapshot))
+        var (_, hasMeaningfulChanges) = await EvaluateMeaningfulChangesAsync(
+            proposal, baseSnapshot, semanticPrevious, cancellationToken);
+        if (!hasMeaningfulChanges)
             throw ApiExceptionDictionary.BadRequest("The proposal does not contain any changes.");
-        if (semanticPrevious is not null)
-        {
-            var previousSnapshot = await PresentAsync(semanticPrevious, baseSnapshot, cancellationToken);
-            if (_diff.IsSemanticEqual(previousSnapshot, proposedSnapshot))
-                throw ApiExceptionDictionary.BadRequest("The proposal does not contain any changes.");
-        }
         return proposal;
+    }
+
+    private async Task<(CavePublishedSnapshotV1 Proposed, bool HasMeaningfulChanges)> EvaluateMeaningfulChangesAsync(
+        CaveProposalSnapshotV1 proposal, CavePublishedSnapshotV1 baseSnapshot,
+        CaveProposalSnapshotV1? semanticPrevious, CancellationToken cancellationToken)
+    {
+        var proposed = await PresentAsync(proposal, baseSnapshot, cancellationToken);
+        if (_diff.IsSemanticEqual(baseSnapshot, proposed)) return (proposed, false);
+        if (semanticPrevious is null) return (proposed, true);
+
+        var previous = await PresentAsync(semanticPrevious, baseSnapshot, cancellationToken);
+        return (proposed, !_diff.IsSemanticEqual(previous, proposed));
     }
 
     private async Task<CaveProposalSnapshotV1> BuildProposalAsync(AddCaveVm values, string caveId,

@@ -258,6 +258,27 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
     }
 
     [Fact]
+    public async Task InitialSemanticNoOpPreviewIsMarkedAsNotMeaningful()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(InitialSemanticNoOpPreviewIsMarkedAsNotMeaningful));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await MakeBaselineStructurallyValidAsync(database, tenant, locationTag.Id);
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+        var preview = await contributor.ChangeRequests.PreviewAsync(tenant.CaveId,
+            ValuesFromCave(context.Cave), context.ExpectedBaseRevisionId, default);
+
+        Assert.False(preview.HasMeaningfulChanges);
+        Assert.Empty(await contributor.Db.CaveChangeRequests.ToListAsync());
+        Assert.Empty(await contributor.Db.CaveProposalVersions.ToListAsync());
+    }
+
+    [Fact]
     public async Task RevisedSemanticNoOpIsRejectedWithoutSupersedingTheValidVersion()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -284,6 +305,40 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
         Assert.Equal(validVersionId, await CurrentVersionAsync(contributor.Db, requestId));
         Assert.Single(await contributor.Db.CaveProposalVersions.Where(row => row.ChangeRequestId == requestId)
             .ToListAsync());
+    }
+
+    [Fact]
+    public async Task IdenticalRevisionPreviewIsMarkedAsNotMeaningfulBeforeSave()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(IdenticalRevisionPreviewIsMarkedAsNotMeaningfulBeforeSave));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await MakeBaselineStructurallyValidAsync(database, tenant, locationTag.Id);
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+        var values = ValuesFromCave(context.Cave);
+        values.Name = "Changed once";
+        var requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId, values,
+            context.ExpectedBaseRevisionId, default);
+        var currentVersionId = await CurrentVersionAsync(contributor.Db, requestId);
+
+        var noOpPreview = await contributor.ChangeRequests.PreviewVersionAsync(requestId, values, false,
+            context.ExpectedBaseRevisionId, currentVersionId, default);
+        Assert.False(noOpPreview.HasMeaningfulChanges);
+
+        values.Narrative = "Actually changed";
+        var changedPreview = await contributor.ChangeRequests.PreviewVersionAsync(requestId, values, false,
+            context.ExpectedBaseRevisionId, currentVersionId, default);
+        Assert.True(changedPreview.HasMeaningfulChanges);
+
+        contributor.Db.ChangeTracker.Clear();
+        Assert.Equal(currentVersionId, await CurrentVersionAsync(contributor.Db, requestId));
+        Assert.Single(await contributor.Db.CaveProposalVersions
+            .Where(row => row.ChangeRequestId == requestId).ToListAsync());
     }
 
     [Fact]
