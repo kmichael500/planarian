@@ -27,7 +27,7 @@ public sealed class EntranceImportPlanner
         {
             cancellationToken.ThrowIfCancellationRequested();
             var record = records[index];
-            var validationRowNumber = index + 1;
+            var validationRowNumber = index + 2;
             var failureCountBefore = failedRecords.Count;
             try
             {

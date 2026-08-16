@@ -99,13 +99,42 @@ internal static class CsvFieldReader
 {
     public static bool TryGet<T>(IReaderRow csv, string fieldName, bool required, ICollection<string> errors, out T? value)
     {
-        var hasValue = csv.TryGetField(fieldName, out value);
-        if (!hasValue || (typeof(T) == typeof(string) && string.IsNullOrWhiteSpace(value?.ToString())))
+        value = default;
+        if (!csv.TryGetField<string>(fieldName, out var raw))
         {
             if (required) errors.Add($"{fieldName} is required.");
             return false;
         }
-        if (typeof(T) == typeof(string) && value != null) value = (T)(object)value.ToString()!.Trim();
-        return true;
+
+        if (typeof(T) == typeof(string))
+        {
+            value = (T)(object)(raw?.Trim() ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                if (required) errors.Add($"{fieldName} is required.");
+                return false;
+            }
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            if (required) errors.Add($"{fieldName} is required.");
+            return false;
+        }
+
+        if (csv.TryGetField(fieldName, out value))
+        {
+            if (value is double number && !double.IsFinite(number))
+            {
+                value = default;
+                errors.Add($"{fieldName} must be a finite number.");
+                return false;
+            }
+            return true;
+        }
+
+        errors.Add($"{fieldName} has an invalid value.");
+        return false;
     }
 }

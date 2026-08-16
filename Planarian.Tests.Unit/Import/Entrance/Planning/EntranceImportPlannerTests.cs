@@ -35,6 +35,15 @@ public sealed class EntranceImportPlannerTests
             value.DecimalLongitude = longitude;
         })]);
 
+    [Fact]
+    public void ValidationErrorsReportCsvRowIncludingHeader()
+    {
+        var exception = Assert.Throws<ApiException>(() => Plan([EntranceRecord(value => value.DecimalLatitude = 91)]));
+
+        var failure = Assert.Single(Assert.IsAssignableFrom<IEnumerable<FailedCaveCsvRecord<EntranceCsvModel>>>(exception.Data));
+        Assert.Equal(2, failure.RowNumber);
+    }
+
     [Theory]
     [InlineData(-1, 0)]
     [InlineData(500, -1)]

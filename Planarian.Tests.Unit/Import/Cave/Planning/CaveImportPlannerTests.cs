@@ -41,6 +41,15 @@ public sealed class CaveImportPlannerTests
     }
 
     [Fact]
+    public void AlternateNamesUseSharedCaveNormalization()
+    {
+        var cave = Assert.Single(Plan([CaveRecord(configure: value =>
+            value.AlternateNames = "Beta, Alpha, Beta")]).Caves);
+
+        Assert.Equal(["Alpha", "Beta"], cave.AlternateNames);
+    }
+
+    [Fact]
     public void MissingCaveNameIsRejected() => AssertInvalid(CaveRecord(configure: value => value.CaveName = ""));
 
     [Fact]
@@ -62,6 +71,12 @@ public sealed class CaveImportPlannerTests
             value.NumberOfPits = pits;
         }));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonPositiveCountyNumberIsRejected(int countyNumber) =>
+        AssertInvalid(CaveRecord(countyNumber));
 
     [Fact]
     public void NonSyncDuplicateCountyNumberIsRejected()
@@ -123,6 +138,31 @@ public sealed class CaveImportPlannerTests
         Assert.Equal("state", Assert.Single(plan.AccountStateCreations).StateId);
         var county = Assert.Single(plan.CountyCreations);
         Assert.Equal(("state", "A01", "Alpha"), (county.StateId, county.DisplayId, county.Name));
+    }
+
+    [Fact]
+    public void NewCountyCaseVariantsCreateSingleCountyIntentAndShareCounty()
+    {
+        var records = new[]
+        {
+            CaveRecord(7),
+            CaveRecord(8, value => value.CountyCode = "a01")
+        };
+
+        var plan = Plan(records, State(counties: []));
+
+        var county = Assert.Single(plan.CountyCreations);
+        Assert.Equal("A01", county.DisplayId);
+        Assert.All(plan.Caves, cave => Assert.Equal(county.Id, cave.CountyId));
+    }
+
+    [Fact]
+    public void ExistingCountyIsReusedCaseInsensitivelyWithoutCreationIntent()
+    {
+        var plan = Plan([CaveRecord(configure: value => value.CountyCode = "a01")]);
+
+        Assert.Equal("county", Assert.Single(plan.Caves).CountyId);
+        Assert.Empty(plan.CountyCreations);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using Planarian.Library.Extensions.String;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Models;
 
 namespace Planarian.Modules.Import.Planning;
@@ -48,7 +49,7 @@ public sealed class CaveImportPlanner
 
         var existingCounties = planningState.Counties.ToList();
         var countyCandidates = new List<CaveImportCountyLookup>();
-        var seenCountyDisplayIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenCountyDisplayIds = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
         foreach (var record in records)
         {
             var displayId = record.CountyCode.Trim();
@@ -58,7 +59,8 @@ public sealed class CaveImportPlanner
                 record.CountyName.Trim()));
         }
         var countyCreations = countyCandidates
-            .Where(candidate => existingCounties.All(existing => existing.DisplayId != candidate.DisplayId))
+            .Where(candidate => existingCounties.All(existing =>
+                !existing.DisplayId.Equals(candidate.DisplayId, StringComparison.InvariantCultureIgnoreCase)))
             .Select(c => new CountyCreationIntent(c.Id, planningState.AccountId, c.StateId, c.DisplayId, c.Name))
             .ToList();
         var allCounties = existingCounties.Concat(countyCreations.Select(c =>
@@ -88,7 +90,8 @@ public sealed class CaveImportPlanner
                     c.StateId == state.Id);
                 if (county is null)
                 {
-                    var conflicting = allCounties.FirstOrDefault(c => c.DisplayId == record.CountyCode.Trim());
+                    var conflicting = allCounties.FirstOrDefault(c =>
+                        c.DisplayId.Equals(record.CountyCode.Trim(), StringComparison.InvariantCultureIgnoreCase));
                     failedRecords.Add(new(record, rowNumber, conflicting is null
                         ? $"{nameof(record.CountyCode)} not found: '{record.CountyCode}'"
                         : $"{nameof(record.CountyCode)} value '{record.CountyCode}' is already being used for county '{conflicting.Name}'."));
@@ -116,7 +119,8 @@ public sealed class CaveImportPlanner
                 var isValidReportedOn = DateTime.TryParse(record.ReportedOnDate, out var reportedOnDate);
                 reportedOnDate = reportedOnDate.ToUtcKind();
                 var caveId = existing?.Id ?? IdGenerator.Generate();
-                var alternateNames = record.AlternateNames.SplitAndTrim().ToList();
+                var alternateNames = CaveAlternateNameNormalizer
+                    .Normalize(record.AlternateNames.SplitAndTrim()).ToList();
                 var transient = new Cave
                 {
                     Id = caveId,
@@ -251,6 +255,11 @@ public sealed class CaveImportPlanner
                 $"{property.Name} exceeds the maximum allowed length of {max.Length}"));
             valid = false;
         }
+        if (cave.CountyNumber <= 0)
+        {
+            failures.Add(new(currentRecord, rowNumber, "County number must be greater than 0."));
+            valid = false;
+        }
         if (!skipCountyNumberConflictCheck)
         {
             var key = new CaveImportUsedCountyNumber(cave.CountyId, cave.CountyNumber);
@@ -263,7 +272,7 @@ public sealed class CaveImportPlanner
         }
         if (cave.NumberOfPits is < 0)
         {
-            failures.Add(new(currentRecord, rowNumber, "Number of pits must be greater than or equal to 1!"));
+            failures.Add(new(currentRecord, rowNumber, "Number of pits must be greater than or equal to 0!"));
             valid = false;
         }
         if (cave.LengthFeet is < 0)
