@@ -16,10 +16,10 @@ public class MessageTypeRepository : RepositoryBase
         _mjmlService = mjmlService;
     }
 
-    public async Task<MessageTypeVm?> GetMessageTypeVm(string messageKey, string messageType)
+    public async Task<MessageTypeVm?> GetMessageTypeVm(string templateKey, string messageType)
     {
         await UpdateHtml();
-        var message = await DbContext.MessageTypes.Where(e => e.Key == messageKey && e.Type == messageType)
+        var message = await DbContext.MessageTypes.Where(e => e.Key == templateKey && e.Type == messageType)
             .Select(e => new MessageTypeVm(e.Subject, e.Html, e.FromEmail, e.FromName))
             .FirstOrDefaultAsync();
 

@@ -17,6 +17,12 @@ public class IdGenerator
         return base64Guid[..10];
     }
 
+    public static string GenerateSecureToken(int byteLength = 32)
+    {
+        if (byteLength <= 0) throw new ArgumentOutOfRangeException(nameof(byteLength));
+        return Convert.ToHexString(RandomNumberGenerator.GetBytes(byteLength)).ToLowerInvariant();
+    }
+
     public static string Generate(int length)
     {
         var base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".ToCharArray();

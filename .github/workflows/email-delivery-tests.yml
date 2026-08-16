@@ -1,0 +1,25 @@
+name: Email delivery unit tests
+
+on:
+  pull_request:
+    paths:
+      - "Planarian/**"
+      - "Planarian.Tests.EmailDelivery/**"
+      - "Planarian.Tests.Unit/**"
+      - "Planarian.Tests.Integration/**"
+      - ".github/workflows/email-delivery-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run email delivery unit tests
+        run: >-
+          dotnet test Planarian.Tests.EmailDelivery/Planarian.Tests.EmailDelivery.csproj
+          --configuration Release
+          --logger "trx;LogFileName=email-delivery-results.trx"
+          --results-directory Planarian.Tests.EmailDelivery/TestResults

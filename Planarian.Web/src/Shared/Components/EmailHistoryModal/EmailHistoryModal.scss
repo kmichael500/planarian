@@ -1,0 +1,21 @@
+.email-history-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.email-history-modal__attempt {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.email-history-modal__events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+}

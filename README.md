@@ -139,7 +139,7 @@ If you have any interest at all in working on Planarian, reach out to me. I am h
 
 If you want to work on the codebase locally:
 
-1. Configure the development app settings for the backend.
+1. Copy `Planarian/Planarian/appsettings.Template.Development.json` to the ignored `Planarian/Planarian/appsettings.Development.json` and configure the backend values. Azure App Configuration is optional in `Development`; leave `ConnectionStrings:AppConfigConnectionString` empty to use local configuration only. Non-Development environments still require Azure App Configuration. The template contains non-secret placeholder email settings so the app can start locally; configure real email credentials separately only when you intend to test outbound email.
 2. Set up PostgreSQL.
 3. Set up Azure Blob Storage for file uploads, or use a local emulator like Azurite.
 4. Open `Planarian/Planarian.sln`.

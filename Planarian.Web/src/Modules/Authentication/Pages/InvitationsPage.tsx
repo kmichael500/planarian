@@ -1,10 +1,7 @@
 import { Card, Empty, List, Space, Typography, message } from "antd";
-import {
-  CheckCircleOutlined,
-  EnvironmentOutlined,
-} from "@ant-design/icons";
+import { CheckCircleOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import React from "react";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
@@ -25,6 +22,7 @@ const InvitationsPage = () => {
   const [decliningInvitationCode, setDecliningInvitationCode] = useState<
     string | null
   >(null);
+  const invitationActionInFlightRef = useRef(false);
   const { setHeaderTitle, setHeaderButtons, refreshPendingInvitations } =
     useContext(AppContext);
 
@@ -33,51 +31,75 @@ const InvitationsPage = () => {
     setHeaderButtons([]);
   }, [setHeaderButtons, setHeaderTitle]);
 
-  const getInvitations = async () => {
-    try {
-      const result = await UserService.GetPendingInvitations();
-      setInvitations(result);
-    } catch (err) {
-      const error = err as ApiErrorResponse;
-      message.error(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    getInvitations();
+    let isCurrent = true;
+
+    const getInvitations = async () => {
+      try {
+        const result = await UserService.GetPendingInvitations();
+        if (!isCurrent) return;
+        setInvitations(result);
+      } catch (err) {
+        if (!isCurrent) return;
+        const error = err as ApiErrorResponse;
+        message.error(error.message);
+      } finally {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void getInvitations();
+
+    return () => {
+      isCurrent = false;
+    };
   }, []);
 
   const handleAccept = async (invitation: AcceptInvitationVm) => {
+    if (invitationActionInFlightRef.current) return;
+
+    invitationActionInFlightRef.current = true;
+    setAcceptingInvitationCode(invitation.invitationCode);
     try {
-      setAcceptingInvitationCode(invitation.invitationCode);
       await UserService.AcceptInvitation(invitation.invitationCode);
       message.success("You have accepted the invitation.");
-      await refreshPendingInvitations();
       AuthenticationService.SwitchAccount(invitation.accountId, "/caves");
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     } finally {
+      invitationActionInFlightRef.current = false;
       setAcceptingInvitationCode(null);
     }
   };
 
   const handleDecline = async (invitation: AcceptInvitationVm) => {
+    if (invitationActionInFlightRef.current) return;
+
+    invitationActionInFlightRef.current = true;
+    setDecliningInvitationCode(invitation.invitationCode);
     try {
-      setDecliningInvitationCode(invitation.invitationCode);
       await UserService.DeclineInvitation(invitation.invitationCode);
+      setInvitations((current) =>
+        current.filter(
+          (item) => item.invitationCode !== invitation.invitationCode
+        )
+      );
       message.warning("You have declined the invitation.");
-      await getInvitations();
-      await refreshPendingInvitations();
+      void refreshPendingInvitations().catch(() => {});
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     } finally {
+      invitationActionInFlightRef.current = false;
       setDecliningInvitationCode(null);
     }
   };
+
+  const isInvitationActionInFlight =
+    acceptingInvitationCode != null || decliningInvitationCode != null;
 
   return (
     <div style={styles.container}>
@@ -130,6 +152,7 @@ const InvitationsPage = () => {
                     loading={
                       acceptingInvitationCode === invitation.invitationCode
                     }
+                    disabled={isInvitationActionInFlight}
                     alwaysShowChildren
                   >
                     Accept
@@ -138,6 +161,7 @@ const InvitationsPage = () => {
                     loading={
                       decliningInvitationCode === invitation.invitationCode
                     }
+                    disabled={isInvitationActionInFlight}
                     title="Are you sure you want to decline the invitation?"
                     onConfirm={() => handleDecline(invitation)}
                     okText="Yes"

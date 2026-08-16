@@ -15,6 +15,8 @@ public static class PropertyLength
     public const int StationName = 100;
     public const int PasswordHash = 100;
     public const int InvitationCode = 10;
+    public const int PasswordResetCode = 64;
+    public const int MailgunWebhookToken = 50;
     public const int FileName = 1000;
     public const int Delimiter = 10;
 }

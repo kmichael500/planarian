@@ -40,6 +40,14 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
         return new JsonResult(user);
     }
 
+    [HttpGet("{userId:length(10)}/invitation-email-history")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    public async Task<ActionResult<IEnumerable<InvitationEmailAttemptVm>>> GetInvitationEmailHistory(string userId)
+    {
+        var history = await Service.GetInvitationEmailHistory(userId);
+        return new JsonResult(history);
+    }
+
     [HttpPost("{userId:length(10)}/resend-invitation")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
     public async Task<IActionResult> ResendInvitation(string userId)
@@ -50,10 +58,10 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
     [HttpPost("")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> Invite([FromBody] InviteUserRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<InviteUserResultVm>> Invite([FromBody] InviteUserRequest request, CancellationToken cancellationToken)
     {
-        var userId = await Service.InviteUser(request, cancellationToken);
-        return new JsonResult(userId);
+        var result = await Service.InviteUser(request, cancellationToken);
+        return new JsonResult(result);
     }
 
     [HttpDelete("{userId:length(10)}")]

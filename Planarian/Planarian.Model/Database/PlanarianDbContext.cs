@@ -138,6 +138,7 @@ public partial class PlanarianDbContextBase : DbContext
 
     public DbSet<MessageType> MessageTypes { get; set; } = null!;
     public DbSet<MessageLog> MessageLogs { get; set; } = null!;
+    public DbSet<MessageLogEvent> MessageLogEvents { get; set; } = null!;
 
     #endregion
 

@@ -8,6 +8,7 @@ on:
       - "Planarian.Tests/**"
       - "Planarian.Tests.Unit/**"
       - "Planarian.Tests.Integration/**"
+      - "Contracts/**"
       - "docs/**"
       - "AGENTS.md"
       - "scripts/**"
@@ -24,6 +25,8 @@ jobs:
           cache: npm
           cache-dependency-path: Planarian.Web/package-lock.json
       - run: npm ci
+        working-directory: Planarian.Web
+      - run: npm run check:client-routes
         working-directory: Planarian.Web
       - run: scripts/validate-env-example.sh
       - run: npm test -- --watchAll=false --runInBand

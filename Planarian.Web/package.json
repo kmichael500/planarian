@@ -24,7 +24,7 @@
     "chartjs-adapter-date-fns": "^3.0.0",
     "csv-parse": "^5.4.0",
     "diff": "^8.0.4",
-    "dompurify": "^3.2.5",
+    "dompurify": "^3.4.13",
     "file-saver": "^2.0.5",
     "imask": "^6.4.3",
     "maplibre-gl": "^3.5.2",
@@ -53,10 +53,20 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "prepare:client-routes": "npm run test:client-routes-generator && npm run generate:client-routes",
+    "generate:client-routes": "node ../scripts/generate-client-routes.mjs",
+    "test:client-routes-generator": "node --test ../scripts/generate-client-routes.test.mjs",
+    "check:client-routes": "npm run test:client-routes-generator && node ../scripts/generate-client-routes.mjs --check",
+    "test:csp-config": "node --test ../scripts/configure-static-web-app-csp.test.mjs",
+    "prestart": "npm run prepare:client-routes",
     "start": "react-scripts start",
+    "prebuild": "npm run prepare:client-routes && npm run test:csp-config",
     "build": "CI=false react-scripts build",
+    "postbuild": "node ../scripts/configure-static-web-app-csp.mjs",
+    "pretest": "npm run prepare:client-routes && npm run test:csp-config",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "predeploy": "npm run build",
     "deploy": "swa deploy --env production"
   },
   "eslintConfig": {

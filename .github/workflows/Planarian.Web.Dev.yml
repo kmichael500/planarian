@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "Planarian.Web/**"
+      - "Contracts/**"
   # pull_request:
   #   branches:
   #     - main
