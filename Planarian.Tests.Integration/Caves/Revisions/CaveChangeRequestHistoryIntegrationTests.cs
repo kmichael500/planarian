@@ -62,8 +62,19 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
             TagTypeKeyConstant.EntranceHydrology, "Wet", "hydrologya");
         var location = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
-        var file = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "versionf0a");
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        var blobs = new TestFileBlobStore();
+        string fileId;
+        string fileTypeId;
+        await using (var uploader = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs))
+        {
+            await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("version file bytes"));
+            var staged = await uploader.Services.Files.StageAuthoringFile(content, "Version file.pdf", default);
+            fileId = staged.Id;
+            fileTypeId = staged.FileTypeTagId;
+        }
 
         CaveProposalSnapshotV1 Version(string name, bool includeReversibleItems) => Proposal(tenant, name) with
         {
@@ -78,8 +89,8 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
                     ? [new SnapshotTagReference(SnapshotTagRole.EntranceHydrology, hydrology.Id, hydrology.Name)] : []
             }],
             Files = includeReversibleItems
-                ? [new ProposalFileIntent(file.FileId, ProposalFileDisposition.PublishStaged,
-                    file.FileTypeId, "Version file", "Version file.pdf", "Document")] : []
+                ? [new ProposalFileIntent(fileId, ProposalFileDisposition.PublishStaged,
+                    fileTypeId, "Version file", "Version file.pdf", "Other")] : []
         };
 
         await using var contributor = database.CreateDbContext("contributor", tenant.AccountId);
@@ -111,7 +122,7 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
             change => change.EntranceId == "proposalena");
         Assert.Contains(removedEntrance.RemovedTags,
             tag => tag.Role == SnapshotTagRole.EntranceHydrology && tag.TagTypeId == hydrology.Id);
-        Assert.Contains(file.FileId, removed.DiffFromPreviousVersion.RemovedFiles);
+        Assert.Contains(fileId, removed.DiffFromPreviousVersion.RemovedFiles);
 
         var restored = await service.GetVersionAsync(requestId, versionThreeId, default);
         Assert.Contains(restored.DiffFromPreviousVersion!.AddedTags,
@@ -120,7 +131,7 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
             change => change.EntranceId == "proposalena");
         Assert.Contains(restoredEntrance.AddedTags,
             tag => tag.Role == SnapshotTagRole.EntranceHydrology && tag.TagTypeId == hydrology.Id);
-        Assert.Contains(file.FileId, restored.DiffFromPreviousVersion.AddedFiles);
+        Assert.Contains(fileId, restored.DiffFromPreviousVersion.AddedFiles);
 
     }
 

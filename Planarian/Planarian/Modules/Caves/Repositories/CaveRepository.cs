@@ -9,6 +9,7 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags;
@@ -1021,14 +1022,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     {
                         Id = ee.Id,
                         IsPrimary = true,
+                        LocationQualityTagId = ee.LocationQualityTagId,
+                        Name = ee.Name,
+                        Description = ee.Description,
                         Latitude = ee.Location.Y,
                         Longitude = ee.Location.X,
                         ElevationFeet = ee.Location.Z,
+                        ReportedOn = ee.ReportedOn,
+                        PitFeet = ee.PitDepthFeet,
                         EntranceStatusTagIds = ee.EntranceStatusTags.Select(eee => eee.TagTypeId).ToList(),
-                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(ee => ee.TagTypeId).ToList(),
+                        FieldIndicationTagIds = ee.FieldIndicationTags.Select(eee => eee.TagTypeId).ToList(),
                         EntranceHydrologyTagIds =
                             ee.EntranceHydrologyTags.Select(eee => eee.TagTypeId).ToList(),
-                        EntranceOtherTagIds = ee.EntranceOtherTags.Select(eee => eee.TagTypeId).ToList()
+                        EntranceOtherTagIds = ee.EntranceOtherTags.Select(eee => eee.TagTypeId).ToList(),
+                        ReportedByNameTagIds = ee.EntranceReportedByNameTags.Select(eee => eee.TagTypeId).ToList()
                     }).FirstOrDefault(),
                 MapIds = e.MapStatusTags.Select(ee => ee.TagTypeId),
                 Entrances = e.Entrances.Select(ee => new EntranceVm
@@ -1101,7 +1108,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.CavePermissions)
             .Include(e => e.Files)
             .Include(e => e.GeoJsons)
-            .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)
             .ThenInclude(entrance => entrance.EntranceStatusTags)
             .Include(e => e.Entrances)
@@ -1112,7 +1118,79 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ThenInclude(entrance => entrance.EntranceHydrologyTags)
             .Include(e => e.Entrances)
             .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
+            .AsSplitQuery()
             .FirstOrDefaultAsync();
+    }
+
+    public async Task DeleteTagAssociationsAsync(string caveId, IEnumerable<EntityBase> associations,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to modify Cave tags.");
+
+        var removed = associations.ToList();
+        if (removed.Count == 0) return;
+
+        async Task DeleteCaveAsync<T>(DbSet<T> set, IEnumerable<T> typed, Func<T, string> tagTypeId)
+            where T : EntityBase
+        {
+            var ids = typed.Select(tagTypeId).Distinct(StringComparer.Ordinal).ToList();
+            if (ids.Count == 0) return;
+            await set.Where(tag => EF.Property<string>(tag, "CaveId") == caveId &&
+                                   EF.Property<Cave>(tag, "Cave").AccountId == RequestUser.AccountId &&
+                                   ids.Contains(EF.Property<string>(tag, "TagTypeId")))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        async Task DeleteEntranceAsync<T>(DbSet<T> set, IEnumerable<T> typed, Func<T, string> tagTypeId,
+            Func<T, string> entranceId) where T : EntityBase
+        {
+            var rows = typed.ToList();
+            var ids = rows.Select(tagTypeId).Distinct(StringComparer.Ordinal).ToList();
+            if (ids.Count == 0) return;
+            var entranceIds = rows.Select(entranceId).Distinct(StringComparer.Ordinal).ToList();
+            await set.Where(tag => entranceIds.Contains(EF.Property<string>(tag, "EntranceId")) &&
+                                   EF.Property<Entrance>(tag, "Entrance").CaveId == caveId &&
+                                   EF.Property<Entrance>(tag, "Entrance").Cave.AccountId == RequestUser.AccountId &&
+                                   ids.Contains(EF.Property<string>(tag, "TagTypeId")))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        await DeleteCaveAsync(DbContext.ArcheologyTags, removed.OfType<ArcheologyTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.BiologyTags, removed.OfType<BiologyTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.CartographerNameTags, removed.OfType<CartographerNameTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.CaveOtherTags, removed.OfType<CaveOtherTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.CaveReportedByNameTags, removed.OfType<CaveReportedByNameTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.GeologicAgeTags, removed.OfType<GeologicAgeTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.GeologyTags, removed.OfType<GeologyTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.MapStatusTags, removed.OfType<MapStatusTag>(), tag => tag.TagTypeId);
+        await DeleteCaveAsync(DbContext.PhysiographicProvinceTags, removed.OfType<PhysiographicProvinceTag>(), tag => tag.TagTypeId);
+        await DeleteEntranceAsync(DbContext.EntranceStatusTags, removed.OfType<EntranceStatusTag>(),
+            tag => tag.TagTypeId, tag => tag.EntranceId);
+        await DeleteEntranceAsync(DbContext.EntranceHydrologyTags, removed.OfType<EntranceHydrologyTag>(),
+            tag => tag.TagTypeId, tag => tag.EntranceId);
+        await DeleteEntranceAsync(DbContext.FieldIndicationTags, removed.OfType<FieldIndicationTag>(),
+            tag => tag.TagTypeId, tag => tag.EntranceId);
+        await DeleteEntranceAsync(DbContext.EntranceOtherTag, removed.OfType<EntranceOtherTag>(),
+            tag => tag.TagTypeId, tag => tag.EntranceId);
+        await DeleteEntranceAsync(DbContext.EntranceReportedByNameTags, removed.OfType<EntranceReportedByNameTag>(),
+            tag => tag.TagTypeId, tag => tag.EntranceId);
+
+        foreach (var association in removed)
+            DbContext.Entry(association).State = EntityState.Detached;
+    }
+
+    public async Task<IReadOnlySet<string>> GetPublishedFileIdsAsync(string caveId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to read Cave files.");
+
+        var ids = await DbContext.Files.AsNoTracking()
+            .Where(file => file.AccountId == RequestUser.AccountId && file.CaveId == caveId)
+            .Select(file => file.Id)
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet(StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyList<Planarian.Model.Database.Entities.RidgeWalker.File>>

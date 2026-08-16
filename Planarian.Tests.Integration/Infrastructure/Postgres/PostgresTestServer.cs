@@ -20,15 +20,20 @@ namespace Planarian.Tests;
 /// </summary>
 public sealed class PostgresTestServer : IAsyncLifetime
 {
-    private const string LatestSchemaTemplateDatabaseName = "planarian_test_template";
+    private static readonly string LatestSchemaTemplateDatabaseName = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PLANARIAN_TEST_POSTGRES_CONNECTION_STRING"))
+        ? "planarian_test_template"
+        : $"planarian_test_template_{Guid.NewGuid():N}"[..40];
     private static readonly SemaphoreSlim SharedInitializationGate = new(1, 1);
     private static readonly SemaphoreSlim DatabaseProvisioningGate = new(1, 1);
     private static PostgreSqlContainer? _sharedContainer;
+    private static readonly string? ExternalConnectionString = Environment.GetEnvironmentVariable("PLANARIAN_TEST_POSTGRES_CONNECTION_STRING");
     private static bool _latestSchemaTemplateCreated;
     private static TimeSpan _templateCreationDuration;
 
-    public string ConnectionString => _sharedContainer?.GetConnectionString()
-        ?? throw new InvalidOperationException("PostgreSQL integration fixture has not been initialized.");
+    public string ConnectionString => !string.IsNullOrWhiteSpace(ExternalConnectionString)
+        ? ExternalConnectionString
+        : _sharedContainer?.GetConnectionString()
+          ?? throw new InvalidOperationException("PostgreSQL integration fixture has not been initialized.");
 
     public TimeSpan TemplateCreationDuration => _latestSchemaTemplateCreated
         ? _templateCreationDuration
@@ -87,7 +92,7 @@ public sealed class PostgresTestServer : IAsyncLifetime
         await SharedInitializationGate.WaitAsync();
         try
         {
-            if (_sharedContainer is null)
+            if (_sharedContainer is null && string.IsNullOrWhiteSpace(ExternalConnectionString))
             {
                 ConfigureColimaForTestcontainers();
                 var container = new PostgreSqlBuilder()
@@ -103,7 +108,8 @@ public sealed class PostgresTestServer : IAsyncLifetime
             if (!_latestSchemaTemplateCreated)
             {
                 var stopwatch = Stopwatch.StartNew();
-                await CreateLatestSchemaTemplateAsync(_sharedContainer.GetConnectionString());
+                var adminConnectionString = ExternalConnectionString ?? _sharedContainer!.GetConnectionString();
+                await CreateLatestSchemaTemplateAsync(adminConnectionString);
                 stopwatch.Stop();
                 _templateCreationDuration = stopwatch.Elapsed;
                 _latestSchemaTemplateCreated = true;

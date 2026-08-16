@@ -47,6 +47,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             blobs.FailDelete(blobContainer, blobKey);
 
             var values = PublishableValues(tenant, location.Id, tenant.CaveName);
+            values.ExpectedRevisionId = revisionWithFileId;
             values.Files = [];
             Assert.Equal(tenant.CaveId, await manager.Services.Caves.AddCave(values, default));
         }

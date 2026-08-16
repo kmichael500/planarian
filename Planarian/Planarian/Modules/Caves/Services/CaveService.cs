@@ -539,6 +539,22 @@ public class CaveService : ServiceBase<CaveRepository>
             throw ApiExceptionDictionary.BadRequest("ExpectedRevisionId must be empty when creating a Cave.");
         CaveMutationValidation.NormalizeAndValidate(values);
 
+        // Object storage is outside the relational transaction. Verify generic authoring uploads
+        // before opening that transaction, then revalidate and lock their relational rows when attaching them.
+        if (changeRequestId is null)
+        {
+            var desiredFileIds = (values.Files ?? []).Select(file => file.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            if (desiredFileIds.Count > 0)
+            {
+                var publishedFileIds = isNew
+                    ? new HashSet<string>(StringComparer.Ordinal)
+                    : await Repository.GetPublishedFileIdsAsync(values.Id!, cancellationToken);
+                var authoringStagedFileIds = desiredFileIds.Except(publishedFileIds, StringComparer.Ordinal).ToList();
+                await _fileService.RequireAuthoringStagedObjectsAvailableAsync(authoringStagedFileIds,
+                    cancellationToken);
+            }
+        }
 
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         string savedCaveId;
@@ -603,15 +619,17 @@ public class CaveService : ServiceBase<CaveRepository>
             entity.ReportedOn = values.ReportedOn?.ToUtcKind();
             entity.AccountId = RequestUser.AccountId;
 
+            var removedTagAssociations = new List<EntityBase>();
+
             SyncTags(entity.GeologyTags, values.GeologyTagIds, tag => tag.TagTypeId,
-                tagId => new GeologyTag { TagTypeId = tagId });
+                tagId => new GeologyTag { TagTypeId = tagId }, deferDelete: true);
             SyncTags(entity.ArcheologyTags, values.ArcheologyTagIds, tag => tag.TagTypeId,
-                tagId => new ArcheologyTag { TagTypeId = tagId });
+                tagId => new ArcheologyTag { TagTypeId = tagId }, deferDelete: true);
             SyncTags(entity.BiologyTags, values.BiologyTagIds, tag => tag.TagTypeId,
-                tagId => new BiologyTag { TagTypeId = tagId });
+                tagId => new BiologyTag { TagTypeId = tagId }, deferDelete: true);
 
             RemoveUnselected(entity.CartographerNameTags, values.CartographerNameTagIds,
-                tag => tag.TagTypeId);
+                tag => tag.TagTypeId, deferDelete: true);
             foreach (var personTagTypeId in values.CartographerNameTagIds)
             {
                 if (entity.CartographerNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
@@ -627,16 +645,16 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             SyncTags(entity.MapStatusTags, values.MapStatusTagIds, tag => tag.TagTypeId,
-                tagId => new MapStatusTag { TagTypeId = tagId });
+                tagId => new MapStatusTag { TagTypeId = tagId }, deferDelete: true);
             SyncTags(entity.GeologicAgeTags, values.GeologicAgeTagIds, tag => tag.TagTypeId,
-                tagId => new GeologicAgeTag { TagTypeId = tagId });
+                tagId => new GeologicAgeTag { TagTypeId = tagId }, deferDelete: true);
             SyncTags(entity.PhysiographicProvinceTags, values.PhysiographicProvinceTagIds,
-                tag => tag.TagTypeId, tagId => new PhysiographicProvinceTag { TagTypeId = tagId });
+                tag => tag.TagTypeId, tagId => new PhysiographicProvinceTag { TagTypeId = tagId }, deferDelete: true);
             SyncTags(entity.CaveOtherTags, values.OtherTagIds, tag => tag.TagTypeId,
-                tagId => new CaveOtherTag { TagTypeId = tagId });
+                tagId => new CaveOtherTag { TagTypeId = tagId }, deferDelete: true);
 
             RemoveUnselected(entity.CaveReportedByNameTags, values.ReportedByNameTagIds,
-                tag => tag.TagTypeId);
+                tag => tag.TagTypeId, deferDelete: true);
             foreach (var personTagTypeId in values.ReportedByNameTagIds)
             {
                 if (entity.CaveReportedByNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
@@ -651,18 +669,22 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             void RemoveUnselected<T>(ICollection<T> current, IEnumerable<string> selectedIds,
-                Func<T, string> getTagTypeId) where T : EntityBase
+                Func<T, string> getTagTypeId, bool deferDelete = true) where T : EntityBase
             {
                 var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
                 foreach (var removed in current.Where(tag => !selected.Contains(getTagTypeId(tag))).ToList())
-                    Repository.Delete(removed);
+                {
+                    current.Remove(removed);
+                    if (deferDelete) removedTagAssociations.Add(removed);
+                    else Repository.Delete(removed);
+                }
             }
 
             void SyncTags<T>(ICollection<T> current, IEnumerable<string> selectedIds,
-                Func<T, string> getTagTypeId, Func<string, T> create) where T : EntityBase
+                Func<T, string> getTagTypeId, Func<string, T> create, bool deferDelete = true) where T : EntityBase
             {
                 var selected = selectedIds.ToHashSet(StringComparer.Ordinal);
-                RemoveUnselected(current, selected, getTagTypeId);
+                RemoveUnselected(current, selected, getTagTypeId, deferDelete);
                 var existing = current.Select(getTagTypeId).ToHashSet(StringComparer.Ordinal);
                 foreach (var tagId in selected.Where(tagId => !existing.Contains(tagId)))
                     current.Add(create(tagId));
@@ -685,7 +707,15 @@ public class CaveService : ServiceBase<CaveRepository>
                     var entranceValue = values.Entrances.FirstOrDefault(e => e.Id == entrance.Id);
 
                     if (entranceValue != null) continue;
-                    entity.Entrances.Remove(entrance);
+
+                    // Entrance tag rows use identifying composite keys that include EntranceId.
+                    // Mark dependents deleted while their principal relationship is still intact;
+                    // severing/removing the Entrance first makes EF try to null/change those key FKs.
+                    Repository.DeleteRange(entrance.EntranceStatusTags);
+                    Repository.DeleteRange(entrance.FieldIndicationTags);
+                    Repository.DeleteRange(entrance.EntranceOtherTags);
+                    Repository.DeleteRange(entrance.EntranceHydrologyTags);
+                    Repository.DeleteRange(entrance.EntranceReportedByNameTags);
                     Repository.Delete(entrance);
                 }
 
@@ -698,8 +728,13 @@ public class CaveService : ServiceBase<CaveRepository>
                 Entrance? entrance;
                 if (isNewEntrance)
                 {
-                    entrance = new Entrance();
-                    if (isAuthorizedProposalEntrance) entrance.Id = entranceValue.Id!;
+                    // Allocate the final Entrance ID before its composite-key tag rows are tracked.
+                    // Otherwise EF can try to propagate a later principal-ID change into an identifying
+                    // EntranceId foreign key when the same tag value moves between entrances.
+                    entrance = new Entrance
+                    {
+                        Id = isAuthorizedProposalEntrance ? entranceValue.Id! : IdGenerator.Generate()
+                    };
                 }
                 else
                 {
@@ -730,13 +765,17 @@ public class CaveService : ServiceBase<CaveRepository>
                 }
 
                 SyncTags(entrance.EntranceStatusTags, entranceValue.EntranceStatusTagIds,
-                    tag => tag.TagTypeId, tagId => new EntranceStatusTag { TagTypeId = tagId });
+                    tag => tag.TagTypeId,
+                    tagId => new EntranceStatusTag { EntranceId = entrance.Id, TagTypeId = tagId });
                 SyncTags(entrance.FieldIndicationTags, entranceValue.FieldIndicationTagIds,
-                    tag => tag.TagTypeId, tagId => new FieldIndicationTag { TagTypeId = tagId });
+                    tag => tag.TagTypeId,
+                    tagId => new FieldIndicationTag { EntranceId = entrance.Id, TagTypeId = tagId });
                 SyncTags(entrance.EntranceOtherTags, entranceValue.EntranceOtherTagIds,
-                    tag => tag.TagTypeId, tagId => new EntranceOtherTag { TagTypeId = tagId });
+                    tag => tag.TagTypeId,
+                    tagId => new EntranceOtherTag { EntranceId = entrance.Id, TagTypeId = tagId });
                 SyncTags(entrance.EntranceHydrologyTags, entranceValue.EntranceHydrologyTagIds,
-                    tag => tag.TagTypeId, tagId => new EntranceHydrologyTag { TagTypeId = tagId });
+                    tag => tag.TagTypeId,
+                    tagId => new EntranceHydrologyTag { EntranceId = entrance.Id, TagTypeId = tagId });
 
                 RemoveUnselected(entrance.EntranceReportedByNameTags, entranceValue.ReportedByNameTagIds,
                     tag => tag.TagTypeId);
@@ -746,6 +785,7 @@ public class CaveService : ServiceBase<CaveRepository>
                     var binding = peopleTagsBySelection[personTagTypeId];
                     var tag = new EntranceReportedByNameTag()
                     {
+                        EntranceId = entrance.Id,
                         TagTypeId = binding.Id,
                         TagType = binding.NewTag
                     };
@@ -863,6 +903,10 @@ public class CaveService : ServiceBase<CaveRepository>
                 entity.Files.Remove(fileEntity);
                 Repository.Delete(fileEntity);
             }
+
+            // Tag association rows use identifying composite keys and can be resurrected by EF relationship fixup.
+            // Delete removed join rows explicitly inside this transaction, then detach their stale tracked instances.
+            await Repository.DeleteTagAssociationsAsync(entity.Id, removedTagAssociations, cancellationToken);
 
             try
             {

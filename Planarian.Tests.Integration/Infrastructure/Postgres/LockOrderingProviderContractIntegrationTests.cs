@@ -103,9 +103,11 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
                 .ExecuteAsync([secondDeleteTag.Id, firstDeleteTag.Id]));
         });
 
-        var currentCaves = await db.Caves.AsNoTracking().Where(cave =>
-                cave.Id == firstCave.CaveId || cave.Id == secondCave.CaveId)
+        var currentCaves = await db.Caves.IgnoreQueryFilters().AsNoTracking().Where(cave =>
+                cave.AccountId == tenant.AccountId &&
+                (cave.Id == firstCave.CaveId || cave.Id == secondCave.CaveId))
             .ToDictionaryAsync(cave => cave.Id, StringComparer.Ordinal);
+        Assert.Equal(2, currentCaves.Count);
         var caveIds = currentCaves.Keys.Order(StringComparer.Ordinal).ToList();
         var rawCommandObserver = new RawNpgsqlLockCommandObserver(database.ConnectionString);
         await using var rawDb = database.CreateDbContext("raw-lock-contract", tenant.AccountId, rawCommandObserver);

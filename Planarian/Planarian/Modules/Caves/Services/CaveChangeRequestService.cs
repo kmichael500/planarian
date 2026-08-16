@@ -247,6 +247,8 @@ public sealed class CaveChangeRequestService
             .Select(file => file.FileId).ToList();
         var publications = await _requests.PlanStagedFilePublicationsAsync(requestId,
             stagedFileIds, cancellationToken);
+        await _files.RequireStoredObjectsAvailableAsync(publications.Select(publication =>
+            new StorageObjectAddress(publication.StoragePartition, publication.StorageKey)), cancellationToken);
         string? publishedRevisionId = null;
         IReadOnlyList<StagedFileObjectDeleteTarget> discardedStagedObjects = [];
         var baseSnapshot = Deserialize(row.ProposalBaseRevision);

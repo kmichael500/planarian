@@ -5,6 +5,7 @@ namespace Planarian.Modules.Import.Models;
 
 public class EntranceCsvModel
 {
+    // TODO: Support Entrance Other tags in the entrance CSV import contract and execution pipeline.
     public string? CountyCode { get; set; }
     public string? CountyCaveNumber { get; set; }
     public string? EntranceName { get; set; }

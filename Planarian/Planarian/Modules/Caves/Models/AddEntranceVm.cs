@@ -60,5 +60,4 @@ public class AddEntranceVm
 
 public class EditEntranceVm : AddEntranceVm
 {
-    public string Id { get; set; } = null!;
 }

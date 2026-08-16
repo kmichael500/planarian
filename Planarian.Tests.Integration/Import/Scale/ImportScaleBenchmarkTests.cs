@@ -42,9 +42,10 @@ public sealed class ImportScaleBenchmarkTests(PostgresTestServer fixture, ITestO
             syncExisting: false);
         WritePhase(entrances);
         Assert.Equal(15_000, entrances.Rows);
-        // Compared with the previous 13,200-row workload, 1,800 additional Entrances require one additional
-        // 1,500-Entrance chunk and their associations require two additional 4,000-association chunks.
-        AssertEntranceStructure(entrances, 270, 200, 200, 50, 45, 50_000);
+        // The 15,000-row workload deterministically executes 273 commands with the current chunking
+        // (500 Cave targets, 1,500 Entrances, and 4,000 associations). Keep only two commands of headroom so
+        // accidental query growth still fails this gate without treating the legitimate chunk plan as a regression.
+        AssertEntranceStructure(entrances, 275, 200, 200, 50, 45, 50_000);
 
         var before = await ReadVersionsAsync(database, accountId);
         var revisionsBefore = await CountRevisionsAsync(database, accountId);

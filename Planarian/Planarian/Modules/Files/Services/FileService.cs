@@ -384,7 +384,14 @@ public class FileService : ServiceBase<FileRepository>
     public async Task RequireAuthoringStagedObjectsAvailableAsync(IEnumerable<string> fileIds,
         CancellationToken cancellationToken)
     {
-        var staged = await Repository.GetAuthoringStagedObjectsAsync(fileIds, cancellationToken);
+        var requestedIds = fileIds.Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal).ToList();
+        if (requestedIds.Count == 0) return;
+
+        var staged = await Repository.GetAuthoringStagedObjectsAsync(requestedIds, cancellationToken);
+        if (staged.Count != requestedIds.Count)
+            throw ApiExceptionDictionary.NotFound("Staged file");
+
         var now = DateTime.UtcNow;
         if (staged.Any(file => file.ExpiresOn <= now))
             throw ApiExceptionDictionary.BadRequest(

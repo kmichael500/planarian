@@ -23,7 +23,7 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(AggregateFileMetadataReplacementLocksOldAndNewFileTypesBeforeWaitingMerge));
-        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var (cave, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, cave, associateWithCave: true,
             fileId: "replace00a");
         var replacement = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
@@ -51,28 +51,37 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
             Id = file.FileId, FileTypeTagId = replacement.Id, DisplayName = "Replacement file"
         }];
         var update = IntegrationTestServices.For(writerDb).Caves.AddCave(updateValues, default);
-        await hold.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
-        Assert.Contains(file.FileTypeId, hold.LockedIds);
-        Assert.Contains(replacement.Id, hold.LockedIds);
-
-        await using var mergeDb = database.CreateDbContext("manager", cave.AccountId);
-        await mergeDb.Database.OpenConnectionAsync();
-        int mergePid;
-        await using (var command = mergeDb.Database.GetDbConnection().CreateCommand())
+        try
         {
-            command.CommandText = "select pg_backend_pid()";
-            mergePid = Convert.ToInt32(await command.ExecuteScalarAsync());
-        }
-        var merge = new TagTypeMergeExecutionRepository(mergeDb, mergeDb.RequestUser,
-            new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
-            new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
-            new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser))
-            .ExecuteAsync([file.FileTypeId], mergeDestination.Id);
-        await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
+            var reached = await Task.WhenAny(hold.LockAcquired.Task, update, Task.Delay(TimeSpan.FromSeconds(15)));
+            if (reached == update) await update; // Surface a real writer failure instead of reporting a lock timeout.
+            Assert.Same(hold.LockAcquired.Task, reached);
+            Assert.Contains(file.FileTypeId, hold.LockedIds);
+            Assert.Contains(replacement.Id, hold.LockedIds);
 
-        hold.Resume.TrySetResult();
-        await update;
-        await merge;
+            await using var mergeDb = database.CreateDbContext("manager", cave.AccountId);
+            await mergeDb.Database.OpenConnectionAsync();
+            int mergePid;
+            await using (var command = mergeDb.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "select pg_backend_pid()";
+                mergePid = Convert.ToInt32(await command.ExecuteScalarAsync());
+            }
+            var merge = new TagTypeMergeExecutionRepository(mergeDb, mergeDb.RequestUser,
+                new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
+                new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
+                new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser))
+                .ExecuteAsync([file.FileTypeId], mergeDestination.Id);
+            await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
+
+            hold.Resume.TrySetResult();
+            await update;
+            await merge;
+        }
+        finally
+        {
+            hold.Resume.TrySetResult();
+        }
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(replacement.Id, (await verify.Files.SingleAsync(row => row.Id == file.FileId)).FileTypeTagId);

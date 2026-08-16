@@ -83,7 +83,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         Assert.Equal(publishedRevisionId, cave.CurrentRevisionId);
         var linePlot = await verify.CaveGeoJsons.SingleAsync(row => row.CaveId == tenant.CaveId);
         Assert.Equal(linePlotId, linePlot.Id);
-        Assert.Equal("{\"features\":[],\"type\":\"FeatureCollection\"}", linePlot.GeoJson);
+        Assert.Equal("{\"features\":[],\"type\":\"FeatureCollection\"}", CaveJsonContent.Normalize(linePlot.GeoJson));
         var revision = await verify.CaveRevisions.SingleAsync(row => row.Id == publishedRevisionId);
         var snapshotLinePlot = Assert.Single(CaveSnapshotJson.Deserialize(revision.SnapshotJson, 1).LinePlots);
         Assert.Equal(linePlotId, snapshotLinePlot.Id);
@@ -140,6 +140,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(GenericAuthoringFilePublishesWithoutCopyingItsObject));
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
         await CavePermissions.GrantManagerAsync(database, tenant, "manager");
         var blobs = new TestFileBlobStore();
 
@@ -178,6 +180,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(DirectPublicationRejectsMissingStagedObjectBeforeMutatingCave));
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
         await CavePermissions.GrantManagerAsync(database, tenant, "manager");
         var blobs = new TestFileBlobStore();
 
@@ -186,6 +190,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         var staged = await manager.Services.Files.StageAuthoringFile(content, "missing.pdf", default);
         var stagedRow = await manager.Db.Files.AsNoTracking().SingleAsync(row => row.Id == staged.Id);
         blobs.Delete(stagedRow.BlobContainer!, stagedRow.BlobKey!);
+        var revisionCountBefore = await manager.Db.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId);
 
         var cave = await new CaveRepository(manager.Db, manager.Db.RequestUser).GetCave(tenant.CaveId);
         var values = ValuesFromCave(cave!);
@@ -208,7 +213,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         var stillStaged = await manager.Db.Files.AsNoTracking().SingleAsync(row => row.Id == staged.Id);
         Assert.Null(stillStaged.CaveId);
         Assert.NotNull(stillStaged.ExpiresOn);
-        Assert.Single(await manager.Db.CaveRevisions.Where(row => row.CaveId == tenant.CaveId).ToListAsync());
+        Assert.Equal(revisionCountBefore,
+            await manager.Db.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
     }
 
     [Fact]
@@ -255,6 +261,8 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(InitialProposalClaimsGenericStagedFileOnlyWhenProposalIsCreated));
         var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
         var blobs = new TestFileBlobStore();
 

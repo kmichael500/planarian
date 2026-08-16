@@ -162,9 +162,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         do
         {
 
-            // Keep file cleanup scoped to files that belong to an active account user.
             deletedCount = await DeleteBatchAsync(DbContext.Files
-                .Where(tag => tag.AccountId == RequestUser.AccountId && tag.Account.AccountUsers.Any())
+                .Where(file => file.AccountId == RequestUser.AccountId)
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;
@@ -276,7 +275,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         do
         {
             deletedCount = await DeleteBatchAsync(DbContext.Caves
-                .Where(c => c.AccountId == RequestUser.AccountId && c.Account.AccountUsers.Any())
+                .Where(cave => cave.AccountId == RequestUser.AccountId)
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
             totalDeleted += deletedCount;

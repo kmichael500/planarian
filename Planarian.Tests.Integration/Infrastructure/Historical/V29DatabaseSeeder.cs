@@ -20,10 +20,10 @@ internal static class V29DatabaseSeeder
             insert into "Counties"("Id","AccountId","StateId","DisplayId","Name","CreatedOn") values('maincnty01','mainacct01','mainstate1','MAIN','Existing County',now());
             insert into "Caves"("Id","AccountId","StateId","CountyId","Name","AlternateNames","CountyNumber","IsArchived","CreatedOn") values('maincave01','mainacct01','mainstate1','maincnty01','Existing Main Cave','[]',42,false,now());
             insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values
-              ('mainfile01','mainacct01','file','Existing file',false,now()),
-              ('maingeo001','mainacct01','geology','Limestone',false,now()),
-              ('mainqual01','mainacct01','location-quality','Survey Grade',false,now()),
-              ('mainstat01','mainacct01','entrance-status','Open',false,now());
+              ('mainfile01','mainacct01','File','Existing file',false,now()),
+              ('maingeo001','mainacct01','Geology','Limestone',false,now()),
+              ('mainqual01','mainacct01','LocationQuality','Survey Grade',false,now()),
+              ('mainstat01','mainacct01','EntranceStatus','Open',false,now());
             insert into "GeologyTags"("Id","TagTypeId","CaveId","CreatedOn") values('maingeot01','maingeo001','maincave01',now());
             insert into "Entrances"("Id","CaveId","LocationQualityTagId","Name","IsPrimary","Description","Location","ReportedOn","PitDepthFeet","CreatedOn") values
               ('mainentr01','maincave01','mainqual01','Historic Entrance',true,'Preserved entrance',ST_SetSRID(ST_MakePoint(-86.25,35.15,612),4326),'2025-04-03',18,now());
