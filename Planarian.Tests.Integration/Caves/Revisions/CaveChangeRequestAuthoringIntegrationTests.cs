@@ -287,6 +287,36 @@ public sealed class CaveChangeRequestAuthoringIntegrationTests(PostgresTestServe
     }
 
     [Fact]
+    public async Task IdenticalRevisionIsRejectedWithoutCreatingDuplicateProposalVersion()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(IdenticalRevisionIsRejectedWithoutCreatingDuplicateProposalVersion));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await MakeBaselineStructurallyValidAsync(database, tenant, locationTag.Id);
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+        var values = ValuesFromCave(context.Cave);
+        values.Name = "Changed once";
+        var requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId, values,
+            context.ExpectedBaseRevisionId, default);
+        var currentVersionId = await CurrentVersionAsync(contributor.Db, requestId);
+
+        var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            contributor.ChangeRequests.AddVersionAsync(requestId, values, false,
+                context.ExpectedBaseRevisionId, currentVersionId, default));
+
+        Assert.Contains("does not contain any changes", failure.Message);
+        contributor.Db.ChangeTracker.Clear();
+        Assert.Equal(currentVersionId, await CurrentVersionAsync(contributor.Db, requestId));
+        Assert.Single(await contributor.Db.CaveProposalVersions
+            .Where(row => row.ChangeRequestId == requestId).ToListAsync());
+    }
+
+    [Fact]
     public async Task AuthoringContextForMissingCaveReturnsNotFound()
     {
         await using var database = await fixture.CreateDatabaseAsync(

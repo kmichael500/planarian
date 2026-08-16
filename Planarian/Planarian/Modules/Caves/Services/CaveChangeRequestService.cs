@@ -101,7 +101,7 @@ public sealed class CaveChangeRequestService
         if (await _caves.GetCave(caveId) is null)
             throw ApiExceptionDictionary.NotFound("Cave");
         return await _requests.CreateAsync(caveId, expectedBaseRevisionId,
-            token => BuildValidatedProposalAsync(values, caveId, expectedBaseRevisionId, null, null, null, null, token),
+            token => BuildValidatedProposalAsync(values, caveId, expectedBaseRevisionId, null, null, null, null, null, token),
             cancellationToken);
     }
 
@@ -116,10 +116,15 @@ public sealed class CaveChangeRequestService
         var stagedIds = await _requests.GetStagedFileIdsAsync(row.Request.Id, cancellationToken);
         var previous = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson,
             row.ProposalVersion.SchemaVersion);
+        // A same-base revision must actually change the proposed state. An explicit re-review against a newer
+        // published revision is still meaningful even when its resulting desired state matches the prior version,
+        // because the immutable proposal base changed.
+        var semanticPrevious = row.ProposalVersion.BaseRevisionId == expectedBaseRevisionId ? previous : null;
         var proposal = await BuildValidatedProposalAsync(values, row.Request.CaveId, expectedBaseRevisionId,
             stagedIds, previous.Entrances.Select(entrance => entrance.EntranceId).ToHashSet(StringComparer.Ordinal),
             previous.LinePlots.Select(linePlot => linePlot.Id).ToHashSet(StringComparer.Ordinal),
-            row.Request.Id, cancellationToken);
+            row.Request.Id, semanticPrevious, cancellationToken);
+
         return await _requests.AddVersionAsync(requestId, expectedBaseRevisionId, expectedProposalVersionId,
             proposal, reviewer, againstCurrent, cancellationToken);
     }
@@ -354,7 +359,8 @@ public sealed class CaveChangeRequestService
 
     private async Task<CaveProposalSnapshotV1> BuildValidatedProposalAsync(AddCaveVm values, string caveId,
         string baseRevisionId, IReadOnlySet<string>? stagedFileIds, IReadOnlySet<string>? previousProposalEntranceIds,
-        IReadOnlySet<string>? previousProposalLinePlotIds, string? requestId, CancellationToken cancellationToken)
+        IReadOnlySet<string>? previousProposalLinePlotIds, string? requestId, CaveProposalSnapshotV1? semanticPrevious,
+        CancellationToken cancellationToken)
     {
         var proposal = await BuildProposalAsync(values, caveId, cancellationToken, baseRevisionId, stagedFileIds,
             previousProposalEntranceIds, previousProposalLinePlotIds, requestId);
@@ -364,6 +370,12 @@ public sealed class CaveChangeRequestService
         var proposedSnapshot = await PresentAsync(proposal, baseSnapshot, cancellationToken);
         if (_diff.IsSemanticEqual(baseSnapshot, proposedSnapshot))
             throw ApiExceptionDictionary.BadRequest("The proposal does not contain any changes.");
+        if (semanticPrevious is not null)
+        {
+            var previousSnapshot = await PresentAsync(semanticPrevious, baseSnapshot, cancellationToken);
+            if (_diff.IsSemanticEqual(previousSnapshot, proposedSnapshot))
+                throw ApiExceptionDictionary.BadRequest("The proposal does not contain any changes.");
+        }
         return proposal;
     }
 
