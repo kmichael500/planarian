@@ -25,8 +25,22 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
+    public async Task<File?> GetDeletableUnpublishedFileByIdAsync(string id,
+        CancellationToken cancellationToken)
+    {
+        return await DbContext.Files.Where(file => file.Id == id &&
+                file.AccountId == RequestUser.AccountId && file.CreatedByUserId == RequestUser.Id &&
+                file.CaveId == null &&
+                !DbContext.CaveChangeRequestStagedFiles.Any(staged =>
+                    staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
     public sealed record FileMetadataMutationContextResult(
-        File File,
+        string Id,
+        string FileTypeTagId,
+        string? CaveId,
+        string FileName,
         bool IsChangeRequestStaged,
         string? CountyId,
         string? StateId);
@@ -34,15 +48,57 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public async Task<FileMetadataMutationContextResult?> GetFileMetadataMutationContextAsync(
         string id, CancellationToken cancellationToken)
     {
-        return await DbContext.Files
+        return await DbContext.Files.AsNoTracking()
             .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId)
             .Select(file => new FileMetadataMutationContextResult(
-                file,
+                file.Id,
+                file.FileTypeTagId,
+                file.CaveId,
+                file.FileName,
                 DbContext.CaveChangeRequestStagedFiles.Any(staged =>
                     staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id),
                 file.Cave != null ? file.Cave.CountyId : null,
                 file.Cave != null ? file.Cave.StateId : null))
             .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<File>> GetTrackedFilesByIdsAsync(IEnumerable<string> fileIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
+        return await DbContext.Files
+            .Where(file => ids.Contains(file.Id) && file.AccountId == RequestUser.AccountId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<FileAccessInfoResult?> GetAuthoringStagedFileAccessInfoAsync(string id,
+        CancellationToken cancellationToken)
+    {
+        return await DbContext.Files.AsNoTracking()
+            .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId &&
+                           file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null)
+            .Select(file => new FileAccessInfoResult(
+                file.Id, file.FileName, file.BlobKey, file.BlobContainer, file.CaveId, null, null))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public sealed record AuthoringStagedObjectResult(
+        string Id, string StorageKey, string StoragePartition, DateTime ExpiresOn);
+
+    public async Task<IReadOnlyList<AuthoringStagedObjectResult>> GetAuthoringStagedObjectsAsync(
+        IEnumerable<string> fileIds, CancellationToken cancellationToken)
+    {
+        var ids = fileIds.Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return [];
+
+        return await DbContext.Files.AsNoTracking()
+            .Where(file => ids.Contains(file.Id) && file.AccountId == RequestUser.AccountId &&
+                           file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null &&
+                           file.BlobKey != null && file.BlobContainer != null)
+            .Select(file => new AuthoringStagedObjectResult(
+                file.Id, file.BlobKey!, file.BlobContainer!, file.ExpiresOn!.Value))
+            .ToListAsync(cancellationToken);
     }
 
     public sealed record FileAuthorizationContextResult(string Id, string? CaveId, string? CountyId, string? StateId);

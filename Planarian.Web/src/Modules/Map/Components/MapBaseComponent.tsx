@@ -31,6 +31,7 @@ import { NavigationService } from "../../../Shared/Services/NavigationService";
 
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
+import { parseZippedShapefile } from "../Helpers/LinePlotFileParser";
 import { MapService } from "../Services/MapService";
 import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
@@ -493,11 +494,6 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   const cachingZoom = 12;
   // Track which fixed-level tiles have been fetched.
   const fetchedTilesRef = React.useRef<Set<string>>(new Set());
-  // Cache the fetched lineplots data.
-  const cachedLineplotsDataRef = React.useRef<
-    { id: string; data: FeatureCollection; type: string }[]
-  >([]);
-
   const loadedPlotIds = React.useRef<Set<string>>(new Set());
 
   const fetchLineplots = async () => {
@@ -808,17 +804,12 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
     if (!file) return;
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const { default: shpjs } = await import("shpjs");
-      const parsed = await shpjs(arrayBuffer);
-
-      // Handle possibility of multiple shapefile layers.
-      const asArray = Array.isArray(parsed) ? parsed : [parsed];
+      const collections = await parseZippedShapefile(file);
 
       // Add the new layers.
-      const newLayers = asArray.map((fc, i) => ({
+      const newLayers = collections.map((fc, i) => ({
         id: `${file.name}-${i}`,
-        data: fc as FeatureCollection,
+        data: fc,
       }));
 
       console.log("Parsed shapefile data:", newLayers);

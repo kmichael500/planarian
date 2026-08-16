@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "caveId": "cave-001",
+  "accountId": "account-001",
+  "name": "Proposed Cave Name",
+  "alternateNames": ["New Alias", "Old Cave"],
+  "stateId": "state-tn",
+  "stateNameAtRevision": "Tennessee",
+  "stateAbbreviationAtRevision": "TN",
+  "countyId": "county-016",
+  "countyNameAtRevision": "Coffee",
+  "countyDisplayIdAtRevision": "016",
+  "countyNumberIntent": "Manual",
+  "requestedCountyNumber": 48,
+  "lengthFeet": 150,
+  "depthFeet": 0,
+  "maxPitDepthFeet": 24,
+  "numberOfPits": 3,
+  "narrative": "Proposed narrative.",
+  "reportedOn": "2026-08-02T00:00:00Z",
+  "isArchived": false,
+  "tags": [{ "role": "CaveReportedBy", "tagTypeId": "person-alice", "nameAtRevision": "Alice Reporter" }],
+  "entrances": [{
+    "entranceId": "entrance-main",
+    "name": "Main Entrance",
+    "isPrimary": true,
+    "latitude": 35.481,
+    "longitude": -86.092,
+    "elevation": 812,
+    "srid": 4326,
+    "locationQualityTagId": "quality-surveyed",
+    "locationQualityNameAtRevision": "Survey Grade",
+    "reportedOn": "2026-07-31T00:00:00Z",
+    "pitDepthFeet": 18,
+    "tags": [{ "role": "EntranceReportedBy", "tagTypeId": "person-bob", "nameAtRevision": "Bob Entrance Reporter" }],
+    "newPeopleTagIntents": [{ "role": "EntranceReportedBy", "name": "New Entrance Reporter" }]
+  }],
+  "files": [
+    { "fileId": "file-retained", "disposition": "RetainPublished", "fileTypeTagId": "type-map", "displayName": "Current Map", "fileName": "current-map.pdf", "fileTypeName": "Map" },
+    { "fileId": "file-removed", "disposition": "RemovePublished", "fileTypeTagId": "type-report", "displayName": "Old Report", "fileName": "old-report.pdf", "fileTypeName": "Report" },
+    { "fileId": "file-staged", "disposition": "PublishStaged", "fileTypeTagId": "type-map", "displayName": "New Survey", "fileName": "new-survey.pdf", "fileTypeName": "Map" }
+  ],
+  "linePlots": [{
+    "id": "lineplot-main",
+    "name": "Main Line Plot",
+    "geoJson": "{\"features\":[],\"type\":\"FeatureCollection\"}"
+  }],
+  "newPeopleTagIntents": [{ "role": "Cartographer", "name": "New Cartographer" }]
+}

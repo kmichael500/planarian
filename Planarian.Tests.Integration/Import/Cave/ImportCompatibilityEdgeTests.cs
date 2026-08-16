@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
@@ -77,7 +78,10 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
         Assert.Contains(plan.Deletions, x => x.CaveId == t.CaveId);
         var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
         var result = await new CaveImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveImportRevisionRepository(db, db.RequestUser)).ExecuteAsync(plan, "delete.csv");
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
+            new CountyReferenceLockRepository(db, db.RequestUser))
+            .ExecuteAsync(plan, "delete.csv");
         Assert.False(await db.Caves.IgnoreQueryFilters().AnyAsync(c => c.Id == t.CaveId));
         Assert.Contains(result.BlobDeletes, b => b.BlobKey == "delete-after-commit" && b.BlobContainer == "test");
     }

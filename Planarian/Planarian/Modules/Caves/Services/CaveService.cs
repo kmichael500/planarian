@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
-using Newtonsoft.Json.Linq;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
@@ -26,6 +25,7 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
+using Planarian.Modules.Tags;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Services;
@@ -40,11 +40,14 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
+    private readonly TagReferenceLockRepository _tagReferenceLocks;
+    private readonly CountyReferenceLockRepository _countyReferenceLocks;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
         TagRepository tagRepository,
         FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
-        CaveMutationCoordinator caveMutationCoordinator) : base(
+        CaveMutationCoordinator caveMutationCoordinator, TagReferenceLockRepository tagReferenceLocks,
+        CountyReferenceLockRepository countyReferenceLocks) : base(
         repository, requestUser)
     {
         _fileService = fileService;
@@ -52,6 +55,8 @@ public class CaveService : ServiceBase<CaveRepository>
         _featureSettingRepository = featureSettingRepository;
         _clientUrlBuilder = clientUrlBuilder;
         _caveMutationCoordinator = caveMutationCoordinator;
+        _tagReferenceLocks = tagReferenceLocks;
+        _countyReferenceLocks = countyReferenceLocks;
     }
 
     #region Caves
@@ -64,6 +69,17 @@ public class CaveService : ServiceBase<CaveRepository>
     public async Task<PagedResult<CaveSearchVm>> GetCavesSearch(FilterQuery query, string? permissionKey = null)
     {
         return await Repository.GetCavesSearch(query, permissionKey);
+    }
+
+    public async Task<CaveEditAuthoringContextVm> GetEditAuthoringContextAsync(string caveId,
+        CancellationToken cancellationToken)
+    {
+        var visible = await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
+        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, visible.CountyId, visible.StateId);
+        await _caveMutationCoordinator.EnsureBaselineAsync(caveId, cancellationToken);
+        var cave = await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
+        var linePlots = await Repository.GetCaveLinePlotsAsync(caveId, cancellationToken);
+        return new CaveEditAuthoringContextVm(cave, linePlots);
     }
 
     public async Task<int> GetNextCountyNumber(string countyId, bool useFirstAvailableCountyNumber = false)
@@ -482,95 +498,87 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     public Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken) =>
-        SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, null, null, null, cancellationToken);
+        SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId, null, null, null, null, null,
+            cancellationToken);
+
+    internal Task<string> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId, string changeRequestId,
+        IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
+        IReadOnlySet<string> authorizedNewEntranceIds,
+        IReadOnlySet<string> authorizedNewLinePlotIds,
+        CavePeoplePublicationContext peoplePublicationContext,
+        Func<CaveMutationResult, CancellationToken, Task> beforeCommit, CancellationToken cancellationToken) =>
+        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
+            stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
+            beforeCommit, cancellationToken);
 
     public Task<string> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId, string changeRequestId,
-        IReadOnlyList<string> stagedFileIds,
+        IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
         Func<CaveMutationResult, CancellationToken, Task> beforeCommit, CancellationToken cancellationToken) =>
-        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId, stagedFileIds,
-            beforeCommit,
-            cancellationToken);
+        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
+            stagedFilePublications, new HashSet<string>(StringComparer.Ordinal),
+            new HashSet<string>(StringComparer.Ordinal), null, beforeCommit, cancellationToken);
 
     private async Task<string> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
         string? changeRequestId, string? expectedRevisionId,
-        IReadOnlyList<string>? stagedFileIds,
+        IReadOnlyList<StagedCaveFilePublication>? stagedFilePublications,
+        IReadOnlySet<string>? authorizedNewEntranceIds,
+        IReadOnlySet<string>? authorizedNewLinePlotIds,
+        CavePeoplePublicationContext? peoplePublicationContext,
         Func<CaveMutationResult, CancellationToken, Task>? beforeCommit, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
+        if (revisionSource == CaveRevisionSource.UserSubmission)
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, null, null);
+        else
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
         var isNew = string.IsNullOrWhiteSpace(values.Id);
-
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
-
-
-        #region Data Validation
-
-        // must be at least one entrance
-        if (values.Entrances == null || !values.Entrances.Any())
-            throw ApiExceptionDictionary.EntranceRequired("At least 1 entrance is required!");
-
-        if (values.NumberOfPits < 0)
-            throw ApiExceptionDictionary.BadRequest("Number of pits must be greater than or equal to 1!");
-
-        if (values.LengthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Length must be greater than or equal to 0!");
-
-        if (values.DepthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Depth must be greater than or equal to 0!");
-
-        if (values.MaxPitDepthFeet < 0)
-            throw ApiExceptionDictionary.BadRequest("Max pit depth must be greater than or equal to 0!");
-
-        if (values.IsCountyNumberManuallySet && (!values.CountyNumber.HasValue || values.CountyNumber.Value <= 0))
-            throw ApiExceptionDictionary.BadRequest("County number must be greater than 0 when manually set.");
-
-        if (values.Entrances.Any(e => e.Latitude > 90 || e.Latitude < -90))
-            throw ApiExceptionDictionary.BadRequest("Latitude must be between -90 and 90!");
-
-        if (values.Entrances.Any(e => e.Longitude > 180 || e.Longitude < -180))
-            throw ApiExceptionDictionary.BadRequest("Longitude must be between -180 and 180!");
-
-        if (values.Entrances.Any(e => e.ElevationFeet < 0))
-            throw ApiExceptionDictionary.BadRequest("Elevation must be greater than or equal to 0!");
-
-        if (values.Entrances.Any(e => e.PitFeet < 0))
-            throw ApiExceptionDictionary.BadRequest("Pit depth must be greater than or equal to 0!");
-
-        var numberOfPrimaryEntrances = values.Entrances.Count(e => e.IsPrimary);
-
-        if (numberOfPrimaryEntrances == 0)
-            throw ApiExceptionDictionary.BadRequest("One entrance must be marked as primary!");
-
-        if (numberOfPrimaryEntrances != 1)
-            throw ApiExceptionDictionary.BadRequest("Only one entrance can be marked as primary!");
-
-        #endregion
+        if (!isNew && revisionSource == CaveRevisionSource.ManagerEdit &&
+            string.IsNullOrWhiteSpace(expectedRevisionId))
+            throw ApiExceptionDictionary.BadRequest("ExpectedRevisionId is required when editing an existing Cave.");
+        if (isNew && !string.IsNullOrWhiteSpace(expectedRevisionId))
+            throw ApiExceptionDictionary.BadRequest("ExpectedRevisionId must be empty when creating a Cave.");
+        CaveMutationValidation.NormalizeAndValidate(values);
 
 
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
+        string savedCaveId;
         try
         {
-            var entity = isNew ? new Cave() : await Repository.GetAsync(values.Id);
+            var entity = isNew ? new Cave { Id = IdGenerator.Generate() } : await Repository.GetAsync(values.Id);
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
 
-            if (changeRequestId is not null && stagedFileIds is { Count: > 0 })
+            var isNewCounty = entity.CountyId != values.CountyId;
+            if (values.IsCountyNumberManuallySet || isNewCounty)
             {
-                var stagedFiles = await Repository.AttachStagedFilesAsync(changeRequestId, entity.Id,
-                    stagedFileIds, cancellationToken);
-                foreach (var stagedFile in stagedFiles)
-                    if (entity.Files.All(file => file.Id != stagedFile.Id)) entity.Files.Add(stagedFile);
+                var lockedCounties = await _countyReferenceLocks.LockForMutationAsync([values.CountyId], cancellationToken);
+                if (lockedCounties.Count != 1 || lockedCounties[0].StateId != values.StateId)
+                    throw ApiExceptionDictionary.BadRequest(
+                        "The selected County does not belong to the selected State.");
             }
+            else
+            {
+                await Repository.ValidateStateCountyPairAsync(values.StateId, values.CountyId, cancellationToken);
+            }
+            var resolvedTags = await ValidateAndNormalizeTagReferencesAsync(values,
+                peoplePublicationContext, cancellationToken);
+            var existingTagIds = CollectExistingStableTagTypeIds(entity)
+                .Concat(resolvedTags.TargetExistingIds)
+                .Distinct(StringComparer.Ordinal).ToList();
+            var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingTagIds, cancellationToken);
+            if (lockedTags.Count != existingTagIds.Count)
+                throw ApiExceptionDictionary.BadRequest(
+                    "One or more selected tag references changed or disappeared. Retry with current data.");
+            var peopleTagsBySelection = resolvedTags.PeopleBindings;
 
             CaveMutationPreparation? revisionPreparation = null;
             if (!isNew)
             {
                 revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
-                    entity.Id, expectedRevisionId ?? entity.CurrentRevisionId, cancellationToken);
+                    entity.Id, expectedRevisionId, cancellationToken);
             }
 
-            var isNewCounty = entity.CountyId != values.CountyId;
             int? countyNumber = null;
 
             if (values.IsCountyNumberManuallySet)
@@ -584,7 +592,7 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             entity.Name = values.Name.Trim();
-            entity.SetAlternateNamesList(values.AlternateNames.Select(e => e.Trim()));
+            entity.SetAlternateNamesList(CaveAlternateNameNormalizer.Normalize(values.AlternateNames));
 
             entity.CountyId = values.CountyId.Trim();
             entity.StateId = values.StateId.Trim();
@@ -609,16 +617,11 @@ public class CaveService : ServiceBase<CaveRepository>
             {
                 if (entity.CartographerNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
 
-                var tagType = await _tagRepository.GetTag(personTagTypeId);
-                tagType ??= new TagType
-                {
-                    Name = personTagTypeId.Trim(),
-                    AccountId = RequestUser.AccountId,
-                    Key = TagTypeKeyConstant.People,
-                };
+                var binding = peopleTagsBySelection[personTagTypeId];
                 var tag = new CartographerNameTag
                 {
-                    TagType = tagType
+                    TagTypeId = binding.Id,
+                    TagType = binding.NewTag
                 };
 
                 entity.CartographerNameTags.Add(tag);
@@ -638,16 +641,11 @@ public class CaveService : ServiceBase<CaveRepository>
             foreach (var personTagTypeId in values.ReportedByNameTagIds)
             {
                 if (entity.CaveReportedByNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
-                var tagType = await _tagRepository.GetTag(personTagTypeId);
-                tagType ??= new TagType
-                {
-                    Name = personTagTypeId.Trim(),
-                    AccountId = RequestUser.AccountId,
-                    Key = TagTypeKeyConstant.People,
-                };
+                var binding = peopleTagsBySelection[personTagTypeId];
                 var tag = new CaveReportedByNameTag
                 {
-                    TagType = tagType
+                    TagTypeId = binding.Id,
+                    TagType = binding.NewTag
                 };
 
                 entity.CaveReportedByNameTags.Add(tag);
@@ -694,13 +692,23 @@ public class CaveService : ServiceBase<CaveRepository>
 
             foreach (var entranceValue in values.Entrances)
             {
-                var isNewEntrance = string.IsNullOrWhiteSpace(entranceValue.Id);
+                var isAuthorizedProposalEntrance = !string.IsNullOrWhiteSpace(entranceValue.Id) &&
+                    authorizedNewEntranceIds?.Contains(entranceValue.Id) == true;
+                var isNewEntrance = string.IsNullOrWhiteSpace(entranceValue.Id) || isAuthorizedProposalEntrance;
 
-                var entrance = isNewEntrance
-                    ? new Entrance()
-                    : entity.Entrances.FirstOrDefault(e => e.Id == entranceValue.Id);
+                Entrance? entrance;
+                if (isNewEntrance)
+                {
+                    entrance = new Entrance();
+                    if (isAuthorizedProposalEntrance) entrance.Id = entranceValue.Id!;
+                }
+                else
+                {
+                    entrance = entity.Entrances.FirstOrDefault(e => e.Id == entranceValue.Id);
+                }
 
-                if (entrance == null) throw ApiExceptionDictionary.NotFound(nameof(entranceValue.Id));
+                if (entrance == null)
+                    throw ApiExceptionDictionary.BadRequest("The selected Entrance does not belong to this Cave.");
 
                 entrance.Name = entranceValue.Name;
                 entrance.LocationQualityTagId = entranceValue.LocationQualityTagId;
@@ -736,16 +744,11 @@ public class CaveService : ServiceBase<CaveRepository>
                 foreach (var personTagTypeId in entranceValue.ReportedByNameTagIds)
                 {
                     if (entrance.EntranceReportedByNameTags.Any(tag => tag.TagTypeId == personTagTypeId)) continue;
-                    var peopleTag = await _tagRepository.GetTag(personTagTypeId);
-                    peopleTag ??= new TagType
-                    {
-                        Name = personTagTypeId.Trim(),
-                        AccountId = RequestUser.AccountId,
-                        Key = TagTypeKeyConstant.People,
-                    };
+                    var binding = peopleTagsBySelection[personTagTypeId];
                     var tag = new EntranceReportedByNameTag()
                     {
-                        TagType = peopleTag
+                        TagTypeId = binding.Id,
+                        TagType = binding.NewTag
                     };
                     entrance.EntranceReportedByNameTags.Add(tag);
 
@@ -756,46 +759,111 @@ public class CaveService : ServiceBase<CaveRepository>
                 if (isNewEntrance) entity.Entrances.Add(entrance);
             }
 
-            var blobsToDelete = new List<File>();
-            if (values.Files != null)
+            var desiredLinePlots = (values.LinePlots ?? []).ToList();
+            var desiredExistingLinePlotIds = desiredLinePlots
+                .Where(linePlot => !string.IsNullOrWhiteSpace(linePlot.Id))
+                .Select(linePlot => linePlot.Id!)
+                .ToHashSet(StringComparer.Ordinal);
+            var currentLinePlotsById = entity.GeoJsons.ToDictionary(linePlot => linePlot.Id, StringComparer.Ordinal);
+            foreach (var linePlotValue in desiredLinePlots)
             {
-                foreach (var file in values.Files)
+                CaveGeoJson linePlot;
+                if (string.IsNullOrWhiteSpace(linePlotValue.Id))
                 {
-                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == file.Id);
-
-                    if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
-
-                    if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
-                        !string.Equals(file.DisplayName, fileEntity.DisplayName))
-                    {
-                        fileEntity.FileName = CaveFileNamePolicy.GetEffectiveFileName(fileEntity.FileName,
-                            fileEntity.DisplayName, file.DisplayName);
-                        fileEntity.DisplayName = file.DisplayName;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
-                        !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId))
-                    {
-                        var tagType = await _tagRepository.GetTag(file.FileTypeTagId);
-                        if (tagType == null) throw ApiExceptionDictionary.NotFound("Tag");
-
-                        fileEntity.FileTypeTagId = tagType.Id;
-                    }
+                    linePlot = new CaveGeoJson { CaveId = entity.Id };
+                    entity.GeoJsons.Add(linePlot);
+                }
+                else if (currentLinePlotsById.TryGetValue(linePlotValue.Id, out var currentLinePlot))
+                {
+                    linePlot = currentLinePlot;
+                }
+                else if (authorizedNewLinePlotIds?.Contains(linePlotValue.Id) == true)
+                {
+                    linePlot = new CaveGeoJson { Id = linePlotValue.Id, CaveId = entity.Id };
+                    entity.GeoJsons.Add(linePlot);
+                }
+                else
+                {
+                    throw ApiExceptionDictionary.BadRequest(
+                        "The selected line plot does not belong to this Cave.");
                 }
 
-                // check if any ids are missing from the request compared to the db and delete the ones that are missing
-                var missingIds = entity.Files.Select(e => e.Id).Except(values.Files.Select(f => f.Id)).ToList();
-                foreach (var missingId in missingIds)
-                {
-                    var fileEntity = entity.Files.FirstOrDefault(f => f.Id == missingId);
-                    if (fileEntity == null) continue;
+                if (!string.Equals(linePlot.Name, linePlotValue.Name, StringComparison.Ordinal))
+                    linePlot.Name = linePlotValue.Name;
+                var currentNormalizedGeoJson = string.IsNullOrWhiteSpace(linePlot.GeoJson)
+                    ? null
+                    : CaveJsonContent.Normalize(linePlot.GeoJson);
+                if (!string.Equals(currentNormalizedGeoJson, linePlotValue.GeoJson, StringComparison.Ordinal))
+                    linePlot.GeoJson = linePlotValue.GeoJson;
+            }
 
-                    blobsToDelete.Add(fileEntity);
-                    Repository.Delete(fileEntity);
-                }
+            foreach (var currentLinePlot in entity.GeoJsons
+                         .Where(linePlot => currentLinePlotsById.ContainsKey(linePlot.Id) &&
+                                            !desiredExistingLinePlotIds.Contains(linePlot.Id))
+                         .ToList())
+            {
+                entity.GeoJsons.Remove(currentLinePlot);
+                Repository.RemoveCaveGeoJson(currentLinePlot);
             }
 
             if (isNew) Repository.Add(entity);
+
+            var desiredFiles = (values.Files ?? []).ToList();
+            var desiredFileIds = desiredFiles.Select(file => file.Id).ToHashSet(StringComparer.Ordinal);
+            var missingDesiredFileIds = desiredFileIds
+                .Except(entity.Files.Select(file => file.Id), StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal).ToList();
+
+            if (missingDesiredFileIds.Count > 0)
+            {
+                IReadOnlyList<File> stagedFiles;
+                if (changeRequestId is not null)
+                {
+                    var publications = (stagedFilePublications ?? [])
+                        .Where(publication => missingDesiredFileIds.Contains(publication.FileId, StringComparer.Ordinal))
+                        .ToList();
+                    if (publications.Count != missingDesiredFileIds.Count ||
+                        publications.Select(publication => publication.FileId)
+                            .Distinct(StringComparer.Ordinal).Count() != missingDesiredFileIds.Count)
+                        throw ApiExceptionDictionary.BadRequest(
+                            "The proposal staged-file set does not match the desired Cave files.");
+                    stagedFiles = await Repository.AttachStagedFilesAsync(changeRequestId, entity.Id,
+                        publications, cancellationToken);
+                }
+                else
+                {
+                    stagedFiles = await Repository.AttachAuthoringStagedFilesAsync(entity.Id,
+                        missingDesiredFileIds, cancellationToken);
+                }
+
+                foreach (var stagedFile in stagedFiles)
+                    if (entity.Files.All(file => file.Id != stagedFile.Id)) entity.Files.Add(stagedFile);
+            }
+
+            foreach (var file in desiredFiles)
+            {
+                var fileEntity = entity.Files.FirstOrDefault(candidate => candidate.Id == file.Id);
+                if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
+
+                if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
+                    !string.Equals(file.DisplayName, fileEntity.DisplayName, StringComparison.Ordinal))
+                {
+                    fileEntity.FileName = CaveFileNamePolicy.GetEffectiveFileName(fileEntity.FileName,
+                        fileEntity.DisplayName, file.DisplayName);
+                    fileEntity.DisplayName = file.DisplayName;
+                }
+
+                if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&
+                    !string.Equals(file.FileTypeTagId, fileEntity.FileTypeTagId, StringComparison.Ordinal))
+                    fileEntity.FileTypeTagId = file.FileTypeTagId;
+            }
+
+            foreach (var fileEntity in entity.Files.Where(file => !desiredFileIds.Contains(file.Id)).ToList())
+            {
+                await Repository.RetainPublishedFileObjectAsync(fileEntity, entity.Id, cancellationToken);
+                entity.Files.Remove(fileEntity);
+                Repository.Delete(fileEntity);
+            }
 
             try
             {
@@ -824,20 +892,199 @@ public class CaveService : ServiceBase<CaveRepository>
             if (beforeCommit is not null) await beforeCommit(mutationResult, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
-
-            foreach (var blobProperties in blobsToDelete)
-                await _fileService.DeleteFile(blobProperties.BlobKey, blobProperties.BlobContainer);
-
-            return entity.Id;
-
-
+            savedCaveId = entity.Id;
         }
-        catch (Exception e)
+        catch
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
 
+        return savedCaveId;
+    }
+
+    private sealed record PeopleTagBinding(string Id, TagType? NewTag);
+    private sealed record ResolvedTagMutationBoundary(
+        IReadOnlyDictionary<string, PeopleTagBinding> PeopleBindings,
+        IReadOnlyList<string> TargetExistingIds);
+
+    private async Task<ResolvedTagMutationBoundary> ValidateAndNormalizeTagReferencesAsync(AddCaveVm values,
+        CavePeoplePublicationContext? publicationContext, CancellationToken cancellationToken)
+    {
+        var caveGroups = CaveTagReferencePolicy.CaveGroups(values).ToList();
+        var entranceGroups = values.Entrances.Select(entrance =>
+            (Entrance: entrance, Groups: CaveTagReferencePolicy.EntranceGroups(entrance).ToList())).ToList();
+        var allIds = caveGroups.SelectMany(group => group.Values)
+            .Concat(entranceGroups.SelectMany(item => item.Groups).SelectMany(group => group.Values))
+            .Concat(values.Entrances.Select(entrance => entrance.LocationQualityTagId))
+            .Concat((values.Files ?? []).Select(file => file.FileTypeTagId!)).ToList();
+        var idCandidates = await Repository.GetTagCandidatesByIdsAsync(allIds, cancellationToken);
+        var byId = idCandidates.ToDictionary(candidate => candidate.Id, StringComparer.Ordinal);
+        var unresolvedPeopleNames = publicationContext is null
+            ? caveGroups.Concat(entranceGroups.SelectMany(item => item.Groups))
+                .Where(group => CaveTagReferencePolicy.AllowsNewPeopleIntent(group.Role))
+                .SelectMany(group => group.Values)
+                .Where(value => !string.IsNullOrWhiteSpace(value) && !byId.ContainsKey(value.Trim()))
+            : publicationContext.Cave.NewPeople.Select(intent => intent.Name)
+                .Concat(publicationContext.Entrances.Values.SelectMany(scope => scope.NewPeople)
+                    .Select(intent => intent.Name));
+        var distinctUnresolvedPeopleNames = unresolvedPeopleNames
+            .Select(name => name.Trim())
+            .Distinct(TagNameMatchPolicy.IdentityComparer)
+            .ToList();
+        IReadOnlyList<TagNameCandidate> peopleNameCandidates = distinctUnresolvedPeopleNames.Count == 0
+            ? []
+            : await Repository.GetEligiblePeopleCandidatesAsync(cancellationToken);
+        ResolvedCaveTagReferences ResolveDirect(
+            IEnumerable<(SnapshotTagRole Role, IEnumerable<string> Values)> groups) =>
+            CaveTagReferencePolicy.Resolve(groups, idCandidates, peopleNameCandidates, RequestUser.AccountId!);
+        var caveResolved = publicationContext is null
+            ? ResolveDirect(caveGroups)
+            : ResolvePublishedPeople(caveGroups, publicationContext.Cave,
+                SnapshotTagRole.Cartographer, SnapshotTagRole.CaveReportedBy);
+        var entranceResolved = entranceGroups.Select(item => (item.Entrance,
+            Resolved: publicationContext is null
+                ? ResolveDirect(item.Groups)
+                : ResolvePublishedPeople(item.Groups,
+                    publicationContext.Entrances.GetValueOrDefault(item.Entrance.Id ?? string.Empty) ??
+                    throw ApiExceptionDictionary.BadRequest(
+                        "The proposal People bindings do not match its Entrances."),
+                    SnapshotTagRole.EntranceReportedBy))).ToList();
+        if (publicationContext is not null &&
+            publicationContext.Entrances.Keys.Except(values.Entrances.Select(entrance => entrance.Id ?? string.Empty),
+                StringComparer.Ordinal).Any())
+            throw ApiExceptionDictionary.BadRequest("The proposal People bindings do not match its Entrances.");
+        if (publicationContext is not null && values.Entrances.Select(entrance => entrance.Id ?? string.Empty)
+            .Except(publicationContext.Entrances.Keys,
+                StringComparer.Ordinal).Any())
+            throw ApiExceptionDictionary.BadRequest("The proposal People bindings do not match its Entrances.");
+
+        foreach (var entrance in values.Entrances)
+            CaveTagReferencePolicy.RequireTypedReference(entrance.LocationQualityTagId,
+                TagTypeKeyConstant.LocationQuality, byId, RequestUser.AccountId!, "Location Quality");
+        foreach (var file in values.Files ?? [])
+            CaveTagReferencePolicy.RequireTypedReference(file.FileTypeTagId!, TagTypeKeyConstant.File,
+                byId, RequestUser.AccountId!, "file type");
+
+        values.GeologyTagIds = Existing(caveResolved, SnapshotTagRole.Geology);
+        values.GeologicAgeTagIds = Existing(caveResolved, SnapshotTagRole.GeologicAge);
+        values.MapStatusTagIds = Existing(caveResolved, SnapshotTagRole.MapStatus);
+        values.PhysiographicProvinceTagIds = Existing(caveResolved, SnapshotTagRole.PhysiographicProvince);
+        values.ArcheologyTagIds = Existing(caveResolved, SnapshotTagRole.Archeology);
+        values.BiologyTagIds = Existing(caveResolved, SnapshotTagRole.Biology);
+        values.OtherTagIds = Existing(caveResolved, SnapshotTagRole.CaveOther);
+        foreach (var item in entranceResolved)
+        {
+            item.Entrance.EntranceStatusTagIds = Existing(item.Resolved, SnapshotTagRole.EntranceStatus);
+            item.Entrance.EntranceHydrologyTagIds = Existing(item.Resolved, SnapshotTagRole.EntranceHydrology);
+            item.Entrance.FieldIndicationTagIds = Existing(item.Resolved, SnapshotTagRole.FieldIndication);
+            item.Entrance.EntranceOtherTagIds = Existing(item.Resolved, SnapshotTagRole.EntranceOther);
+        }
+
+        var existingPeopleIds = caveResolved.Existing.Concat(entranceResolved.SelectMany(item => item.Resolved.Existing))
+            .Where(reference => CaveTagReferencePolicy.AllowsNewPeopleIntent(reference.Role))
+            .Select(reference => reference.TagTypeId).Distinct(StringComparer.Ordinal).ToList();
+        var newIntents = caveResolved.NewPeople.Concat(entranceResolved.SelectMany(item => item.Resolved.NewPeople))
+            .ToList();
+        var peopleByName = new Dictionary<string, PeopleTagBinding>(TagNameMatchPolicy.IdentityComparer);
+        foreach (var name in newIntents.Select(intent => intent.Name)
+                     .Distinct(TagNameMatchPolicy.IdentityComparer))
+        {
+            var match = TagNameMatchPolicy.Select(name, RequestUser.AccountId!, peopleNameCandidates);
+            if (match is not null)
+            {
+                peopleByName[name] = new PeopleTagBinding(match.Id, null);
+                continue;
+            }
+
+            var created = new TagType
+            {
+                Name = name, AccountId = RequestUser.AccountId, Key = TagTypeKeyConstant.People
+            };
+            peopleByName[name] = new PeopleTagBinding(created.Id, created);
+        }
+        var candidateIds = peopleNameCandidates.Select(candidate => candidate.Id).ToHashSet(StringComparer.Ordinal);
+        var selectedExistingIds = caveResolved.Existing
+            .Concat(entranceResolved.SelectMany(item => item.Resolved.Existing))
+            .Select(reference => reference.TagTypeId)
+            .Concat(values.Entrances.Select(entrance => entrance.LocationQualityTagId))
+            .Concat((values.Files ?? []).Select(file => file.FileTypeTagId!))
+            .Concat(peopleByName.Values.Where(binding => candidateIds.Contains(binding.Id)).Select(binding => binding.Id))
+            .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
+        var result = existingPeopleIds.ToDictionary(id => id, id => new PeopleTagBinding(id, null),
+            StringComparer.Ordinal);
+        foreach (var binding in peopleByName.Values)
+            result.TryAdd(binding.Id, binding);
+
+        values.CartographerNameTagIds = People(caveResolved, SnapshotTagRole.Cartographer);
+        values.ReportedByNameTagIds = People(caveResolved, SnapshotTagRole.CaveReportedBy);
+        foreach (var item in entranceResolved)
+            item.Entrance.ReportedByNameTagIds = People(item.Resolved, SnapshotTagRole.EntranceReportedBy);
+        return new ResolvedTagMutationBoundary(result, selectedExistingIds);
+
+        static IReadOnlyList<string> Existing(ResolvedCaveTagReferences resolved, SnapshotTagRole role) =>
+            resolved.Existing.Where(tag => tag.Role == role).Select(tag => tag.TagTypeId).ToList();
+        IReadOnlyList<string> People(ResolvedCaveTagReferences resolved, SnapshotTagRole role) =>
+            Existing(resolved, role).Concat(resolved.NewPeople.Where(tag => tag.Role == role)
+                .Select(tag => peopleByName[tag.Name].Id)).Distinct(StringComparer.Ordinal).ToList();
+
+        ResolvedCaveTagReferences ResolvePublishedPeople(
+            IEnumerable<(SnapshotTagRole Role, IEnumerable<string> Values)> groups,
+            CavePeoplePublicationScope people, params SnapshotTagRole[] allowedRoles)
+        {
+            var allowed = allowedRoles.ToHashSet();
+            if (people.Existing.Any(reference => !allowed.Contains(reference.Role)) ||
+                people.NewPeople.Any(intent => !allowed.Contains(intent.Role)))
+                throw ApiExceptionDictionary.BadRequest("The proposal People bindings contain an invalid role.");
+            var nonPeople = ResolveDirect(groups.Where(group => !CaveTagReferencePolicy
+                .AllowsNewPeopleIntent(group.Role)));
+            var existing = new List<SnapshotTagReference>(nonPeople.Existing);
+            foreach (var reference in people.Existing)
+            {
+                if (!byId.TryGetValue(reference.TagTypeId, out var candidate) ||
+                    candidate.Key != TagTypeKeyConstant.People ||
+                    (!candidate.IsDefault && candidate.AccountId != RequestUser.AccountId))
+                    throw ApiExceptionDictionary.BadRequest(
+                        $"The recorded People tag is no longer valid for {reference.Role}.");
+                existing.Add(new SnapshotTagReference(reference.Role, candidate.Id, candidate.Name));
+            }
+            var newPeople = people.NewPeople.Select(intent =>
+            {
+                CaveTagReferencePolicy.ValidateNewPeopleName(intent.Name);
+                return intent with { Name = intent.Name.Trim() };
+            }).ToList();
+            return new ResolvedCaveTagReferences(existing, newPeople);
+        }
+    }
+
+    private static IReadOnlyList<string> CollectExistingStableTagTypeIds(Cave cave)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        static void Add<T>(HashSet<string> target, IEnumerable<T> tags, Func<T, string> id)
+        {
+            foreach (var tag in tags) target.Add(id(tag));
+        }
+
+        Add(ids, cave.GeologyTags, tag => tag.TagTypeId);
+        Add(ids, cave.GeologicAgeTags, tag => tag.TagTypeId);
+        Add(ids, cave.MapStatusTags, tag => tag.TagTypeId);
+        Add(ids, cave.PhysiographicProvinceTags, tag => tag.TagTypeId);
+        Add(ids, cave.ArcheologyTags, tag => tag.TagTypeId);
+        Add(ids, cave.BiologyTags, tag => tag.TagTypeId);
+        Add(ids, cave.CaveOtherTags, tag => tag.TagTypeId);
+        Add(ids, cave.CartographerNameTags, tag => tag.TagTypeId);
+        Add(ids, cave.CaveReportedByNameTags, tag => tag.TagTypeId);
+        foreach (var entrance in cave.Entrances)
+        {
+            Add(ids, entrance.EntranceStatusTags, tag => tag.TagTypeId);
+            Add(ids, entrance.EntranceHydrologyTags, tag => tag.TagTypeId);
+            Add(ids, entrance.FieldIndicationTags, tag => tag.TagTypeId);
+            Add(ids, entrance.EntranceOtherTags, tag => tag.TagTypeId);
+            Add(ids, entrance.EntranceReportedByNameTags, tag => tag.TagTypeId);
+            ids.Add(entrance.LocationQualityTagId);
+        }
+        foreach (var file in cave.Files) ids.Add(file.FileTypeTagId);
+        return ids.Where(id => !string.IsNullOrWhiteSpace(id)).Order(StringComparer.Ordinal).ToList();
     }
 
     public async Task<CaveVm?> GetCave(string caveId)
@@ -850,12 +1097,14 @@ public class CaveService : ServiceBase<CaveRepository>
     }
 
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
-        IDbContextTransaction? transaction = null, List<File>? deferredFileDeletes = null)
+        IDbContextTransaction? transaction = null, List<File>? deferredFileDeletes = null,
+        List<StorageObjectAddress>? deferredObjectDeletes = null)
     {
         var outsideTransaction = transaction != null;
         transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
 
         var files = new List<File>();
+        var retainedObjects = new List<StorageObjectAddress>();
         var isSuccessful = false;
         try
         {
@@ -1010,6 +1259,8 @@ public class CaveService : ServiceBase<CaveRepository>
             await Repository.SaveChangesAsync(cancellationToken);
 
             files = entity.Files.ToList();
+            retainedObjects = (await Repository.RemoveRetainedFileObjectsForHardDeleteAsync(
+                caveId, cancellationToken)).ToList();
 
             foreach (var permission in entity.CavePermissions)
             {
@@ -1051,13 +1302,26 @@ public class CaveService : ServiceBase<CaveRepository>
 
         if (isSuccessful)
         {
-            if (deferredFileDeletes != null)
+            var objectAddresses = files
+                .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) &&
+                               !string.IsNullOrWhiteSpace(file.BlobContainer))
+                .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
+                .Concat(retainedObjects)
+                .Distinct()
+                .ToList();
+
+            if (outsideTransaction)
             {
-                deferredFileDeletes.AddRange(files);
+                deferredFileDeletes?.AddRange(files);
+                deferredObjectDeletes?.AddRange(objectAddresses);
+                // The caller owns commit/rollback. External object deletion cannot be
+                // made safe here before that decision; production hard delete uses the
+                // internally-owned transaction path below.
             }
             else
             {
-                foreach (var file in files) await _fileService.DeleteFile(file.BlobKey, file.BlobContainer);
+                foreach (var address in objectAddresses)
+                    await _fileService.DeleteObjectBestEffortAsync(address);
             }
         }
     }
@@ -1144,282 +1408,4 @@ public class CaveService : ServiceBase<CaveRepository>
 
     #endregion
 
-    #region GeoJson
-
-    public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
-        CancellationToken cancellationToken = default)
-    {
-        var cave = await Repository.GetCaveWithLinePlots(caveId);
-        if (cave == null)
-            throw ApiExceptionDictionary.NotFound("Cave");
-
-        await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId, cave.StateId);
-
-        foreach (var oldGeoJson in cave.GeoJsons.ToList())
-        {
-            Repository.RemoveCaveGeoJson(oldGeoJson);
-        }
-
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            foreach (var uploadVm in geoJsonUploads)
-            {
-                var parsedToken = JToken.Parse(uploadVm.GeoJson);
-                IList<JToken> featureCollections;
-                // If the token is an array, treat each element as a FeatureCollection.
-                if (parsedToken is JArray jArray)
-                {
-                    featureCollections = jArray.Children().ToList();
-                }
-                // If it’s a single FeatureCollection object, wrap it in a list.
-                else if (parsedToken is JObject)
-                {
-                    featureCollections = new List<JToken> { parsedToken };
-                }
-                else
-                {
-                    throw ApiExceptionDictionary.BadRequest("Invalid GeoJSON format.");
-                }
-
-                // Process each FeatureCollection individually.
-                foreach (var featureCollectionToken in featureCollections)
-                {
-                    // Get the features array from the current FeatureCollection.
-                    var featuresArray = featureCollectionToken["features"] as JArray;
-                    if (featuresArray == null)
-                    {
-                        throw ApiExceptionDictionary.BadRequest(
-                            "GeoJSON feature collection does not contain any features.");
-                    }
-
-                    var geoJsonEntity = new CaveGeoJson
-                    {
-                        CaveId = caveId,
-                        Name = uploadVm.Name,
-                        GeoJson = featureCollectionToken.ToString(),
-                    };
-
-                    Repository.AddCaveGeoJson(geoJsonEntity);
-                    cave.GeoJsons.Add(geoJsonEntity);
-                }
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
-
-    #region Example Geometry Code
-    // public async Task UploadCaveGeoJson(string caveId, IEnumerable<GeoJsonUploadVm> geoJsonUploads,
-    //     CancellationToken cancellationToken = default)
-    // {
-    //     // Retrieve the cave entity (your GetCaveWithLinePlots method already does permission filtering)
-    //     var cave = await Repository.GetCaveWithLinePlots(caveId);
-    //     if (cave == null)
-    //         throw ApiExceptionDictionary.NotFound("Cave");
-
-    //     // Check that the current user has the Manager-level permission for the cave
-    //     await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, cave.CountyId);
-
-    //     // Clear out any old geojson entries for the cave.
-    //     foreach (var oldGeoJson in cave.GeoJsons.ToList())
-    //     {
-    //         Repository.RemoveCaveGeoJson(oldGeoJson);
-    //     }
-
-    //     // Begin a transaction
-    //     await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-    //     try
-    //     {
-    //         var reader = new NetTopologySuite.IO.GeoJsonReader();
-    //         // Iterate over each upload.
-    //         foreach (var uploadVm in geoJsonUploads)
-    //         {
-    //             // Parse the uploaded GeoJSON string.
-    //             var parsedToken = JToken.Parse(uploadVm.GeoJson);
-    //             IList<JToken> featureCollections;
-    //             // If the token is an array, treat each element as a FeatureCollection.
-    //             if (parsedToken is JArray jArray)
-    //             {
-    //                 featureCollections = jArray.Children().ToList();
-    //             }
-    //             // If it’s a single FeatureCollection object, wrap it in a list.
-    //             else if (parsedToken is JObject)
-    //             {
-    //                 featureCollections = new List<JToken> { parsedToken };
-    //             }
-    //             else
-    //             {
-    //                 throw ApiExceptionDictionary.BadRequest("Invalid GeoJSON format.");
-    //             }
-
-    //             // Process each FeatureCollection individually.
-    //             foreach (var featureCollectionToken in featureCollections)
-    //             {
-    //                 // Get the features array from the current FeatureCollection.
-    //                 var featuresArray = featureCollectionToken["features"] as JArray;
-    //                 if (featuresArray == null)
-    //                 {
-    //                     throw ApiExceptionDictionary.BadRequest(
-    //                         "GeoJSON feature collection does not contain any features.");
-    //                 }
-
-    //                 var collectedGeometries = new List<Geometry>();
-
-    //                 // Process each feature individually.
-    //                 foreach (var featureToken in featuresArray)
-    //                 {
-    //                     try
-    //                     {
-    //                         // Get the geometry token.
-    //                         var geometryToken = featureToken["geometry"];
-    //                         if (geometryToken != null)
-    //                         {
-    //                             // Force the rings closed for Polygon or MultiPolygon.
-    //                             featureToken["geometry"] = ForceCloseRings(geometryToken);
-    //                         }
-
-    //                         // Convert the feature token to JSON and parse it.
-    //                         var featureJson = featureToken.ToString();
-    //                         var feature = reader.Read<Feature>(featureJson);
-    //                         if (feature != null && feature.Geometry != null)
-    //                         {
-    //                             collectedGeometries.Add(feature.Geometry);
-    //                         }
-    //                     }
-    //                     catch (Exception ex)
-    //                     {
-    //                         // Log the error and skip any invalid feature.
-    //                         Console.WriteLine($"Skipping invalid feature: {ex.Message}");
-    //                     }
-    //                 }
-
-    //                 // If we collected any valid geometries, combine them in one GeometryCollection.
-    //                 if (collectedGeometries.Any())
-    //                 {
-    //                     Geometry combinedGeometry = new GeometryCollection(collectedGeometries.ToArray());
-    //                     // Create one database record for this feature collection.
-    //                     var geoJsonEntity = new CaveGeoJson
-    //                     {
-    //                         CaveId = caveId,
-    //                         Geometry = combinedGeometry,
-    //                         // Optionally, store the entire feature collection JSON. Remove if not needed.
-    //                         OriginalGeoJson = featureCollectionToken.ToString(),
-    //                         Attributes = "{}"
-    //                     };
-
-    //                     Repository.AddCaveGeoJson(geoJsonEntity);
-    //                     cave.GeoJsons.Add(geoJsonEntity);
-    //                 }
-    //             }
-    //         }
-
-    //         await Repository.SaveChangesAsync(cancellationToken);
-    //         await transaction.CommitAsync(cancellationToken);
-    //     }
-    //     catch (Exception)
-    //     {
-    //         await transaction.RollbackAsync(cancellationToken);
-    //         throw;
-    //     }
-    // }
-
-    // /// <summary>
-    // /// Ensures that for all Polygon or MultiPolygon geometries, each coordinate ring is explicitly closed
-    // /// and has at least four points. Rings that do not meet the criteria are removed.
-    // /// </summary>
-    // /// <param name="geometryToken">The JSON token representing the geometry.</param>
-    // /// <returns>The modified JSON token with only valid rings.</returns>
-    // private JToken? ForceCloseRings(JToken? geometryToken)
-    // {
-    //     if (geometryToken == null) return null;
-
-    //     var type = geometryToken["type"]?.Value<string>();
-    //     if (string.IsNullOrWhiteSpace(type))
-    //         return geometryToken;
-
-    //     // Process Polygon geometry
-    //     if (type == "Polygon")
-    //     {
-    //         var rings = geometryToken["coordinates"] as JArray;
-    //         if (rings != null)
-    //         {
-    //             var validRings = new JArray();
-    //             foreach (var ring in rings)
-    //             {
-    //                 var ringArray = ring as JArray;
-    //                 if (ringArray == null || ringArray.Count == 0)
-    //                     continue;
-
-    //                 // If the first coordinate is not the same as the last, append a copy of the first.
-    //                 if (!JToken.DeepEquals(ringArray.First, ringArray.Last))
-    //                 {
-    //                     ringArray.Add(ringArray.First.DeepClone());
-    //                 }
-
-    //                 // Only include this ring if it has at least 4 coordinates.
-    //                 if (ringArray.Count >= 4)
-    //                 {
-    //                     validRings.Add(ringArray);
-    //                 }
-    //             }
-
-    //             geometryToken["coordinates"] = validRings;
-    //         }
-    //     }
-    //     // Process MultiPolygon geometry
-    //     else if (type == "MultiPolygon")
-    //     {
-    //         var polygons = geometryToken["coordinates"] as JArray;
-    //         if (polygons != null)
-    //         {
-    //             var validPolygons = new JArray();
-    //             foreach (var polygon in polygons)
-    //             {
-    //                 var rings = polygon as JArray;
-    //                 if (rings != null)
-    //                 {
-    //                     var validRings = new JArray();
-    //                     foreach (var ring in rings)
-    //                     {
-    //                         var ringArray = ring as JArray;
-    //                         if (ringArray == null || ringArray.Count == 0)
-    //                             continue;
-
-    //                         if (!JToken.DeepEquals(ringArray.First, ringArray.Last))
-    //                         {
-    //                             ringArray.Add(ringArray.First.DeepClone());
-    //                         }
-
-    //                         if (ringArray.Count >= 4)
-    //                         {
-    //                             validRings.Add(ringArray);
-    //                         }
-    //                     }
-
-    //                     // Only add the polygon if at least one ring is valid.
-    //                     if (validRings.Count > 0)
-    //                     {
-    //                         validPolygons.Add(validRings);
-    //                     }
-    //                 }
-    //             }
-
-    //             geometryToken["coordinates"] = validPolygons;
-    //         }
-    //     }
-
-    //     return geometryToken;
-    // }
-
-    #endregion
-
-
-    #endregion
 }

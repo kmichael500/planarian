@@ -84,6 +84,35 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     }
 
     [Fact]
+    public async Task CaveSyncDeletionPurgesRetainedFileObjectsAndDefersPhysicalDelete()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(CaveSyncDeletionPurgesRetainedFileObjectsAndDefersPhysicalDelete));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        db.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
+        {
+            AccountId = tenant.AccountId,
+            CaveId = tenant.CaveId,
+            FileId = "oldfile001",
+            StoragePartition = "test",
+            StorageKey = "objects/files/oldfile001"
+        });
+        await db.SaveChangesAsync();
+        var import = new CaveImportTestHarness(db, db.RequestUser);
+        var csv = ImportDryRunIntegrationTests.CaveHeader +
+            "\nReplacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,Replacement\n";
+
+        var plan = await import.PlanCsvAsync(csv, syncExisting: true);
+        var result = await import.ExecuteAsync(plan, "delete-retained.csv");
+
+        Assert.False(await db.RetainedCaveFileObjects.IgnoreQueryFilters().AnyAsync(row =>
+            row.AccountId == tenant.AccountId && row.CaveId == tenant.CaveId));
+        Assert.Contains(result.BlobDeletes, target =>
+            target.BlobContainer == "test" && target.BlobKey == "objects/files/oldfile001");
+    }
+
+    [Fact]
     public Task EntranceInsertPreviewMatchesCommit() =>
         VerifyEntranceAsync("insert", syncExisting: false, seedExisting: false, importPrimary: true);
 

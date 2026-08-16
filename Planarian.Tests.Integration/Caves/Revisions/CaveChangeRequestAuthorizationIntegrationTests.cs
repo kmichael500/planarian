@@ -5,6 +5,7 @@ using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
+using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Import.Planning;
@@ -20,6 +21,58 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     [Fact]
+    public async Task ProposalOwnerLosesAllRequestAndHistoryAccessWhenCaveViewIsRevoked()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ProposalOwnerLosesAllRequestAndHistoryAccessWhenCaveViewIsRevoked));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant);
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+
+        string requestId;
+        string versionId;
+        await using (var owner = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            requestId = await owner.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Visible proposal"), tenant.RevisionId, default);
+            await new CaveChangeRequestRepository(owner.Db, owner.Db.RequestUser).StageFileAsync(
+                requestId, file.FileId, file.FileTypeId, "Evidence", false, default);
+            versionId = await CurrentVersionAsync(owner.Db, requestId);
+        }
+
+        await CavePermissions.RevokeAllAsync(database, tenant, "contributor");
+        await using (var revoked = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            var service = revoked.ChangeRequests;
+            Assert.Empty(await service.ListMineAsync(default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => service.GetAsync(requestId, default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                service.GetVersionAsync(requestId, versionId, default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => service.PreviewVersionAsync(
+                requestId, PublishableValues(tenant, quality.Id, "Revision"), false,
+                tenant.RevisionId, versionId, default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => service.AddVersionAsync(
+                requestId, PublishableValues(tenant, quality.Id, "Revision"), false,
+                tenant.RevisionId, versionId, default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => revoked.Services.StageRequestFileForTestAsync(
+                requestId, new MemoryStream([1, 2, 3]), "blocked.txt", null, default));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                service.OpenStagedFileAsync(requestId, file.FileId, default));
+            var revisions = new CaveRevisionService(new CaveRepository(revoked.Db, revoked.Db.RequestUser),
+                new CaveRevisionQueryRepository(revoked.Db, revoked.Db.RequestUser));
+            await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                revisions.ListAsync(tenant.CaveId, default));
+        }
+
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await using var restored = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        Assert.Equal(requestId, (await restored.ChangeRequests.GetAsync(requestId, default)).Request.Id);
+        Assert.Contains((await restored.ChangeRequests.ListMineAsync(default)), row => row.Id == requestId);
+    }
+
+    [Fact]
     public async Task SameAccountGuessedCaveWithoutViewPermissionCannotReceiveProposal()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -27,25 +80,17 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
         var visible = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var hiddenCave = await CaveTestDataFactory.AddCaveAsync(database, visible, "hidden000a", "Hidden Cave", 2);
         var hidden = await CaveTestDataFactory.PublishBaselineRevisionAsync(database, hiddenCave, "revisionha");
+        var locationTag = await ReferenceTestData.AddTagAsync(database, visible.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
         await CavePermissions.GrantViewAsync(database, visible, "contributor");
 
-        await using (var contributor = database.CreateDbContext("contributor", visible.AccountId))
+        await using (var contributor = await CaveTestActor.CreateAsync(
+                         database, visible.AccountId, "contributor"))
         {
-            await CavePermissions.AuthenticateAsync(contributor, visible.AccountId);
-            var values = new AddCaveVm
-            {
-                Id = hidden.CaveId,
-                Name = "Guessed hidden Cave",
-                AlternateNames = [],
-                StateId = hidden.StateId,
-                CountyId = hidden.CountyId,
-                CountyNumber = hidden.CountyNumber,
-                IsCountyNumberManuallySet = true,
-                Entrances = []
-            };
+            var values = PublishableValues(hidden, locationTag.Id, "Guessed hidden Cave");
 
             var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
-                IntegrationTestServices.For(contributor).CaveChangeRequests.CreateAsync(hidden.CaveId, values,
+                contributor.ChangeRequests.CreateAsync(hidden.CaveId, values,
                     hidden.RevisionId, default));
             Assert.Contains("Cave", failure.Message);
         }
@@ -72,29 +117,26 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
 
         string requestId;
         string versionId;
-        await using (var contributor = database.CreateDbContext("contributor", tenantA.AccountId))
+        await using (var contributor = await CaveTestActor.CreateAsync(
+                         database, tenantA.AccountId, "contributor"))
         {
-            await CavePermissions.AuthenticateAsync(contributor, tenantA.AccountId);
-            requestId = await IntegrationTestServices.For(contributor).CaveChangeRequests.CreateAsync(tenantA.CaveId,
+            requestId = await contributor.ChangeRequests.CreateAsync(tenantA.CaveId,
                 PublishableValues(tenantA, locationTagA.Id, "Protected proposal"), tenantA.RevisionId, default);
-            versionId = await CurrentVersionAsync(contributor, requestId);
+            versionId = await CurrentVersionAsync(contributor.Db, requestId);
         }
 
-        await using (var viewer = database.CreateDbContext("viewer", tenantA.AccountId))
+        await using (var viewer = await CaveTestActor.CreateAsync(database, tenantA.AccountId, "viewer"))
         {
-            await CavePermissions.AuthenticateAsync(viewer, tenantA.AccountId);
-            var service = IntegrationTestServices.For(viewer).CaveChangeRequests;
+            var service = viewer.ChangeRequests;
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 service.ApproveAsync(requestId, versionId, null, default));
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 service.RejectAsync(requestId, versionId, null, default));
         }
 
-        await using (var accountB = database.CreateDbContext("user-b", tenantB.AccountId))
+        await using (var accountB = await CaveTestActor.CreateAsync(database, tenantB.AccountId, "user-b"))
         {
-            await CavePermissions.EnsureAccountUserAsync(accountB, tenantB.AccountId);
-            await CavePermissions.AuthenticateAsync(accountB, tenantB.AccountId);
-            var service = IntegrationTestServices.For(accountB).CaveChangeRequests;
+            var service = accountB.ChangeRequests;
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => service.GetAsync(requestId, default));
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 service.GetVersionAsync(requestId, versionId, default));
@@ -128,9 +170,8 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
         var file = await FileTestDataFactory.AddFileAsync(database, visible);
         await CavePermissions.GrantViewAsync(database, visible, "contributor");
 
-        await using var contributor = database.CreateDbContext("contributor", visible.AccountId);
-        await CavePermissions.AuthenticateAsync(contributor, visible.AccountId);
-        var service = IntegrationTestServices.For(contributor).CaveChangeRequests;
+        await using var contributor = await CaveTestActor.CreateAsync(database, visible.AccountId, "contributor");
+        var service = contributor.ChangeRequests;
         await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => service.CreateAsync(
             invisible.CaveId, PublishableValues(invisible, locationTag.Id, "Guessed cave"),
             invisible.RevisionId, default));
@@ -139,21 +180,20 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
             PublishableValues(visible, locationTag.Id, "Request A"), visible.RevisionId, default);
         var requestB = await service.CreateAsync(visible.CaveId,
             PublishableValues(visible, locationTag.Id, "Request B"), visible.RevisionId, default);
-        await new CaveChangeRequestRepository(contributor, contributor.RequestUser).StageFileAsync(
+        await new CaveChangeRequestRepository(contributor.Db, contributor.Db.RequestUser).StageFileAsync(
             requestB, file.FileId, file.FileTypeId, "Request B file", false, default);
 
         await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
             service.OpenStagedFileAsync(requestA, file.FileId, default));
-        contributor.ChangeTracker.Clear();
-        Assert.Equal(2, await contributor.CaveChangeRequests.CountAsync());
-        Assert.Equal(3, await contributor.CaveProposalVersions.CountAsync());
+        contributor.Db.ChangeTracker.Clear();
+        Assert.Equal(2, await contributor.Db.CaveChangeRequests.CountAsync());
+        Assert.Equal(3, await contributor.Db.CaveProposalVersions.CountAsync());
 
-        await using (var crossAccount = database.CreateDbContext("cross-account", invisible.AccountId))
+        await using (var crossAccount = await CaveTestActor.CreateAsync(
+                         database, invisible.AccountId, "cross-account"))
         {
-            await CavePermissions.EnsureAccountUserAsync(crossAccount, invisible.AccountId);
-            await CavePermissions.AuthenticateAsync(crossAccount, invisible.AccountId);
             await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
-                IntegrationTestServices.For(crossAccount).CaveChangeRequests.OpenStagedFileAsync(requestB, file.FileId, default));
+                crossAccount.ChangeRequests.OpenStagedFileAsync(requestB, file.FileId, default));
         }
 
         await using var verifyInvisible = database.CreateDbContext("verify", invisible.AccountId);

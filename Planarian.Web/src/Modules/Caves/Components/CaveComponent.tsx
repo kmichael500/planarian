@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
-import { CloudUploadOutlined } from "@ant-design/icons";
-import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Col,
   Collapse,
@@ -26,17 +24,12 @@ import {
   isNullOrWhiteSpace,
 } from "../../../Shared/Helpers/StringHelpers";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
 import { MapComponent } from "../../Map/Components/MapComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
-import { UploadComponent } from "../../Files/Components/UploadComponent";
-import { FileService } from "../../Files/Services/FileService";
-import { CaveService } from "../Service/CaveService";
 import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/ShouldDisplay";
 import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
-import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
 import dayjs, { Dayjs } from "dayjs";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
@@ -44,12 +37,10 @@ import { StateTagComponent } from "../../../Shared/Components/Display/StateTagCo
 import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
-import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
   <Descriptions bordered>
@@ -114,13 +105,11 @@ const CaveComponent = ({
   cave,
   isLoading,
   options = {}, // Default to empty object
-  updateCave,
   hasEditPermission,
 }: CaveComponentProps) => {
   // Set default for inCardContainer within options
   const inCardContainer = options.inCardContainer !== false; // Default to true unless explicitly set to false
 
-  const [isUploading, setIsUploading] = useState(false);
   const { isFeatureEnabled } = useFeatureEnabled();
 
   const [showMap, setShowMap] = useState(true);
@@ -139,23 +128,6 @@ const CaveComponent = ({
 
   const [showGeology, setShowGeology] = useState(false);
   const [showGages, setShowGages] = useState(false);
-
-  const [geoJsonToSave, setGeoJsonToSave] = useState<string | null>(null);
-  const [isGeoJsonModalVisible, setIsGeoJsonModalVisible] = useState(false);
-
-  const handleGeoJsonReceived = (
-    data: FeatureCollection<Geometry, GeoJsonProperties>[]
-  ) => {
-    if (data && data.length > 0) {
-      const geoJsonString = JSON.stringify(data, null, 2);
-      setGeoJsonToSave(geoJsonString);
-      setIsGeoJsonModalVisible(true);
-    } else {
-      // Optionally handle the case when data is empty.
-      setGeoJsonToSave(null);
-      setIsGeoJsonModalVisible(false);
-    }
-  };
 
   const screens = Grid.useBreakpoint();
   const descriptionLayout = screens.md ? "horizontal" : "vertical";
@@ -423,56 +395,14 @@ const CaveComponent = ({
         </>
       )}
 
-      <PlanarianDividerComponent
-        title="Files"
-        element={
-          <>
-            {!isUploading && (
-              <PlanarianButton
-                permissionKey={PermissionKey.Manager}
-                disabled={!hasEditPermission}
-                icon={<CloudUploadOutlined />}
-                onClick={() => {
-                  setIsUploading(true);
-                }}
-              >
-                Upload
-              </PlanarianButton>
-            )}
-          </>
-        }
+      <PlanarianDividerComponent title="Files" />
+      <FileListComponent
+        files={cave?.files}
+        isUploading={false}
+        customOrder={["Map"]}
+        hasEditPermission={hasEditPermission}
+        allowUpload={false}
       />
-
-      {!isUploading && (
-        <>
-          <FileListComponent
-            files={cave?.files}
-            isUploading={isUploading}
-            setIsUploading={(value) => setIsUploading(value)}
-            customOrder={["Map"]}
-            hasEditPermission={hasEditPermission}
-          />
-        </>
-      )}
-      {isUploading && (
-        <UploadComponent
-          onClose={() => {
-            if (updateCave) {
-              updateCave();
-            }
-            setIsUploading(false);
-          }}
-          uploadFunction={(params) =>
-            CaveService.AddCaveFile(
-              params.file,
-              cave?.id as string,
-              params.uid,
-              params.onProgress
-            )
-          }
-          updateFunction={FileService.UpdateFilesMetadata}
-        />
-      )}
 
       {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
         <>
@@ -642,7 +572,6 @@ const CaveComponent = ({
                 showFullScreenControl
                 showSearchBar={false}
                 showGeolocateControl={false}
-                onShapefileUploaded={handleGeoJsonReceived}
               />
             </div>
           )}
@@ -659,22 +588,6 @@ const CaveComponent = ({
         content
       )}
 
-      {geoJsonToSave && (
-        <GeoJsonSaveModal
-          isVisible={isGeoJsonModalVisible}
-          caveId={cave?.id as string}
-          geoJson={geoJsonToSave}
-          onCancel={() => {
-            setIsGeoJsonModalVisible(false);
-            setGeoJsonToSave(null);
-          }}
-          onSaved={() => {
-            setIsGeoJsonModalVisible(false);
-            setGeoJsonToSave(null);
-            updateCave && updateCave();
-          }}
-        />
-      )}
     </>
   );
 };

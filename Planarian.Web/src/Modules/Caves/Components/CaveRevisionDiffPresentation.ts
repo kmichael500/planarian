@@ -2,6 +2,7 @@ import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/
 import {
   CaveEntranceSnapshotVm,
   CaveFileSnapshotVm,
+  CaveLinePlotSnapshotVm,
   CaveRevisionDiffVm,
   CaveScalarChangeVm,
   CaveSnapshotVm,
@@ -64,11 +65,21 @@ export interface AffectedFilePresentation {
   detailsAvailable: boolean;
 }
 
+export interface AffectedLinePlotPresentation {
+  id: string;
+  status: "added" | "removed" | "changed";
+  heading: string;
+  snapshot?: CaveLinePlotSnapshotVm;
+  fields: ChangedFieldPresentation[];
+  detailsAvailable: boolean;
+}
+
 export interface CaveRevisionDiffPresentation {
   caveInformation: CaveInformationFieldPresentation[];
   entrances: AffectedEntrancePresentation[];
   narrative?: ChangedFieldPresentation;
   files: AffectedFilePresentation[];
+  linePlots: AffectedLinePlotPresentation[];
   fallbackScalars: ChangedFieldPresentation[];
   fallbackMetadata: ReferenceMetadataPresentation[];
 }
@@ -84,7 +95,6 @@ const caveScalarDefinitions: Record<string, { label: string; format: DiffValueFo
   MaxPitDepthFeet: { label: "Max Pit Depth", format: "distance" },
   NumberOfPits: { label: "Number of Pits", format: "number" },
   ReportedOn: { label: "Reported On", format: "date" },
-  ReportedByUserId: { label: "Reported By", format: "text" },
   IsArchived: { label: "Archived", format: "boolean" },
 };
 
@@ -107,7 +117,7 @@ export const roleLabels: Record<string, string> = {
 
 const caveOrder = [
   "Name", "AlternateNames", "State.Id", "County.Id", "CountyNumber", "LengthFeet", "DepthFeet",
-  "MaxPitDepthFeet", "NumberOfPits", "ReportedOn", "ReportedByUserId", "CaveReportedBy", "Geology", "GeologicAge",
+  "MaxPitDepthFeet", "NumberOfPits", "ReportedOn", "CaveReportedBy", "Geology", "GeologicAge",
   "PhysiographicProvince", "Biology", "Archeology", "MapStatus", "Cartographer",
   "CaveOther", "IsArchived",
 ];
@@ -120,14 +130,13 @@ const entranceDefinitions: Record<string, { label: string; format: DiffValueForm
   Name: { label: "Name", format: "text" },
   IsPrimary: { label: "Primary", format: "boolean" },
   ReportedOn: { label: "Reported On", format: "date" },
-  ReportedByUserId: { label: "Reported By", format: "text" },
   PitDepthFeet: { label: "Pit Depth", format: "distance" },
   Srid: { label: "Coordinate Reference System", format: "number" },
 };
 
 const entranceOrder = [
   "Coordinates", "Srid", "Description", "Elevation", "LocationQualityTagId", "Name", "IsPrimary", "ReportedOn",
-  "ReportedByUserId", "PitDepthFeet", "EntranceStatus", "FieldIndication", "EntranceHydrology",
+  "PitDepthFeet", "EntranceStatus", "FieldIndication", "EntranceHydrology",
   "EntranceReportedBy", "EntranceOther",
 ];
 
@@ -137,6 +146,11 @@ const fileDefinitions: Record<string, { label: string; format: DiffValueFormat }
   FileTypeTagId: { label: "File Type", format: "reference" },
 };
 const fileOrder = ["DisplayName", "FileName", "FileTypeTagId"];
+const linePlotDefinitions: Record<string, { label: string; format: DiffValueFormat }> = {
+  Name: { label: "Name", format: "text" },
+  ContentHash: { label: "Content", format: "text" },
+};
+const linePlotOrder = ["Name", "ContentHash"];
 
 const compareOrder = (order: string[]) => (a: { key: string }, b: { key: string }) => {
   const ai = order.indexOf(a.key);
@@ -314,9 +328,6 @@ export const buildCaveRevisionDiffPresentation = (
         if (change.path === "LocationQualityTagId") {
           previousValue = oldEntrance?.locationQualityNameAtRevision;
           currentValue = newEntrance?.locationQualityNameAtRevision;
-        } else if (change.path === "ReportedByUserId") {
-          previousValue = oldEntrance?.reportedByNameAtRevision ?? change.previous;
-          currentValue = newEntrance?.reportedByNameAtRevision ?? change.current;
         }
         fields.push({ ...scalarField(change, definition, metadataByField.get(change.path) ?? []), previous: previousValue, current: currentValue });
       });
@@ -375,11 +386,39 @@ export const buildCaveRevisionDiffPresentation = (
     };
   });
 
+  const previousLinePlots = new Map(previous?.linePlots.map(item => [item.id, item]) ?? []);
+  const currentLinePlots = new Map(current?.linePlots.map(item => [item.id, item]) ?? []);
+  const detailByLinePlot = new Map(diff.linePlotChanges.map(change => [change.linePlotId, change]));
+  const linePlotIds = [
+    ...diff.removedLinePlots.map(id => ({ id, status: "removed" as const })),
+    ...diff.addedLinePlots.map(id => ({ id, status: "added" as const })),
+    ...diff.changedLinePlots.map(id => ({ id, status: "changed" as const })),
+  ];
+  const linePlots = linePlotIds.map(({ id, status }): AffectedLinePlotPresentation => {
+    const oldLinePlot = previousLinePlots.get(id);
+    const newLinePlot = currentLinePlots.get(id);
+    const snapshot = status === "removed" ? oldLinePlot : newLinePlot;
+    const detail = detailByLinePlot.get(id);
+    const fields = status === "changed" && detail ? detail.scalars.map(change => {
+      const definition = linePlotDefinitions[change.path] ?? { label: safeLabel(change.path), format: "text" as const };
+      if (change.path === "ContentHash") {
+        return { ...scalarField(change, definition), previous: "Previous content", current: "Updated content" };
+      }
+      return scalarField(change, definition);
+    }).sort(compareOrder(linePlotOrder)) : [];
+    return {
+      id, status, snapshot, fields,
+      detailsAvailable: status === "changed" ? !!detail && !!oldLinePlot && !!newLinePlot : !!snapshot,
+      heading: snapshot?.name || oldLinePlot?.name || newLinePlot?.name || "Line plot",
+    };
+  });
+
   return {
     caveInformation: [...caveFields.values()].sort(compareOrder(caveOrder)),
     entrances,
     narrative,
     files,
+    linePlots,
     fallbackScalars: fallbackScalars.sort((a, b) => a.key.localeCompare(b.key)),
     fallbackMetadata: fallbackMetadata.sort((a, b) => a.path.localeCompare(b.path) || a.property.localeCompare(b.property)),
   };

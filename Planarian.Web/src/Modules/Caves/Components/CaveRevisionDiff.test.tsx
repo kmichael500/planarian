@@ -24,8 +24,6 @@ const snapshot = (current: boolean): CaveSnapshotVm => ({
   entrances: [{
     id: "entrance", name: current ? "Main Entrance" : "Old Entrance", isPrimary: current,
     description: current ? "New entrance description" : "Old entrance description",
-    reportedByUserId: current ? "new-user" : "old-user",
-    reportedByNameAtRevision: current ? "New Reporter" : "Old Reporter",
     latitude: current ? 35 : 34, longitude: current ? -86 : -85, elevation: current ? 500 : 450, srid: 4326,
     locationQualityTagId: current ? "surveyed" : "estimated",
     locationQualityNameAtRevision: current ? "Survey Grade" : "Estimated",
@@ -36,11 +34,13 @@ const snapshot = (current: boolean): CaveSnapshotVm => ({
         { role: "EntranceStatus", tagTypeId: "open", nameAtRevision: "Open" },
         { role: "EntranceHydrology", tagTypeId: "wet", nameAtRevision: "Wet" },
         { role: "FieldIndication", tagTypeId: "sink", nameAtRevision: "Sinkhole" },
+        { role: "EntranceReportedBy", tagTypeId: "new-reporter", nameAtRevision: "New Reporter" },
       ]
       : [
         { role: "EntranceStatus", tagTypeId: "closed", nameAtRevision: "Closed" },
         { role: "EntranceHydrology", tagTypeId: "dry", nameAtRevision: "Dry" },
         { role: "FieldIndication", tagTypeId: "spring", nameAtRevision: "Spring" },
+        { role: "EntranceReportedBy", tagTypeId: "old-reporter", nameAtRevision: "Old Reporter" },
       ],
   }],
   files: [{
@@ -49,6 +49,7 @@ const snapshot = (current: boolean): CaveSnapshotVm => ({
     fileName: current ? "survey-map.pdf" : "survey.pdf",
     displayName: current ? "Survey Map" : "Survey",
   }],
+  linePlots: [{ id: "line", name: current ? "Main line" : "Old line", contentHash: current ? "newhash" : "oldhash" }],
 });
 
 const diff: CaveRevisionDiffVm = {
@@ -63,7 +64,6 @@ const diff: CaveRevisionDiffVm = {
     entranceId: "entrance",
     scalars: [
       { path: "Description", previous: "Old entrance description", current: "New entrance description" },
-      { path: "ReportedByUserId", previous: "old-user", current: "new-user" },
       { path: "Latitude", previous: 34, current: 35 },
       { path: "Longitude", previous: -85, current: -86 },
       { path: "Elevation", previous: 450, current: 500 },
@@ -75,11 +75,13 @@ const diff: CaveRevisionDiffVm = {
       { role: "EntranceStatus", tagTypeId: "closed", nameAtRevision: "Closed" },
       { role: "EntranceHydrology", tagTypeId: "dry", nameAtRevision: "Dry" },
       { role: "FieldIndication", tagTypeId: "spring", nameAtRevision: "Spring" },
+      { role: "EntranceReportedBy", tagTypeId: "old-reporter", nameAtRevision: "Old Reporter" },
     ],
     addedTags: [
       { role: "EntranceStatus", tagTypeId: "open", nameAtRevision: "Open" },
       { role: "EntranceHydrology", tagTypeId: "wet", nameAtRevision: "Wet" },
       { role: "FieldIndication", tagTypeId: "sink", nameAtRevision: "Sinkhole" },
+      { role: "EntranceReportedBy", tagTypeId: "new-reporter", nameAtRevision: "New Reporter" },
     ],
   }],
   addedFiles: [], removedFiles: [], changedFiles: ["file"],
@@ -87,6 +89,11 @@ const diff: CaveRevisionDiffVm = {
     { path: "DisplayName", previous: "Survey", current: "Survey Map" },
     { path: "FileName", previous: "survey.pdf", current: "survey-map.pdf" },
     { path: "FileTypeTagId", previous: "report", current: "map" },
+  ] }],
+  addedLinePlots: [], removedLinePlots: [], changedLinePlots: ["line"],
+  linePlotChanges: [{ linePlotId: "line", scalars: [
+    { path: "Name", previous: "Old line", current: "Main line" },
+    { path: "ContentHash", previous: "oldhash", current: "newhash" },
   ] }],
   referenceMetadataChanges: [],
 };
@@ -102,6 +109,7 @@ it("shows the actual nested and reference values needed for review", () => {
     "42 ft", "12 ft", "+ Added Open", "− Removed Closed", "+ Added Wet", "− Removed Dry",
     "+ Added Sinkhole", "− Removed Spring",
     "Survey Map", "Survey", "survey-map.pdf", "survey.pdf", "Map", "Report",
+    "Line Plots", "Main line", "Old line", "Updated content", "Previous content",
   ]) expect(document.body).toHaveTextContent(text);
 });
 
@@ -194,6 +202,8 @@ it("retains initial-publication and no-visible-change states", () => {
   expect(document.body).toHaveTextContent("Initial publication");
   rerender(<CaveRevisionDiff diff={{ ...diff, scalars: [], addedTags: [], removedTags: [],
     addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
-    addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [], referenceMetadataChanges: [] }} />);
+    addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+    referenceMetadataChanges: [] }} />);
   expect(document.body).toHaveTextContent("No visible field changes");
 });

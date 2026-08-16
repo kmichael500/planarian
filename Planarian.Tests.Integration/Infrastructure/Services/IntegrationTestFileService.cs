@@ -7,6 +7,7 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Options;
+using Planarian.Shared.Services;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
 namespace Planarian.Tests.Integration.Infrastructure.Services;
@@ -21,26 +22,22 @@ internal sealed class IntegrationTestFileService(
     CaveRepository caveRepository,
     RequestThrottleService requestThrottleService,
     CaveMutationCoordinator caveMutationCoordinator,
+    TagReferenceLockRepository tagReferenceLocks,
     TestFileBlobStore blobs)
     : FileService(repository, requestUser, tagRepository, fileOptions, settingsRepository, caveRepository,
-        requestThrottleService, caveMutationCoordinator)
+        requestThrottleService, caveMutationCoordinator, tagReferenceLocks, blobs)
 {
     protected override Task AddToBlobStorage(Stream stream, string key, string containerName,
         CancellationToken cancellationToken) => blobs.WriteAsync(stream, containerName, key, cancellationToken);
 
-    protected override Task BestEffortDeleteBlobAsync(string blobKey, string blobContainer)
+    public override async Task DeleteContainer(string containerName)
     {
-        blobs.Delete(blobContainer, blobKey);
-        return Task.CompletedTask;
+        if (blobs.BeforeContainerDeleteAsync is not null)
+            await blobs.BeforeContainerDeleteAsync(containerName);
+        if (blobs.FailContainerDeletes)
+            throw new IOException("The test blob boundary rejected the container delete.");
+        blobs.DeleteContainer(containerName);
     }
 
-    public override async Task<(Stream Stream, string FileName)> OpenUnpublishedFileAsync(string fileId,
-        CancellationToken cancellationToken)
-    {
-        var file = await Repository.GetFileAccessInfo(fileId);
-        if (file is null || !string.IsNullOrWhiteSpace(file.CaveId) ||
-            string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
-            throw Planarian.Library.Exceptions.ApiExceptionDictionary.NotFound("Staged file");
-        return (blobs.OpenRead(file.ContainerName, file.BlobKey), file.FileName);
-    }
+
 }

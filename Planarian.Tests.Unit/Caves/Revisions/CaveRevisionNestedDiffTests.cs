@@ -11,7 +11,6 @@ public sealed class CaveRevisionNestedDiffTests
     [InlineData(nameof(CaveEntranceSnapshotV1.Name))]
     [InlineData(nameof(CaveEntranceSnapshotV1.IsPrimary))]
     [InlineData(nameof(CaveEntranceSnapshotV1.Description))]
-    [InlineData(nameof(CaveEntranceSnapshotV1.ReportedByUserId))]
     [InlineData(nameof(CaveEntranceSnapshotV1.Latitude))]
     [InlineData(nameof(CaveEntranceSnapshotV1.Longitude))]
     [InlineData(nameof(CaveEntranceSnapshotV1.Elevation))]
@@ -27,7 +26,6 @@ public sealed class CaveRevisionNestedDiffTests
             nameof(CaveEntranceSnapshotV1.Name) => original with { Name = "North" },
             nameof(CaveEntranceSnapshotV1.IsPrimary) => original with { IsPrimary = true },
             nameof(CaveEntranceSnapshotV1.Description) => original with { Description = "Changed" },
-            nameof(CaveEntranceSnapshotV1.ReportedByUserId) => original with { ReportedByUserId = "user-2" },
             nameof(CaveEntranceSnapshotV1.Latitude) => original with { Latitude = 36 },
             nameof(CaveEntranceSnapshotV1.Longitude) => original with { Longitude = -87 },
             nameof(CaveEntranceSnapshotV1.Elevation) => original with { Elevation = 0 },
@@ -141,16 +139,23 @@ public sealed class CaveRevisionNestedDiffTests
     }
 
     [Fact]
-    public void ReporterDisplayMetadataDoesNotLeakIntoSemanticFields()
+    public void EntranceReportedByPeopleTagsAreSemanticFields()
     {
-        var original = Entrance();
-        var changed = original with { Name = "Changed name", ReportedByNameAtRevision = "Renamed reporter" };
+        var original = Entrance() with
+        {
+            Tags = [new SnapshotTagReference(SnapshotTagRole.EntranceReportedBy, "person-1", "Old Reporter")]
+        };
+        var changed = original with
+        {
+            Tags = [new SnapshotTagReference(SnapshotTagRole.EntranceReportedBy, "person-2", "New Reporter")]
+        };
 
         var diff = _diff.Compare(Snapshot(original), Snapshot(changed));
 
         var detail = Assert.Single(diff.EntranceChanges);
-        Assert.Equal(nameof(CaveEntranceSnapshotV1.Name), Assert.Single(detail.Scalars).Key);
-        Assert.DoesNotContain(nameof(CaveEntranceSnapshotV1.ReportedByUserId), detail.Scalars.Keys);
+        Assert.Empty(detail.Scalars);
+        Assert.Equal("Old Reporter", Assert.Single(detail.RemovedTags).NameAtRevision);
+        Assert.Equal("New Reporter", Assert.Single(detail.AddedTags).NameAtRevision);
     }
 
     [Fact]
@@ -172,8 +177,7 @@ public sealed class CaveRevisionNestedDiffTests
 
     private static CaveEntranceSnapshotV1 Entrance() => new()
     {
-        Id = "entrance", Name = "Main", Description = "Original", ReportedByUserId = "user-1",
-        ReportedByNameAtRevision = "Reporter", Latitude = 35, Longitude = -86, Elevation = null,
+        Id = "entrance", Name = "Main", Description = "Original", Latitude = 35, Longitude = -86, Elevation = null,
         Srid = 4326, LocationQualityTagId = "exact", LocationQualityNameAtRevision = "Exact",
         PitDepthFeet = null
     };

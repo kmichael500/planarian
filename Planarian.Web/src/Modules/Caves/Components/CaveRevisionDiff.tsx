@@ -5,6 +5,7 @@ import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/
 import {
   AffectedEntrancePresentation,
   AffectedFilePresentation,
+  AffectedLinePlotPresentation,
   buildCaveRevisionDiffPresentation,
   ChangedFieldPresentation,
   DiffValueFormat,
@@ -101,7 +102,6 @@ const Entrance = ({ entrance, layout }: { entrance: AffectedEntrancePresentation
       <Descriptions.Item label="Name">{defaultIfEmpty(snapshot.name)}</Descriptions.Item>
       <Descriptions.Item label="Primary">{snapshot.isPrimary ? "Yes" : "No"}</Descriptions.Item>
       <Descriptions.Item label="Reported On">{formatDate(snapshot.reportedOn) ?? "—"}</Descriptions.Item>
-      <Descriptions.Item label="Reported By">{defaultIfEmpty(snapshot.reportedByNameAtRevision ?? snapshot.reportedByUserId)}</Descriptions.Item>
       <Descriptions.Item label="Pit Depth">{defaultIfEmpty(formatDistance(snapshot.pitDepthFeet, DistanceFormat.feet))}</Descriptions.Item>
       <Descriptions.Item label="Coordinate Reference System">{formatNumber(snapshot.srid) ?? "—"}</Descriptions.Item>
       <SnapshotTagGroups tags={snapshot.tags} />
@@ -125,6 +125,23 @@ const File = ({ file, layout }: { file: AffectedFilePresentation; layout: "horiz
   </Card>;
 };
 
+const LinePlot = ({ linePlot, layout }: { linePlot: AffectedLinePlotPresentation; layout: "horizontal" | "vertical" }) => {
+  const snapshot = linePlot.snapshot;
+  const statusColor = linePlot.status === "added" ? "success" : linePlot.status === "removed" ? "error" : "processing";
+  return <Card size="small" title={<Space><span>{linePlot.heading}</span><Tag color={statusColor}>{statusLabel[linePlot.status]}</Tag></Space>}>
+    {!linePlot.detailsAvailable && <Alert type="warning" showIcon message="Line plot details unavailable" description={`Line plot ID: ${linePlot.id}`} />}
+    {linePlot.detailsAvailable && linePlot.status === "changed" && <Descriptions bordered column={1} size="small" layout={layout}>
+      {linePlot.fields.map(field => <Descriptions.Item label={field.label} key={field.key}>
+        <ChangedValue field={field} name={`line-plot-${linePlot.id}-${field.key}`} />
+      </Descriptions.Item>)}
+    </Descriptions>}
+    {linePlot.detailsAvailable && linePlot.status !== "changed" && snapshot && <Descriptions bordered column={1} size="small" layout={layout}>
+      <Descriptions.Item label="Name">{defaultIfEmpty(snapshot.name)}</Descriptions.Item>
+      <Descriptions.Item label="Content">GeoJSON content</Descriptions.Item>
+    </Descriptions>}
+  </Card>;
+};
+
 const SectionTitle = ({ children }: { children: ReactNode }) => <Typography.Title level={5} style={{ margin: 0 }}>{children}</Typography.Title>;
 
 export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, proposalCountyNumberChange }: {
@@ -142,7 +159,7 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, 
   const model = buildCaveRevisionDiffPresentation(diff, previous, current, countyNumberIntent,
     proposalCountyNumberChange);
   const hasChanges = model.caveInformation.length || model.entrances.length || model.narrative || model.files.length ||
-    model.fallbackScalars.length || model.fallbackMetadata.length;
+    model.linePlots.length || model.fallbackScalars.length || model.fallbackMetadata.length;
   if (!hasChanges) return <Typography.Text type="secondary">No visible field changes</Typography.Text>;
 
   return <Space direction="vertical" size="large" style={{ width: "100%" }}>
@@ -173,6 +190,13 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, 
       <SectionTitle>Files</SectionTitle>
       <Space direction="vertical" style={{ width: "100%", marginTop: token.marginXS }}>
         {model.files.map(file => <File key={`${file.status}-${file.id}`} file={file} layout={layout} />)}
+      </Space>
+    </section>}
+
+    {!!model.linePlots.length && <section>
+      <SectionTitle>Line Plots</SectionTitle>
+      <Space direction="vertical" style={{ width: "100%", marginTop: token.marginXS }}>
+        {model.linePlots.map(linePlot => <LinePlot key={`${linePlot.status}-${linePlot.id}`} linePlot={linePlot} layout={layout} />)}
       </Space>
     </section>}
 

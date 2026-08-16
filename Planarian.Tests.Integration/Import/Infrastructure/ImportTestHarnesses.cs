@@ -1,10 +1,12 @@
 using System.Text;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Data;
 using Planarian.Modules.Import.Parsing;
 using Planarian.Modules.Import.Planning;
+using Planarian.Modules.Tags.Repositories;
 
 namespace Planarian.Tests;
 
@@ -45,8 +47,10 @@ internal sealed class CaveImportTestHarness
         CancellationToken cancellationToken = default)
     {
         var snapshots = new CavePublishedSnapshotRepository(_db, _db.RequestUser);
-        var revisions = new CaveImportRevisionRepository(_db, _db.RequestUser);
-        var repository = new CaveImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions);
+        var revisions = new CaveBulkRevisionRepository(_db, _db.RequestUser);
+        var locks = new TagReferenceLockRepository(_db, _db.RequestUser);
+        var repository = new CaveImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks,
+            new CountyReferenceLockRepository(_db, _db.RequestUser));
         return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
     }
 
@@ -86,8 +90,9 @@ internal sealed class EntranceImportTestHarness
         CancellationToken cancellationToken = default)
     {
         var snapshots = new CavePublishedSnapshotRepository(_db, _db.RequestUser);
-        var revisions = new CaveImportRevisionRepository(_db, _db.RequestUser);
-        var repository = new EntranceImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions);
+        var revisions = new CaveBulkRevisionRepository(_db, _db.RequestUser);
+        var locks = new TagReferenceLockRepository(_db, _db.RequestUser);
+        var repository = new EntranceImportExecutionRepository(_db, _db.RequestUser, snapshots, revisions, locks);
         return repository.ExecuteAsync(plan, sourceFileName, cancellationToken);
     }
 

@@ -11,6 +11,7 @@ using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
+using Planarian.Modules.Tags.Repositories;
 
 namespace Planarian.Modules.Import.Data;
 
@@ -23,15 +24,18 @@ public sealed class EntranceImportExecutionRepository
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
     private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveImportRevisionRepository _revisionPublisher;
+    private readonly CaveBulkRevisionRepository _revisionPublisher;
+    private readonly TagReferenceLockRepository _tagReferenceLocks;
 
     public EntranceImportExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotRepository snapshots, CaveImportRevisionRepository revisionPublisher)
+        CavePublishedSnapshotRepository snapshots, CaveBulkRevisionRepository revisionPublisher,
+        TagReferenceLockRepository tagReferenceLocks)
     {
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
         _revisionPublisher = revisionPublisher;
+        _tagReferenceLocks = tagReferenceLocks;
     }
 
     public async Task<string> ExecuteAsync(EntranceImportPlan plan, string? sourceFileName,
@@ -43,8 +47,8 @@ public sealed class EntranceImportExecutionRepository
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            await LockAndVerifyTargetsAsync(plan, cancellationToken);
             await VerifyTagsAsync(plan, cancellationToken);
+            await LockAndVerifyTargetsAsync(plan, cancellationToken);
 
             var targetIds = plan.Targets.Keys.Order(StringComparer.Ordinal).ToList();
             var before = targetIds.Count == 0
@@ -83,7 +87,8 @@ public sealed class EntranceImportExecutionRepository
                 StringComparer.Ordinal);
             var operations = targetIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
                 StringComparer.Ordinal);
-            await _revisionPublisher.PublishAsync(before, after, expected, operations, batchId,
+            await _revisionPublisher.PublishAsync(before, after, expected, operations,
+                CaveRevisionSource.Import, batchId,
                 cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -112,7 +117,7 @@ public sealed class EntranceImportExecutionRepository
                 command.CommandText = """
                     select "Id" from "Caves"
                     where "AccountId" = @account_id and "Id" = any(@cave_ids)
-                    order by "Id" for update
+                    order by "Id" collate "C" for update
                     """;
                 command.Parameters.AddWithValue("account_id", _scope.AccountId);
                 command.Parameters.AddWithValue("cave_ids", chunk);
@@ -155,16 +160,13 @@ public sealed class EntranceImportExecutionRepository
     {
         var creationIds = plan.TagCreations.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
         var existingIds = plan.TagNamesById.Keys.Where(id => !creationIds.Contains(id)).ToList();
-        foreach (var chunk in existingIds.Chunk(CaveBatchSize))
+        var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingIds, cancellationToken);
+        if (lockedTags.Count != existingIds.Distinct(StringComparer.Ordinal).Count())
+            throw new ImportPlanConcurrencyException("A referenced Entrance Tag changed ownership or disappeared.");
+        foreach (var tag in lockedTags)
         {
-            var tags = await _db.TagTypes
-                .Where(t => chunk.Contains(t.Id) && (t.AccountId == _scope.AccountId || t.IsDefault))
-                .AsNoTracking().Select(t => new { t.Id, t.Name }).ToListAsync(cancellationToken);
-            if (tags.Count != chunk.Length)
-                throw new ImportPlanConcurrencyException("A referenced Entrance Tag changed ownership or disappeared.");
-            foreach (var tag in tags)
-                if (plan.TagNamesById[tag.Id] != tag.Name)
-                    throw new ImportPlanConcurrencyException($"Tag '{tag.Id}' was renamed after Entrance import planning.");
+            if (plan.TagNamesById[tag.Id] != tag.Name)
+                throw new ImportPlanConcurrencyException($"Tag '{tag.Id}' was renamed after Entrance import planning.");
         }
     }
 

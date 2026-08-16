@@ -36,8 +36,6 @@ export interface CaveEntranceSnapshotVm {
   name?: string;
   isPrimary: boolean;
   description?: string;
-  reportedByUserId?: string;
-  reportedByNameAtRevision?: string;
   latitude?: number;
   longitude?: number;
   elevation?: number;
@@ -47,6 +45,12 @@ export interface CaveEntranceSnapshotVm {
   reportedOn?: string;
   pitDepthFeet?: number;
   tags: SnapshotTagReference[];
+}
+
+export interface CaveLinePlotSnapshotVm {
+  id: string;
+  name: string;
+  contentHash: string;
 }
 
 export interface CaveFileSnapshotVm {
@@ -65,7 +69,6 @@ export interface CaveSnapshotVm {
   state: SnapshotReferenceVm;
   county: SnapshotReferenceVm;
   countyNumber: number;
-  reportedByUserId?: string;
   lengthFeet?: number | null;
   depthFeet?: number | null;
   maxPitDepthFeet?: number | null;
@@ -76,6 +79,7 @@ export interface CaveSnapshotVm {
   tags: SnapshotTagReference[];
   entrances: CaveEntranceSnapshotVm[];
   files: CaveFileSnapshotVm[];
+  linePlots: CaveLinePlotSnapshotVm[];
 }
 
 export interface CaveScalarChangeVm {
@@ -94,6 +98,9 @@ export interface CaveRevisionDiffVm {
   addedFiles: string[];
   removedFiles: string[];
   changedFiles: string[];
+  addedLinePlots: string[];
+  removedLinePlots: string[];
+  changedLinePlots: string[];
   entranceChanges: Array<{
     entranceId: string;
     scalars: CaveScalarChangeVm[];
@@ -102,6 +109,10 @@ export interface CaveRevisionDiffVm {
   }>;
   fileChanges: Array<{
     fileId: string;
+    scalars: CaveScalarChangeVm[];
+  }>;
+  linePlotChanges: Array<{
+    linePlotId: string;
     scalars: CaveScalarChangeVm[];
   }>;
   referenceMetadataChanges: Array<{

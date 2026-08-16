@@ -6,7 +6,7 @@ import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButt
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { AddCaveComponent } from "../Components/AddCaveComponent";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
-import { snapshotToForm } from "../Helpers/CaveFormMapper";
+import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
@@ -18,6 +18,9 @@ export const ReviseCaveChangeRequestPage = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const [form] = Form.useForm<AddCaveVm>();
   const [detail, setDetail] = useState<CaveChangeRequestDetailVm>();
+  const [editorValues, setEditorValues] = useState<AddCaveVm>();
+  const [expectedBaseRevisionId, setExpectedBaseRevisionId] = useState<string>();
+  const [expectedProposalVersionId, setExpectedProposalVersionId] = useState<string>();
   const [draft, setDraft] = useState<AddCaveVm>();
   const [preview, setPreview] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
@@ -27,19 +30,46 @@ export const ReviseCaveChangeRequestPage = () => {
     setHeaderTitle(["Revise Cave Change Request"]);
     setHeaderButtons([<BackButtonComponent to={`/caves/requests/${requestId}`} />]);
     if (!requestId) return;
-    CaveService.GetChangeRequest(requestId).then((loaded) => {
-      setDetail(loaded);
-      form.setFieldsValue(loaded.request.isStale
-        ? snapshotToForm(loaded.current, undefined, undefined, loaded.activeStagedFiles)
-        : snapshotToForm(loaded.proposed, loaded.countyNumberIntent, loaded.requestedCountyNumber));
-    }).catch(() => message.error("The change request could not be loaded."))
-      .finally(() => setLoading(false));
+    const load = async () => {
+      try {
+        const loaded = await CaveService.GetChangeRequest(requestId);
+        setDetail(loaded);
+        setExpectedProposalVersionId(loaded.request.currentProposalVersionId);
+
+        let values: AddCaveVm;
+        if (loaded.request.isStale) {
+          const context = await CaveService.GetProposalAuthoringContext(loaded.request.caveId);
+          values = caveToForm(context.cave, context.linePlots);
+          const existingIds = new Set((values.files ?? []).map((file) => file.id));
+          values.files = [
+            ...(values.files ?? []),
+            ...loaded.activeStagedFiles.filter((file) => !existingIds.has(file.id)).map((file) => ({
+              id: file.id,
+              displayName: file.displayName ?? null,
+              fileTypeTagId: file.fileTypeTagId,
+              fileTypeKey: file.fileTypeNameAtRevision,
+            })),
+          ];
+          setExpectedBaseRevisionId(context.expectedBaseRevisionId);
+        } else {
+          const version = await CaveService.GetProposalVersion(requestId, loaded.request.currentProposalVersionId);
+          values = snapshotToForm(version.proposed, version.countyNumberIntent,
+            version.requestedCountyNumber, loaded.activeStagedFiles, version.linePlots);
+          setExpectedBaseRevisionId(version.baseRevisionId);
+        }
+        setEditorValues(values);
+        form.setFieldsValue(values);
+      } catch {
+        message.error("The change request could not be loaded.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
   }, [requestId, form, setHeaderButtons, setHeaderTitle]);
 
   if (!requestId) return null;
   const againstCurrent = detail?.request.isStale === true;
-  const expectedBaseRevisionId = againstCurrent ? detail?.request.currentRevisionId : detail?.request.proposalBaseRevisionId;
-  const expectedProposalVersionId = detail?.request.currentProposalVersionId;
 
   const previewChanges = async (values: AddCaveVm) => {
     setLoading(true);
@@ -48,9 +78,9 @@ export const ReviseCaveChangeRequestPage = () => {
       setPreview(await CaveService.PreviewRevisedChanges(requestId, values, againstCurrent,
         expectedBaseRevisionId!, expectedProposalVersionId!));
     } catch (error: any) {
-      if (error?.response?.data?.conflictKind === "ActiveProposalVersionChanged")
+      if (error?.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before continuing.");
-      else if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+      else if (error?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed again. Reload this page before revising the proposal.");
       else message.error("The revised proposal could not be previewed.");
     } finally { setLoading(false); }
@@ -65,9 +95,9 @@ export const ReviseCaveChangeRequestPage = () => {
       message.success("A new immutable proposal version was created.");
       navigate(`/caves/requests/${requestId}`);
     } catch (error: any) {
-      if (error?.response?.data?.conflictKind === "ActiveProposalVersionChanged")
+      if (error?.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before saving.");
-      else if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+      else if (error?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed again. Reload before creating the new proposal version.");
       else message.error("The proposal version could not be saved.");
     } finally { setSaving(false); }
@@ -101,14 +131,13 @@ export const ReviseCaveChangeRequestPage = () => {
       <Alert type="info" showIcon message={`This request is ${detail.request.status.toLowerCase()} and can no longer be revised.`} />}
     {detail && detail.request.status === "Pending" && !detail.request.canEdit && !detail.request.canReview &&
       <Alert type="error" showIcon message="You do not have permission to revise this request." />}
-    {detail && detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview) && !preview && <Card>
+    {detail && editorValues && detail.request.status === "Pending" &&
+      (detail.request.canEdit || detail.request.canReview) && !preview && <Card>
       <Typography.Paragraph type="secondary">
         {againstCurrent ? "This editor is initialized from the current published Cave." : "This editor is initialized from the active proposal."}
       </Typography.Paragraph>
       <Form form={form} layout="vertical" onFinish={previewChanges}>
-        <AddCaveComponent isEditing form={form} cave={againstCurrent
-          ? snapshotToForm(detail.current, undefined, undefined, detail.activeStagedFiles)
-          : snapshotToForm(detail.proposed, detail.countyNumberIntent, detail.requestedCountyNumber)} />
+        <AddCaveComponent isEditing form={form} cave={editorValues} />
       </Form>
     </Card>}
   </Space></Spin>;

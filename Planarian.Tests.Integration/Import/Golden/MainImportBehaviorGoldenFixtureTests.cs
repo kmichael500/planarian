@@ -9,6 +9,7 @@ using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Model.Shared.Helpers;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
@@ -184,7 +185,10 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
 
         var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
         await new CaveImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveImportRevisionRepository(db, db.RequestUser)).ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
+            new CountyReferenceLockRepository(db, db.RequestUser))
+            .ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 
         var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves, beforeTags);
@@ -217,7 +221,9 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
 
         var reader = new CavePublishedSnapshotRepository(db, db.RequestUser);
         await new EntranceImportExecutionRepository(db, db.RequestUser, reader,
-            new CaveImportRevisionRepository(db, db.RequestUser)).ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser))
+            .ExecuteAsync(plan, $"golden-{item.Behavior}.csv");
         db.ChangeTracker.Clear();
 
         var actualCommitted = await GoldenCommittedState.CaptureAsync(db, tenant.AccountId, beforeCaves, beforeTags);

@@ -5,7 +5,7 @@ namespace Planarian.Modules.Caves.Models;
 
 public class GeoJsonUploadVm
 {
-    public string? Id { get; set; }
+    [MaxLength(PropertyLength.Id)] public string? Id { get; set; }
         
     [Required]
     public string GeoJson { get; set; } = null!;

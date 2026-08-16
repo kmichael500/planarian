@@ -1,10 +1,12 @@
 import { AddCaveVm } from "../Models/AddCaveVm";
+import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveFileSnapshotVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 
-export const caveToForm = (cave: CaveVm): AddCaveVm => ({
+export const caveToForm = (cave: CaveVm, linePlots: GeoJsonUploadVm[] = []): AddCaveVm => ({
   id: cave.id,
+  expectedRevisionId: cave.currentRevisionId ?? null,
   name: cave.name,
   alternateNames: cave.alternateNames,
   countyId: cave.countyId,
@@ -38,6 +40,7 @@ export const caveToForm = (cave: CaveVm): AddCaveVm => ({
   })),
   geologyTagIds: cave.geologyTagIds,
   files: cave.files,
+  linePlots,
   reportedByNameTagIds: cave.reportedByNameTagIds,
   biologyTagIds: cave.biologyTagIds,
   archeologyTagIds: cave.archeologyTagIds,
@@ -52,7 +55,8 @@ const tagIds = (tags: SnapshotTagReference[], role: string) =>
   tags.filter((tag) => tag.role === role).map((tag) => tag.tagTypeId);
 
 export const snapshotToForm = (snapshot: CaveSnapshotVm, countyNumberIntent?: CountyNumberIntent,
-  requestedCountyNumber?: number, additionalFiles: CaveFileSnapshotVm[] = []): AddCaveVm => ({
+  requestedCountyNumber?: number, additionalFiles: CaveFileSnapshotVm[] = [],
+  linePlots: GeoJsonUploadVm[] = []): AddCaveVm => ({
   id: snapshot.caveId,
   name: snapshot.name,
   alternateNames: snapshot.alternateNames,
@@ -92,6 +96,7 @@ export const snapshotToForm = (snapshot: CaveSnapshotVm, countyNumberIntent?: Co
     displayName: file.displayName ?? null,
     fileTypeKey: file.fileTypeNameAtRevision,
   })),
+  linePlots,
   reportedByNameTagIds: tagIds(snapshot.tags, "CaveReportedBy"),
   biologyTagIds: tagIds(snapshot.tags, "Biology"),
   archeologyTagIds: tagIds(snapshot.tags, "Archeology"),

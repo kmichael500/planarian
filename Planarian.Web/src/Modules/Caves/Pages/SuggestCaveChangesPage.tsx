@@ -32,7 +32,7 @@ export const SuggestCaveChangesPage = () => {
     CaveService.GetProposalAuthoringContext(caveId).then((context) => {
       setCave(context.cave);
       setExpectedBaseRevisionId(context.expectedBaseRevisionId);
-      form.setFieldsValue(caveToForm(context.cave));
+      form.setFieldsValue(caveToForm(context.cave, context.linePlots));
     }).catch(() => message.error("The Cave could not be loaded."))
       .finally(() => setLoading(false));
   }, [caveId]);
@@ -45,7 +45,7 @@ export const SuggestCaveChangesPage = () => {
       setDraft(values);
       setPreviewResult(await CaveService.PreviewChanges(caveId, values, expectedBaseRevisionId!));
     } catch (error: any) {
-      if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+      if (error?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed while you were editing. Reload and review the current Cave before continuing.");
       else message.error("The proposed changes could not be previewed.");
     } finally {
@@ -61,7 +61,7 @@ export const SuggestCaveChangesPage = () => {
       message.success("Your changes were submitted for review.");
       navigate(`/caves/requests/${id}`);
     } catch (error: any) {
-      if (error?.response?.data?.conflictKind === "PublishedCaveChanged")
+      if (error?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed after your preview. Reload and review it before submitting.");
       else message.error("The change request could not be submitted.");
     } finally {

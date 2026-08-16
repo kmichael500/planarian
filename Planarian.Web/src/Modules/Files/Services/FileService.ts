@@ -1,4 +1,3 @@
-import { EditFileMetadataVm } from "../Models/EditFileMetadataVm";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
@@ -9,10 +8,6 @@ export enum FileAccessAction {
 }
 
 const FileService = {
-  async UpdateFilesMetadata(values: EditFileMetadataVm[]): Promise<void> {
-    await HttpClient.put<string>(`${filesBaseUrl}/multiple`, values);
-  },
-
   async getFileBlob(fileId: string): Promise<Blob> {
     const response = await HttpClient.get<Blob>(
       `${filesBaseUrl}/${fileId}/${FileAccessAction.View}`,

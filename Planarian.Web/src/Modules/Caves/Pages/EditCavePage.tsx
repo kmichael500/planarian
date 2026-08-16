@@ -49,7 +49,8 @@ const EditCavePage: React.FC = () => {
 
   useEffect(() => {
     const getCave = async () => {
-      const caveResponse = await CaveService.GetCave(caveId);
+      const context = await CaveService.GetEditAuthoringContext(caveId);
+      const caveResponse = context.cave;
 
       // date picker requires it to be a dayjs object
       if (!isNullOrWhiteSpace(caveResponse.reportedOn)) {
@@ -61,7 +62,7 @@ const EditCavePage: React.FC = () => {
         }
       });
       setCave(caveResponse);
-      const formValues = caveToForm(caveResponse);
+      const formValues = caveToForm(caveResponse, context.linePlots);
 
       form.setFieldsValue(formValues);
 
@@ -97,8 +98,12 @@ const EditCavePage: React.FC = () => {
       message.success(`'${values?.name}' has been updated successfully`);
       navigate(`/caves/${cave?.id}`);
     } catch (e: any) {
-      const error = e as ApiErrorResponse;
-      message.error(error.message);
+      const error = e as ApiErrorResponse & { conflictKind?: string };
+      if (error.statusCode === 409 && error.conflictKind === "PublishedCaveChanged") {
+        message.warning("This Cave changed after you opened the editor. Reload before saving so you do not overwrite newer changes.");
+      } else {
+        message.error(error.message);
+      }
     } finally {
       setIsLoading(false);
     }

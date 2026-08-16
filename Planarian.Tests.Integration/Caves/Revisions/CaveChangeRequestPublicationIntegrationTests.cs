@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
@@ -19,6 +20,157 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 
 public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
+    [Fact]
+    public async Task AgainstCurrentRereviewRetainsServerAllocatedProposalEntranceIdThroughApproval()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(AgainstCurrentRereviewRetainsServerAllocatedProposalEntranceIdThroughApproval));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+        string requestId;
+        string versionOne;
+        string proposalEntranceId;
+
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Initial proposal"), tenant.RevisionId, default);
+            versionOne = await CurrentVersionAsync(contributor.Db, requestId);
+            var version = await contributor.Db.CaveProposalVersions.SingleAsync(row => row.Id == versionOne);
+            proposalEntranceId = Assert.Single(CaveProposalJson.Deserialize(version.ProposalJson, 1).Entrances)
+                .EntranceId;
+        }
+
+        string currentRevisionId;
+        await using (var manager = database.CreateDbContext("manager", tenant.AccountId))
+        {
+            var mutations = new CaveMutationRepository(manager, manager.RequestUser,
+                new CavePublishedSnapshotRepository(manager, manager.RequestUser));
+            currentRevisionId = (await mutations.PublishExistingAsync(tenant.CaveId, tenant.RevisionId,
+                CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                cave => cave.Narrative = "Independent publication")).RevisionId!;
+        }
+
+        string versionTwo;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            var rereviewed = PublishableValues(tenant, quality.Id, "Rereviewed proposal");
+            rereviewed.Narrative = "Independent publication";
+            rereviewed.Entrances.Single().Id = proposalEntranceId;
+            versionTwo = await contributor.ChangeRequests.AddVersionAsync(requestId, rereviewed,
+                againstCurrent: true, expectedBaseRevisionId: currentRevisionId,
+                expectedProposalVersionId: versionOne, default);
+            var persisted = await contributor.Db.CaveProposalVersions.SingleAsync(row => row.Id == versionTwo);
+            Assert.Equal(proposalEntranceId,
+                Assert.Single(CaveProposalJson.Deserialize(persisted.ProposalJson, 1).Entrances).EntranceId);
+        }
+
+        string acceptedRevisionId;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+            acceptedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(requestId, versionTwo, null, default))
+                .PublishedRevisionId!;
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Equal(proposalEntranceId, Assert.Single(await verify.Entrances.Where(entrance =>
+            entrance.CaveId == tenant.CaveId).ToListAsync()).Id);
+        var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == acceptedRevisionId)).SnapshotJson, 1);
+        Assert.Equal(proposalEntranceId, Assert.Single(accepted.Entrances).Id);
+    }
+
+    [Fact]
+    public async Task ServerAllocatedProposalEntranceIdSurvivesPublication()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ServerAllocatedProposalEntranceIdSurvivesPublication));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+        string requestId;
+        string proposalEntranceId;
+
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            var values = PublishableValues(tenant, locationTag.Id, "Entrance identity");
+            values.CartographerNameTagIds = ["Shared New Person"];
+            values.ReportedByNameTagIds = ["Shared New Person"];
+            values.Entrances.Single().ReportedByNameTagIds = ["Shared New Person"];
+            requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                values, tenant.RevisionId, default);
+            var version = await contributor.Db.CaveProposalVersions.SingleAsync(row =>
+                row.ChangeRequestId == requestId);
+            proposalEntranceId = Assert.Single(CaveProposalJson.Deserialize(version.ProposalJson, 1).Entrances)
+                .EntranceId;
+            Assert.False(string.IsNullOrWhiteSpace(proposalEntranceId));
+        }
+
+        string revisionId;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+            revisionId = (await reviewer.ChangeRequests.ApproveAsync(requestId,
+                await CurrentVersionAsync(reviewer.Db, requestId), null, default)).PublishedRevisionId!;
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.Equal(proposalEntranceId, Assert.Single(await verify.Entrances.Where(entrance =>
+            entrance.CaveId == tenant.CaveId).ToListAsync()).Id);
+        var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == revisionId)).SnapshotJson, 1);
+        Assert.Equal(proposalEntranceId, Assert.Single(accepted.Entrances).Id);
+        var person = Assert.Single(await verify.TagTypes.Where(tag => tag.AccountId == tenant.AccountId &&
+            tag.Key == TagTypeKeyConstant.People && tag.Name == "Shared New Person").ToListAsync());
+        Assert.Contains(accepted.Tags, tag => tag.Role == SnapshotTagRole.Cartographer &&
+            tag.TagTypeId == person.Id);
+        Assert.Contains(accepted.Tags, tag => tag.Role == SnapshotTagRole.CaveReportedBy &&
+            tag.TagTypeId == person.Id);
+        Assert.Contains(accepted.Entrances.Single().Tags, tag => tag.Role == SnapshotTagRole.EntranceReportedBy &&
+            tag.TagTypeId == person.Id);
+    }
+
+    [Fact]
+    public async Task ApprovalReturnsThePublishedRevisionWithoutPostCommitReload()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ApprovalReturnsThePublishedRevisionWithoutPostCommitReload));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+        string requestId;
+
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            requestId = await new CaveChangeRequestRepository(contributor, contributor.RequestUser).CreateAsync(
+                tenant.CaveId, tenant.RevisionId,
+                PublishableProposal(tenant, locationTag.Id, "Published revision response"), default);
+        }
+
+        CaveChangeRequestDecisionVm decision;
+        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
+            decision = await IntegrationTestServices.For(reviewer).CaveChangeRequests.ApproveAsync(requestId,
+                await CurrentVersionAsync(reviewer, requestId), null, default);
+        }
+
+        Assert.Equal(CaveChangeRequestDecisionResult.Approved, decision.Result);
+        Assert.False(string.IsNullOrWhiteSpace(decision.PublishedRevisionId));
+        Assert.Equal(decision.PublishedRevisionId, decision.CurrentRevisionId);
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Approved, request.Status);
+        Assert.Equal(decision.PublishedRevisionId, request.ApprovedRevisionId);
+        var revision = await verify.CaveRevisions.SingleAsync(row => row.ChangeRequestId == requestId);
+        Assert.Equal(decision.PublishedRevisionId, revision.Id);
+        var cave = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+        Assert.Equal(decision.PublishedRevisionId, cave.CurrentRevisionId);
+    }
+
     [Fact]
     public async Task ApplicationApprovalPublishesNormalizedCaveAndExactlyOneLinkedRevision()
     {
@@ -192,18 +344,10 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
         await using var contributorHistory = database.CreateDbContext("contributor", tenant.AccountId);
         await CavePermissions.AuthenticateAsync(contributorHistory, tenant.AccountId);
         var history = IntegrationTestServices.For(contributorHistory).CaveChangeRequests;
-        var listed = Assert.Single(await history.ListMineAsync(default), request => request.Id == requestId);
-        Assert.False(listed.CaveExists);
-        Assert.False(listed.IsStale);
-        Assert.Equal("Cave A", listed.CaveName);
-        var detail = await history.GetAsync(requestId, default);
-        Assert.Equal(CaveChangeRequestStatus.Rejected, detail.Request.Status);
-        Assert.Equal("Resolved before deletion", detail.Request.ReviewerNotes);
-        Assert.False(string.IsNullOrWhiteSpace(detail.Request.ReviewerName));
-        Assert.False(detail.Request.CaveExists);
-        Assert.False(detail.Request.IsStale);
-        Assert.Equal("Pending V1", (await history.GetVersionAsync(requestId, versionOneId, default)).Proposed.Name);
-        Assert.Equal("Rejected V2", (await history.GetVersionAsync(requestId, versionTwoId, default)).Proposed.Name);
+        Assert.DoesNotContain(await history.ListMineAsync(default), request => request.Id == requestId);
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => history.GetAsync(requestId, default));
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            history.GetVersionAsync(requestId, versionOneId, default));
 
         await using var reviewQueue = database.CreateDbContext("reviewer", tenant.AccountId);
         await CavePermissions.AuthenticateAsync(reviewQueue, tenant.AccountId);
@@ -383,6 +527,28 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
             CountyNumber = 20,
             RevisionId = importedRevisionId
         };
+        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await using (var validImport = database.CreateDbContext("valid-import", tenant.AccountId))
+        {
+            var entrance = new Entrance
+            {
+                Id = "importent1", CaveId = importedCaveId, IsPrimary = true,
+                LocationQualityTagId = locationTag.Id, Location = new Point(-86, 35, 500) { SRID = 4326 }
+            };
+            validImport.Entrances.Add(entrance);
+            var revision = await validImport.CaveRevisions.SingleAsync(row => row.Id == importedRevisionId);
+            var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, 1) with
+            {
+                Entrances = [new CaveEntranceSnapshotV1
+                {
+                    Id = entrance.Id, IsPrimary = true, Latitude = 35, Longitude = -86, Elevation = 500,
+                    LocationQualityTagId = locationTag.Id, LocationQualityNameAtRevision = locationTag.Name
+                }]
+            };
+            revision.SnapshotJson = CaveSnapshotJson.Serialize(snapshot);
+            await validImport.SaveChangesAsync();
+        }
         await CavePermissions.GrantViewAsync(database, imported, "contributor");
 
         await using var contributor = database.CreateDbContext("contributor", tenant.AccountId);

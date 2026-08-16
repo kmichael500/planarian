@@ -1,7 +1,6 @@
 export interface EntranceVm {
   id: string;
   isPrimary: boolean;
-  reportedByUserId: string | null;
   locationQualityTagId: string;
   name: string | null;
   description: string | null;

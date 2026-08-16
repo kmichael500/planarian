@@ -1,8 +1,10 @@
+import { GeoJsonUploadVm } from "./GeoJsonUploadVm";
 import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { AddEntranceVm } from "./AddEntranceVm";
 
 export interface AddCaveVm {
   id?: string;
+  expectedRevisionId?: string | null;
   name: string;
   alternateNames: string[];
   countyId: string | null;
@@ -20,6 +22,7 @@ export interface AddCaveVm {
   entrances: AddEntranceVm[];
   geologyTagIds: string[];
   files?: EditFileMetadataVm[];
+  linePlots?: GeoJsonUploadVm[];
   reportedByNameTagIds: string[];
   biologyTagIds: string[];
   archeologyTagIds: string[];

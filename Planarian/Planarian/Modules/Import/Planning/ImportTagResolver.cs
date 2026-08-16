@@ -1,6 +1,7 @@
 using Planarian.Library.Exceptions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Tags;
 
 namespace Planarian.Modules.Import.Planning;
 
@@ -29,12 +30,8 @@ internal static class ImportTagResolver
         foreach (var (key, name) in normalized)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var match = existing
-                .Where(tag => tag.Key == key && tag.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))
-                .OrderByDescending(tag => tag.Name.Equals(name, StringComparison.Ordinal))
-                .ThenByDescending(tag => tag.AccountId == accountId)
-                .ThenBy(tag => tag.Id, StringComparer.Ordinal)
-                .FirstOrDefault();
+            var match = TagNameMatchPolicy.Select(name, accountId,
+                existing.Where(tag => tag.Key == key));
             if (match is null)
             {
                 if (name.Length > PropertyLength.Name)
@@ -81,16 +78,16 @@ internal static class ImportTagResolver
         public bool Equals(TagIdentity? x, TagIdentity? y) =>
             x is not null && y is not null &&
             StringComparer.Ordinal.Equals(x.Key, y.Key) &&
-            StringComparer.InvariantCultureIgnoreCase.Equals(x.Name, y.Name);
+            TagNameMatchPolicy.IdentityComparer.Equals(x.Name, y.Name);
 
         public int GetHashCode(TagIdentity obj) => HashCode.Combine(
             StringComparer.Ordinal.GetHashCode(obj.Key),
-            StringComparer.InvariantCultureIgnoreCase.GetHashCode(obj.Name));
+            TagNameMatchPolicy.IdentityComparer.GetHashCode(obj.Name));
     }
 }
 
 public sealed record ImportTagLookup(
-    string Id, string Key, string Name, string? AccountId, bool IsDefault, bool IsCreation);
+    string Id, string Key, string Name, string? AccountId, bool IsDefault, bool IsCreation) : ITagNameMatchCandidate;
 
 internal sealed record ImportTagResolutionSet(
     IReadOnlyDictionary<ImportTagResolver.TagIdentity, ImportTagLookup> Selected,

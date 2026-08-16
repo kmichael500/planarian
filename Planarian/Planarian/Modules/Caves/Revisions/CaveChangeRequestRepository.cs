@@ -5,18 +5,25 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Query.Constants;
+using Planarian.Modules.Query.Extensions;
+using Planarian.Modules.Tags;
+using Planarian.Modules.Tags.Repositories;
 
 namespace Planarian.Modules.Caves.Revisions;
 
-public sealed record CaveChangeRequestReadRow(
-    CaveChangeRequest Request,
-    CaveProposalVersion ProposalVersion,
-    CaveRevision ProposalBaseRevision,
-    CaveRevision? CurrentRevision,
-    string? LiveCaveName,
-    bool CaveExists,
-    string? SubmitterName,
-    string? ReviewerName);
+public sealed class CaveChangeRequestReadRow
+{
+    public CaveChangeRequest Request { get; init; } = null!;
+    public CaveProposalVersion ProposalVersion { get; init; } = null!;
+    public CaveRevision ProposalBaseRevision { get; init; } = null!;
+    public CaveRevision? CurrentRevision { get; init; }
+    public string? LiveCaveName { get; init; }
+    public bool CaveExists { get; init; }
+    public string? SubmitterName { get; init; }
+    public string? ReviewerName { get; init; }
+    public bool CurrentCanReview { get; init; }
+}
 
 public sealed record CaveProposalVersionReadRow(CaveProposalVersion Version, string? ActorName);
 public sealed record CaveProposalVersionDetailReadRow(CaveProposalVersion Version, CaveRevision BaseRevision,
@@ -69,6 +76,9 @@ public sealed class CaveChangeRequestRepository
         };
         _db.CaveChangeRequests.Add(request);
         await _db.SaveChangesAsync(cancellationToken);
+        await ClaimAuthoringStagedFilesAsync(request, proposal.Files
+            .Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
+            .Select(file => file.FileId), cancellationToken);
         var version = NewVersion(request, baseRevisionId, null, proposal);
         _db.CaveProposalVersions.Add(version);
         await _db.SaveChangesAsync(cancellationToken);
@@ -91,6 +101,14 @@ public sealed class CaveChangeRequestRepository
             .SingleOrDefaultAsync(cancellationToken) ?? throw ApiExceptionDictionary.NotFound("Change request");
         if (request.Status != CaveChangeRequestStatus.Pending)
             throw ApiExceptionDictionary.BadRequest("Only pending requests can be revised.");
+        var visible = await _db.UserCavePermissionView.AnyAsync(permission =>
+            permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
+            permission.CaveId == request.CaveId, cancellationToken);
+        if (!visible) throw ApiExceptionDictionary.NotFound("Change request");
+        reviewer = await _db.UserCavePermissionView.AnyAsync(permission =>
+            permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
+            permission.CaveId == request.CaveId && permission.PermissionKey == PermissionPolicyKey.Manager,
+            cancellationToken);
         if (!reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only revise your own request.");
         if (request.CurrentProposalVersionId != expectedProposalVersionId)
@@ -109,6 +127,9 @@ public sealed class CaveChangeRequestRepository
         if (currentRevisionId != baseRevisionId)
             throw new CaveRevisionConflictException(request.CaveId, baseRevisionId, currentRevisionId);
 
+        await ClaimAuthoringStagedFilesAsync(request, proposal.Files
+            .Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
+            .Select(file => file.FileId), cancellationToken);
         var version = NewVersion(request, baseRevisionId, expectedProposalVersionId, proposal);
         _db.CaveProposalVersions.Add(version);
         await _db.SaveChangesAsync(cancellationToken);
@@ -120,13 +141,21 @@ public sealed class CaveChangeRequestRepository
         return version.Id;
     }
 
-    public async Task StageFileAsync(string requestId, string fileId, string fileTypeTagId, string? displayName,
+    internal async Task StageFileAsync(string requestId, string fileId, string fileTypeTagId, string? displayName,
         bool reviewer, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
         if (request.Status != CaveChangeRequestStatus.Pending)
             throw ApiExceptionDictionary.BadRequest("Only pending requests can receive files.");
+        var visible = await _db.UserCavePermissionView.AnyAsync(permission =>
+            permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
+            permission.CaveId == request.CaveId, cancellationToken);
+        if (!visible) throw ApiExceptionDictionary.NotFound("Change request");
+        reviewer = await _db.UserCavePermissionView.AnyAsync(permission =>
+            permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
+            permission.CaveId == request.CaveId && permission.PermissionKey == PermissionPolicyKey.Manager,
+            cancellationToken);
         if (!reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only add files to your own request.");
 
@@ -190,13 +219,71 @@ public sealed class CaveChangeRequestRepository
             .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
             .Select(staged => staged.FileId).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
 
-    public async Task<List<CaveChangeRequestReadRow>> ListMineAsync(CancellationToken cancellationToken) =>
-        (await Query(createdByUserId: _user.Id).ToListAsync(cancellationToken))
-        .OrderByDescending(row => row.Request.CreatedOn).ToList();
+    public async Task<IReadOnlySet<string>> GetAuthorableStagedFileIdsAsync(IEnumerable<string> fileIds,
+        string? requestId, CancellationToken cancellationToken)
+    {
+        var ids = fileIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return new HashSet<string>(StringComparer.Ordinal);
 
-    public async Task<List<CaveChangeRequestReadRow>> ListForReviewAsync(CancellationToken cancellationToken) =>
-        (await Query(status: CaveChangeRequestStatus.Pending).ToListAsync(cancellationToken))
-        .OrderBy(row => row.Request.CreatedOn).ToList();
+        var now = DateTime.UtcNow;
+        var rows = await _db.Files.IgnoreQueryFilters().AsNoTracking()
+            .Where(file => file.AccountId == _scope.AccountId && ids.Contains(file.Id) && file.CaveId == null &&
+                           ((requestId != null && _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().Any(staged =>
+                                staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId &&
+                                staged.FileId == file.Id)) ||
+                            (file.CreatedByUserId == _user.Id && file.ExpiresOn != null && file.ExpiresOn > now &&
+                             !_db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().Any(staged =>
+                                 staged.AccountId == _scope.AccountId && staged.FileId == file.Id))))
+            .Select(file => file.Id)
+            .ToListAsync(cancellationToken);
+        return rows.ToHashSet(StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyList<StagedCaveFilePublication>> PlanStagedFilePublicationsAsync(
+        string requestId, IEnumerable<string> fileIds, CancellationToken cancellationToken)
+    {
+        var ids = fileIds.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return [];
+
+        var rows = await (from staged in _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+                join file in _db.Files.IgnoreQueryFilters()
+                    on new { staged.AccountId, staged.FileId } equals new { file.AccountId, FileId = file.Id }
+                where staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId &&
+                      ids.Contains(staged.FileId) && file.CaveId == null
+                select file)
+            .ToListAsync(cancellationToken);
+        if (rows.Count != ids.Count || rows.Select(row => row.Id).Distinct(StringComparer.Ordinal).Count() != ids.Count)
+            throw ApiExceptionDictionary.NotFound("Staged file");
+
+        var sharedPendingFileId = await (from staged in _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+                join request in _db.CaveChangeRequests.IgnoreQueryFilters()
+                    on new { staged.AccountId, Id = staged.ChangeRequestId }
+                    equals new { request.AccountId, request.Id }
+                where staged.AccountId == _scope.AccountId && ids.Contains(staged.FileId) &&
+                      staged.ChangeRequestId != requestId && request.Status == CaveChangeRequestStatus.Pending
+                select staged.FileId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (sharedPendingFileId is not null)
+            throw ApiExceptionDictionary.BadRequest(
+                "A staged file shared with another pending request cannot be published.");
+
+        return rows.Select(file =>
+        {
+            if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
+                throw ApiExceptionDictionary.NotFound("Staged file");
+            return new StagedCaveFilePublication(file.Id, file.BlobKey, file.BlobContainer);
+        }).OrderBy(publication => publication.FileId, StringComparer.Ordinal).ToList();
+    }
+
+    public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
+        CancellationToken cancellationToken) => PageAsync(Query(createdByUserId: _user.Id)
+            .OrderByDescending(row => row.Request.CreatedOn).ThenByDescending(row => row.Request.Id),
+            pageNumber, pageSize, cancellationToken);
+
+    public Task<PagedResult<CaveChangeRequestReadRow>> ListForReviewAsync(int pageNumber, int pageSize,
+        CancellationToken cancellationToken) => PageAsync(Query(status: CaveChangeRequestStatus.Pending)
+            .Where(row => row.CurrentCanReview).OrderBy(row => row.Request.CreatedOn).ThenBy(row => row.Request.Id),
+            pageNumber, pageSize, cancellationToken);
 
     public Task<CaveChangeRequestReadRow?> GetAsync(string requestId, CancellationToken cancellationToken) =>
         Query(requestId: requestId).SingleOrDefaultAsync(cancellationToken);
@@ -244,26 +331,35 @@ public sealed class CaveChangeRequestRepository
             previousVersion, previousBaseRevision);
     }
 
-    public async Task<Dictionary<string, string>> GetTagNamesAsync(IEnumerable<string> ids,
+    public async Task<IReadOnlyList<TagNameCandidate>> GetTagCandidatesByIdsAsync(IEnumerable<string> ids,
         CancellationToken cancellationToken)
     {
-        var distinct = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
-        return await _db.TagTypes.AsNoTracking().Where(tag => distinct.Contains(tag.Id))
-            .ToDictionaryAsync(tag => tag.Id, tag => tag.Name, cancellationToken);
+        var distinct = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
+        return await _db.TagTypes.AsNoTracking()
+            .Where(tag => distinct.Contains(tag.Id))
+            .Select(tag => new TagNameCandidate(tag.Id, tag.Name, tag.Key, tag.AccountId, tag.IsDefault))
+            .ToListAsync(cancellationToken);
     }
+
+    public Task<IReadOnlyList<TagNameCandidate>> GetEligiblePeopleCandidatesAsync(
+        CancellationToken cancellationToken) =>
+        EligiblePeopleTagLookup.GetEligibleAsync(_db, _scope.AccountId, cancellationToken);
 
     public async Task<(string StateName, string? StateAbbreviation, string CountyName, string CountyDisplayId)>
         GetLocationLabelsAsync(string stateId, string countyId, CancellationToken cancellationToken)
     {
-        var state = await _db.States.AsNoTracking().Where(row => row.Id == stateId)
-            .Select(row => new { row.Name, row.Abbreviation }).SingleAsync(cancellationToken);
-        var county = await _db.Counties.AsNoTracking()
-            .Where(row => row.AccountId == _scope.AccountId && row.Id == countyId)
-            .Select(row => new { row.Name, row.DisplayId }).SingleAsync(cancellationToken);
-        return (state.Name, state.Abbreviation, county.Name, county.DisplayId);
+        var pair = await (from county in _db.Counties.AsNoTracking()
+                join state in _db.States.AsNoTracking() on county.StateId equals state.Id
+                where county.AccountId == _scope.AccountId && county.Id == countyId &&
+                      county.StateId == stateId && state.Id == stateId
+                select new { StateName = state.Name, state.Abbreviation, CountyName = county.Name, county.DisplayId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (pair is null) throw ApiExceptionDictionary.BadRequest("The selected County does not belong to the selected State.");
+        return (pair.StateName, pair.Abbreviation, pair.CountyName, pair.DisplayId);
     }
 
-    public async Task RejectAsync(string requestId, string expectedProposalVersionId, string? notes,
+    public async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> RejectAsync(string requestId,
+        string expectedProposalVersionId, string? notes,
         CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -277,14 +373,14 @@ public sealed class CaveChangeRequestRepository
         request.ReviewerUserId = _user.Id;
         request.ReviewerNotes = notes?.Trim();
         request.ReviewedOn = DateTime.UtcNow;
-        await _db.CaveChangeRequestStagedFiles
-            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
-            .ExecuteDeleteAsync(cancellationToken);
+        var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return blobs;
     }
 
-    public async Task MarkApprovedAsync(string requestId, string expectedProposalVersionId,
+    public async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> MarkApprovedAsync(string requestId,
+        string expectedProposalVersionId,
         CaveMutationResult mutation, string? notes, CancellationToken cancellationToken)
     {
         if (!mutation.CreatedRevision || mutation.RevisionId is null)
@@ -300,10 +396,73 @@ public sealed class CaveChangeRequestRepository
         request.ReviewerUserId = _user.Id;
         request.ReviewerNotes = notes?.Trim();
         request.ReviewedOn = DateTime.UtcNow;
+        var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        return blobs;
+    }
+
+    private async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> RemoveRemainingStagedFilesAsync(
+        string requestId, CancellationToken cancellationToken)
+    {
+        var stagedFileIds = await _db.CaveChangeRequestStagedFiles
+            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
+            .Select(staged => staged.FileId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        if (stagedFileIds.Count == 0) return [];
+
         await _db.CaveChangeRequestStagedFiles
             .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == requestId)
             .ExecuteDeleteAsync(cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        var filesToDelete = await _db.Files
+            .Where(file => file.AccountId == _scope.AccountId && stagedFileIds.Contains(file.Id) &&
+                           file.CaveId == null &&
+                           !_db.CaveChangeRequestStagedFiles.Any(staged =>
+                               staged.AccountId == _scope.AccountId && staged.FileId == file.Id))
+            .ToListAsync(cancellationToken);
+        var blobs = filesToDelete
+            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) &&
+                           !string.IsNullOrWhiteSpace(file.BlobContainer))
+            .Select(file => new StagedFileObjectDeleteTarget(file.BlobKey!, file.BlobContainer!))
+            .ToList();
+        _db.Files.RemoveRange(filesToDelete);
+        return blobs;
+    }
+
+    private async Task ClaimAuthoringStagedFilesAsync(CaveChangeRequest request, IEnumerable<string> fileIds,
+        CancellationToken cancellationToken)
+    {
+        var requestedIds = fileIds.Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        if (requestedIds.Count == 0) return;
+
+        var existingIds = (await _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
+            .Where(staged => staged.AccountId == _scope.AccountId && staged.ChangeRequestId == request.Id &&
+                             requestedIds.Contains(staged.FileId))
+            .Select(staged => staged.FileId).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+
+        var now = DateTime.UtcNow;
+        foreach (var fileId in requestedIds.Where(id => !existingIds.Contains(id)))
+        {
+            var file = await _db.Files.FromSqlInterpolated(
+                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {fileId} FOR UPDATE")
+                .IgnoreQueryFilters().SingleOrDefaultAsync(cancellationToken);
+            if (file is null || file.CaveId is not null || file.ExpiresOn is null || file.ExpiresOn <= now ||
+                file.CreatedByUserId != _user.Id)
+                throw ApiExceptionDictionary.NotFound("Staged file");
+
+            var alreadyBound = await _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AnyAsync(staged =>
+                staged.AccountId == _scope.AccountId && staged.FileId == fileId, cancellationToken);
+            if (alreadyBound)
+                throw ApiExceptionDictionary.BadRequest("The staged file is already bound to another change request.");
+
+            _db.CaveChangeRequestStagedFiles.Add(new CaveChangeRequestStagedFile
+            {
+                AccountId = _scope.AccountId,
+                ChangeRequestId = request.Id,
+                FileId = fileId
+            });
+        }
     }
 
     private async Task<CaveChangeRequest> LockedAsync(string requestId, CancellationToken cancellationToken) =>
@@ -332,13 +491,36 @@ public sealed class CaveChangeRequestRepository
         join reviewerValue in _db.Users.AsNoTracking() on request.ReviewerUserId equals reviewerValue.Id into reviewers
         from reviewer in reviewers.DefaultIfEmpty()
         where request.AccountId == _scope.AccountId &&
+              cave != null && _db.UserCavePermissionView.Any(permission =>
+                  permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
+                  permission.CaveId == request.CaveId) &&
               (requestId == null || request.Id == requestId) &&
               (createdByUserId == null || request.CreatedByUserId == createdByUserId) &&
               (status == null || request.Status == status)
-        select new CaveChangeRequestReadRow(request, proposal, proposalBaseRevision, currentRevision,
-            cave == null ? null : cave.Name, cave != null,
-            submitter == null ? null : submitter.FirstName + " " + submitter.LastName,
-            reviewer == null ? null : reviewer.FirstName + " " + reviewer.LastName);
+        select new CaveChangeRequestReadRow
+        {
+            Request = request, ProposalVersion = proposal, ProposalBaseRevision = proposalBaseRevision,
+            CurrentRevision = currentRevision, LiveCaveName = cave == null ? null : cave.Name,
+            CaveExists = cave != null,
+            SubmitterName = submitter == null ? null : submitter.FirstName + " " + submitter.LastName,
+            ReviewerName = reviewer == null ? null : reviewer.FirstName + " " + reviewer.LastName,
+            CurrentCanReview = _db.UserCavePermissionView.Any(permission => permission.AccountId == _scope.AccountId &&
+                permission.UserId == _user.Id && permission.CaveId == request.CaveId &&
+                permission.PermissionKey == PermissionPolicyKey.Manager)
+        };
+
+    private static async Task<PagedResult<CaveChangeRequestReadRow>> PageAsync(
+        IQueryable<CaveChangeRequestReadRow> query, int pageNumber, int pageSize,
+        CancellationToken cancellationToken)
+    {
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = pageSize < 1 ? QueryConstants.DefaultPageSize : Math.Min(pageSize, QueryConstants.MaxPageSize);
+        var count = await query.CountAsync(cancellationToken);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(count / (double)pageSize));
+        pageNumber = Math.Min(pageNumber, totalPages);
+        var rows = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        return new PagedResult<CaveChangeRequestReadRow>(pageNumber, pageSize, count, rows);
+    }
 
     private static CaveProposalVersion NewVersion(CaveChangeRequest request, string baseRevisionId, string? previousId,
         CaveProposalSnapshotV1 proposal) => new()

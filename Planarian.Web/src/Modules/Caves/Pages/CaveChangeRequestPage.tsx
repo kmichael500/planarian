@@ -1,13 +1,12 @@
 import { useContext, useEffect, useState } from "react";
-import { Alert, Card, Collapse, Input, message, Space, Spin, Tag, Typography, Upload } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
-import { RcFile } from "antd/lib/upload";
+import { Alert, Card, Collapse, Input, message, Space, Spin, Tag, Typography } from "antd";
 import { Link, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
 import { CaveChangeRequestDetailVm, CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
+import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
 import { CaveService } from "../Service/CaveService";
 
 export const CaveAvailability = ({ request }: { request: CaveChangeRequestSummaryVm }) =>
@@ -15,14 +14,22 @@ export const CaveAvailability = ({ request }: { request: CaveChangeRequestSummar
     ? <Link to={`/caves/${request.caveId}`}>Open Cave</Link>
     : <Typography.Text type="secondary">Cave no longer available</Typography.Text>;
 
+export const getDownloadableProposalFiles = (detail?: CaveChangeRequestDetailVm) =>
+  detail?.activeStagedFiles ?? [];
+
+export const UnavailableProposalFilesAlert = ({ fileIds, snapshots }: {
+  fileIds: string[];
+  snapshots: Array<CaveSnapshotVm | undefined>;
+}) => fileIds.length > 0 ? <Alert type="warning" showIcon message="Historical attachment unavailable"
+  description={fileIds.map(fileId => {
+    const file = snapshots.flatMap(snapshot => snapshot?.files ?? [])
+      .find(candidate => candidate.id === fileId);
+    return file?.displayName ?? file?.fileName ?? fileId;
+  }).join(", ")} /> : null;
+
 export const ProposalVersionComparison = ({ detail }: { detail: CaveProposalVersionDetailVm }) => <>
-  {detail.unavailableStagedFileIds.length > 0 &&
-    <Alert type="warning" showIcon message="Historical attachment unavailable"
-      description={detail.unavailableStagedFileIds.map(fileId => {
-        const file = detail.proposed.files.find(candidate => candidate.id === fileId)
-          ?? detail.previousProposed?.files.find(candidate => candidate.id === fileId);
-        return file?.displayName ?? file?.fileName ?? fileId;
-      }).join(", ")} />}
+  <UnavailableProposalFilesAlert fileIds={detail.unavailableStagedFileIds}
+    snapshots={[detail.proposed, detail.previousProposed]} />
   {detail.baseRevisionChanged &&
     <Alert type="info" showIcon message="This proposal version is based on a newer published Cave revision."
       description={`Previous base: ${detail.previousBaseRevisionId}. This base: ${detail.baseRevisionId}. The comparison below shows effective proposal state, not author attribution.`} />}
@@ -58,8 +65,7 @@ export const CaveChangeRequestPage = () => {
   const [versionDetails, setVersionDetails] = useState<Record<string, CaveProposalVersionDetailVm>>({});
   const [loadingVersionId, setLoadingVersionId] = useState<string>();
 
-  const stagedFiles = detail ? detail.proposed.files.filter(file =>
-    !detail.base.files.some(baseFile => baseFile.id === file.id)) : [];
+  const stagedFiles = getDownloadableProposalFiles(detail);
 
   useEffect(() => {
     setHeaderTitle(["Cave Change Request"]);
@@ -80,10 +86,10 @@ export const CaveChangeRequestPage = () => {
       message.success(approve ? "Changes approved and published." : "Change request rejected.");
       setDetail(await CaveService.GetChangeRequest(requestId));
     } catch (error: any) {
-      if (error?.response?.data?.conflictKind === "ActiveProposalVersionChanged") {
+      if (error?.conflictKind === "ActiveProposalVersionChanged") {
         message.warning("The proposal changed while you were reviewing it. Review the current version before making a decision.");
         setDetail(await CaveService.GetChangeRequest(requestId));
-      } else if (error?.response?.data?.conflictKind === "PublishedCaveChanged") {
+      } else if (error?.conflictKind === "PublishedCaveChanged") {
         message.warning("The published Cave changed. Revise the proposal against the current Cave before approval.");
         setDetail(await CaveService.GetChangeRequest(requestId));
       } else message.error("The review decision could not be saved.");
@@ -91,6 +97,8 @@ export const CaveChangeRequestPage = () => {
   };
 
   return <Spin spinning={loading}>{detail && <Space direction="vertical" style={{ width: "100%" }}>
+    <UnavailableProposalFilesAlert fileIds={detail.unavailableStagedFileIds}
+      snapshots={[detail.proposed, detail.current, detail.base]} />
     {detail.request.isStale && <Alert type="warning" showIcon message="This proposal version is based on an older Cave revision." description="Review both comparisons, then create a new proposal version from the current published Cave." />}
     <Card title={detail.request.caveName} extra={<CaveAvailability request={detail.request} />}>
       <Space direction="vertical">
@@ -108,24 +116,9 @@ export const CaveChangeRequestPage = () => {
     </Card>
     <Card title="Base → proposed"><CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed}
       countyNumberIntent={detail.countyNumberIntent} /></Card>
-    {detail.request.status === "Pending" && (detail.request.canEdit || detail.request.canReview || stagedFiles.length > 0) && <Card title="Proposal files">
-      <Typography.Paragraph type="secondary">Uploaded files remain staged and unpublished until this request is approved.</Typography.Paragraph>
+    {stagedFiles.length > 0 && <Card title="Proposal files">
+      <Typography.Paragraph type="secondary">These files are part of the active proposal and remain unpublished until approval.</Typography.Paragraph>
       {stagedFiles.map(file => <div key={file.id}><Typography.Link href={CaveService.GetStagedChangeRequestFileUrl(detail.request.id, file.id)}>{file.displayName ?? file.fileName}</Typography.Link></div>)}
-      {(detail.request.canEdit || detail.request.canReview) && <Upload showUploadList={false} customRequest={async ({ file, onSuccess, onError, onProgress }) => {
-        try {
-          await CaveService.StageChangeRequestFile(requestId!, file as RcFile, (file as RcFile).uid, event => {
-            onProgress?.({ percent: Math.round(100 * event.loaded / (event.total ?? event.loaded)) });
-          });
-          onSuccess?.({});
-          message.success("File staged for review.");
-          setDetail(await CaveService.GetChangeRequest(requestId!));
-        } catch (error) {
-          onError?.(error as Error);
-          message.error("The file could not be staged.");
-        }
-      }}>
-        <PlanarianButton icon={<UploadOutlined />}>Add staged file</PlanarianButton>
-      </Upload>}
     </Card>}
     {detail.request.isStale && detail.publishedSinceBase && <Card title="What changed in the published Cave after submission"><CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} /></Card>}
     {detail.versions.length > 1 && <Card title="Proposal versions">

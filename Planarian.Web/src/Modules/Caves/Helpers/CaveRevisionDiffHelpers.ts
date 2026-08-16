@@ -10,4 +10,7 @@ export const isCaveRevisionDiffEmpty = (diff: CaveRevisionDiffVm): boolean =>
   diff.addedFiles.length === 0 &&
   diff.removedFiles.length === 0 &&
   diff.changedFiles.length === 0 &&
+  diff.addedLinePlots.length === 0 &&
+  diff.removedLinePlots.length === 0 &&
+  diff.changedLinePlots.length === 0 &&
   diff.referenceMetadataChanges.length === 0;

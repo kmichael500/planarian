@@ -398,10 +398,10 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
     }
 
     [Fact]
-    public async Task ApprovedRequestAndProposalHistoryRemainReadableAfterLaterHardDelete()
+    public async Task ApprovedRequestAndProposalHistoryRemainStoredButAreHiddenAfterLaterHardDelete()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(ApprovedRequestAndProposalHistoryRemainReadableAfterLaterHardDelete));
+            nameof(ApprovedRequestAndProposalHistoryRemainStoredButAreHiddenAfterLaterHardDelete));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
@@ -439,14 +439,9 @@ public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer 
         await using var contributorHistory = database.CreateDbContext("contributor", tenant.AccountId);
         await CavePermissions.AuthenticateAsync(contributorHistory, tenant.AccountId);
         var history = IntegrationTestServices.For(contributorHistory).CaveChangeRequests;
-        var detail = await history.GetAsync(requestId, default);
-        Assert.Equal(CaveChangeRequestStatus.Approved, detail.Request.Status);
-        Assert.Equal(approvedRevisionId, detail.Request.ApprovedRevisionId);
-        Assert.Equal("Approved for publication", detail.Request.ReviewerNotes);
-        Assert.False(detail.Request.CaveExists);
-        Assert.False(detail.Request.IsStale);
-        var version = await history.GetVersionAsync(requestId, proposalVersionId, default);
-        Assert.Equal("Approved historical Cave", version.Proposed.Name);
-        Assert.Contains(detail.Versions, candidate => candidate.Id == proposalVersionId);
+        Assert.DoesNotContain(await history.ListMineAsync(default), request => request.Id == requestId);
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => history.GetAsync(requestId, default));
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            history.GetVersionAsync(requestId, proposalVersionId, default));
     }
 }

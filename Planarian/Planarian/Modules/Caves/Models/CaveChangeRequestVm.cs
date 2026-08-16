@@ -36,7 +36,8 @@ public sealed record CaveChangeRequestDetailVm(
     IReadOnlyList<CaveProposalVersionVm> Versions,
     CountyNumberIntent CountyNumberIntent,
     int? RequestedCountyNumber,
-    IReadOnlyList<CaveFileSnapshotV1> ActiveStagedFiles);
+    IReadOnlyList<CaveFileSnapshotV1> ActiveStagedFiles,
+    IReadOnlyList<string> UnavailableStagedFileIds);
 
 public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
@@ -44,7 +45,10 @@ public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
 
 public sealed record CreateCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId);
 
-public sealed record CaveProposalAuthoringContextVm(CaveVm Cave, string ExpectedBaseRevisionId);
+public sealed record CaveProposalAuthoringContextVm(
+    CaveVm Cave,
+    string ExpectedBaseRevisionId,
+    IReadOnlyList<GeoJsonUploadVm> LinePlots);
 
 public sealed record ReviseCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId,
     string ExpectedProposalVersionId, bool AgainstCurrent);
@@ -99,6 +103,7 @@ public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
     CaveProposalCountyNumberChangeVm? CountyNumberChange,
     bool BaseRevisionChanged, string? PreviousBaseRevisionId, string BaseRevisionId,
     CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber,
+    IReadOnlyList<GeoJsonUploadVm> LinePlots,
     IReadOnlyList<string> UnavailableStagedFileIds);
 
 public sealed record CaveChangeRequestDecisionRequestVm(string? Notes, string ExpectedProposalVersionId);

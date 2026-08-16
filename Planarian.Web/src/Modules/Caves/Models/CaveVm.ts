@@ -5,7 +5,6 @@ export interface CaveVm {
   id: string;
   currentRevisionId: string | null;
   displayId: string;
-  reportedByUserId: string | null;
   countyId: string;
   stateId: string;
   countyDisplayId: string;

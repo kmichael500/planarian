@@ -1,5 +1,6 @@
 using Planarian.Library.Exceptions;
 using Planarian.Modules.Account.Import.Models;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Import.Services;
 
@@ -39,7 +40,8 @@ public partial class ImportService
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(blob.BlobKey) && !string.IsNullOrWhiteSpace(blob.BlobContainer))
-                await _fileService.DeleteFile(blob.BlobKey, blob.BlobContainer);
+                await _fileService.DeleteObjectBestEffortAsync(
+                    new StorageObjectAddress(blob.BlobContainer, blob.BlobKey));
         }
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished cave import");

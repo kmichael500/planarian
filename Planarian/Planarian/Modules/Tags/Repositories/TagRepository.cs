@@ -19,6 +19,13 @@ public class TagRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCon
         return await DbContext.TagTypes.FirstOrDefaultAsync(e => e.Id == tagTypeId);
     }
 
+    public async Task<TagType?> GetAccountAdministrativeTagAsync(string tagTypeId,
+        CancellationToken cancellationToken = default)
+    {
+        return await DbContext.TagTypes.FirstOrDefaultAsync(tag => tag.Id == tagTypeId &&
+            (tag.AccountId == RequestUser.AccountId || tag.IsDefault), cancellationToken);
+    }
+
     public async Task<TagType?> GetFileTypeTagByName(string fileTagTypeName, string? accountId = null)
     {
         var result = await GetTagTypesQuery(TagTypeKeyConstant.File)

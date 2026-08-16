@@ -19,6 +19,10 @@ public sealed record CaveFileChange(
     string FileId,
     IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars);
 
+public sealed record CaveLinePlotChange(
+    string LinePlotId,
+    IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars);
+
 public sealed record CaveRevisionDiff(
     IReadOnlyDictionary<string, (object? Previous, object? Current)> Scalars,
     IReadOnlyList<SnapshotTagReference> AddedTags,
@@ -29,8 +33,12 @@ public sealed record CaveRevisionDiff(
     IReadOnlyList<string> AddedFiles,
     IReadOnlyList<string> RemovedFiles,
     IReadOnlyList<string> ChangedFiles,
+    IReadOnlyList<string> AddedLinePlots,
+    IReadOnlyList<string> RemovedLinePlots,
+    IReadOnlyList<string> ChangedLinePlots,
     IReadOnlyList<CaveEntranceChange> EntranceChanges,
     IReadOnlyList<CaveFileChange> FileChanges,
+    IReadOnlyList<CaveLinePlotChange> LinePlotChanges,
     IReadOnlyList<ReferenceMetadataChange> ReferenceMetadataChanges);
 
 public sealed class CaveRevisionDiffService
@@ -46,7 +54,6 @@ public sealed class CaveRevisionDiffService
         CompareReference(nameof(CavePublishedSnapshotV1.County), previous.County, current.County,
             "NameAtRevision", "DisplayIdAtRevision");
         AddScalar(nameof(CavePublishedSnapshotV1.CountyNumber), previous.CountyNumber, current.CountyNumber);
-        AddScalar(nameof(CavePublishedSnapshotV1.ReportedByUserId), previous.ReportedByUserId, current.ReportedByUserId);
         AddScalar(nameof(CavePublishedSnapshotV1.LengthFeet), previous.LengthFeet, current.LengthFeet);
         AddScalar(nameof(CavePublishedSnapshotV1.DepthFeet), previous.DepthFeet, current.DepthFeet);
         AddScalar(nameof(CavePublishedSnapshotV1.MaxPitDepthFeet), previous.MaxPitDepthFeet, current.MaxPitDepthFeet);
@@ -77,7 +84,7 @@ public sealed class CaveRevisionDiffService
         var oldFiles = previous.Files.ToDictionary(e => e.Id);
         var newFiles = current.Files.ToDictionary(e => e.Id);
         var fileChanges = new List<CaveFileChange>();
-        foreach (var id in oldFiles.Keys.Intersect(newFiles.Keys).Order())
+        foreach (var id in oldFiles.Keys.Intersect(newFiles.Keys).Order(StringComparer.Ordinal))
         {
             var metadataBefore = metadata.Count;
             var change = CompareFile(oldFiles[id], newFiles[id], id);
@@ -85,11 +92,25 @@ public sealed class CaveRevisionDiffService
                 fileChanges.Add(change);
         }
 
+        var oldLinePlots = previous.LinePlots.ToDictionary(linePlot => linePlot.Id);
+        var newLinePlots = current.LinePlots.ToDictionary(linePlot => linePlot.Id);
+        var linePlotChanges = new List<CaveLinePlotChange>();
+        foreach (var id in oldLinePlots.Keys.Intersect(newLinePlots.Keys).Order(StringComparer.Ordinal))
+        {
+            var change = CompareLinePlot(oldLinePlots[id], newLinePlots[id], id);
+            if (change.Scalars.Count != 0) linePlotChanges.Add(change);
+        }
+
         return new CaveRevisionDiff(scalars, addedTags, removedTags,
             newEntrances.Keys.Except(oldEntrances.Keys).Order().ToList(),
             oldEntrances.Keys.Except(newEntrances.Keys).Order().ToList(), entranceChanges.Select(change => change.EntranceId).ToList(),
-            newFiles.Keys.Except(oldFiles.Keys).Order().ToList(), oldFiles.Keys.Except(newFiles.Keys).Order().ToList(), fileChanges.Select(change => change.FileId).ToList(),
-            entranceChanges, fileChanges,
+            newFiles.Keys.Except(oldFiles.Keys).Order(StringComparer.Ordinal).ToList(),
+            oldFiles.Keys.Except(newFiles.Keys).Order(StringComparer.Ordinal).ToList(),
+            fileChanges.Select(change => change.FileId).ToList(),
+            newLinePlots.Keys.Except(oldLinePlots.Keys).Order(StringComparer.Ordinal).ToList(),
+            oldLinePlots.Keys.Except(newLinePlots.Keys).Order(StringComparer.Ordinal).ToList(),
+            linePlotChanges.Select(change => change.LinePlotId).ToList(),
+            entranceChanges, fileChanges, linePlotChanges,
             metadata.OrderBy(change => change.Path).ThenBy(change => change.Property).ToList());
 
         void AddScalar(string name, object? oldValue, object? newValue)
@@ -137,7 +158,6 @@ public sealed class CaveRevisionDiffService
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.Name), oldEntrance.Name, newEntrance.Name);
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.IsPrimary), oldEntrance.IsPrimary, newEntrance.IsPrimary);
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.Description), oldEntrance.Description, newEntrance.Description);
-            AddNestedScalar(nameof(CaveEntranceSnapshotV1.ReportedByUserId), oldEntrance.ReportedByUserId, newEntrance.ReportedByUserId);
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.Latitude), oldEntrance.Latitude, newEntrance.Latitude);
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.Longitude), oldEntrance.Longitude, newEntrance.Longitude);
             AddNestedScalar(nameof(CaveEntranceSnapshotV1.Elevation), oldEntrance.Elevation, newEntrance.Elevation);
@@ -183,6 +203,18 @@ public sealed class CaveRevisionDiffService
             }
         }
 
+        CaveLinePlotChange CompareLinePlot(CaveLinePlotSnapshotV1 oldLinePlot, CaveLinePlotSnapshotV1 newLinePlot,
+            string linePlotId)
+        {
+            var nestedScalars = new Dictionary<string, (object?, object?)>();
+            if (!SemanticEquals(oldLinePlot.Name, newLinePlot.Name))
+                nestedScalars[nameof(CaveLinePlotSnapshotV1.Name)] = (oldLinePlot.Name, newLinePlot.Name);
+            if (!SemanticEquals(oldLinePlot.ContentHash, newLinePlot.ContentHash))
+                nestedScalars[nameof(CaveLinePlotSnapshotV1.ContentHash)] =
+                    (oldLinePlot.ContentHash, newLinePlot.ContentHash);
+            return new CaveLinePlotChange(linePlotId, nestedScalars);
+        }
+
         static bool SemanticEquals(object? oldValue, object? newValue) =>
             oldValue is IEnumerable<string> oldStrings && newValue is IEnumerable<string> newStrings
                 ? oldStrings.SequenceEqual(newStrings, StringComparer.Ordinal)
@@ -195,6 +227,7 @@ public sealed class CaveRevisionDiffService
         return diff.Scalars.Count == 0 && diff.AddedTags.Count == 0 && diff.RemovedTags.Count == 0 &&
                diff.AddedEntrances.Count == 0 && diff.RemovedEntrances.Count == 0 && diff.ChangedEntrances.Count == 0 &&
                diff.AddedFiles.Count == 0 && diff.RemovedFiles.Count == 0 && diff.ChangedFiles.Count == 0 &&
-               diff.ReferenceMetadataChanges.Count == 0;
+               diff.AddedLinePlots.Count == 0 && diff.RemovedLinePlots.Count == 0 &&
+               diff.ChangedLinePlots.Count == 0 && diff.ReferenceMetadataChanges.Count == 0;
     }
 }

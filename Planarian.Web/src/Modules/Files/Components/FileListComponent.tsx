@@ -17,6 +17,7 @@ export interface FileListComponentProps {
   isUploading: boolean;
   setIsUploading?: (value: boolean) => void;
   hasEditPermission?: boolean;
+  allowUpload?: boolean;
 }
 
 export const FileListComponent = ({
@@ -25,6 +26,7 @@ export const FileListComponent = ({
   setIsUploading,
   customOrder,
   hasEditPermission = true,
+  allowUpload = true,
 }: FileListComponentProps) => {
   const safeFiles = files ?? [];
 
@@ -121,19 +123,17 @@ export const FileListComponent = ({
               <CardGridComponent
                 useList
                 noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
-                noDataCreateButton={
+                noDataCreateButton={allowUpload ? (
                   <PlanarianButton
                     alwaysShowChildren
                     icon={<CloudUploadOutlined />}
                     onClick={() => {
-                      if (setIsUploading) {
-                        setIsUploading(true);
-                      }
+                      if (setIsUploading) setIsUploading(true);
                     }}
                   >
                     Upload
                   </PlanarianButton>
-                }
+                ) : undefined}
                 renderItem={(file) => {
                   return (
                     <FileListItemComponent
@@ -153,21 +153,19 @@ export const FileListComponent = ({
       ) : (
         <CardGridComponent
           noDataDescription={`Looks like this cave was scooped ... do you want to change that?`}
-          noDataCreateButton={
+          noDataCreateButton={allowUpload ? (
             <PlanarianButton
               icon={<CloudUploadOutlined />}
               alwaysShowChildren
               permissionKey={PermissionKey.Manager}
               disabled={!hasEditPermission}
               onClick={() => {
-                if (setIsUploading) {
-                  setIsUploading(true);
-                }
+                if (setIsUploading) setIsUploading(true);
               }}
             >
               Upload
             </PlanarianButton>
-          }
+          ) : undefined}
           renderItem={function (item: object): ReactNode {
             return null;
           }}

@@ -68,10 +68,13 @@ public sealed class CaveRevisionService
             change.Value.Current)).ToList(),
         diff.AddedTags, diff.RemovedTags, diff.AddedEntrances, diff.RemovedEntrances,
         diff.ChangedEntrances, diff.AddedFiles, diff.RemovedFiles, diff.ChangedFiles,
+        diff.AddedLinePlots, diff.RemovedLinePlots, diff.ChangedLinePlots,
         diff.EntranceChanges.Select(change => new CaveEntranceChangeVm(change.EntranceId,
             change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList(),
             change.AddedTags, change.RemovedTags)).ToList(),
         diff.FileChanges.Select(change => new CaveFileChangeVm(change.FileId,
+            change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList())).ToList(),
+        diff.LinePlotChanges.Select(change => new CaveLinePlotChangeVm(change.LinePlotId,
             change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList())).ToList(),
         diff.ReferenceMetadataChanges);
 }

@@ -5,21 +5,22 @@ const snapshot = (): CaveSnapshotVm => ({
   caveId: "cave", accountId: "account", name: "Before", alternateNames: [],
   state: { id: "tn", nameAtRevision: "Tennessee", abbreviationAtRevision: "TN" },
   county: { id: "county", nameAtRevision: "Franklin", displayIdAtRevision: "026" },
-  countyNumber: 1, reportedByUserId: "reporter", lengthFeet: null, numberOfPits: null,
+  countyNumber: 1, lengthFeet: null, numberOfPits: null,
   narrative: "old narrative", isArchived: false,
   tags: [],
   entrances: [{
     id: "entrance", name: "Main", isPrimary: false, description: "old description",
-    reportedByUserId: "user", reportedByNameAtRevision: "Old Reporter", latitude: 35, longitude: -86,
+    latitude: 35, longitude: -86,
     elevation: undefined, srid: 4326, locationQualityTagId: "exact", locationQualityNameAtRevision: "Exact",
     pitDepthFeet: undefined, tags: [],
   }],
   files: [{ id: "file", fileTypeTagId: "map", fileTypeNameAtRevision: "Map", fileName: "map.pdf", displayName: "Map" }],
+  linePlots: [],
 });
 
 const emptyDiff = (): CaveRevisionDiffVm => ({
   scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [], changedEntrances: [],
-  addedFiles: [], removedFiles: [], changedFiles: [], entranceChanges: [], fileChanges: [], referenceMetadataChanges: [],
+  addedFiles: [], removedFiles: [], changedFiles: [], entranceChanges: [], fileChanges: [], addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [],
 });
 
 it("groups Cave roles in Cave-detail order with removals before additions", () => {
@@ -49,7 +50,7 @@ it("uses only authoritative nested fields and groups authoritative coordinates",
   const previous = snapshot();
   const current = snapshot();
   current.entrances[0] = { ...current.entrances[0], name: "Snapshot-only difference", latitude: 36,
-    reportedByNameAtRevision: "Renamed Reporter", elevation: 0, isPrimary: true };
+    elevation: 0, isPrimary: true };
   const diff = emptyDiff();
   diff.changedEntrances = ["entrance"];
   diff.entranceChanges = [{ entranceId: "entrance", scalars: [{ path: "Latitude", previous: 35, current: 36 }],

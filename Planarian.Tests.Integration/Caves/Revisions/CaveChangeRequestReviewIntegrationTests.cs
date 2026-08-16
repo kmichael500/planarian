@@ -20,6 +20,39 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     [Fact]
+    public async Task ReviewerImmediatelyLosesQueueAndDecisionAccessWhenCurrentManagerPermissionIsRevoked()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ReviewerImmediatelyLosesQueueAndDecisionAccessWhenCurrentManagerPermissionIsRevoked));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantViewAsync(database, tenant, "reviewer");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            requestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Pending review"), tenant.RevisionId, default);
+            versionId = await CurrentVersionAsync(contributor.Db, requestId);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+            Assert.Contains((await reviewer.ChangeRequests.ListForReviewAsync(default)), row => row.Id == requestId);
+
+        await CavePermissions.RevokeManagerAsync(database, tenant, "reviewer");
+        await using var revoked = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer");
+        Assert.DoesNotContain((await revoked.ChangeRequests.ListForReviewAsync(default)), row => row.Id == requestId);
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            revoked.ChangeRequests.ApproveAsync(requestId, versionId, null, default));
+        await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            revoked.ChangeRequests.RejectAsync(requestId, versionId, null, default));
+    }
+
+    [Fact]
     public async Task ReviewerCannotApproveOrRejectAProposalVersionThatWasSupersededAfterLoading()
     {
         await using var database = await fixture.CreateDatabaseAsync(
@@ -51,10 +84,9 @@ public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer f
                 PublishableProposal(tenant, locationTag.Id, "Rejection V2"), false, false, default);
         }
 
-        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
         {
-            await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
-            var service = IntegrationTestServices.For(reviewer).CaveChangeRequests;
+            var service = reviewer.ChangeRequests;
             var approvalConflict = await Assert.ThrowsAsync<CaveProposalVersionConflictException>(() =>
                 service.ApproveAsync(approvalRequestId, approvalV1, null, default));
             Assert.Equal(approvalV2, approvalConflict.ActualProposalVersionId);

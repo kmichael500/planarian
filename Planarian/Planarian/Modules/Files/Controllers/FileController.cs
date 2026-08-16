@@ -36,14 +36,30 @@ public class FileController : PlanarianControllerBase<FileService>
         return await CreateFileResult(result);
     }
 
-    [HttpPut("multiple")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<IActionResult> UpdateFilesMetadata([FromBody] IEnumerable<EditFileMetadataVm> values,
+    [HttpPost("staged")]
+    [RequestSizeLimit(550L * 1024 * 1024)]
+    public async Task<ActionResult<FileVm>> StageAuthoringFile(string? uuid, IFormFile file,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await Service.StageAuthoringFile(file.OpenReadStream(), file.FileName,
+            cancellationToken, uuid));
+
+    [HttpGet("staged/{fileId:length(10)}")]
+    public async Task<IActionResult> DownloadAuthoringStagedFile(string fileId,
         CancellationToken cancellationToken)
     {
-        await Service.UpdateFilesMetadata(values, cancellationToken);
-        return Ok();
+        var file = await Service.OpenAuthoringStagedFileAsync(fileId, cancellationToken);
+        return File(file.Stream, "application/octet-stream", file.FileName);
     }
+
+    [HttpDelete("staged/{fileId:length(10)}")]
+    public async Task<IActionResult> DeleteAuthoringStagedFile(string fileId,
+        CancellationToken cancellationToken)
+    {
+        await Service.DeleteUnpublishedFileAsync(fileId, cancellationToken);
+        return NoContent();
+    }
+
+
 }
 
 public class EditFileMetadataVm

@@ -30,6 +30,7 @@ public sealed record CaveScalarChangeVm(string Path, object? Previous, object? C
 public sealed record CaveEntranceChangeVm(string EntranceId, IReadOnlyList<CaveScalarChangeVm> Scalars,
     IReadOnlyList<SnapshotTagReference> AddedTags, IReadOnlyList<SnapshotTagReference> RemovedTags);
 public sealed record CaveFileChangeVm(string FileId, IReadOnlyList<CaveScalarChangeVm> Scalars);
+public sealed record CaveLinePlotChangeVm(string LinePlotId, IReadOnlyList<CaveScalarChangeVm> Scalars);
 
 public sealed record CaveRevisionDiffVm(
     IReadOnlyList<CaveScalarChangeVm> Scalars,
@@ -41,6 +42,10 @@ public sealed record CaveRevisionDiffVm(
     IReadOnlyList<string> AddedFiles,
     IReadOnlyList<string> RemovedFiles,
     IReadOnlyList<string> ChangedFiles,
+    IReadOnlyList<string> AddedLinePlots,
+    IReadOnlyList<string> RemovedLinePlots,
+    IReadOnlyList<string> ChangedLinePlots,
     IReadOnlyList<CaveEntranceChangeVm> EntranceChanges,
     IReadOnlyList<CaveFileChangeVm> FileChanges,
+    IReadOnlyList<CaveLinePlotChangeVm> LinePlotChanges,
     IReadOnlyList<ReferenceMetadataChange> ReferenceMetadataChanges);

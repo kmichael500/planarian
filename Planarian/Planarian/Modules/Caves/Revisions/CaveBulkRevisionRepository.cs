@@ -4,23 +4,20 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
-using Planarian.Modules.Caves.Revisions;
-using Planarian.Modules.Import.Planning;
 
-namespace Planarian.Modules.Import.Data;
+namespace Planarian.Modules.Caves.Revisions;
 
 /// <summary>
-/// Publishes accepted import revisions inside the caller's existing import
-/// transaction. Existing Caves without history receive a baseline only when
-/// the import actually changes their published state.
+/// Publishes a bounded set of Cave revisions inside the caller's existing transaction.
+/// Existing Caves without history receive a baseline only when state actually changes.
 /// </summary>
-public sealed class CaveImportRevisionRepository
+public sealed class CaveBulkRevisionRepository
 {
     private const int BatchSize = 1000;
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
 
-    public CaveImportRevisionRepository(PlanarianDbContext db, RequestUser requestUser)
+    public CaveBulkRevisionRepository(PlanarianDbContext db, RequestUser requestUser)
     {
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
@@ -31,9 +28,18 @@ public sealed class CaveImportRevisionRepository
         IReadOnlyDictionary<string, CavePublishedSnapshotV1> after,
         IReadOnlyDictionary<string, string?> expectedCurrentRevisionIds,
         IReadOnlyDictionary<string, CaveRevisionOperation> operations,
-        string importBatchId,
+        CaveRevisionSource source,
+        string? importBatchId = null,
         CancellationToken cancellationToken = default)
     {
+        if (source is not (CaveRevisionSource.Import or CaveRevisionSource.ManagerEdit))
+            throw new ArgumentException(
+                "Bulk revision publication only supports Import and ManagerEdit sources.", nameof(source));
+        if (source == CaveRevisionSource.Import && string.IsNullOrWhiteSpace(importBatchId))
+            throw new ArgumentException("Import revision publication requires an import batch.", nameof(importBatchId));
+        if (source != CaveRevisionSource.Import && importBatchId is not null)
+            throw new ArgumentException("Only import revisions may identify an import batch.", nameof(importBatchId));
+
         var mutationIds = operations.Keys.Order(StringComparer.Ordinal).ToList();
         foreach (var chunk in mutationIds.Chunk(BatchSize))
         {
@@ -60,13 +66,9 @@ public sealed class CaveImportRevisionRepository
                 {
                     var baseline = new CaveRevision
                     {
-                        Id = IdGenerator.Generate(),
-                        AccountId = _scope.AccountId,
-                        CaveId = caveId,
-                        Source = CaveRevisionSource.SystemBaseline,
-                        Operation = CaveRevisionOperation.Create,
-                        SnapshotSchemaVersion = 1,
-                        SnapshotJson = CaveSnapshotJson.Serialize(previousSnapshot)
+                        Id = IdGenerator.Generate(), AccountId = _scope.AccountId, CaveId = caveId,
+                        Source = CaveRevisionSource.SystemBaseline, Operation = CaveRevisionOperation.Create,
+                        SnapshotSchemaVersion = 1, SnapshotJson = CaveSnapshotJson.Serialize(previousSnapshot)
                     };
                     _db.CaveRevisions.Add(baseline);
                     previousRevisionId = baseline.Id;
@@ -77,26 +79,19 @@ public sealed class CaveImportRevisionRepository
                     : currentSnapshot ?? throw new InvalidOperationException($"Published Cave '{caveId}' has no after snapshot.");
                 var revision = new CaveRevision
                 {
-                    Id = IdGenerator.Generate(),
-                    AccountId = _scope.AccountId,
-                    CaveId = caveId,
-                    PreviousRevisionId = previousRevisionId,
-                    Source = CaveRevisionSource.Import,
-                    Operation = operation,
-                    ImportBatchId = importBatchId,
-                    SnapshotSchemaVersion = 1,
+                    Id = IdGenerator.Generate(), AccountId = _scope.AccountId, CaveId = caveId,
+                    PreviousRevisionId = previousRevisionId, Source = source, Operation = operation,
+                    ImportBatchId = importBatchId, SnapshotSchemaVersion = 1,
                     SnapshotJson = CaveSnapshotJson.Serialize(acceptedSnapshot)
                 };
                 _db.CaveRevisions.Add(revision);
 
-                if (operation != CaveRevisionOperation.Delete)
-                {
-                    if (!liveCaves.TryGetValue(caveId, out var cave))
-                        throw new ImportPlanConcurrencyException($"Cave '{caveId}' disappeared before revision publication.");
-                    if (cave.CurrentRevisionId != expectedCurrent)
-                        throw new CaveRevisionConflictException(caveId, expectedCurrent, cave.CurrentRevisionId);
-                    cave.CurrentRevisionId = revision.Id;
-                }
+                if (operation == CaveRevisionOperation.Delete) continue;
+                if (!liveCaves.TryGetValue(caveId, out var cave))
+                    throw new CaveRevisionConflictException(caveId, expectedCurrent, null);
+                if (cave.CurrentRevisionId != expectedCurrent)
+                    throw new CaveRevisionConflictException(caveId, expectedCurrent, cave.CurrentRevisionId);
+                cave.CurrentRevisionId = revision.Id;
             }
 
             await _db.SaveChangesAsync(cancellationToken);

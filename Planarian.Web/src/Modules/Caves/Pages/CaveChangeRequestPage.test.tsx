@@ -1,7 +1,8 @@
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { CaveAvailability, ProposalVersionComparison } from "./CaveChangeRequestPage";
-import { CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
+import { CaveAvailability, getDownloadableProposalFiles, ProposalVersionComparison,
+  UnavailableProposalFilesAlert } from "./CaveChangeRequestPage";
+import { CaveChangeRequestDetailVm, CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "../Models/CaveRevisionVm";
 
 beforeAll(() => {
@@ -31,17 +32,40 @@ it("renders the live Cave link while the Cave is available", () => {
   expect(document.querySelector("a")).toHaveAttribute("href", "/caves/cave");
 });
 
+it("offers downloads only for live staged files, not historical attachment placeholders", () => {
+  const live = { id: "live", fileTypeTagId: "map", fileTypeNameAtRevision: "Map",
+    fileName: "live.pdf", displayName: "Live survey" };
+  const unavailable = { ...live, id: "unavailable", fileName: "historical.pdf",
+    displayName: "Historical survey" };
+  const baseSnapshot = snapshot("Original");
+  const detail = {
+    request: request(true), base: baseSnapshot, current: baseSnapshot,
+    proposed: { ...baseSnapshot, files: [live, unavailable] }, diff: emptyDiff(), versions: [],
+    countyNumberIntent: "Manual", activeStagedFiles: [live],
+    unavailableStagedFileIds: [unavailable.id],
+  } as CaveChangeRequestDetailVm;
+
+  expect(getDownloadableProposalFiles(detail)).toEqual([live]);
+  expect(getDownloadableProposalFiles(detail)).not.toContainEqual(unavailable);
+
+  render(<UnavailableProposalFilesAlert fileIds={detail.unavailableStagedFileIds}
+    snapshots={[detail.proposed]} />);
+  expect(document.body).toHaveTextContent("Historical attachment unavailable");
+  expect(document.body).toHaveTextContent("Historical survey");
+  expect(document.querySelector("a")).not.toBeInTheDocument();
+});
+
 const snapshot = (name: string, tags: CaveSnapshotVm["tags"] = []): CaveSnapshotVm => ({
   caveId: "cave", accountId: "account", name, alternateNames: [], countyNumber: 1,
   state: { id: "tn", nameAtRevision: "Tennessee", abbreviationAtRevision: "TN" },
   county: { id: "county", nameAtRevision: "Coffee", displayIdAtRevision: "016" },
-  isArchived: false, tags, entrances: [], files: [],
+  isArchived: false, tags, entrances: [], files: [], linePlots: [],
 });
 
 const emptyDiff = (): CaveRevisionDiffVm => ({
   scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [],
   changedEntrances: [], entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [],
-  fileChanges: [], referenceMetadataChanges: [],
+  fileChanges: [], addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [],
 });
 
 const versionDetail = (later: boolean, baseChanged = false): CaveProposalVersionDetailVm => {
@@ -61,7 +85,7 @@ const versionDetail = (later: boolean, baseChanged = false): CaveProposalVersion
     baseRevisionChanged: baseChanged,
     previousBaseRevisionId: baseChanged ? "revision-one" : undefined,
     baseRevisionId: baseChanged ? "revision-two" : "revision-one",
-    countyNumberIntent: "Manual", unavailableStagedFileIds: [],
+    countyNumberIntent: "Manual", linePlots: [], unavailableStagedFileIds: [],
   };
 };
 

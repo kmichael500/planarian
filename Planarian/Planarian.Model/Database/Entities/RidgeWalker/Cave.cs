@@ -15,7 +15,6 @@ public class Cave : EntityBase
 {
     [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
-    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     [MaxLength(PropertyLength.Max)] public string AlternateNames { get; private set; } = "[]";
@@ -37,7 +36,6 @@ public class Cave : EntityBase
 
 
     public virtual Account Account { get; set; } = null!;
-    public virtual User? ReportedByUser { get; set; }
     public virtual County County { get; set; } = null!;
     public virtual State State { get; set; } = null!;
     public virtual ICollection<File> Files { get; set; } = new HashSet<File>();
@@ -86,11 +84,6 @@ public class CaveConfiguration : BaseEntityTypeConfiguration<Cave>
         builder.HasOne(e => e.County)
             .WithMany(e => e.Caves)
             .HasForeignKey(e => e.CountyId)
-            .OnDelete(DeleteBehavior.NoAction);
-
-        builder.HasOne(e => e.ReportedByUser)
-            .WithMany(e => e.CavesReported)
-            .HasForeignKey(e => e.ReportedByUserId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(e => e.Account)

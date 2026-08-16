@@ -33,7 +33,7 @@ public class CaveVm
     }
 
 
-    public CaveVm(string id, string reportedByUserId, string narrative, DateTime? reportedOn,
+    public CaveVm(string id, string narrative, DateTime? reportedOn,
         IEnumerable<string> reportedByNameTagIds, string stateId, string countyId, string displayId, string name,
         IEnumerable<string> alternateNames,
         double? lengthFeet,
@@ -45,7 +45,6 @@ public class CaveVm
         countyId, displayId, name, alternateNames, lengthFeet, depthFeet, maxPitDepthFeet, numberOfPits, isArchived,
         primaryEntrance, mapIds, entrances, geologyTagIds, files)
     {
-        ReportedByUserId = reportedByUserId;
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
         ReportedOn = reportedOn;
@@ -58,7 +57,6 @@ public class CaveVm
 
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string? CurrentRevisionId { get; set; }
-    [MaxLength(PropertyLength.Id)] public string? ReportedByUserId { get; set; }
     [MaxLength(PropertyLength.Id)] public string StateId { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string CountyId { get; set; } = null!;
     [MaxLength(PropertyLength.SmallText)] public string CountyDisplayId { get; set; } = null!;

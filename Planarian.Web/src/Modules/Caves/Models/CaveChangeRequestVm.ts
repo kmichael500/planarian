@@ -1,3 +1,4 @@
+import { GeoJsonUploadVm } from "./GeoJsonUploadVm";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 
 export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
@@ -41,6 +42,12 @@ export interface CaveProposalVersionVm {
 export interface CaveProposalAuthoringContextVm {
   cave: import("./CaveVm").CaveVm;
   expectedBaseRevisionId: string;
+  linePlots: GeoJsonUploadVm[];
+}
+
+export interface CaveEditAuthoringContextVm {
+  cave: import("./CaveVm").CaveVm;
+  linePlots: GeoJsonUploadVm[];
 }
 
 export interface CaveProposalVersionDetailVm {
@@ -55,6 +62,7 @@ export interface CaveProposalVersionDetailVm {
   baseRevisionId: string;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
+  linePlots: GeoJsonUploadVm[];
   unavailableStagedFileIds: string[];
 }
 
@@ -79,6 +87,7 @@ export interface CaveChangeRequestDetailVm {
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
   activeStagedFiles: CaveSnapshotVm["files"];
+  unavailableStagedFileIds: string[];
 }
 
 export interface CaveChangeRequestDecisionVm {

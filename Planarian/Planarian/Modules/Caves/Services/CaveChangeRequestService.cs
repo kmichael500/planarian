@@ -8,6 +8,10 @@ using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Modules.Files.Services;
+using Planarian.Modules.Query.Constants;
+using Planarian.Modules.Query.Extensions;
+using Planarian.Modules.Tags;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Caves.Services;
 
@@ -38,10 +42,15 @@ public sealed class CaveChangeRequestService
     public async Task<CaveProposalAuthoringContextVm> GetAuthoringContextAsync(string caveId,
         CancellationToken cancellationToken)
     {
+        // Visibility is the hard boundary: an inaccessible Cave must not even have a baseline
+        // initialized as a side effect of a guessed authoring-context request.
+        _ = await _caves.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
         await _mutations.EnsureBaselineAsync(caveId, cancellationToken);
         var cave = await _caves.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
+        var linePlots = await _caves.GetCaveLinePlotsAsync(caveId, cancellationToken);
         return new CaveProposalAuthoringContextVm(cave,
-            cave.CurrentRevisionId ?? throw new InvalidOperationException("Revision baseline initialization failed."));
+            cave.CurrentRevisionId ?? throw new InvalidOperationException("Revision baseline initialization failed."),
+            linePlots);
     }
 
     public async Task<CaveChangePreviewVm> PreviewAsync(string caveId, AddCaveVm values,
@@ -89,8 +98,10 @@ public sealed class CaveChangeRequestService
         CancellationToken cancellationToken)
     {
         if (values.Id != caveId) throw ApiExceptionDictionary.BadRequest("The proposed Cave does not match the route.");
+        if (await _caves.GetCave(caveId) is null)
+            throw ApiExceptionDictionary.NotFound("Cave");
         return await _requests.CreateAsync(caveId, expectedBaseRevisionId,
-            token => BuildValidatedProposalAsync(values, caveId, expectedBaseRevisionId, null, token),
+            token => BuildValidatedProposalAsync(values, caveId, expectedBaseRevisionId, null, null, null, null, token),
             cancellationToken);
     }
 
@@ -103,34 +114,14 @@ public sealed class CaveChangeRequestService
         var reviewer = await CanReviewAsync(row, false);
         RequireExpectedEditorState(row, expectedBaseRevisionId, expectedProposalVersionId, againstCurrent);
         var stagedIds = await _requests.GetStagedFileIdsAsync(row.Request.Id, cancellationToken);
+        var previous = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson,
+            row.ProposalVersion.SchemaVersion);
         var proposal = await BuildValidatedProposalAsync(values, row.Request.CaveId, expectedBaseRevisionId,
-            stagedIds, cancellationToken);
+            stagedIds, previous.Entrances.Select(entrance => entrance.EntranceId).ToHashSet(StringComparer.Ordinal),
+            previous.LinePlots.Select(linePlot => linePlot.Id).ToHashSet(StringComparer.Ordinal),
+            row.Request.Id, cancellationToken);
         return await _requests.AddVersionAsync(requestId, expectedBaseRevisionId, expectedProposalVersionId,
             proposal, reviewer, againstCurrent, cancellationToken);
-    }
-
-    public async Task<FileVm> StageFileAsync(string requestId, Stream stream, string fileName, string? uuid,
-        CancellationToken cancellationToken)
-    {
-        var row = await RequireReadableAsync(requestId, cancellationToken);
-        var reviewer = await CanReviewAsync(row, false);
-        if (row.Request.CreatedByUserId != _user.Id && !reviewer)
-            throw ApiExceptionDictionary.Forbidden("You cannot add files to this proposal.");
-        if (row.Request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("Only pending requests can receive files.");
-
-        var file = await _files.StageCaveChangeRequestFile(stream, fileName, cancellationToken, uuid);
-        try
-        {
-            await _requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.DisplayName, reviewer,
-                cancellationToken);
-            return file;
-        }
-        catch
-        {
-            await _files.DeleteUnpublishedFileAsync(file.Id, CancellationToken.None);
-            throw;
-        }
     }
 
     public async Task<(Stream Stream, string FileName)> OpenStagedFileAsync(string requestId, string fileId,
@@ -142,22 +133,28 @@ public sealed class CaveChangeRequestService
         return await _files.OpenUnpublishedFileAsync(fileId, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<CaveChangeRequestSummaryVm>> ListMineAsync(CancellationToken cancellationToken)
+    public async Task<PagedResult<CaveChangeRequestSummaryVm>> ListMineAsync(int pageNumber, int pageSize,
+        CancellationToken cancellationToken)
     {
-        var result = new List<CaveChangeRequestSummaryVm>();
-        foreach (var row in await _requests.ListMineAsync(cancellationToken))
-            result.Add(MapSummary(row, await CanReviewAsync(row, false)));
-        return result;
+        var page = await _requests.ListMineAsync(pageNumber, pageSize, cancellationToken);
+        return new PagedResult<CaveChangeRequestSummaryVm>(page.PageNumber, page.PageSize, page.TotalCount,
+            page.Results.Select(row => MapSummary(row, row.CurrentCanReview)).ToList());
     }
 
-    public async Task<IReadOnlyList<CaveChangeRequestSummaryVm>> ListForReviewAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<CaveChangeRequestSummaryVm>> ListMineAsync(CancellationToken cancellationToken) =>
+        (await ListMineAsync(1, QueryConstants.MaxPageSize, cancellationToken)).Results.ToList();
+
+    public async Task<PagedResult<CaveChangeRequestSummaryVm>> ListForReviewAsync(int pageNumber, int pageSize,
+        CancellationToken cancellationToken)
     {
-        var rows = await _requests.ListForReviewAsync(cancellationToken);
-        var visible = new List<CaveChangeRequestSummaryVm>();
-        foreach (var row in rows)
-            if (await CanReviewAsync(row, false)) visible.Add(MapSummary(row, true));
-        return visible;
+        var page = await _requests.ListForReviewAsync(pageNumber, pageSize, cancellationToken);
+        return new PagedResult<CaveChangeRequestSummaryVm>(page.PageNumber, page.PageSize, page.TotalCount,
+            page.Results.Select(row => MapSummary(row, true)).ToList());
     }
+
+    public async Task<IReadOnlyList<CaveChangeRequestSummaryVm>> ListForReviewAsync(
+        CancellationToken cancellationToken) =>
+        (await ListForReviewAsync(1, QueryConstants.MaxPageSize, cancellationToken)).Results.ToList();
 
     public async Task<CaveChangeRequestDetailVm> GetAsync(string requestId, CancellationToken cancellationToken)
     {
@@ -166,10 +163,14 @@ public sealed class CaveChangeRequestService
         var baseSnapshot = Deserialize(row.ProposalBaseRevision);
         var currentSnapshot = row.CurrentRevision is null ? baseSnapshot : Deserialize(row.CurrentRevision);
         var proposal = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson, row.ProposalVersion.SchemaVersion);
-        var proposedSnapshot = await PresentAsync(proposal, baseSnapshot, cancellationToken);
+        var presentation = await PresentAsync(proposal, baseSnapshot, cancellationToken,
+            preserveUnavailableStagedFiles: true);
+        var proposedSnapshot = presentation.Snapshot;
         var isStale = IsStale(row);
-        var activeStagedFiles = proposedSnapshot.Files.Where(file => proposal.Files.Any(intent =>
-            intent.FileId == file.Id && intent.Disposition == ProposalFileDisposition.PublishStaged)).ToList();
+        var activeStagedFileIds = await _requests.GetStagedFileIdsAsync(requestId, cancellationToken);
+        var unavailableStagedFileIds = presentation.UnavailableStagedFileIds.ToHashSet(StringComparer.Ordinal);
+        var activeStagedFiles = proposedSnapshot.Files.Where(file => activeStagedFileIds.Contains(file.Id) &&
+            !unavailableStagedFileIds.Contains(file.Id)).ToList();
         var versions = await _requests.ListVersionsAsync(requestId, cancellationToken);
         return new CaveChangeRequestDetailVm(MapSummary(row, canReview), baseSnapshot, proposedSnapshot, currentSnapshot,
             Map(_diff.Compare(baseSnapshot, proposedSnapshot)),
@@ -178,7 +179,8 @@ public sealed class CaveChangeRequestService
                 version.Version.PreviousProposalVersionId, version.Version.BaseRevisionId,
                 version.Version.CreatedByUserId, version.ActorName,
                 version.Version.CreatedOn, version.Version.Id == row.Request.CurrentProposalVersionId)).ToList(),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, activeStagedFiles);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, activeStagedFiles,
+            presentation.UnavailableStagedFileIds);
     }
 
     public async Task<CaveProposalVersionDetailVm> GetVersionAsync(string requestId, string versionId,
@@ -216,7 +218,12 @@ public sealed class CaveChangeRequestService
             countyNumberChange,
             row.PreviousVersion is not null && row.PreviousVersion.BaseRevisionId != row.Version.BaseRevisionId,
             row.PreviousVersion?.BaseRevisionId, row.Version.BaseRevisionId, proposal.CountyNumberIntent,
-            proposal.RequestedCountyNumber, unavailableStagedFileIds.ToList());
+            proposal.RequestedCountyNumber,
+            proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
+            {
+                Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson
+            }).ToList(),
+            unavailableStagedFileIds.ToList());
     }
 
     public async Task<CaveChangeRequestDecisionVm> ApproveAsync(string requestId,
@@ -235,16 +242,39 @@ public sealed class CaveChangeRequestService
                 row.CurrentRevision?.Id);
 
         var proposal = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson, row.ProposalVersion.SchemaVersion);
-        var values = ToAddCave(proposal, Deserialize(row.ProposalBaseRevision));
+        var values = ToAddCave(proposal);
         var stagedFileIds = proposal.Files.Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
             .Select(file => file.FileId).ToList();
+        var publications = await _requests.PlanStagedFilePublicationsAsync(requestId,
+            stagedFileIds, cancellationToken);
+        string? publishedRevisionId = null;
+        IReadOnlyList<StagedFileObjectDeleteTarget> discardedStagedObjects = [];
+        var baseSnapshot = Deserialize(row.ProposalBaseRevision);
         await _caveService.ApproveChangeRequestAsync(values, row.ProposalVersion.BaseRevisionId, requestId,
-            stagedFileIds,
-            (mutation, token) => _requests.MarkApprovedAsync(requestId, expectedProposalVersionId,
-                mutation, notes, token), cancellationToken);
-        var approved = await _requests.GetAsync(requestId, cancellationToken);
+            publications, proposal.Entrances.Select(entrance => entrance.EntranceId)
+                .Except(baseSnapshot.Entrances.Select(entrance => entrance.Id))
+                .ToHashSet(StringComparer.Ordinal),
+            proposal.LinePlots.Select(linePlot => linePlot.Id)
+                .Except(baseSnapshot.LinePlots.Select(linePlot => linePlot.Id))
+                .ToHashSet(StringComparer.Ordinal),
+            ToPeoplePublicationContext(proposal),
+            async (mutation, token) =>
+            {
+                publishedRevisionId = mutation.RevisionId;
+                discardedStagedObjects = await _requests.MarkApprovedAsync(requestId,
+                    expectedProposalVersionId, mutation, notes, token);
+            }, cancellationToken);
+
+        foreach (var objectAddress in discardedStagedObjects)
+            await _files.DeleteObjectBestEffortAsync(
+                new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
+
+        if (string.IsNullOrWhiteSpace(publishedRevisionId))
+            throw new InvalidOperationException("Approval completed without producing a published Cave revision.");
+
+        // The relational approval has committed. Use its revision instead of a failure-capable post-commit reload.
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Approved, requestId,
-            approved?.Request.ApprovedRevisionId, approved?.CurrentRevision?.Id);
+            publishedRevisionId, publishedRevisionId);
     }
 
     public async Task<CaveChangeRequestDecisionVm> RejectAsync(string requestId,
@@ -256,7 +286,11 @@ public sealed class CaveChangeRequestService
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
-        await _requests.RejectAsync(requestId, expectedProposalVersionId, notes, cancellationToken);
+        var rejectedObjects = await _requests.RejectAsync(requestId, expectedProposalVersionId, notes,
+            cancellationToken);
+        foreach (var objectAddress in rejectedObjects)
+            await _files.DeleteObjectBestEffortAsync(
+                new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Rejected, requestId, null,
             row.CurrentRevision?.Id);
     }
@@ -266,14 +300,14 @@ public sealed class CaveChangeRequestService
     {
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
-        if (row.Request.CreatedByUserId != _user.Id && !await CanReviewAsync(row, false))
+        if (row.Request.CreatedByUserId != _user.Id && !row.CurrentCanReview)
             throw ApiExceptionDictionary.NotFound("Change request");
         return row;
     }
 
     private Task<bool> CanReviewAsync(CaveChangeRequestReadRow row, bool throwIfDenied) =>
         _user.HasCavePermission(PermissionPolicyKey.Manager, row.Request.CaveId,
-            row.Request.BaseCountyId, row.Request.BaseStateId, throwIfDenied);
+            null, null, throwIfDenied);
 
     private async Task<string> GetCurrentRevisionIdAsync(string caveId, CancellationToken cancellationToken)
     {
@@ -309,13 +343,19 @@ public sealed class CaveChangeRequestService
         AddCaveVm values, string baseRevisionId, CancellationToken cancellationToken)
     {
         var stagedIds = await _requests.GetStagedFileIdsAsync(row.Request.Id, cancellationToken);
-        return await BuildProposalAsync(values, row.Request.CaveId, cancellationToken, baseRevisionId, stagedIds);
+        var previous = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson,
+            row.ProposalVersion.SchemaVersion);
+        return await BuildProposalAsync(values, row.Request.CaveId, cancellationToken, baseRevisionId, stagedIds,
+            previous.Entrances.Select(entrance => entrance.EntranceId).ToHashSet(StringComparer.Ordinal),
+            previous.LinePlots.Select(linePlot => linePlot.Id).ToHashSet(StringComparer.Ordinal), row.Request.Id);
     }
 
     private async Task<CaveProposalSnapshotV1> BuildValidatedProposalAsync(AddCaveVm values, string caveId,
-        string baseRevisionId, IReadOnlySet<string>? stagedFileIds, CancellationToken cancellationToken)
+        string baseRevisionId, IReadOnlySet<string>? stagedFileIds, IReadOnlySet<string>? previousProposalEntranceIds,
+        IReadOnlySet<string>? previousProposalLinePlotIds, string? requestId, CancellationToken cancellationToken)
     {
-        var proposal = await BuildProposalAsync(values, caveId, cancellationToken, baseRevisionId, stagedFileIds);
+        var proposal = await BuildProposalAsync(values, caveId, cancellationToken, baseRevisionId, stagedFileIds,
+            previousProposalEntranceIds, previousProposalLinePlotIds, requestId);
         var revision = await _revisions.GetAsync(caveId, baseRevisionId, cancellationToken)
                        ?? throw ApiExceptionDictionary.NotFound("Cave revision");
         var baseSnapshot = Deserialize(revision.Revision);
@@ -327,26 +367,70 @@ public sealed class CaveChangeRequestService
 
     private async Task<CaveProposalSnapshotV1> BuildProposalAsync(AddCaveVm values, string caveId,
         CancellationToken cancellationToken, string? sourceRevisionId = null,
-        IReadOnlySet<string>? stagedFileIds = null)
+        IReadOnlySet<string>? stagedFileIds = null, IReadOnlySet<string>? previousProposalEntranceIds = null,
+        IReadOnlySet<string>? previousProposalLinePlotIds = null, string? requestId = null)
     {
+        CaveMutationValidation.NormalizeAndValidate(values);
         var currentRevisionId = sourceRevisionId ?? await GetCurrentRevisionIdAsync(caveId, cancellationToken);
         var currentRevision = await _revisions.GetAsync(caveId, currentRevisionId, cancellationToken)
                               ?? throw ApiExceptionDictionary.NotFound("Cave revision");
         var current = Deserialize(currentRevision.Revision);
-        var currentEntrances = current.Entrances.ToDictionary(entrance => entrance.Id);
-        var ids = CaveTagGroups(values).SelectMany(group => group.Ids)
-            .Concat(values.Entrances.SelectMany(EntranceTagGroups).SelectMany(group => group.Ids))
+        var allowedEntranceIds = current.Entrances.Select(entrance => entrance.Id).ToHashSet(StringComparer.Ordinal);
+        if (previousProposalEntranceIds is not null) allowedEntranceIds.UnionWith(previousProposalEntranceIds);
+        if (values.Entrances.Any(entrance => !string.IsNullOrWhiteSpace(entrance.Id) &&
+                !allowedEntranceIds.Contains(entrance.Id)))
+            throw ApiExceptionDictionary.BadRequest("The proposal contains an unauthorized Entrance ID.");
+        var allowedLinePlotIds = current.LinePlots.Select(linePlot => linePlot.Id).ToHashSet(StringComparer.Ordinal);
+        if (previousProposalLinePlotIds is not null) allowedLinePlotIds.UnionWith(previousProposalLinePlotIds);
+        if ((values.LinePlots ?? []).Any(linePlot => !string.IsNullOrWhiteSpace(linePlot.Id) &&
+                !allowedLinePlotIds.Contains(linePlot.Id)))
+            throw ApiExceptionDictionary.BadRequest("The proposal contains an unauthorized line plot ID.");
+        var caveGroups = CaveTagReferencePolicy.CaveGroups(values).ToList();
+        var entranceGroups = values.Entrances.Select(entrance =>
+            (Entrance: entrance, Groups: CaveTagReferencePolicy.EntranceGroups(entrance).ToList())).ToList();
+        var tagValues = caveGroups.SelectMany(group => group.Values)
+            .Concat(entranceGroups.SelectMany(item => item.Groups).SelectMany(group => group.Values)).ToList();
+        var ids = tagValues
             .Concat(values.Entrances.Select(entrance => entrance.LocationQualityTagId))
             .Concat((values.Files ?? []).Select(file => file.FileTypeTagId));
-        var names = await _requests.GetTagNamesAsync(ids, cancellationToken);
+        var idCandidates = await _requests.GetTagCandidatesByIdsAsync(ids!, cancellationToken);
+        var candidatesById = idCandidates.ToDictionary(candidate => candidate.Id, StringComparer.Ordinal);
+        var unresolvedPeopleNames = caveGroups.Concat(entranceGroups.SelectMany(item => item.Groups))
+            .Where(group => CaveTagReferencePolicy.AllowsNewPeopleIntent(group.Role))
+            .SelectMany(group => group.Values)
+            .Where(value => !string.IsNullOrWhiteSpace(value) && !candidatesById.ContainsKey(value.Trim()))
+            .Select(value => value.Trim())
+            .Distinct(TagNameMatchPolicy.IdentityComparer)
+            .ToList();
+        IReadOnlyList<TagNameCandidate> peopleNameCandidates = unresolvedPeopleNames.Count == 0
+            ? []
+            : await _requests.GetEligiblePeopleCandidatesAsync(cancellationToken);
+        var resolvedCaveTags = CaveTagReferencePolicy.Resolve(caveGroups, idCandidates, peopleNameCandidates,
+            _user.AccountId!);
+        var resolvedEntranceTags = entranceGroups.Select(item => (item.Entrance,
+            Resolved: CaveTagReferencePolicy.Resolve(item.Groups, idCandidates, peopleNameCandidates,
+                _user.AccountId!))).ToList();
+        foreach (var entrance in values.Entrances)
+            CaveTagReferencePolicy.RequireTypedReference(entrance.LocationQualityTagId,
+                TagTypeKeyConstant.LocationQuality, candidatesById, _user.AccountId!, "Location Quality");
+        foreach (var file in values.Files ?? [])
+            CaveTagReferencePolicy.RequireTypedReference(file.FileTypeTagId!, TagTypeKeyConstant.File,
+                candidatesById, _user.AccountId!, "file type");
         var locationLabels = await _requests.GetLocationLabelsAsync(values.StateId, values.CountyId,
             cancellationToken);
-        string Name(string id) => names.GetValueOrDefault(id, id);
+        string Name(string id) => candidatesById.TryGetValue(id, out var candidate) ? candidate.Name : id;
 
         var selectedFiles = (values.Files ?? []).ToDictionary(file => file.Id, StringComparer.Ordinal);
         var baseFileIds = current.Files.Select(file => file.Id).ToHashSet(StringComparer.Ordinal);
-        var stagedSnapshots = await _requests.GetFileSnapshotsAsync(selectedFiles.Keys
-            .Where(fileId => !baseFileIds.Contains(fileId)), cancellationToken);
+        var selectedStagedFileIds = selectedFiles.Keys.Where(fileId => !baseFileIds.Contains(fileId)).ToList();
+        var authorableStagedFileIds = await _requests.GetAuthorableStagedFileIdsAsync(
+            selectedStagedFileIds, requestId, cancellationToken);
+        var allowedStagedFileIds = (stagedFileIds ?? new HashSet<string>(StringComparer.Ordinal))
+            .Concat(authorableStagedFileIds).ToHashSet(StringComparer.Ordinal);
+        if (selectedStagedFileIds.Any(fileId => !allowedStagedFileIds.Contains(fileId)))
+            throw ApiExceptionDictionary.BadRequest(
+                "The proposal contains a file that is neither published nor available to this authoring session.");
+        var stagedSnapshots = await _requests.GetFileSnapshotsAsync(selectedStagedFileIds, cancellationToken);
         var fileIntents = current.Files.Select(file => selectedFiles.TryGetValue(file.Id, out var selected)
                 ? new ProposalFileIntent(file.Id, ProposalFileDisposition.RetainPublished,
                     selected.FileTypeTagId, selected.DisplayName,
@@ -356,8 +440,9 @@ public sealed class CaveChangeRequestService
             .ToList();
         foreach (var selected in selectedFiles.Values.Where(file => !baseFileIds.Contains(file.Id)))
         {
-            if (stagedFileIds?.Contains(selected.Id) != true)
-                throw ApiExceptionDictionary.BadRequest("The proposal contains a file that is neither published nor staged for this request.");
+            if (!allowedStagedFileIds.Contains(selected.Id))
+                throw ApiExceptionDictionary.BadRequest(
+                    "The proposal contains a file that is neither published nor available to this authoring session.");
             if (!stagedSnapshots.TryGetValue(selected.Id, out var staged))
                 throw ApiExceptionDictionary.NotFound("Staged file");
             fileIntents.Add(new ProposalFileIntent(selected.Id, ProposalFileDisposition.PublishStaged,
@@ -371,7 +456,7 @@ public sealed class CaveChangeRequestService
             CaveId = caveId,
             AccountId = _user.AccountId!,
             Name = values.Name.Trim(),
-            AlternateNames = values.AlternateNames.Select(name => name.Trim()).ToList(),
+            AlternateNames = CaveAlternateNameNormalizer.Normalize(values.AlternateNames),
             StateId = values.StateId,
             StateNameAtRevision = locationLabels.StateName,
             StateAbbreviationAtRevision = locationLabels.StateAbbreviation,
@@ -388,28 +473,31 @@ public sealed class CaveChangeRequestService
             Narrative = values.Narrative?.Trim(),
             ReportedOn = values.ReportedOn,
             IsArchived = current.IsArchived,
-            Tags = CaveTagGroups(values).SelectMany(group => group.Ids.Select(id =>
-                new SnapshotTagReference(group.Role, id, Name(id)))).ToList(),
-            Entrances = values.Entrances.Select(entrance => new CaveProposalEntranceV1
+            Tags = resolvedCaveTags.Existing,
+            NewPeopleTagIntents = resolvedCaveTags.NewPeople,
+            Entrances = resolvedEntranceTags.Select(item => new CaveProposalEntranceV1
             {
-                EntranceId = string.IsNullOrWhiteSpace(entrance.Id) ? IdGenerator.Generate() : entrance.Id,
-                Name = entrance.Name,
-                IsPrimary = entrance.IsPrimary,
-                Description = entrance.Description,
-                ReportedByUserId = !string.IsNullOrWhiteSpace(entrance.Id) &&
-                                   currentEntrances.TryGetValue(entrance.Id, out var currentEntrance)
-                    ? currentEntrance.ReportedByUserId : null,
-                Latitude = entrance.Latitude,
-                Longitude = entrance.Longitude,
-                Elevation = entrance.ElevationFeet,
-                LocationQualityTagId = entrance.LocationQualityTagId,
-                LocationQualityNameAtRevision = Name(entrance.LocationQualityTagId),
-                ReportedOn = entrance.ReportedOn,
-                PitDepthFeet = entrance.PitFeet,
-                Tags = EntranceTagGroups(entrance).SelectMany(group => group.Ids.Select(id =>
-                    new SnapshotTagReference(group.Role, id, Name(id)))).ToList()
+                EntranceId = string.IsNullOrWhiteSpace(item.Entrance.Id) ? IdGenerator.Generate() : item.Entrance.Id,
+                Name = item.Entrance.Name,
+                IsPrimary = item.Entrance.IsPrimary,
+                Description = item.Entrance.Description,
+                Latitude = item.Entrance.Latitude,
+                Longitude = item.Entrance.Longitude,
+                Elevation = item.Entrance.ElevationFeet,
+                LocationQualityTagId = item.Entrance.LocationQualityTagId,
+                LocationQualityNameAtRevision = Name(item.Entrance.LocationQualityTagId),
+                ReportedOn = item.Entrance.ReportedOn,
+                PitDepthFeet = item.Entrance.PitFeet,
+                Tags = item.Resolved.Existing,
+                NewPeopleTagIntents = item.Resolved.NewPeople
             }).ToList(),
-            Files = fileIntents
+            Files = fileIntents,
+            LinePlots = (values.LinePlots ?? []).Select(linePlot => new CaveProposalLinePlotV1
+            {
+                Id = string.IsNullOrWhiteSpace(linePlot.Id) ? IdGenerator.Generate() : linePlot.Id,
+                Name = linePlot.Name,
+                GeoJson = linePlot.GeoJson
+            }).OrderBy(linePlot => linePlot.Id, StringComparer.Ordinal).ToList()
         };
     }
 
@@ -432,9 +520,12 @@ public sealed class CaveChangeRequestService
         var missingLocationQualityIds = proposal.Entrances
             .Where(entrance => entrance.LocationQualityNameAtRevision is null)
             .Select(entrance => entrance.LocationQualityTagId);
-        var tagNames = await _requests.GetTagNamesAsync(missingLocationQualityIds, cancellationToken);
+        var locationQualityCandidates = (await _requests.GetTagCandidatesByIdsAsync(missingLocationQualityIds,
+            cancellationToken)).ToDictionary(candidate => candidate.Id, StringComparer.Ordinal);
+        foreach (var id in missingLocationQualityIds)
+            CaveTagReferencePolicy.RequireTypedReference(id, TagTypeKeyConstant.LocationQuality,
+                locationQualityCandidates, _user.AccountId!, "Location Quality");
         var baseFiles = @base.Files.ToDictionary(file => file.Id);
-        var baseEntrances = @base.Entrances.ToDictionary(entrance => entrance.Id);
         var stagedFiles = await _requests.GetFileSnapshotsAsync(proposal.Files
             .Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
             .Select(file => file.FileId), cancellationToken);
@@ -451,7 +542,6 @@ public sealed class CaveChangeRequestService
             State = new SnapshotReference(proposal.StateId, labels.Item1, null, labels.Item2),
             County = new SnapshotReference(proposal.CountyId, labels.Item3, labels.Item4),
             CountyNumber = proposal.RequestedCountyNumber ?? (@base.County.Id == proposal.CountyId ? @base.CountyNumber : 0),
-            ReportedByUserId = @base.ReportedByUserId,
             LengthFeet = proposal.LengthFeet,
             DepthFeet = proposal.DepthFeet,
             MaxPitDepthFeet = proposal.MaxPitDepthFeet,
@@ -459,19 +549,21 @@ public sealed class CaveChangeRequestService
             Narrative = proposal.Narrative,
             ReportedOn = proposal.ReportedOn,
             IsArchived = proposal.IsArchived,
-            Tags = proposal.Tags,
+            Tags = proposal.Tags.Concat(proposal.NewPeopleTagIntents.Select(intent =>
+                new SnapshotTagReference(intent.Role, intent.Name, intent.Name))).ToList(),
             Entrances = proposal.Entrances.Select(entrance => new CaveEntranceSnapshotV1
             {
                 Id = entrance.EntranceId, Name = entrance.Name, IsPrimary = entrance.IsPrimary,
-                Description = entrance.Description, ReportedByUserId = entrance.ReportedByUserId,
-                ReportedByNameAtRevision = baseEntrances.GetValueOrDefault(entrance.EntranceId)?.ReportedByNameAtRevision,
+                Description = entrance.Description,
                 Latitude = entrance.Latitude, Longitude = entrance.Longitude,
                 Elevation = entrance.Elevation, Srid = entrance.Srid,
                 LocationQualityTagId = entrance.LocationQualityTagId,
                 LocationQualityNameAtRevision = entrance.LocationQualityNameAtRevision ??
-                    tagNames.GetValueOrDefault(entrance.LocationQualityTagId, entrance.LocationQualityTagId),
+                    locationQualityCandidates[entrance.LocationQualityTagId].Name,
                 ReportedOn = entrance.ReportedOn,
-                PitDepthFeet = entrance.PitDepthFeet, Tags = entrance.Tags
+                PitDepthFeet = entrance.PitDepthFeet,
+                Tags = entrance.Tags.Concat(entrance.NewPeopleTagIntents.Select(intent =>
+                    new SnapshotTagReference(intent.Role, intent.Name, intent.Name))).ToList()
             }).ToList(),
             Files = proposal.Files.Select(file => file.Disposition switch
                 {
@@ -501,15 +593,20 @@ public sealed class CaveChangeRequestService
                             DisplayName = file.DisplayName
                         },
                     _ => null
-                }).Where(file => file is not null).Cast<CaveFileSnapshotV1>().ToList()
+                }).Where(file => file is not null).Cast<CaveFileSnapshotV1>().ToList(),
+            LinePlots = proposal.LinePlots.OrderBy(linePlot => linePlot.Id, StringComparer.Ordinal)
+                .Select(linePlot => new CaveLinePlotSnapshotV1
+                {
+                    Id = linePlot.Id,
+                    Name = linePlot.Name,
+                    ContentHash = CaveJsonContent.NormalizeAndHash(linePlot.GeoJson).ContentHash
+                }).ToList()
         };
         return new ProposalPresentation(snapshot, unavailableStagedFileIds);
     }
 
-    private static AddCaveVm ToAddCave(CaveProposalSnapshotV1 proposal, CavePublishedSnapshotV1 proposalBase)
+    private static AddCaveVm ToAddCave(CaveProposalSnapshotV1 proposal)
     {
-        var publishedEntranceIds = proposalBase.Entrances.Select(entrance => entrance.Id)
-            .ToHashSet(StringComparer.Ordinal);
         return new AddCaveVm
     {
         Id = proposal.CaveId, Name = proposal.Name, AlternateNames = proposal.AlternateNames,
@@ -530,9 +627,7 @@ public sealed class CaveChangeRequestService
         ReportedByNameTagIds = Tags(proposal, SnapshotTagRole.CaveReportedBy),
         Entrances = proposal.Entrances.Select(entrance => new AddEntranceVm
         {
-            // Proposal-only IDs keep immutable versions/diffs stable, but the canonical Cave mutation
-            // boundary must allocate the persisted ID for an entrance that was not in this version's base.
-            Id = publishedEntranceIds.Contains(entrance.EntranceId) ? entrance.EntranceId : null,
+            Id = entrance.EntranceId,
             Name = entrance.Name, IsPrimary = entrance.IsPrimary,
             Description = entrance.Description, Latitude = entrance.Latitude ?? 0,
             Longitude = entrance.Longitude ?? 0, ElevationFeet = entrance.Elevation ?? 0,
@@ -547,7 +642,13 @@ public sealed class CaveChangeRequestService
         Files = proposal.Files.Where(file => file.Disposition is ProposalFileDisposition.RetainPublished or
                 ProposalFileDisposition.PublishStaged)
             .Select(file => new EditFileMetadataVm { Id = file.FileId, FileTypeTagId = file.FileTypeTagId,
-                DisplayName = file.DisplayName }).ToList()
+                DisplayName = file.DisplayName }).ToList(),
+        LinePlots = proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
+        {
+            Id = linePlot.Id,
+            Name = linePlot.Name,
+            GeoJson = linePlot.GeoJson
+        }).ToList()
     };
     }
 
@@ -556,26 +657,19 @@ public sealed class CaveChangeRequestService
     private static IEnumerable<string> Tags(CaveProposalEntranceV1 proposal, SnapshotTagRole role) =>
         proposal.Tags.Where(tag => tag.Role == role).Select(tag => tag.TagTypeId);
 
-    private static IEnumerable<(SnapshotTagRole Role, IEnumerable<string> Ids)> CaveTagGroups(AddCaveVm cave)
+    private static CavePeoplePublicationContext ToPeoplePublicationContext(CaveProposalSnapshotV1 proposal)
     {
-        yield return (SnapshotTagRole.Geology, cave.GeologyTagIds);
-        yield return (SnapshotTagRole.GeologicAge, cave.GeologicAgeTagIds);
-        yield return (SnapshotTagRole.MapStatus, cave.MapStatusTagIds);
-        yield return (SnapshotTagRole.PhysiographicProvince, cave.PhysiographicProvinceTagIds);
-        yield return (SnapshotTagRole.Archeology, cave.ArcheologyTagIds);
-        yield return (SnapshotTagRole.Biology, cave.BiologyTagIds);
-        yield return (SnapshotTagRole.CaveOther, cave.OtherTagIds);
-        yield return (SnapshotTagRole.Cartographer, cave.CartographerNameTagIds);
-        yield return (SnapshotTagRole.CaveReportedBy, cave.ReportedByNameTagIds);
-    }
-
-    private static IEnumerable<(SnapshotTagRole Role, IEnumerable<string> Ids)> EntranceTagGroups(AddEntranceVm entrance)
-    {
-        yield return (SnapshotTagRole.EntranceStatus, entrance.EntranceStatusTagIds);
-        yield return (SnapshotTagRole.EntranceHydrology, entrance.EntranceHydrologyTagIds);
-        yield return (SnapshotTagRole.FieldIndication, entrance.FieldIndicationTagIds);
-        yield return (SnapshotTagRole.EntranceReportedBy, entrance.ReportedByNameTagIds);
-        yield return (SnapshotTagRole.EntranceOther, entrance.EntranceOtherTagIds);
+        if (proposal.Entrances.GroupBy(entrance => entrance.EntranceId, StringComparer.Ordinal)
+            .Any(group => group.Count() > 1))
+            throw ApiExceptionDictionary.BadRequest("Entrance IDs must be unique within a Cave mutation.");
+        return new CavePeoplePublicationContext(
+            new CavePeoplePublicationScope(proposal.Tags.Where(tag =>
+                    CaveTagReferencePolicy.AllowsNewPeopleIntent(tag.Role)).ToList(),
+                proposal.NewPeopleTagIntents),
+            proposal.Entrances.ToDictionary(entrance => entrance.EntranceId, entrance =>
+                new CavePeoplePublicationScope(entrance.Tags.Where(tag =>
+                        CaveTagReferencePolicy.AllowsNewPeopleIntent(tag.Role)).ToList(),
+                    entrance.NewPeopleTagIntents), StringComparer.Ordinal));
     }
 
     private static CavePublishedSnapshotV1 Deserialize(CaveRevision revision) =>
@@ -600,10 +694,13 @@ public sealed class CaveChangeRequestService
         diff.Scalars.Select(change => new CaveScalarChangeVm(change.Key, change.Value.Previous, change.Value.Current)).ToList(),
         diff.AddedTags, diff.RemovedTags, diff.AddedEntrances, diff.RemovedEntrances, diff.ChangedEntrances,
         diff.AddedFiles, diff.RemovedFiles, diff.ChangedFiles,
+        diff.AddedLinePlots, diff.RemovedLinePlots, diff.ChangedLinePlots,
         diff.EntranceChanges.Select(change => new CaveEntranceChangeVm(change.EntranceId,
             change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList(),
             change.AddedTags, change.RemovedTags)).ToList(),
         diff.FileChanges.Select(change => new CaveFileChangeVm(change.FileId,
+            change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList())).ToList(),
+        diff.LinePlotChanges.Select(change => new CaveLinePlotChangeVm(change.LinePlotId,
             change.Scalars.Select(pair => new CaveScalarChangeVm(pair.Key, pair.Value.Previous, pair.Value.Current)).ToList())).ToList(),
         diff.ReferenceMetadataChanges);
 }

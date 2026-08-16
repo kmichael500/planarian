@@ -4,8 +4,8 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
-using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Attributes;
@@ -17,14 +17,11 @@ namespace Planarian.Modules.Caves.Controllers;
 [Authorize]
 public class CaveController : PlanarianControllerBase<CaveService>
 {
-    private readonly FileService _fileService;
     private readonly CaveRevisionService _revisionService;
 
     public CaveController(RequestUser requestUser, TokenService tokenService, CaveService service,
-        FileService fileService, CaveRevisionService revisionService) : base(requestUser,
-        tokenService, service)
+        CaveRevisionService revisionService) : base(requestUser, tokenService, service)
     {
-        _fileService = fileService;
         _revisionService = revisionService;
     }
 
@@ -80,6 +77,13 @@ public class CaveController : PlanarianControllerBase<CaveService>
         return new JsonResult(cave);
     }
 
+    [HttpGet("{caveId:length(10)}/edit-context")]
+    [Authorize(Policy = PermissionPolicyKey.Manager)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<CaveEditAuthoringContextVm>> GetEditAuthoringContext(string caveId,
+        CancellationToken cancellationToken) =>
+        new JsonResult(await Service.GetEditAuthoringContextAsync(caveId, cancellationToken));
+
     [HttpGet("{caveId:length(10)}/revisions")]
     public async Task<ActionResult<CaveRevisionHistoryVm>> GetRevisions(string caveId,
         CancellationToken cancellationToken) =>
@@ -123,22 +127,17 @@ public class CaveController : PlanarianControllerBase<CaveService>
     [Authorize(Policy = PermissionPolicyKey.Manager)]
     public async Task<ActionResult<string>> UpdateCave([FromBody] AddCaveVm cave, CancellationToken cancellationToken)
     {
-        var result = await Service.AddCave(cave, cancellationToken);
-
-        return new JsonResult(result);
-    }
-
-    [DisableRequestSizeLimit] //TODO
-    [HttpPost("{caveId:length(10)}/files")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<IActionResult> UploadCaveFile(string caveId, string? uuid, IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var result =
-            await _fileService.UploadCaveFile(file.OpenReadStream(), caveId, file.FileName, cancellationToken, uuid);
-
-        // return Ok();
-        return new JsonResult(result);
+        try
+        {
+            return new JsonResult(await Service.AddCave(cave, cancellationToken));
+        }
+        catch (CaveRevisionConflictException conflict)
+        {
+            return Conflict(new CaveProposalAuthoringConflictVm(
+                CaveProposalAuthoringConflictKind.PublishedCaveChanged,
+                conflict.ExpectedRevisionId ?? string.Empty,
+                conflict.ActualRevisionId));
+        }
     }
 
     [HttpDelete("{caveId:length(10)}")]
@@ -196,16 +195,4 @@ public class CaveController : PlanarianControllerBase<CaveService>
 
     #endregion
 
-    #region GeoJson
-
-    [RequestSizeLimit(200 * 1024 * 1024)]      // 200MB for large GeoJSON files
-    [HttpPost("{caveId:length(10)}/geojson")]
-    [Authorize(Policy = PermissionPolicyKey.Manager)]
-    public async Task<ActionResult> UploadCaveGeoJson(string caveId, [FromBody] IEnumerable<GeoJsonUploadVm> geoJsonUploads, CancellationToken cancellationToken)
-    {
-            await Service.UploadCaveGeoJson(caveId, geoJsonUploads, cancellationToken);
-        return new OkResult();
-    }
-    
-    #endregion
 }

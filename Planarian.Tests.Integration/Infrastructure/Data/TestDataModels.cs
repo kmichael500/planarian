@@ -49,7 +49,3 @@ internal sealed record PendingReviewWithStagedFileTestData(
     string ProposalVersionId,
     string FileId,
     string StagedFileId);
-
-/// <summary>
-/// Small typed test-data primitives. Compositions create only the domain state
-/// named by the method; review, file, and import-batch rows are always explicit.

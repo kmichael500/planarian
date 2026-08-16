@@ -9,14 +9,33 @@ using Planarian.Model.Shared.Base;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Model;
 using Planarian.Shared.Base;
-using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Account.Repositories;
+
+public sealed record AccountFileObjectAddress(string Partition, string Key);
 
 public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
     public AccountRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
+    }
+
+    public async Task<IReadOnlyList<AccountFileObjectAddress>> GetFileObjectAddressesForResetAsync(
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
+
+        var live = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
+            .Where(file => file.AccountId == RequestUser.AccountId &&
+                           file.BlobContainer != null && file.BlobKey != null)
+            .Select(file => new AccountFileObjectAddress(file.BlobContainer!, file.BlobKey!))
+            .ToListAsync(cancellationToken);
+        var retained = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.AccountId == RequestUser.AccountId)
+            .Select(row => new AccountFileObjectAddress(row.StoragePartition, row.StorageKey))
+            .ToListAsync(cancellationToken);
+
+        return live.Concat(retained).Distinct().ToList();
     }
 
     public async Task DeleteCaveWithRelatedData(IProgress<string> progress, CancellationToken cancellationToken)
@@ -124,6 +143,18 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
             totalDeleted += deletedCount;
             progress.Report($"Deleted {totalDeleted} geology tags.");
+        } while (deletedCount == batchSize);
+        deletedCount = 0;
+        totalDeleted = 0;
+
+        do
+        {
+            deletedCount = await DeleteBatchAsync(DbContext.RetainedCaveFileObjects
+                .Where(row => row.AccountId == RequestUser.AccountId)
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
+
+            totalDeleted += deletedCount;
+            progress.Report($"Deleted {totalDeleted} retained cave file objects.");
         } while (deletedCount == batchSize);
         deletedCount = 0;
         totalDeleted = 0;
@@ -415,257 +446,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         return result;
     }
 
-    public async Task<int> DeleteTagsAsync(IEnumerable<string> tagTypeIds, CancellationToken cancellationToken)
-    {
-        var deletedRecords = 0;
-
-        await using var transaction = await DbContext.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            foreach (var batch in tagTypeIds.Chunk(100))
-                deletedRecords += await DbContext.TagTypes
-                    .Where(e => e.AccountId == RequestUser.AccountId)
-                    .Where(e => batch.Contains(e.Id))
-                    .ExecuteDeleteAsync(cancellationToken);
-
-            await SaveChangesAsync(cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            // rollback transaction
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-
-        return deletedRecords;
-    }
-
-    public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,
-        CancellationToken cancellationToken)
-    {
-        var dbTransaction = await BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-            var destinationTagType = await DbContext.TagTypes
-                .Where(e => e.Id == destinationTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (destinationTagType == null)
-            {
-                throw ApiExceptionDictionary.NotFound("Destination tag type");
-            }
-
-            var destinationTagTypeKey = destinationTagType.Key;
-
-            var cavesParentSet = DbContext.Caves.Where(e => e.AccountId == RequestUser.AccountId);
-            var entrancesParentSet = DbContext.Entrances.Where(e => e.Cave!.AccountId == RequestUser.AccountId);
-            foreach (var sourceTagTypeId in tagTypeIds)
-            {
-                if (sourceTagTypeId == destinationTagTypeId) continue; // skip if it's the same as destination
-
-                var sourceTagType = await DbContext.TagTypes
-                    .Where(e => e.Id == sourceTagTypeId && (e.AccountId == RequestUser.AccountId || e.IsDefault))
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (sourceTagType == null)
-                {
-                    throw ApiExceptionDictionary.NotFound("Source tag type");
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                #region Cave Tags
-
-                if (TagTypeKeyConstant.Archeology.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.ArcheologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<ArcheologyTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.Biology.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.BiologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<BiologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.People.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CartographerNameTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveReportedByNameTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceReportedByNameTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-
-                    await MergeTags<CartographerNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
-                    await MergeTags<CaveReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
-                    await MergeTags<EntranceReportedByNameTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.CaveOther.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.CaveOtherTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<CaveOtherTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.File.Equals(destinationTagTypeKey))
-                {
-                    // we do not delete duplicate file tags because each file can only have one tag. it would remove the file in some cases
-                    await MergeTags<File>(sourceTagTypeId, destinationTagTypeId, e => e.FileTypeTagId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.GeologicAge.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.GeologicAgeTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<GeologicAgeTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.Geology.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.GeologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<GeologyTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.MapStatus.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.MapStatusTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<MapStatusTag>(sourceTagTypeId, destinationTagTypeId, e => e.TagTypeId,
-                        e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.PhysiographicProvince.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(cavesParentSet, e => e.PhysiographicProvinceTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<PhysiographicProvinceTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.LocationQuality.Equals(destinationTagTypeKey))
-                {
-                    // we do not delete duplicate location quality tags because each entrance can only have one tag. it would remove the entrance in some cases
-                    await MergeTags<Entrance>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.LocationQualityTagId, e => e.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.EntranceHydrology.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceHydrologyTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<EntranceHydrologyTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.EntranceStatus.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.EntranceStatusTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<EntranceStatusTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
-                }
-                else if (TagTypeKeyConstant.FieldIndication.Equals(destinationTagTypeKey))
-                {
-                    await DeleteDuplicateTags(entrancesParentSet, e => e.FieldIndicationTags, tag => tag.TagTypeId,
-                        sourceTagTypeId, destinationTagTypeId, cancellationToken);
-                    await MergeTags<FieldIndicationTag>(sourceTagTypeId, destinationTagTypeId,
-                        e => e.TagTypeId, e => e.Entrance!.Cave!.AccountId, cancellationToken);
-                }
-
-                #endregion
-            }
-
-            await DbContext.SaveChangesAsync(cancellationToken);
-            await dbTransaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
-
-    private async Task MergeTags<T>(string sourceTagTypeId,
-        string destinationTagTypeId,
-        Expression<Func<T, string>> tagTypeSelector,
-        Expression<Func<T, string>> accountIdSelector,
-        CancellationToken cancellationToken) where T : class
-    {
-        // Update the source tags to the destination type.
-        var tags = DbContext.Set<T>()
-            .Where(tagTypeSelector.Compose(s => s == sourceTagTypeId))
-            .Where(accountIdSelector.Compose(a => a == RequestUser.AccountId));
-
-        var tagProperty = tagTypeSelector.Body is MemberExpression member
-            ? member.Member.Name
-            : throw new ArgumentException("tagTypeSelector must be a member access expression.");
-        var matchingTags = await tags.IgnoreQueryFilters().ToListAsync(cancellationToken);
-        foreach (var tag in matchingTags)
-            DbContext.Entry(tag).Property(tagProperty).CurrentValue = destinationTagTypeId;
-        await DbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task DeleteDuplicateTags<TEntity, TTag>(IQueryable<TEntity> parentSet,
-        Expression<Func<TEntity, IEnumerable<TTag>>> tagCollectionSelector,
-        Expression<Func<TTag, string>> tagTypeIdSelector,
-        string sourceTagTypeId,
-        string destinationTagTypeId,
-        CancellationToken cancellationToken)
-        where TEntity : class
-        where TTag : class
-    {
-        // Extract the collection property name.
-        if (!(tagCollectionSelector.Body is MemberExpression memberExpression))
-        {
-            throw new ArgumentException("tagCollectionSelector must be a member access expression.",
-                nameof(tagCollectionSelector));
-        }
-
-        var collectionPropertyName = memberExpression.Member.Name;
-
-        // Extract the tag type property name.
-        if (!(tagTypeIdSelector.Body is MemberExpression tagMemberExpression))
-        {
-            throw new ArgumentException("tagTypeIdSelector must be a member access expression.",
-                nameof(tagTypeIdSelector));
-        }
-
-        var tagTypeIdPropertyName = tagMemberExpression.Member.Name;
-
-        var query = parentSet
-            .Where(e =>
-                EF.Property<IEnumerable<TTag>>(e, collectionPropertyName)
-                    .Any(tag => EF.Property<string>(tag, tagTypeIdPropertyName) == sourceTagTypeId)
-                &&
-                EF.Property<IEnumerable<TTag>>(e, collectionPropertyName)
-                    .Any(tag => EF.Property<string>(tag, tagTypeIdPropertyName) == destinationTagTypeId)
-            )
-            .SelectMany(e => EF.Property<IEnumerable<TTag>>(e, collectionPropertyName))
-            .Where(tag => EF.Property<string>(tag, tagTypeIdPropertyName) == sourceTagTypeId);
-
-        // Execute the deletion of duplicate (source) tags.
-        await query.ExecuteDeleteAsync(cancellationToken);
-    }
-
-
-    private void UpdateTagTypeId<T>(ICollection<T> tags, string destinationTagTypeId) where T : class
-    {
-        var propertyInfo = typeof(T).GetProperty("TagTypeId");
-        if (propertyInfo == null) return;
-
-        foreach (var tag in tags) propertyInfo.SetValue(tag, destinationTagTypeId);
-    }
-
     public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
         CancellationToken cancellationToken)
     {
@@ -687,7 +467,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
     public async Task<County?> GetCounty(string? countyId, CancellationToken cancellationToken)
     {
-        return await DbContext.Counties.FirstOrDefaultAsync(e => e.Id == countyId, cancellationToken);
+        return await DbContext.Counties.FirstOrDefaultAsync(e =>
+            e.Id == countyId && e.AccountId == RequestUser.AccountId, cancellationToken);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
@@ -701,32 +482,24 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .OrderBy(e => e.Display).ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> IsDuplicateCountyCode(string countyDisplayId, string stateId,
+    public async Task<bool> IsDuplicateCountyCode(string countyDisplayId, string stateId, string? excludedCountyId,
         CancellationToken cancellationToken)
     {
         return await EntityFrameworkQueryableExtensions.AnyAsync(DbContext.Counties, e =>
                 EF.Functions.ILike(e.DisplayId, $"{countyDisplayId}") && e.DisplayId.Length == countyDisplayId.Length &&
-                e.StateId == stateId && e.AccountId == RequestUser.AccountId,
+                e.StateId == stateId && e.AccountId == RequestUser.AccountId && e.Id != excludedCountyId,
             cancellationToken);
     }
 
-    public async Task<bool> CanDeleteCounty(string countyId)
+    public async Task<bool> IsCountyReferencedByCave(string countyId, CancellationToken cancellationToken)
     {
-        return DbContext.Counties.Any(e =>
-            e.Id == countyId && e.Caves.Count.Equals(0) && e.AccountId == RequestUser.AccountId);
+        return await DbContext.Caves.IgnoreQueryFilters().AnyAsync(cave =>
+            cave.AccountId == RequestUser.AccountId && cave.CountyId == countyId, cancellationToken);
     }
 
-    public async Task MergeCounties(string[] countyIds, string destinationCountyId)
+    public async Task<bool> StateExistsAsync(string stateId, CancellationToken cancellationToken)
     {
-        foreach (var countyId in countyIds)
-        {
-            if (countyId == destinationCountyId) continue;
-
-            await DbContext.Caves.Where(e => e.CountyId == countyId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.CountyId, destinationCountyId));
-        }
-
-        await DbContext.SaveChangesAsync();
+        return await DbContext.States.AsNoTracking().AnyAsync(state => state.Id == stateId, cancellationToken);
     }
 
     public async Task<MiscAccountSettingsVm?> GetMiscAccountSettingsVm(CancellationToken cancellationToken)

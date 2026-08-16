@@ -72,13 +72,13 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
             County = new SnapshotReference(cave.CountyId, cave.County.Name, cave.County.DisplayId),
             CountyNumber = cave.CountyNumber, LengthFeet = cave.LengthFeet, DepthFeet = cave.DepthFeet,
             MaxPitDepthFeet = cave.MaxPitDepthFeet, NumberOfPits = cave.NumberOfPits, Narrative = cave.Narrative,
-            ReportedByUserId = cave.ReportedByUserId, ReportedOn = cave.ReportedOn, IsArchived = cave.IsArchived,
+            ReportedOn = cave.ReportedOn, IsArchived = cave.IsArchived,
             Tags = cave.GeologyTags.Select(t => new SnapshotTagReference(SnapshotTagRole.Geology, t.TagTypeId, t.TagType.Name))
                 .OrderBy(t => t.Role).ThenBy(t => t.TagTypeId).ToList(),
             Entrances = cave.Entrances.OrderBy(e => e.Id).Select(e => new CaveEntranceSnapshotV1
             {
                 Id = e.Id, Name = e.Name, IsPrimary = e.IsPrimary, Description = e.Description,
-                ReportedByUserId = e.ReportedByUserId, Latitude = e.Location?.Y, Longitude = e.Location?.X,
+                Latitude = e.Location?.Y, Longitude = e.Location?.X,
                 Elevation = e.Location?.Z, Srid = e.Location?.SRID ?? 4326,
                 LocationQualityTagId = e.LocationQualityTagId, LocationQualityNameAtRevision = e.LocationQualityTag.Name,
                 ReportedOn = e.ReportedOn, PitDepthFeet = e.PitDepthFeet,

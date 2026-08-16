@@ -39,14 +39,15 @@ public sealed class CavePublishedSnapshotRepository
             if (cores.Count != chunk.Length)
                 throw new InvalidOperationException("One or more Caves are not owned by the current account.");
 
-            // Five bounded projection groups per chunk: core, cave tags,
-            // entrances, entrance tags, and files. No tracked aggregate graph is
+            // Six bounded projection groups per chunk: core, cave tags,
+            // entrances, entrance tags, files, and line plots. No tracked aggregate graph is
             // materialized and memory usage scales with ChunkSize, not import size.
             var caveTags = await LoadCaveTagsAsync(chunk, cancellationToken);
             var entrances = await LoadEntrancesAsync(chunk, cancellationToken);
             var entranceIds = entrances.Select(e => e.Id).ToArray();
             var entranceTags = await LoadEntranceTagsAsync(chunk, entranceIds, cancellationToken);
             var files = await LoadFilesAsync(chunk, cancellationToken);
+            var linePlots = await LoadLinePlotsAsync(chunk, cancellationToken);
 
             var caveTagsByCave = caveTags.GroupBy(t => t.CaveId)
                 .ToDictionary(g => g.Key,
@@ -69,8 +70,6 @@ public sealed class CavePublishedSnapshotRepository
                             Name = e.Name,
                             IsPrimary = e.IsPrimary,
                             Description = e.Description,
-                            ReportedByUserId = e.ReportedByUserId,
-                            ReportedByNameAtRevision = e.ReportedByName,
                             Latitude = e.Location?.Y,
                             Longitude = e.Location?.X,
                             Elevation = e.Location?.Z,
@@ -94,6 +93,17 @@ public sealed class CavePublishedSnapshotRepository
                             DisplayName = f.DisplayName
                         }).ToList(),
                     StringComparer.Ordinal);
+            var linePlotsByCave = linePlots.GroupBy(linePlot => linePlot.CaveId)
+                .ToDictionary(group => group.Key,
+                    group => (IReadOnlyList<CaveLinePlotSnapshotV1>)group
+                        .OrderBy(linePlot => linePlot.Id, StringComparer.Ordinal)
+                        .Select(linePlot => new CaveLinePlotSnapshotV1
+                        {
+                            Id = linePlot.Id,
+                            Name = linePlot.Name,
+                            ContentHash = CaveJsonContent.NormalizeAndHash(linePlot.GeoJson).ContentHash
+                        }).ToList(),
+                    StringComparer.Ordinal);
 
             foreach (var core in cores)
             {
@@ -103,11 +113,10 @@ public sealed class CavePublishedSnapshotRepository
                     CaveId = core.Id,
                     AccountId = core.AccountId,
                     Name = core.Name,
-                    AlternateNames = alternateNames.Order(StringComparer.Ordinal).ToList(),
+                    AlternateNames = CaveAlternateNameNormalizer.Normalize(alternateNames),
                     State = new SnapshotReference(core.StateId, core.StateName, null, core.StateAbbreviation),
                     County = new SnapshotReference(core.CountyId, core.CountyName, core.CountyDisplayId),
                     CountyNumber = core.CountyNumber,
-                    ReportedByUserId = core.ReportedByUserId,
                     LengthFeet = core.LengthFeet,
                     DepthFeet = core.DepthFeet,
                     MaxPitDepthFeet = core.MaxPitDepthFeet,
@@ -117,7 +126,8 @@ public sealed class CavePublishedSnapshotRepository
                     IsArchived = core.IsArchived,
                     Tags = caveTagsByCave.GetValueOrDefault(core.Id) ?? [],
                     Entrances = entrancesByCave.GetValueOrDefault(core.Id) ?? [],
-                    Files = filesByCave.GetValueOrDefault(core.Id) ?? []
+                    Files = filesByCave.GetValueOrDefault(core.Id) ?? [],
+                    LinePlots = linePlotsByCave.GetValueOrDefault(core.Id) ?? []
                 };
             }
         }
@@ -133,7 +143,7 @@ public sealed class CavePublishedSnapshotRepository
             .AsNoTracking()
             .Select(c => new CaveCoreRow(
                 c.Id, c.AccountId, c.Name, c.AlternateNames, c.StateId, c.State.Name, c.State.Abbreviation,
-                c.CountyId, c.County.Name, c.County.DisplayId, c.CountyNumber, c.ReportedByUserId,
+                c.CountyId, c.County.Name, c.County.DisplayId, c.CountyNumber,
                 c.LengthFeet, c.DepthFeet, c.MaxPitDepthFeet, c.NumberOfPits, c.Narrative, c.ReportedOn,
                 c.IsArchived))
             .ToListAsync(cancellationToken);
@@ -179,8 +189,7 @@ public sealed class CavePublishedSnapshotRepository
         _db.Entrances.IgnoreQueryFilters()
             .Where(e => caveIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
             .AsNoTracking()
-            .Select(e => new EntranceRow(e.Id, e.CaveId, e.Name, e.IsPrimary, e.Description, e.ReportedByUserId,
-                e.ReportedByUser == null ? null : e.ReportedByUser.FirstName + " " + e.ReportedByUser.LastName,
+            .Select(e => new EntranceRow(e.Id, e.CaveId, e.Name, e.IsPrimary, e.Description,
                 e.Location, e.LocationQualityTagId, e.LocationQualityTag.Name, e.ReportedOn, e.PitDepthFeet))
             .ToListAsync(cancellationToken);
 
@@ -223,21 +232,30 @@ public sealed class CavePublishedSnapshotRepository
             .Select(f => new FileRow(f.CaveId!, f.Id, f.FileTypeTagId, f.FileTypeTag.Name, f.FileName, f.DisplayName))
             .ToListAsync(cancellationToken);
 
+    private Task<List<LinePlotRow>> LoadLinePlotsAsync(string[] caveIds, CancellationToken cancellationToken) =>
+        _db.CaveGeoJsons.IgnoreQueryFilters()
+            .Where(linePlot => caveIds.Contains(linePlot.CaveId) && linePlot.Cave != null &&
+                               linePlot.Cave.AccountId == _scope.AccountId)
+            .AsNoTracking()
+            .Select(linePlot => new LinePlotRow(linePlot.CaveId, linePlot.Id, linePlot.Name, linePlot.GeoJson))
+            .ToListAsync(cancellationToken);
+
     private sealed record CaveCoreRow(
         string Id, string AccountId, string Name, string AlternateNames,
         string StateId, string StateName, string StateAbbreviation,
         string CountyId, string CountyName, string CountyDisplayId, int CountyNumber,
-        string? ReportedByUserId, double? LengthFeet, double? DepthFeet, double? MaxPitDepthFeet,
+        double? LengthFeet, double? DepthFeet, double? MaxPitDepthFeet,
         int? NumberOfPits, string? Narrative, DateTime? ReportedOn, bool IsArchived);
 
     private sealed record CaveTagRow(string CaveId, SnapshotTagRole Role, string TagTypeId, string Name);
 
     private sealed record EntranceRow(
-        string Id, string CaveId, string? Name, bool IsPrimary, string? Description, string? ReportedByUserId,
-        string? ReportedByName, Point? Location, string LocationQualityTagId, string LocationQualityName, DateTime? ReportedOn,
+        string Id, string CaveId, string? Name, bool IsPrimary, string? Description,
+        Point? Location, string LocationQualityTagId, string LocationQualityName, DateTime? ReportedOn,
         double? PitDepthFeet);
 
     private sealed record EntranceTagRow(string EntranceId, SnapshotTagRole Role, string TagTypeId, string Name);
     private sealed record FileRow(string CaveId, string Id, string FileTypeTagId, string FileTypeName,
         string FileName, string? DisplayName);
+    private sealed record LinePlotRow(string CaveId, string Id, string Name, string GeoJson);
 }

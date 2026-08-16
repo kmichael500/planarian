@@ -8,8 +8,10 @@ using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
+using Planarian.Modules.Tags.Repositories;
 
 namespace Planarian.Modules.Import.Data;
 
@@ -25,15 +27,20 @@ public sealed class CaveImportExecutionRepository
     private readonly PlanarianDbContext _db;
     private readonly AccountExecutionScope _scope;
     private readonly CavePublishedSnapshotRepository _snapshots;
-    private readonly CaveImportRevisionRepository _revisionPublisher;
+    private readonly CaveBulkRevisionRepository _revisionPublisher;
+    private readonly TagReferenceLockRepository _tagReferenceLocks;
+    private readonly CountyReferenceLockRepository _countyReferenceLocks;
 
     public CaveImportExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
-        CavePublishedSnapshotRepository snapshots, CaveImportRevisionRepository revisionPublisher)
+        CavePublishedSnapshotRepository snapshots, CaveBulkRevisionRepository revisionPublisher,
+        TagReferenceLockRepository tagReferenceLocks, CountyReferenceLockRepository countyReferenceLocks)
     {
         _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _snapshots = snapshots;
         _revisionPublisher = revisionPublisher;
+        _tagReferenceLocks = tagReferenceLocks;
+        _countyReferenceLocks = countyReferenceLocks;
     }
 
     public async Task<CaveImportExecutionResult> ExecuteAsync(CaveImportPlan plan, string? sourceFileName,
@@ -47,8 +54,11 @@ public sealed class CaveImportExecutionRepository
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            await LockAndVerifyExistingCountyReferencesAsync(plan, cancellationToken);
+            await LockAndVerifyExistingTagReferencesAsync(plan, cancellationToken);
             await LockAndVerifyExistingCavesAsync(plan, cancellationToken);
-            await VerifyReferenceMetadataAsync(plan, cancellationToken);
+            await RejectPendingRequestDeletionsAsync(plan, cancellationToken);
+            await VerifyNonTagReferenceMetadataAsync(plan, cancellationToken);
 
             var mutationExistingIds = plan.Caves
                 .Where(c => c.Action == CaveImportAction.Update)
@@ -100,7 +110,8 @@ public sealed class CaveImportExecutionRepository
                 operations[cave.Id] = cave.Action == CaveImportAction.Insert ? CaveRevisionOperation.Create : CaveRevisionOperation.Update;
             foreach (var deletion in plan.Deletions) operations[deletion.CaveId] = CaveRevisionOperation.Delete;
 
-            await _revisionPublisher.PublishAsync(before, after, expectedRevisions, operations, importBatchId, cancellationToken);
+            await _revisionPublisher.PublishAsync(before, after, expectedRevisions, operations,
+                CaveRevisionSource.Import, importBatchId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -109,7 +120,26 @@ public sealed class CaveImportExecutionRepository
             throw;
         }
 
-        return new CaveImportExecutionResult(importBatchId, deferredBlobDeletes);
+        return new CaveImportExecutionResult(importBatchId, deferredBlobDeletes.Distinct().ToList());
+    }
+
+    private async Task RejectPendingRequestDeletionsAsync(CaveImportPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var deletionIds = plan.Deletions.Select(deletion => deletion.CaveId)
+            .Distinct(StringComparer.Ordinal).ToList();
+        if (deletionIds.Count == 0) return;
+        foreach (var chunk in deletionIds.Chunk(LookupBatchSize))
+        {
+            var hasPending = await _db.CaveChangeRequests.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(request => request.AccountId == _scope.AccountId &&
+                                     request.Status == CaveChangeRequestStatus.Pending &&
+                                     chunk.Contains(request.CaveId), cancellationToken);
+            if (hasPending)
+                throw new ImportPlanConcurrencyException(
+                    "One or more Caves selected for sync deletion have pending change requests. " +
+                    "Re-plan after those requests are resolved.");
+        }
     }
 
     private async Task LockAndVerifyExistingCavesAsync(CaveImportPlan plan, CancellationToken cancellationToken)
@@ -127,7 +157,7 @@ public sealed class CaveImportExecutionRepository
                 command.CommandText = """
                     select "Id" from "Caves"
                     where "AccountId" = @account_id and "Id" = any(@cave_ids)
-                    order by "Id" for update
+                    order by "Id" collate "C" for update
                     """;
                 command.Parameters.AddWithValue("account_id", _scope.AccountId);
                 command.Parameters.AddWithValue("cave_ids", chunk);
@@ -149,7 +179,43 @@ public sealed class CaveImportExecutionRepository
         }
     }
 
-    private async Task VerifyReferenceMetadataAsync(CaveImportPlan plan, CancellationToken cancellationToken)
+    private async Task LockAndVerifyExistingTagReferencesAsync(CaveImportPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var creationTagIds = plan.TagCreations.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
+        var existingTagIds = plan.TagNamesById.Keys.Where(id => !creationTagIds.Contains(id)).ToList();
+        var lockedTags = await _tagReferenceLocks.LockForReferenceAsync(existingTagIds, cancellationToken);
+        if (lockedTags.Count != existingTagIds.Distinct(StringComparer.Ordinal).Count())
+            throw new ImportPlanConcurrencyException("A referenced Tag changed ownership or disappeared.");
+        foreach (var tag in lockedTags)
+        {
+            if (plan.TagNamesById[tag.Id] != tag.Name)
+                throw new ImportPlanConcurrencyException($"Tag '{tag.Id}' was renamed after import planning.");
+        }
+    }
+
+    private async Task LockAndVerifyExistingCountyReferencesAsync(CaveImportPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var createdCountyIds = plan.CountyCreations.Select(county => county.Id).ToHashSet(StringComparer.Ordinal);
+        var expectations = plan.Caves.Where(cave => !createdCountyIds.Contains(cave.CountyId))
+            .GroupBy(cave => cave.CountyId)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var locked = await _countyReferenceLocks.LockForReferenceAsync(expectations.Keys, cancellationToken);
+        if (locked.Count != expectations.Count)
+            throw new ImportPlanConcurrencyException(
+                "A referenced County changed ownership or disappeared after import planning.");
+
+        foreach (var county in locked)
+        {
+            var expected = expectations[county.Id];
+            if (county.AccountId != _scope.AccountId || county.StateId != expected.StateId ||
+                county.DisplayId != expected.CountyDisplayId || county.Name != expected.CountyName)
+                throw new ImportPlanConcurrencyException($"County '{county.Id}' changed after Cave import planning.");
+        }
+    }
+
+    private async Task VerifyNonTagReferenceMetadataAsync(CaveImportPlan plan, CancellationToken cancellationToken)
     {
         var stateExpectations = plan.Caves.GroupBy(c => c.StateId)
             .ToDictionary(g => g.Key, g => g.First().StateAbbreviation, StringComparer.Ordinal);
@@ -160,22 +226,6 @@ public sealed class CaveImportExecutionRepository
                 .Select(s => new { s.Id, s.Abbreviation }).ToListAsync(cancellationToken);
             if (states.Count != ids.Count || states.Any(s => stateExpectations[s.Id] != s.Abbreviation))
                 throw new ImportPlanConcurrencyException("A referenced State changed after Cave import planning.");
-        }
-
-        var createdCountyIds = plan.CountyCreations.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
-        var countyExpectations = plan.Caves.Where(c => !createdCountyIds.Contains(c.CountyId))
-            .GroupBy(c => c.CountyId).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        foreach (var chunk in countyExpectations.Keys.Chunk(LookupBatchSize))
-        {
-            var rows = await _db.Counties.Where(c => c.AccountId == _scope.AccountId && chunk.Contains(c.Id))
-                .AsNoTracking().Select(c => new { c.Id, c.StateId, c.DisplayId, c.Name }).ToListAsync(cancellationToken);
-            if (rows.Count != chunk.Length) throw new ImportPlanConcurrencyException("A referenced County disappeared after import planning.");
-            foreach (var row in rows)
-            {
-                var expected = countyExpectations[row.Id];
-                if (row.StateId != expected.StateId || row.DisplayId != expected.CountyDisplayId || row.Name != expected.CountyName)
-                    throw new ImportPlanConcurrencyException($"County '{row.Id}' changed after Cave import planning.");
-            }
         }
 
         if (plan.AccountStateCreations.Count > 0)
@@ -191,17 +241,6 @@ public sealed class CaveImportExecutionRepository
                 throw new ImportPlanConcurrencyException("A County was created after import planning; re-plan before committing.");
         }
 
-        var creationTagIds = plan.TagCreations.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
-        var existingTagIds = plan.TagNamesById.Keys.Where(id => !creationTagIds.Contains(id)).ToList();
-        foreach (var chunk in existingTagIds.Chunk(LookupBatchSize))
-        {
-            var tags = await _db.TagTypes.Where(t => chunk.Contains(t.Id) && (t.AccountId == _scope.AccountId || t.IsDefault))
-                .AsNoTracking().Select(t => new { t.Id, t.Name }).ToListAsync(cancellationToken);
-            if (tags.Count != chunk.Length) throw new ImportPlanConcurrencyException("A referenced Tag changed ownership or disappeared.");
-            foreach (var tag in tags)
-                if (plan.TagNamesById[tag.Id] != tag.Name)
-                    throw new ImportPlanConcurrencyException($"Tag '{tag.Id}' was renamed after import planning.");
-        }
     }
 
     private async Task PersistReferenceCreationsAsync(CaveImportPlan plan, CancellationToken cancellationToken)
@@ -299,6 +338,14 @@ public sealed class CaveImportExecutionRepository
             var files = await _db.Files.IgnoreQueryFilters().Where(f => f.CaveId != null && scopedIds.Contains(f.CaveId) && f.Cave != null && f.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(f => new { f.Id, f.BlobKey, f.BlobContainer }).ToListAsync(cancellationToken);
             foreach (var file in files) deferredBlobDeletes.Add(new DeferredImportBlobDelete(file.BlobKey, file.BlobContainer));
+            var retainedObjects = await _db.RetainedCaveFileObjects.IgnoreQueryFilters()
+                .Where(row => row.AccountId == _scope.AccountId && scopedIds.Contains(row.CaveId))
+                .AsNoTracking().Select(row => new { row.StorageKey, row.StoragePartition }).ToListAsync(cancellationToken);
+            foreach (var retained in retainedObjects)
+                deferredBlobDeletes.Add(new DeferredImportBlobDelete(retained.StorageKey, retained.StoragePartition));
+            await _db.RetainedCaveFileObjects.IgnoreQueryFilters()
+                .Where(row => row.AccountId == _scope.AccountId && scopedIds.Contains(row.CaveId))
+                .ExecuteDeleteAsync(cancellationToken);
             var entranceIds = await _db.Entrances.IgnoreQueryFilters().Where(e => scopedIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))

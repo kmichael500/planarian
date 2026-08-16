@@ -16,9 +16,9 @@ appropriate completion suite before finishing.
 - `Scale` tests protect the normal 10,000-Cave / roughly 15,000-Entrance workload. Assert command, write,
   `SaveChanges`, batching, and tracked-entry structure rather than flaky wall-clock thresholds.
 
-Use small, scenario-specific typed builders for test data, not a universal seed. `TestDataBuilder` composes ordinary
-account, reference, Cave, Entrance, request, and file state. `GlobalStateTestData` is the narrow global-reference
-bypass; dedicated high-volume setup belongs in `ImportScaleSeeder`.
+Use small, scenario-specific typed factories for test data rather than a universal seed. Account, Cave, reference,
+file, change-request, and import setup live in focused helpers under `Infrastructure/Data`. `GlobalStateTestData` is the
+narrow global-reference bypass; dedicated high-volume setup belongs in `ImportScaleSeeder`.
 
 Raw SQL in tests is reserved for provider contracts and observations (catalogs, constraints, PostGIS, locks, `xmin`,
 or exact no-write checks), historical migration setup, and dedicated scale seeding. Routine domain arrangement uses

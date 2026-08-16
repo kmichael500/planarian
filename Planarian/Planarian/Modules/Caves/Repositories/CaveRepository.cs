@@ -10,10 +10,14 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
+using Planarian.Modules.Caves.Revisions;
+using Planarian.Modules.Tags;
+using Planarian.Modules.Tags.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 
@@ -957,6 +961,37 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .AnyAsync();
     }
 
+    public async Task<IReadOnlyList<TagNameCandidate>> GetTagCandidatesByIdsAsync(IEnumerable<string> ids,
+        CancellationToken cancellationToken)
+    {
+        var distinct = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToList();
+        return await DbContext.TagTypes.AsNoTracking().Where(tag => distinct.Contains(tag.Id))
+            .Select(tag => new TagNameCandidate(tag.Id, tag.Name, tag.Key, tag.AccountId, tag.IsDefault))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<IReadOnlyList<TagNameCandidate>> GetEligiblePeopleCandidatesAsync(
+        CancellationToken cancellationToken) =>
+        EligiblePeopleTagLookup.GetEligibleAsync(DbContext, RequestUser.AccountId!, cancellationToken);
+
+    public async Task<IReadOnlyList<Planarian.Model.Database.Entities.TagType>> GetTrackedTagTypesAsync(
+        IEnumerable<string> ids, CancellationToken cancellationToken)
+    {
+        var distinct = ids.Distinct(StringComparer.Ordinal).ToList();
+        return await DbContext.TagTypes.Where(tag => distinct.Contains(tag.Id) &&
+                (tag.AccountId == RequestUser.AccountId || tag.IsDefault))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task ValidateStateCountyPairAsync(string stateId, string countyId,
+        CancellationToken cancellationToken)
+    {
+        var valid = await DbContext.Counties.AsNoTracking().AnyAsync(county =>
+            county.AccountId == RequestUser.AccountId && county.Id == countyId && county.StateId == stateId &&
+            DbContext.States.Any(state => state.Id == stateId), cancellationToken);
+        if (!valid) throw ApiExceptionDictionary.BadRequest("The selected County does not belong to the selected State.");
+    }
+
     public async Task<CaveVm?> GetCave(string caveId)
     {
         return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
@@ -965,7 +1000,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 Id = e.Id,
                 CurrentRevisionId = e.CurrentRevisionId,
                 IsFavorite = e.Favorites.Any(favorite => favorite.UserId == RequestUser.Id),
-                ReportedByUserId = e.ReportedByUserId,
                 StateId = e.StateId,
                 CountyId = e.CountyId,
                 CountyDisplayId = e.County.DisplayId,
@@ -1001,7 +1035,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 {
                     Id = ee.Id,
                     IsPrimary = ee.IsPrimary,
-                    ReportedByUserId = ee.ReportedByUserId,
                     LocationQualityTagId = ee.LocationQualityTagId,
                     Name = ee.Name,
                     Description = ee.Description,
@@ -1067,6 +1100,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.Favorites)
             .Include(e => e.CavePermissions)
             .Include(e => e.Files)
+            .Include(e => e.GeoJsons)
             .Include(e => e.CaveReportedByNameTags)
             .Include(e => e.Entrances)
             .ThenInclude(entrance => entrance.EntranceStatusTags)
@@ -1079,6 +1113,86 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Include(e => e.Entrances)
             .ThenInclude(entrance => entrance.EntranceReportedByNameTags)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<IReadOnlyList<Planarian.Model.Database.Entities.RidgeWalker.File>>
+        AttachAuthoringStagedFilesAsync(string caveId, IEnumerable<string> fileIds,
+            CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId) || string.IsNullOrWhiteSpace(RequestUser.Id))
+            throw new InvalidOperationException("An active account user is required to publish staged files.");
+        var ids = fileIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return [];
+
+        var files = new List<Planarian.Model.Database.Entities.RidgeWalker.File>(ids.Count);
+        foreach (var id in ids)
+        {
+            var file = await DbContext.Files.FromSqlInterpolated(
+                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {RequestUser.AccountId} AND \"Id\" = {id} FOR UPDATE")
+                .IgnoreQueryFilters()
+                .SingleOrDefaultAsync(cancellationToken);
+            if (file is null || file.CreatedByUserId != RequestUser.Id || file.CaveId is not null ||
+                file.ExpiresOn is null || file.ExpiresOn <= DateTime.UtcNow ||
+                await DbContext.CaveChangeRequestStagedFiles.IgnoreQueryFilters().AnyAsync(staged =>
+                    staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id, cancellationToken) ||
+                string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
+                throw ApiExceptionDictionary.NotFound("Staged file");
+            files.Add(file);
+        }
+
+        foreach (var file in files)
+        {
+            file.CaveId = caveId;
+            file.ExpiresOn = null;
+        }
+        return files;
+    }
+
+    public async Task RetainPublishedFileObjectAsync(
+        Planarian.Model.Database.Entities.RidgeWalker.File file, string caveId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId) || file.AccountId != RequestUser.AccountId ||
+            file.CaveId != caveId)
+            throw new InvalidOperationException("The File is not a current File for this account/Cave.");
+        if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) return;
+        if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
+            throw new InvalidOperationException("The File has an incomplete object-storage address.");
+
+        var existing = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(row => row.AccountId == RequestUser.AccountId && row.FileId == file.Id,
+                cancellationToken);
+        if (existing is null)
+        {
+            DbContext.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
+            {
+                AccountId = RequestUser.AccountId,
+                CaveId = caveId,
+                FileId = file.Id,
+                StoragePartition = file.BlobContainer,
+                StorageKey = file.BlobKey
+            });
+            return;
+        }
+
+        if (existing.CaveId != caveId ||
+            !string.Equals(existing.StoragePartition, file.BlobContainer, StringComparison.Ordinal) ||
+            !string.Equals(existing.StorageKey, file.BlobKey, StringComparison.Ordinal))
+            throw new InvalidOperationException("Historical File identity cannot be repointed to different content.");
+    }
+
+    public async Task<IReadOnlyList<StorageObjectAddress>> RemoveRetainedFileObjectsForHardDeleteAsync(
+        string caveId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required to delete retained File objects.");
+        var rows = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
+            .Where(row => row.AccountId == RequestUser.AccountId && row.CaveId == caveId)
+            .ToListAsync(cancellationToken);
+        DbContext.RetainedCaveFileObjects.RemoveRange(rows);
+        return rows.Select(row => new StorageObjectAddress(row.StoragePartition, row.StorageKey))
+            .Distinct().ToList();
     }
 
     public async Task DeleteStagedFileReferencesAsync(IEnumerable<string> fileIds,
@@ -1096,12 +1210,13 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     }
 
     public async Task<List<Planarian.Model.Database.Entities.RidgeWalker.File>> AttachStagedFilesAsync(
-        string changeRequestId, string caveId, IEnumerable<string> fileIds,
+        string changeRequestId, string caveId, IReadOnlyList<StagedCaveFilePublication> publications,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
             throw new InvalidOperationException("An active account is required to publish staged files.");
-        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
+        var byId = publications.ToDictionary(publication => publication.FileId, StringComparer.Ordinal);
+        var ids = byId.Keys.OrderBy(id => id, StringComparer.Ordinal).ToList();
         if (ids.Count == 0) return [];
 
         var stagedIds = await DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
@@ -1110,12 +1225,36 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(staged => staged.FileId).ToListAsync(cancellationToken);
         if (stagedIds.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
 
-        var files = await DbContext.Files.IgnoreQueryFilters()
-            .Where(file => file.AccountId == RequestUser.AccountId && stagedIds.Contains(file.Id) && file.CaveId == null)
-            .ToListAsync(cancellationToken);
+        var files = new List<Planarian.Model.Database.Entities.RidgeWalker.File>(ids.Count);
+        foreach (var id in ids)
+        {
+            var file = await DbContext.Files.FromSqlInterpolated(
+                    $"SELECT * FROM \"Files\" WHERE \"AccountId\" = {RequestUser.AccountId} AND \"Id\" = {id} FOR UPDATE")
+                .IgnoreQueryFilters()
+                .SingleOrDefaultAsync(cancellationToken);
+            if (file is not null && file.CaveId is null) files.Add(file);
+        }
         if (files.Count != ids.Count) throw ApiExceptionDictionary.NotFound("Staged file");
+
+        var sharedPendingFileId = await (from staged in DbContext.Set<CaveChangeRequestStagedFile>().IgnoreQueryFilters()
+                join request in DbContext.CaveChangeRequests.IgnoreQueryFilters()
+                    on new { staged.AccountId, Id = staged.ChangeRequestId }
+                    equals new { request.AccountId, request.Id }
+                where staged.AccountId == RequestUser.AccountId && ids.Contains(staged.FileId) &&
+                      staged.ChangeRequestId != changeRequestId &&
+                      request.Status == CaveChangeRequestStatus.Pending
+                select staged.FileId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (sharedPendingFileId is not null)
+            throw ApiExceptionDictionary.BadRequest(
+                "A staged file shared with another pending request cannot be published.");
+
         foreach (var file in files)
         {
+            var publication = byId[file.Id];
+            if (!string.Equals(file.BlobKey, publication.StorageKey, StringComparison.Ordinal) ||
+                !string.Equals(file.BlobContainer, publication.StoragePartition, StringComparison.Ordinal))
+                throw ApiExceptionDictionary.NotFound("Staged file");
             file.CaveId = caveId;
             file.ExpiresOn = null;
         }
@@ -1125,6 +1264,24 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                              staged.ChangeRequestId == changeRequestId && stagedIds.Contains(staged.FileId))
             .ExecuteDeleteAsync(cancellationToken);
         return files;
+    }
+
+    public async Task<IReadOnlyList<GeoJsonUploadVm>> GetCaveLinePlotsAsync(string caveId,
+        CancellationToken cancellationToken = default)
+    {
+        return await DbContext.CaveGeoJsons.AsNoTracking()
+            .Where(linePlot => linePlot.CaveId == caveId &&
+                               linePlot.Cave.AccountId == RequestUser.AccountId &&
+                               DbContext.UserCavePermissionView.Any(permission =>
+                                   permission.AccountId == RequestUser.AccountId &&
+                                   permission.UserId == RequestUser.Id && permission.CaveId == caveId))
+            .OrderBy(linePlot => linePlot.Id)
+            .Select(linePlot => new GeoJsonUploadVm
+            {
+                Id = linePlot.Id,
+                Name = linePlot.Name,
+                GeoJson = linePlot.GeoJson
+            }).ToListAsync(cancellationToken);
     }
 
     public async Task<Cave?> GetCaveWithLinePlots(string caveId)
@@ -1176,143 +1333,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 e.CartographerNameTags.Select(tag => tag.TagTypeId),
                 e.CaveReportedByNameTags.Select(tag => tag.TagTypeId)))
             .ToListAsync();
-    }
-
-    public async Task BulkUpdateImportCaves(List<Cave> caves, CancellationToken cancellationToken)
-    {
-        if (!caves.Any()) return;
-
-        var scopedCaveIds = await DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => caves.Select(ee => ee.Id).Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            .ToListAsync(cancellationToken);
-
-        var scopedCaves = caves.Where(e => scopedCaveIds.Contains(e.Id)).ToList();
-        if (!scopedCaves.Any()) return;
-
-        var ids = scopedCaves.Select(e => e.Id).ToList();
-        var currentCaves = await DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => ids.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .ToListAsync(cancellationToken);
-
-        var incoming = scopedCaves.ToDictionary(e => e.Id);
-        foreach (var current in currentCaves)
-        {
-            var update = incoming[current.Id];
-            current.Name = update.Name;
-            current.SetAlternateNamesList(update.AlternateNamesList);
-            current.CountyId = update.CountyId;
-            current.CountyNumber = update.CountyNumber;
-            current.StateId = update.StateId;
-            current.LengthFeet = update.LengthFeet;
-            current.DepthFeet = update.DepthFeet;
-            current.MaxPitDepthFeet = update.MaxPitDepthFeet;
-            current.NumberOfPits = update.NumberOfPits;
-            current.Narrative = update.Narrative;
-            current.ReportedOn = update.ReportedOn;
-            current.IsArchived = update.IsArchived;
-        }
-
-        await DbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteImportSyncCaveTags(List<string> caveIds, CancellationToken cancellationToken)
-    {
-        if (!caveIds.Any()) return;
-
-        var scopedCaveIds = await DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => caveIds.Contains(e.Id) && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            .ToListAsync(cancellationToken);
-
-        if (!scopedCaveIds.Any()) return;
-
-        await DbContext.Set<GeologyTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<GeologicAgeTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<MapStatusTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<PhysiographicProvinceTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<ArcheologyTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<BiologyTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<CaveOtherTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<CartographerNameTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-        await DbContext.Set<CaveReportedByNameTag>()
-            .Where(e => scopedCaveIds.Contains(e.CaveId))
-            .ExecuteDeleteAsync(cancellationToken);
-    }
-
-    public async Task DeleteImportSyncCave(string caveId,
-        List<Planarian.Model.Database.Entities.RidgeWalker.File> deferredFileDeletes,
-        CancellationToken cancellationToken)
-    {
-        var cave = await DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
-            .Include(e => e.Files)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (cave == null) throw ApiExceptionDictionary.NotFound(nameof(cave.Id));
-
-        var entranceIds = await DbContext.Entrances
-            .IgnoreQueryFilters()
-            .Where(e => e.CaveId == caveId && e.Cave.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id)
-            .ToListAsync(cancellationToken);
-
-        await DbContext.CaveGeoJsons
-            .Where(e => e.CaveId == caveId)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        if (entranceIds.Any())
-        {
-            await DbContext.EntranceStatusTags
-                .Where(e => entranceIds.Contains(e.EntranceId))
-                .ExecuteDeleteAsync(cancellationToken);
-            await DbContext.EntranceHydrologyTags
-                .Where(e => entranceIds.Contains(e.EntranceId))
-                .ExecuteDeleteAsync(cancellationToken);
-            await DbContext.FieldIndicationTags
-                .Where(e => entranceIds.Contains(e.EntranceId))
-                .ExecuteDeleteAsync(cancellationToken);
-            await DbContext.EntranceReportedByNameTags
-                .Where(e => entranceIds.Contains(e.EntranceId))
-                .ExecuteDeleteAsync(cancellationToken);
-            await DbContext.EntranceOtherTag
-                .Where(e => entranceIds.Contains(e.EntranceId))
-                .ExecuteDeleteAsync(cancellationToken);
-            await DbContext.Entrances
-                .IgnoreQueryFilters()
-                .Where(e => entranceIds.Contains(e.Id) && e.Cave.AccountId == RequestUser.AccountId)
-                .ExecuteDeleteAsync(cancellationToken);
-        }
-
-        await DeleteImportSyncCaveTags([caveId], cancellationToken);
-        await DbContext.Favorites
-            .Where(e => e.CaveId == caveId && e.AccountId == RequestUser.AccountId)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        deferredFileDeletes.AddRange(cave.Files);
-
-        DbContext.Caves.Remove(cave);
-        await DbContext.SaveChangesAsync(cancellationToken);
     }
 
     public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);

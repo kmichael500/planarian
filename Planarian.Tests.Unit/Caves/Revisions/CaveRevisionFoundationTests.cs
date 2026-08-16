@@ -12,7 +12,7 @@ public class CaveRevisionFoundationTests
     public void ProposalJsonWithoutOptionalFilePresentationMetadataRemainsReadable()
     {
         const string json = """
-            {"schemaVersion":1,"caveId":"c","accountId":"a","name":"Cave","stateId":"s","countyId":"co","files":[{"fileId":"f","disposition":0,"fileTypeTagId":"report","displayName":"Survey"}]}
+            {"schemaVersion":1,"caveId":"c","accountId":"a","name":"Cave","stateId":"s","countyId":"co","files":[{"fileId":"f","disposition":"RetainPublished","fileTypeTagId":"report","displayName":"Survey"}]}
             """;
 
         var file = Assert.Single(CaveProposalJson.Deserialize(json, 1).Files);
@@ -63,6 +63,26 @@ public class CaveRevisionFoundationTests
         var diff = new CaveRevisionDiffService().Compare(before, after);
         Assert.Single(diff.AddedTags);
         Assert.Single(diff.RemovedTags);
+    }
+
+    [Fact]
+    public void CaveReportedByPeopleTagAdditionsAndRemovalsRemainSemanticDifferences()
+    {
+        var before = new CavePublishedSnapshotV1
+        {
+            CaveId = "c", AccountId = "a", Name = "n",
+            State = new SnapshotReference("s", "S"), County = new SnapshotReference("co", "C"),
+            Tags = [new SnapshotTagReference(SnapshotTagRole.CaveReportedBy, "alice", "Alice")]
+        };
+        var after = before with
+        {
+            Tags = [new SnapshotTagReference(SnapshotTagRole.CaveReportedBy, "bob", "Bob")]
+        };
+
+        var diff = new CaveRevisionDiffService().Compare(before, after);
+
+        Assert.Equal("Alice", Assert.Single(diff.RemovedTags).NameAtRevision);
+        Assert.Equal("Bob", Assert.Single(diff.AddedTags).NameAtRevision);
     }
 
     [Fact]

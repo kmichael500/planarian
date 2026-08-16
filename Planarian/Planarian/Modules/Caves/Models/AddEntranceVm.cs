@@ -21,7 +21,7 @@ public class AddEntranceVm
 
     public AddEntranceVm(string name, string description, double latitude, double longitude,
         double elevationFeet,
-        double? pitFeet, string locationQualityTagId, string reportedByName,
+        double? pitFeet, string locationQualityTagId,
         DateTime? reportedOn, IEnumerable<string> entranceStatusTagIds, IEnumerable<string> fieldIndicationTagIds,
         IEnumerable<string> entranceHydrologyTagIds) : this(latitude, longitude, elevationFeet, entranceStatusTagIds, fieldIndicationTagIds, entranceHydrologyTagIds)
     {
@@ -29,7 +29,6 @@ public class AddEntranceVm
         PitFeet = pitFeet;
         Description = description;
         LocationQualityTagId = locationQualityTagId;
-        ReportedByName = reportedByName;
         ReportedOn = reportedOn;
     }
 
@@ -49,7 +48,6 @@ public class AddEntranceVm
     public double ElevationFeet { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public double? PitFeet { get; set; }
 

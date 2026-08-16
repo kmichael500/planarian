@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Data;
 using Planarian.Modules.Import.Parsing;
@@ -35,7 +36,10 @@ internal sealed class ImportScaleRunner(PostgresTestDatabase database, string ac
         var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
         var execution = Stopwatch.StartNew();
         await new CaveImportExecutionRepository(db, db.RequestUser, snapshots,
-            new CaveImportRevisionRepository(db, db.RequestUser)).ExecuteAsync(plan, phase + ".csv");
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
+            new CountyReferenceLockRepository(db, db.RequestUser))
+            .ExecuteAsync(plan, phase + ".csv");
         execution.Stop();
 
         var writes = sql.Items.Where(item => IsWrite(item.Sql)).ToList();
@@ -78,7 +82,9 @@ internal sealed class ImportScaleRunner(PostgresTestDatabase database, string ac
         var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
         var execution = Stopwatch.StartNew();
         await new EntranceImportExecutionRepository(db, db.RequestUser, snapshots,
-            new CaveImportRevisionRepository(db, db.RequestUser)).ExecuteAsync(plan, phase + ".csv");
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser))
+            .ExecuteAsync(plan, phase + ".csv");
         execution.Stop();
 
         var writes = sql.Items.Where(item => IsWrite(item.Sql)).ToList();

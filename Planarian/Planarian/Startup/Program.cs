@@ -71,7 +71,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Limits.MaxRequestLineSize = 1024 * 1024; // 1MB for entire request line query params on searching with polygons
     serverOptions.Limits.MaxRequestHeadersTotalSize = 1024 * 1024; // 1MB for headers
-    serverOptions.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 200MB for large GeoJSON files
+    serverOptions.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500 MB default; large upload actions may override per request
 });
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
@@ -217,6 +217,10 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
+builder.Services.AddScoped<TagTypeMergeExecutionRepository>();
+builder.Services.AddScoped<TagTypeDeleteExecutionRepository>();
+builder.Services.AddScoped<CountyReferenceLockRepository>();
+builder.Services.AddScoped<CountyDeleteExecutionRepository>();
 builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
@@ -231,6 +235,8 @@ builder.Services.AddScoped<CaveRevisionQueryRepository>();
 builder.Services.AddScoped<CaveChangeRequestRepository>();
 builder.Services.AddScoped<CaveMutationCoordinator>();
 builder.Services.AddScoped<CaveMutationRepository>();
+builder.Services.AddScoped<TagReferenceLockRepository>();
+builder.Services.AddSingleton<IObjectStorage, AzureBlobObjectStorage>();
 builder.Services.AddScoped<FileService>();
 builder.Services.AddScoped<AppService>();
 builder.Services.AddScoped<ImportService>();
@@ -238,7 +244,7 @@ builder.Services.AddSingleton<CaveImportCsvParser>();
 builder.Services.AddSingleton<EntranceImportCsvParser>();
 builder.Services.AddSingleton<CaveImportPlanner>();
 builder.Services.AddSingleton<EntranceImportPlanner>();
-builder.Services.AddScoped<CaveImportRevisionRepository>();
+builder.Services.AddScoped<CaveBulkRevisionRepository>();
 builder.Services.AddScoped<CaveImportExecutionRepository>();
 builder.Services.AddScoped<EntranceImportExecutionRepository>();
 builder.Services.AddScoped<NotificationService>();

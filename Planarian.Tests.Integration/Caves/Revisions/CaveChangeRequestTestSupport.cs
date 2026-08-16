@@ -1,18 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Data.Common;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
-using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
 using Planarian.Modules.Caves.Revisions;
-using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Files.Controllers;
-using Planarian.Modules.Files.Repositories;
-using Planarian.Modules.Files.Services;
-using Planarian.Modules.Tags.Repositories;
 using Planarian.Tests;
 
 namespace Planarian.Tests.Integration.Caves.Revisions;
@@ -86,6 +79,7 @@ internal static class CaveChangeRequestTestSupport
         string name, string? narrative = null) => new()
     {
         Id = cave.CaveId,
+        ExpectedRevisionId = cave.RevisionId,
         Name = name,
         AlternateNames = [],
         StateId = cave.StateId,
@@ -107,6 +101,7 @@ internal static class CaveChangeRequestTestSupport
     internal static AddCaveVm ValuesFromCave(CaveVm cave) => new()
     {
         Id = cave.Id,
+        ExpectedRevisionId = cave.CurrentRevisionId,
         Name = cave.Name,
         AlternateNames = cave.AlternateNames,
         StateId = cave.StateId,

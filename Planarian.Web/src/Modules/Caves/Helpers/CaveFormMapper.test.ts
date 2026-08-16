@@ -6,7 +6,7 @@ const snapshot: CaveSnapshotVm = {
   caveId: "cave", accountId: "account", name: "Cave", alternateNames: [],
   state: { id: "state", nameAtRevision: "State" },
   county: { id: "county", nameAtRevision: "County", displayIdAtRevision: "001" },
-  countyNumber: 12, isArchived: false, tags: [], entrances: [], files: [],
+  countyNumber: 12, isArchived: false, tags: [], entrances: [], files: [], linePlots: [],
 };
 
 it.each([
@@ -45,7 +45,7 @@ it("preserves null, zero, and positive Cave measurements in proposal editor stat
 
 it("retains Entrance Other tags when mapping a Cave into the editor", () => {
   const cave: CaveVm = {
-    id: "cave", currentRevisionId: null, displayId: "A-1", reportedByUserId: null,
+    id: "cave", currentRevisionId: null, displayId: "A-1",
     countyId: "county", stateId: "state", countyDisplayId: "A", countyNumber: 1,
     name: "Cave", alternateNames: [], lengthFeet: 0, depthFeet: 0, maxPitDepthFeet: 0,
     numberOfPits: 0, narrative: null, reportedOn: null, isArchived: false, primaryEntrance: null,
@@ -53,7 +53,7 @@ it("retains Entrance Other tags when mapping a Cave into the editor", () => {
     archeologyTagIds: [], cartographerNameTagIds: [], mapStatusTagIds: [], geologicAgeTagIds: [],
     physiographicProvinceTagIds: [], otherTagIds: [],
     entrances: [{
-      id: "entrance", isPrimary: true, reportedByUserId: null, locationQualityTagId: "quality",
+      id: "entrance", isPrimary: true, locationQualityTagId: "quality",
       name: null, description: null, latitude: 35, longitude: -86, elevationFeet: 500,
       reportedOn: null, pitFeet: null, entranceStatusTagIds: [], fieldIndicationTagIds: [],
       entranceHydrologyTagIds: [], reportedByNameTagIds: [], entranceOtherTagIds: ["other-tag"],
@@ -61,4 +61,9 @@ it("retains Entrance Other tags when mapping a Cave into the editor", () => {
   };
 
   expect(caveToForm(cave).entrances[0].entranceOtherTagIds).toEqual(["other-tag"]);
+});
+
+it("carries exact line-plot authoring payloads into editor state", () => {
+  const linePlots = [{ id: "line-1", name: "Survey", geoJson: '{"type":"FeatureCollection","features":[]}' }];
+  expect(snapshotToForm(snapshot, undefined, undefined, [], linePlots).linePlots).toEqual(linePlots);
 });

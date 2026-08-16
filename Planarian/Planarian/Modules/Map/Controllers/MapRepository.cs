@@ -228,7 +228,6 @@ public class MapRepository : RepositoryBase
                     SELECT ST_AsMVT(tile_geom.*, 'entrances', 4096, 'geom') AS mvt
                     FROM (
                         SELECT 
-                            "Entrances"."ReportedByUserId",
                             "Entrances"."CaveId",
                             "Caves"."Name" as CaveName,
                             "Entrances"."LocationQualityTagId",

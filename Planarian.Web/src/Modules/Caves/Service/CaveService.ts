@@ -9,12 +9,11 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
 import { FileVm } from "../../Files/Models/FileVm";
-import { AxiosProgressEvent, AxiosRequestConfig } from "axios";
+import { AxiosProgressEvent } from "axios";
 import { CaveSearchVm } from "../Models/CaveSearchVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../../../Shared/Helpers/StringHelpers";
 import { FavoriteVm } from "../Models/FavoriteCaveVm";
-import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import {
   CaveRevisionComparisonVm,
   CaveRevisionHistoryVm,
@@ -24,6 +23,7 @@ import {
   CaveChangeRequestDetailVm,
   CaveChangeRequestSummaryVm,
   CaveChangePreviewVm,
+  CaveEditAuthoringContextVm,
   CaveProposalAuthoringContextVm,
   CaveProposalVersionDetailVm,
 } from "../Models/CaveChangeRequestVm";
@@ -88,6 +88,11 @@ const CaveService = {
     const response = await HttpClient.get<CaveVm>(`${baseUrl}/${id}`);
     return response.data;
   },
+  async GetEditAuthoringContext(id: string): Promise<CaveEditAuthoringContextVm> {
+    return (await HttpClient.get<CaveEditAuthoringContextVm>(
+      `${baseUrl}/${id}/edit-context`
+    )).data;
+  },
   async GetProposalAuthoringContext(id: string): Promise<CaveProposalAuthoringContextVm> {
     return (await HttpClient.post<CaveProposalAuthoringContextVm>(
       `${changeRequestUrl}/caves/${id}/authoring-context`
@@ -136,31 +141,34 @@ const CaveService = {
     );
     return response.data;
   },
-  async StageChangeRequestFile(
-    requestId: string,
+  async StageAuthoringFile(
     file: string | Blob | RcFile,
     uuid: string,
     onProgress: (progressEvent: AxiosProgressEvent) => void
   ): Promise<FileVm> {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await HttpClient.post<FileVm>(
-      `${changeRequestUrl}/${requestId}/files?uuid=${uuid}`,
+    return (await HttpClient.post<FileVm>(
+      `api/files/staged?uuid=${encodeURIComponent(uuid)}`,
       formData,
       { headers: { "Content-Type": "multipart/form-data" }, onUploadProgress: onProgress }
-    );
-    return response.data;
+    )).data;
+  },
+  async DeleteAuthoringStagedFile(fileId: string): Promise<void> {
+    await HttpClient.delete(`api/files/staged/${encodeURIComponent(fileId)}`);
   },
   GetStagedChangeRequestFileUrl(requestId: string, fileId: string): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
       `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}`
     );
   },
-  async GetMyChangeRequests(): Promise<CaveChangeRequestSummaryVm[]> {
-    return (await HttpClient.get<CaveChangeRequestSummaryVm[]>(`${changeRequestUrl}/mine`)).data;
+  async GetMyChangeRequests(pageNumber = 1, pageSize = 10): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+    return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(
+      `${changeRequestUrl}/mine?pageNumber=${pageNumber}&pageSize=${pageSize}`)).data;
   },
-  async GetReviewQueue(): Promise<CaveChangeRequestSummaryVm[]> {
-    return (await HttpClient.get<CaveChangeRequestSummaryVm[]>(`${changeRequestUrl}/review`)).data;
+  async GetReviewQueue(pageNumber = 1, pageSize = 10): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+    return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(
+      `${changeRequestUrl}/review?pageNumber=${pageNumber}&pageSize=${pageSize}`)).data;
   },
   async GetChangeRequest(id: string): Promise<CaveChangeRequestDetailVm> {
     return (await HttpClient.get<CaveChangeRequestDetailVm>(`${changeRequestUrl}/${id}`)).data;
@@ -216,30 +224,6 @@ const CaveService = {
     const response = await HttpClient.delete<void>(`${baseUrl}/import`);
     return response.data;
   },
-  async AddCaveFile(
-    file: string | Blob | RcFile,
-    caveId: string,
-    uuid: string,
-    onProgress: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<FileVm> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const config: AxiosRequestConfig = {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      onUploadProgress: onProgress, // Set the onUploadProgress callback
-    };
-
-    const response = await HttpClient.post<FileVm>(
-      `${baseUrl}/${caveId}/files?uuid=${uuid}`,
-      formData,
-      config
-    );
-    return response.data;
-  },
-
   async SearchCavesPaged(
     name: string,
     pageNumber: number = 1,
@@ -274,16 +258,7 @@ const CaveService = {
     );
     return response.data;
   },
-  async uploadCaveGeoJson(
-    caveId: string,
-    geoJsonUploads: GeoJsonUploadVm[]
-  ): Promise<void> {
-    const response = await HttpClient.post<void>(
-      `${baseUrl}/${caveId}/geojson`,
-      geoJsonUploads
-    );
-    return response.data;
-  },
+
 };
 
 export { CaveService };

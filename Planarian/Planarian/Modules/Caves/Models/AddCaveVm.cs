@@ -22,7 +22,7 @@ public class AddCaveVm
 
 
     public AddCaveVm(double maxPitDepthFeet, string narrative, DateTime? reportedOn,
-        string reportedByName, string stateId, string countyId, string name,
+        string stateId, string countyId, string name,
         double lengthFeet,
         double depthFeet, int numberOfPits, IEnumerable<string> geologyTagIds) : this(stateId, countyId, name,
         lengthFeet, depthFeet, numberOfPits, geologyTagIds)
@@ -30,7 +30,6 @@ public class AddCaveVm
         MaxPitDepthFeet = maxPitDepthFeet;
         Narrative = narrative;
         ReportedOn = reportedOn;
-        ReportedByName = reportedByName;
     }
 
     public AddCaveVm()
@@ -38,6 +37,7 @@ public class AddCaveVm
     }
 
     [MaxLength(PropertyLength.Id)] public string? Id { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string? ExpectedRevisionId { get; set; }
     [MaxLength(PropertyLength.Name)] public string Name { get; set; } = null!;
     public IEnumerable<string> AlternateNames { get; set; } = new HashSet<string>();
 
@@ -56,10 +56,10 @@ public class AddCaveVm
     public string? Narrative { get; set; }
 
     public DateTime? ReportedOn { get; set; }
-    [MaxLength(PropertyLength.Name)] public string? ReportedByName { get; set; }
 
     public IEnumerable<AddEntranceVm> Entrances { get; set; } = new HashSet<AddEntranceVm>();
     public IEnumerable<EditFileMetadataVm>? Files { get; set; } = new HashSet<EditFileMetadataVm>();
+    public IEnumerable<GeoJsonUploadVm>? LinePlots { get; set; } = new HashSet<GeoJsonUploadVm>();
     public IEnumerable<string> GeologyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> BiologyTagIds { get; set; } = new HashSet<string>();

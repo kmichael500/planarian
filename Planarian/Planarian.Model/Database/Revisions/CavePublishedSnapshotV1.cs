@@ -3,6 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace Planarian.Model.Database.Revisions;
 
+/// <summary>
+/// Persisted historical schema. V1 is immutable after the cave-revisions feature lands;
+/// future persisted semantics require a V2 model, reader, and schema-version dispatch.
+/// </summary>
 public sealed record CavePublishedSnapshotV1
 {
     public int SchemaVersion { get; init; } = 1;
@@ -13,7 +17,6 @@ public sealed record CavePublishedSnapshotV1
     public SnapshotReference State { get; init; } = null!;
     public SnapshotReference County { get; init; } = null!;
     public int CountyNumber { get; init; }
-    public string? ReportedByUserId { get; init; }
     public double? LengthFeet { get; init; }
     public double? DepthFeet { get; init; }
     public double? MaxPitDepthFeet { get; init; }
@@ -24,6 +27,7 @@ public sealed record CavePublishedSnapshotV1
     public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];
     public IReadOnlyList<CaveEntranceSnapshotV1> Entrances { get; init; } = [];
     public IReadOnlyList<CaveFileSnapshotV1> Files { get; init; } = [];
+    public IReadOnlyList<CaveLinePlotSnapshotV1> LinePlots { get; init; } = [];
 }
 
 public sealed record SnapshotReference(string Id, string NameAtRevision, string? DisplayIdAtRevision = null,
@@ -44,8 +48,6 @@ public sealed record CaveEntranceSnapshotV1
     public string? Name { get; init; }
     public bool IsPrimary { get; init; }
     public string? Description { get; init; }
-    public string? ReportedByUserId { get; init; }
-    public string? ReportedByNameAtRevision { get; init; }
     public double? Latitude { get; init; }
     public double? Longitude { get; init; }
     public double? Elevation { get; init; }
@@ -55,6 +57,13 @@ public sealed record CaveEntranceSnapshotV1
     public DateTime? ReportedOn { get; init; }
     public double? PitDepthFeet { get; init; }
     public IReadOnlyList<SnapshotTagReference> Tags { get; init; } = [];
+}
+
+public sealed record CaveLinePlotSnapshotV1
+{
+    public string Id { get; init; } = null!;
+    public string Name { get; init; } = null!;
+    public string ContentHash { get; init; } = null!;
 }
 
 public sealed record CaveFileSnapshotV1
@@ -68,11 +77,18 @@ public sealed record CaveFileSnapshotV1
 
 public static class CaveSnapshotJson
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    public static readonly JsonSerializerOptions Options = CreateOptions();
+
+    private static JsonSerializerOptions CreateOptions()
     {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            WriteIndented = false,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
+        return options;
+    }
 
     public static string Serialize(CavePublishedSnapshotV1 snapshot) =>
         JsonSerializer.Serialize(snapshot, Options);

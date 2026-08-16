@@ -93,6 +93,93 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
+    public async Task LegacyReporterUserColumnsAreDroppedWhileExistingCaveEntranceAndPeopleTagDataSurvives()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(LegacyReporterUserColumnsAreDroppedWhileExistingCaveEntranceAndPeopleTagDataSurvives));
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_CaveProposalVersionBaseRevision", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var caveReporter = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.People, "Cave Reporter", "caverep00a");
+        var entranceReporter = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.People, "Entrance Reporter", "entrep000a");
+        var location = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        const string entranceId = "legacyent1";
+        string reporterUserId;
+
+        await using (var seed = database.CreateDbContext("legacy-reporter-seed", tenant.AccountId))
+        {
+            reporterUserId = await seed.Users.Select(user => user.Id).FirstAsync();
+            seed.Entrances.Add(new Entrance
+            {
+                Id = entranceId,
+                CaveId = tenant.CaveId,
+                Name = "Legacy entrance",
+                IsPrimary = true,
+                Description = "Preserve me",
+                LocationQualityTagId = location.Id,
+                Location = new NetTopologySuite.Geometries.Point(-86.25, 35.15, 612) { SRID = 4326 }
+            });
+            seed.CaveReportedByNameTags.Add(new CaveReportedByNameTag
+                { CaveId = tenant.CaveId, TagTypeId = caveReporter.Id });
+            seed.EntranceReportedByNameTags.Add(new EntranceReportedByNameTag
+                { EntranceId = entranceId, TagTypeId = entranceReporter.Id });
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var setLegacyReporter = new NpgsqlCommand("""
+                update "Caves" set "ReportedByUserId" = @user where "Id" = @cave;
+                update "Entrances" set "ReportedByUserId" = @user where "Id" = @entrance;
+                """, connection);
+            setLegacyReporter.Parameters.AddWithValue("user", reporterUserId);
+            setLegacyReporter.Parameters.AddWithValue("cave", tenant.CaveId);
+            setLegacyReporter.Parameters.AddWithValue("entrance", entranceId);
+            await setLegacyReporter.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using (var verify = database.CreateDbContext("verify", tenant.AccountId))
+        {
+            Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == tenant.CaveId));
+            var entrance = await verify.Entrances.IgnoreQueryFilters().SingleAsync(row => row.Id == entranceId);
+            Assert.Equal("Preserve me", entrance.Description);
+            Assert.Equal(-86.25, entrance.Location.X, 6);
+            Assert.Equal(35.15, entrance.Location.Y, 6);
+            Assert.Equal(612, entrance.Location.Z, 6);
+            Assert.True(await verify.CaveReportedByNameTags.AnyAsync(tag =>
+                tag.CaveId == tenant.CaveId && tag.TagTypeId == caveReporter.Id));
+            Assert.True(await verify.EntranceReportedByNameTags.AnyAsync(tag =>
+                tag.EntranceId == entranceId && tag.TagTypeId == entranceReporter.Id));
+            Assert.True(await verify.Users.AnyAsync(user => user.Id == reporterUserId));
+            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == caveReporter.Id));
+            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == entranceReporter.Id));
+        }
+
+        await using var catalog = new NpgsqlConnection(database.ConnectionString);
+        await catalog.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select
+              not exists(select 1 from information_schema.columns where table_name='Caves' and column_name='ReportedByUserId'),
+              not exists(select 1 from information_schema.columns where table_name='Entrances' and column_name='ReportedByUserId'),
+              not exists(select 1 from pg_constraint where conname in ('FK_Caves_Users_ReportedByUserId', 'FK_Entrances_Users_ReportedByUserId')),
+              not exists(select 1 from pg_indexes where indexname in ('IX_Caves_ReportedByUserId', 'IX_Entrances_ReportedByUserId'))
+            """, catalog);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.True(reader.GetBoolean(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.True(reader.GetBoolean(2));
+        Assert.True(reader.GetBoolean(3));
+    }
+
+    [Fact]
     public async Task ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData()
     {
         // Arrange the exact pre-foundation production schema and representative data.

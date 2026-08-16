@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
+using Planarian.Modules.Query.Constants;
+using Planarian.Modules.Query.Extensions;
 
 namespace Planarian.Modules.Caves.Controllers;
 
@@ -90,13 +92,6 @@ public sealed class CaveChangeRequestController : ControllerBase
         }
     }
 
-    [HttpPost("{requestId:length(10)}/files")]
-    [RequestSizeLimit(550L * 1024 * 1024)]
-    public async Task<ActionResult> StageFile(string requestId, string? uuid, IFormFile file,
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.StageFileAsync(requestId, file.OpenReadStream(), file.FileName, uuid,
-            cancellationToken));
-
     [HttpGet("{requestId:length(10)}/files/{fileId:length(10)}")]
     public async Task<IActionResult> DownloadStagedFile(string requestId, string fileId,
         CancellationToken cancellationToken)
@@ -106,14 +101,16 @@ public sealed class CaveChangeRequestController : ControllerBase
     }
 
     [HttpGet("mine")]
-    public async Task<ActionResult<IReadOnlyList<CaveChangeRequestSummaryVm>>> Mine(
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.ListMineAsync(cancellationToken));
+    public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> Mine(
+        CancellationToken cancellationToken, [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = QueryConstants.DefaultPageSize) =>
+        new JsonResult(await _service.ListMineAsync(pageNumber, pageSize, cancellationToken));
 
     [HttpGet("review")]
-    public async Task<ActionResult<IReadOnlyList<CaveChangeRequestSummaryVm>>> ReviewQueue(
-        CancellationToken cancellationToken) =>
-        new JsonResult(await _service.ListForReviewAsync(cancellationToken));
+    public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> ReviewQueue(
+        CancellationToken cancellationToken, [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = QueryConstants.DefaultPageSize) =>
+        new JsonResult(await _service.ListForReviewAsync(pageNumber, pageSize, cancellationToken));
 
     [HttpGet("{requestId:length(10)}")]
     public async Task<ActionResult<CaveChangeRequestDetailVm>> Get(string requestId,
