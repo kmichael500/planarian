@@ -81,13 +81,21 @@ var isHostedDeployment = isAzureAppService || !isDevelopment;
 if (isAzureAppService && !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_FORWARDEDHEADERS_ENABLED"), "true", StringComparison.OrdinalIgnoreCase))
     throw new InvalidOperationException("Azure App Service requires ASPNETCORE_FORWARDEDHEADERS_ENABLED=true so public HTTPS origins are available behind TLS termination.");
 
-builder.Configuration.AddAzureAppConfiguration(options =>
+if (string.IsNullOrWhiteSpace(appConfigConnectionString))
 {
-    options.Connect(appConfigConnectionString)
-        .Select(KeyFilter.Any, LabelFilter.Null)
-        .Select(KeyFilter.Any,
-            isDevelopment ? "Development" : "Production");
-});
+    if (!isDevelopment)
+        throw new InvalidOperationException("Azure App Configuration is required outside the Development environment.");
+}
+else
+{
+    builder.Configuration.AddAzureAppConfiguration(options =>
+    {
+        options.Connect(appConfigConnectionString)
+            .Select(KeyFilter.Any, LabelFilter.Null)
+            .Select(KeyFilter.Any,
+                isDevelopment ? "Development" : "Production");
+    });
+}
 
 #if DEBUG
 builder.Configuration.AddJsonFile("appsettings.Development.json", false);
