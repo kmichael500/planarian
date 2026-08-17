@@ -138,6 +138,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
               <PlanarianButton
                 type="link"
                 icon={<CopyOutlined />}
+                aria-label="Copy coordinates"
                 onClick={copyCoordinates}
               />
             </span>

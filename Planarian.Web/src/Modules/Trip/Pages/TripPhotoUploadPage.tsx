@@ -283,6 +283,7 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
                                     handlePreview(file);
                                   }}
                                   ghost
+                                  aria-label="Preview photo"
                                   icon={<EyeOutlined />}
                                 ></PlanarianButton>
                               </Tooltip>

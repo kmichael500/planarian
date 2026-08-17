@@ -93,7 +93,12 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
   // Show loading indicator if caveId is missing
   if (!caveId) {
     return (
-      <PlanarianButton icon={favoriteIcon} loading={true} disabled={true} />
+      <PlanarianButton
+        icon={favoriteIcon}
+        aria-label="Loading favorite status"
+        loading={true}
+        disabled={true}
+      />
     );
   }
 

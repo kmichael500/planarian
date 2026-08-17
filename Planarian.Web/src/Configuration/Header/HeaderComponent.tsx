@@ -65,6 +65,7 @@ const HeaderComponent = () => {
               <PlanarianButton
                 className="planarian-header__menu-button menu"
                 icon={<MenuOutlined />}
+                aria-label="Open navigation"
                 onClick={() => setVisible(true)}
               />
               <Drawer

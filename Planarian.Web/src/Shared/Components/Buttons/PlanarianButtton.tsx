@@ -4,7 +4,7 @@ import { PermissionKey } from "../../../Modules/Authentication/Models/Permission
 import { AppContext } from "../../../Configuration/Context/AppContext";
 
 interface PlanarianButtonProps {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   alwaysShowChildren?: boolean;
   neverShowChildren?: boolean;
   collapseOnScreenSize?: "xl" | "lg" | "md" | "sm" | "xs";
@@ -36,6 +36,8 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
     permissionKey && !hasPermission(permissionKey);
 
   const disabled = rest.disabled;
+  const accessibleLabel =
+    rest["aria-label"] ?? (typeof tooltip === "string" ? tooltip : undefined);
 
   const [debouncing, setDebouncing] = useState(false);
 
@@ -76,12 +78,13 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
 
     showChildren = activeIndex > collapseIndex;
   } else {
-    showChildren = !!screens.xl;
+    showChildren = true;
   }
 
   const getButton = () => (
     <Button
       {...rest}
+      aria-label={accessibleLabel}
       icon={rest.icon}
       onClick={handleClick}
       disabled={disabled}

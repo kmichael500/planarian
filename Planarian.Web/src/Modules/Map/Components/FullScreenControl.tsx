@@ -22,7 +22,11 @@ const FullScreenControl = ({
         ...position,
       }}
     >
-      <PlanarianButton icon={<FullscreenOutlined />} onClick={handleClick} />
+      <PlanarianButton
+        icon={<FullscreenOutlined />}
+        aria-label="Enter full screen"
+        onClick={handleClick}
+      />
     </div>
   );
 };

@@ -90,6 +90,7 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
                               handlePreview(photo);
                             }}
                             ghost
+                            aria-label="Preview photo"
                             icon={<EyeOutlined />}
                           />
                         </Tooltip>

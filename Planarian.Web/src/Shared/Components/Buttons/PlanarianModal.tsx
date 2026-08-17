@@ -193,6 +193,7 @@ export function PlanarianModal({
             ))}
             <PlanarianButton
               icon={<CloseOutlined />}
+              aria-label="Close"
               onClick={(e) => {
                 e.stopPropagation();
                 setShouldRenderChildren(false);
