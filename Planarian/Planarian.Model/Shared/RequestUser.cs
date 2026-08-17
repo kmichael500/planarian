@@ -112,20 +112,8 @@ public class RequestUser
             )
             .Select(e => e.Permission!.Key).ToListAsync();
 
-        var hasUserPermission = permissionKey switch
-        {
-            PermissionKey.View => userPermissions.Contains(PermissionPolicyKey.View) ||
-                                  userPermissions.Contains(PermissionPolicyKey.Manager) ||
-                                  userPermissions.Contains(PermissionPolicyKey.Admin) ||
-                                  userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-            PermissionKey.Manager => userPermissions.Contains(PermissionPolicyKey.Manager) ||
-                                     userPermissions.Contains(PermissionPolicyKey.Admin) ||
-                                     userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-            PermissionKey.Admin => userPermissions.Contains(PermissionPolicyKey.Admin) ||
-                                   userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-            PermissionKey.PlanarianAdmin => userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin),
-            _ => false
-        };
+        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
+        var hasUserPermission = userPermissions.Any(satisfyingPermissionKeys.Contains);
 
         if (permissionKey == PermissionPolicyKey.AdminManager)
         {
@@ -166,7 +154,7 @@ public class RequestUser
             .AnyAsync(e =>
                 e.AccountId == AccountId
                 && e.UserId == Id
-                && permissionKey == e.Permission!.Key
+                && satisfyingPermissionKeys.Contains(e.PermissionKey)
             );
 
         if (!hasCavePermission && @throw)
@@ -183,6 +171,7 @@ public class RequestUser
         if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
             throw ApiExceptionDictionary.BadRequest("Invalid request. IsAuthenticated, permissionKey, and AccountId are required");
 
+        var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
         var hasPermission = false;
         if (string.IsNullOrWhiteSpace(caveId) && string.IsNullOrWhiteSpace(countyId) &&
             string.IsNullOrWhiteSpace(stateId))
@@ -194,7 +183,7 @@ public class RequestUser
                     && string.IsNullOrWhiteSpace(e.CountyId)
                     && e.UserId == Id
                     && e.AccountId == AccountId
-                    && e.Permission!.Key == permissionKey
+                    && satisfyingPermissionKeys.Contains(e.Permission!.Key)
                 );
             if (!hasPermission)
             {
@@ -207,7 +196,7 @@ public class RequestUser
                 .AnyAsync(e =>
                     e.UserId == Id
                     && e.AccountId == AccountId
-                    && e.PermissionKey == permissionKey
+                    && satisfyingPermissionKeys.Contains(e.PermissionKey)
                     && ((!string.IsNullOrWhiteSpace(caveId) && e.CaveId == caveId) ||
                         (!string.IsNullOrWhiteSpace(countyId) && e.CountyId == countyId) ||
                         (!string.IsNullOrWhiteSpace(stateId) && e.StateId == stateId))
@@ -222,5 +211,17 @@ public class RequestUser
 
         return hasPermission;
     }
+
+    private static string[] GetSatisfyingPermissionKeys(string permissionKey) => permissionKey switch
+    {
+        PermissionKey.View =>
+            [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin,
+                PermissionPolicyKey.PlanarianAdmin],
+        PermissionKey.Manager =>
+            [PermissionPolicyKey.Manager, PermissionPolicyKey.Admin, PermissionPolicyKey.PlanarianAdmin],
+        PermissionKey.Admin => [PermissionPolicyKey.Admin, PermissionPolicyKey.PlanarianAdmin],
+        PermissionKey.PlanarianAdmin => [PermissionPolicyKey.PlanarianAdmin],
+        _ => [permissionKey]
+    };
 
 }
