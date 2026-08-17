@@ -8,7 +8,10 @@ import { parseCaveLinePlotFile } from "../../Map/Helpers/LinePlotFileParser";
 
 const baseName = (name: string) => name.replace(/\.(zip|geojson|json)$/i, "");
 
-export const CaveLinePlotAuthoringEditor = ({ form }: { form: FormInstance<AddCaveVm> }) => {
+export const CaveLinePlotAuthoringEditor = ({ form, onAuthoringChange }: {
+  form: FormInstance<AddCaveVm>;
+  onAuthoringChange?: () => void;
+}) => {
   const linePlots = Form.useWatch<GeoJsonUploadVm[]>("linePlots", form) ?? [];
 
   return <Form.List name="linePlots">
@@ -25,6 +28,7 @@ export const CaveLinePlotAuthoringEditor = ({ form }: { form: FormInstance<AddCa
               name: collections.length === 1 ? baseName(upload.name) : `${baseName(upload.name)} ${index + 1}`,
               geoJson: JSON.stringify(collection),
             }));
+            onAuthoringChange?.();
             onSuccess?.({});
           } catch (error) {
             message.error(error instanceof Error ? error.message : "The line plot could not be read.");
@@ -39,7 +43,7 @@ export const CaveLinePlotAuthoringEditor = ({ form }: { form: FormInstance<AddCa
           const linePlot = linePlots[field.name];
           return <Col xs={24} lg={12} key={field.key}>
             <Card size="small" title={linePlot?.name ?? "Line plot"}
-              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} />}>
+              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
               <Form.Item name={[field.name, "id"]} hidden><Input /></Form.Item>
               <Form.Item name={[field.name, "geoJson"]} hidden
                 rules={[{ required: true, message: "Line plot GeoJSON is required" }]}><Input /></Form.Item>
@@ -57,6 +61,7 @@ export const CaveLinePlotAuthoringEditor = ({ form }: { form: FormInstance<AddCa
                       const collections = await parseCaveLinePlotFile(file as RcFile);
                       if (collections.length !== 1) throw new Error("Replacing a line plot requires exactly one FeatureCollection.");
                       form.setFieldValue(["linePlots", field.name, "geoJson"], JSON.stringify(collections[0]));
+                      onAuthoringChange?.();
                       onSuccess?.({});
                     } catch (error) {
                       message.error(error instanceof Error ? error.message : "The line plot could not be read.");

@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
+import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
 import { AddCaveComponent } from "../Components/AddCaveComponent";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
 import { caveToForm } from "../Helpers/CaveFormMapper";
@@ -23,6 +25,7 @@ export const SuggestCaveChangesPage = () => {
   const [previewResult, setPreviewResult] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
     if (!caveId) return;
@@ -58,6 +61,7 @@ export const SuggestCaveChangesPage = () => {
     try {
       const id = await CaveService.SubmitChanges(caveId, draft, expectedBaseRevisionId!);
       message.success("Your changes were submitted for review.");
+      unsaved.markClean();
       navigate(`/caves/requests/${id}`);
     } catch (error: any) {
       if (error?.conflictKind === "PublishedCaveChanged")
@@ -70,6 +74,11 @@ export const SuggestCaveChangesPage = () => {
 
   return (
     <Space direction="vertical" style={{ width: "100%" }}>
+      <UnsavedChangesModal
+        open={unsaved.isBlocked}
+        onKeepEditing={unsaved.keepEditing}
+        onDiscardChanges={unsaved.discardChanges}
+      />
       {previewResult && draft && (
         <Card title="Review your changes">
           <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
@@ -85,9 +94,10 @@ export const SuggestCaveChangesPage = () => {
         </Card>
       )}
       <Card loading={loading} style={{ display: previewResult ? "none" : undefined }}>
-        {cave && <Form form={form} layout="vertical" onFinish={preview}>
-          <Typography.Paragraph type="secondary">Use the normal Cave editor. You will review the field-level changes before submission.</Typography.Paragraph>
-          <AddCaveComponent isEditing form={form} cave={cave} />
+        {cave && <Form form={form} layout="vertical" onFinish={preview} onValuesChange={unsaved.markDirty}>
+          <Typography.Paragraph type="secondary">Make the changes you want reviewed. Everything else will stay as it is.</Typography.Paragraph>
+          <AddCaveComponent isEditing form={form} cave={cave} submitLabel="Review changes"
+            onAuthoringChange={unsaved.markDirty} stickySubmit />
         </Form>}
       </Card>
     </Space>

@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
+import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
 import { AddCaveComponent } from "../Components/AddCaveComponent";
 import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
 import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
@@ -24,9 +26,10 @@ export const ReviseCaveChangeRequestPage = () => {
   const [preview, setPreview] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
-    setHeaderTitle(["Revise Cave Change Request"]);
+    setHeaderTitle(["Revise changes"]);
     setHeaderButtons([<BackButtonComponent to={`/caves/requests/${requestId}`} />]);
     if (!requestId) return;
     const load = async () => {
@@ -91,7 +94,8 @@ export const ReviseCaveChangeRequestPage = () => {
     try {
       await CaveService.ReviseChanges(requestId, draft, againstCurrent,
         expectedBaseRevisionId!, expectedProposalVersionId!);
-      message.success("A new immutable proposal version was created.");
+      message.success("A new proposal version was saved.");
+      unsaved.markClean();
       navigate(`/caves/requests/${requestId}`);
     } catch (error: any) {
       if (error?.conflictKind === "ActiveProposalVersionChanged")
@@ -103,6 +107,11 @@ export const ReviseCaveChangeRequestPage = () => {
   };
 
   return <Spin spinning={loading}><Space direction="vertical" style={{ width: "100%" }}>
+    <UnsavedChangesModal
+      open={unsaved.isBlocked}
+      onKeepEditing={unsaved.keepEditing}
+      onDiscardChanges={unsaved.discardChanges}
+    />
     {detail?.request.isStale && <>
       <Alert type="warning" showIcon message="Revise against the current published Cave"
         description="The editor starts from the current Cave. Reapply the changes you still want; the older proposal remains unchanged in the version history." />
@@ -133,10 +142,11 @@ export const ReviseCaveChangeRequestPage = () => {
     {detail && editorValues && detail.request.status === "Pending" &&
       (detail.request.canEdit || detail.request.canReview) && !preview && <Card>
       <Typography.Paragraph type="secondary">
-        {againstCurrent ? "This editor is initialized from the current published Cave." : "This editor is initialized from the active proposal."}
+        Update the proposed changes, then review them before saving a new version.
       </Typography.Paragraph>
-      <Form form={form} layout="vertical" onFinish={previewChanges}>
-        <AddCaveComponent isEditing form={form} cave={editorValues} />
+      <Form form={form} layout="vertical" onFinish={previewChanges} onValuesChange={unsaved.markDirty}>
+        <AddCaveComponent isEditing form={form} cave={editorValues} submitLabel="Review changes"
+          onAuthoringChange={unsaved.markDirty} stickySubmit />
       </Form>
     </Card>}
   </Space></Spin>;

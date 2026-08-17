@@ -41,7 +41,7 @@
     "react-map-gl": "^7.1.6",
     "react-papaparse": "^4.1.0",
     "react-pdf": "^10.4.1",
-    "react-router-dom": "^6.4.2",
+    "react-router-dom": "^6.30.1",
     "react-scripts": "5.0.1",
     "react-text-mask": "^5.5.0",
     "sass": "^1.83.0",

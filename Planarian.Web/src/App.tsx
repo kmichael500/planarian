@@ -3,7 +3,7 @@ import { theme as antdTheme } from "antd";
 import { Col, ConfigProvider, Layout, Row, Spin, message } from "antd";
 import React from "react";
 import { Helmet } from "react-helmet";
-import { BrowserRouter } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./App.css";
 import { AppContext, AppProvider } from "./Configuration/Context/AppContext";
 import { HeaderComponent } from "./Configuration/Header/HeaderComponent";
@@ -28,8 +28,13 @@ const AppContent: React.FC = () => {
         <meta name="description" content="Cave project management" />
       </Helmet>
       <SyncfusionThemeManager />
-      <BrowserRouter>
-        <AppProvider>
+      <RouterProvider router={appRouter} />
+    </>
+  );
+};
+
+const RoutedAppContent: React.FC = () => (
+  <AppProvider>
           <AppContext.Consumer>
             {({
               isInitialized,
@@ -104,11 +109,12 @@ const AppContent: React.FC = () => {
               )
             }
           </AppContext.Consumer>
-        </AppProvider>
-      </BrowserRouter>
-    </>
-  );
-};
+  </AppProvider>
+);
+
+const appRouter = createBrowserRouter([
+  { path: "*", element: <RoutedAppContent /> },
+]);
 
 const ThemeConsumerWrapper: React.FC = () => {
   const { effectiveMode } = useTheme();

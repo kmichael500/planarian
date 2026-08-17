@@ -15,7 +15,7 @@ describe("generated client routes", () => {
     const match = matchPath(ClientRoutes.invitation.path, builtPath);
 
     expect(match).not.toBeNull();
-    expect(match?.params.invitationCode).toBe(invitationCode);
+    expect(decodeURIComponent(match?.params.invitationCode ?? "")).toBe(invitationCode);
   });
 
   it.each([

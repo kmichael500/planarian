@@ -9,7 +9,10 @@ import { TagSelectComponent } from "../../Tag/Components/TagSelectComponent";
 import { TagType } from "../../Tag/Models/TagType";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 
-export const CaveFileAuthoringEditor = ({ form }: { form: FormInstance<AddCaveVm> }) => {
+export const CaveFileAuthoringEditor = ({ form, onAuthoringChange }: {
+  form: FormInstance<AddCaveVm>;
+  onAuthoringChange?: () => void;
+}) => {
   const files = Form.useWatch<EditFileMetadataVm[]>("files", form) ?? [];
 
   return <Form.List name="files">
@@ -30,6 +33,7 @@ export const CaveFileAuthoringEditor = ({ form }: { form: FormInstance<AddCaveVm
               fileTypeTagId: staged.fileTypeTagId,
               fileTypeKey: staged.fileTypeKey,
             });
+            onAuthoringChange?.();
             onSuccess?.({});
           } catch (error) {
             message.error((error as ApiErrorResponse).message ?? "The file could not be staged.");
@@ -46,7 +50,7 @@ export const CaveFileAuthoringEditor = ({ form }: { form: FormInstance<AddCaveVm
           const file = files[field.name];
           return <Col xs={24} lg={12} key={field.key}>
             <Card size="small" title={file?.displayName ?? "File"}
-              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} />}>
+              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
               <Form.Item name={[field.name, "id"]} hidden><Input /></Form.Item>
               <Form.Item name={[field.name, "fileTypeKey"]} hidden><Input /></Form.Item>
               <Form.Item label="Name" name={[field.name, "displayName"]}

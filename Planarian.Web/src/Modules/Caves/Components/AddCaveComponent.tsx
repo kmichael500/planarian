@@ -44,8 +44,18 @@ export interface AddCaveComponentProps {
   form: FormInstance<AddCaveVm>;
   isEditing?: boolean;
   cave?: AddCaveVm | CaveVm;
+  submitLabel?: string;
+  onAuthoringChange?: () => void;
+  stickySubmit?: boolean;
 }
-const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
+const AddCaveComponent = ({
+  form,
+  isEditing,
+  cave,
+  submitLabel = "Submit",
+  onAuthoringChange,
+  stickySubmit = false,
+}: AddCaveComponentProps) => {
   const { isFeatureEnabled } = useFeatureEnabled();
   const editingCave = isEditing ? (cave as CaveVm | undefined) : undefined;
   const [selectedStateId, setSelectedStateId] = useState<string>();
@@ -82,6 +92,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
           isPrimary: i === index,
         })),
     });
+    onAuthoringChange?.();
   };
 
   useEffect(() => {
@@ -325,7 +336,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
         <Input type="hidden" />
       </Form.Item>
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveName}>
-        <Col span={12}>
+        <Col {...twoColProps}>
           <Form.Item
             label="Name"
             name={nameof<AddCaveVm>("name")}
@@ -336,7 +347,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
         </Col>
       </ShouldDisplay>
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveAlternateNames}>
-        <Col span={12}>
+        <Col {...twoColProps}>
           <Form.Item
             label="Alternate Names"
             name={nameof<AddCaveVm>("alternateNames")}
@@ -693,7 +704,8 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                 {fields.map((field, index) => (
                   <Col
                     key={field.name}
-                    span={
+                    xs={24}
+                    lg={
                       fields.length % 2 === 1 && index === fields.length - 1
                         ? 24
                         : 12
@@ -713,6 +725,7 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                           ).toString()}?`}
                           onConfirm={() => {
                             remove(field.name);
+                            onAuthoringChange?.();
                           }}
                           okText="Yes"
                           cancelText="No"
@@ -1027,7 +1040,10 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
                 <Col span={24}>
                   <Form.Item>
                     <PlanarianButton
-                      onClick={() => add()}
+                      onClick={() => {
+                        add();
+                        onAuthoringChange?.();
+                      }}
                       icon={<PlusOutlined />}
                       block
                     >
@@ -1049,20 +1065,33 @@ const AddCaveComponent = ({ form, isEditing, cave }: AddCaveComponentProps) => {
       </Col>
       <Col span={24}>
         <PlanarianDividerComponent title={"Files"} />
-        <CaveFileAuthoringEditor form={form} />
+        <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange} />
       </Col>
       <Col span={24}>
         <PlanarianDividerComponent title={"Line Plots"} />
-        <CaveLinePlotAuthoringEditor form={form} />
+        <CaveLinePlotAuthoringEditor form={form} onAuthoringChange={onAuthoringChange} />
       </Col>
-      <Col>
-        <Form.Item>
+      <Col
+        span={24}
+        style={
+          stickySubmit
+            ? {
+                position: "sticky",
+                bottom: 0,
+                zIndex: 5,
+                padding: "12px 0",
+                background: "var(--surface-color)",
+              }
+            : undefined
+        }
+      >
+        <Form.Item style={{ marginBottom: stickySubmit ? 0 : undefined }}>
           <Button
             style={{ marginTop: "16px" }}
             type="primary"
             htmlType="submit"
           >
-            Submit
+            {submitLabel}
           </Button>
         </Form.Item>
       </Col>
