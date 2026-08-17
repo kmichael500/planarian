@@ -127,3 +127,28 @@
  .quality-flow{display:grid}
  .quality-flow b{transform:rotate(90deg)}
 }
+
+/* Search page illustration — mirrors the real Planarian Caves page with synthetic data. */
+.product-search-page .frame-body{display:block}
+.product-search-page .frame-rail{display:none}
+.product-search-page .frame-content{height:100%;padding:0;background:#f3f4f6}
+.search-app-mock{height:100%;display:grid;grid-template-columns:138px minmax(0,1fr);background:#f3f4f6;color:#252a30}
+.search-app-sidebar{min-width:0;border-right:1px solid #dfe2e6;background:#fff}
+.search-app-logo{height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-bottom:1px solid #f0f1f2}
+.search-app-logo .mark{width:42px;height:38px}.search-app-logo small{font-size:8px;color:#858b92}
+.search-app-sidebar nav{display:grid;padding:7px 6px;gap:3px}.search-app-sidebar nav span{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:4px;font-size:9px;color:#4e555d;white-space:nowrap}
+.search-app-sidebar nav span.active{background:#f0f1f3;color:#2c3238;font-weight:650}.search-app-sidebar nav i{width:9px;height:9px;border:1px solid #777f87;border-radius:2px}
+.search-app-main{min-width:0;display:flex;flex-direction:column}.search-app-header{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #dfe2e6;background:#fff}
+.search-app-header>b{font-size:12px}.search-app-header>div{display:flex;align-items:center;gap:7px}.search-app-header>div>span{padding:2px 7px;border:1px solid #d4d8dd;border-radius:3px;background:#fff;font-size:7.5px;color:#59616a}
+.search-app-header button{border:0;border-radius:4px;padding:4px 8px;background:var(--blue);color:#fff;font-size:8px}.search-app-header i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#f8efd4;color:#625a48;font-size:8px;font-style:normal}
+.search-app-content{min-height:0;overflow:hidden;padding:9px 10px 10px}.search-controls{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto auto;gap:3px;align-items:stretch}
+.search-input,.search-controls button,.search-sort,.search-count{min-height:26px;border:1px solid #d8dce1;background:#fff;color:#5d6570;font-size:7.5px}.search-input{display:flex;align-items:center;padding:0 8px;border-radius:4px 0 0 4px}.search-controls button{padding:0 8px}.search-sort{display:flex;align-items:center;padding:0 8px;border-radius:4px}.search-count{display:grid;place-items:center;padding:2px 7px;border-radius:4px;line-height:1}.search-count small{font-size:6px}.search-count b{font-size:9px;color:#30363d}
+.display-attributes{display:flex;align-items:center;justify-content:space-between;margin-top:4px;padding:3px 7px;border:1px solid #dde0e4;border-radius:3px;background:#fff;font-size:7.5px}.display-attributes span{font-size:12px}
+.search-results-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:6px}.search-result-card{min-width:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #d7dbe0;border-radius:4px;background:#fff}
+.search-result-head{padding:6px 7px 5px;border-bottom:1px solid #e0e3e6}.search-result-head strong{display:block;overflow:hidden;font-size:8.5px;line-height:1.2;white-space:nowrap;text-overflow:ellipsis}.search-result-head strong span{color:var(--cave-id)}.search-result-head small{display:block;margin-top:2px;color:#4f83f7;font-size:6.8px;line-height:1.1}
+.search-result-card dl{display:grid;gap:1px;margin:0;padding:6px 7px;flex:1}.search-result-card dl>div{display:flex;align-items:flex-start;gap:3px;min-width:0;line-height:1.25}.search-result-card dt{flex:0 0 auto;font-size:7px;font-weight:700}.search-result-card dd{display:flex;min-width:0;flex-wrap:wrap;gap:2px;margin:0;color:#555d66;font-size:7px}.search-result-card .data-tag{padding:1px 4px;border-radius:3px;font-size:6.4px;line-height:1.25;white-space:normal}
+.search-result-actions{display:grid;grid-template-columns:1fr 1fr;margin-top:auto;border-top:1px solid #dfe2e5}.search-result-actions span{padding:5px 3px;text-align:center;font-size:7px}.search-result-actions span:first-child{background:var(--blue);color:#fff}.search-result-actions span+span{border-left:1px solid #dfe2e5;background:#fff;color:#4f5760}
+@media(max-width:1050px){.search-app-mock{grid-template-columns:112px minmax(0,1fr)}.search-app-sidebar nav span{padding:6px 7px;font-size:8px}.search-results-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.search-result-card:nth-child(n+7){display:none}}
+@media(max-width:620px){.product-search-page .frame-bar{height:34px}.product-search-page .frame-body{height:calc(100% - 34px)}.search-app-mock{grid-template-columns:1fr}.search-app-sidebar{display:none}.search-app-header>div>span,.search-controls button:nth-of-type(2),.search-controls button:nth-of-type(3),.search-sort{display:none}.search-controls{grid-template-columns:minmax(0,1fr) auto auto}.search-results-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.search-result-card:nth-child(n+5){display:none}}
+.search-app-content{display:flex;flex-direction:column}
+.search-results-grid{flex:1;min-height:0;grid-template-rows:repeat(2,minmax(0,1fr))}
