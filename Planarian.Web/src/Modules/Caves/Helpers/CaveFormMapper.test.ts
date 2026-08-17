@@ -1,6 +1,7 @@
 import { caveToForm, snapshotToForm } from "./CaveFormMapper";
 import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
 import { CaveVm } from "../Models/CaveVm";
+import dayjs from "dayjs";
 
 const snapshot: CaveSnapshotVm = {
   caveId: "cave", accountId: "account", name: "Cave", alternateNames: [],
@@ -66,4 +67,47 @@ it("retains Entrance Other tags when mapping a Cave into the editor", () => {
 it("carries exact line-plot authoring payloads into editor state", () => {
   const linePlots = [{ id: "line-1", name: "Survey", geoJson: '{"type":"FeatureCollection","features":[]}' }];
   expect(snapshotToForm(snapshot, undefined, undefined, [], linePlots).linePlots).toEqual(linePlots);
+});
+
+
+it("converts Cave and entrance API date strings into DatePicker-compatible values", () => {
+  const cave: CaveVm = {
+    id: "cave", currentRevisionId: "revision", displayId: "A-1",
+    countyId: "county", stateId: "state", countyDisplayId: "A", countyNumber: 1,
+    name: "Cave", alternateNames: [], lengthFeet: 0, depthFeet: 0, maxPitDepthFeet: 0,
+    numberOfPits: 0, narrative: null, reportedOn: "2026-01-02T00:00:00Z", isArchived: false, primaryEntrance: null,
+    mapIds: [], geologyTagIds: [], files: [], reportedByNameTagIds: [], biologyTagIds: [],
+    archeologyTagIds: [], cartographerNameTagIds: [], mapStatusTagIds: [], geologicAgeTagIds: [],
+    physiographicProvinceTagIds: [], otherTagIds: [],
+    entrances: [{
+      id: "entrance", isPrimary: true, locationQualityTagId: "quality", name: null, description: null,
+      latitude: 35, longitude: -86, elevationFeet: 500, reportedOn: "2026-02-03T00:00:00Z", pitFeet: null,
+      entranceStatusTagIds: [], fieldIndicationTagIds: [], entranceHydrologyTagIds: [],
+      reportedByNameTagIds: [], entranceOtherTagIds: [],
+    }],
+  };
+
+  const form = caveToForm(cave);
+
+  expect(dayjs.isDayjs(form.reportedOn)).toBe(true);
+  expect(dayjs.isDayjs(form.entrances[0].reportedOn)).toBe(true);
+  expect(form.reportedOn?.format("YYYY-MM-DD")).toBe("2026-01-02");
+  expect(form.entrances[0].reportedOn?.format("YYYY-MM-DD")).toBe("2026-02-03");
+});
+
+it("converts proposal snapshot date strings into DatePicker-compatible values", () => {
+  const form = snapshotToForm({
+    ...snapshot,
+    reportedOn: "2026-03-04T00:00:00Z",
+    entrances: [{
+      id: "entrance", isPrimary: true, description: "", latitude: 35, longitude: -86, elevation: 0, srid: 4326,
+      locationQualityTagId: "quality", locationQualityNameAtRevision: "Survey Grade",
+      reportedOn: "2026-05-06T00:00:00Z", tags: [],
+    }],
+  });
+
+  expect(dayjs.isDayjs(form.reportedOn)).toBe(true);
+  expect(dayjs.isDayjs(form.entrances[0].reportedOn)).toBe(true);
+  expect(form.reportedOn?.format("YYYY-MM-DD")).toBe("2026-03-04");
+  expect(form.entrances[0].reportedOn?.format("YYYY-MM-DD")).toBe("2026-05-06");
 });

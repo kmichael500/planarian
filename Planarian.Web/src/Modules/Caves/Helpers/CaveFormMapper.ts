@@ -3,6 +3,9 @@ import { GeoJsonUploadVm } from "../Models/GeoJsonUploadVm";
 import { CaveVm } from "../Models/CaveVm";
 import { CaveFileSnapshotVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 import { CountyNumberIntent } from "../Models/CaveChangeRequestVm";
+import dayjs from "dayjs";
+
+const toDatePickerValue = (value?: string | null) => value ? dayjs.utc(value) : null;
 
 export const caveToForm = (cave: CaveVm, linePlots: GeoJsonUploadVm[] = []): AddCaveVm => ({
   id: cave.id,
@@ -20,7 +23,7 @@ export const caveToForm = (cave: CaveVm, linePlots: GeoJsonUploadVm[] = []): Add
   maxPitDepthFeet: cave.maxPitDepthFeet,
   numberOfPits: cave.numberOfPits,
   narrative: cave.narrative,
-  reportedOn: cave.reportedOn,
+  reportedOn: toDatePickerValue(cave.reportedOn),
   entrances: cave.entrances.map((entrance) => ({
     id: entrance.id,
     isPrimary: entrance.isPrimary,
@@ -30,7 +33,7 @@ export const caveToForm = (cave: CaveVm, linePlots: GeoJsonUploadVm[] = []): Add
     latitude: entrance.latitude,
     longitude: entrance.longitude,
     elevationFeet: entrance.elevationFeet,
-    reportedOn: entrance.reportedOn,
+    reportedOn: toDatePickerValue(entrance.reportedOn),
     pitFeet: entrance.pitFeet,
     entranceStatusTagIds: entrance.entranceStatusTagIds,
     fieldIndicationTagIds: entrance.fieldIndicationTagIds,
@@ -71,7 +74,7 @@ export const snapshotToForm = (snapshot: CaveSnapshotVm, countyNumberIntent?: Co
   maxPitDepthFeet: snapshot.maxPitDepthFeet ?? null,
   numberOfPits: snapshot.numberOfPits ?? null,
   narrative: snapshot.narrative ?? null,
-  reportedOn: snapshot.reportedOn ?? null,
+  reportedOn: toDatePickerValue(snapshot.reportedOn),
   entrances: snapshot.entrances.map((entrance) => ({
     id: entrance.id,
     isPrimary: entrance.isPrimary,
@@ -81,7 +84,7 @@ export const snapshotToForm = (snapshot: CaveSnapshotVm, countyNumberIntent?: Co
     latitude: entrance.latitude ?? 0,
     longitude: entrance.longitude ?? 0,
     elevationFeet: entrance.elevation ?? 0,
-    reportedOn: entrance.reportedOn ?? null,
+    reportedOn: toDatePickerValue(entrance.reportedOn),
     pitFeet: entrance.pitDepthFeet ?? null,
     entranceStatusTagIds: tagIds(entrance.tags, "EntranceStatus"),
     fieldIndicationTagIds: tagIds(entrance.tags, "FieldIndication"),

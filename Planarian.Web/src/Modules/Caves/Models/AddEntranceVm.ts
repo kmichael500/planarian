@@ -1,3 +1,4 @@
+import { Dayjs } from "dayjs";
 export interface AddEntranceVm {
   id?: string;
   isPrimary: boolean;
@@ -7,7 +8,7 @@ export interface AddEntranceVm {
   latitude: number;
   longitude: number;
   elevationFeet: number;
-  reportedOn: string | null;
+  reportedOn: Dayjs | null;
   pitFeet: number | null;
   entranceStatusTagIds: string[];
   fieldIndicationTagIds: string[];

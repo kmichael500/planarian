@@ -1,3 +1,4 @@
+import { Dayjs } from "dayjs";
 import { GeoJsonUploadVm } from "./GeoJsonUploadVm";
 import { EditFileMetadataVm } from "../../Files/Models/EditFileMetadataVm";
 import { AddEntranceVm } from "./AddEntranceVm";
@@ -18,7 +19,7 @@ export interface AddCaveVm {
   maxPitDepthFeet: number | null;
   numberOfPits: number | null;
   narrative: string | null;
-  reportedOn: string | null;
+  reportedOn: Dayjs | null;
   entrances: AddEntranceVm[];
   geologyTagIds: string[];
   files?: EditFileMetadataVm[];

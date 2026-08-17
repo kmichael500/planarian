@@ -8,11 +8,7 @@ import { CaveService } from "../Service/CaveService";
 import { useNavigate, useParams } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
-import {
-  isNullOrWhiteSpace,
-} from "../../../Shared/Helpers/StringHelpers";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
-import dayjs from "dayjs";
 import { caveToForm } from "../Helpers/CaveFormMapper";
 
 const EditCavePage: React.FC = () => {
@@ -52,15 +48,6 @@ const EditCavePage: React.FC = () => {
       const context = await CaveService.GetEditAuthoringContext(caveId);
       const caveResponse = context.cave;
 
-      // date picker requires it to be a dayjs object
-      if (!isNullOrWhiteSpace(caveResponse.reportedOn)) {
-        caveResponse.reportedOn = dayjs.utc(caveResponse.reportedOn) as any;
-      }
-      caveResponse.entrances.forEach((entrance) => {
-        if (!isNullOrWhiteSpace(entrance.reportedOn)) {
-          entrance.reportedOn = dayjs.utc(entrance.reportedOn) as any;
-        }
-      });
       setCave(caveResponse);
       const formValues = caveToForm(caveResponse, context.linePlots);
 
