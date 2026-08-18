@@ -23,22 +23,24 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<CaveRevisionHistoryVm>();
   const [comparisons, setComparisons] = useState<Record<string, CaveRevisionComparisonVm>>({});
-  const [error, setError] = useState<string>();
+  const [historyError, setHistoryError] = useState<string>();
+  const [revisionErrors, setRevisionErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setHistory(undefined);
     setComparisons({});
-    setError(undefined);
+    setHistoryError(undefined);
+    setRevisionErrors({});
   }, [caveId]);
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setLoading(true);
-    setError(undefined);
+    setHistoryError(undefined);
     CaveService.GetRevisionHistory(caveId)
       .then((loaded) => { if (active) setHistory(loaded); })
-      .catch(() => { if (active) setError("Cave history could not be loaded."); })
+      .catch(() => { if (active) setHistoryError("Cave history could not be loaded."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [open, caveId]);
@@ -46,11 +48,17 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
   const loadRevision = async (revisionId?: string | string[]) => {
     const id = Array.isArray(revisionId) ? revisionId[0] : revisionId;
     if (!id || comparisons[id]) return;
+    setRevisionErrors((current) => {
+      if (!(id in current)) return current;
+      const remaining = { ...current };
+      delete remaining[id];
+      return remaining;
+    });
     try {
       const comparison = await CaveService.GetRevision(caveId, id);
       setComparisons((current) => ({ ...current, [id]: comparison }));
     } catch {
-      setError("That revision could not be loaded.");
+      setRevisionErrors((current) => ({ ...current, [id]: "That revision could not be loaded." }));
     }
   };
 
@@ -59,7 +67,7 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
       <PlanarianButton icon={<HistoryOutlined />} onClick={() => setOpen(true)}>History</PlanarianButton>
       <PlanarianModal header="Cave History" open={open} onClose={() => setOpen(false)} width={900}>
         <Spin spinning={loading}>
-          {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+          {historyError && <Alert type="error" showIcon message={historyError} style={{ marginBottom: 16 }} />}
           {!loading && history?.revisions.length === 0 && <Typography.Text type="secondary">Revision tracking has not started yet.</Typography.Text>}
           <Timeline
             items={history?.revisions.map((revision) => ({
@@ -68,7 +76,11 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
                 <Collapse onChange={loadRevision} ghost items={[{
                   key: revision.id,
                   label: <div><strong>{sourceLabel(revision)}</strong>{revision.isCurrent && <Tag color="success" style={{ marginLeft: 8 }}>Current</Tag>}<div><Typography.Text type="secondary">Revision {revision.sequence} · {formatDateTime(revision.publishedOn)}{revision.actorName ? ` · ${revision.actorName}` : ""}</Typography.Text></div></div>,
-                  children: comparisons[revision.id] ? <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} /> : <Spin size="small" />,
+                  children: comparisons[revision.id]
+                    ? <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} />
+                    : revisionErrors[revision.id]
+                      ? <Alert type="error" showIcon message={revisionErrors[revision.id]} />
+                      : <Spin size="small" />,
                 }]} />
               ),
             })) ?? []}

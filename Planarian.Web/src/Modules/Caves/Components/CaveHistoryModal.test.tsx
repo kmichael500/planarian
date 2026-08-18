@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { CaveHistoryModal } from "./CaveHistoryModal";
 import { CaveService } from "../Service/CaveService";
 import { CaveRevisionHistoryVm } from "../Models/CaveRevisionVm";
@@ -40,4 +40,21 @@ it("clears cached history and loads the new Cave when caveId changes while open"
   expect(document.body).not.toHaveTextContent("Actor A");
   expect(load).toHaveBeenNthCalledWith(1, "cave-a");
   expect(load).toHaveBeenNthCalledWith(2, "cave-b");
+});
+
+it("shows a revision load error inside the expanded revision and stops its spinner", async () => {
+  jest.spyOn(CaveService, "GetRevisionHistory").mockResolvedValue(history("cave-a", "Actor A"));
+  jest.spyOn(CaveService, "GetRevision").mockRejectedValue(new Error("load failed"));
+  render(<CaveHistoryModal caveId="cave-a" />);
+
+  fireEvent.click(screen.getByRole("button", { name: /history/i }));
+  await screen.findByText(/Actor A/);
+  fireEvent.click(screen.getByText("Edited"));
+
+  const error = await screen.findByText("That revision could not be loaded.");
+  const revisionPanel = error.closest(".ant-collapse-content");
+  expect(revisionPanel).not.toBeNull();
+  expect(revisionPanel).not.toHaveClass("ant-collapse-content-hidden");
+  expect(error.closest(".ant-alert")).toBe(revisionPanel!.querySelector(".ant-alert"));
+  expect(document.querySelectorAll(".ant-spin-spinning")).toHaveLength(0);
 });

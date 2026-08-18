@@ -78,7 +78,7 @@ const PlanarianButton: React.FC<PlanarianButtonType> = (props) => {
 
     showChildren = activeIndex > collapseIndex;
   } else {
-    showChildren = true;
+    showChildren = !!screens.xl;
   }
 
   const getButton = () => (
