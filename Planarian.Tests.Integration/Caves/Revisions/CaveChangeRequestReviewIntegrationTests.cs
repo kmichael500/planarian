@@ -52,6 +52,88 @@ public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer f
             revoked.ChangeRequests.RejectAsync(requestId, versionId, null, default));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t\r\n")]
+    public async Task RejectionRequiresANonWhitespaceReason(string reason)
+    {
+        await using var database = await fixture.CreateDatabaseAsync(nameof(RejectionRequiresANonWhitespaceReason));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                Proposal(tenant, "Needs review"), default);
+            versionId = await CurrentVersionAsync(contributor, requestId);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+        {
+            var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                reviewer.ChangeRequests.RejectAsync(requestId, versionId, reason, default));
+            Assert.Equal(400, failure.StatusCode);
+            Assert.Equal("A reason is required to reject requested changes.", failure.Message);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Pending, request.Status);
+        Assert.Null(request.ReviewerUserId);
+        Assert.Null(request.ReviewerNotes);
+        Assert.Null(request.ReviewedOn);
+    }
+
+    [Fact]
+    public async Task RejectionPersistsTheTrimmedReasonAndTerminalRequestCannotBeReviewedAgain()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RejectionPersistsTheTrimmedReasonAndTerminalRequestCannotBeReviewedAgain));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                Proposal(tenant, "Needs evidence"), default);
+            versionId = await CurrentVersionAsync(contributor, requestId);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+        {
+            var decision = await reviewer.ChangeRequests.RejectAsync(requestId, versionId,
+                "  Not enough evidence  ", default);
+            Assert.Equal(CaveChangeRequestDecisionResult.Rejected, decision.Result);
+
+            var secondRejection = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                reviewer.ChangeRequests.RejectAsync(requestId, versionId, "Another reason", default));
+            Assert.Equal(400, secondRejection.StatusCode);
+            Assert.Equal("This request has already been reviewed.", secondRejection.Message);
+
+            var laterApproval = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                reviewer.ChangeRequests.ApproveAsync(requestId, versionId, null, default));
+            Assert.Equal(400, laterApproval.StatusCode);
+            Assert.Equal("This request has already been reviewed.", laterApproval.Message);
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Rejected, request.Status);
+        Assert.Equal("reviewer", request.ReviewerUserId);
+        Assert.Equal("Not enough evidence", request.ReviewerNotes);
+        Assert.NotNull(request.ReviewedOn);
+        Assert.Single(await verify.CaveRevisions.Where(revision => revision.CaveId == tenant.CaveId).ToListAsync());
+    }
+
     [Fact]
     public async Task ReviewerCannotApproveOrRejectAProposalVersionThatWasSupersededAfterLoading()
     {
@@ -91,7 +173,7 @@ public sealed class CaveChangeRequestReviewIntegrationTests(PostgresTestServer f
                 service.ApproveAsync(approvalRequestId, approvalV1, null, default));
             Assert.Equal(approvalV2, approvalConflict.ActualProposalVersionId);
             var rejectionConflict = await Assert.ThrowsAsync<CaveProposalVersionConflictException>(() =>
-                service.RejectAsync(rejectionRequestId, rejectionV1, null, default));
+                service.RejectAsync(rejectionRequestId, rejectionV1, "Superseded proposal", default));
             Assert.Equal(rejectionV2, rejectionConflict.ActualProposalVersionId);
         }
 

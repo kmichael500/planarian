@@ -75,6 +75,49 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
     }
 
     [Fact]
+    public async Task ConcurrentRejectionsOfTheSameRequestProduceExactlyOneDecision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ConcurrentRejectionsOfTheSameRequestProduceExactlyOneDecision));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
+                Proposal(tenant, "Reject once"), default);
+            versionId = await CurrentVersionAsync(contributor, requestId);
+        }
+
+        await using var reviewerOne = database.CreateDbContext("reviewer", tenant.AccountId);
+        await using var reviewerTwo = database.CreateDbContext("reviewer", tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(reviewerOne, tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(reviewerTwo, tenant.AccountId);
+
+        var rejectOne = IntegrationTestServices.For(reviewerOne).CaveChangeRequests
+            .RejectAsync(requestId, versionId, "Reason one", default);
+        var rejectTwo = IntegrationTestServices.For(reviewerTwo).CaveChangeRequests
+            .RejectAsync(requestId, versionId, "Reason two", default);
+        var outcomes = await Task.WhenAll(CaptureAsync(rejectOne), CaptureAsync(rejectTwo));
+
+        Assert.Single(outcomes.Where(outcome => outcome.Decision?.Result == CaveChangeRequestDecisionResult.Rejected));
+        var failure = Assert.IsType<ApiException>(Assert.Single(outcomes.Where(outcome => outcome.Error is not null)).Error);
+        Assert.Equal(400, failure.StatusCode);
+        Assert.Equal("This request has already been reviewed.", failure.Message);
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Rejected, request.Status);
+        Assert.NotNull(request.ReviewerNotes);
+        Assert.Contains(request.ReviewerNotes, new[] { "Reason one", "Reason two" });
+        Assert.Single(await verify.CaveRevisions.Where(revision => revision.CaveId == tenant.CaveId).ToListAsync());
+    }
+
+    [Fact]
     public async Task ConcurrentApprovalsMovingIntoOneCountyCommitDistinctAllocatedNumbers()
     {
         await using var database = await fixture.CreateDatabaseAsync(

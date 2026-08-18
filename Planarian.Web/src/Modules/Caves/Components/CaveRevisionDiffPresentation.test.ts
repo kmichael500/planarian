@@ -23,6 +23,33 @@ const emptyDiff = (): CaveRevisionDiffVm => ({
   addedFiles: [], removedFiles: [], changedFiles: [], entranceChanges: [], fileChanges: [], addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [],
 });
 
+it("exposes structured scope counts from the same authoritative presentation model", () => {
+  const diff = emptyDiff();
+  diff.scalars = [
+    { path: "Name", previous: "Before", current: "After" },
+    { path: "Narrative", previous: "old", current: "new" },
+    { path: "Future.Value", previous: "old", current: "new" },
+  ];
+  diff.addedTags = [
+    { role: "Geology", tagTypeId: "lime", nameAtRevision: "Limestone" },
+    { role: "Geology", tagTypeId: "dolomite", nameAtRevision: "Dolomite" },
+  ];
+  diff.changedEntrances = ["entrance-1", "entrance-2"];
+  diff.addedEntrances = ["entrance-3"];
+  diff.removedEntrances = ["entrance-4"];
+  diff.addedFiles = ["file-1"];
+  diff.changedFiles = ["file-2"];
+  diff.removedLinePlots = ["line-1"];
+
+  const summary = buildCaveRevisionDiffPresentation(diff).summary;
+
+  expect(summary.caveFields).toBe(3);
+  expect(summary.entrances).toEqual({ added: 1, removed: 1, changed: 2, total: 4 });
+  expect(summary.files).toEqual({ added: 1, removed: 0, changed: 1, total: 2 });
+  expect(summary.linePlots).toEqual({ added: 0, removed: 1, changed: 0, total: 1 });
+  expect(summary.otherChanges).toBe(1);
+});
+
 it("groups Cave roles in Cave-detail order with removals before additions", () => {
   const diff = emptyDiff();
   diff.removedTags = [
@@ -137,6 +164,26 @@ it("does not infer unreported file fields from snapshots", () => {
   expect(fields.map(field => field.label)).toEqual(["Name"]);
 });
 
+it("presents line-plot rename and content changes without exposing hashes as review text", () => {
+  const previous = snapshot();
+  previous.linePlots = [{ id: "line", name: "Old line", contentHash: "old-hash" }];
+  const current = snapshot();
+  current.linePlots = [{ id: "line", name: "Main line", contentHash: "new-hash" }];
+  const diff = emptyDiff();
+  diff.changedLinePlots = ["line"];
+  diff.linePlotChanges = [{ linePlotId: "line", scalars: [
+    { path: "Name", previous: "Old line", current: "Main line" },
+    { path: "ContentHash", previous: "old-hash", current: "new-hash" },
+  ] }];
+
+  const linePlot = buildCaveRevisionDiffPresentation(diff, previous, current).linePlots[0];
+
+  expect(linePlot.heading).toBe("Main line");
+  expect(linePlot.fields.map(field => field.label)).toEqual(["Name", "Content"]);
+  expect(linePlot.fields[1].previous).toBe("Previous content");
+  expect(linePlot.fields[1].current).toBe("Updated content");
+});
+
 it("parses only the defined metadata grammar and attaches metadata to its field", () => {
   expect(parseReferenceMetadataPath("Entrances/e/Tags/EntranceHydrology")).toEqual({
     kind: "entranceField", id: "e", key: "EntranceHydrology",
@@ -185,14 +232,18 @@ it("attaches Cave, entrance-tag, and File Type metadata without association chan
 
 it("selects complete snapshots for added and removed items and exposes missing IDs", () => {
   const previous = snapshot();
+  previous.linePlots = [{ id: "line", name: "Old line", contentHash: "old-hash" }];
   const current = snapshot();
   current.entrances[0] = { ...current.entrances[0], id: "added", name: "Added" };
   current.files[0] = { ...current.files[0], id: "added-file", name: "Added file" };
+  current.linePlots = [{ id: "added-line", name: "Added line", contentHash: "new-hash" }];
   const diff = emptyDiff();
   diff.addedEntrances = ["added"];
   diff.removedEntrances = ["entrance", "missing"];
   diff.addedFiles = ["added-file"];
   diff.removedFiles = ["file", "missing-file"];
+  diff.addedLinePlots = ["added-line"];
+  diff.removedLinePlots = ["line", "missing-line"];
 
   const model = buildCaveRevisionDiffPresentation(diff, previous, current);
 
@@ -202,6 +253,9 @@ it("selects complete snapshots for added and removed items and exposes missing I
   expect(model.files.find(item => item.status === "added")?.snapshot?.name).toBe("Added file");
   expect(model.files.find(item => item.id === "file")?.snapshot?.name).toBe("Map");
   expect(model.files.find(item => item.id === "missing-file")?.detailsAvailable).toBe(false);
+  expect(model.linePlots.find(item => item.status === "added")?.snapshot?.name).toBe("Added line");
+  expect(model.linePlots.find(item => item.id === "line")?.snapshot?.name).toBe("Old line");
+  expect(model.linePlots.find(item => item.id === "missing-line")?.detailsAvailable).toBe(false);
 });
 
 it("shows unknown authoritative scalar paths deterministically", () => {

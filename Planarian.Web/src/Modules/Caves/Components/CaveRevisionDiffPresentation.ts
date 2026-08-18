@@ -9,7 +9,7 @@ import {
   SnapshotTagReference,
 } from "../Models/CaveRevisionVm";
 
-export type DiffValueFormat = "text" | "distance" | "number" | "date" | "boolean" | "coordinates" | "reference";
+export type DiffValueFormat = "text" | "stringList" | "distance" | "number" | "date" | "boolean" | "coordinates" | "reference";
 
 export interface ReferenceMetadataPresentation {
   path: string;
@@ -74,7 +74,23 @@ export interface AffectedLinePlotPresentation {
   detailsAvailable: boolean;
 }
 
+export interface DiffEntitySummary {
+  added: number;
+  removed: number;
+  changed: number;
+  total: number;
+}
+
+export interface CaveRevisionDiffSummaryPresentation {
+  caveFields: number;
+  entrances: DiffEntitySummary;
+  files: DiffEntitySummary;
+  linePlots: DiffEntitySummary;
+  otherChanges: number;
+}
+
 export interface CaveRevisionDiffPresentation {
+  summary: CaveRevisionDiffSummaryPresentation;
   caveInformation: CaveInformationFieldPresentation[];
   entrances: AffectedEntrancePresentation[];
   narrative?: ChangedFieldPresentation;
@@ -86,7 +102,7 @@ export interface CaveRevisionDiffPresentation {
 
 const caveScalarDefinitions: Record<string, { label: string; format: DiffValueFormat }> = {
   Name: { label: "Name", format: "text" },
-  AlternateNames: { label: "Alternative Names", format: "text" },
+  AlternateNames: { label: "Alternative Names", format: "stringList" },
   "State.Id": { label: "State", format: "reference" },
   "County.Id": { label: "County", format: "reference" },
   CountyNumber: { label: "County Number", format: "number" },
@@ -156,6 +172,12 @@ const compareOrder = (order: string[]) => (a: { key: string }, b: { key: string 
   const ai = order.indexOf(a.key);
   const bi = order.indexOf(b.key);
   return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi) || a.key.localeCompare(b.key);
+};
+
+const summarizeEntities = (items: { status: "added" | "removed" | "changed" }[]): DiffEntitySummary => {
+  const summary = { added: 0, removed: 0, changed: 0, total: items.length };
+  items.forEach(item => summary[item.status]++);
+  return summary;
 };
 
 const safeLabel = (path: string) => {
@@ -413,13 +435,24 @@ export const buildCaveRevisionDiffPresentation = (
     };
   });
 
+  const caveInformation = [...caveFields.values()].sort(compareOrder(caveOrder));
+  const sortedFallbackScalars = fallbackScalars.sort((a, b) => a.key.localeCompare(b.key));
+  const sortedFallbackMetadata = fallbackMetadata.sort((a, b) => a.path.localeCompare(b.path) || a.property.localeCompare(b.property));
+
   return {
-    caveInformation: [...caveFields.values()].sort(compareOrder(caveOrder)),
+    summary: {
+      caveFields: caveInformation.length + (narrative ? 1 : 0),
+      entrances: summarizeEntities(entrances),
+      files: summarizeEntities(files),
+      linePlots: summarizeEntities(linePlots),
+      otherChanges: sortedFallbackScalars.length + sortedFallbackMetadata.length,
+    },
+    caveInformation,
     entrances,
     narrative,
     files,
     linePlots,
-    fallbackScalars: fallbackScalars.sort((a, b) => a.key.localeCompare(b.key)),
-    fallbackMetadata: fallbackMetadata.sort((a, b) => a.path.localeCompare(b.path) || a.property.localeCompare(b.property)),
+    fallbackScalars: sortedFallbackScalars,
+    fallbackMetadata: sortedFallbackMetadata,
   };
 };

@@ -184,7 +184,7 @@ const CaveService = {
       { notes, expectedProposalVersionId })).data;
   },
   async RejectChangeRequest(id: string, expectedProposalVersionId: string,
-    notes?: string): Promise<CaveChangeRequestDecisionVm> {
+    notes: string): Promise<CaveChangeRequestDecisionVm> {
     return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/reject`,
       { notes, expectedProposalVersionId })).data;
   },

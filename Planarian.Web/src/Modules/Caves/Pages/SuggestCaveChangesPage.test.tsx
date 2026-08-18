@@ -1,8 +1,26 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
+import { CaveRevisionDiffVm, CaveSnapshotVm } from "../Models/CaveRevisionVm";
+import { CaveVm } from "../Models/CaveVm";
 import { CaveService } from "../Service/CaveService";
 import { SuggestCaveChangesPage } from "./SuggestCaveChangesPage";
+
+type MockPlanarianButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
+  type?: string;
+  loading?: boolean;
+  icon?: ReactNode;
+  danger?: boolean;
+};
+
+type MockPlanarianModalProps = {
+  open?: boolean;
+  header?: ReactNode;
+  footer?: ReactNode;
+  children?: ReactNode;
+};
 
 jest.mock("../Components/AddCaveComponent", () => {
   const { Form, Input } = require("antd");
@@ -23,12 +41,12 @@ jest.mock("../Components/CaveRevisionDiff", () => ({
 }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianButtton", () => ({
-  PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger, ...props }: any) =>
-    <button {...props}>{children}</button>,
+  PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger, type: _type,
+    ...props }: MockPlanarianButtonProps) => <button {...props}>{children}</button>,
 }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
-  PlanarianModal: ({ open, header, footer, children }: any) =>
+  PlanarianModal: ({ open, header, footer, children }: MockPlanarianModalProps) =>
     open ? (
       <div role="dialog" aria-label={typeof header === "string" ? header : undefined}>
         {children}
@@ -55,9 +73,36 @@ beforeAll(() => {
   });
 });
 
+const authoringCave = (): CaveVm => ({
+  id: "cave000001", currentRevisionId: "revision01", displayId: "DAV-1", countyId: "davidson", stateId: "tn",
+  countyDisplayId: "019", countyNumber: 1, name: "Published cave", alternateNames: [], lengthFeet: null,
+  depthFeet: null, maxPitDepthFeet: null, numberOfPits: null, narrative: null, reportedOn: null, isArchived: false,
+  primaryEntrance: null, mapIds: [], entrances: [], geologyTagIds: [], files: [], reportedByNameTagIds: [],
+  biologyTagIds: [], archeologyTagIds: [], cartographerNameTagIds: [], mapStatusTagIds: [], geologicAgeTagIds: [],
+  physiographicProvinceTagIds: [], otherTagIds: [],
+});
+
+const previewSnapshot = (): CaveSnapshotVm => ({
+  caveId: "cave000001", accountId: "account", name: "Published cave", alternateNames: [],
+  state: { id: "tn", nameAtRevision: "Tennessee", abbreviationAtRevision: "TN" },
+  county: { id: "davidson", nameAtRevision: "Davidson", displayIdAtRevision: "019" },
+  countyNumber: 1, isArchived: false, tags: [], entrances: [], files: [], linePlots: [],
+});
+
+const emptyDiff = (): CaveRevisionDiffVm => ({
+  scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [], changedEntrances: [],
+  entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+  addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [],
+});
+
+const previewResult = (hasMeaningfulChanges: boolean): CaveChangePreviewVm => ({
+  base: previewSnapshot(), proposed: { ...previewSnapshot(), name: "Changed cave" },
+  diff: emptyDiff(), countyNumberIntent: "Manual", hasMeaningfulChanges,
+});
+
 const mockAuthoringContext = () =>
   jest.spyOn(CaveService, "GetProposalAuthoringContext").mockResolvedValue({
-    cave: { id: "cave000001", name: "Published cave" } as any,
+    cave: authoringCave(),
     expectedBaseRevisionId: "revision01",
     linePlots: [],
   });
@@ -86,13 +131,7 @@ afterEach(() => jest.restoreAllMocks());
 
 it("prevents submitting a change request when the authoritative preview is semantically unchanged", async () => {
   mockAuthoringContext();
-  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue({
-    base: {} as any,
-    proposed: {} as any,
-    diff: {} as any,
-    countyNumberIntent: "Manual",
-    hasMeaningfulChanges: false,
-  });
+  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue(previewResult(false));
   const submit = jest
     .spyOn(CaveService, "SubmitChanges")
     .mockResolvedValue("request0001");
@@ -107,7 +146,20 @@ it("prevents submitting a change request when the authoritative preview is seman
   const submitButton = screen.getByRole("button", { name: "Submit for review" });
   expect(submitButton).toBeDisabled();
   fireEvent.click(submitButton);
-  await waitFor(() => expect(submit).not.toHaveBeenCalled());
+  expect(submit).not.toHaveBeenCalled();
+});
+
+it("places the publication reminder with the review actions instead of in an alert", async () => {
+  mockAuthoringContext();
+  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue(previewResult(true));
+
+  renderWithDataRouter();
+  fireEvent.click(await screen.findByRole("button", { name: "Review changes" }));
+
+  const actions = await screen.findByRole("group", { name: "Review actions" });
+  expect(actions).toHaveTextContent(/reviewer approves/i);
+  expect(actions).toContainElement(screen.getByRole("button", { name: "Submit for review" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("blocks in-app navigation after the author changes a field and lets them keep editing", async () => {
@@ -165,13 +217,7 @@ it("does not block navigation when the author has not changed the loaded form", 
 
 it("clears the dirty guard before navigating after a successful submission", async () => {
   mockAuthoringContext();
-  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue({
-    base: {} as any,
-    proposed: {} as any,
-    diff: {} as any,
-    countyNumberIntent: "Manual",
-    hasMeaningfulChanges: true,
-  });
+  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue(previewResult(true));
   const submit = jest
     .spyOn(CaveService, "SubmitChanges")
     .mockResolvedValue("request0001");

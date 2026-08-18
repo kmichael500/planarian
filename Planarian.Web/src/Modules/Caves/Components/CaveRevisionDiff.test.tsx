@@ -1,12 +1,25 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { CaveRevisionDiff } from "./CaveRevisionDiff";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "../Models/CaveRevisionVm";
+
+let desktopLayout = false;
 
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
-    value: () => ({ matches: false, addListener: () => undefined, removeListener: () => undefined }),
+    value: () => ({
+      matches: desktopLayout,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
   });
+});
+
+beforeEach(() => {
+  desktopLayout = false;
 });
 
 const snapshot = (current: boolean): CaveSnapshotVm => ({
@@ -102,14 +115,92 @@ it("shows the actual nested and reference values needed for review", () => {
 
   for (const text of [
     "Tennessee (TN)", "Kentucky (KY)", "Franklin (026)", "Barren (009)",
-    "Geology", "+ Added Limestone", "− Removed Sandstone",
+    "Geology", "+ Limestone", "− Sandstone",
     "New entrance description", "Survey Grade", "Estimated",
     "New Reporter", "Old Reporter", "35", "34", "-86", "-85", "500", "450", "2026", "2025",
-    "42 ft", "12 ft", "+ Added Open", "− Removed Closed", "+ Added Wet", "− Removed Dry",
-    "+ Added Sinkhole", "− Removed Spring",
+    "42 ft", "12 ft", "+ Open", "− Closed", "+ Wet", "− Dry",
+    "+ Sinkhole", "− Spring",
     "Survey Map", "Survey", "Map", "Report",
     "Line Plots", "Main line", "Old line", "Updated content", "Previous content",
   ]) expect(document.body).toHaveTextContent(text);
+});
+
+it("renders a broad scope summary with separate entrance statuses", () => {
+  const broadDiff: CaveRevisionDiffVm = {
+    ...diff,
+    scalars: [{ path: "Name", previous: "Old name", current: "New name" }],
+    addedTags: [], removedTags: [],
+    changedEntrances: ["changed-1", "changed-2"], addedEntrances: ["added"], removedEntrances: ["removed"],
+    entranceChanges: [],
+    addedFiles: ["file"], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: ["line"], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  };
+
+  render(<CaveRevisionDiff diff={broadDiff} />);
+
+  expect(screen.getByText(
+    "1 cave field · 2 entrances changed · 1 entrance added · 1 entrance removed · 1 file · 1 line plot"
+  )).toBeInTheDocument();
+});
+
+it("uses one Before / After header for desktop Cave field comparison", () => {
+  desktopLayout = true;
+  const scalarDiff: CaveRevisionDiffVm = {
+    ...diff,
+    scalars: [
+      { path: "Name", previous: "Old name", current: "New name" },
+      { path: "NumberOfPits", previous: 2, current: 3 },
+    ],
+    addedTags: [], removedTags: [],
+    addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
+    addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  };
+
+  render(<CaveRevisionDiff diff={scalarDiff} previous={snapshot(false)} current={snapshot(true)} />);
+
+  expect(screen.getAllByRole("columnheader", { name: "Before" })).toHaveLength(1);
+  expect(screen.getAllByRole("columnheader", { name: "After" })).toHaveLength(1);
+  expect(screen.getByRole("row", { name: "Name Old name New name" })).toBeInTheDocument();
+  expect(screen.getByRole("row", { name: "Number of Pits 2 3" })).toBeInTheDocument();
+});
+
+it("shows Alternative Names as collection additions and removals", () => {
+  const previous = { ...snapshot(false), alternateNames: ["Keep", "Old alias"] };
+  const current = { ...snapshot(true), alternateNames: ["Keep", "New alias"] };
+  const aliasDiff: CaveRevisionDiffVm = {
+    ...diff,
+    scalars: [{ path: "AlternateNames", previous: previous.alternateNames, current: current.alternateNames }],
+    addedTags: [], removedTags: [],
+    addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
+    addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  };
+
+  render(<CaveRevisionDiff diff={aliasDiff} previous={previous} current={current} />);
+
+  expect(screen.getByLabelText("Removed Old alias")).toHaveTextContent("− Old alias");
+  expect(screen.getByLabelText("Added New alias")).toHaveTextContent("+ New alias");
+  expect(screen.queryByText("Keep")).not.toBeInTheDocument();
+});
+
+it("uses a unified signed scalar diff on mobile without repeated Before / After labels", () => {
+  const scalarDiff: CaveRevisionDiffVm = {
+    ...diff,
+    scalars: [{ path: "Name", previous: "Old name", current: "New name" }],
+    addedTags: [], removedTags: [],
+    addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
+    addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  };
+
+  render(<CaveRevisionDiff diff={scalarDiff} previous={snapshot(false)} current={snapshot(true)} />);
+
+  const change = screen.getByRole("group", { name: "Name change" });
+  expect(change).toHaveTextContent("− Old name");
+  expect(change).toHaveTextContent("+ New name");
+  expect(change).not.toHaveTextContent("Before");
+  expect(change).not.toHaveTextContent("After");
 });
 
 it.each([
@@ -124,7 +215,7 @@ it.each([
   expect(document.body).not.toHaveTextContent("County Number0");
 });
 
-it("renders motivating Cave tags as distinct grouped field rows", () => {
+it("renders concise signed tag changes while preserving accessible operation names", () => {
   const groupedDiff: CaveRevisionDiffVm = {
     ...diff,
     scalars: [], addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
@@ -145,8 +236,10 @@ it("renders motivating Cave tags as distinct grouped field rows", () => {
 
   for (const label of ["Geologic Age", "Physiographic Province", "Biology", "Cartographers"])
     expect(document.body).toHaveTextContent(label);
-  expect(document.body).not.toHaveTextContent("Added Biology: Cricket");
-  expect(document.body).not.toHaveTextContent("Added Cartographer: David Parr");
+  expect(screen.getByLabelText("Removed Mississippian")).toHaveTextContent("− Mississippian");
+  expect(screen.getByLabelText("Added Cricket")).toHaveTextContent("+ Cricket");
+  expect(document.body).not.toHaveTextContent("Removed Mississippian");
+  expect(document.body).not.toHaveTextContent("Added Cricket");
 });
 
 it("renders complete added and removed entrance and file state", () => {
@@ -162,8 +255,8 @@ it("renders complete added and removed entrance and file state", () => {
     addedFiles: ["added-file"], removedFiles: ["removed-file"], changedFiles: [], fileChanges: [],
   }} previous={previous} current={current} />);
 
-  expect(document.body).toHaveTextContent("CARR ENTRANCEAdded");
-  expect(document.body).toHaveTextContent("OLD NORTH ENTRANCERemoved");
+  expect(document.body).toHaveTextContent("Carr EntranceAdded");
+  expect(document.body).toHaveTextContent("Old North EntranceRemoved");
   expect(document.body).toHaveTextContent("New entrance description");
   expect(document.body).toHaveTextContent("Old entrance description");
   expect(document.body).toHaveTextContent("Survey MapAdded");
@@ -172,6 +265,30 @@ it("renders complete added and removed entrance and file state", () => {
   expect(document.body).toHaveTextContent(".txt");
   expect(document.body).toHaveTextContent("Map");
   expect(document.body).toHaveTextContent("Report");
+});
+
+it("keeps added entity snapshots readable without inventing Before / After values", () => {
+  const current = snapshot(true);
+  current.entrances[0] = { ...current.entrances[0], id: "added-entrance", name: "Carr Entrance" };
+  current.files[0] = { ...current.files[0], id: "added-file" };
+  current.linePlots[0] = { ...current.linePlots[0], id: "added-line" };
+  const entityDiff: CaveRevisionDiffVm = {
+    ...diff,
+    scalars: [], addedTags: [], removedTags: [],
+    addedEntrances: ["added-entrance"], removedEntrances: [], changedEntrances: [], entranceChanges: [],
+    addedFiles: ["added-file"], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: ["added-line"], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  };
+
+  render(<CaveRevisionDiff diff={entityDiff} current={current} />);
+
+  expect(document.body).toHaveTextContent("Carr EntranceAdded");
+  expect(document.body).toHaveTextContent("Survey MapAdded");
+  expect(document.body).toHaveTextContent("Main lineAdded");
+  expect(screen.getByText("GeoJSON content")).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent("newhash");
+  expect(screen.queryByText("Before")).not.toBeInTheDocument();
+  expect(screen.queryByText("After")).not.toBeInTheDocument();
 });
 
 it("renders reference label updates neutrally and missing snapshots visibly", () => {
@@ -195,9 +312,8 @@ it("renders Narrative and changed Description with prose diff controls", () => {
   render(<CaveRevisionDiff diff={{ ...diff,
     scalars: [{ path: "Narrative", previous: "Old cave narrative", current: "New cave narrative" }],
   }} previous={snapshot(false)} current={snapshot(true)} />);
-  expect(document.body).toHaveTextContent("Narrative");
-  expect(Array.from(document.querySelectorAll('input[type="radio"]')).filter(input =>
-    input.parentElement?.textContent === "Changes")).toHaveLength(2);
+  expect(screen.getByText("Narrative")).toBeInTheDocument();
+  expect(screen.getAllByRole("radio", { name: "Changes" })).toHaveLength(2);
 });
 
 it("retains initial-publication and no-visible-change states", () => {

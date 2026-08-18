@@ -371,9 +371,11 @@ public sealed class CaveChangeRequestRepository
         if (request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 request.CurrentProposalVersionId);
+        if (string.IsNullOrWhiteSpace(notes))
+            throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
         request.Status = CaveChangeRequestStatus.Rejected;
         request.ReviewerUserId = _user.Id;
-        request.ReviewerNotes = notes?.Trim();
+        request.ReviewerNotes = notes.Trim();
         request.ReviewedOn = DateTime.UtcNow;
         var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);

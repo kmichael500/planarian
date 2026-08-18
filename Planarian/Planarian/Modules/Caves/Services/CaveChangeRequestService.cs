@@ -298,10 +298,14 @@ public sealed class CaveChangeRequestService
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
+        if (row.Request.Status != CaveChangeRequestStatus.Pending)
+            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
-        var rejectedObjects = await _requests.RejectAsync(requestId, expectedProposalVersionId, notes,
+        if (string.IsNullOrWhiteSpace(notes))
+            throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
+        var rejectedObjects = await _requests.RejectAsync(requestId, expectedProposalVersionId, notes.Trim(),
             cancellationToken);
         foreach (var objectAddress in rejectedObjects)
             await _files.DeleteObjectBestEffortAsync(

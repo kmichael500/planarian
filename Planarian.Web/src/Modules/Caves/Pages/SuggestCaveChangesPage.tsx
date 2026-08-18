@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Alert, Card, Form, message, Space, Typography } from "antd";
+import { Alert, Card, Form, Grid, message, Space, theme, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
@@ -18,6 +18,8 @@ export const SuggestCaveChangesPage = () => {
   const { caveId } = useParams();
   const navigate = useNavigate();
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
+  const screens = Grid.useBreakpoint();
+  const { token } = theme.useToken();
   const [form] = Form.useForm<AddCaveVm>();
   const [cave, setCave] = useState<CaveVm>();
   const [expectedBaseRevisionId, setExpectedBaseRevisionId] = useState<string>();
@@ -80,18 +82,31 @@ export const SuggestCaveChangesPage = () => {
         onDiscardChanges={unsaved.discardChanges}
       />
       {previewResult && draft && (
-        <Card title="Review your changes">
-          <Alert message="These changes are not published until a reviewer approves them." type="info" showIcon style={{ marginBottom: 16 }} />
+        <section aria-labelledby="review-changes-title" style={{
+          background: token.colorBgContainer,
+          borderRadius: token.borderRadiusLG,
+          padding: screens.md ? token.paddingLG : token.padding,
+        }}>
+          <Typography.Title id="review-changes-title" level={4} style={{ marginTop: 0, marginBottom: token.marginSM }}>
+            Review your changes
+          </Typography.Title>
           {!previewResult.hasMeaningfulChanges &&
-            <Alert message="Make at least one meaningful change before submitting this proposal." type="warning" showIcon style={{ marginBottom: 16 }} />}
+            <Alert message="Make at least one meaningful change before submitting this proposal." type="warning" showIcon
+              style={{ marginBottom: token.marginMD }} />}
           <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed}
             countyNumberIntent={previewResult.countyNumberIntent} />
-          <Space style={{ marginTop: 16 }}>
-            <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}
-              disabled={!previewResult.hasMeaningfulChanges}>Submit for review</PlanarianButton>
-            <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
-          </Space>
-        </Card>
+          <div role="group" aria-label="Review actions" style={{ borderTop: `1px solid ${token.colorSplit}`,
+            marginTop: token.marginLG, paddingTop: token.paddingMD }}>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>
+              Changes are published only after a reviewer approves them.
+            </Typography.Paragraph>
+            <Space wrap>
+              <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}
+                disabled={!previewResult.hasMeaningfulChanges}>Submit for review</PlanarianButton>
+              <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
+            </Space>
+          </div>
+        </section>
       )}
       <Card loading={loading} style={{ display: previewResult ? "none" : undefined }}>
         {cave && <Form form={form} layout="vertical" onFinish={preview} onValuesChange={unsaved.markDirty}>
