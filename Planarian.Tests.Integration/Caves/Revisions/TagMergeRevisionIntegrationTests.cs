@@ -247,7 +247,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             seed.Files.Add(new File
             {
                 Id = "cavefile0a", AccountId = cave.AccountId, CaveId = cave.CaveId,
-                FileName = "map.pdf", DisplayName = "map", FileTypeTagId = source.Id
+                Name = "map", Extension = ".pdf", FileTypeTagId = source.Id
             });
             await seed.SaveChangesAsync();
         }

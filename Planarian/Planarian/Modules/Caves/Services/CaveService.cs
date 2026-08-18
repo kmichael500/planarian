@@ -10,6 +10,7 @@ using NetTopologySuite.IO;
 using Planarian.Library.Exceptions;
 using Planarian.Library.Extensions.DateTime;
 using Planarian.Library.Extensions.String;
+using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
@@ -884,12 +885,18 @@ public class CaveService : ServiceBase<CaveRepository>
                 var fileEntity = entity.Files.FirstOrDefault(candidate => candidate.Id == file.Id);
                 if (fileEntity == null) throw ApiExceptionDictionary.NotFound("File");
 
-                if (!string.IsNullOrWhiteSpace(file.DisplayName) &&
-                    !string.Equals(file.DisplayName, fileEntity.DisplayName, StringComparison.Ordinal))
+                if (!string.IsNullOrWhiteSpace(file.Name) &&
+                    !string.Equals(file.Name, fileEntity.Name, StringComparison.Ordinal))
                 {
-                    fileEntity.FileName = CaveFileNamePolicy.GetEffectiveFileName(fileEntity.FileName,
-                        fileEntity.DisplayName, file.DisplayName);
-                    fileEntity.DisplayName = file.DisplayName;
+                    try
+                    {
+                        FileNamePolicy.ComposeEditableName(fileEntity.Name, file.Name, fileEntity.Extension);
+                    }
+                    catch (ArgumentException exception)
+                    {
+                        throw ApiExceptionDictionary.BadRequest(exception.Message);
+                    }
+                    fileEntity.Name = file.Name;
                 }
 
                 if (!string.IsNullOrWhiteSpace(file.FileTypeTagId) &&

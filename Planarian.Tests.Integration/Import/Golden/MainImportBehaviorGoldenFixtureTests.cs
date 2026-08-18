@@ -390,7 +390,8 @@ public sealed class MainImportBehaviorGoldenFixtureTests(PostgresTestServer fixt
                 {
                     var file = await db.Files.SingleAsync(value => value.Id == testFile.FileId);
                     file.CaveId = tenant.CaveId;
-                    file.DisplayName = "Preserved display";
+                    // The main-anchored Golden scenario observes the complete filename as seed-a.pdf.
+                    // Legacy DisplayName was not part of that observable contract, so do not change Name here.
                     file.ExpiresOn = new DateTime(2027, 1, 2, 0, 0, 0, DateTimeKind.Utc);
                     await db.SaveChangesAsync();
                 }

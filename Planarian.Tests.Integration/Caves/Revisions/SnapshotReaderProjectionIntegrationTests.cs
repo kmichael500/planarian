@@ -42,7 +42,7 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
             db.EntranceStatusTags.Add(new EntranceStatusTag { Id = IdGenerator.Generate(), EntranceId = entrance.Id, TagTypeId = status.Id });
             var file = await db.Files.SingleAsync(f => f.Id == testFile.FileId);
             file.CaveId = cave.Id;
-            file.DisplayName = "Survey map";
+            file.Name = "Survey map";
             await db.SaveChangesAsync();
         }
 
@@ -88,7 +88,7 @@ public sealed class SnapshotReaderProjectionIntegrationTests(PostgresTestServer 
             Files = cave.Files.OrderBy(f => f.Id).Select(f => new CaveFileSnapshotV1
             {
                 Id = f.Id, FileTypeTagId = f.FileTypeTagId, FileTypeNameAtRevision = f.FileTypeTag.Name,
-                FileName = f.FileName, DisplayName = f.DisplayName
+                Name = f.Name, Extension = f.Extension
             }).ToList()
         };
     }

@@ -156,7 +156,7 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
             Assert.Equal(CaveChangeRequestDecisionResult.Rejected, decision.Result);
             var detail = await reviewer.ChangeRequests.GetAsync(requestId, default);
             Assert.Contains(detail.Proposed.Files, file => file.Id == stagedFileId &&
-                file.DisplayName == "survey");
+                file.Name == "survey");
             Assert.Contains(stagedFileId, detail.UnavailableStagedFileIds);
             Assert.DoesNotContain(detail.ActiveStagedFiles, file => file.Id == stagedFileId);
         }
@@ -191,7 +191,8 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
                 Id = unrelatedFileId,
                 AccountId = tenant.AccountId,
                 FileTypeTagId = stagedFile.FileTypeId,
-                FileName = "expired.pdf",
+                Name = "expired",
+                Extension = ".pdf",
                 BlobKey = "expired",
                 BlobContainer = "test"
             });
@@ -275,10 +276,10 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
             requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
                 PublishableProposal(tenant, locationTag.Id, "Historical file"), default);
             var file = await contributor.Files.SingleAsync(row => row.Id == stagedFile.FileId);
-            file.DisplayName = "Lost survey attachment";
+            file.Name = "Lost survey attachment";
             file.ExpiresOn = DateTime.UtcNow.AddDays(-1);
             await contributor.SaveChangesAsync();
-            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.DisplayName, false, default);
+            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.Name, false, default);
             versionWithFileId = await CurrentVersionAsync(contributor, requestId);
 
             await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
@@ -299,8 +300,8 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
         var historical = await IntegrationTestServices.For(audit).CaveChangeRequests.GetVersionAsync(requestId, versionWithFileId, default);
         var unavailable = Assert.Single(historical.Proposed.Files,
             file => file.Id == stagedFile.FileId);
-        Assert.Equal("Lost survey attachment", unavailable.DisplayName);
-        Assert.Equal("seed-a.pdf", unavailable.FileName);
+        Assert.Equal("Lost survey attachment", unavailable.Name);
+        Assert.Equal(".pdf", unavailable.Extension);
         Assert.Contains(stagedFile.FileId, historical.UnavailableStagedFileIds);
     }
 }

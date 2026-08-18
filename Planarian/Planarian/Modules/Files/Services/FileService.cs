@@ -70,7 +70,8 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
         CancellationToken cancellationToken, string? uuid = null)
     {
-        fileName = FileValidation.NormalizeUploadedFileName(fileName);
+        var parsedFileName = FileNamePolicy.Parse(fileName);
+        fileName = parsedFileName.CompleteName;
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
@@ -98,14 +99,12 @@ public class FileService : ServiceBase<FileRepository>
             caveId, cancellationToken: cancellationToken);
 
 
-        //fileName without extension
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
         var entity = new File()
         {
             Id = IdGenerator.Generate(),
             CaveId = caveId,
-            FileName = fileName,
-            DisplayName = fileNameWithoutExtension,
+            Name = parsedFileName.Name,
+            Extension = parsedFileName.Extension,
             AccountId = RequestUser.AccountId,
             FileTypeTagId = tagTypeId
         };
@@ -118,7 +117,7 @@ public class FileService : ServiceBase<FileRepository>
         try
         {
             if (stream.CanSeek) stream.Position = 0;
-            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(Path.GetExtension(fileName)),
+            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
 
             entity.BlobKey = address.Key;
@@ -141,8 +140,8 @@ public class FileService : ServiceBase<FileRepository>
         var fileInformation = new FileVm
         {
             Id = entity.Id,
-            FileName = entity.FileName,
-            DisplayName = entity.DisplayName,
+            Name = entity.Name,
+            Extension = entity.Extension,
             FileTypeTagId = entity.FileTypeTagId,
             Uuid = uuid
         };
@@ -152,6 +151,8 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<FileVm> PublishStagedCaveFile(string sourceBlobKey, string caveId, string fileName,
         CancellationToken cancellationToken, string? uuid = null)
     {
+        var parsedFileName = FileNamePolicy.Parse(fileName);
+        fileName = parsedFileName.CompleteName;
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
@@ -176,13 +177,12 @@ public class FileService : ServiceBase<FileRepository>
         var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
             caveId, cancellationToken: cancellationToken);
 
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
         var entity = new File
         {
             Id = IdGenerator.Generate(),
             CaveId = caveId,
-            FileName = fileName,
-            DisplayName = fileNameWithoutExtension,
+            Name = parsedFileName.Name,
+            Extension = parsedFileName.Extension,
             AccountId = RequestUser.AccountId,
             FileTypeTagId = tagTypeId
         };
@@ -199,7 +199,7 @@ public class FileService : ServiceBase<FileRepository>
             var sourceContainer = await GetBlobContainerClient(RequestUser.AccountContainerName,
                 createIfNotExists: false);
             await using var source = await OpenBlobReadStream(sourceContainer, sourceBlobKey, cancellationToken);
-            await _objectStorage.PutAsync(address, source, MimeTypes.GetMimeType(Path.GetExtension(fileName)),
+            await _objectStorage.PutAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
 
             entity.BlobKey = address.Key;
@@ -222,8 +222,8 @@ public class FileService : ServiceBase<FileRepository>
         var fileInformation = new FileVm
         {
             Id = entity.Id,
-            FileName = entity.FileName,
-            DisplayName = entity.DisplayName,
+            Name = entity.Name,
+            Extension = entity.Extension,
             FileTypeTagId = entity.FileTypeTagId,
             Uuid = uuid
         };
@@ -234,6 +234,8 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken,
         string? uuid = null)
     {
+        var parsedFileName = FileNamePolicy.Parse(fileName);
+        fileName = parsedFileName.CompleteName;
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
@@ -248,16 +250,15 @@ public class FileService : ServiceBase<FileRepository>
             throw ApiExceptionDictionary.NotFound("File type");
 
 
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
         var entity = new File()
         {
-            FileName = fileName,
-            DisplayName = fileNameWithoutExtension,
+            Name = parsedFileName.Name,
+            Extension = parsedFileName.Extension,
             AccountId = RequestUser.AccountId,
             FileTypeTagId = tagTypeId,
             ExpiresOn = DateTime.UtcNow.AddDays(10)
         };
-        var fileExtension = Path.GetExtension(fileName);
+        var fileExtension = parsedFileName.Extension;
         var blobKey = $"temp/import/caves/{entity.Id}{fileExtension}";
 
         try
@@ -283,8 +284,8 @@ public class FileService : ServiceBase<FileRepository>
         var fileInformation = new FileVm
         {
             Id = entity.Id,
-            FileName = entity.FileName,
-            DisplayName = entity.DisplayName,
+            Name = entity.Name,
+            Extension = entity.Extension,
             FileTypeTagId = entity.FileTypeTagId,
             Uuid = uuid
         };
@@ -296,6 +297,8 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken, string? uuid = null)
     {
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+        var parsedFileName = FileNamePolicy.Parse(fileName);
+        fileName = parsedFileName.CompleteName;
 
         var expiredObjects = await RemoveExpiredFiles(cancellationToken);
         foreach (var expiredObject in expiredObjects)
@@ -313,8 +316,8 @@ public class FileService : ServiceBase<FileRepository>
         var entity = new File
         {
             Id = IdGenerator.Generate(),
-            FileName = fileName,
-            DisplayName = Path.GetFileNameWithoutExtension(fileName),
+            Name = parsedFileName.Name,
+            Extension = parsedFileName.Extension,
             AccountId = RequestUser.AccountId,
             FileTypeTagId = tagTypeId,
             ExpiresOn = DateTime.UtcNow.AddDays(10)
@@ -324,7 +327,7 @@ public class FileService : ServiceBase<FileRepository>
         try
         {
             if (stream.CanSeek) stream.Position = 0;
-            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(Path.GetExtension(fileName)),
+            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
@@ -354,8 +357,8 @@ public class FileService : ServiceBase<FileRepository>
         return new FileVm
         {
             Id = entity.Id,
-            FileName = entity.FileName,
-            DisplayName = entity.DisplayName,
+            Name = entity.Name,
+            Extension = entity.Extension,
             FileTypeTagId = entity.FileTypeTagId,
             FileTypeKey = fileTypeKey,
             Uuid = uuid
@@ -422,7 +425,8 @@ public class FileService : ServiceBase<FileRepository>
         if (stored is null) throw ApiExceptionDictionary.NotFound("Staged file");
         try
         {
-            return (await stored.OpenReadStreamAsync(cancellationToken), file.FileName);
+            return (await stored.OpenReadStreamAsync(cancellationToken),
+                FileNamePolicy.Compose(file.Name, file.Extension));
         }
         catch (FileNotFoundException)
         {
@@ -442,7 +446,8 @@ public class FileService : ServiceBase<FileRepository>
         if (stored is null) throw ApiExceptionDictionary.NotFound("Staged file");
         try
         {
-            return (await stored.OpenReadStreamAsync(cancellationToken), file.FileName);
+            return (await stored.OpenReadStreamAsync(cancellationToken),
+                FileNamePolicy.Compose(file.Name, file.Extension));
         }
         catch (FileNotFoundException)
         {
@@ -563,8 +568,8 @@ public class FileService : ServiceBase<FileRepository>
         var stored = await _objectStorage.OpenReadAsync(
             new StorageObjectAddress(file.ContainerName, file.BlobKey), cancellationToken);
         if (stored is null) throw ApiExceptionDictionary.NotFound("File");
-        var fallbackContentType = MimeTypes.GetMimeType(Path.GetExtension(file.FileName));
-        var (contentType, forceDownload) = FileResponsePolicy.Resolve(file.FileName,
+        var fallbackContentType = MimeTypes.GetMimeType(file.Extension);
+        var (contentType, forceDownload) = FileResponsePolicy.ResolveExtension(file.Extension,
             string.IsNullOrWhiteSpace(stored.ContentType) ? fallbackContentType : stored.ContentType, isDownload);
         return new AuthenticatedFileResponse
         {
@@ -580,7 +585,7 @@ public class FileService : ServiceBase<FileRepository>
                 }
             },
             ContentType = contentType,
-            FileName = file.FileName,
+            FileName = FileNamePolicy.Compose(file.Name, file.Extension),
             Download = forceDownload,
             EntityTag = string.IsNullOrWhiteSpace(stored.EntityTag) ? null : EntityTagHeaderValue.Parse(stored.EntityTag),
             LastModified = stored.LastModified
@@ -698,8 +703,8 @@ public class FileTypeTagName
 
 public class FileVm
 {
-    [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string Name { get; set; } = null!;
+    [MaxLength(PropertyLength.FileName)] public string Extension { get; set; } = string.Empty;
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;

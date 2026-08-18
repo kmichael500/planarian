@@ -40,7 +40,8 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         string Id,
         string FileTypeTagId,
         string? CaveId,
-        string FileName,
+        string Name,
+        string Extension,
         bool IsChangeRequestStaged,
         string? CountyId,
         string? StateId);
@@ -54,7 +55,8 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 file.Id,
                 file.FileTypeTagId,
                 file.CaveId,
-                file.FileName,
+                file.Name,
+                file.Extension,
                 DbContext.CaveChangeRequestStagedFiles.Any(staged =>
                     staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id),
                 file.Cave != null ? file.Cave.CountyId : null,
@@ -78,7 +80,7 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId &&
                            file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null)
             .Select(file => new FileAccessInfoResult(
-                file.Id, file.FileName, file.BlobKey, file.BlobContainer, file.CaveId, null, null))
+                file.Id, file.Name, file.Extension, file.BlobKey, file.BlobContainer, file.CaveId, null, null))
             .SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -114,7 +116,8 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     public sealed record FileAccessInfoResult(
         string Id,
-        string FileName,
+        string Name,
+        string Extension,
         string? BlobKey,
         string? ContainerName,
         string? CaveId,
@@ -128,7 +131,8 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Where(e => e.Id == id && (!checkRequestUserAccountId || e.AccountId == RequestUser.AccountId))
             .Select(e => new FileAccessInfoResult(
                 e.Id,
-                e.FileName,
+                e.Name,
+                e.Extension,
                 e.BlobKey,
                 e.BlobContainer,
                 e.CaveId,
@@ -164,8 +168,8 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return query.Select(e => new FileVm
         {
             Id = e.Id,
-            DisplayName = e.DisplayName,
-            FileName = e.FileName,
+            Name = e.Name,
+            Extension = e.Extension,
             FileTypeKey = e.FileTypeTag.Key,
             FileTypeTagId = e.FileTypeTagId
         });
@@ -186,10 +190,11 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .ToListAsync();
     }
 
-    public async Task<bool> IsDuplicateFile(string caveId, string fileName)
+    public async Task<bool> IsDuplicateFile(string caveId, string name, string extension)
     {
         return await DbContext.Files.AnyAsync(e =>
-            e.CaveId == caveId && e.FileName == fileName && e.AccountId == RequestUser.AccountId);
+            e.CaveId == caveId && e.Name == name && e.Extension == extension &&
+            e.AccountId == RequestUser.AccountId);
     }
 }
 

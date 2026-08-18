@@ -146,7 +146,8 @@ staging/published state, for example:
 objects/files/{fileId}
 ```
 
-Do not require the original extension in the storage key. Original filename and content type are metadata, not object
+Do not require the uploaded extension in the storage key. Editable `Name`, immutable `Extension`, and content type are
+metadata, not object
 identity.
 Lifecycle is represented relationally:
 

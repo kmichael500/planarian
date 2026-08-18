@@ -17,13 +17,11 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     [Fact]
-    public async Task PublishedFileTypeAndDisplayNamePreviewMatchApprovedRevision()
+    public async Task PublishedFileMetadataSurvivesPreviewReviewAndApproval()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(PublishedFileTypeAndDisplayNamePreviewMatchApprovedRevision));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+            nameof(PublishedFileMetadataSurvivesPreviewReviewAndApproval));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
             fileId: "publish00a");
         var mapType = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
@@ -32,8 +30,8 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         {
             (await seed.TagTypes.SingleAsync(tag => tag.Id == file.FileTypeId)).Name = "Report";
             var entity = await seed.Files.SingleAsync(row => row.Id == file.FileId);
-            entity.FileName = "survey.pdf";
-            entity.DisplayName = "Survey";
+            entity.Extension = ".pdf";
+            entity.Name = "Survey";
             await seed.SaveChangesAsync();
             var mutations = new CaveMutationRepository(seed, seed.RequestUser,
                 new CavePublishedSnapshotRepository(seed, seed.RequestUser));
@@ -49,10 +47,9 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         {
             var cave = await new CaveRepository(contributor.Db, contributor.Db.RequestUser).GetCave(tenant.CaveId);
             var values = ValuesFromCave(cave!);
-            values.Entrances = PublishableValues(tenant, locationTag.Id, cave!.Name).Entrances;
             values.Files = [new EditFileMetadataVm
             {
-                Id = file.FileId, FileTypeTagId = mapType.Id, DisplayName = "Survey Map"
+                Id = file.FileId, FileTypeTagId = mapType.Id, Name = "Survey Map"
             }];
             var service = contributor.ChangeRequests;
             var preview = await service.PreviewAsync(tenant.CaveId, values, tenant.RevisionId, default);
@@ -60,9 +57,8 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
             var proposed = Assert.Single(preview.Proposed.Files);
             Assert.Equal(file.FileTypeId, before.FileTypeTagId);
             Assert.Equal("Report", before.FileTypeNameAtRevision);
-            Assert.Equal(mapType.Id, proposed.FileTypeTagId);
-            Assert.Equal("Map", proposed.FileTypeNameAtRevision);
-            Assert.Equal("Survey Map.pdf", proposed.FileName);
+            Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+                (proposed.FileTypeTagId, proposed.FileTypeNameAtRevision, proposed.Name, proposed.Extension));
             Assert.Contains(file.FileId, preview.Diff.ChangedFiles);
             requestId = await service.CreateAsync(tenant.CaveId, values, tenant.RevisionId, default);
         }
@@ -72,8 +68,8 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         {
             var detail = await reviewer.ChangeRequests.GetAsync(requestId, default);
             var reviewed = Assert.Single(detail.Proposed.Files);
-            Assert.Equal((mapType.Id, "Map", "Survey Map.pdf"),
-                (reviewed.FileTypeTagId, reviewed.FileTypeNameAtRevision, reviewed.FileName));
+            Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+                (reviewed.FileTypeTagId, reviewed.FileTypeNameAtRevision, reviewed.Name, reviewed.Extension));
             approvedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(requestId,
                 detail.Request.CurrentProposalVersionId, null, default)).PublishedRevisionId!;
         }
@@ -82,18 +78,16 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
             revision.Id == approvedRevisionId)).SnapshotJson, 1);
         var acceptedFile = Assert.Single(accepted.Files);
-        Assert.Equal((mapType.Id, "Map", "Survey Map.pdf"),
-            (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision, acceptedFile.FileName));
+        Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+            (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision, acceptedFile.Name, acceptedFile.Extension));
     }
 
     [Fact]
-    public async Task StagedFileSelectedTypeAndFilenameAreImmutableAndMatchApproval()
+    public async Task StagedFileSelectedMetadataIsPersistedAndMatchesApproval()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(StagedFileSelectedTypeAndFilenameAreImmutableAndMatchApproval));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+            nameof(StagedFileSelectedMetadataIsPersistedAndMatchesApproval));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stgtype00a");
         var blobs = new TestFileBlobStore();
         blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("typed staged bytes"));
@@ -102,7 +96,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         await using (var seed = database.CreateDbContext("staged-file-type-seed", tenant.AccountId))
         {
             (await seed.TagTypes.SingleAsync(tag => tag.Id == file.FileTypeId)).Name = "Report";
-            (await seed.Files.SingleAsync(row => row.Id == file.FileId)).FileName = "survey.pdf";
+            (await seed.Files.SingleAsync(row => row.Id == file.FileId)).Extension = ".pdf";
             await seed.SaveChangesAsync();
         }
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
@@ -114,17 +108,19 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         {
             var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
             requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
-                PublishableProposal(tenant, locationTag.Id, "Staged map"), default);
+                Proposal(tenant, "Temporary request state"), default);
             await requests.StageFileAsync(requestId, file.FileId, file.FileTypeId, "Survey", false, default);
             var stagedVersionId = await CurrentVersionAsync(contributor, requestId);
-            var values = PublishableValues(tenant, locationTag.Id, "Staged map");
+
+            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
             values.Files = [new EditFileMetadataVm
             {
-                Id = file.FileId, FileTypeTagId = mapType.Id, DisplayName = "Survey Map"
+                Id = file.FileId, FileTypeTagId = mapType.Id, Name = "Survey Map"
             }];
-            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
-            versionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(requestId, values,
-                againstCurrent: false, expectedBaseRevisionId: tenant.RevisionId,
+            versionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(requestId,
+                values, againstCurrent: false, expectedBaseRevisionId: tenant.RevisionId,
                 expectedProposalVersionId: stagedVersionId, default);
         }
 
@@ -134,28 +130,31 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
             var stored = await inspect.CaveProposalVersions.SingleAsync(version => version.Id == versionId);
             var intent = Assert.Single(CaveProposalJson.Deserialize(stored.ProposalJson, stored.SchemaVersion).Files,
                 candidate => candidate.FileId == file.FileId);
-            Assert.Equal((mapType.Id, "Map", "Survey Map.pdf"),
-                (intent.FileTypeTagId, intent.FileTypeName, intent.FileName));
-            var historical = await IntegrationTestServices.For(inspect).CaveChangeRequests.GetVersionAsync(requestId, versionId, default);
+            Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+                (intent.FileTypeTagId, intent.FileTypeName, intent.Name, intent.Extension));
+            var historical = await IntegrationTestServices.For(inspect).CaveChangeRequests.GetVersionAsync(
+                requestId, versionId, default);
             var presented = Assert.Single(historical.Proposed.Files);
-            Assert.Equal((mapType.Id, "Map", "Survey Map.pdf"),
-                (presented.FileTypeTagId, presented.FileTypeNameAtRevision, presented.FileName));
+            Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+                (presented.FileTypeTagId, presented.FileTypeNameAtRevision, presented.Name, presented.Extension));
+            Assert.Empty(historical.DiffFromBase.Scalars);
+            Assert.Equal([file.FileId], historical.DiffFromBase.AddedFiles);
         }
 
         string approvedRevisionId;
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {
             await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
-            approvedRevisionId = (await IntegrationTestServices.For(reviewer, blobs).CaveChangeRequests.ApproveAsync(requestId, versionId,
-                null, default)).PublishedRevisionId!;
+            approvedRevisionId = (await IntegrationTestServices.For(reviewer, blobs).CaveChangeRequests.ApproveAsync(
+                requestId, versionId, null, default)).PublishedRevisionId!;
         }
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
             revision.Id == approvedRevisionId)).SnapshotJson, 1);
         var acceptedFile = Assert.Single(accepted.Files);
-        Assert.Equal((mapType.Id, "Map", "Survey Map.pdf"),
-            (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision, acceptedFile.FileName));
+        Assert.Equal((mapType.Id, "Map", "Survey Map", ".pdf"),
+            (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision, acceptedFile.Name, acceptedFile.Extension));
     }
 
     [Fact]
@@ -163,7 +162,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(HistoricalStagedFilePresentationDoesNotDriftWhileLiveFileExists));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "drift0000a");
         var mapType = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.File, "Map", "filemap00a");
@@ -174,105 +173,82 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
         {
             (await contributor.TagTypes.SingleAsync(tag => tag.Id == file.FileTypeId)).Name = "Report";
-            (await contributor.Files.SingleAsync(row => row.Id == file.FileId)).FileName = "survey.pdf";
+            (await contributor.Files.SingleAsync(row => row.Id == file.FileId)).Extension = ".pdf";
             await contributor.SaveChangesAsync();
+
             var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
             requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
-                Proposal(tenant, "Immutable staged metadata"), default);
+                Proposal(tenant, "Temporary request state"), default);
             await requests.StageFileAsync(requestId, file.FileId, file.FileTypeId, "Version One", false, default);
-            versionId = await CurrentVersionAsync(contributor, requestId);
+            var stagedVersionId = await CurrentVersionAsync(contributor, requestId);
+
+            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
+            values.Files = [new EditFileMetadataVm
+            {
+                Id = file.FileId,
+                FileTypeTagId = file.FileTypeId,
+                Name = "Version One"
+            }];
+            versionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(
+                requestId, values, againstCurrent: false, tenant.RevisionId, stagedVersionId, default);
         }
 
         await using (var mutate = database.CreateDbContext("live-file-mutation", tenant.AccountId))
         {
             var live = await mutate.Files.SingleAsync(row => row.Id == file.FileId);
             live.FileTypeTagId = mapType.Id;
-            live.FileName = "today.png";
-            live.DisplayName = "Today";
+            live.Extension = ".png";
+            live.Name = "Today";
             await mutate.SaveChangesAsync();
         }
 
         await using var audit = database.CreateDbContext("contributor", tenant.AccountId);
         await CavePermissions.AuthenticateAsync(audit, tenant.AccountId);
-        var historical = await IntegrationTestServices.For(audit).CaveChangeRequests.GetVersionAsync(requestId, versionId, default);
+        var historical = await IntegrationTestServices.For(audit).CaveChangeRequests.GetVersionAsync(
+            requestId, versionId, default);
         var presented = Assert.Single(historical.Proposed.Files);
-        Assert.Equal((file.FileTypeId, "Report", "Version One.pdf", "Version One"),
-            (presented.FileTypeTagId, presented.FileTypeNameAtRevision, presented.FileName,
-                presented.DisplayName));
+        Assert.Equal((file.FileTypeId, "Report", "Version One", ".pdf"),
+            (presented.FileTypeTagId, presented.FileTypeNameAtRevision, presented.Name, presented.Extension));
+        Assert.Empty(historical.DiffFromBase.Scalars);
+        Assert.Equal([file.FileId], historical.DiffFromBase.AddedFiles);
         Assert.Empty(historical.UnavailableStagedFileIds);
     }
 
     [Fact]
-    public async Task PublishedFileProposalPreviewMatchesApprovedTypeAndEffectiveFileName()
+    public async Task PublishedFileProposalRejectsANameThatNewlyIncludesItsFixedExtension()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(PublishedFileProposalPreviewMatchesApprovedTypeAndEffectiveFileName));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
-        var publishedFile = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
-            fileId: "publish00a");
-        const string mapTypeId = "maptype00a";
-        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File, "Map", mapTypeId);
-        await using (var seed = database.CreateDbContext("file-baseline", tenant.AccountId))
+            nameof(PublishedFileProposalRejectsANameThatNewlyIncludesItsFixedExtension));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
+            fileId: "badname00a");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+
+        await using (var seed = database.CreateDbContext("proposal-name-validation-baseline", tenant.AccountId))
         {
-            var reportType = await seed.TagTypes.SingleAsync(tag => tag.Id == publishedFile.FileTypeId);
-            reportType.Name = "Report";
-            var file = await seed.Files.SingleAsync(candidate => candidate.Id == publishedFile.FileId);
-            file.FileName = "survey.pdf";
-            file.DisplayName = "Survey";
-            await seed.SaveChangesAsync();
-            var baseline = await new CaveMutationRepository(seed, seed.RequestUser,
+            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
                     new CavePublishedSnapshotRepository(seed, seed.RequestUser))
                 .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
                     CaveRevisionOperation.Update, _ => { });
-            tenant = tenant with { RevisionId = baseline.RevisionId! };
+            tenant = tenant with { RevisionId = mutation.RevisionId! };
         }
-        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
-        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 
-        string requestId;
-        CaveChangePreviewVm preview;
-        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+        var values = ValuesFromCave(context.Cave);
+        values.Files = [new EditFileMetadataVm
         {
-            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
-            var values = PublishableValues(tenant, locationTag.Id, "Published file metadata");
-            values.Files = [new EditFileMetadataVm
-            {
-                Id = publishedFile.FileId,
-                FileTypeTagId = mapTypeId,
-                DisplayName = "Renamed Survey"
-            }];
-            var service = IntegrationTestServices.For(contributor).CaveChangeRequests;
-            preview = await service.PreviewAsync(tenant.CaveId, values, tenant.RevisionId, default);
-            requestId = await service.CreateAsync(tenant.CaveId, values, tenant.RevisionId, default);
-        }
+            Id = file.FileId,
+            Name = "seed-a.pdf",
+            FileTypeTagId = file.FileTypeId
+        }];
 
-        var proposedFile = Assert.Single(preview.Proposed.Files, file => file.Id == publishedFile.FileId);
-        Assert.Equal(mapTypeId, proposedFile.FileTypeTagId);
-        Assert.Equal("Map", proposedFile.FileTypeNameAtRevision);
-        Assert.Equal("Renamed Survey", proposedFile.DisplayName);
-        Assert.Equal("Renamed Survey.pdf", proposedFile.FileName);
-        Assert.Contains(publishedFile.FileId, preview.Diff.ChangedFiles);
-        Assert.Equal("Report", Assert.Single(preview.Base.Files,
-            file => file.Id == publishedFile.FileId).FileTypeNameAtRevision);
-
-        string approvedRevisionId;
-        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
-        {
-            await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
-            approvedRevisionId = (await IntegrationTestServices.For(reviewer).CaveChangeRequests.ApproveAsync(requestId,
-                await CurrentVersionAsync(reviewer, requestId), null, default)).PublishedRevisionId!;
-        }
-
-        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
-        var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
-            revision.Id == approvedRevisionId)).SnapshotJson, 1);
-        var acceptedFile = Assert.Single(accepted.Files, file => file.Id == publishedFile.FileId);
-        Assert.Equal(proposedFile.FileTypeTagId, acceptedFile.FileTypeTagId);
-        Assert.Equal(proposedFile.FileTypeNameAtRevision, acceptedFile.FileTypeNameAtRevision);
-        Assert.Equal(proposedFile.DisplayName, acceptedFile.DisplayName);
-        Assert.Equal(proposedFile.FileName, acceptedFile.FileName);
+        var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            contributor.ChangeRequests.PreviewAsync(tenant.CaveId, values, context.ExpectedBaseRevisionId, default));
+        Assert.Equal(400, failure.StatusCode);
+        Assert.Contains("must not include its fixed extension", failure.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -280,45 +256,53 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(HistoricalStagedFileProposalMetadataRemainsImmutableAcrossVersions));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var stagedFile = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stagedmeta");
         const string mapTypeId = "maptype00a";
         const string liveTypeId = "livetype0a";
         await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File, "Map", mapTypeId);
         await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File, "Live type", liveTypeId);
         await CavePermissions.GrantViewAsync(database, tenant, "contributor");
-        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 
         string requestId;
         string versionOneId;
         string versionTwoId;
         await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
         {
-            var reportType = await contributor.TagTypes.SingleAsync(tag => tag.Id == stagedFile.FileTypeId);
-            reportType.Name = "Report";
+            (await contributor.TagTypes.SingleAsync(tag => tag.Id == stagedFile.FileTypeId)).Name = "Report";
             var file = await contributor.Files.SingleAsync(candidate => candidate.Id == stagedFile.FileId);
-            file.FileName = "survey.pdf";
-            file.DisplayName = "Survey";
+            file.Extension = ".pdf";
+            file.Name = "Survey";
             await contributor.SaveChangesAsync();
+
             var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
             requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
-                PublishableProposal(tenant, locationTag.Id, "Staged file metadata"), default);
-            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.DisplayName,
+                Proposal(tenant, "Temporary request state"), default);
+            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.Name,
                 reviewer: false, default);
-            versionOneId = await CurrentVersionAsync(contributor, requestId);
+            var stagedVersionId = await CurrentVersionAsync(contributor, requestId);
 
             await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
-            var values = PublishableValues(tenant, locationTag.Id, "Staged file metadata");
-            values.Files = [new EditFileMetadataVm
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tenant.CaveId);
+            var versionOneValues = ValuesFromCave(cave!);
+            versionOneValues.Files = [new EditFileMetadataVm
+            {
+                Id = stagedFile.FileId,
+                FileTypeTagId = stagedFile.FileTypeId,
+                Name = "Survey"
+            }];
+            versionOneId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(
+                requestId, versionOneValues, againstCurrent: false, tenant.RevisionId, stagedVersionId, default);
+
+            var versionTwoValues = ValuesFromCave(cave!);
+            versionTwoValues.Files = [new EditFileMetadataVm
             {
                 Id = stagedFile.FileId,
                 FileTypeTagId = mapTypeId,
-                DisplayName = "Reviewed Survey"
+                Name = "Reviewed Survey"
             }];
-            versionTwoId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(requestId, values,
-                againstCurrent: false, tenant.RevisionId, versionOneId, default);
+            versionTwoId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(
+                requestId, versionTwoValues, againstCurrent: false, tenant.RevisionId, versionOneId, default);
         }
 
         await using (var inspect = database.CreateDbContext("contributor", tenant.AccountId))
@@ -328,32 +312,31 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
             var activeRow = await inspect.CaveProposalVersions.SingleAsync(version => version.Id == versionTwoId);
             var activeIntent = Assert.Single(CaveProposalJson.Deserialize(activeRow.ProposalJson,
                 activeRow.SchemaVersion).Files, intent => intent.FileId == stagedFile.FileId);
-            Assert.Equal(mapTypeId, activeIntent.FileTypeTagId);
-            Assert.Equal("Map", activeIntent.FileTypeName);
-            Assert.Equal("Reviewed Survey.pdf", activeIntent.FileName);
+            Assert.Equal((mapTypeId, "Map", "Reviewed Survey", ".pdf"),
+                (activeIntent.FileTypeTagId, activeIntent.FileTypeName, activeIntent.Name, activeIntent.Extension));
             var activePreview = await service.GetVersionAsync(requestId, versionTwoId, default);
             var activeFile = Assert.Single(activePreview.Proposed.Files, file => file.Id == stagedFile.FileId);
-            Assert.Equal(mapTypeId, activeFile.FileTypeTagId);
-            Assert.Equal("Map", activeFile.FileTypeNameAtRevision);
-            Assert.Equal("Reviewed Survey.pdf", activeFile.FileName);
+            Assert.Equal((mapTypeId, "Map", "Reviewed Survey", ".pdf"),
+                (activeFile.FileTypeTagId, activeFile.FileTypeNameAtRevision, activeFile.Name, activeFile.Extension));
+            Assert.Empty(activePreview.DiffFromBase.Scalars);
+            Assert.Equal([stagedFile.FileId], activePreview.DiffFromBase.AddedFiles);
 
             var liveFile = await inspect.Files.SingleAsync(file => file.Id == stagedFile.FileId);
             liveFile.FileTypeTagId = liveTypeId;
-            liveFile.FileName = "today.txt";
-            liveFile.DisplayName = "Today's mutable metadata";
+            liveFile.Extension = ".txt";
+            liveFile.Name = "Today's mutable metadata";
             await inspect.SaveChangesAsync();
 
             var historical = await service.GetVersionAsync(requestId, versionOneId, default);
             var historicalFile = Assert.Single(historical.Proposed.Files,
                 file => file.Id == stagedFile.FileId);
-            Assert.Equal(stagedFile.FileTypeId, historicalFile.FileTypeTagId);
-            Assert.Equal("Report", historicalFile.FileTypeNameAtRevision);
-            Assert.Equal("survey.pdf", historicalFile.FileName);
-            Assert.Equal("Survey", historicalFile.DisplayName);
+            Assert.Equal((stagedFile.FileTypeId, "Report", "Survey", ".pdf"),
+                (historicalFile.FileTypeTagId, historicalFile.FileTypeNameAtRevision,
+                    historicalFile.Name, historicalFile.Extension));
+            Assert.Empty(historical.DiffFromBase.Scalars);
+            Assert.Equal([stagedFile.FileId], historical.DiffFromBase.AddedFiles);
             Assert.Empty(historical.UnavailableStagedFileIds);
-
         }
-
     }
 
     [Fact]
@@ -361,9 +344,7 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
     {
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ApprovalPublishesMetadataFromTheActiveStagedFileProposalVersion));
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
         var stagedFile = await FileTestDataFactory.AddFileAsync(database, tenant, fileId: "stagedmeta");
         var blobs = new TestFileBlobStore();
         blobs.Seed("test", "seed-a", System.Text.Encoding.UTF8.GetBytes("metadata staged bytes"));
@@ -378,32 +359,46 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         {
             (await contributor.TagTypes.SingleAsync(tag => tag.Id == stagedFile.FileTypeId)).Name = "Report";
             var file = await contributor.Files.SingleAsync(candidate => candidate.Id == stagedFile.FileId);
-            file.FileName = "survey.pdf";
-            file.DisplayName = "Survey";
+            file.Extension = ".pdf";
+            file.Name = "Survey";
             await contributor.SaveChangesAsync();
+
             var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
             requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
-                PublishableProposal(tenant, locationTag.Id, "Active staged metadata"), default);
-            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.DisplayName,
+                Proposal(tenant, "Temporary request state"), default);
+            await requests.StageFileAsync(requestId, file.Id, file.FileTypeTagId, file.Name,
                 reviewer: false, default);
-            var firstVersionId = await CurrentVersionAsync(contributor, requestId);
+            var stagedVersionId = await CurrentVersionAsync(contributor, requestId);
 
             await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
-            var values = PublishableValues(tenant, locationTag.Id, "Active staged metadata");
+            var cave = await new CaveRepository(contributor, contributor.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
             values.Files = [new EditFileMetadataVm
             {
                 Id = stagedFile.FileId,
                 FileTypeTagId = mapTypeId,
-                DisplayName = "Reviewed Survey"
+                Name = "Reviewed Survey"
             }];
             activeVersionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(
-                requestId, values, againstCurrent: false, tenant.RevisionId, firstVersionId, default);
+                requestId, values, againstCurrent: false, tenant.RevisionId, stagedVersionId, default);
+        }
+
+        await using (var mutate = database.CreateDbContext("live-file-mutation", tenant.AccountId))
+        {
+            var live = await mutate.Files.SingleAsync(file => file.Id == stagedFile.FileId);
+            live.Name = "Drifted live name";
+            live.Extension = ".png";
+            await mutate.SaveChangesAsync();
         }
 
         string approvedRevisionId;
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {
             await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
+            var selected = await IntegrationTestServices.For(reviewer).CaveChangeRequests.GetVersionAsync(
+                requestId, activeVersionId, default);
+            Assert.Empty(selected.DiffFromBase.Scalars);
+            Assert.Equal([stagedFile.FileId], selected.DiffFromBase.AddedFiles);
             approvedRevisionId = (await IntegrationTestServices.For(reviewer, blobs).CaveChangeRequests.ApproveAsync(
                 requestId, activeVersionId, null, default)).PublishedRevisionId!;
         }
@@ -412,9 +407,12 @@ public sealed class CaveChangeRequestFileMetadataIntegrationTests(PostgresTestSe
         var accepted = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
             revision.Id == approvedRevisionId)).SnapshotJson, 1);
         var acceptedFile = Assert.Single(accepted.Files, file => file.Id == stagedFile.FileId);
-        Assert.Equal(mapTypeId, acceptedFile.FileTypeTagId);
-        Assert.Equal("Map", acceptedFile.FileTypeNameAtRevision);
-        Assert.Equal("Reviewed Survey", acceptedFile.DisplayName);
-        Assert.Equal("Reviewed Survey.pdf", acceptedFile.FileName);
+        Assert.Equal((mapTypeId, "Map", "Reviewed Survey", ".pdf"),
+            (acceptedFile.FileTypeTagId, acceptedFile.FileTypeNameAtRevision,
+                acceptedFile.Name, acceptedFile.Extension));
+        var liveFile = await verify.Files.SingleAsync(file => file.Id == stagedFile.FileId);
+        Assert.Equal(("Reviewed Survey", ".pdf", mapTypeId),
+            (liveFile.Name, liveFile.Extension, liveFile.FileTypeTagId));
     }
+
 }

@@ -246,7 +246,8 @@ Security for an unbound staged File:
 
 Do not make all account users able to read arbitrary unbound staging merely because `CaveId` is null.
 
-Return enough metadata for the editor to add the staged File to its form state: ID, original filename, display name,
+Return enough metadata for the editor to add the staged File to its form state: ID, editable `Name`, immutable
+`Extension`,
 selected/default File type metadata as appropriate, and any existing `FileVm` fields used by the editor.
 
 ### 4.2 Add File upload to `AddCaveComponent`
@@ -395,8 +396,8 @@ Primary files:
 
 ### 6.1 Keep File snapshot provider-neutral and public-safe
 
-Do **not** add storage partition/key fields to `CaveFileSnapshotV1`. Its existing stable File ID plus historical filename,
-display name, and File-type metadata remain the persisted revision contract. The internal `RetainedCaveFileObject` row
+Do **not** add storage partition/key fields to `CaveFileSnapshotV1`. Its stable File ID plus historical `Name`, immutable
+`Extension`, and File-type metadata remain the persisted revision contract. The internal `RetainedCaveFileObject` row
 is the server-side content locator after an ordinary published File removal.
 
 This matters because Cave revision comparison currently returns `CavePublishedSnapshotV1` through the API. Never expose

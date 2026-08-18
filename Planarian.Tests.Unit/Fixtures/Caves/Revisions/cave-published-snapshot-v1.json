@@ -36,8 +36,8 @@
     "id": "file-map",
     "fileTypeTagId": "type-map",
     "fileTypeNameAtRevision": "Map",
-    "fileName": "survey-map.pdf",
-    "displayName": "Survey Map"
+    "name": "Survey Map",
+    "extension": ".pdf"
   }],
   "linePlots": [{
     "id": "lineplot-main",

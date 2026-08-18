@@ -89,8 +89,8 @@ public sealed class CavePublishedSnapshotRepository
                             Id = f.Id,
                             FileTypeTagId = f.FileTypeTagId,
                             FileTypeNameAtRevision = f.FileTypeName,
-                            FileName = f.FileName,
-                            DisplayName = f.DisplayName
+                            Name = f.Name,
+                            Extension = f.Extension
                         }).ToList(),
                     StringComparer.Ordinal);
             var linePlotsByCave = linePlots.GroupBy(linePlot => linePlot.CaveId)
@@ -229,7 +229,7 @@ public sealed class CavePublishedSnapshotRepository
             .Where(f => f.CaveId != null && caveIds.Contains(f.CaveId) && f.Cave != null &&
                         f.Cave.AccountId == _scope.AccountId)
             .AsNoTracking()
-            .Select(f => new FileRow(f.CaveId!, f.Id, f.FileTypeTagId, f.FileTypeTag.Name, f.FileName, f.DisplayName))
+            .Select(f => new FileRow(f.CaveId!, f.Id, f.FileTypeTagId, f.FileTypeTag.Name, f.Name, f.Extension))
             .ToListAsync(cancellationToken);
 
     private Task<List<LinePlotRow>> LoadLinePlotsAsync(string[] caveIds, CancellationToken cancellationToken) =>
@@ -256,6 +256,6 @@ public sealed class CavePublishedSnapshotRepository
 
     private sealed record EntranceTagRow(string EntranceId, SnapshotTagRole Role, string TagTypeId, string Name);
     private sealed record FileRow(string CaveId, string Id, string FileTypeTagId, string FileTypeName,
-        string FileName, string? DisplayName);
+        string Name, string Extension);
     private sealed record LinePlotRow(string CaveId, string Id, string Name, string GeoJson);
 }

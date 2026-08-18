@@ -118,8 +118,8 @@ const File = ({ file, layout }: { file: AffectedFilePresentation; layout: "horiz
       {file.fields.map(field => <Descriptions.Item label={field.label} key={field.key}><ChangedValue field={field} name={`file-${file.id}-${field.key}`} /></Descriptions.Item>)}
     </Descriptions>}
     {file.detailsAvailable && file.status !== "changed" && snapshot && <Descriptions bordered column={1} size="small" layout={layout}>
-      <Descriptions.Item label="Display Name">{defaultIfEmpty(snapshot.displayName)}</Descriptions.Item>
-      <Descriptions.Item label="Filename">{defaultIfEmpty(snapshot.fileName)}</Descriptions.Item>
+      <Descriptions.Item label="Name">{defaultIfEmpty(snapshot.name)}</Descriptions.Item>
+      <Descriptions.Item label="Extension">{defaultIfEmpty(snapshot.extension)}</Descriptions.Item>
       <Descriptions.Item label="File Type">{defaultIfEmpty(snapshot.fileTypeNameAtRevision)}</Descriptions.Item>
     </Descriptions>}
   </Card>;

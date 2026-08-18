@@ -33,14 +33,18 @@ internal static class FileResponsePolicy
     public static (string ContentType, bool ForceDownload) Resolve(
         string? fileName,
         string sourceContentType,
+        bool requestedDownload) =>
+        ResolveExtension(Path.GetExtension(fileName ?? string.Empty), sourceContentType, requestedDownload);
+
+    public static (string ContentType, bool ForceDownload) ResolveExtension(
+        string extension,
+        string sourceContentType,
         bool requestedDownload)
     {
         if (requestedDownload)
         {
             return (sourceContentType, true);
         }
-
-        var extension = Path.GetExtension(fileName ?? string.Empty);
 
         if (InlineSafeExtensions.Contains(extension))
         {

@@ -6,7 +6,7 @@ test("uses the current Form.List name after an earlier file is removed", () => {
       id: "file-b",
       fileTypeTagId: "type-b",
       fileTypeKey: "Survey",
-      displayName: "File B",
+      name: "File B",
     },
   ];
 

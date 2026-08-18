@@ -39,6 +39,6 @@ export interface CaveSearchParamsVm {
   //#endregion
   //#region Files
   fileTypeTagIds: string;
-  fileDisplayName: string;
+  fileName: string;
   fileExtension: string;
 }

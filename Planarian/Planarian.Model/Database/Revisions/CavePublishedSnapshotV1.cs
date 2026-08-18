@@ -71,8 +71,8 @@ public sealed record CaveFileSnapshotV1
     public string Id { get; init; } = null!;
     public string FileTypeTagId { get; init; } = null!;
     public string FileTypeNameAtRevision { get; init; } = null!;
-    public string FileName { get; init; } = null!;
-    public string? DisplayName { get; init; }
+    public string Name { get; init; } = null!;
+    public string Extension { get; init; } = string.Empty;
 }
 
 public static class CaveSnapshotJson

@@ -593,7 +593,7 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
         />
         <TextFilterFormItem
           queryBuilder={queryBuilder}
-          field={"fileDisplayName"}
+          field={"fileName"}
           label={"File Name"}
           queryOperator={QueryOperator.Contains}
         />

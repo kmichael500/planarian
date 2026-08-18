@@ -92,8 +92,8 @@ public sealed class CaveRevisionNestedDiffTests
 
     [Theory]
     [InlineData(nameof(CaveFileSnapshotV1.FileTypeTagId))]
-    [InlineData(nameof(CaveFileSnapshotV1.FileName))]
-    [InlineData(nameof(CaveFileSnapshotV1.DisplayName))]
+    [InlineData(nameof(CaveFileSnapshotV1.Name))]
+    [InlineData(nameof(CaveFileSnapshotV1.Extension))]
     public void FileScalarDetailsComeFromTheAuthoritativeComparison(string path)
     {
         var original = File();
@@ -101,8 +101,8 @@ public sealed class CaveRevisionNestedDiffTests
         {
             nameof(CaveFileSnapshotV1.FileTypeTagId) => original with
                 { FileTypeTagId = "photo", FileTypeNameAtRevision = "Photo" },
-            nameof(CaveFileSnapshotV1.FileName) => original with { FileName = "new.pdf" },
-            nameof(CaveFileSnapshotV1.DisplayName) => original with { DisplayName = "New map" },
+            nameof(CaveFileSnapshotV1.Name) => original with { Name = "new" },
+            nameof(CaveFileSnapshotV1.Extension) => original with { Extension = ".jpg" },
             _ => throw new ArgumentOutOfRangeException(nameof(path), path, null)
         };
 
@@ -185,6 +185,6 @@ public sealed class CaveRevisionNestedDiffTests
     private static CaveFileSnapshotV1 File() => new()
     {
         Id = "file", FileTypeTagId = "map", FileTypeNameAtRevision = "Map",
-        FileName = "map.pdf", DisplayName = "Map"
+        Name = "Map", Extension = ".pdf"
     };
 }

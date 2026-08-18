@@ -29,16 +29,32 @@ const AppContextWithPermissions: React.FC<{ children: React.ReactNode }> = ({
 };
 
 describe("PlanarianButton", () => {
-  it("keeps text actions visible when the caller did not request responsive collapsing", () => {
+  it("collapses children by default below the xl breakpoint", () => {
     render(
       <AppContextWithPermissions>
-        <PlanarianButton icon={undefined}>Approve and publish</PlanarianButton>
+        <PlanarianButton
+          icon={<span aria-hidden="true">icon</span>}
+          aria-label="Approve and publish"
+        >
+          Approve and publish
+        </PlanarianButton>
       </AppContextWithPermissions>
     );
 
-    expect(
-      screen.getByRole("button", { name: "Approve and publish" })
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Approve and publish" }))
+      .not.toHaveTextContent("Approve and publish");
+  });
+
+  it("allows callers to keep children visible regardless of the breakpoint", () => {
+    render(
+      <AppContextWithPermissions>
+        <PlanarianButton icon={undefined} alwaysShowChildren>
+          Approve and publish
+        </PlanarianButton>
+      </AppContextWithPermissions>
+    );
+
+    expect(screen.getByRole("button", { name: "Approve and publish" })).toBeVisible();
   });
 
   it("still allows callers to explicitly hide children", () => {

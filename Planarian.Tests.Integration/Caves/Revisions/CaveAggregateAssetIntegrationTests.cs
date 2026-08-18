@@ -149,6 +149,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("one upload"));
         var staged = await manager.Services.Files.StageAuthoringFile(content, "survey.pdf", default);
         var before = await manager.Db.Files.AsNoTracking().SingleAsync(row => row.Id == staged.Id);
+        Assert.Equal(("survey", ".pdf"), (before.Name, before.Extension));
         Assert.Null(before.CaveId);
         Assert.NotNull(before.ExpiresOn);
         var objectAddress = (before.BlobContainer!, before.BlobKey!);
@@ -161,7 +162,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         {
             Id = staged.Id,
             FileTypeTagId = staged.FileTypeTagId,
-            DisplayName = staged.DisplayName!
+            Name = staged.Name!
         }];
         await manager.Services.Caves.AddCave(values, default);
         manager.Db.ChangeTracker.Clear();
@@ -172,6 +173,105 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         Assert.Equal(objectAddress, (published.BlobContainer!, published.BlobKey!));
         Assert.Single(blobs.Keys);
         Assert.True(blobs.Contains(objectAddress.Item1, objectAddress.Item2));
+    }
+
+    [Fact]
+    public async Task DirectFileRenameUpdatesNameAndPreservesExtensionFileTypeAndStorageIdentity()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(DirectFileRenameUpdatesNameAndPreservesExtensionFileTypeAndStorageIdentity));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
+            fileId: "rename000a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+
+        await using (var seed = database.CreateDbContext("file-rename-baseline", tenant.AccountId))
+        {
+            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
+                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+                .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
+                    CaveRevisionOperation.Update, _ => { });
+            tenant = tenant with { RevisionId = mutation.RevisionId! };
+        }
+
+        string originalPartition;
+        string originalKey;
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager"))
+        {
+            var original = await manager.Db.Files.AsNoTracking().SingleAsync(row => row.Id == file.FileId);
+            originalPartition = original.BlobContainer!;
+            originalKey = original.BlobKey!;
+            var cave = await new CaveRepository(manager.Db, manager.Db.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
+            values.Files = [new EditFileMetadataVm
+            {
+                Id = file.FileId,
+                Name = "Entrance Survey",
+                FileTypeTagId = original.FileTypeTagId
+            }];
+            await manager.Services.Caves.AddCave(values, default);
+        }
+
+        await using var verify = database.CreateDbContext("file-rename-verify", tenant.AccountId);
+        var currentCave = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+        var currentFile = await verify.Files.AsNoTracking().SingleAsync(row => row.Id == file.FileId);
+        Assert.Equal("Entrance Survey", currentFile.Name);
+        Assert.Equal(".pdf", currentFile.Extension);
+        Assert.Equal(file.FileId, currentFile.Id);
+        Assert.Equal((originalPartition, originalKey), (currentFile.BlobContainer, currentFile.BlobKey));
+        Assert.Equal(file.FileTypeId, currentFile.FileTypeTagId);
+
+        var previous = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == tenant.RevisionId)).SnapshotJson, 1);
+        var current = CaveSnapshotJson.Deserialize((await verify.CaveRevisions.SingleAsync(revision =>
+            revision.Id == currentCave.CurrentRevisionId)).SnapshotJson, 1);
+        var fileChange = Assert.Single(new CaveRevisionDiffService().Compare(previous, current).FileChanges);
+        var scalar = Assert.Single(fileChange.Scalars);
+        Assert.Equal(nameof(CaveFileSnapshotV1.Name), scalar.Key);
+        Assert.Equal(("seed-a", "Entrance Survey"), (scalar.Value.Previous, scalar.Value.Current));
+    }
+
+    [Fact]
+    public async Task DirectFileRenameRejectsANameThatNewlyIncludesItsFixedExtension()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(DirectFileRenameRejectsANameThatNewlyIncludesItsFixedExtension));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
+            fileId: "badname00a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+
+        await using (var seed = database.CreateDbContext("file-name-validation-baseline", tenant.AccountId))
+        {
+            var mutation = await new CaveMutationRepository(seed, seed.RequestUser,
+                    new CavePublishedSnapshotRepository(seed, seed.RequestUser))
+                .PublishExistingAsync(tenant.CaveId, tenant.RevisionId, CaveRevisionSource.ManagerEdit,
+                    CaveRevisionOperation.Update, _ => { });
+            tenant = tenant with { RevisionId = mutation.RevisionId! };
+        }
+
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager"))
+        {
+            var cave = await new CaveRepository(manager.Db, manager.Db.RequestUser).GetCave(tenant.CaveId);
+            var values = ValuesFromCave(cave!);
+            values.Files = [new EditFileMetadataVm
+            {
+                Id = file.FileId,
+                Name = "seed-a.pdf",
+                FileTypeTagId = file.FileTypeId
+            }];
+
+            var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+                manager.Services.Caves.AddCave(values, default));
+            Assert.Equal(400, failure.StatusCode);
+            Assert.Contains("must not include its fixed extension", failure.Message, StringComparison.Ordinal);
+        }
+
+        await using var verify = database.CreateDbContext("file-name-validation-verify", tenant.AccountId);
+        var unchangedFile = await verify.Files.AsNoTracking().SingleAsync(row => row.Id == file.FileId);
+        Assert.Equal(("seed-a", ".pdf"), (unchangedFile.Name, unchangedFile.Extension));
+        Assert.Equal(tenant.RevisionId, (await verify.Caves.IgnoreQueryFilters()
+            .SingleAsync(row => row.Id == tenant.CaveId)).CurrentRevisionId);
     }
 
     [Fact]
@@ -199,7 +299,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         {
             Id = staged.Id,
             FileTypeTagId = staged.FileTypeTagId,
-            DisplayName = staged.DisplayName!
+            Name = staged.Name!
         }];
 
         var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
@@ -243,7 +343,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         {
             Id = staged.Id,
             FileTypeTagId = staged.FileTypeTagId,
-            DisplayName = staged.DisplayName!
+            Name = staged.Name!
         }];
 
         await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
@@ -278,7 +378,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         {
             Id = staged.Id,
             FileTypeTagId = staged.FileTypeTagId,
-            DisplayName = staged.DisplayName!
+            Name = staged.Name!
         }];
         var requestId = await contributor.ChangeRequests.CreateAsync(
             tenant.CaveId, values, context.ExpectedBaseRevisionId, default);
@@ -316,8 +416,10 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
 
         await using (var other = await CaveTestActor.CreateAsync(database, tenant.AccountId, "other", blobs))
         {
-            await Assert.ThrowsAnyAsync<Exception>(() =>
+            var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 other.Services.Files.OpenAuthoringStagedFileAsync(fileId, default));
+            Assert.Equal(404, failure.StatusCode);
+            Assert.Contains("Staged file", failure.Message, StringComparison.Ordinal);
             await other.Services.Files.DeleteUnpublishedFileAsync(fileId, default);
         }
 

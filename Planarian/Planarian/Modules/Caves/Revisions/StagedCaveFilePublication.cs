@@ -7,4 +7,5 @@ namespace Planarian.Modules.Caves.Revisions;
 public sealed record StagedCaveFilePublication(
     string FileId,
     string StorageKey,
-    string StoragePartition);
+    string StoragePartition,
+    string Extension);

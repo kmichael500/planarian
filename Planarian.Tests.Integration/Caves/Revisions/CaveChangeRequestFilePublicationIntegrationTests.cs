@@ -40,6 +40,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             fileId = (await manager.Services.Files.UploadCaveFile(content, tenant.CaveId, "published.pdf",
                 default)).Id;
             var file = await manager.Db.Files.SingleAsync(row => row.Id == fileId);
+            Assert.Equal(("published", ".pdf"), (file.Name, file.Extension));
             blobKey = file.BlobKey!;
             blobContainer = file.BlobContainer!;
             revisionWithFileId = (await manager.Db.Caves.IgnoreQueryFilters()
@@ -92,7 +93,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             var stagedVersionId = await CurrentVersionAsync(contributor.Db, requestId);
             var fileOnlyValues = ValuesFromCave(context.Cave);
             fileOnlyValues.Files = [new EditFileMetadataVm
-                { Id = file.FileId, FileTypeTagId = file.FileTypeId, DisplayName = "Only file change" }];
+                { Id = file.FileId, FileTypeTagId = file.FileTypeId, Name = "Only file change" }];
             fileOnlyVersionId = await service.AddVersionAsync(requestId, fileOnlyValues, false,
                 tenant.RevisionId, stagedVersionId, default);
             var detail = await service.GetVersionAsync(requestId, fileOnlyVersionId, default);
@@ -164,7 +165,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
                 .CurrentProposalVersionId!;
             var values = PublishableValues(tenant, locationTag.Id, "Proposal with staged file");
             values.Files = [new EditFileMetadataVm
-                { Id = file.FileId, FileTypeTagId = file.FileTypeId, DisplayName = "Survey attachment" }];
+                { Id = file.FileId, FileTypeTagId = file.FileTypeId, Name = "Survey attachment" }];
             await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(requestId,
                 values, againstCurrent: false, expectedBaseRevisionId: tenant.RevisionId,
                 expectedProposalVersionId: stagedVersionId, default);
@@ -234,11 +235,11 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             {
                 Id = file.FileId,
                 FileTypeTagId = file.FileTypeId,
-                DisplayName = "Rollback attachment"
+                Name = "Rollback attachment"
             }];
             await Assert.ThrowsAsync<InvalidOperationException>(() => IntegrationTestServices.For(reviewer).Caves
                 .ApproveChangeRequestAsync(values, tenant.RevisionId, requestId,
-                    [new StagedCaveFilePublication(file.FileId, "seed-a", "test")],
+                    [new StagedCaveFilePublication(file.FileId, "seed-a", "test", ".pdf")],
                     (_, _) => throw new InvalidOperationException("Simulated approval failure"), default));
         }
 
@@ -269,10 +270,10 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             requestId = await repository.CreateAsync(tenant.CaveId, tenant.RevisionId,
                 Proposal(tenant, "Proposal with file"), default);
             var file = await contributor.Files.SingleAsync(row => row.Id == fileId);
-            file.DisplayName = "Survey";
+            file.Name = "Survey";
             file.ExpiresOn = DateTime.UtcNow.AddDays(10);
             await contributor.SaveChangesAsync();
-            await repository.StageFileAsync(requestId, fileId, stagedFile.FileTypeId, file.DisplayName,
+            await repository.StageFileAsync(requestId, fileId, stagedFile.FileTypeId, file.Name,
                 reviewer: false, default);
         }
 
@@ -294,7 +295,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
         {
             var caves = new Planarian.Modules.Caves.Repositories.CaveRepository(reviewer, reviewer.RequestUser);
             var attached = await caves.AttachStagedFilesAsync(requestId, tenant.CaveId,
-                [new StagedCaveFilePublication(fileId, "seed-a", "test")]);
+                [new StagedCaveFilePublication(fileId, "seed-a", "test", ".pdf")]);
             await reviewer.SaveChangesAsync();
             Assert.Single(attached);
         }
@@ -352,11 +353,11 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             [
                 new EditFileMetadataVm
                 {
-                    Id = removedFileId, FileTypeTagId = fileType.Id, DisplayName = "Removed survey"
+                    Id = removedFileId, FileTypeTagId = fileType.Id, Name = "Removed survey"
                 },
                 new EditFileMetadataVm
                 {
-                    Id = retainedFileId, FileTypeTagId = fileType.Id, DisplayName = "Retained survey"
+                    Id = retainedFileId, FileTypeTagId = fileType.Id, Name = "Retained survey"
                 }
             ];
             versionContainingRemovedFile = await contributor.ChangeRequests.AddVersionAsync(requestId, bothValues,
@@ -367,7 +368,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             [
                 new EditFileMetadataVm
                 {
-                    Id = retainedFileId, FileTypeTagId = fileType.Id, DisplayName = "Retained survey"
+                    Id = retainedFileId, FileTypeTagId = fileType.Id, Name = "Retained survey"
                 }
             ];
             acceptedVersionId = await contributor.ChangeRequests.AddVersionAsync(requestId, retainedValues,
@@ -436,8 +437,8 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
         var historicalVersion = await audit.ChangeRequests.GetVersionAsync(requestId,
             versionContainingRemovedFile, default);
         var historicalFile = Assert.Single(historicalVersion.Proposed.Files, file => file.Id == removedFileId);
-        Assert.Equal("Removed survey.pdf", historicalFile.FileName);
-        Assert.Equal("Removed survey", historicalFile.DisplayName);
+        Assert.Equal("Removed survey", historicalFile.Name);
+        Assert.Equal(".pdf", historicalFile.Extension);
         Assert.Equal(fileType.Id, historicalFile.FileTypeTagId);
         Assert.Equal("Other", historicalFile.FileTypeNameAtRevision);
         Assert.Contains(removedFileId, historicalVersion.UnavailableStagedFileIds);

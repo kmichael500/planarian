@@ -40,7 +40,8 @@ internal sealed record GoldenCommittedState(
                 operation = (await db.CaveRevisions.IgnoreQueryFilters().AsNoTracking()
                     .SingleAsync(value => value.Id == cave.CurrentRevisionId)).Operation.ToString();
             var fileNames = await db.Files.IgnoreQueryFilters().Where(file => file.CaveId == cave.Id)
-                .OrderBy(file => file.FileName).Select(file => file.FileName).ToListAsync();
+                .OrderBy(file => file.Name).ThenBy(file => file.Extension)
+                .Select(file => file.Name + file.Extension).ToListAsync();
             caves.Add(GoldenCommittedCave.From(snapshot, markerChanged, operation, fileNames));
         }
 

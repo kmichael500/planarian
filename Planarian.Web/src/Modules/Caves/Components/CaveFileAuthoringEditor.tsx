@@ -29,7 +29,8 @@ export const CaveFileAuthoringEditor = ({ form, onAuthoringChange }: {
             });
             add({
               id: staged.id,
-              displayName: staged.displayName,
+              name: staged.name,
+              extension: staged.extension,
               fileTypeTagId: staged.fileTypeTagId,
               fileTypeKey: staged.fileTypeKey,
             });
@@ -49,13 +50,13 @@ export const CaveFileAuthoringEditor = ({ form, onAuthoringChange }: {
         {fields.map((field) => {
           const file = files[field.name];
           return <Col xs={24} lg={12} key={field.key}>
-            <Card size="small" title={file?.displayName ?? "File"}
+            <Card size="small" title={file?.name ?? "File"}
               extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
               <Form.Item name={[field.name, "id"]} hidden><Input /></Form.Item>
               <Form.Item name={[field.name, "fileTypeKey"]} hidden><Input /></Form.Item>
-              <Form.Item label="Name" name={[field.name, "displayName"]}
+              <Form.Item label="Name" name={[field.name, "name"]}
                 rules={[{ required: true, whitespace: true, message: "Please enter a name" }]}>
-                <Input />
+                <Input addonAfter={file?.extension || undefined} />
               </Form.Item>
               <Form.Item label="File Type" name={[field.name, "fileTypeTagId"]}
                 rules={[{ required: true, message: "Please select a file type" }]}>

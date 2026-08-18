@@ -11,7 +11,8 @@ namespace Planarian.Tests.Integration.Infrastructure.Data;
 internal static class FileTestDataFactory
 {
     public static async Task<TestFileData> AddFileAsync(PostgresTestDatabase database,
-        PublishedCaveTestData cave, bool associateWithCave = false, string? fileId = null)
+        PublishedCaveTestData cave, bool associateWithCave = false, string? fileId = null,
+        string? name = null, string extension = ".pdf")
     {
         var suffix = cave.AccountId[^1];
         var fileTypeId = $"filetype0{suffix}";
@@ -25,7 +26,8 @@ internal static class FileTestDataFactory
             AccountId = cave.AccountId,
             CaveId = associateWithCave ? cave.CaveId : null,
             FileTypeTagId = fileTypeId,
-            FileName = $"seed-{suffix}.pdf",
+            Name = name ?? $"seed-{suffix}",
+            Extension = extension,
             BlobKey = $"seed-{suffix}",
             BlobContainer = "test"
         });

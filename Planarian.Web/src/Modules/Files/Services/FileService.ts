@@ -41,5 +41,6 @@ export interface UploadedFileResponse {
 export interface FileInformation {
   FileTypeKey: string;
   CaveId?: string;
-  DisplayName?: string;
+  Name?: string;
+  Extension?: string;
 }

@@ -1,6 +1,7 @@
 import { caveToForm, snapshotToForm } from "./CaveFormMapper";
 import { CaveSnapshotVm } from "../Models/CaveRevisionVm";
 import { CaveVm } from "../Models/CaveVm";
+import { FileTypeKey } from "../../Files/Models/FileTypeKey";
 import dayjs from "dayjs";
 
 const snapshot: CaveSnapshotVm = {
@@ -23,10 +24,12 @@ it.each([
 
 it("adds active staged files to a current-Cave stale rereview baseline", () => {
   const form = snapshotToForm(snapshot, undefined, undefined, [{
-    id: "staged", fileName: "staged.pdf", displayName: "Staged",
+    id: "staged", name: "Staged", extension: ".pdf",
     fileTypeTagId: "document", fileTypeNameAtRevision: "Document",
   }]);
-  expect(form.files).toEqual([expect.objectContaining({ id: "staged", displayName: "Staged" })]);
+  expect(form.files).toEqual([expect.objectContaining({
+    id: "staged", name: "Staged", extension: ".pdf",
+  })]);
 });
 
 it("preserves null, zero, and positive Cave measurements in proposal editor state", () => {
@@ -62,6 +65,23 @@ it("retains Entrance Other tags when mapping a Cave into the editor", () => {
   };
 
   expect(caveToForm(cave).entrances[0].entranceOtherTagIds).toEqual(["other-tag"]);
+});
+
+it("carries the file extension into authoring state", () => {
+  const cave: CaveVm = {
+    id: "cave", currentRevisionId: null, displayId: "A-1",
+    countyId: "county", stateId: "state", countyDisplayId: "A", countyNumber: 1,
+    name: "Cave", alternateNames: [], lengthFeet: 0, depthFeet: 0, maxPitDepthFeet: 0,
+    numberOfPits: 0, narrative: null, reportedOn: null, isArchived: false, primaryEntrance: null,
+    mapIds: [], geologyTagIds: [], reportedByNameTagIds: [], biologyTagIds: [],
+    archeologyTagIds: [], cartographerNameTagIds: [], mapStatusTagIds: [], geologicAgeTagIds: [],
+    physiographicProvinceTagIds: [], otherTagIds: [], entrances: [],
+    files: [{ id: "file", name: "Map", extension: ".PDF", fileTypeTagId: "map", fileTypeKey: FileTypeKey.Map }],
+  };
+
+  expect(caveToForm(cave).files).toEqual([{
+    id: "file", name: "Map", extension: ".PDF", fileTypeTagId: "map", fileTypeKey: "Map",
+  }]);
 });
 
 it("carries exact line-plot authoring payloads into editor state", () => {

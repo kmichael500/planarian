@@ -34,7 +34,7 @@ it("loads the dedicated Cave edit authoring context", async () => {
 
 it("stages an authoring file through the generic file endpoint", async () => {
   const post = jest.spyOn(HttpClient, "post").mockResolvedValue({
-    data: { id: "file-a", fileName: "map.pdf", displayName: "map", fileTypeTagId: "type-a", fileTypeKey: "Map" },
+    data: { id: "file-a", name: "map", extension: ".pdf", fileTypeTagId: "type-a", fileTypeKey: "Map" },
   });
   const upload = new File(["bytes"], "map.pdf", { type: "application/pdf" });
 

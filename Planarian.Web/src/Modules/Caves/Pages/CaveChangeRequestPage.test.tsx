@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CaveAvailability, getDownloadableProposalFiles, ProposalVersionComparison,
   UnavailableProposalFilesAlert } from "./CaveChangeRequestPage";
@@ -23,20 +23,20 @@ it("does not render an Open Cave link when the historical Cave is unavailable", 
   render(<MemoryRouter><CaveAvailability request={request(false)} /></MemoryRouter>);
 
   expect(document.body).toHaveTextContent("Cave no longer available");
-  expect(document.querySelector("a")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Open Cave" })).not.toBeInTheDocument();
 });
 
 it("renders the live Cave link while the Cave is available", () => {
   render(<MemoryRouter><CaveAvailability request={request(true)} /></MemoryRouter>);
 
-  expect(document.querySelector("a")).toHaveAttribute("href", "/caves/cave");
+  expect(screen.getByRole("link", { name: "Open Cave" })).toHaveAttribute("href", "/caves/cave");
 });
 
 it("offers downloads only for live staged files, not historical attachment placeholders", () => {
   const live = { id: "live", fileTypeTagId: "map", fileTypeNameAtRevision: "Map",
-    fileName: "live.pdf", displayName: "Live survey" };
-  const unavailable = { ...live, id: "unavailable", fileName: "historical.pdf",
-    displayName: "Historical survey" };
+    name: "Live survey", extension: ".pdf" };
+  const unavailable = { ...live, id: "unavailable", name: "Historical survey",
+    extension: ".pdf" };
   const baseSnapshot = snapshot("Original");
   const detail = {
     request: request(true), base: baseSnapshot, current: baseSnapshot,
@@ -52,7 +52,7 @@ it("offers downloads only for live staged files, not historical attachment place
     snapshots={[detail.proposed]} />);
   expect(document.body).toHaveTextContent("Historical attachment unavailable");
   expect(document.body).toHaveTextContent("Historical survey");
-  expect(document.querySelector("a")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
 });
 
 const snapshot = (name: string, tags: CaveSnapshotVm["tags"] = []): CaveSnapshotVm => ({

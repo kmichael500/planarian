@@ -145,7 +145,8 @@ ordinary `CaveVm` reads or the revision API.
   actors, change-request submitters, proposal-version authors, and reviewers. Cave and Entrance do not store a separate
   reporter-user identity. A legacy Cave's first system baseline records who initialized revision tracking, which may not
   identify the actor who originally entered the Cave.
-- File history preserves attachment identity, filename, display name, and captured file-type metadata without exposing
+- File history preserves attachment identity, editable filename stem (`Name`), immutable uploaded-file `Extension`, and
+  captured file-type metadata without exposing
   object-storage locators in revision JSON. Bytes from Files that were successfully published are retained across ordinary
   later removal through the internal retained-object locator until explicit hard purge; never-published staged bytes may
   expire or be discarded. No historical-download or rollback API is implied by retention alone.

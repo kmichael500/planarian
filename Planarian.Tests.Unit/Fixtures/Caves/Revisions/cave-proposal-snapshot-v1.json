@@ -36,9 +36,9 @@
     "newPeopleTagIntents": [{ "role": "EntranceReportedBy", "name": "New Entrance Reporter" }]
   }],
   "files": [
-    { "fileId": "file-retained", "disposition": "RetainPublished", "fileTypeTagId": "type-map", "displayName": "Current Map", "fileName": "current-map.pdf", "fileTypeName": "Map" },
-    { "fileId": "file-removed", "disposition": "RemovePublished", "fileTypeTagId": "type-report", "displayName": "Old Report", "fileName": "old-report.pdf", "fileTypeName": "Report" },
-    { "fileId": "file-staged", "disposition": "PublishStaged", "fileTypeTagId": "type-map", "displayName": "New Survey", "fileName": "new-survey.pdf", "fileTypeName": "Map" }
+    { "fileId": "file-retained", "disposition": "RetainPublished", "fileTypeTagId": "type-map", "name": "Current Map", "extension": ".pdf", "fileTypeName": "Map" },
+    { "fileId": "file-removed", "disposition": "RemovePublished", "fileTypeTagId": "type-report", "name": "Old Report", "extension": ".pdf", "fileTypeName": "Report" },
+    { "fileId": "file-staged", "disposition": "PublishStaged", "fileTypeTagId": "type-map", "name": "New Survey", "extension": ".pdf", "fileTypeName": "Map" }
   ],
   "linePlots": [{
     "id": "lineplot-main",

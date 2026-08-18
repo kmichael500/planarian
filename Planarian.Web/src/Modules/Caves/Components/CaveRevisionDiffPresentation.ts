@@ -141,11 +141,11 @@ const entranceOrder = [
 ];
 
 const fileDefinitions: Record<string, { label: string; format: DiffValueFormat }> = {
-  DisplayName: { label: "Display Name", format: "text" },
-  FileName: { label: "Filename", format: "text" },
+  Name: { label: "Name", format: "text" },
+  Extension: { label: "Extension", format: "text" },
   FileTypeTagId: { label: "File Type", format: "reference" },
 };
-const fileOrder = ["DisplayName", "FileName", "FileTypeTagId"];
+const fileOrder = ["Name", "Extension", "FileTypeTagId"];
 const linePlotDefinitions: Record<string, { label: string; format: DiffValueFormat }> = {
   Name: { label: "Name", format: "text" },
   ContentHash: { label: "Content", format: "text" },
@@ -382,7 +382,7 @@ export const buildCaveRevisionDiffPresentation = (
     return {
       id, status, snapshot, fields: fields.sort(compareOrder(fileOrder)), metadata: [],
       detailsAvailable: status === "changed" ? !!detail && !!oldFile && !!newFile : !!snapshot,
-      heading: snapshot?.displayName || snapshot?.fileName || oldFile?.displayName || oldFile?.fileName || "File",
+      heading: snapshot?.name || oldFile?.name || "File",
     };
   });
 

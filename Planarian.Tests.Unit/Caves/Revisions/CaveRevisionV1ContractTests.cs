@@ -23,7 +23,9 @@ public sealed class CaveRevisionV1ContractTests
         var entrance = Assert.Single(snapshot.Entrances);
         Assert.Equal("Survey Grade", entrance.LocationQualityNameAtRevision);
         Assert.Contains(entrance.Tags, tag => tag.Role == SnapshotTagRole.EntranceReportedBy);
-        Assert.Equal("Map", Assert.Single(snapshot.Files).FileTypeNameAtRevision);
+        var file = Assert.Single(snapshot.Files);
+        Assert.Equal(("Map", "Survey Map", ".pdf"),
+            (file.FileTypeNameAtRevision, file.Name, file.Extension));
         var linePlot = Assert.Single(snapshot.LinePlots);
         Assert.Equal("lineplot-main", linePlot.Id);
         Assert.Equal("Main Line Plot", linePlot.Name);
@@ -31,6 +33,10 @@ public sealed class CaveRevisionV1ContractTests
         AssertStructuralJson(json, CaveSnapshotJson.Serialize(snapshot));
         Assert.DoesNotContain("ReportedByUserId", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ReportedByNameAtRevision", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"fileName\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"displayName\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storagePartition", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storageKey", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -41,9 +47,11 @@ public sealed class CaveRevisionV1ContractTests
 
         Assert.Equal(CountyNumberIntent.Manual, proposal.CountyNumberIntent);
         Assert.Equal(48, proposal.RequestedCountyNumber);
-        Assert.Contains(proposal.Files, file => file.Disposition == ProposalFileDisposition.RetainPublished);
+        Assert.Contains(proposal.Files, file => file is
+            { Disposition: ProposalFileDisposition.RetainPublished, Name: "Current Map", Extension: ".pdf" });
         Assert.Contains(proposal.Files, file => file.Disposition == ProposalFileDisposition.RemovePublished);
-        Assert.Contains(proposal.Files, file => file.Disposition == ProposalFileDisposition.PublishStaged);
+        Assert.Contains(proposal.Files, file => file is
+            { Disposition: ProposalFileDisposition.PublishStaged, Name: "New Survey", Extension: ".pdf" });
         var linePlot = Assert.Single(proposal.LinePlots);
         Assert.Equal("lineplot-main", linePlot.Id);
         Assert.Equal("{\"features\":[],\"type\":\"FeatureCollection\"}", linePlot.GeoJson);
@@ -55,6 +63,10 @@ public sealed class CaveRevisionV1ContractTests
         AssertStructuralJson(json, CaveProposalJson.Serialize(proposal));
         Assert.DoesNotContain("ReportedByUserId", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ReportedByNameAtRevision", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"fileName\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"displayName\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storagePartition", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("storageKey", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

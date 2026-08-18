@@ -96,6 +96,7 @@ public sealed class CaveRevisionMetadataDiffTests
         Id = id,
         FileTypeTagId = fileTypeId,
         FileTypeNameAtRevision = fileTypeName,
-        FileName = "map.pdf"
+        Name = "map",
+        Extension = ".pdf"
     };
 }

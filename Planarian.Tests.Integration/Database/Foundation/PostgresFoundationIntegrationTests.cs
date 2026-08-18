@@ -105,8 +105,8 @@ public sealed class PostgresFoundationIntegrationTests(PostgresTestServer fixtur
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using (var sameAccount = new NpgsqlCommand("""
-            insert into "Files" ("Id", "AccountId", "FileTypeTagId", "FileName", "CreatedOn")
-            select 'samefile02', @account, "FileTypeTagId", 'same-account.pdf', now()
+            insert into "Files" ("Id", "AccountId", "FileTypeTagId", "Name", "Extension", "CreatedOn")
+            select 'samefile02', @account, "FileTypeTagId", 'same-account', '.pdf', now()
             from "Files" where "Id" = @existing_file;
 
             insert into "CaveChangeRequestStagedFiles" ("Id", "AccountId", "ChangeRequestId", "FileId", "CreatedOn")

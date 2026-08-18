@@ -681,12 +681,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ThenBy(file => file.Cave.County.DisplayId)
             .ThenBy(file => file.Cave.CountyNumber)
             .ThenBy(file => file.FileTypeTag.Name)
-            .ThenBy(file => file.FileName)
+            .ThenBy(file => file.Name)
+            .ThenBy(file => file.Extension)
             .Select(file => new ArchiveFileByCaveModel
             {
                 CavePlanarianId = file.CaveId!,
                 Id = file.Id,
-                FileName = file.FileName,
+                FileName = file.Name + file.Extension,
                 BlobKey = file.BlobKey,
                 FileTypeDisplayName = file.FileTypeTag.Name
             })

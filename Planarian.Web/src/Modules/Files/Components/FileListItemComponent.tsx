@@ -14,7 +14,7 @@ const FileListItemComponent = ({
   file,
   onView,
 }: FileListItemComponentProps) => {
-  const fileType = getFileType(file.fileName);
+  const fileType = getFileType(file.extension);
 
   return (
     <List.Item
@@ -32,7 +32,7 @@ const FileListItemComponent = ({
     >
       <Typography.Text>
         <PlanarianTag>{fileType}</PlanarianTag>
-        {file.displayName}
+        {file.name}
       </Typography.Text>
     </List.Item>
   );

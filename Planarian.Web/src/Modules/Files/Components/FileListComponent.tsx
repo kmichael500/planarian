@@ -111,7 +111,7 @@ export const FileListComponent = ({
 
   const viewerIsOpen = Boolean(activeFile);
   const viewerFileType = activeFile
-    ? getFileType(activeFile.fileName)
+    ? getFileType(activeFile.extension)
     : undefined;
 
   return (
@@ -178,7 +178,7 @@ export const FileListComponent = ({
         open={viewerIsOpen}
         onCancel={closeViewer}
         fileId={activeFile?.id}
-        displayName={activeFile?.displayName}
+        name={activeFile?.name}
         fileType={viewerFileType}
         onPrevious={goToPrevious}
         onNext={goToNext}

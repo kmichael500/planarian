@@ -80,7 +80,7 @@ public enum ProposalFileDisposition
 
 /// <summary>Complete file intent; absence from another table never implies removal.</summary>
 public sealed record ProposalFileIntent(string FileId, ProposalFileDisposition Disposition,
-    string? FileTypeTagId = null, string? DisplayName = null, string? FileName = null,
+    string? FileTypeTagId = null, string? Name = null, string? Extension = null,
     string? FileTypeName = null);
 
 public static class CaveProposalJson

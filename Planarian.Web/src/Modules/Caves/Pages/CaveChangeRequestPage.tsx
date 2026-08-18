@@ -24,7 +24,7 @@ export const UnavailableProposalFilesAlert = ({ fileIds, snapshots }: {
   description={fileIds.map(fileId => {
     const file = snapshots.flatMap(snapshot => snapshot?.files ?? [])
       .find(candidate => candidate.id === fileId);
-    return file?.displayName ?? file?.fileName ?? fileId;
+    return file ? `${file.name}${file.extension}` : fileId;
   }).join(", ")} /> : null;
 
 export const ProposalVersionComparison = ({ detail }: { detail: CaveProposalVersionDetailVm }) => <>
@@ -118,7 +118,7 @@ export const CaveChangeRequestPage = () => {
       countyNumberIntent={detail.countyNumberIntent} /></Card>
     {stagedFiles.length > 0 && <Card title="Proposal files">
       <Typography.Paragraph type="secondary">These files are part of the active proposal and remain unpublished until approval.</Typography.Paragraph>
-      {stagedFiles.map(file => <div key={file.id}><Typography.Link href={CaveService.GetStagedChangeRequestFileUrl(detail.request.id, file.id)}>{file.displayName ?? file.fileName}</Typography.Link></div>)}
+      {stagedFiles.map(file => <div key={file.id}><Typography.Link href={CaveService.GetStagedChangeRequestFileUrl(detail.request.id, file.id)}>{file.name}{file.extension}</Typography.Link></div>)}
     </Card>}
     {detail.request.isStale && detail.publishedSinceBase && <Card title="What changed in the published Cave after submission"><CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} /></Card>}
     {detail.versions.length > 1 && <Card title="Proposal versions">

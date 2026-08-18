@@ -20,6 +20,7 @@ using Planarian.Modules.Files.Services;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Shared.Attributes;
 using Planarian.Shared.Options;
 using Planarian.Shared.Repositories;
 using Planarian.Shared.Services;
@@ -75,7 +76,7 @@ internal sealed class IntegrationTestServices
         try
         {
             await new CaveChangeRequestRepository(_db, _db.RequestUser).StageFileAsync(
-                requestId, file.Id, file.FileTypeTagId, file.DisplayName, reviewer: false, cancellationToken);
+                requestId, file.Id, file.FileTypeTagId, file.Name, reviewer: false, cancellationToken);
             return file;
         }
         catch
@@ -103,11 +104,21 @@ internal sealed class IntegrationTestServices
     private static RequestThrottleService CreateThrottle(PlanarianDbContext db)
     {
         var memory = new MemoryCache(new MemoryCacheOptions());
-        var accessor = new HttpContextAccessor();
+        var httpContext = new DefaultHttpContext();
+        httpContext.SetEndpoint(new Endpoint(
+            requestDelegate: null,
+            metadata: new EndpointMetadataCollection(new ThrottleAttribute()),
+            displayName: "integration-test-throttled-endpoint"));
+        var accessor = new FixedHttpContextAccessor(httpContext);
         var log = new ThrottleEventLogService(
             new ThrottleEventLogRepository(new IntegrationDbContextFactory(db)), accessor,
             NullLogger<ThrottleEventLogService>.Instance, memory, db.RequestUser, new ServerOptions());
         return new RequestThrottleService(memory, new RequestThrottleOptions(), accessor, db.RequestUser, log);
+    }
+
+    private sealed class FixedHttpContextAccessor(HttpContext httpContext) : IHttpContextAccessor
+    {
+        public HttpContext? HttpContext { get; set; } = httpContext;
     }
 
     private sealed class FixedClientRequestOrigin : IClientRequestOrigin

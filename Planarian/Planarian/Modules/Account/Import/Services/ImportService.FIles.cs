@@ -1,4 +1,5 @@
 using Planarian.Library.Exceptions;
+using Planarian.Library.Helpers;
 using Planarian.Modules.Account.Import.Models;
 using Planarian.Shared.Services;
 
@@ -226,7 +227,9 @@ public partial class ImportService
 
         if (ignoreDuplicates)
         {
-            var isDuplicate = await _fileRepository.IsDuplicateFile(caveInformation.CaveId, fileName);
+            var parsedFileName = FileNamePolicy.Parse(fileName);
+            var isDuplicate = await _fileRepository.IsDuplicateFile(
+                caveInformation.CaveId, parsedFileName.Name, parsedFileName.Extension);
             if (isDuplicate)
             {
                 result.Message = $"File already exists for cave '{caveInformation.CaveName}'.";

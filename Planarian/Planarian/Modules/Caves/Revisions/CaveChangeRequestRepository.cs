@@ -141,7 +141,7 @@ public sealed class CaveChangeRequestRepository
         return version.Id;
     }
 
-    internal async Task StageFileAsync(string requestId, string fileId, string fileTypeTagId, string? displayName,
+    internal async Task StageFileAsync(string requestId, string fileId, string fileTypeTagId, string? name,
         bool reviewer, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -163,7 +163,7 @@ public sealed class CaveChangeRequestRepository
                 from tag in _db.TagTypes.AsNoTracking()
                 where file.AccountId == _scope.AccountId && file.Id == fileId && file.CaveId == null &&
                       tag.Id == fileTypeTagId
-                select new { file.FileName, file.DisplayName, FileTypeName = tag.Name })
+                select new { file.Name, file.Extension, FileTypeName = tag.Name })
             .SingleOrDefaultAsync(cancellationToken);
         if (fileSnapshot is null) throw ApiExceptionDictionary.NotFound("File");
 
@@ -172,8 +172,8 @@ public sealed class CaveChangeRequestRepository
             version.Id == request.CurrentProposalVersionId, cancellationToken);
         var proposal = CaveProposalJson.Deserialize(current.ProposalJson, current.SchemaVersion);
         var files = proposal.Files.Where(file => file.FileId != fileId).Append(
-            new ProposalFileIntent(fileId, ProposalFileDisposition.PublishStaged, fileTypeTagId, displayName,
-                CaveFileNamePolicy.GetEffectiveFileName(fileSnapshot.FileName, fileSnapshot.DisplayName, displayName),
+            new ProposalFileIntent(fileId, ProposalFileDisposition.PublishStaged, fileTypeTagId,
+                string.IsNullOrWhiteSpace(name) ? fileSnapshot.Name : name, fileSnapshot.Extension,
                 fileSnapshot.FileTypeName)).ToList();
         var nextProposal = proposal with { Files = files };
         var nextVersion = NewVersion(request, current.BaseRevisionId, request.CurrentProposalVersionId, nextProposal);
@@ -202,8 +202,8 @@ public sealed class CaveChangeRequestRepository
                     Id = file.Id,
                     FileTypeTagId = file.FileTypeTagId,
                     FileTypeNameAtRevision = tag.Name,
-                    FileName = file.FileName,
-                    DisplayName = file.DisplayName
+                    Name = file.Name,
+                    Extension = file.Extension
                 })
             .ToDictionaryAsync(file => file.Id, cancellationToken);
     }
@@ -240,9 +240,10 @@ public sealed class CaveChangeRequestRepository
     }
 
     public async Task<IReadOnlyList<StagedCaveFilePublication>> PlanStagedFilePublicationsAsync(
-        string requestId, IEnumerable<string> fileIds, CancellationToken cancellationToken)
+        string requestId, IReadOnlyDictionary<string, string> extensionsByFileId,
+        CancellationToken cancellationToken)
     {
-        var ids = fileIds.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        var ids = extensionsByFileId.Keys.OrderBy(id => id, StringComparer.Ordinal).ToList();
         if (ids.Count == 0) return [];
 
         var rows = await (from staged in _db.CaveChangeRequestStagedFiles.IgnoreQueryFilters()
@@ -271,7 +272,8 @@ public sealed class CaveChangeRequestRepository
         {
             if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
                 throw ApiExceptionDictionary.NotFound("Staged file");
-            return new StagedCaveFilePublication(file.Id, file.BlobKey, file.BlobContainer);
+            return new StagedCaveFilePublication(file.Id, file.BlobKey, file.BlobContainer,
+                extensionsByFileId[file.Id]);
         }).OrderBy(publication => publication.FileId, StringComparer.Ordinal).ToList();
     }
 

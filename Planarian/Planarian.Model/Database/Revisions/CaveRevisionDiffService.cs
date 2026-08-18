@@ -190,8 +190,8 @@ public sealed class CaveRevisionDiffService
         {
             var nestedScalars = new Dictionary<string, (object?, object?)>();
             AddNestedScalar(nameof(CaveFileSnapshotV1.FileTypeTagId), oldFile.FileTypeTagId, newFile.FileTypeTagId);
-            AddNestedScalar(nameof(CaveFileSnapshotV1.FileName), oldFile.FileName, newFile.FileName);
-            AddNestedScalar(nameof(CaveFileSnapshotV1.DisplayName), oldFile.DisplayName, newFile.DisplayName);
+            AddNestedScalar(nameof(CaveFileSnapshotV1.Name), oldFile.Name, newFile.Name);
+            AddNestedScalar(nameof(CaveFileSnapshotV1.Extension), oldFile.Extension, newFile.Extension);
             if (oldFile.FileTypeTagId == newFile.FileTypeTagId && oldFile.FileTypeNameAtRevision != newFile.FileTypeNameAtRevision)
                 metadata.Add(new ReferenceMetadataChange($"Files/{fileId}/FileType", oldFile.FileTypeTagId,
                     nameof(CaveFileSnapshotV1.FileTypeNameAtRevision), oldFile.FileTypeNameAtRevision, newFile.FileTypeNameAtRevision));

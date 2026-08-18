@@ -33,7 +33,7 @@ const VectorDatasetViewer = lazy(async () => ({
 
 interface FileViewerProps {
   fileId?: string | null;
-  displayName?: string | null;
+  name?: string | null;
   fileType?: string | null;
   open: boolean;
   onCancel?: (() => void) | undefined;
@@ -45,7 +45,7 @@ interface FileViewerProps {
 
 const FileViewer: React.FC<FileViewerProps> = ({
   fileId,
-  displayName,
+  name,
   fileType,
   open,
   onCancel: onClose,
@@ -62,7 +62,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const isSupported = isSupportedFileType(fileType);
   const headerTitle = (
     <>
-      {displayName}
+      {name}
       {fileType && <PlanarianTag style={{ marginLeft: "0.5rem" }}>{fileType}</PlanarianTag>}
     </>
   );

@@ -803,12 +803,12 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
-                case nameof(CaveSearchParamsVm.FileDisplayName):
+                case nameof(CaveSearchParamsVm.FileName):
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.Contains => query.Where(e =>
                             e.Files.Any(ee =>
-                                ee.DisplayName != null && ee.DisplayName.Contains(queryCondition.Value))),
+                                ee.Name.Contains(queryCondition.Value))),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
@@ -820,31 +820,24 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         break;
                     }
 
-                    var normalizedExtension = fileExtension!
-                        .TrimStart('.')
-                        .ToLowerInvariant();
+                    var normalizedExtension = "." + fileExtension!.TrimStart('.');
 
                     if (normalizedExtension.IsNullOrWhiteSpace())
                     {
                         break;
                     }
 
-                    var extensionPattern = $"%.{normalizedExtension}";
-
                     query = queryCondition.Operator switch
                     {
                         QueryOperator.EndsWith => query.Where(e =>
                             e.Files.Any(ee =>
-                                ee.FileName != null &&
-                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                                EF.Functions.ILike(ee.Extension, normalizedExtension))),
                         QueryOperator.Equal => query.Where(e =>
                             e.Files.Any(ee =>
-                                ee.FileName != null &&
-                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                                EF.Functions.ILike(ee.Extension, normalizedExtension))),
                         QueryOperator.Contains => query.Where(e =>
                             e.Files.Any(ee =>
-                                ee.FileName != null &&
-                                EF.Functions.ILike(ee.FileName, extensionPattern))),
+                                EF.Functions.ILike(ee.Extension, $"%{normalizedExtension}%"))),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
@@ -1062,8 +1055,8 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 Files = e.Files.Select(ee => new FileVm
                 {
                     Id = ee.Id,
-                    DisplayName = ee.DisplayName,
-                    FileName = ee.FileName,
+                    Name = ee.Name,
+                    Extension = ee.Extension,
                     FileTypeKey = ee.FileTypeTag.Name,
                     FileTypeTagId = ee.FileTypeTagId
                 }),
@@ -1333,6 +1326,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             if (!string.Equals(file.BlobKey, publication.StorageKey, StringComparison.Ordinal) ||
                 !string.Equals(file.BlobContainer, publication.StoragePartition, StringComparison.Ordinal))
                 throw ApiExceptionDictionary.NotFound("Staged file");
+            file.Extension = publication.Extension;
             file.CaveId = caveId;
             file.ExpiresOn = null;
         }

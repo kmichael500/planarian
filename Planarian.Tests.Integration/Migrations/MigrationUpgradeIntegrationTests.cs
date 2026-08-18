@@ -225,10 +225,10 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
 
             var files = await verify.Files.OrderBy(file => file.Id).ToListAsync();
             Assert.Equal(2, files.Count);
-            Assert.Equal(("mainacct01", "maincave01", "existing-cave.pdf"),
-                (files[0].AccountId, files[0].CaveId, files[0].FileName));
-            Assert.Equal(("mainacct01", (string?)null, "temporary.csv"),
-                (files[1].AccountId, files[1].CaveId, files[1].FileName));
+            Assert.Equal(("mainacct01", "maincave01", "existing-cave", ".pdf"),
+                (files[0].AccountId, files[0].CaveId, files[0].Name, files[0].Extension));
+            Assert.Equal(("mainacct01", (string?)null, "temporary", ".csv"),
+                (files[1].AccountId, files[1].CaveId, files[1].Name, files[1].Extension));
         }
 
         // The newly-added xmin concurrency token must also work after upgrade.
@@ -317,6 +317,243 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
+    public async Task FileNameMigrationPreservesLegacyDisplayNameAndBackfillsNameAndExtensionEdgeCases()
+    {
+        await using var database = await CreateV29DatabaseAsync(
+            nameof(FileNameMigrationPreservesLegacyDisplayNameAndBackfillsNameAndExtensionEdgeCases));
+        await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                update "Files" set "DisplayName" = 'Entrance Survey' where "Id" = 'mainfiler1';
+                insert into "Files"("Id","AccountId","CaveId","FileTypeTagId","FileName","BlobKey","BlobContainer","CreatedOn") values
+                  ('filemulti1','mainacct01','maincave01','mainfile01','survey.final.PDF','multi','main',now()),
+                  ('fileplain1','mainacct01','maincave01','mainfile01','README','plain','main',now()),
+                  ('filedot001','mainacct01','maincave01','mainfile01','.gitignore','dot','main',now()),
+                  ('filetrail1','mainacct01','maincave01','mainfile01','survey.','trail','main',now()),
+                  ('fileutf001','mainacct01','maincave01','mainfile01','Mügelhöhle.pdf','utf','main',now());
+                update "Files" set "DisplayName" = '   ' where "Id" = 'fileplain1';
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        var results = new Dictionary<string, (string Name, string Extension)>(StringComparer.Ordinal);
+        await using (var command = new NpgsqlCommand(
+                         "select \"Id\", \"Name\", \"Extension\" from \"Files\" order by \"Id\"", verify))
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+                results.Add(reader.GetString(0), (reader.GetString(1), reader.GetString(2)));
+        }
+
+        Assert.Equal(("Entrance Survey", ".pdf"), results["mainfiler1"]);
+        Assert.Equal(("temporary", ".csv"), results["mainfilet1"]);
+        Assert.Equal(("survey.final", ".PDF"), results["filemulti1"]);
+        Assert.Equal(("README", ""), results["fileplain1"]);
+        Assert.Equal((".gitignore", ""), results["filedot001"]);
+        Assert.Equal(("survey.", ""), results["filetrail1"]);
+        Assert.Equal(("Mügelhöhle", ".pdf"), results["fileutf001"]);
+
+        await using var schema = new NpgsqlCommand("""
+            select exists(select 1 from information_schema.columns where table_name='Files' and column_name='Name'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Extension'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='FileName'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='DisplayName'),
+                   exists(select 1 from pg_constraint where conname='CK_Files_ValidNameAndExtension')
+            """, verify);
+        await using var schemaReader = await schema.ExecuteReaderAsync();
+        Assert.True(await schemaReader.ReadAsync());
+        Assert.True(schemaReader.GetBoolean(0));
+        Assert.True(schemaReader.GetBoolean(1));
+        Assert.False(schemaReader.GetBoolean(2));
+        Assert.False(schemaReader.GetBoolean(3));
+        Assert.True(schemaReader.GetBoolean(4));
+    }
+
+    [Fact]
+    public async Task FileNameMigrationFailsRatherThanTruncatingLegacyFileMetadata()
+    {
+        await using var database = await CreateV29DatabaseAsync(
+            nameof(FileNameMigrationFailsRatherThanTruncatingLegacyFileMetadata));
+        await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+        var displayName = new string('n', 100);
+        var fileName = "x." + new string('e', 998);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                update "Files"
+                set "DisplayName" = @display, "FileName" = @file
+                where "Id" = 'mainfiler1'
+                """, connection);
+            seed.Parameters.AddWithValue("display", displayName);
+            seed.Parameters.AddWithValue("file", fileName);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(null));
+        Assert.Contains("would exceed 1000 characters", error.MessageText, StringComparison.Ordinal);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "DisplayName", "FileName",
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Name'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Extension')
+            from "Files" where "Id"='mainfiler1'
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(displayName, reader.GetString(0));
+        Assert.Equal(fileName, reader.GetString(1));
+        Assert.False(reader.GetBoolean(2));
+        Assert.False(reader.GetBoolean(3));
+    }
+
+    [Theory]
+    [InlineData("nested/report", "path-separator")]
+    [InlineData("\u00A0", "unicode-whitespace")]
+    public async Task FileNameMigrationFailsWhenLegacyDisplayNameViolatesTheNewNamePolicy(
+        string legacyDisplayName, string databaseSuffix)
+    {
+        await using var database = await CreateV29DatabaseAsync(
+            $"{nameof(FileNameMigrationFailsWhenLegacyDisplayNameViolatesTheNewNamePolicy)}_{databaseSuffix}");
+        await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var update = new NpgsqlCommand("""
+                update "Files"
+                set "DisplayName" = @displayName
+                where "Id" = 'mainfiler1'
+                """, connection);
+            update.Parameters.AddWithValue("displayName", legacyDisplayName);
+            await update.ExecuteNonQueryAsync();
+        }
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(null));
+        Assert.Contains("legacy DisplayName contains a file name that is invalid", error.MessageText,
+            StringComparison.Ordinal);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "DisplayName", "FileName",
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Name'),
+                   exists(select 1 from pg_constraint where conname='CK_Files_ValidNameAndExtension')
+            from "Files" where "Id"='mainfiler1'
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(legacyDisplayName, reader.GetString(0));
+        Assert.Equal("existing-cave.pdf", reader.GetString(1));
+        Assert.False(reader.GetBoolean(2));
+        Assert.False(reader.GetBoolean(3));
+    }
+
+    [Fact]
+    public async Task FileNameMigrationDownRestoresLegacyNameColumnsWithoutChangingTheFilename()
+    {
+        await using var database = await CreateV29DatabaseAsync(
+            nameof(FileNameMigrationDownRestoresLegacyNameColumnsWithoutChangingTheFilename));
+        await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
+        await database.MigrateAsync(null);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var update = new NpgsqlCommand("""
+                update "Files"
+                set "Name" = 'Entrance Survey', "Extension" = '.PDF'
+                where "Id" = 'mainfiler1'
+                """, connection);
+            await update.ExecuteNonQueryAsync();
+        }
+
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "DisplayName", "FileName",
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Name'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='Extension'),
+                   exists(select 1 from pg_constraint where conname='CK_Files_ValidNameAndExtension')
+            from "Files" where "Id"='mainfiler1'
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("Entrance Survey", reader.GetString(0));
+        Assert.Equal("Entrance Survey.PDF", reader.GetString(1));
+        Assert.False(reader.GetBoolean(2));
+        Assert.False(reader.GetBoolean(3));
+        Assert.False(reader.GetBoolean(4));
+    }
+
+    [Fact]
+    public async Task FileNameMigrationDownFailsRatherThanTruncatingLegacyDisplayName()
+    {
+        await using var database = await CreateV29DatabaseAsync(
+            nameof(FileNameMigrationDownFailsRatherThanTruncatingLegacyDisplayName));
+        await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
+        await database.MigrateAsync(null);
+        var name = new string('n', 101);
+        const string extension = ".pdf";
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var update = new NpgsqlCommand("""
+                update "Files"
+                set "Name" = @name, "Extension" = @extension
+                where "Id" = 'mainfiler1'
+                """, connection);
+            update.Parameters.AddWithValue("name", name);
+            update.Parameters.AddWithValue("extension", extension);
+            await update.ExecuteNonQueryAsync();
+        }
+
+        var previousMigration = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(previousMigration));
+        Assert.Contains("cannot fit the legacy DisplayName column", error.MessageText, StringComparison.Ordinal);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            select "Name", "Extension",
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='FileName'),
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='DisplayName')
+            from "Files" where "Id"='mainfiler1'
+            """, verify);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(name, reader.GetString(0));
+        Assert.Equal(extension, reader.GetString(1));
+        Assert.False(reader.GetBoolean(2));
+        Assert.False(reader.GetBoolean(3));
+    }
+
+    [Fact]
     public async Task V29LegacyCaveFileWithNullOwnerIsBackfilledFromItsCave()
     {
         await using var database = await CreateV29DatabaseAsync(nameof(V29LegacyCaveFileWithNullOwnerIsBackfilledFromItsCave));
@@ -328,7 +565,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            select f."AccountId", f."CaveId", f."FileName", f."BlobKey",
+            select f."AccountId", f."CaveId", f."Name", f."Extension", f."BlobKey",
                    exists(select 1 from pg_constraint where conname = 'FK_Files_Accounts_AccountId'),
                    exists(select 1 from pg_constraint where conname = 'AK_Files_AccountId_Id'),
                    exists(select 1 from pg_constraint where conname = 'FK_CaveChangeRequestStagedFiles_Files_AccountId_FileId')
@@ -338,11 +575,11 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         Assert.True(await reader.ReadAsync());
         Assert.Equal("legacyacct", reader.GetString(0));
         Assert.Equal("legcave01", reader.GetString(1));
-        Assert.Equal("legacy-cave.pdf", reader.GetString(2));
-        Assert.Equal("caves/legcave01/files/legfile01.pdf", reader.GetString(3));
-        Assert.True(reader.GetBoolean(4));
+        Assert.Equal("legacy-cave", reader.GetString(2));
+        Assert.Equal(".pdf", reader.GetString(3));
+        Assert.Equal("caves/legcave01/files/legfile01.pdf", reader.GetString(4));
         Assert.True(reader.GetBoolean(5));
-        Assert.True(reader.GetBoolean(6));
+        Assert.True(reader.GetBoolean(7));
     }
 
     [Fact]
@@ -356,13 +593,14 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("select \"AccountId\", \"CaveId\", \"FileName\", \"BlobKey\" from \"Files\" where \"Id\"='temporary1'", connection);
+        await using var command = new NpgsqlCommand("select \"AccountId\", \"CaveId\", \"Name\", \"Extension\", \"BlobKey\" from \"Files\" where \"Id\"='temporary1'", connection);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal("legacyacct", reader.GetString(0));
         Assert.True(reader.IsDBNull(1));
-        Assert.Equal("temporary.csv", reader.GetString(2));
-        Assert.Equal("temp/import/temporary1.csv", reader.GetString(3));
+        Assert.Equal("temporary", reader.GetString(2));
+        Assert.Equal(".csv", reader.GetString(3));
+        Assert.Equal("temp/import/temporary1.csv", reader.GetString(4));
     }
 
     [Fact]
@@ -409,7 +647,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         PhysiographicProvinceTagIds = cave.PhysiographicProvinceTagIds,
         OtherTagIds = cave.OtherTagIds,
         Files = cave.Files.Select(file => new EditFileMetadataVm
-            { Id = file.Id, FileTypeTagId = file.FileTypeTagId, DisplayName = file.DisplayName }).ToList(),
+            { Id = file.Id, FileTypeTagId = file.FileTypeTagId, Name = file.Name }).ToList(),
         Entrances = cave.Entrances.Select(entrance => new AddEntranceVm
         {
             Id = entrance.Id,

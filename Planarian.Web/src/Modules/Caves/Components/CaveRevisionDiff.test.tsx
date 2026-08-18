@@ -46,8 +46,8 @@ const snapshot = (current: boolean): CaveSnapshotVm => ({
   files: [{
     id: "file", fileTypeTagId: current ? "map" : "report",
     fileTypeNameAtRevision: current ? "Map" : "Report",
-    fileName: current ? "survey-map.pdf" : "survey.pdf",
-    displayName: current ? "Survey Map" : "Survey",
+    name: current ? "Survey Map" : "Survey",
+    extension: ".pdf",
   }],
   linePlots: [{ id: "line", name: current ? "Main line" : "Old line", contentHash: current ? "newhash" : "oldhash" }],
 });
@@ -86,8 +86,7 @@ const diff: CaveRevisionDiffVm = {
   }],
   addedFiles: [], removedFiles: [], changedFiles: ["file"],
   fileChanges: [{ fileId: "file", scalars: [
-    { path: "DisplayName", previous: "Survey", current: "Survey Map" },
-    { path: "FileName", previous: "survey.pdf", current: "survey-map.pdf" },
+    { path: "Name", previous: "Survey", current: "Survey Map" },
     { path: "FileTypeTagId", previous: "report", current: "map" },
   ] }],
   addedLinePlots: [], removedLinePlots: [], changedLinePlots: ["line"],
@@ -108,7 +107,7 @@ it("shows the actual nested and reference values needed for review", () => {
     "New Reporter", "Old Reporter", "35", "34", "-86", "-85", "500", "450", "2026", "2025",
     "42 ft", "12 ft", "+ Added Open", "− Removed Closed", "+ Added Wet", "− Removed Dry",
     "+ Added Sinkhole", "− Removed Spring",
-    "Survey Map", "Survey", "survey-map.pdf", "survey.pdf", "Map", "Report",
+    "Survey Map", "Survey", "Map", "Report",
     "Line Plots", "Main line", "Old line", "Updated content", "Previous content",
   ]) expect(document.body).toHaveTextContent(text);
 });
@@ -155,7 +154,7 @@ it("renders complete added and removed entrance and file state", () => {
   const current = snapshot(true);
   previous.entrances[0] = { ...previous.entrances[0], id: "removed", name: "Old North Entrance" };
   current.entrances[0] = { ...current.entrances[0], id: "added", name: "Carr Entrance" };
-  previous.files[0] = { ...previous.files[0], id: "removed-file" };
+  previous.files[0] = { ...previous.files[0], id: "removed-file", extension: ".txt" };
   current.files[0] = { ...current.files[0], id: "added-file" };
   render(<CaveRevisionDiff diff={{ ...diff,
     scalars: [], addedTags: [], removedTags: [],
@@ -169,6 +168,10 @@ it("renders complete added and removed entrance and file state", () => {
   expect(document.body).toHaveTextContent("Old entrance description");
   expect(document.body).toHaveTextContent("Survey MapAdded");
   expect(document.body).toHaveTextContent("SurveyRemoved");
+  expect(document.body).toHaveTextContent(".pdf");
+  expect(document.body).toHaveTextContent(".txt");
+  expect(document.body).toHaveTextContent("Map");
+  expect(document.body).toHaveTextContent("Report");
 });
 
 it("renders reference label updates neutrally and missing snapshots visibly", () => {

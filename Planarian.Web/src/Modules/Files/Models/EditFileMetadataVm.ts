@@ -1,6 +1,7 @@
 export interface EditFileMetadataVm {
   id: string;
-  displayName: string | null;
+  name: string;
+  extension?: string;
   fileTypeTagId: string;
   fileTypeKey: string;
 }

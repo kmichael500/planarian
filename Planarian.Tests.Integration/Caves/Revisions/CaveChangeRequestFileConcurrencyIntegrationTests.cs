@@ -48,7 +48,7 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
         var updateValues = ValuesFromCave(writerCave!);
         updateValues.Files = [new EditFileMetadataVm
         {
-            Id = file.FileId, FileTypeTagId = replacement.Id, DisplayName = "Replacement file"
+            Id = file.FileId, FileTypeTagId = replacement.Id, Name = "Replacement file"
         }];
         var update = IntegrationTestServices.For(writerDb).Caves.AddCave(updateValues, default);
         try
@@ -146,7 +146,7 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
             {
                 Id = file.FileId,
                 FileTypeTagId = mapType.Id,
-                DisplayName = "Proposed survey map"
+                Name = "Proposed survey map"
             }];
             await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
             proposalVersionId = await IntegrationTestServices.For(contributor).CaveChangeRequests.AddVersionAsync(requestId, values,
@@ -156,14 +156,14 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
         await using (var inspect = database.CreateDbContext("verify", tenant.AccountId))
         {
             var liveFile = await inspect.Files.SingleAsync(candidate => candidate.Id == file.FileId);
-            Assert.Equal(("seed-a.pdf", (string?)null, file.FileTypeId),
-                (liveFile.FileName, liveFile.DisplayName, liveFile.FileTypeTagId));
+            Assert.Equal(("seed-a", ".pdf", file.FileTypeId),
+                (liveFile.Name, liveFile.Extension, liveFile.FileTypeTagId));
             var proposalRow = await inspect.CaveProposalVersions.SingleAsync(version =>
                 version.Id == proposalVersionId);
             var proposed = Assert.Single(CaveProposalJson.Deserialize(proposalRow.ProposalJson,
                 proposalRow.SchemaVersion).Files, candidate => candidate.FileId == file.FileId);
-            Assert.Equal(("Proposed survey map.pdf", "Proposed survey map", mapType.Id),
-                (proposed.FileName, proposed.DisplayName, proposed.FileTypeTagId));
+            Assert.Equal(("Proposed survey map", ".pdf", mapType.Id),
+                (proposed.Name, proposed.Extension, proposed.FileTypeTagId));
         }
 
         string acceptedRevisionId;
@@ -182,8 +182,8 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
             var publishedFile = await acceptedState.Files.SingleAsync(candidate => candidate.Id == file.FileId);
             Assert.Equal(tenant.CaveId, publishedFile.CaveId);
             Assert.Null(publishedFile.ExpiresOn);
-            Assert.Equal(("Proposed survey map.pdf", "Proposed survey map", mapType.Id),
-                (publishedFile.FileName, publishedFile.DisplayName, publishedFile.FileTypeTagId));
+            Assert.Equal(("Proposed survey map", ".pdf", mapType.Id),
+                (publishedFile.Name, publishedFile.Extension, publishedFile.FileTypeTagId));
             var accepted = await acceptedState.CaveRevisions.SingleAsync(revision =>
                 revision.Id == acceptedRevisionId);
             Assert.Equal(CaveRevisionSource.UserSubmission, accepted.Source);
@@ -199,7 +199,7 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
             {
                 Id = file.FileId,
                 FileTypeTagId = laterType.Id,
-                DisplayName = "Manager follow-up photograph"
+                Name = "Manager follow-up photograph"
             }];
             await IntegrationTestServices.For(manager).Caves.AddCave(values, default);
         }
@@ -211,15 +211,15 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
         Assert.Equal(acceptedSnapshotJson, acceptedRevision.SnapshotJson);
         var acceptedFile = Assert.Single(CaveSnapshotJson.Deserialize(acceptedRevision.SnapshotJson,
             acceptedRevision.SnapshotSchemaVersion).Files, candidate => candidate.Id == file.FileId);
-        Assert.Equal(("Proposed survey map.pdf", "Proposed survey map", mapType.Id),
-            (acceptedFile.FileName, acceptedFile.DisplayName, acceptedFile.FileTypeTagId));
+        Assert.Equal(("Proposed survey map", ".pdf", mapType.Id),
+            (acceptedFile.Name, acceptedFile.Extension, acceptedFile.FileTypeTagId));
         var managerRevision = await verify.CaveRevisions.SingleAsync(revision =>
             revision.Id == cave.CurrentRevisionId);
         Assert.Equal(CaveRevisionSource.ManagerEdit, managerRevision.Source);
         Assert.Equal(acceptedRevisionId, managerRevision.PreviousRevisionId);
         var managerFile = Assert.Single(CaveSnapshotJson.Deserialize(managerRevision.SnapshotJson,
             managerRevision.SnapshotSchemaVersion).Files, candidate => candidate.Id == file.FileId);
-        Assert.Equal(("Manager follow-up photograph.pdf", "Manager follow-up photograph", laterType.Id),
-            (managerFile.FileName, managerFile.DisplayName, managerFile.FileTypeTagId));
+        Assert.Equal(("Manager follow-up photograph", ".pdf", laterType.Id),
+            (managerFile.Name, managerFile.Extension, managerFile.FileTypeTagId));
     }
 }

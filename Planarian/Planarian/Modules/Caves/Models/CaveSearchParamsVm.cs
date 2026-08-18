@@ -53,7 +53,7 @@ public class CaveSearchParamsVm
     #region Files
 
     public string FileTypeTagIds { get; set; }
-    public string FileDisplayName { get; set; }
+    public string FileName { get; set; }
     public string FileExtension { get; set; }
 
     #endregion

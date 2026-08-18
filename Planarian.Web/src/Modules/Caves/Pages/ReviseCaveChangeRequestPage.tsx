@@ -47,7 +47,7 @@ export const ReviseCaveChangeRequestPage = () => {
             ...(values.files ?? []),
             ...loaded.activeStagedFiles.filter((file) => !existingIds.has(file.id)).map((file) => ({
               id: file.id,
-              displayName: file.displayName ?? null,
+              name: file.name,
               fileTypeTagId: file.fileTypeTagId,
               fileTypeKey: file.fileTypeNameAtRevision,
             })),

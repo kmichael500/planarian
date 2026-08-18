@@ -1,6 +1,11 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Planarian.Library.Options;
+using Planarian.Model.Database;
+using Planarian.Model.Shared;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Shared.Base;
 using Planarian.Shared.Models;
 using Planarian.Shared.Services;
@@ -66,10 +71,30 @@ public sealed class FileResponseSecurityTests
         Assert.True(result.ForceDownload);
     }
 
+    [Theory]
+    [InlineData("document.pdf", ".pdf")]
+    [InlineData("payload.svg", ".svg")]
+    [InlineData("data.csv", ".csv")]
+    [InlineData("archive.zip", ".zip")]
+    public void FileNameAndExtensionPolicyEntryPointsRemainEquivalent(string fileName, string extension)
+    {
+        var fromFileName = Resolve(fileName, "text/html", requestedDownload: false);
+        var fromExtension = ResolveExtension(extension, "text/html", requestedDownload: false);
+
+        Assert.Equal(fromFileName, fromExtension);
+    }
+
     [Fact]
     public async Task FileResultsAlwaysDisableContentTypeSniffingAndHonorAttachmentDisposition()
     {
-        var controller = new TestController();
+        using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
+        var controller = new TestController(
+            new RequestUser(db),
+            new TokenService(new AuthOptions
+            {
+                JwtSecret = new string('x', 32),
+                JwtIssuer = "planarian-tests"
+            }));
         var response = new AuthenticatedFileResponse
         {
             OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([1, 2, 3])),
@@ -103,9 +128,26 @@ public sealed class FileResponseSecurityTests
             [fileName, sourceContentType, requestedDownload])!;
     }
 
+    private static (string ContentType, bool ForceDownload) ResolveExtension(
+        string extension,
+        string sourceContentType,
+        bool requestedDownload)
+    {
+        var policyType = typeof(BlobService).Assembly.GetType(
+            "Planarian.Shared.Services.FileResponsePolicy",
+            throwOnError: true)!;
+        var resolveMethod = policyType.GetMethod(
+            "ResolveExtension",
+            BindingFlags.Public | BindingFlags.Static)!;
+
+        return ((string ContentType, bool ForceDownload))resolveMethod.Invoke(
+            null,
+            [extension, sourceContentType, requestedDownload])!;
+    }
+
     private sealed class TestController : PlanarianControllerBase
     {
-        public TestController() : base(null!, null!)
+        public TestController(RequestUser requestUser, TokenService tokenService) : base(requestUser, tokenService)
         {
             ControllerContext = new ControllerContext
             {

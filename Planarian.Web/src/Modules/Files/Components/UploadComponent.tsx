@@ -264,7 +264,7 @@ const UploadComponent = ({
                           <Form.Item
                             name={[
                               field.name,
-                              nameof<EditFileMetadataVm>("displayName"),
+                              nameof<EditFileMetadataVm>("name"),
                             ]}
                             key={field.key}
                             label={`Name`}

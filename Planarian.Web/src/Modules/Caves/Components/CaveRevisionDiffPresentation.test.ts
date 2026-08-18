@@ -14,7 +14,7 @@ const snapshot = (): CaveSnapshotVm => ({
     elevation: undefined, srid: 4326, locationQualityTagId: "exact", locationQualityNameAtRevision: "Exact",
     pitDepthFeet: undefined, tags: [],
   }],
-  files: [{ id: "file", fileTypeTagId: "map", fileTypeNameAtRevision: "Map", fileName: "map.pdf", displayName: "Map" }],
+  files: [{ id: "file", fileTypeTagId: "map", fileTypeNameAtRevision: "Map", name: "Map", extension: ".pdf" }],
   linePlots: [],
 });
 
@@ -127,14 +127,14 @@ it("keeps SRID separate and orders entrance fields like Cave detail", () => {
 it("does not infer unreported file fields from snapshots", () => {
   const previous = snapshot();
   const current = snapshot();
-  current.files[0] = { ...current.files[0], fileName: "snapshot-only.pdf", displayName: "Changed display", fileTypeNameAtRevision: "Renamed" };
+  current.files[0] = { ...current.files[0], name: "Changed name", extension: ".jpg", fileTypeNameAtRevision: "Renamed" };
   const diff = emptyDiff();
   diff.changedFiles = ["file"];
-  diff.fileChanges = [{ fileId: "file", scalars: [{ path: "DisplayName", previous: "Map", current: "Changed display" }] }];
+  diff.fileChanges = [{ fileId: "file", scalars: [{ path: "Name", previous: "Map", current: "Changed name" }] }];
 
   const fields = buildCaveRevisionDiffPresentation(diff, previous, current).files[0].fields;
 
-  expect(fields.map(field => field.label)).toEqual(["Display Name"]);
+  expect(fields.map(field => field.label)).toEqual(["Name"]);
 });
 
 it("parses only the defined metadata grammar and attaches metadata to its field", () => {
@@ -187,7 +187,7 @@ it("selects complete snapshots for added and removed items and exposes missing I
   const previous = snapshot();
   const current = snapshot();
   current.entrances[0] = { ...current.entrances[0], id: "added", name: "Added" };
-  current.files[0] = { ...current.files[0], id: "added-file", displayName: "Added file" };
+  current.files[0] = { ...current.files[0], id: "added-file", name: "Added file" };
   const diff = emptyDiff();
   diff.addedEntrances = ["added"];
   diff.removedEntrances = ["entrance", "missing"];
@@ -199,8 +199,8 @@ it("selects complete snapshots for added and removed items and exposes missing I
   expect(model.entrances.find(item => item.status === "added")?.snapshot?.name).toBe("Added");
   expect(model.entrances.find(item => item.id === "entrance")?.snapshot?.name).toBe("Main");
   expect(model.entrances.find(item => item.id === "missing")?.detailsAvailable).toBe(false);
-  expect(model.files.find(item => item.status === "added")?.snapshot?.displayName).toBe("Added file");
-  expect(model.files.find(item => item.id === "file")?.snapshot?.displayName).toBe("Map");
+  expect(model.files.find(item => item.status === "added")?.snapshot?.name).toBe("Added file");
+  expect(model.files.find(item => item.id === "file")?.snapshot?.name).toBe("Map");
   expect(model.files.find(item => item.id === "missing-file")?.detailsAvailable).toBe(false);
 });
 

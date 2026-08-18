@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Planarian.Model.Database;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
-using Planarian.Model.Shared.Helpers;
 using Xunit;
 
 namespace Planarian.Tests.Unit.Caves.Revisions;
@@ -12,24 +12,15 @@ public class CaveRevisionFoundationTests
     public void ProposalJsonWithoutOptionalFilePresentationMetadataRemainsReadable()
     {
         const string json = """
-            {"schemaVersion":1,"caveId":"c","accountId":"a","name":"Cave","stateId":"s","countyId":"co","files":[{"fileId":"f","disposition":"RetainPublished","fileTypeTagId":"report","displayName":"Survey"}]}
+            {"schemaVersion":1,"caveId":"c","accountId":"a","name":"Cave","stateId":"s","countyId":"co","files":[{"fileId":"f","disposition":"RetainPublished","fileTypeTagId":"report","name":"Survey","extension":".pdf"}]}
             """;
 
         var file = Assert.Single(CaveProposalJson.Deserialize(json, 1).Files);
 
-        Assert.Null(file.FileName);
+        Assert.Equal("Survey", file.Name);
+        Assert.Equal(".pdf", file.Extension);
         Assert.Null(file.FileTypeName);
     }
-
-    [Theory]
-    [InlineData("survey.pdf", "Survey", "Survey Map", "Survey Map.pdf")]
-    [InlineData("survey.pdf", "Survey", "Survey", "survey.pdf")]
-    [InlineData("survey.pdf", "Survey", null, "survey.pdf")]
-    [InlineData("survey", null, "Renamed", "Renamed")]
-    public void EffectiveProposalFileNameMatchesPublicationSemantics(string existingFileName,
-        string? existingDisplayName, string? proposedDisplayName, string expected) =>
-        Assert.Equal(expected, CaveFileNamePolicy.GetEffectiveFileName(existingFileName,
-            existingDisplayName, proposedDisplayName));
 
     [Fact]
     public void RoundTripUnchangedSnapshotIsSemanticNoOp()
@@ -132,14 +123,14 @@ public class CaveRevisionFoundationTests
             State = new SnapshotReference("s", "Georgia", null, "GA"),
             County = new SnapshotReference("co", "Marion", "MAR"),
             Entrances = [new CaveEntranceSnapshotV1 { Id = "e", LocationQualityTagId = "q", LocationQualityNameAtRevision = "Exact" }],
-            Files = [new CaveFileSnapshotV1 { Id = "f", FileTypeTagId = "map", FileTypeNameAtRevision = "Map", FileName = "x" }]
+            Files = [new CaveFileSnapshotV1 { Id = "f", FileTypeTagId = "map", FileTypeNameAtRevision = "Map", Name = "x" }]
         };
         var after = before with
         {
             State = new SnapshotReference("s", "State of Georgia", null, "GA"),
             County = new SnapshotReference("co", "Marion", "MA"),
             Entrances = [new CaveEntranceSnapshotV1 { Id = "e", LocationQualityTagId = "q", LocationQualityNameAtRevision = "Survey Grade" }],
-            Files = [new CaveFileSnapshotV1 { Id = "f", FileTypeTagId = "map", FileTypeNameAtRevision = "Cave Map", FileName = "x" }]
+            Files = [new CaveFileSnapshotV1 { Id = "f", FileTypeTagId = "map", FileTypeNameAtRevision = "Cave Map", Name = "x" }]
         };
 
         var diff = new CaveRevisionDiffService().Compare(before, after);
@@ -152,7 +143,9 @@ public class CaveRevisionFoundationTests
     [Fact]
     public void ScopeFailsClosedWithoutAccount()
     {
-        var user = new RequestUser(null!) { Id = "user-a", AccountId = null };
+        using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
+        var user = new RequestUser(db) { Id = "user-a", AccountId = null };
+
         Assert.Throws<InvalidOperationException>(() => AccountExecutionScope.Require(user));
     }
 }

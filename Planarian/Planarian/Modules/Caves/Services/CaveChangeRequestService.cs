@@ -1,4 +1,5 @@
 using Planarian.Library.Exceptions;
+using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
@@ -252,10 +253,13 @@ public sealed class CaveChangeRequestService
 
         var proposal = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson, row.ProposalVersion.SchemaVersion);
         var values = ToAddCave(proposal);
-        var stagedFileIds = proposal.Files.Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
-            .Select(file => file.FileId).ToList();
+        var stagedFileExtensions = proposal.Files
+            .Where(file => file.Disposition == ProposalFileDisposition.PublishStaged)
+            .ToDictionary(file => file.FileId, file => file.Extension
+                ?? throw new InvalidOperationException("A staged proposal File must capture its Extension."),
+                StringComparer.Ordinal);
         var publications = await _requests.PlanStagedFilePublicationsAsync(requestId,
-            stagedFileIds, cancellationToken);
+            stagedFileExtensions, cancellationToken);
         await _files.RequireStoredObjectsAvailableAsync(publications.Select(publication =>
             new StorageObjectAddress(publication.StoragePartition, publication.StorageKey)), cancellationToken);
         string? publishedRevisionId = null;
@@ -456,10 +460,27 @@ public sealed class CaveChangeRequestService
             throw ApiExceptionDictionary.BadRequest(
                 "The proposal contains a file that is neither published nor available to this authoring session.");
         var stagedSnapshots = await _requests.GetFileSnapshotsAsync(selectedStagedFileIds, cancellationToken);
+        foreach (var selected in selectedFiles.Values)
+        {
+            if (string.IsNullOrWhiteSpace(selected.Name))
+                throw ApiExceptionDictionary.BadRequest("A file name is required.");
+            var currentFile = current.Files.FirstOrDefault(file => file.Id == selected.Id);
+            var stagedFile = stagedSnapshots.GetValueOrDefault(selected.Id);
+            var extension = currentFile?.Extension ?? stagedFile?.Extension;
+            var existingName = currentFile?.Name ?? stagedFile?.Name;
+            if (extension is null || existingName is null) continue;
+            try
+            {
+                FileNamePolicy.ComposeEditableName(existingName, selected.Name, extension);
+            }
+            catch (ArgumentException exception)
+            {
+                throw ApiExceptionDictionary.BadRequest(exception.Message);
+            }
+        }
         var fileIntents = current.Files.Select(file => selectedFiles.TryGetValue(file.Id, out var selected)
                 ? new ProposalFileIntent(file.Id, ProposalFileDisposition.RetainPublished,
-                    selected.FileTypeTagId, selected.DisplayName,
-                    CaveFileNamePolicy.GetEffectiveFileName(file.FileName, file.DisplayName, selected.DisplayName),
+                    selected.FileTypeTagId, selected.Name, file.Extension,
                     Name(selected.FileTypeTagId))
                 : new ProposalFileIntent(file.Id, ProposalFileDisposition.RemovePublished, null, null))
             .ToList();
@@ -471,8 +492,7 @@ public sealed class CaveChangeRequestService
             if (!stagedSnapshots.TryGetValue(selected.Id, out var staged))
                 throw ApiExceptionDictionary.NotFound("Staged file");
             fileIntents.Add(new ProposalFileIntent(selected.Id, ProposalFileDisposition.PublishStaged,
-                selected.FileTypeTagId, selected.DisplayName,
-                CaveFileNamePolicy.GetEffectiveFileName(staged.FileName, staged.DisplayName, selected.DisplayName),
+                selected.FileTypeTagId, selected.Name, staged.Extension,
                 Name(selected.FileTypeTagId)));
         }
 
@@ -597,16 +617,21 @@ public sealed class CaveChangeRequestService
                         {
                             FileTypeTagId = file.FileTypeTagId ?? published.FileTypeTagId,
                             FileTypeNameAtRevision = file.FileTypeName ?? published.FileTypeNameAtRevision,
-                            FileName = file.FileName ?? published.FileName,
-                            DisplayName = file.DisplayName ?? published.DisplayName
+                            Name = file.Name ?? published.Name,
+                            Extension = published.Extension
                         },
-                    ProposalFileDisposition.PublishStaged when stagedFiles.TryGetValue(file.FileId, out var staged) =>
-                        staged with
+                    ProposalFileDisposition.PublishStaged when stagedFiles.ContainsKey(file.FileId) =>
+                        new CaveFileSnapshotV1
                         {
-                            FileTypeTagId = file.FileTypeTagId ?? staged.FileTypeTagId,
-                            FileTypeNameAtRevision = file.FileTypeName ?? staged.FileTypeNameAtRevision,
-                            FileName = file.FileName ?? staged.FileName,
-                            DisplayName = file.DisplayName ?? staged.DisplayName
+                            Id = file.FileId,
+                            FileTypeTagId = file.FileTypeTagId
+                                ?? throw new InvalidOperationException("A staged proposal File must capture its File Type."),
+                            FileTypeNameAtRevision = file.FileTypeName
+                                ?? throw new InvalidOperationException("A staged proposal File must capture its File Type name."),
+                            Name = file.Name
+                                ?? throw new InvalidOperationException("A staged proposal File must capture its Name."),
+                            Extension = file.Extension
+                                ?? throw new InvalidOperationException("A staged proposal File must capture its Extension.")
                         },
                     ProposalFileDisposition.PublishStaged when preserveUnavailableStagedFiles =>
                         new CaveFileSnapshotV1
@@ -614,8 +639,8 @@ public sealed class CaveChangeRequestService
                             Id = file.FileId,
                             FileTypeTagId = file.FileTypeTagId ?? "unavailable",
                             FileTypeNameAtRevision = file.FileTypeName ?? "Unavailable staged file",
-                            FileName = file.FileName ?? file.DisplayName ?? file.FileId,
-                            DisplayName = file.DisplayName
+                            Name = file.Name ?? file.FileId,
+                            Extension = file.Extension ?? string.Empty
                         },
                     _ => null
                 }).Where(file => file is not null).Cast<CaveFileSnapshotV1>().ToList(),
@@ -667,7 +692,7 @@ public sealed class CaveChangeRequestService
         Files = proposal.Files.Where(file => file.Disposition is ProposalFileDisposition.RetainPublished or
                 ProposalFileDisposition.PublishStaged)
             .Select(file => new EditFileMetadataVm { Id = file.FileId, FileTypeTagId = file.FileTypeTagId,
-                DisplayName = file.DisplayName }).ToList(),
+                Name = file.Name }).ToList(),
         LinePlots = proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
         {
             Id = linePlot.Id,

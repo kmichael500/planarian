@@ -124,7 +124,7 @@ internal static class CaveChangeRequestTestSupport
         PhysiographicProvinceTagIds = cave.PhysiographicProvinceTagIds,
         OtherTagIds = cave.OtherTagIds,
         Files = cave.Files.Select(file => new EditFileMetadataVm
-            { Id = file.Id, FileTypeTagId = file.FileTypeTagId, DisplayName = file.DisplayName }).ToList(),
+            { Id = file.Id, FileTypeTagId = file.FileTypeTagId, Name = file.Name }).ToList(),
         Entrances = cave.Entrances.Select(entrance => new AddEntranceVm
         {
             Id = entrance.Id,

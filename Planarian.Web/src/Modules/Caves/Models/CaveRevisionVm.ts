@@ -57,8 +57,8 @@ export interface CaveFileSnapshotVm {
   id: string;
   fileTypeTagId: string;
   fileTypeNameAtRevision: string;
-  fileName: string;
-  displayName?: string;
+  name: string;
+  extension: string;
 }
 
 export interface CaveSnapshotVm {
