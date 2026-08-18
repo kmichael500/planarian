@@ -59,6 +59,7 @@ const mockPendingRequest = () => {
       originalBaseRevisionId: "revision01", proposalBaseRevisionId: "revision01",
       currentRevisionId: "revision01", currentProposalVersionId: "proposal01",
       isStale: false, canEdit: true, canReview: false,
+      changeSummary: { caveFields: 0, entrances: { added: 0, removed: 0, changed: 0, total: 0 }, files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
     },
     base: {} as any, proposed: {} as any, current: {} as any, diff: {} as any,
     versions: [], countyNumberIntent: "Manual", activeStagedFiles: [], unavailableStagedFileIds: [],

@@ -35,6 +35,7 @@ const request = (caveExists: boolean): CaveChangeRequestSummaryVm => ({
   status: "Rejected", submitterUserId: "submitter", submittedOn: "2026-08-11T00:00:00Z",
   originalBaseRevisionId: "revision", proposalBaseRevisionId: "revision",
   currentProposalVersionId: "proposal", isStale: false, canEdit: false, canReview: false,
+  changeSummary: { caveFields: 0, entrances: { added: 0, removed: 0, changed: 0, total: 0 }, files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
 });
 
 it("does not render an Open Cave link when the historical Cave is unavailable", () => {
@@ -92,7 +93,9 @@ const pageRequest = (overrides: Partial<CaveChangeRequestSummaryVm> = {}): CaveC
   submittedOn: "2026-08-17T12:00:00", updatedOn: "2026-08-17T13:00:00",
   originalBaseRevisionId: "base000001", proposalBaseRevisionId: "base000001",
   currentRevisionId: "base000001", currentProposalVersionId: "version0002", isStale: false,
-  canEdit: true, canReview: true, ...overrides,
+  canEdit: true, canReview: true,
+  changeSummary: { caveFields: 0, entrances: { added: 0, removed: 0, changed: 0, total: 0 }, files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
+  ...overrides,
 });
 
 const pageDetail = (overrides: Partial<CaveChangeRequestDetailVm> = {}): CaveChangeRequestDetailVm => {

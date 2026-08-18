@@ -278,8 +278,11 @@ public sealed class CaveChangeRequestRepository
     }
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken) => PageAsync(Query(createdByUserId: _user.Id)
-            .OrderByDescending(row => row.Request.CreatedOn).ThenByDescending(row => row.Request.Id),
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null) =>
+        PageAsync(Query(createdByUserId: _user.Id, status: status)
+            .OrderByDescending(row => row.Request.Status == CaveChangeRequestStatus.Pending)
+            .ThenByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
+            .ThenByDescending(row => row.Request.Id),
             pageNumber, pageSize, cancellationToken);
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListForReviewAsync(int pageNumber, int pageSize,

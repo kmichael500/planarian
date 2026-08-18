@@ -22,6 +22,7 @@ import {
   CaveChangeRequestDecisionVm,
   CaveChangeRequestDetailVm,
   CaveChangeRequestSummaryVm,
+  CaveChangeRequestStatus,
   CaveChangePreviewVm,
   CaveEditAuthoringContextVm,
   CaveProposalAuthoringContextVm,
@@ -162,9 +163,11 @@ const CaveService = {
       `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}`
     );
   },
-  async GetMyChangeRequests(pageNumber = 1, pageSize = 10): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+  async GetMyChangeRequests(pageNumber = 1, pageSize = 10,
+    status?: CaveChangeRequestStatus): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+    const statusQuery = status ? `&status=${encodeURIComponent(status)}` : "";
     return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(
-      `${changeRequestUrl}/mine?pageNumber=${pageNumber}&pageSize=${pageSize}`)).data;
+      `${changeRequestUrl}/mine?pageNumber=${pageNumber}&pageSize=${pageSize}${statusQuery}`)).data;
   },
   async GetReviewQueue(pageNumber = 1, pageSize = 10): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
     return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(

@@ -23,4 +23,16 @@ export const ClientRoutes = {
     path: "/reset-password",
     get(code: string): string { return "/reset-password?code=" + encodeURIComponent(code); },
   },
+  caveChanges: {
+    path: "/caves/changes",
+    get(): string { return "/caves/changes"; },
+  },
+  caveChangeRequest: {
+    path: "/caves/requests/:requestId",
+    get(requestId: string): string { return "/caves/requests/" + encodeURIComponent(requestId); },
+  },
+  caveChangeRequestRevise: {
+    path: "/caves/requests/:requestId/revise",
+    get(requestId: string): string { return "/caves/requests/" + encodeURIComponent(requestId) + "/revise"; },
+  },
 } as const;

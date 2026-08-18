@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Tests;
 using Planarian.Tests.Integration.Infrastructure.Actors;
@@ -60,6 +61,48 @@ public sealed class CaveChangeRequestPagingIntegrationTests(PostgresTestServer f
             Assert.Equal(2, reviewCounter.Count);
             Assert.Empty(first.Results.Select(row => row.Id).Intersect(last.Results.Select(row => row.Id)));
         }
+    }
+
+
+    [Fact]
+    public async Task MinePutsPendingFirstAndFiltersStatusesBeforePaging()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(MinePutsPendingFirstAndFiltersStatusesBeforePaging));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00b");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantViewAsync(database, tenant, "reviewer");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string olderPendingId;
+        string rejectedId;
+        string newerPendingId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            olderPendingId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Older pending"), tenant.RevisionId, default);
+            rejectedId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Rejected"), tenant.RevisionId, default);
+            newerPendingId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Newer pending"), tenant.RevisionId, default);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+            await reviewer.ChangeRequests.RejectAsync(rejectedId,
+                await CurrentVersionAsync(reviewer.Db, rejectedId), "Not ready", default);
+
+        await using var contributorReader = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
+        var all = await contributorReader.ChangeRequests.ListMineAsync(1, 10, default);
+        var rejected = await contributorReader.ChangeRequests.ListMineAsync(1, 10, default,
+            CaveChangeRequestStatus.Rejected);
+
+        Assert.Equal([newerPendingId, olderPendingId, rejectedId], all.Results.Select(row => row.Id));
+        Assert.Single(rejected.Results);
+        Assert.Equal(rejectedId, rejected.Results.Single().Id);
+        Assert.Equal(CaveChangeRequestStatus.Rejected, rejected.Results.Single().Status);
+        Assert.Equal(1, rejected.TotalCount);
     }
 
     private sealed class CommandCounter : DbCommandInterceptor

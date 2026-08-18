@@ -24,7 +24,8 @@ public sealed record CaveChangeRequestSummaryVm(
     bool IsStale,
     string? ApprovedRevisionId,
     bool CanEdit,
-    bool CanReview);
+    bool CanReview,
+    CaveChangeScopeSummary ChangeSummary);
 
 public sealed record CaveChangeRequestDetailVm(
     CaveChangeRequestSummaryVm Request,

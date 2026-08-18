@@ -3,6 +3,7 @@ import { CheckOutlined, CloseOutlined, EditOutlined, EyeOutlined } from "@ant-de
 import { Alert, Card, Collapse, Divider, Grid, Input, message, Space, Spin, Tag, theme, Typography } from "antd";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
@@ -77,7 +78,7 @@ export const CaveChangeRequestPage = () => {
 
   useEffect(() => {
     setHeaderTitle(["Cave Change Request"]);
-    setHeaderButtons([<BackButtonComponent to="/caves/requests" />]);
+    setHeaderButtons([<BackButtonComponent to={ClientRoutes.caveChanges.path} />]);
     if (!requestId) { setLoading(false); setLoadFailed(true); return; }
     CaveService.GetChangeRequest(requestId).then(setDetail)
       .catch(() => { setLoadFailed(true); message.error("The change request could not be loaded."); })
@@ -166,7 +167,7 @@ export const CaveChangeRequestPage = () => {
               <PlanarianButton icon={<EditOutlined />} alwaysShowChildren
                 aria-label={request.isStale ? "Revise against current Cave" : "Revise changes"}
                 type={request.isStale ? "primary" : "default"}
-                onClick={() => navigate(`/caves/requests/${request.id}/revise`)}>
+                onClick={() => navigate(ClientRoutes.caveChangeRequestRevise.get(request.id))}>
                 {request.isStale ? "Revise against current Cave" : "Revise changes"}
               </PlanarianButton>}
           </Space>

@@ -144,9 +144,9 @@ public sealed class CaveChangeRequestService
     }
 
     public async Task<PagedResult<CaveChangeRequestSummaryVm>> ListMineAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null)
     {
-        var page = await _requests.ListMineAsync(pageNumber, pageSize, cancellationToken);
+        var page = await _requests.ListMineAsync(pageNumber, pageSize, cancellationToken, status);
         return new PagedResult<CaveChangeRequestSummaryVm>(page.PageNumber, page.PageSize, page.TotalCount,
             page.Results.Select(row => MapSummary(row, row.CurrentCanReview)).ToList());
     }
@@ -729,16 +729,20 @@ public sealed class CaveChangeRequestService
     private static CavePublishedSnapshotV1 Deserialize(CaveRevision revision) =>
         CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
 
-    private CaveChangeRequestSummaryVm MapSummary(CaveChangeRequestReadRow row, bool canReview) => new(
-        row.Request.Id, row.Request.CaveId,
-        row.LiveCaveName ?? Deserialize(row.ProposalBaseRevision).Name, row.CaveExists, row.Request.Status,
-        row.Request.CreatedByUserId!, row.SubmitterName, row.Request.CreatedOn, row.Request.ModifiedOn,
-        row.Request.ReviewedOn, row.Request.ReviewerUserId, row.ReviewerName, row.Request.ReviewerNotes,
-        row.Request.BaseRevisionId!, row.ProposalVersion.BaseRevisionId, row.CurrentRevision?.Id,
-        row.Request.CurrentProposalVersionId!, IsStale(row),
-        row.Request.ApprovedRevisionId,
-        row.Request.CreatedByUserId == _user.Id && row.Request.Status == CaveChangeRequestStatus.Pending,
-        canReview && row.Request.Status == CaveChangeRequestStatus.Pending);
+    private CaveChangeRequestSummaryVm MapSummary(CaveChangeRequestReadRow row, bool canReview)
+    {
+        var baseSnapshot = Deserialize(row.ProposalBaseRevision);
+        var proposal = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson, row.ProposalVersion.SchemaVersion);
+        return new CaveChangeRequestSummaryVm(
+            row.Request.Id, row.Request.CaveId, row.LiveCaveName ?? baseSnapshot.Name, row.CaveExists, row.Request.Status,
+            row.Request.CreatedByUserId!, row.SubmitterName, row.Request.CreatedOn, row.Request.ModifiedOn,
+            row.Request.ReviewedOn, row.Request.ReviewerUserId, row.ReviewerName, row.Request.ReviewerNotes,
+            row.Request.BaseRevisionId!, row.ProposalVersion.BaseRevisionId, row.CurrentRevision?.Id,
+            row.Request.CurrentProposalVersionId!, IsStale(row), row.Request.ApprovedRevisionId,
+            row.Request.CreatedByUserId == _user.Id && row.Request.Status == CaveChangeRequestStatus.Pending,
+            canReview && row.Request.Status == CaveChangeRequestStatus.Pending,
+            CaveProposalChangeScopeSummary.Build(baseSnapshot, proposal));
+    }
 
     private static bool IsStale(CaveChangeRequestReadRow row) =>
         row.Request.Status == CaveChangeRequestStatus.Pending &&

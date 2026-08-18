@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Alert, Card, Form, Grid, message, Space, theme, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
@@ -64,7 +65,7 @@ export const SuggestCaveChangesPage = () => {
       const id = await CaveService.SubmitChanges(caveId, draft, expectedBaseRevisionId!);
       message.success("Your changes were submitted for review.");
       unsaved.markClean();
-      navigate(`/caves/requests/${id}`);
+      navigate(ClientRoutes.caveChangeRequest.get(id));
     } catch (error: any) {
       if (error?.conflictKind === "PublishedCaveChanged")
         message.warning("The Cave changed after your preview. Reload and review it before submitting.");

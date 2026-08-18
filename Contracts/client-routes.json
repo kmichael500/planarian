@@ -20,6 +20,15 @@
       "queryParameters": [
         "code"
       ]
+    },
+    "caveChanges": {
+      "path": "/caves/changes"
+    },
+    "caveChangeRequest": {
+      "path": "/caves/requests/:requestId"
+    },
+    "caveChangeRequestRevise": {
+      "path": "/caves/requests/:requestId/revise"
     }
   }
 }

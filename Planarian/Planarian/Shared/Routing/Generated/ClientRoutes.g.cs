@@ -37,4 +37,23 @@ public static class ClientRoutes
         public static string Get(string code) => "/reset-password?code=" + Uri.EscapeDataString(code);
     }
 
+    public static class CaveChanges
+    {
+        public const string Path = "/caves/changes";
+        public static string Get() => "/caves/changes";
+    }
+
+    public static class CaveChangeRequest
+    {
+        public const string Path = "/caves/requests/:requestId";
+        public const string Prefix = "/caves/requests/";
+        public static string Get(string requestId) => "/caves/requests/" + Uri.EscapeDataString(requestId);
+    }
+
+    public static class CaveChangeRequestRevise
+    {
+        public const string Path = "/caves/requests/:requestId/revise";
+        public static string Get(string requestId) => "/caves/requests/" + Uri.EscapeDataString(requestId) + "/revise";
+    }
+
 }

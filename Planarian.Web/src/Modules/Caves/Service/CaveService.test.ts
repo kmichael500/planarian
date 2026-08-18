@@ -20,6 +20,8 @@ it("requests bounded Mine and Review pages", async () => {
 
   await CaveService.GetMyChangeRequests(2, 5);
   expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=2&pageSize=5");
+  await CaveService.GetMyChangeRequests(1, 10, "Approved");
+  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=1&pageSize=10&status=Approved");
   await CaveService.GetReviewQueue(3, 7);
   expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/review?pageNumber=3&pageSize=7");
 });

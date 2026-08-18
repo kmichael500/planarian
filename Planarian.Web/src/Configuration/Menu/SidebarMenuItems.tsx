@@ -8,7 +8,6 @@ import {
   UserAddOutlined,
   UserOutlined,
   FormOutlined,
-  AuditOutlined,
 } from "@ant-design/icons";
 import { Divider } from "antd";
 import { useContext, useMemo } from "react";
@@ -16,6 +15,7 @@ import { Link } from "react-router-dom";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { AppContext } from "../Context/AppContext";
 import { PlanarianMenuItem } from "./PlanarianMenuComponent";
+import { ClientRoutes } from "../Routing/ClientRoutes.generated";
 
 const useSideBarMenuItems = () => {
   const { currentAccountId } = useContext(AppContext);
@@ -44,17 +44,10 @@ const useSideBarMenuItems = () => {
         isVisible: hasAccount,
       },
       {
-        key: "/caves/requests",
-        icon: <Link to="/caves/requests"><FormOutlined /></Link>,
-        label: "My Cave Requests",
+        key: ClientRoutes.caveChanges.path,
+        icon: <Link to={ClientRoutes.caveChanges.path}><FormOutlined /></Link>,
+        label: "Cave Changes",
         isVisible: hasAccount,
-      },
-      {
-        key: "/caves/review",
-        icon: <Link to="/caves/review"><AuditOutlined /></Link>,
-        label: "Review Cave Changes",
-        isVisible: hasAccount,
-        permissionKey: PermissionKey.Manager,
       },
       {
         key: "/account",

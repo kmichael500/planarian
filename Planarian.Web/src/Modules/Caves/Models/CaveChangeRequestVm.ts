@@ -5,6 +5,21 @@ export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
 
 export type CaveChangeRequestStatus = "Pending" | "Approved" | "Rejected";
 
+export interface DiffEntitySummaryVm {
+  added: number;
+  removed: number;
+  changed: number;
+  total: number;
+}
+
+export interface CaveChangeScopeSummaryVm {
+  caveFields: number;
+  entrances: DiffEntitySummaryVm;
+  files: DiffEntitySummaryVm;
+  linePlots: DiffEntitySummaryVm;
+  otherChanges: number;
+}
+
 export interface CaveChangeRequestSummaryVm {
   id: string;
   caveId: string;
@@ -27,6 +42,7 @@ export interface CaveChangeRequestSummaryVm {
   approvedRevisionId?: string;
   canEdit: boolean;
   canReview: boolean;
+  changeSummary: CaveChangeScopeSummaryVm;
 }
 
 export interface CaveProposalVersionVm {

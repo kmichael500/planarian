@@ -5,6 +5,7 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Extensions;
+using Planarian.Model.Database.Entities.RidgeWalker;
 
 namespace Planarian.Modules.Caves.Controllers;
 
@@ -103,8 +104,9 @@ public sealed class CaveChangeRequestController : ControllerBase
     [HttpGet("mine")]
     public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> Mine(
         CancellationToken cancellationToken, [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = QueryConstants.DefaultPageSize) =>
-        new JsonResult(await _service.ListMineAsync(pageNumber, pageSize, cancellationToken));
+        [FromQuery] int pageSize = QueryConstants.DefaultPageSize,
+        [FromQuery] CaveChangeRequestStatus? status = null) =>
+        new JsonResult(await _service.ListMineAsync(pageNumber, pageSize, cancellationToken, status));
 
     [HttpGet("review")]
     public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> ReviewQueue(

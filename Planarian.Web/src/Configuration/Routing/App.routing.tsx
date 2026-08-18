@@ -59,10 +59,11 @@ export const AppRouting: React.FC = () => {
         <Route path="/caves" element={<CavesPage />} />
         <Route path="/caves/:caveId" element={<CavePage />} />
         <Route path="/caves/:caveId/suggest" element={<SuggestCaveChangesPage />} />
-        <Route path="/caves/requests" element={<CaveChangeRequestsPage />} />
-        <Route path="/caves/requests/:requestId" element={<CaveChangeRequestPage />} />
-        <Route path="/caves/requests/:requestId/revise" element={<ReviseCaveChangeRequestPage />} />
-        <Route path="/caves/review" element={<CaveChangeRequestsPage review />} />
+        <Route path={ClientRoutes.caveChanges.path} element={<CaveChangeRequestsPage />} />
+        <Route path="/caves/requests" element={<Navigate replace to={ClientRoutes.caveChanges.path} />} />
+        <Route path="/caves/review" element={<Navigate replace to={`${ClientRoutes.caveChanges.path}?tab=review`} />} />
+        <Route path={ClientRoutes.caveChangeRequest.path} element={<CaveChangeRequestPage />} />
+        <Route path={ClientRoutes.caveChangeRequestRevise.path} element={<ReviseCaveChangeRequestPage />} />
         <Route
           element={
             <ProtectedRoutesComponent permissionKey={PermissionKey.Manager} />

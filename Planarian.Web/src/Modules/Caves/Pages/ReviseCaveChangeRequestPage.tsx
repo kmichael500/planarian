@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Alert, Card, Form, message, Space, Spin, Typography } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { BackButtonComponent } from "../../../Shared/Components/Buttons/BackButtonComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
@@ -30,8 +31,13 @@ export const ReviseCaveChangeRequestPage = () => {
 
   useEffect(() => {
     setHeaderTitle(["Revise changes"]);
-    setHeaderButtons([<BackButtonComponent to={`/caves/requests/${requestId}`} />]);
-    if (!requestId) return;
+    setHeaderButtons(requestId
+      ? [<BackButtonComponent to={ClientRoutes.caveChangeRequest.get(requestId)} />]
+      : []);
+    if (!requestId) {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       try {
         const loaded = await CaveService.GetChangeRequest(requestId);
@@ -96,7 +102,7 @@ export const ReviseCaveChangeRequestPage = () => {
         expectedBaseRevisionId!, expectedProposalVersionId!);
       message.success("A new proposal version was saved.");
       unsaved.markClean();
-      navigate(`/caves/requests/${requestId}`);
+      navigate(ClientRoutes.caveChangeRequest.get(requestId));
     } catch (error: any) {
       if (error?.conflictKind === "ActiveProposalVersionChanged")
         message.warning("Another editor created a newer proposal version. Reload before saving.");
