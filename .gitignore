@@ -129,6 +129,10 @@ fabric.properties
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
 
+# Linux core dumps can be emitted by containerized development tools into the bind-mounted repo root.
+/core
+/core.*
+
 ### macOS ###
 # General
 .DS_Store

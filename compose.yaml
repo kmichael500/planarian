@@ -1,0 +1,266 @@
+name: planarian-dev
+
+x-dev-build: &dev-build
+  context: docker/dev
+  dockerfile: Dockerfile
+
+x-source-volume: &source-volume
+  type: bind
+  source: .
+  target: /workspace
+
+services:
+  postgres:
+    build:
+      context: docker/dev/postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: planarian
+      POSTGRES_PASSWORD: planarian
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planarian -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.36.0
+    command: >-
+      azurite --location /data --blobHost 0.0.0.0
+      --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+      --disableTelemetry
+    ports:
+      - "127.0.0.1:11000:10000"
+      - "127.0.0.1:11001:10001"
+      - "127.0.0.1:11002:10002"
+    volumes:
+      - azurite-data:/data
+
+  backend:
+    build: *dev-build
+    init: true
+    working_dir: /workspace
+    command: >-
+      bash -lc "dotnet watch --project Planarian/Planarian/Planarian.csproj
+      run --no-launch-profile --urls http://0.0.0.0:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      PLANARIAN_DATASET: ${PLANARIAN_DATASET:-generic}
+      AllowedHosts: "planarian.local;localhost;backend"
+      Server__AllowedCorsOrigins: "https://planarian.local"
+      "Server__ClientOriginMappings__planarian.local": "https://planarian.local"
+    ports:
+      - "127.0.0.1:17111:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/swagger/index.html >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+    volumes:
+      - *source-volume
+      - type: bind
+        source: ${PLANARIAN_APPSETTINGS:-./docker/dev/appsettings.generic.json}
+        target: /workspace/Planarian/Planarian/appsettings.Development.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - nuget-cache:/home/agent/.nuget/packages
+      - rider-debugger:/home/agent/.RiderDebuggerTools
+      - data-protection:/home/agent/.aspnet/DataProtection-Keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+
+  frontend:
+    build: *dev-build
+    init: true
+    user: "0:0"
+    working_dir: /workspace/Planarian.Web
+    command: /workspace/docker/dev/start-frontend.sh
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      HTTPS: "false"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      WDS_SOCKET_PORT: "443"
+      REACT_APP_API_ORIGIN_MAPPINGS: '{"planarian.local":"https://planarian.local"}'
+    ports:
+      - "127.0.0.1:13000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 90
+      start_period: 10s
+    volumes:
+      - *source-volume
+      - ./docker/dev/frontend.env:/workspace/Planarian.Web/.env:ro
+      - frontend-node-modules:/workspace/Planarian.Web/node_modules
+      - npm-cache:/home/agent/.npm
+    depends_on:
+      backend:
+        condition: service_started
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:443:443/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2019/config/ >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./docker/dev/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${PLANARIAN_VIEWER_AUTH_FILE:-./docker/dev/viewer-auth.default.caddy}:/etc/caddy/viewer-auth.caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    networks:
+      default:
+        aliases:
+          - planarian.local
+          - viewer.planarian.local
+          - cert.planarian.local
+
+  browser:
+    build:
+      context: docker/dev/browser
+    init: true
+    restart: unless-stopped
+    ipc: host
+    environment:
+      VIEWER_PORT: "6080"
+      CDP_PORT: "9222"
+      PLANARIAN_URL: "https://planarian.local/login"
+    ports:
+      - "127.0.0.1:6080:6080"
+    expose:
+      - "9222"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:6080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+    depends_on:
+      caddy:
+        condition: service_started
+
+  agent:
+    build: *dev-build
+    init: true
+    hostname: dc-agent-planarian
+    working_dir: /workspace
+    command: ["desktop-commander", "remote", "--persist-session"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: planarian
+      PGPASSWORD: planarian
+      PGDATABASE: ${PLANARIAN_DATABASE:-planarian_dev_generic}
+      PLANARIAN_DATASET: ${PLANARIAN_AGENT_DATASET:-generic}
+      PLAYWRIGHT_CDP_URL: http://browser:9222
+      PLANARIAN_URL: https://planarian.local
+    volumes:
+      - *source-volume
+      - ${PLANARIAN_AGENT_APPSETTINGS:-./docker/dev/appsettings.generic.json}:/workspace/Planarian/Planarian/appsettings.Development.json:ro
+      - ./docker/dev/appsettings.Migrations.json:/workspace/Planarian/Planarian.Migrations/appsettings.Migrations.json:ro
+      - ./docker/dev/frontend.env:/workspace/Planarian.Web/.env:ro
+      - agent-home:/home/agent
+      - nuget-cache:/home/agent/.nuget/packages
+      - frontend-node-modules:/workspace/Planarian.Web/node_modules
+      - npm-cache:/home/agent/.npm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      browser:
+        condition: service_started
+
+  workspace:
+    profiles: ["ide"]
+    build: *dev-build
+    init: true
+    working_dir: /workspace
+    command: ["sleep", "infinity"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: planarian
+      PGPASSWORD: planarian
+      PGDATABASE: planarian_dev_generic
+      PLANARIAN_URL: https://planarian.local
+    volumes:
+      - *source-volume
+      - ./docker/dev/appsettings.generic.json:/workspace/Planarian/Planarian/appsettings.Development.json:ro
+      - ./docker/dev/appsettings.Migrations.json:/workspace/Planarian/Planarian.Migrations/appsettings.Migrations.json:ro
+      - ./docker/dev/frontend.env:/workspace/Planarian.Web/.env:ro
+      - nuget-cache:/home/agent/.nuget/packages
+      - frontend-node-modules:/workspace/Planarian.Web/node_modules
+      - npm-cache:/home/agent/.npm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+
+  tooling:
+    profiles: ["tools"]
+    build: *dev-build
+    init: true
+    working_dir: /workspace
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: planarian
+      PGPASSWORD: planarian
+      PGDATABASE: ${PLANARIAN_DATABASE:-planarian_dev_generic}
+      PLANARIAN_DEV_CONNECTION_STRING: ${PLANARIAN_DEV_CONNECTION_STRING:-Host=postgres;Port=5432;Database=planarian_dev_generic;Username=planarian;Password=planarian}
+      PLANARIAN_DEV_BLOB_CONNECTION_STRING: ${PLANARIAN_DEV_BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;}
+    volumes:
+      - *source-volume
+      - nuget-cache:/home/agent/.nuget/packages
+      - npm-cache:/home/agent/.npm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+volumes:
+  postgres-data:
+    name: planarian-compose-postgres-data
+  azurite-data:
+    name: planarian-compose-azurite-data
+  caddy-data:
+    name: planarian-compose-caddy-data
+  caddy-config:
+    name: planarian-compose-caddy-config
+  agent-home:
+    name: planarian-compose-agent-home
+  nuget-cache:
+    name: planarian-compose-nuget-cache
+  rider-debugger:
+    name: planarian-compose-rider-debugger
+  data-protection:
+    name: planarian-compose-data-protection
+  npm-cache:
+    name: planarian-compose-npm-cache
+  frontend-node-modules:
+    name: planarian-compose-frontend-node-modules

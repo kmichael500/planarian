@@ -1,0 +1,4 @@
+# Fallback for direct `docker compose` use. `./dev` generates a random LAN-viewer password instead.
+basic_auth {
+    planarian $2a$14$FwWB7vS22dQunlawZtPoK.ECj3BvfMDf5dUMz9Ph2aqYPWawh31ou
+}

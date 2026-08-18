@@ -1,0 +1,8 @@
+{
+  "name": "Planarian",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "workspace",
+  "runServices": ["postgres", "azurite", "workspace"],
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "none"
+}

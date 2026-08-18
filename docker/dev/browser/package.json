@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "dependencies": {
+    "@playwright/test": "1.62.1",
+    "ws": "8.21.3"
+  }
+}

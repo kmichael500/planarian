@@ -1,0 +1,22 @@
+{
+  "name": "planarian-dev",
+  "private": true,
+  "scripts": {
+    "dev": "./dev up",
+    "dev:setup": "./dev setup",
+    "dev:e2e": "./dev up e2e",
+    "dev:settings": "./dev up --settings",
+    "dev:stop": "./dev down",
+    "dev:status": "./dev status",
+    "dev:logs": "./dev logs",
+    "dev:restart": "./dev restart",
+    "dev:reset": "./dev reset generic",
+    "dev:reset:e2e": "./dev reset e2e",
+    "dev:db": "./dev psql generic",
+    "dev:db:e2e": "./dev psql e2e",
+    "dev:shell": "./dev shell",
+    "dev:viewer": "./dev viewer-credentials",
+    "dev:agent": "./dev agent-auth",
+    "dev:cert": "./dev trust-cert"
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Planarian Browser — Live</title>
+  <style>
+    html,body{margin:0;height:100%;background:#181818;color:#eee;font:14px system-ui,sans-serif}
+    body{display:flex;flex-direction:column}
+    header{padding:10px 14px;background:#242424;border-bottom:1px solid #444;display:flex;gap:12px;align-items:center}
+    #dot{width:10px;height:10px;border-radius:50%;background:#888}
+    #title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:30vw}
+    #url{opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+    main{flex:1;display:grid;place-items:center;overflow:auto;padding:12px}
+    #screen{max-width:100%;max-height:100%;box-shadow:0 4px 24px #0008;background:white}
+    #status{font-size:12px;opacity:.7}
+  </style>
+</head>
+<body>
+<header><span id="dot"></span><span id="title">Connecting…</span><span id="url"></span><span id="status">live viewport</span></header>
+<main><img id="screen" alt="Live Chromium viewport" /></main>
+<script>
+  const screen=document.getElementById('screen');
+  const dot=document.getElementById('dot');
+  const title=document.getElementById('title');
+  const url=document.getElementById('url');
+  function connect(){
+    const proto=location.protocol==='https:'?'wss':'ws';
+    const ws=new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onopen=()=>{dot.style.background='#35c759';};
+    ws.onclose=()=>{
+      dot.style.background='#ff453a';
+      title.textContent='Disconnected — reconnecting…';
+      setTimeout(connect,1000);
+    };
+    ws.onmessage=e=>{
+      const m=JSON.parse(e.data);
+      if(m.type==='frame'){
+        screen.src=m.data;
+        title.textContent=m.title||'Planarian';
+        url.textContent=m.url||'';
+      }
+    };
+  }
+  connect();
+</script>
+</body>
+</html>

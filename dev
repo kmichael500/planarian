@@ -1,0 +1,376 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+COMPOSE=(docker compose)
+AZURITE_CONNECTION='DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;'
+
+ensure_viewer_auth() {
+  local state_dir="$HOME/.local/share/planarian-dev"
+  local auth_file="$state_dir/viewer-auth.caddy"
+  local credentials_file="$state_dir/viewer-credentials.txt"
+  mkdir -p "$state_dir"
+
+  if [[ ! -s "$auth_file" || ! -s "$credentials_file" ]]; then
+    local password hash
+    password="$(openssl rand -hex 12)"
+    hash="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$password")"
+    printf 'basic_auth {\n    planarian %s\n}\n' "$hash" > "$auth_file"
+    printf 'username=planarian\npassword=%s\n' "$password" > "$credentials_file"
+    chmod 600 "$auth_file" "$credentials_file"
+  fi
+
+  export PLANARIAN_VIEWER_AUTH_FILE="$auth_file"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: ./dev <command> [options]
+
+  setup                     Build and initialize the generic local environment
+  up [generic|e2e]          Start Planarian using a local dataset (generic is default)
+  up --settings [file]      Start with project appsettings.Development.json or an explicit file
+  reset [generic|e2e]       Delete all local DB/blob data for that dataset and reseed it
+  status                    Show containers, active dataset, and local URLs
+  logs [service]            Follow Compose logs
+  restart [service]         Restart the stack or one service
+  shell                     Open a shell in the Desktop Commander agent
+  agent-auth                Start/restart Desktop Commander auth and follow its logs
+  psql [generic|e2e]        Open psql against a local dataset
+  trust-cert                Trust the local Caddy CA in the macOS login keychain
+  viewer-credentials        Show the LAN viewer username/password
+  down                      Stop the Compose environment
+EOF
+}
+require_compose() {
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "Docker Compose v2 is required (docker compose)." >&2
+    exit 1
+  fi
+}
+
+select_dataset() {
+  local dataset="${1:-generic}"
+  case "$dataset" in
+    generic)
+      export PLANARIAN_DATASET=generic
+      export PLANARIAN_DATABASE=planarian_dev_generic
+      export PLANARIAN_APPSETTINGS="$ROOT/docker/dev/appsettings.generic.json"
+      export PLANARIAN_AGENT_APPSETTINGS="$ROOT/docker/dev/appsettings.generic.json"
+      ;;
+    e2e)
+      export PLANARIAN_DATASET=e2e
+      export PLANARIAN_DATABASE=planarian_dev_e2e
+      export PLANARIAN_APPSETTINGS="$ROOT/docker/dev/appsettings.e2e.json"
+      export PLANARIAN_AGENT_APPSETTINGS="$ROOT/docker/dev/appsettings.e2e.json"
+      ;;
+    *)
+      echo "Dataset must be 'generic' or 'e2e'." >&2
+      exit 2
+      ;;
+  esac
+  export PLANARIAN_AGENT_DATASET="$PLANARIAN_DATASET"
+  export PLANARIAN_DEV_CONNECTION_STRING="Host=postgres;Port=5432;Database=${PLANARIAN_DATABASE};Username=planarian;Password=planarian"
+  export PLANARIAN_DEV_BLOB_CONNECTION_STRING="$AZURITE_CONNECTION"
+}
+stop_mdns() {
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+  local state_dir="$HOME/.local/share/planarian-dev"
+  local pid_file="$state_dir/mdns.pid"
+  local pid=""
+
+  if [[ -f "$pid_file" ]]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    local command=""
+    if [[ "$pid" =~ ^[0-9]+$ ]]; then
+      command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    fi
+    if [[ "$command" == *"$ROOT/docker/dev/advertise-mdns.sh"* ]]; then
+      kill "$pid" 2>/dev/null || true
+      for _ in {1..20}; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+      done
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+        for _ in {1..20}; do
+          kill -0 "$pid" 2>/dev/null || break
+          sleep 0.05
+        done
+      fi
+    fi
+    rm -f "$pid_file"
+  fi
+
+  # Clean up announcements left behind by an interrupted or pre-PID-file helper.
+  pkill -f "$ROOT/docker/dev/advertise-mdns.sh" 2>/dev/null || true
+  pkill -f '/bin/zsh ./docker/dev/advertise-mdns.sh' 2>/dev/null || true
+  pkill -f '/usr/bin/dns-sd -P Planarian _https._tcp local 443 planarian.local ' 2>/dev/null || true
+  pkill -f '/usr/bin/dns-sd -P PlanarianViewer _https._tcp local 443 viewer.planarian.local ' 2>/dev/null || true
+  pkill -f '/usr/bin/dns-sd -P PlanarianCert _http._tcp local 80 cert.planarian.local ' 2>/dev/null || true
+}
+
+ensure_mdns() {
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+  local script="$ROOT/docker/dev/advertise-mdns.sh"
+  local state_dir="$HOME/.local/share/planarian-dev"
+  local pid_file="$state_dir/mdns.pid"
+  mkdir -p "$state_dir"
+  stop_mdns
+  nohup "$script" >"$state_dir/mdns.log" 2>"$state_dir/mdns-error.log" </dev/null &
+  local pid=$!
+  printf '%s\n' "$pid" > "$pid_file"
+  disown || true
+  sleep 1
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "Planarian mDNS advertiser failed to start. See $state_dir/mdns-error.log." >&2
+    rm -f "$pid_file"
+    return 1
+  fi
+}
+
+ensure_infrastructure() {
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 60 postgres azurite
+}
+
+database_exists() {
+  "${COMPOSE[@]}" exec -T postgres psql -U planarian -d postgres -tAc \
+    "SELECT 1 FROM pg_database WHERE datname = '${PLANARIAN_DATABASE}'" | grep -q 1
+}
+
+create_database() {
+  "${COMPOSE[@]}" exec -T postgres psql -U planarian -d postgres -v ON_ERROR_STOP=1 -c \
+    "CREATE DATABASE \"${PLANARIAN_DATABASE}\""
+}
+seed_dataset() {
+  "${COMPOSE[@]}" --profile tools run --rm tooling \
+    dotnet run --project tools/Planarian.Dev/Planarian.Dev.csproj -- seed "$PLANARIAN_DATASET"
+}
+
+ensure_dataset() {
+  ensure_infrastructure
+  if ! database_exists; then
+    echo "Creating ${PLANARIAN_DATABASE}..."
+    create_database
+  fi
+  seed_dataset
+}
+
+reset_dataset() {
+  local dataset="${1:-generic}"
+  local restart_backend=false
+  select_dataset "$dataset"
+  ensure_infrastructure
+
+  if "${COMPOSE[@]}" ps --status running --services | grep -qx backend; then
+    local backend_mode
+    backend_mode="$("${COMPOSE[@]}" exec -T backend printenv PLANARIAN_DATASET 2>/dev/null || true)"
+    if [[ "$backend_mode" == "$PLANARIAN_DATASET" ]]; then
+      restart_backend=true
+      "${COMPOSE[@]}" stop backend
+    fi
+  fi
+
+  echo "Resetting all local data for '${PLANARIAN_DATASET}'..."
+  if database_exists; then
+    "${COMPOSE[@]}" --profile tools run --rm tooling \
+      dotnet run --project tools/Planarian.Dev/Planarian.Dev.csproj -- reset-storage "$PLANARIAN_DATASET"
+  fi
+
+  "${COMPOSE[@]}" exec -T postgres psql -U planarian -d postgres -v ON_ERROR_STOP=1 <<SQL
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = '${PLANARIAN_DATABASE}' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS "${PLANARIAN_DATABASE}";
+CREATE DATABASE "${PLANARIAN_DATABASE}";
+SQL
+
+  seed_dataset
+  if [[ "$restart_backend" == true ]]; then
+    "${COMPOSE[@]}" up -d --wait --wait-timeout 120 backend
+  fi
+  echo "Reset complete: ${PLANARIAN_DATASET}"
+}
+start_local() {
+  ensure_viewer_auth
+  local dataset="${1:-generic}"
+  select_dataset "$dataset"
+  ensure_mdns
+  ensure_dataset
+
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  print_ready "$PLANARIAN_DATASET"
+}
+
+start_external() {
+  ensure_viewer_auth
+  local settings="${1:-$ROOT/Planarian/Planarian/appsettings.Development.json}"
+  if [[ ! -f "$settings" ]]; then
+    echo "Settings file not found: $settings" >&2
+    if [[ "$settings" == "$ROOT/Planarian/Planarian/appsettings.Development.json" ]]; then
+      echo "Create it from Planarian/Planarian/appsettings.Template.Development.json or pass an explicit file." >&2
+    fi
+    exit 2
+  fi
+
+  select_dataset generic
+  ensure_mdns
+  ensure_dataset
+  export PLANARIAN_DATASET=external
+  export PLANARIAN_APPSETTINGS="$(cd "$(dirname "$settings")" && pwd)/$(basename "$settings")"
+
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  print_ready external
+}
+
+print_ready() {
+  local mode="$1"
+  echo
+  echo "Planarian mode: $mode"
+  echo "App:          https://planarian.local"
+  echo "Live viewer:  https://viewer.planarian.local"
+  echo "Viewer auth:  $HOME/.local/share/planarian-dev/viewer-credentials.txt"
+  if [[ "$mode" != external ]]; then
+    echo "Users:        admin@planarian.local / manager@planarian.local / viewer@planarian.local"
+    echo "Password:     planarian"
+  fi
+  echo
+  echo "Useful:       npm run dev:status | npm run dev:logs -- backend | npm run dev:stop"
+}
+agent_auth() {
+  require_compose
+
+  local mode="generic"
+  if "${COMPOSE[@]}" ps --status running --services | grep -qx backend; then
+    mode="$("${COMPOSE[@]}" exec -T backend printenv PLANARIAN_DATASET 2>/dev/null || echo generic)"
+  fi
+  if [[ "$mode" == "e2e" ]]; then
+    select_dataset e2e
+  else
+    select_dataset generic
+  fi
+
+  "${COMPOSE[@]}" up -d --no-deps agent
+  echo "Following Desktop Commander authentication logs. Press Ctrl-C after authentication completes; the agent will keep running."
+  "${COMPOSE[@]}" logs --tail=80 -f agent
+}
+
+show_status() {
+  "${COMPOSE[@]}" ps
+  echo
+  local mode="stopped"
+  if "${COMPOSE[@]}" ps --status running --services | grep -qx backend; then
+    mode="$("${COMPOSE[@]}" exec -T backend printenv PLANARIAN_DATASET 2>/dev/null || echo unknown)"
+  fi
+  echo "Active mode:  $mode"
+  echo "App:          https://planarian.local"
+  echo "Live viewer:  https://viewer.planarian.local"
+  echo "Viewer auth:  $HOME/.local/share/planarian-dev/viewer-credentials.txt"
+  echo "Postgres:     127.0.0.1:55432"
+  echo "Azurite:      127.0.0.1:11000"
+}
+
+trust_certificate() {
+  ensure_viewer_auth
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "Automatic certificate trust is currently implemented for macOS only." >&2
+    return 1
+  fi
+
+  local temp_cert
+  temp_cert="$(mktemp -t planarian-local-ca).crt"
+  trap 'rm -f "$temp_cert"' RETURN
+
+  "${COMPOSE[@]}" up -d --no-deps caddy
+  "${COMPOSE[@]}" cp caddy:/data/caddy/pki/authorities/local/root.crt "$temp_cert"
+  security add-trusted-cert -d -r trustRoot \
+    -k "$HOME/Library/Keychains/login.keychain-db" "$temp_cert"
+  echo "Trusted the Planarian local Caddy CA in your login keychain."
+}
+setup_environment() {
+  ensure_viewer_auth
+  require_compose
+  ensure_mdns
+  echo "Building Planarian development images..."
+  "${COMPOSE[@]}" --profile tools build postgres backend frontend browser tooling agent
+  select_dataset generic
+  ensure_dataset
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  echo
+  echo "Initial environment is ready."
+  echo "If https://planarian.local is not trusted, run: npm run dev:cert"
+  print_ready generic
+}
+
+command="${1:-}"
+case "$command" in
+  setup)
+    setup_environment
+    ;;
+  up)
+    shift
+    if [[ "${1:-}" == "--settings" ]]; then
+      [[ $# -le 2 ]] || { usage; exit 2; }
+      start_external "${2:-}"
+    else
+      [[ $# -le 1 ]] || { usage; exit 2; }
+      start_local "${1:-generic}"
+    fi
+    ;;
+  reset)
+    shift
+    [[ $# -le 1 ]] || { usage; exit 2; }
+    reset_dataset "${1:-generic}"
+    ;;
+  status)
+    show_status
+    ;;
+  logs)
+    shift
+    if [[ $# -eq 0 ]]; then
+      "${COMPOSE[@]}" logs -f
+    else
+      "${COMPOSE[@]}" logs -f "$1"
+    fi
+    ;;
+  restart)
+    shift
+    if [[ $# -eq 0 ]]; then
+      "${COMPOSE[@]}" restart backend frontend caddy browser agent
+    else
+      "${COMPOSE[@]}" restart "$1"
+    fi
+    ;;
+  shell)
+    "${COMPOSE[@]}" exec agent bash
+    ;;
+  agent-auth)
+    agent_auth
+    ;;
+  psql)
+    shift
+    select_dataset "${1:-generic}"
+    ensure_dataset
+    "${COMPOSE[@]}" --profile tools run --rm tooling psql
+    ;;
+  trust-cert)
+    trust_certificate
+    ;;
+  viewer-credentials)
+    ensure_viewer_auth
+    cat "$HOME/.local/share/planarian-dev/viewer-credentials.txt"
+    ;;
+  down)
+    stop_mdns
+    "${COMPOSE[@]}" down
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac

@@ -130,14 +130,50 @@ Users can be invited by managers or admins through the app, accept or decline pe
 
 - Frontend: React + TypeScript
 - Backend: C#
-- Database: PostgreSQL
+- Database: PostgreSQL/PostGIS
 - File storage: Azure Blob Storage or a local storage emulator
 
 Planarian is not heavily dependent on Azure specifically. Most of the application can run anywhere that supports the backend, frontend, and PostgreSQL. The main Azure-specific piece right now is file storage, since files such as maps, articles, trip reports, and survey data are stored in blob storage. For local development, you can use a real Azure Blob Storage account or a local emulator like Azurite.
 
-If you have any interest at all in working on Planarian, reach out to me. I am happy to help get you set up locally and figure out where to start.
+### Docker development
 
-If you want to work on the codebase locally:
+The repository includes a Compose-based development environment for the backend, frontend, PostgreSQL/PostGIS, Azurite, Caddy, a shared Playwright/Chromium browser, and an optional Desktop Commander agent. Docker Compose v2 and Docker Buildx are expected; Docker Desktop includes them, while Homebrew/Colima users can install the corresponding Docker CLI plugins separately.
+
+```bash
+npm run dev:setup             # first-time build + generic dataset
+npm run dev                   # generic dataset
+npm run dev:e2e               # separate deterministic E2E dataset
+npm run dev:reset             # drop/recreate/reseed only generic DB + local blobs
+npm run dev:reset:e2e         # drop/recreate/reseed only E2E DB + local blobs
+npm run dev:status
+npm run dev:db
+```
+
+The root `package.json` is only a convenience layer; `./dev` remains the canonical implementation for Docker orchestration. Run `npm run` to list the available aliases. Arguments can be passed through after `--`, for example `npm run dev:logs -- backend` or `npm run dev:restart -- backend`.
+
+The app is available to devices on the same LAN at `https://planarian.local` with no port number. The shared agent browser is available to devices on the same LAN at `https://viewer.planarian.local` with no port number; run `npm run dev:viewer` to see its generated username/password. The raw browser viewer and CDP endpoint remain Docker-internal/loopback-only.
+
+Caddy uses one local development CA for both `planarian.local` and `viewer.planarian.local`. Run `npm run dev:cert` once on macOS. On another LAN device, open `http://cert.planarian.local` to download that same root CA and install/trust it once; trusting that root covers certificates for both local hostnames. The seeded Planarian users are `admin@planarian.local`, `manager@planarian.local`, and `viewer@planarian.local`, all with password `planarian`.
+
+The generic and E2E datasets are separate databases in the same local PostgreSQL container. `reset` is intentionally destructive for the selected local dataset: it recreates that database and removes its account-owned Azurite containers before reseeding the baseline. It does not reset the other dataset.
+
+To run the app with the normal ignored project development configuration, use:
+
+```bash
+npm run dev:settings
+```
+
+This defaults to `Planarian/Planarian/appsettings.Development.json`. To use a different file instead, pass it explicitly:
+
+```bash
+npm run dev:settings -- /absolute/path/to/appsettings.Development.json
+```
+
+The backend receives the selected file read-only. The Desktop Commander agent continues to receive the safe generic local settings and local PostgreSQL configuration, so mounting Azure-backed application settings does not automatically expose them to the agent. Use `npm run dev:agent` for the one-time Desktop Commander device authorization; its session persists in a Docker volume.
+
+Rider can continue to open the host checkout directly. The same checkout is bind-mounted into the containers, and `.devcontainer/devcontainer.json` is available for Rider's Dev Container workflow when desired. Rider's Docker-attach debugger tools are stored in the named `planarian-compose-rider-debugger` volume at `~/.RiderDebuggerTools`, so the one-time **Install tools to the container** step survives backend-container recreation. After a Rider upgrade, Rider may refresh the tools in that same persistent volume; normal `npm run dev:stop` does not remove it.
+
+If you prefer to run Planarian natively:
 
 1. Copy `Planarian/Planarian/appsettings.Template.Development.json` to the ignored `Planarian/Planarian/appsettings.Development.json` and configure the backend values. Azure App Configuration is optional in `Development`; leave `ConnectionStrings:AppConfigConnectionString` empty to use local configuration only. Non-Development environments still require Azure App Configuration. The template contains non-secret placeholder email settings so the app can start locally; configure real email credentials separately only when you intend to test outbound email.
 2. Set up PostgreSQL.

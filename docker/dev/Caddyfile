@@ -1,0 +1,45 @@
+{
+    auto_https disable_redirects
+}
+
+https://planarian.local {
+    tls internal
+
+    @backend path /api/* /swagger*
+    handle @backend {
+        reverse_proxy backend:8080
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
+
+https://viewer.planarian.local {
+    tls internal
+    import /etc/caddy/viewer-auth.caddy
+    reverse_proxy browser:6080
+}
+
+:80 {
+    @cert host cert.planarian.local
+    handle @cert {
+        root * /data/caddy/pki/authorities/local
+        rewrite * /root.crt
+        header Content-Type application/x-x509-ca-cert
+        header Content-Disposition "attachment; filename=planarian-local-ca.crt"
+        file_server
+    }
+
+    @viewer host viewer.planarian.local
+    handle @viewer {
+        redir https://viewer.planarian.local{uri} permanent
+    }
+
+    @app host planarian.local
+    handle @app {
+        redir https://planarian.local{uri} permanent
+    }
+
+    respond 404
+}
