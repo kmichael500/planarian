@@ -539,7 +539,7 @@ app.UseCors(x =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()
-        .WithExposedHeaders("Content-Disposition")
+        .WithExposedHeaders("Content-Disposition", HeaderNames.AcceptRanges, HeaderNames.ContentRange, HeaderNames.ETag)
 );
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();

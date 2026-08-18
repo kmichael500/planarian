@@ -23,13 +23,36 @@ import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModa
 import { GpxViewer } from "./GpxViewer";
 import { PltViewer } from "./PltViewer";
 import { FileAccessAction, FileService } from "../Services/FileService";
+import { LazyLoadErrorBoundary } from "../../../Shared/Components/LazyLoadErrorBoundary";
+import { isChunkLoadError, retryChunkImport } from "../../../Shared/Helpers/LazyImport";
 
-const PdfViewer = lazy(async () => ({
-  default: (await import("./PdfViewer")).PdfViewer,
+const LazyPdfViewer = lazy(async () => ({
+  default: (await retryChunkImport(() => import("./PdfViewer"))).PdfViewer,
 }));
+const PdfViewer = process.env.NODE_ENV === "development"
+  ? require("./PdfViewer").PdfViewer
+  : LazyPdfViewer;
+
 const VectorDatasetViewer = lazy(async () => ({
-  default: (await import("./VectorDatasetViewer")).VectorDatasetViewer,
+  default: (await retryChunkImport(() => import("./VectorDatasetViewer"))).VectorDatasetViewer,
 }));
+
+const LazyViewerLoadError = ({ error }: { error: Error }) => {
+  const chunkLoadFailed = isChunkLoadError(error);
+  const message = chunkLoadFailed
+    ? "The application may have updated while this page was open. Reload the page and try again."
+    : "The viewer encountered an unexpected error. Reload the page and try again.";
+  const details = process.env.NODE_ENV === "development"
+    ? ` ${error.name}: ${error.message}`
+    : "";
+
+  return <Result
+    status="error"
+    title={chunkLoadFailed ? "The file viewer could not be loaded." : "The file viewer encountered an error."}
+    subTitle={`${message}${details}`}
+    extra={<PlanarianButton alwaysShowChildren onClick={() => window.location.reload()}>Reload page</PlanarianButton>}
+  />;
+};
 
 interface FileViewerProps {
   fileId?: string | null;
@@ -79,14 +102,12 @@ const FileViewer: React.FC<FileViewerProps> = ({
   ) : null;
 
   const [fileContent, setFileContent] = useState<string | null>(null);
-  const [pdfFile, setPdfFile] = useState<Blob | null>(null);
   const [fileEmbedUrl, setFileEmbedUrl] = useState<string | undefined>(undefined);
   const [fileAccessError, setFileAccessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setPdfFile(null);
       setFileContent(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
@@ -95,7 +116,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
 
     if (!fileId) {
-      setPdfFile(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
       setFileContent(null);
@@ -104,7 +124,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
 
     setFileContent(null);
-    setPdfFile(null);
     setFileEmbedUrl(undefined);
     setFileAccessError(null);
     setIsLoading(true);
@@ -118,7 +137,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
         }
 
         setFileEmbedUrl(accessUrl);
-        if (!isTextFileType(fileType) && !isCsvFileType(fileType) && !isPdf) {
+        if (!isTextFileType(fileType) && !isCsvFileType(fileType)) {
           setIsLoading(false);
         }
       } catch {
@@ -136,7 +155,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [open, fileId, fileType, isPdf]);
+  }, [open, fileId, fileType]);
 
   useEffect(() => {
     if (!open || !fileEmbedUrl) {
@@ -184,39 +203,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
       };
     }
   }, [open, fileEmbedUrl, fileType, fileAccessError]);
-
-  useEffect(() => {
-    if (!open || !fileId || !isPdf) {
-      return;
-    }
-
-    let isCancelled = false;
-    setIsLoading(true);
-    setPdfFile(null);
-
-    const loadPdf = async () => {
-      try {
-        const pdfBlob = await FileService.getFileBlob(fileId);
-        if (isCancelled) {
-          return;
-        }
-
-        setPdfFile(pdfBlob);
-        setIsLoading(false);
-      } catch {
-        if (!isCancelled) {
-          setFileAccessError("Unable to load file.");
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadPdf();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [open, fileId, isPdf]);
 
   const hasPrevious = typeof onPrevious === "function";
   const hasNext = typeof onNext === "function";
@@ -313,14 +299,15 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   />
                 </div>
               )}
-              {isPdf && pdfFile && (
-                <Suspense fallback={<Spin />}>
-                  <PdfViewer
-                    file={pdfFile}
-                    openUrl={fileEmbedUrl}
-                    downloadButton={downloadButton}
-                  />
-                </Suspense>
+              {isPdf && fileEmbedUrl && (
+                <LazyLoadErrorBoundary renderFallback={error => <LazyViewerLoadError error={error} />}>
+                  <Suspense fallback={<Spin />}>
+                    <PdfViewer
+                      fileUrl={fileEmbedUrl}
+                      downloadButton={downloadButton}
+                    />
+                  </Suspense>
+                </LazyLoadErrorBoundary>
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}
               {isTextFileType(fileType) && (
@@ -336,13 +323,15 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 </pre>
               )}
               {isVectorDataset && fileEmbedUrl && (
-                <Suspense fallback={<Spin />}>
-                  <VectorDatasetViewer
-                    embedUrl={fileEmbedUrl}
-                    fileType={fileType}
-                    downloadButton={downloadButton}
-                  />
-                </Suspense>
+                <LazyLoadErrorBoundary renderFallback={error => <LazyViewerLoadError error={error} />}>
+                  <Suspense fallback={<Spin />}>
+                    <VectorDatasetViewer
+                      embedUrl={fileEmbedUrl}
+                      fileType={fileType}
+                      downloadButton={downloadButton}
+                    />
+                  </Suspense>
+                </LazyLoadErrorBoundary>
               )}
               {isPlt && fileEmbedUrl && (
                 <PltViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />

@@ -1,5 +1,13 @@
 export {};
 
+type PromiseConstructorWithResolvers = PromiseConstructor & {
+  withResolvers?: <T>() => {
+    promise: Promise<T>;
+    resolve: (value: T | PromiseLike<T>) => void;
+    reject: (reason?: unknown) => void;
+  };
+};
+
 jest.mock("react-dom/client", () => ({
   __esModule: true,
   default: { createRoot: () => ({ render: jest.fn() }) },
@@ -32,5 +40,22 @@ describe("browser authentication migration", () => {
     });
 
     expect(localStorage.getItem("token")).toBeNull();
+  });
+
+  it("installs Promise.withResolvers compatibility support during bootstrap", () => {
+    const promiseConstructor = Promise as PromiseConstructorWithResolvers;
+    const original = Object.getOwnPropertyDescriptor(promiseConstructor, "withResolvers");
+    delete promiseConstructor.withResolvers;
+
+    try {
+      jest.isolateModules(() => {
+        require("./index");
+      });
+
+      expect(typeof promiseConstructor.withResolvers).toBe("function");
+    } finally {
+      if (original) Object.defineProperty(promiseConstructor, "withResolvers", original);
+      else delete promiseConstructor.withResolvers;
+    }
   });
 });

@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import { registerLicense } from "@syncfusion/ej2-base";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./index.css";
+import "./Shared/Polyfills/PromiseWithResolvers";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { BootstrapErrorBoundary } from "./Shared/Components/BootstrapErrorBoundary";

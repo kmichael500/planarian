@@ -1,4 +1,3 @@
-import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 const filesBaseUrl = "api/files";
@@ -8,17 +7,6 @@ export enum FileAccessAction {
 }
 
 const FileService = {
-  async getFileBlob(fileId: string): Promise<Blob> {
-    const response = await HttpClient.get<Blob>(
-      `${filesBaseUrl}/${fileId}/${FileAccessAction.View}`,
-      {
-        responseType: "blob",
-      }
-    );
-
-    return response.data;
-  },
-
   getFileAccessUrl(fileId: string, action: FileAccessAction): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
       `${filesBaseUrl}/${fileId}/${action}`

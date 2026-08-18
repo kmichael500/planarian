@@ -6,44 +6,15 @@ import {
   PlusOutlined,
   VerticalAlignMiddleOutlined,
 } from "@ant-design/icons";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import { createPdfDocumentOptions } from "./PdfViewerRequest";
 import "./PdfViewer.scss";
 
-type PromiseWithResolversResult<T> = {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-};
-
-type PromiseConstructorWithResolvers = PromiseConstructor & {
-  withResolvers?: <T>() => PromiseWithResolversResult<T>;
-};
-
-const promiseWithResolversSupport =
-  Promise as PromiseConstructorWithResolvers;
-
-if (typeof promiseWithResolversSupport.withResolvers !== "function") {
-  promiseWithResolversSupport.withResolvers = function withResolvers<T>() {
-    let resolve!: (value: T | PromiseLike<T>) => void;
-    let reject!: (reason?: unknown) => void;
-
-    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-      resolve = resolvePromise;
-      reject = rejectPromise;
-    });
-
-    return { promise, resolve, reject };
-  };
-}
-
-type PdfComponents = {
-  Document: React.ComponentType<any>;
-  Page: React.ComponentType<any>;
-};
-
 interface PdfViewerProps {
-  file: Blob;
-  openUrl?: string;
+  fileUrl: string;
   downloadButton?: React.ReactNode;
 }
 
@@ -55,51 +26,26 @@ const MIN_ZOOM = 0.75;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.25;
 
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
+
 export function PdfViewer({
-  file,
-  openUrl,
+  fileUrl,
   downloadButton,
 }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const documentOptions = useMemo(
+    () => createPdfDocumentOptions(crypto.randomUUID()),
+    [fileUrl]
+  );
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1);
   const [fitToWidth, setFitToWidth] = useState(true);
   const [pageWidth, setPageWidth] = useState<number | undefined>(undefined);
   const [renderError, setRenderError] = useState(false);
   const [documentLoading, setDocumentLoading] = useState(true);
-  const [pdfComponents, setPdfComponents] = useState<PdfComponents | null>(null);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const loadPdfViewer = async () => {
-      try {
-        const [{ Document, Page, pdfjs }] = await Promise.all([
-          import("react-pdf"),
-          import("react-pdf/dist/Page/AnnotationLayer.css"),
-          import("react-pdf/dist/Page/TextLayer.css"),
-        ]);
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "../../../../node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url
-        ).toString();
-
-        if (!isCancelled) {
-          setPdfComponents({ Document, Page });
-        }
-      } catch {
-        if (!isCancelled) {
-          setDocumentLoading(false);
-          setRenderError(true);
-        }
-      }
-    };
-
-    loadPdfViewer();
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     setNumPages(0);
@@ -107,7 +53,7 @@ export function PdfViewer({
     setFitToWidth(true);
     setRenderError(false);
     setDocumentLoading(true);
-  }, [file]);
+  }, [fileUrl]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -142,13 +88,13 @@ export function PdfViewer({
   const fallbackActions = useMemo(() => {
     const actions: React.ReactNode[] = [];
 
-    if (openUrl) {
+    if (fileUrl) {
       actions.push(
         <PlanarianButton
           key="open"
           icon={<EyeOutlined />}
           onClick={() => {
-            window.open(openUrl, "_blank", "noopener,noreferrer");
+            window.open(fileUrl, "_blank", "noopener,noreferrer");
           }}
         >
           Open in browser
@@ -161,7 +107,7 @@ export function PdfViewer({
     }
 
     return actions;
-  }, [downloadButton, openUrl]);
+  }, [downloadButton, fileUrl]);
 
   if (renderError) {
     return (
@@ -172,12 +118,6 @@ export function PdfViewer({
       />
     );
   }
-
-  if (!pdfComponents) {
-    return <Spin />;
-  }
-
-  const { Document, Page } = pdfComponents;
 
   return (
     <div className="pdf-viewer">
@@ -221,7 +161,8 @@ export function PdfViewer({
         className="pdf-viewer__canvas-shell pdf-viewer__canvas-shell--centered"
       >
         <Document
-          file={file}
+          file={fileUrl}
+          options={documentOptions}
           loading={<Spin />}
           onLoadSuccess={({ numPages: nextNumPages }: PdfDocumentLoadSuccess) => {
             setNumPages(nextNumPages);

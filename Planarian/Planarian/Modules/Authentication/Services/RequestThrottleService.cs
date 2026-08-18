@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Planarian.Model.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Net.Http.Headers;
 using Planarian.Library.Exceptions;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Options;
@@ -11,6 +12,9 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class RequestThrottleService
 {
+    public const string FileStreamSessionHeaderName = "X-Planarian-File-Stream-Session";
+    private static readonly object FileStreamSessionStateCreationLock = new();
+
     #region Constructor/Fields
 
     private readonly MemoryCache _cache;
@@ -110,6 +114,38 @@ public class RequestThrottleService
     #endregion
 
     #region Throttle Enforcement
+
+    public async Task CountFileAccessAttempt(string fileId)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        var sessionId = GetNormalizedFileStreamSessionId(httpContext?.Request);
+        var hasRangeHeader = httpContext?.Request.Headers.ContainsKey(HeaderNames.Range) == true;
+        var sessionKey = sessionId is null || string.IsNullOrWhiteSpace(_requestUser.Id)
+            ? null
+            : $"file-stream-session:{_requestUser.Id}:{fileId}:{sessionId}";
+
+        if (sessionKey is null)
+        {
+            await CountAttempt(ThrottleProfile.FileAccess, fileId);
+            return;
+        }
+
+        var sessionState = GetOrCreateFileStreamSessionState(sessionKey);
+
+        await sessionState.Gate.WaitAsync();
+        try
+        {
+            if (hasRangeHeader && sessionState.Counted)
+                return;
+
+            await CountAttempt(ThrottleProfile.FileAccess, fileId);
+            sessionState.Counted = true;
+        }
+        finally
+        {
+            sessionState.Gate.Release();
+        }
+    }
 
     public async Task CountAttempt(
         ThrottleProfile profile,
@@ -294,6 +330,35 @@ public class RequestThrottleService
 
     #region Helpers
 
+    public static bool HasValidFileStreamSession(HttpRequest request) =>
+        GetNormalizedFileStreamSessionId(request) is not null;
+
+    private static string? GetNormalizedFileStreamSessionId(HttpRequest? request)
+    {
+        var sessionId = request?.Headers[FileStreamSessionHeaderName].ToString();
+        return Guid.TryParse(sessionId, out var parsedSessionId)
+            ? parsedSessionId.ToString("N")
+            : null;
+    }
+
+    private FileStreamSessionState GetOrCreateFileStreamSessionState(string sessionKey)
+    {
+        if (_cache.TryGetValue<FileStreamSessionState>(sessionKey, out var existing))
+            return existing!;
+
+        // MemoryCache.GetOrCreate is not atomic. Serialize only the rare first creation
+        // so concurrent PDF range requests share one gate and one counted session.
+        lock (FileStreamSessionStateCreationLock)
+        {
+            if (_cache.TryGetValue<FileStreamSessionState>(sessionKey, out existing))
+                return existing!;
+
+            var created = new FileStreamSessionState();
+            _cache.Set(sessionKey, created, TimeSpan.FromMinutes(_options.FileAccessWindowMinutes));
+            return created;
+        }
+    }
+
     private static string NormalizeIdentifier(ThrottleProfile profile, string? identifier)
     {
         return profile switch
@@ -302,6 +367,12 @@ public class RequestThrottleService
             ThrottleProfile.FileAccess => identifier?.Trim() ?? string.Empty,
             _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
         };
+    }
+
+    private sealed class FileStreamSessionState
+    {
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public bool Counted { get; set; }
     }
 
     private sealed class CounterState

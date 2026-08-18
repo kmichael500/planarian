@@ -40,8 +40,9 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
                 {
                     try
                     {
-                        var download = await client.DownloadStreamingAsync(cancellationToken: readCancellationToken);
-                        return download.Value.Content;
+                        return await client.OpenReadAsync(
+                            new BlobOpenReadOptions(allowModifications: false),
+                            readCancellationToken);
                     }
                     catch (RequestFailedException exception) when (exception.Status == 404)
                     {
