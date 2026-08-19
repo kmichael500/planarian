@@ -102,7 +102,18 @@ public class RequestUser
     /// <exception cref="ApiException"></exception>
     public async Task<bool> HasCavePermission(string permissionKey, bool @throw = true)
     {
-        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey) || string.IsNullOrWhiteSpace(AccountId))
+        if (!IsAuthenticated || string.IsNullOrWhiteSpace(permissionKey))
+            return false;
+
+        if (permissionKey == PermissionPolicyKey.PlanarianAdmin)
+        {
+            return await _dbContext.UserPermissions.AnyAsync(e =>
+                e.UserId == Id &&
+                e.AccountId == null &&
+                e.Permission!.Key == PermissionPolicyKey.PlanarianAdmin);
+        }
+
+        if (string.IsNullOrWhiteSpace(AccountId))
             return false;
 
         var userPermissions = await _dbContext.UserPermissions

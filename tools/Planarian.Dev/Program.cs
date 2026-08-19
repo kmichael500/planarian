@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using Azure.Storage.Blobs;
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
@@ -8,14 +7,18 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Generators;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
+using Planarian.Modules.PlanarianSettings.Models;
+using Planarian.Modules.PlanarianSettings.Repositories;
+using Planarian.Modules.PlanarianSettings.Services;
 
 const string connectionVariable = "PLANARIAN_DEV_CONNECTION_STRING";
 const string storageVariable = "PLANARIAN_DEV_BLOB_CONNECTION_STRING";
-const string defaultPassword = "planarian";
+const string apiUrlVariable = "PLANARIAN_DEV_API_URL";
+const string authSettingsFileVariable = "PLANARIAN_DEV_AUTH_SETTINGS_FILE";
 
-if (args.Length != 2 || args[0] is not ("seed" or "reset-storage"))
+if (args.Length != 2 || args[0] is not ("seed" or "reset-storage" or "verify-api"))
 {
-    Console.Error.WriteLine("Usage: Planarian.Dev <seed|reset-storage> <generic|e2e>");
+    Console.Error.WriteLine("Usage: Planarian.Dev <seed|reset-storage|verify-api> <generic|e2e>");
     return 2;
 }
 
@@ -27,6 +30,16 @@ if (args[0] == "reset-storage")
 }
 
 var connectionString = RequireEnvironment(connectionVariable);
+if (args[0] == "verify-api")
+{
+    await DevelopmentApiVerifier.VerifyAsync(
+        dataset,
+        connectionString,
+        RequireEnvironment(apiUrlVariable),
+        RequireEnvironment(authSettingsFileVariable));
+    return 0;
+}
+
 await ApplyMigrations(connectionString);
 await SeedDatabase(connectionString, dataset);
 return 0;
@@ -46,38 +59,130 @@ static async Task ApplyMigrations(string connectionString)
 
 static async Task SeedDatabase(string connectionString, DatasetConfig dataset)
 {
+    // TODO(.NET 10 / EF Core 10+): When Planarian is upgraded, evaluate moving this custom dev-data
+    // initialization to UseSeeding/UseAsyncSeeding so it participates in EF's migration locking. Keep both
+    // sync and async seed hooks because EF tooling currently relies on UseSeeding even for async applications.
     var options = new DbContextOptionsBuilder<PlanarianDbContext>()
         .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
         .Options;
 
     await using var db = new DevelopmentSeedDbContext(options);
     await new DataGenerator(db).AddOrUpdateDefaultData();
-    await EnsureDatasetBaseline(db, dataset);
-    await VerifyBaseline(db, dataset);
+    await EnsureUsers(db, dataset);
+    await db.SaveChangesAsync();
+
+    var stateId = await ResolveStateId(db);
+    var accountId = await DevelopmentDatasetLocator.FindAccountIdAsync(db, dataset)
+        ?? await CreateAccountThroughService(connectionString, dataset, stateId);
+
+    await EnsureDatasetDetails(db, dataset, accountId, stateId);
+    await VerifyBaseline(db, dataset, accountId, stateId);
 }
-static async Task EnsureDatasetBaseline(PlanarianDbContext db, DatasetConfig dataset)
+
+static async Task<string> ResolveStateId(PlanarianDbContext db) =>
+    await db.States
+        .AsNoTracking()
+        .Where(state => state.Abbreviation == DevelopmentDatasetBaseline.StateAbbreviation)
+        .Select(state => state.Id)
+        .SingleAsync();
+
+static async Task EnsureUsers(PlanarianDbContext db, DatasetConfig dataset)
 {
-    var createdOn = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    if (!await db.Accounts.AnyAsync(account => account.Id == dataset.AccountId))
+    foreach (var userSpec in DevelopmentDatasetBaseline.Users(dataset))
     {
-        db.Accounts.Add(new Account
+        if (await db.Users.AnyAsync(user => user.Id == userSpec.Id)) continue;
+
+        db.Users.Add(new User(userSpec.FirstName, userSpec.LastName, userSpec.EmailAddress)
         {
-            Id = dataset.AccountId,
-            Name = "Planarian Local Development",
-            CountyIdDelimiter = "-",
-            DefaultViewAccessAllCaves = true,
-            ExportEnabled = true,
-            CreatedOn = createdOn
+            Id = userSpec.Id,
+            HashedPassword = PasswordService.Hash(DevelopmentDatasetBaseline.DefaultPassword),
+            EmailConfirmedOn = DevelopmentDatasetBaseline.CreatedOn,
+            CreatedOn = DevelopmentDatasetBaseline.CreatedOn
         });
     }
-    var accountStateId = StableId($"{dataset.Name}:account-state:tn");
-    if (!await db.AccountStates.AnyAsync(row => row.Id == accountStateId))
+}
+
+static async Task<string> CreateAccountThroughService(
+    string connectionString, DatasetConfig dataset, string stateId)
+{
+    var options = new DbContextOptionsBuilder<PlanarianDbContext>()
+        .UseNpgsql(connectionString, postgres => postgres.UseNetTopologySuite())
+        .Options;
+    await using var db = new PlanarianDbContext(options);
+    await using var transaction = await db.Database.BeginTransactionAsync();
+
+    var requestUser = new RequestUser(db);
+    db.RequestUser = requestUser;
+
+    var planarianAdminPermissionId = await db.Permissions
+        .Where(permission => permission.Key == PermissionKey.PlanarianAdmin)
+        .Select(permission => permission.Id)
+        .SingleAsync();
+    var hasPlanarianAdmin = await db.UserPermissions.AnyAsync(row =>
+        row.UserId == dataset.AdminUserId &&
+        row.AccountId == null &&
+        row.PermissionId == planarianAdminPermissionId);
+
+    UserPermission? bootstrapPermission = null;
+    if (!hasPlanarianAdmin)
+    {
+        bootstrapPermission = new UserPermission
+        {
+            UserId = dataset.AdminUserId,
+            PermissionId = planarianAdminPermissionId
+        };
+        db.UserPermissions.Add(bootstrapPermission);
+        await db.SaveChangesAsync();
+    }
+
+    await requestUser.Initialize(null, dataset.AdminUserId);
+    if (!requestUser.IsAuthenticated)
+        throw new InvalidOperationException("Seeded development admin could not be initialized for account creation.");
+
+    var repository = new PlanarianSettingsRepository(db, requestUser);
+    var service = new PlanarianSettingsService(repository, requestUser);
+    var accountId = await service.CreateAccount(new CreateAccountVm
+    {
+        Name = DevelopmentDatasetBaseline.AccountName,
+        CountyIdDelimiter = DevelopmentDatasetBaseline.CountyIdDelimiter,
+        DefaultViewAccessAllCaves = DevelopmentDatasetBaseline.DefaultViewAccessAllCaves,
+        ExportEnabled = DevelopmentDatasetBaseline.ExportEnabled,
+        StateIds = [stateId]
+    }, CancellationToken.None);
+
+    await requestUser.Initialize(accountId, dataset.AdminUserId);
+    db.Counties.Add(new County
+    {
+        Id = dataset.CountyId,
+        AccountId = accountId,
+        StateId = stateId,
+        Name = DevelopmentDatasetBaseline.CountyName,
+        DisplayId = DevelopmentDatasetBaseline.CountyDisplayId
+    });
+    await db.SaveChangesAsync();
+
+    if (bootstrapPermission != null)
+    {
+        db.UserPermissions.Remove(bootstrapPermission);
+        await db.SaveChangesAsync();
+    }
+
+    await transaction.CommitAsync();
+    Console.WriteLine($"Created '{dataset.Name}' account through PlanarianSettingsService.CreateAccount ({accountId}).");
+    return accountId;
+}
+
+static async Task EnsureDatasetDetails(
+    PlanarianDbContext db, DatasetConfig dataset, string accountId, string stateId)
+{
+    var createdOn = DevelopmentDatasetBaseline.CreatedOn;
+    if (!await db.AccountStates.AnyAsync(row => row.AccountId == accountId && row.StateId == stateId))
     {
         db.AccountStates.Add(new AccountState
         {
-            Id = accountStateId,
-            AccountId = dataset.AccountId,
-            StateId = "X6Y7Z8a9B1",
+            Id = DevelopmentDatasetBaseline.AccountStateId(dataset),
+            AccountId = accountId,
+            StateId = stateId,
             CreatedOn = createdOn
         });
     }
@@ -87,97 +192,78 @@ static async Task EnsureDatasetBaseline(PlanarianDbContext db, DatasetConfig dat
         db.Counties.Add(new County
         {
             Id = dataset.CountyId,
-            AccountId = dataset.AccountId,
-            StateId = "X6Y7Z8a9B1",
-            Name = "Demo County",
-            DisplayId = "DEMO",
+            AccountId = accountId,
+            StateId = stateId,
+            Name = DevelopmentDatasetBaseline.CountyName,
+            DisplayId = DevelopmentDatasetBaseline.CountyDisplayId,
             CreatedOn = createdOn
         });
     }
+
     var existingFeatureKeys = (await db.FeatureSettings
-        .Where(setting => setting.AccountId == dataset.AccountId)
+        .Where(setting => setting.AccountId == accountId)
         .Select(setting => setting.Key)
         .ToListAsync())
         .ToHashSet();
     foreach (var key in Enum.GetValues<FeatureKey>())
     {
         if (existingFeatureKeys.Contains(key)) continue;
-
         db.FeatureSettings.Add(new FeatureSetting
         {
-            Id = StableId($"{dataset.Name}:feature:{key}"),
-            AccountId = dataset.AccountId,
+            Id = DevelopmentDatasetBaseline.FeatureId(dataset, key),
+            AccountId = accountId,
             Key = key,
-            IsEnabled = key != FeatureKey.EnabledFieldCaveGeologicAgeTags,
+            IsEnabled = AccountFeatureSettingDefaults.IsEnabled(key),
             IsDefault = false,
             CreatedOn = createdOn
         });
     }
 
-    var users = new[]
+    foreach (var userSpec in DevelopmentDatasetBaseline.Users(dataset))
     {
-        (dataset.AdminUserId, "Local", "Admin", "admin@planarian.local"),
-        (dataset.ManagerUserId, "Local", "Manager", "manager@planarian.local"),
-        (dataset.ViewerUserId, "Local", "Viewer", "viewer@planarian.local")
-    };
-
-    foreach (var (id, firstName, lastName, email) in users)
-    {
-        if (!await db.Users.AnyAsync(user => user.Id == id))
+        if (await db.AccountUsers.AnyAsync(row => row.AccountId == accountId && row.UserId == userSpec.Id)) continue;
+        db.AccountUsers.Add(new AccountUser
         {
-            db.Users.Add(new User(firstName, lastName, email)
-            {
-                Id = id,
-                HashedPassword = PasswordService.Hash(defaultPassword),
-                EmailConfirmedOn = createdOn,
-                CreatedOn = createdOn
-            });
-        }
-
-        var accountUserId = StableId($"{dataset.Name}:account-user:{id}");
-        if (!await db.AccountUsers.AnyAsync(row => row.Id == accountUserId))
-        {
-            db.AccountUsers.Add(new AccountUser
-            {
-                Id = accountUserId,
-                AccountId = dataset.AccountId,
-                UserId = id,
-                InvitationAcceptedOn = createdOn,
-                CreatedOn = createdOn
-            });
-        }
+            Id = DevelopmentDatasetBaseline.AccountUserId(dataset, userSpec.Id),
+            AccountId = accountId,
+            UserId = userSpec.Id,
+            InvitationAcceptedOn = createdOn,
+            CreatedOn = createdOn
+        });
     }
+
     var permissions = await db.Permissions
         .Where(permission => permission.Key == PermissionKey.Admin ||
                              permission.Key == PermissionKey.Manager ||
                              permission.Key == PermissionKey.View)
         .ToDictionaryAsync(permission => permission.Key);
-
-    var adminPermissionId = StableId($"{dataset.Name}:admin-permission");
-    if (!await db.UserPermissions.AnyAsync(row => row.Id == adminPermissionId))
+    var adminPermission = permissions[PermissionKey.Admin];
+    if (!await db.UserPermissions.AnyAsync(row =>
+            row.AccountId == accountId && row.UserId == dataset.AdminUserId &&
+            row.PermissionId == adminPermission.Id))
     {
         db.UserPermissions.Add(new UserPermission
         {
-            Id = adminPermissionId,
-            AccountId = dataset.AccountId,
+            Id = DevelopmentDatasetBaseline.AdminPermissionId(dataset),
+            AccountId = accountId,
             UserId = dataset.AdminUserId,
-            PermissionId = permissions[PermissionKey.Admin].Id,
+            PermissionId = adminPermission.Id,
             CreatedOn = createdOn
         });
     }
 
     var broadPermissions = new[]
     {
-        BroadCavePermission(dataset, dataset.ManagerUserId, permissions[PermissionKey.Manager].Id, createdOn),
-        BroadCavePermission(dataset, dataset.ViewerUserId, permissions[PermissionKey.View].Id, createdOn)
+        BroadCavePermission(dataset, accountId, dataset.ManagerUserId, permissions[PermissionKey.Manager].Id, createdOn),
+        BroadCavePermission(dataset, accountId, dataset.ViewerUserId, permissions[PermissionKey.View].Id, createdOn)
     };
     foreach (var permission in broadPermissions)
     {
-        if (!await db.CavePermissions.AnyAsync(row => row.Id == permission.Id))
+        if (!await HasBroadCavePermission(db, permission.UserId, accountId, permission.PermissionId))
             db.CavePermissions.Add(permission);
     }
 
-    foreach (var tag in DatasetTags(dataset, createdOn))
+    foreach (var tag in DatasetTags(dataset, accountId, createdOn))
     {
         if (!await db.TagTypes.AnyAsync(row => row.Id == tag.Id))
             db.TagTypes.Add(tag);
@@ -187,85 +273,114 @@ static async Task EnsureDatasetBaseline(PlanarianDbContext db, DatasetConfig dat
 }
 
 static CavePermission BroadCavePermission(
-    DatasetConfig dataset, string userId, string permissionId, DateTime createdOn) => new()
+    DatasetConfig dataset, string accountId, string userId, string permissionId, DateTime createdOn) => new()
 {
-    Id = StableId($"{dataset.Name}:cave-permission:{userId}:{permissionId}"),
-    AccountId = dataset.AccountId,
+    Id = DevelopmentDatasetBaseline.CavePermissionId(dataset, userId, permissionId),
+    AccountId = accountId,
     UserId = userId,
     PermissionId = permissionId,
     CreatedOn = createdOn
 };
-static IEnumerable<TagType> DatasetTags(DatasetConfig dataset, DateTime createdOn)
-{
-    yield return Tag(dataset, "geology:bangor", "Bangor Limestone", TagTypeKeyConstant.Geology, createdOn);
-    yield return Tag(dataset, "geology:monteagle", "Monteagle Limestone", TagTypeKeyConstant.Geology, createdOn);
-    yield return Tag(dataset, "people:surveyor", "Dev Surveyor", TagTypeKeyConstant.People, createdOn);
-    yield return Tag(dataset, "other:training", "Training Data", TagTypeKeyConstant.CaveOther, createdOn);
-}
 
-static TagType Tag(DatasetConfig dataset, string identity, string name, string key, DateTime createdOn) => new(name, key)
-{
-    Id = StableId($"{dataset.Name}:tag:{identity}"),
-    AccountId = dataset.AccountId,
-    IsDefault = false,
-    CreatedOn = createdOn
-};
+static Task<bool> HasBroadCavePermission(
+    PlanarianDbContext db, string userId, string accountId, string permissionId) =>
+    db.CavePermissions.AnyAsync(row =>
+        row.UserId == userId &&
+        row.AccountId == accountId &&
+        row.PermissionId == permissionId &&
+        row.StateId == null &&
+        row.CountyId == null &&
+        row.CaveId == null);
 
-static async Task VerifyBaseline(PlanarianDbContext db, DatasetConfig dataset)
-{
-    var featureKeys = Enum.GetValues<FeatureKey>();
-    var expectedFeatureIds = featureKeys
-        .Select(key => StableId($"{dataset.Name}:feature:{key}"))
-        .ToArray();
-    var expectedUserIds = new[] { dataset.AdminUserId, dataset.ManagerUserId, dataset.ViewerUserId };
-    var expectedTagIds = DatasetTags(dataset, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc))
-        .Select(tag => tag.Id)
-        .ToArray();
-    var expectedAccountStateId = StableId($"{dataset.Name}:account-state:tn");
-    var expectedAdminPermissionId = StableId($"{dataset.Name}:admin-permission");
-
-    var stateCount = await db.States.CountAsync();
-    var permissionCount = await db.Permissions.CountAsync();
-    var userCount = await db.AccountUsers.CountAsync(row =>
-        row.AccountId == dataset.AccountId && expectedUserIds.Contains(row.UserId));
-    var customTagCount = await db.TagTypes.CountAsync(tag =>
-        tag.AccountId == dataset.AccountId && expectedTagIds.Contains(tag.Id));
-    var actualFeatureCount = await db.FeatureSettings.CountAsync(setting =>
-        setting.AccountId == dataset.AccountId && expectedFeatureIds.Contains(setting.Id));
-    var hasAccountState = await db.AccountStates.AnyAsync(row =>
-        row.Id == expectedAccountStateId && row.AccountId == dataset.AccountId);
-    var hasCounty = await db.Counties.AnyAsync(row =>
-        row.Id == dataset.CountyId && row.AccountId == dataset.AccountId);
-    var hasAdminPermission = await db.UserPermissions.AnyAsync(row =>
-        row.Id == expectedAdminPermissionId &&
-        row.AccountId == dataset.AccountId && row.UserId == dataset.AdminUserId);
-    var cavePermissionIds = await db.Permissions
-        .Where(permission => permission.Key == PermissionKey.Manager || permission.Key == PermissionKey.View)
-        .ToDictionaryAsync(permission => permission.Key, permission => permission.Id);
-    var expectedBroadPermissionIds = new[]
+static IEnumerable<TagType> DatasetTags(
+    DatasetConfig dataset, string accountId, DateTime createdOn) =>
+    DevelopmentDatasetBaseline.Tags.Select(spec => new TagType(spec.Name, spec.Key)
     {
-        StableId($"{dataset.Name}:cave-permission:{dataset.ManagerUserId}:{cavePermissionIds[PermissionKey.Manager]}"),
-        StableId($"{dataset.Name}:cave-permission:{dataset.ViewerUserId}:{cavePermissionIds[PermissionKey.View]}")
-    };
-    var broadCavePermissionCount = await db.CavePermissions.CountAsync(row =>
-        row.AccountId == dataset.AccountId && expectedBroadPermissionIds.Contains(row.Id));
+        Id = spec.Id(dataset),
+        AccountId = accountId,
+        IsDefault = false,
+        CreatedOn = createdOn
+    });
 
-    if (stateCount != 50 || permissionCount < 4 || userCount != expectedUserIds.Length ||
-        customTagCount != expectedTagIds.Length || actualFeatureCount != featureKeys.Length ||
-        !hasAccountState || !hasCounty || !hasAdminPermission ||
-        broadCavePermissionCount != expectedBroadPermissionIds.Length)
+static async Task VerifyBaseline(
+    PlanarianDbContext db, DatasetConfig dataset, string accountId, string stateId)
+{
+    var failures = new List<string>();
+    if (!await db.Accounts.AnyAsync(row => row.Id == accountId))
+        failures.Add($"account '{accountId}' is missing");
+
+    if (!await db.AccountStates.AnyAsync(row => row.AccountId == accountId && row.StateId == stateId))
+        failures.Add($"account is not associated with {DevelopmentDatasetBaseline.StateAbbreviation}");
+
+    if (!await db.Counties.AnyAsync(row =>
+            row.Id == dataset.CountyId && row.AccountId == accountId && row.StateId == stateId))
+        failures.Add($"county '{dataset.CountyId}' is missing or not associated with the seeded account/state");
+
+    var accountFeatureRows = await db.FeatureSettings
+        .AsNoTracking()
+        .Where(setting => setting.AccountId == accountId && !setting.IsDefault)
+        .Select(setting => setting.Key)
+        .ToListAsync();
+    foreach (var key in Enum.GetValues<FeatureKey>())
+    {
+        var count = accountFeatureRows.Count(rowKey => rowKey == key);
+        if (count != 1)
+            failures.Add($"feature '{key}' has {count} account rows; expected exactly one");
+    }
+
+    foreach (var user in DevelopmentDatasetBaseline.Users(dataset))
+    {
+        if (!await db.AccountUsers.AnyAsync(row => row.AccountId == accountId && row.UserId == user.Id))
+            failures.Add($"user '{user.Id}' is not associated with account '{accountId}'");
+    }
+
+    foreach (var tag in DevelopmentDatasetBaseline.Tags)
+    {
+        var tagId = tag.Id(dataset);
+        if (!await db.TagTypes.AnyAsync(row =>
+                row.Id == tagId && row.AccountId == accountId && row.Key == tag.Key))
+            failures.Add($"tag '{tagId}' ({tag.Key}) is missing from the seeded account");
+    }
+
+    var requiredPermissionKeys = new[] { PermissionKey.Admin, PermissionKey.Manager, PermissionKey.View };
+    var permissionRows = await db.Permissions
+        .AsNoTracking()
+        .Where(permission => requiredPermissionKeys.Contains(permission.Key))
+        .Select(permission => new { permission.Id, permission.Key })
+        .ToListAsync();
+    var permissionIds = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var permissionKey in requiredPermissionKeys)
+    {
+        var matches = permissionRows.Where(permission => permission.Key == permissionKey).ToList();
+        if (matches.Count == 1)
+            permissionIds[permissionKey] = matches[0].Id;
+        else
+            failures.Add($"permission key '{permissionKey}' has {matches.Count} rows; expected exactly one");
+    }
+
+    if (permissionIds.TryGetValue(PermissionKey.Admin, out var adminPermissionId) &&
+        !await db.UserPermissions.AnyAsync(row =>
+            row.AccountId == accountId && row.UserId == dataset.AdminUserId && row.PermissionId == adminPermissionId))
+        failures.Add("seeded admin does not have the Admin permission");
+
+    if (permissionIds.TryGetValue(PermissionKey.Manager, out var managerPermissionId) &&
+        !await HasBroadCavePermission(db, dataset.ManagerUserId, accountId, managerPermissionId))
+        failures.Add("seeded manager does not have broad Manager permission");
+
+    if (permissionIds.TryGetValue(PermissionKey.View, out var viewPermissionId) &&
+        !await HasBroadCavePermission(db, dataset.ViewerUserId, accountId, viewPermissionId))
+        failures.Add("seeded viewer does not have broad View permission");
+
+    if (failures.Count > 0)
     {
         throw new InvalidOperationException(
             $"Seed verification failed for '{dataset.Name}'. Run './dev reset {dataset.Name}' to rebuild the local dataset. " +
-            $"states={stateCount}, permissions={permissionCount}, users={userCount}/{expectedUserIds.Length}, " +
-            $"customTags={customTagCount}/{expectedTagIds.Length}, features={actualFeatureCount}/{featureKeys.Length}, " +
-            $"accountState={hasAccountState}, county={hasCounty}, adminPermission={hasAdminPermission}, " +
-            $"broadCavePermissions={broadCavePermissionCount}/2."
-        );
+            string.Join("; ", failures));
     }
 
-    Console.WriteLine($"Dataset '{dataset.Name}' seeded and verified.");
+    Console.WriteLine($"Dataset '{dataset.Name}' seeded and verified using account '{accountId}'.");
 }
+
 static async Task ResetStorage(DatasetConfig dataset)
 {
     var connectionString = RequireEnvironment(connectionVariable);
@@ -296,49 +411,14 @@ static string RequireEnvironment(string name) =>
         ? value
         : throw new InvalidOperationException($"Required environment variable '{name}' is not set.");
 
-static string StableId(string logicalName)
-{
-    var hash = SHA256.HashData(Encoding.UTF8.GetBytes(logicalName));
-    return Convert.ToHexString(hash).ToLowerInvariant()[..10];
-}
-
-sealed record DatasetConfig(
-    string Name,
-    string AccountId,
-    string CountyId,
-    string AdminUserId,
-    string ManagerUserId,
-    string ViewerUserId,
-    string BlobContainer)
-{
-    public static DatasetConfig Parse(string value) => value switch
-    {
-        "generic" => new DatasetConfig(
-            "generic",
-            "genacct001",
-            "gencounty1",
-            "genadmin01",
-            "genmanage1",
-            "genviewer1",
-            "planarian-generic"),
-        "e2e" => new DatasetConfig(
-            "e2e",
-            "e2eacct001",
-            "e2ecounty1",
-            "e2eadmin01",
-            "e2emanage1",
-            "e2eviewer1",
-            "planarian-e2e"),
-        _ => throw new ArgumentException("Dataset must be 'generic' or 'e2e'.", nameof(value))
-    };
-}
-
-
 sealed class DevelopmentSeedDbContext(DbContextOptions<PlanarianDbContext> options)
     : PlanarianDbContext(options)
 {
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
+        // Intentionally do not call PlanarianDbContext.OnConfiguring: this context seeds
+        // global reference data before an account/request user exists, so the normal
+        // tenant-aware SaveChangesInterceptor must not be installed here.
         optionsBuilder.EnableSensitiveDataLogging();
     }
 }

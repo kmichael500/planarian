@@ -138,7 +138,42 @@ services:
         aliases:
           - planarian.local
           - viewer.planarian.local
+          - repo.planarian.local
           - cert.planarian.local
+
+  repo:
+    profiles: ["repo"]
+    build:
+      context: docker/dev/repo
+    init: true
+    user: "0:0"
+    working_dir: /workspace
+    command: ["--config", "/run/planarian-code-server/config.yaml", "/workspace"]
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+    environment:
+      PLANARIAN_URL: https://planarian.local
+    volumes:
+      - *source-volume
+      - type: bind
+        source: ${HOME}/.local/share/planarian-dev/repo-code-server.yaml
+        target: /run/planarian-code-server/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - ./docker/dev/appsettings.generic.json:/workspace/Planarian/Planarian/appsettings.Development.json:ro
+      - ./docker/dev/appsettings.Migrations.json:/workspace/Planarian/Planarian.Migrations/appsettings.Migrations.json:ro
+      - ./docker/dev/frontend.env:/workspace/Planarian.Web/.env:ro
+      - repo-code-server-data:/home/coder/.local/share/code-server
+      - nuget-cache:/home/coder/.nuget/packages
+      - frontend-node-modules:/workspace/Planarian.Web/node_modules
+      - npm-cache:/home/coder/.npm
 
   browser:
     build:
@@ -234,6 +269,8 @@ services:
       PGDATABASE: ${PLANARIAN_DATABASE:-planarian_dev_generic}
       PLANARIAN_DEV_CONNECTION_STRING: ${PLANARIAN_DEV_CONNECTION_STRING:-Host=postgres;Port=5432;Database=planarian_dev_generic;Username=planarian;Password=planarian}
       PLANARIAN_DEV_BLOB_CONNECTION_STRING: ${PLANARIAN_DEV_BLOB_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;}
+      PLANARIAN_DEV_API_URL: ${PLANARIAN_DEV_API_URL:-http://backend:8080}
+      PLANARIAN_DEV_AUTH_SETTINGS_FILE: /workspace/docker/dev/appsettings.${PLANARIAN_DATASET:-generic}.json
     volumes:
       - *source-volume
       - nuget-cache:/home/agent/.nuget/packages
@@ -264,3 +301,5 @@ volumes:
     name: planarian-compose-npm-cache
   frontend-node-modules:
     name: planarian-compose-frontend-node-modules
+  repo-code-server-data:
+    name: planarian-compose-repo-code-server-data

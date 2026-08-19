@@ -142,9 +142,11 @@ The repository includes a Compose-based development environment for the backend,
 ```bash
 npm run dev:setup             # first-time build + generic dataset
 npm run dev                   # generic dataset
-npm run dev:e2e               # separate deterministic E2E dataset
+npm run dev:e2e               # separate reproducible E2E dataset
 npm run dev:reset             # drop/recreate/reseed only generic DB + local blobs
 npm run dev:reset:e2e         # drop/recreate/reseed only E2E DB + local blobs
+npm run dev:verify            # re-run generic API-level dataset verification
+npm run dev:repo              # optional browser editor at repo.planarian.local
 npm run dev:status
 npm run dev:db
 ```
@@ -153,9 +155,15 @@ The root `package.json` is only a convenience layer; `./dev` remains the canonic
 
 The app is available to devices on the same LAN at `https://planarian.local` with no port number. The shared agent browser is available to devices on the same LAN at `https://viewer.planarian.local` with no port number; run `npm run dev:viewer` to see its generated username/password. The raw browser viewer and CDP endpoint remain Docker-internal/loopback-only.
 
-Caddy uses one local development CA for both `planarian.local` and `viewer.planarian.local`. Run `npm run dev:cert` once on macOS. On another LAN device, open `http://cert.planarian.local` to download that same root CA and install/trust it once; trusting that root covers certificates for both local hostnames. The seeded Planarian users are `admin@planarian.local`, `manager@planarian.local`, and `viewer@planarian.local`, all with password `planarian`.
+`npm run dev:repo` starts an optional code-server editor at `https://repo.planarian.local`; it is off by default. Run `npm run dev:repo:credentials` to see its generated password. The editor uses the same read/write checkout, persists its editor data/extensions in a Docker volume, includes the repository's .NET 8 and Node 22 development toolchains, and does not receive the Docker socket. Known ignored Planarian appsettings and frontend environment paths are overlaid with the tracked safe local-development files rather than exposing those host files through the editor.
+
+Caddy uses one local development CA for `planarian.local`, `viewer.planarian.local`, and `repo.planarian.local`. Run `npm run dev:cert` once on macOS. On another LAN device, open `http://cert.planarian.local` to download that same root CA and install/trust it once; trusting that root covers certificates for all three HTTPS hostnames. The seeded Planarian users are `admin@planarian.local`, `manager@planarian.local`, and `viewer@planarian.local`, all with password `planarian`.
 
 The generic and E2E datasets are separate databases in the same local PostgreSQL container. `reset` is intentionally destructive for the selected local dataset: it recreates that database and removes its account-owned Azurite containers before reseeding the baseline. It does not reset the other dataset.
+
+On a fresh local dataset, `Planarian.Dev` bootstraps the local users and creates the fixture account through `PlanarianSettingsService.CreateAccount`, so the account, selected state, feature settings, creator membership, and Admin permission follow the normal Planarian account-creation path. The generated account and the dev-owned county marker are committed in one transaction, so a failed bootstrap cannot leave an unmarked fixture account behind. Subsequent startup resolves the account by that marker; if the marker was deleted, it can recover one unambiguous account matching the local account name and seeded admin. Unrelated local accounts can coexist, and ambiguous recovery fails instead of choosing an account implicitly.
+
+Local dataset startup validates the seed twice. `Planarian.Dev` first verifies the required database baseline directly. After the backend is healthy, `./dev` makes authenticated requests through the real Planarian API and checks that the required account state, county, feature settings, tags, users, and permissions are visible through the normal controller/service/repository pipeline; it also verifies that an authenticated user cannot select an account they do not belong to. The API verifier signs 60-second local-only development JWTs with the tracked Docker signing secret and issuer instead of calling the login endpoint, so repeated startup checks do not consume login-throttle attempts. External-settings mode skips this local-dataset API verification.
 
 To run the app with the normal ignored project development configuration, use:
 

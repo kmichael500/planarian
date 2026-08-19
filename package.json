@@ -12,10 +12,13 @@
     "dev:restart": "./dev restart",
     "dev:reset": "./dev reset generic",
     "dev:reset:e2e": "./dev reset e2e",
+    "dev:verify": "./dev verify",
     "dev:db": "./dev psql generic",
     "dev:db:e2e": "./dev psql e2e",
     "dev:shell": "./dev shell",
     "dev:viewer": "./dev viewer-credentials",
+    "dev:repo": "./dev repo",
+    "dev:repo:credentials": "./dev repo-credentials",
     "dev:agent": "./dev agent-auth",
     "dev:cert": "./dev trust-cert"
   }

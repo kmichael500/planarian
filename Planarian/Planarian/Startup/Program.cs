@@ -18,7 +18,6 @@ using Planarian.Library.Extensions.String;
 using Planarian.Library.Options;
 using Planarian.Model.Database;
 using Planarian.Model.Database.Entities.RidgeWalker;
-using Planarian.Model.Generators;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Archive.Services;
 using Planarian.Modules.Account.Import.Services;
@@ -516,17 +515,6 @@ if (!isDevelopment)
     app.UseHsts();
 
 app.UseResponseCompression();
-
-if (false)
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-
-    var dbContext = services.GetRequiredService<PlanarianDbContext>();
-    var dataGenerator = new DataGenerator(dbContext);
-
-    await dataGenerator.AddOrUpdateDefaultData();
-}
 
 app.UseSession();
 

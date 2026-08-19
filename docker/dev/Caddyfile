@@ -21,6 +21,11 @@ https://viewer.planarian.local {
     reverse_proxy browser:6080
 }
 
+https://repo.planarian.local {
+    tls internal
+    reverse_proxy repo:8080
+}
+
 :80 {
     @cert host cert.planarian.local
     handle @cert {
@@ -34,6 +39,11 @@ https://viewer.planarian.local {
     @viewer host viewer.planarian.local
     handle @viewer {
         redir https://viewer.planarian.local{uri} permanent
+    }
+
+    @repo host repo.planarian.local
+    handle @repo {
+        redir https://repo.planarian.local{uri} permanent
     }
 
     @app host planarian.local

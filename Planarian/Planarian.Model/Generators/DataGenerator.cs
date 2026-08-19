@@ -40,90 +40,83 @@ public class DataGenerator
             }
         }
 
-        var transaction = await _dbContext.Database.BeginTransactionAsync();
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
-        try
+        var permissions = GeneratePermissions();
+        foreach (var permission in permissions)
         {
-            var permissions = GeneratePermissions();
-            foreach (var permission in permissions)
-            {
-                var existingPermission = await _dbContext.Permissions.FindAsync(permission.Id);
+            var existingPermission = await _dbContext.Permissions.FindAsync(permission.Id);
 
-                if (existingPermission != null)
+            if (existingPermission != null)
+            {
+                existingPermission.Name = permission.Name;
+                existingPermission.Description = permission.Description;
+                existingPermission.IsHidden = permission.IsHidden;
+                existingPermission.Key = permission.Key;
+                existingPermission.PermissionType = permission.PermissionType;
+                existingPermission.SortOrder = permission.SortOrder;
+            }
+            else
+            {
+                await _dbContext.Permissions.AddAsync(permission);
+            }
+        }
+
+        var defaultFeatureSettings = GenerateDefaultFeatureSettings();
+        foreach (var setting in defaultFeatureSettings)
+        {
+            var existingSetting = await _dbContext.FeatureSettings.FindAsync(setting.Id);
+            if (existingSetting != null)
+            {
+                existingSetting.IsEnabled = setting.IsEnabled;
+                existingSetting.IsDefault = setting.IsDefault;
+            }
+            else
+            {
+                await _dbContext.FeatureSettings.AddAsync(setting);
+            }
+        }
+
+        foreach (var tagGroup in allGeneratedTags)
+        {
+            foreach (var tag in tagGroup)
+            {
+                var existingTag = await _dbContext.TagTypes.FindAsync(tag.Id);
+
+                if (existingTag != null)
                 {
-                    existingPermission.Name = permission.Name;
-                    existingPermission.Description = permission.Description;
-                    existingPermission.IsHidden = permission.IsHidden;
-                    existingPermission.Key = permission.Key;
-                    existingPermission.PermissionType = permission.PermissionType;
-                    existingPermission.SortOrder = permission.SortOrder;
+                    existingTag.Name = tag.Name;
+                    existingTag.Key = tag.Key;
+                    existingTag.IsDefault = tag.IsDefault;
                 }
                 else
                 {
-                    await _dbContext.Permissions.AddAsync(permission);
-                }
-            }
-
-            var defaultFeatureSettings = GenerateDefaultFeatureSettings();
-            foreach (var setting in defaultFeatureSettings)
-            {
-                var existingSetting = await _dbContext.FeatureSettings.FindAsync(setting.Id);
-                if (existingSetting != null)
-                {
-                    existingSetting.IsEnabled = setting.IsEnabled;
-                    existingSetting.IsDefault = setting.IsDefault;
-                }
-                else
-                {
-                    await _dbContext.FeatureSettings.AddAsync(setting);
-                }
-            }
-
-            foreach (var tagGroup in allGeneratedTags)
-            {
-                foreach (var tag in tagGroup)
-                {
-                    var existingTag = await _dbContext.TagTypes.FindAsync(tag.Id);
-
-                    if (existingTag != null)
-                    {
-                        existingTag.Name = tag.Name;
-                        existingTag.Key = tag.Key;
-                        existingTag.IsDefault = tag.IsDefault;
-                    }
-                    else
-                    {
-                        await _dbContext.TagTypes.AddAsync(tag);
-                    }
-                }
-
-                await _dbContext.SaveChangesAsync();
-            }
-
-            var generatedStates = GenerateStates();
-
-            foreach (var state in generatedStates)
-            {
-                var existingState = await _dbContext.States.FindAsync(state.Id);
-
-                if (existingState != null)
-                {
-                    existingState.Name = state.Name;
-                    existingState.Abbreviation = state.Abbreviation;
-                }
-                else
-                {
-                    await _dbContext.States.AddAsync(state);
+                    await _dbContext.TagTypes.AddAsync(tag);
                 }
             }
 
             await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
         }
-        catch (Exception)
+
+        var generatedStates = GenerateStates();
+
+        foreach (var state in generatedStates)
         {
-            // ignored
+            var existingState = await _dbContext.States.FindAsync(state.Id);
+
+            if (existingState != null)
+            {
+                existingState.Name = state.Name;
+                existingState.Abbreviation = state.Abbreviation;
+            }
+            else
+            {
+                await _dbContext.States.AddAsync(state);
+            }
         }
+
+        await _dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
     private static IEnumerable<TagType> GenerateArcheologyTags()

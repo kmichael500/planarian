@@ -54,17 +54,11 @@ public class PlanarianSettingsService : ServiceBase<PlanarianSettingsRepository>
 
         foreach (var key in Enum.GetValues<FeatureKey>())
         {
-            var isEnabled = key switch
-            {
-                FeatureKey.EnabledFieldCaveGeologicAgeTags => false,
-                _ => true
-            };
-
             entity.FeatureSettings.Add(new FeatureSetting
             {
                 AccountId = entity.Id,
                 Key = key,
-                IsEnabled = isEnabled
+                IsEnabled = AccountFeatureSettingDefaults.IsEnabled(key)
             });
         }
 

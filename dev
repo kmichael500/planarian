@@ -25,6 +25,30 @@ ensure_viewer_auth() {
   export PLANARIAN_VIEWER_AUTH_FILE="$auth_file"
 }
 
+ensure_repo_auth() (
+  umask 077
+  local state_dir="$HOME/.local/share/planarian-dev"
+  local config_file="$state_dir/repo-code-server.yaml"
+  local credentials_file="$state_dir/repo-credentials.txt"
+  mkdir -p "$state_dir"
+
+  if [[ ! -s "$config_file" || ! -s "$credentials_file" ]]; then
+    local password
+    password="$(openssl rand -hex 16)"
+    cat > "$config_file" <<EOF
+bind-addr: 0.0.0.0:8080
+auth: password
+password: $password
+cert: false
+disable-telemetry: true
+disable-update-check: true
+app-name: Planarian Repo
+EOF
+    printf 'url=https://repo.planarian.local\npassword=%s\n' "$password" > "$credentials_file"
+    chmod 600 "$config_file" "$credentials_file"
+  fi
+)
+
 usage() {
   cat <<'EOF'
 Usage: ./dev <command> [options]
@@ -33,9 +57,12 @@ Usage: ./dev <command> [options]
   up [generic|e2e]          Start Planarian using a local dataset (generic is default)
   up --settings [file]      Start with project appsettings.Development.json or an explicit file
   reset [generic|e2e]       Delete all local DB/blob data for that dataset and reseed it
+  verify [generic|e2e]      Validate the running local dataset through Planarian's API
   status                    Show containers, active dataset, and local URLs
   logs [service]            Follow Compose logs
   restart [service]         Restart the stack or one service
+  repo                      Start the optional browser repo editor
+  repo-credentials          Show the browser repo editor password
   shell                     Open a shell in the Desktop Commander agent
   agent-auth                Start/restart Desktop Commander auth and follow its logs
   psql [generic|e2e]        Open psql against a local dataset
@@ -109,6 +136,7 @@ stop_mdns() {
   pkill -f '/bin/zsh ./docker/dev/advertise-mdns.sh' 2>/dev/null || true
   pkill -f '/usr/bin/dns-sd -P Planarian _https._tcp local 443 planarian.local ' 2>/dev/null || true
   pkill -f '/usr/bin/dns-sd -P PlanarianViewer _https._tcp local 443 viewer.planarian.local ' 2>/dev/null || true
+  pkill -f '/usr/bin/dns-sd -P PlanarianRepo _https._tcp local 443 repo.planarian.local ' 2>/dev/null || true
   pkill -f '/usr/bin/dns-sd -P PlanarianCert _http._tcp local 80 cert.planarian.local ' 2>/dev/null || true
 }
 
@@ -147,6 +175,11 @@ create_database() {
 seed_dataset() {
   "${COMPOSE[@]}" --profile tools run --rm tooling \
     dotnet run --project tools/Planarian.Dev/Planarian.Dev.csproj -- seed "$PLANARIAN_DATASET"
+}
+
+verify_api() {
+  "${COMPOSE[@]}" --profile tools run --rm --no-deps tooling \
+    dotnet run --project tools/Planarian.Dev/Planarian.Dev.csproj -- verify-api "$PLANARIAN_DATASET"
 }
 
 ensure_dataset() {
@@ -190,6 +223,7 @@ SQL
   seed_dataset
   if [[ "$restart_backend" == true ]]; then
     "${COMPOSE[@]}" up -d --wait --wait-timeout 120 backend
+    verify_api
   fi
   echo "Reset complete: ${PLANARIAN_DATASET}"
 }
@@ -201,6 +235,7 @@ start_local() {
   ensure_dataset
 
   "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  verify_api
   print_ready "$PLANARIAN_DATASET"
 }
 
@@ -225,12 +260,46 @@ start_external() {
   print_ready external
 }
 
+start_repo() {
+  require_compose
+  ensure_viewer_auth
+  ensure_repo_auth
+  ensure_mdns
+
+  "${COMPOSE[@]}" --profile repo up -d --build --no-deps --wait --wait-timeout 180 repo caddy
+
+  echo
+  echo "Repo editor:  https://repo.planarian.local"
+  echo "Credentials:  $HOME/.local/share/planarian-dev/repo-credentials.txt"
+  echo
+}
+
+verify_running_dataset() {
+  local dataset="${1:-generic}"
+  select_dataset "$dataset"
+
+  if ! "${COMPOSE[@]}" ps --status running --services | grep -qx backend; then
+    echo "The Planarian backend is not running. Start it with npm run dev or npm run dev:e2e first." >&2
+    return 1
+  fi
+
+  local active_mode
+  active_mode="$("${COMPOSE[@]}" exec -T backend printenv PLANARIAN_DATASET 2>/dev/null || true)"
+  if [[ "$active_mode" != "$PLANARIAN_DATASET" ]]; then
+    echo "The running backend is '$active_mode', not '$PLANARIAN_DATASET'." >&2
+    return 1
+  fi
+
+  verify_api
+}
+
 print_ready() {
   local mode="$1"
   echo
   echo "Planarian mode: $mode"
   echo "App:          https://planarian.local"
   echo "Live viewer:  https://viewer.planarian.local"
+  echo "Repo editor:  https://repo.planarian.local (optional: npm run dev:repo)"
   echo "Viewer auth:  $HOME/.local/share/planarian-dev/viewer-credentials.txt"
   if [[ "$mode" != external ]]; then
     echo "Users:        admin@planarian.local / manager@planarian.local / viewer@planarian.local"
@@ -258,15 +327,20 @@ agent_auth() {
 }
 
 show_status() {
-  "${COMPOSE[@]}" ps
+  "${COMPOSE[@]}" --profile repo ps
   echo
   local mode="stopped"
+  local repo_status="stopped"
   if "${COMPOSE[@]}" ps --status running --services | grep -qx backend; then
     mode="$("${COMPOSE[@]}" exec -T backend printenv PLANARIAN_DATASET 2>/dev/null || echo unknown)"
+  fi
+  if "${COMPOSE[@]}" --profile repo ps --status running --services | grep -qx repo; then
+    repo_status="running"
   fi
   echo "Active mode:  $mode"
   echo "App:          https://planarian.local"
   echo "Live viewer:  https://viewer.planarian.local"
+  echo "Repo editor:  https://repo.planarian.local ($repo_status)"
   echo "Viewer auth:  $HOME/.local/share/planarian-dev/viewer-credentials.txt"
   echo "Postgres:     127.0.0.1:55432"
   echo "Azurite:      127.0.0.1:11000"
@@ -298,6 +372,7 @@ setup_environment() {
   select_dataset generic
   ensure_dataset
   "${COMPOSE[@]}" up -d --wait --wait-timeout 180 backend frontend caddy browser agent
+  verify_api
   echo
   echo "Initial environment is ready."
   echo "If https://planarian.local is not trusted, run: npm run dev:cert"
@@ -324,6 +399,11 @@ case "$command" in
     [[ $# -le 1 ]] || { usage; exit 2; }
     reset_dataset "${1:-generic}"
     ;;
+  verify)
+    shift
+    [[ $# -le 1 ]] || { usage; exit 2; }
+    verify_running_dataset "${1:-generic}"
+    ;;
   status)
     show_status
     ;;
@@ -339,9 +419,21 @@ case "$command" in
     shift
     if [[ $# -eq 0 ]]; then
       "${COMPOSE[@]}" restart backend frontend caddy browser agent
+      if "${COMPOSE[@]}" --profile repo ps --status running --services | grep -qx repo; then
+        "${COMPOSE[@]}" --profile repo restart repo
+      fi
+    elif [[ "$1" == "repo" ]]; then
+      "${COMPOSE[@]}" --profile repo restart repo
     else
       "${COMPOSE[@]}" restart "$1"
     fi
+    ;;
+  repo)
+    start_repo
+    ;;
+  repo-credentials)
+    ensure_repo_auth
+    cat "$HOME/.local/share/planarian-dev/repo-credentials.txt"
     ;;
   shell)
     "${COMPOSE[@]}" exec agent bash
@@ -364,7 +456,7 @@ case "$command" in
     ;;
   down)
     stop_mdns
-    "${COMPOSE[@]}" down
+    "${COMPOSE[@]}" --profile repo down
     ;;
   help|-h|--help)
     usage

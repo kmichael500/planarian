@@ -23,6 +23,8 @@ while true; do
   children=($!)
   /usr/bin/dns-sd -P PlanarianViewer _https._tcp local 443 viewer.planarian.local "$lan_ip" &
   children+=($!)
+  /usr/bin/dns-sd -P PlanarianRepo _https._tcp local 443 repo.planarian.local "$lan_ip" &
+  children+=($!)
   /usr/bin/dns-sd -P PlanarianCert _http._tcp local 80 cert.planarian.local "$lan_ip" &
   children+=($!)
 
