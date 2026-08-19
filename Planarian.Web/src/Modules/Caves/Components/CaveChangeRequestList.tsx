@@ -1,4 +1,4 @@
-import { Empty, List, Space, Tag, Typography } from "antd";
+import { Empty, List, Space, Tag, Typography, theme } from "antd";
 import { Link } from "react-router-dom";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
@@ -17,22 +17,21 @@ export const formatChangeScopeSummary = (summary: CaveChangeScopeSummaryVm) => {
   return parts.length ? parts.join(" · ") : "No visible changes";
 };
 
-const statusTag = (request: CaveChangeRequestSummaryVm, review: boolean) => {
-  if (request.isStale) return <Tag color="warning">Needs re-review</Tag>;
-  if (review) return null;
-  if (request.status === "Approved") return <Tag color="success">Approved</Tag>;
-  if (request.status === "Rejected") return <Tag color="error">Rejected</Tag>;
-  return <Tag color="processing">Pending review</Tag>;
-};
+const statusTag = (request: CaveChangeRequestSummaryVm) => <Space size={4} wrap>
+  {request.status === "Approved" ? <Tag color="success">Approved</Tag>
+    : request.status === "Rejected" ? <Tag color="error">Rejected</Tag>
+      : <Tag color="processing">Pending review</Tag>}
+  {request.isStale && <Tag color="warning">Needs re-review</Tag>}
+</Space>;
 
 const EmptyState = ({ review }: { review: boolean }) => (
   <Empty
     image={Empty.PRESENTED_IMAGE_SIMPLE}
     description={
       <Space direction="vertical" size={2}>
-        <Typography.Text strong>{review ? "Nothing is waiting for review" : "No submissions yet"}</Typography.Text>
+        <Typography.Text strong>{review ? "No review submissions found" : "No submissions found"}</Typography.Text>
         <Typography.Text type="secondary">
-          {review ? "New submissions you can review will appear here." : "Changes you submit for review will appear here."}
+          {review ? "Try a different status filter, or check back later." : "Try a different status filter, or submit changes to a Cave."}
         </Typography.Text>
       </Space>
     }
@@ -43,14 +42,17 @@ export const CaveChangeRequestList = ({ requests, review = false }: {
   requests: CaveChangeRequestSummaryVm[];
   review?: boolean;
 }) => {
+  const { token } = theme.useToken();
   if (!requests.length) return <EmptyState review={review} />;
 
   return (
     <List
-      bordered
+      split={false}
       dataSource={requests}
       renderItem={(request) => (
-        <List.Item key={request.id} style={{ padding: 0 }}>
+        <List.Item key={request.id} style={{ padding: 0, marginBottom: token.marginSM,
+          border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG,
+          background: token.colorBgContainer, overflow: "hidden" }}>
           <Link
             to={ClientRoutes.caveChangeRequest.get(request.id)}
             style={{ display: "block", width: "100%", padding: "12px 16px", color: "inherit" }}
@@ -71,7 +73,7 @@ export const CaveChangeRequestList = ({ requests, review = false }: {
                 )}
               </Space>
               <Space direction="vertical" size={4} align="end" style={{ marginLeft: "auto" }}>
-                {statusTag(request, review)}
+                {statusTag(request)}
                 <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                   Updated {formatDateTime(request.updatedOn ?? request.submittedOn)}
                 </Typography.Text>

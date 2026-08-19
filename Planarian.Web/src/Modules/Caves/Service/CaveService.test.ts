@@ -2,16 +2,20 @@ import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { CaveService } from "./CaveService";
 
-it("builds staged-file browser URLs through the authenticated API helper", () => {
+it("builds request and authoring staged-file view URLs through the authenticated API helper", () => {
   const builder = jest.spyOn(HttpHelpers, "BuildAuthenticatedApiUrl")
-    .mockReturnValue("https://api.example.test/download?account_id=account-a");
+    .mockReturnValue("https://api.example.test/file?account_id=account-a");
 
-  expect(CaveService.GetStagedChangeRequestFileUrl("request/id", "file id")).toBe(
-    "https://api.example.test/download?account_id=account-a"
+  expect(CaveService.GetStagedChangeRequestFileUrl("request/id", "file id", "view")).toBe(
+    "https://api.example.test/file?account_id=account-a"
   );
-  expect(builder).toHaveBeenCalledWith(
-    "api/cave-change-requests/request%2Fid/files/file%20id"
+  expect(builder).toHaveBeenLastCalledWith(
+    "api/cave-change-requests/request%2Fid/files/file%20id/view"
   );
+  expect(CaveService.GetAuthoringStagedFileUrl("file id", "view")).toBe(
+    "https://api.example.test/file?account_id=account-a"
+  );
+  expect(builder).toHaveBeenLastCalledWith("api/files/staged/file%20id/view");
 });
 
 it("requests bounded Mine and Review pages", async () => {
@@ -19,11 +23,13 @@ it("requests bounded Mine and Review pages", async () => {
   const get = jest.spyOn(HttpClient, "get").mockResolvedValue(response);
 
   await CaveService.GetMyChangeRequests(2, 5);
-  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=2&pageSize=5");
+  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=2&pageSize=5&sortBy=UpdatedOn&sortDescending=true");
   await CaveService.GetMyChangeRequests(1, 10, "Approved");
-  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=1&pageSize=10&status=Approved");
+  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/mine?pageNumber=1&pageSize=10&status=Approved&sortBy=UpdatedOn&sortDescending=true");
   await CaveService.GetReviewQueue(3, 7);
-  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/review?pageNumber=3&pageSize=7");
+  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/review?pageNumber=3&pageSize=7&sortBy=SubmittedOn&sortDescending=false");
+  await CaveService.GetReviewQueue(1, 10, "Approved", "CaveName", true);
+  expect(get).toHaveBeenLastCalledWith("api/cave-change-requests/review?pageNumber=1&pageSize=10&status=Approved&sortBy=CaveName&sortDescending=true");
 });
 
 it("loads the dedicated Cave edit authoring context", async () => {

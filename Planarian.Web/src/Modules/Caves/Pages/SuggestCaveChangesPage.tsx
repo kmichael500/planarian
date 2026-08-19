@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { Alert, Card, Form, Grid, message, Space, theme, Typography } from "antd";
+import { EditOutlined, SendOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
@@ -8,7 +9,13 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
 import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
 import { AddCaveComponent } from "../Components/AddCaveComponent";
-import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
+import { CaveRevisionDiff, CaveRevisionDiffAssetActions } from "../Components/CaveRevisionDiff";
+import { CaveLinePlotViewer } from "../Components/CaveLinePlotViewer";
+import { useLikelyCountyNumber } from "../Components/useLikelyCountyNumber";
+import { FileViewer } from "../../Files/Components/FileViewerComponent";
+import { getFileType } from "../../Files/Services/FileHelpers";
+import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
+import { FileService } from "../../Files/Services/FileService";
 import { caveToForm } from "../Helpers/CaveFormMapper";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
@@ -28,6 +35,9 @@ export const SuggestCaveChangesPage = () => {
   const [previewResult, setPreviewResult] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [activeFileId, setActiveFileId] = useState<string>();
+  const [activeLinePlot, setActiveLinePlot] = useState<NonNullable<CaveChangePreviewVm["linePlots"]>[number]>();
+  const likelyCountyNumber = useLikelyCountyNumber(previewResult);
   const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
@@ -40,7 +50,29 @@ export const SuggestCaveChangesPage = () => {
       form.setFieldsValue(caveToForm(context.cave, context.linePlots));
     }).catch(() => message.error("The Cave could not be loaded."))
       .finally(() => setLoading(false));
-  }, [caveId]);
+  }, [caveId, form, setHeaderButtons, setHeaderTitle]);
+
+  const previewFiles = previewResult
+    ? [...new Map([...previewResult.base.files, ...previewResult.proposed.files].map(file => [file.id, file])).values()]
+    : [];
+  const publishedFileIds = new Set(previewResult?.base.files.map(file => file.id) ?? []);
+  const activeFile = previewFiles.find(file => file.id === activeFileId);
+  const activeFileIsStaged = !!activeFile && !publishedFileIds.has(activeFile.id);
+  const reviewLinePlots = [...(previewResult?.linePlots ?? []), ...(previewResult?.removedLinePlots ?? [])];
+  const assetActions: CaveRevisionDiffAssetActions = {
+    files: Object.fromEntries(previewFiles.map(file => [file.id, {
+      onView: () => setActiveFileId(file.id),
+      onDownload: () => publishedFileIds.has(file.id)
+        ? FileService.startFileDownload(file.id)
+        : CaveService.StartAuthoringStagedFileDownload(file.id),
+    }])),
+    linePlots: Object.fromEntries(reviewLinePlots
+      .filter(linePlot => !!linePlot.id)
+      .map(linePlot => [linePlot.id!, {
+        onView: () => setActiveLinePlot(linePlot),
+        onDownload: () => downloadFile(`${linePlot.name}.geojson`, linePlot.geoJson),
+      }])),
+  };
 
   if (!caveId) return null;
 
@@ -95,16 +127,17 @@ export const SuggestCaveChangesPage = () => {
             <Alert message="Make at least one meaningful change before submitting this proposal." type="warning" showIcon
               style={{ marginBottom: token.marginMD }} />}
           <CaveRevisionDiff diff={previewResult.diff} previous={previewResult.base} current={previewResult.proposed}
-            countyNumberIntent={previewResult.countyNumberIntent} />
+            countyNumberIntent={previewResult.countyNumberIntent} likelyCountyNumber={likelyCountyNumber}
+            assetActions={assetActions} />
           <div role="group" aria-label="Review actions" style={{ borderTop: `1px solid ${token.colorSplit}`,
             marginTop: token.marginLG, paddingTop: token.paddingMD }}>
             <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>
               Changes are published only after a reviewer approves them.
             </Typography.Paragraph>
             <Space wrap>
-              <PlanarianButton icon={undefined} type="primary" onClick={submit} loading={submitting}
+              <PlanarianButton icon={<SendOutlined />} alwaysShowChildren type="primary" onClick={submit} loading={submitting}
                 disabled={!previewResult.hasMeaningfulChanges}>Submit for review</PlanarianButton>
-              <PlanarianButton icon={undefined} onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
+              <PlanarianButton icon={<EditOutlined />} alwaysShowChildren onClick={() => { setPreviewResult(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
             </Space>
           </div>
         </section>
@@ -116,6 +149,19 @@ export const SuggestCaveChangesPage = () => {
             onAuthoringChange={unsaved.markDirty} stickySubmit />
         </Form>}
       </Card>
+      <FileViewer
+        open={!!activeFile}
+        onCancel={() => setActiveFileId(undefined)}
+        fileId={activeFile?.id}
+        name={activeFile ? `${activeFile.name}${activeFile.extension ?? ""}` : undefined}
+        fileType={getFileType(activeFile?.extension)}
+        viewUrl={activeFileIsStaged && activeFile
+          ? CaveService.GetAuthoringStagedFileUrl(activeFile.id, "view") : undefined}
+        onDownload={activeFileIsStaged && activeFile
+          ? () => CaveService.StartAuthoringStagedFileDownload(activeFile.id) : undefined}
+      />
+      <CaveLinePlotViewer linePlot={activeLinePlot} open={!!activeLinePlot}
+        onClose={() => setActiveLinePlot(undefined)} />
     </Space>
   );
 };

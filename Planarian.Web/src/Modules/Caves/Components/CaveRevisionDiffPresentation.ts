@@ -240,6 +240,7 @@ export const buildCaveRevisionDiffPresentation = (
   current?: CaveSnapshotVm,
   countyNumberIntent?: CountyNumberIntent,
   proposalCountyNumberChange?: CaveProposalCountyNumberChangeVm,
+  likelyCountyNumber?: number,
 ): CaveRevisionDiffPresentation => {
   const caveMetadata = new Map<string, ReferenceMetadataPresentation[]>();
   const entranceMetadata = new Map<string, Map<string, ReferenceMetadataPresentation[]>>();
@@ -281,16 +282,22 @@ export const buildCaveRevisionDiffPresentation = (
       previousValue = referenceLabel(previous, change.path);
       currentValue = referenceLabel(current, change.path);
     }
-    if (change.path === "CountyNumber" && countyNumberIntent && countyNumberIntent !== "Manual")
-      currentValue = countyNumberIntent === "FirstAvailable" ? "First available on approval" : "Auto-assigned on approval";
+    if (change.path === "CountyNumber" && countyNumberIntent && countyNumberIntent !== "Manual") {
+      const likely = likelyCountyNumber && likelyCountyNumber > 0 ? `Likely ${likelyCountyNumber} · ` : undefined;
+      currentValue = countyNumberIntent === "FirstAvailable"
+        ? likely ? `${likely}first available on approval` : "First available on approval"
+        : likely ? `${likely}assigned on approval` : "Auto-assigned on approval";
+    }
     const metadata = caveMetadata.get(change.path) ?? [];
     caveFields.set(change.path, { key: change.path, label: definition.label,
       change: { ...scalarField(change, definition, metadata), previous: previousValue, current: currentValue }, metadata });
   });
   if (proposalCountyNumberChange) {
-    const proposalValue = (state: CaveProposalCountyNumberChangeVm["previous"]) => {
-      if (state.mode === "FirstAvailable") return "First available on approval";
-      if (state.mode === "AutomaticNext") return "Auto-assigned on approval";
+    const proposalValue = (state: CaveProposalCountyNumberChangeVm["previous"], currentState = false) => {
+      const likely = currentState && likelyCountyNumber && likelyCountyNumber > 0
+        ? `Likely ${likelyCountyNumber} · ` : undefined;
+      if (state.mode === "FirstAvailable") return likely ? `${likely}first available on approval` : "First available on approval";
+      if (state.mode === "AutomaticNext") return likely ? `${likely}assigned on approval` : "Auto-assigned on approval";
       return state.number;
     };
     const metadata = caveMetadata.get("CountyNumber") ?? [];
@@ -299,7 +306,7 @@ export const buildCaveRevisionDiffPresentation = (
       change: {
         key: "CountyNumber", label: "County Number", format: "number", metadata,
         previous: proposalValue(proposalCountyNumberChange.previous),
-        current: proposalValue(proposalCountyNumberChange.current),
+        current: proposalValue(proposalCountyNumberChange.current, true),
       },
     });
   }

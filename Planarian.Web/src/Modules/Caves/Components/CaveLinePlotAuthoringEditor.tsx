@@ -43,7 +43,8 @@ export const CaveLinePlotAuthoringEditor = ({ form, onAuthoringChange }: {
           const linePlot = linePlots[field.name];
           return <Col xs={24} lg={12} key={field.key}>
             <Card size="small" title={linePlot?.name ?? "Line plot"}
-              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
+              extra={<Button type="text" danger icon={<DeleteOutlined />} aria-label={`Remove ${linePlot?.name ?? "line plot"}`}
+                onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
               <Form.Item name={[field.name, "id"]} hidden><Input /></Form.Item>
               <Form.Item name={[field.name, "geoJson"]} hidden
                 rules={[{ required: true, message: "Line plot GeoJSON is required" }]}><Input /></Form.Item>

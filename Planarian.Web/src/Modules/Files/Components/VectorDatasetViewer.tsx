@@ -19,12 +19,14 @@ interface VectorDatasetViewerProps {
   embedUrl: string;
   fileType: string | null | undefined;
   downloadButton?: ReactNode;
+  data?: FeatureCollection;
 }
 
 export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
   embedUrl,
   fileType,
   downloadButton,
+  data,
 }) => {
   const [collection, setCollection] = useState<FeatureCollection | null>(null);
   const [bounds, setBounds] = useState<BoundsTuple | null>(null);
@@ -43,7 +45,9 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
         const normalizedType = (fileType || "").toLowerCase();
         let featureCollection: FeatureCollection | null = null;
 
-        if (normalizedType === "zip") {
+        if (data) {
+          featureCollection = normalizeToFeatureCollection(data);
+        } else if (normalizedType === "zip") {
           const response = await fetch(embedUrl, { credentials: "include" });
           if (!response.ok) {
             throw new Error("Unable to download shapefile archive.");
@@ -110,7 +114,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [embedUrl, fileType]);
+  }, [embedUrl, fileType, data]);
 
   const center = useMemo<[number, number] | undefined>(() => {
     if (!bounds) {
@@ -143,7 +147,7 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <MapBaseComponent
-        key={embedUrl}
+        key={data ? "inline-vector-dataset" : embedUrl}
         initialCenter={center}
         initialZoom={10}
         initialBounds={bounds}

@@ -8,7 +8,12 @@ import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianBut
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
 import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
 import { AddCaveComponent } from "../Components/AddCaveComponent";
-import { CaveRevisionDiff } from "../Components/CaveRevisionDiff";
+import { CaveRevisionDiff, CaveRevisionDiffAssetActions } from "../Components/CaveRevisionDiff";
+import { CaveLinePlotViewer } from "../Components/CaveLinePlotViewer";
+import { FileViewer } from "../../Files/Components/FileViewerComponent";
+import { FileService } from "../../Files/Services/FileService";
+import { getFileType } from "../../Files/Services/FileHelpers";
+import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
@@ -27,6 +32,8 @@ export const ReviseCaveChangeRequestPage = () => {
   const [preview, setPreview] = useState<CaveChangePreviewVm>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeFileId, setActiveFileId] = useState<string>();
+  const [activeLinePlot, setActiveLinePlot] = useState<NonNullable<CaveChangePreviewVm["linePlots"]>[number]>();
   const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
@@ -78,6 +85,26 @@ export const ReviseCaveChangeRequestPage = () => {
 
   if (!requestId) return null;
   const againstCurrent = detail?.request.isStale === true;
+  const previewFiles = preview
+    ? [...new Map([...(preview.base.files ?? []), ...(preview.proposed.files ?? [])].map(file => [file.id, file])).values()]
+    : [];
+  const publishedFileIds = new Set((preview?.base.files ?? []).map(file => file.id));
+  const existingStagedFileIds = new Set(detail?.activeStagedFiles.map(file => file.id) ?? []);
+  const activeFile = previewFiles.find(file => file.id === activeFileId);
+  const reviewLinePlots = [...(preview?.linePlots ?? []), ...(preview?.removedLinePlots ?? [])];
+  const assetActions: CaveRevisionDiffAssetActions = {
+    files: Object.fromEntries(previewFiles.map(file => [file.id, {
+      onView: () => setActiveFileId(file.id),
+      onDownload: () => publishedFileIds.has(file.id) ? FileService.startFileDownload(file.id)
+        : existingStagedFileIds.has(file.id)
+          ? CaveService.StartStagedChangeRequestFileDownload(requestId, file.id)
+          : CaveService.StartAuthoringStagedFileDownload(file.id),
+    }])),
+    linePlots: Object.fromEntries(reviewLinePlots.filter(linePlot => !!linePlot.id).map(linePlot => [linePlot.id!, {
+      onView: () => setActiveLinePlot(linePlot),
+      onDownload: () => downloadFile(`${linePlot.name}.geojson`, linePlot.geoJson),
+    }])),
+  };
 
   const previewChanges = async (values: AddCaveVm) => {
     setLoading(true);
@@ -134,7 +161,7 @@ export const ReviseCaveChangeRequestPage = () => {
         <Alert type="warning" showIcon message="This would not create a meaningful new proposal version. Change the proposal before saving."
           style={{ marginBottom: 16 }} />}
       <CaveRevisionDiff diff={preview.diff} previous={preview.base} current={preview.proposed}
-        countyNumberIntent={preview.countyNumberIntent} />
+        countyNumberIntent={preview.countyNumberIntent} assetActions={assetActions} />
       <Space style={{ marginTop: 16 }}>
         <PlanarianButton icon={undefined} type="primary" loading={saving} onClick={save}
           disabled={!preview.hasMeaningfulChanges}>Save proposal version</PlanarianButton>
@@ -155,5 +182,18 @@ export const ReviseCaveChangeRequestPage = () => {
           onAuthoringChange={unsaved.markDirty} stickySubmit />
       </Form>
     </Card>}
+    <FileViewer open={!!activeFile} onCancel={() => setActiveFileId(undefined)}
+      fileId={activeFile?.id} name={activeFile ? `${activeFile.name}${activeFile.extension ?? ""}` : undefined}
+      fileType={getFileType(activeFile?.extension)}
+      viewUrl={activeFile && !publishedFileIds.has(activeFile.id)
+        ? existingStagedFileIds.has(activeFile.id)
+          ? CaveService.GetStagedChangeRequestFileUrl(requestId, activeFile.id, "view")
+          : CaveService.GetAuthoringStagedFileUrl(activeFile.id, "view") : undefined}
+      onDownload={activeFile && !publishedFileIds.has(activeFile.id)
+        ? () => existingStagedFileIds.has(activeFile.id)
+          ? CaveService.StartStagedChangeRequestFileDownload(requestId, activeFile.id)
+          : CaveService.StartAuthoringStagedFileDownload(activeFile.id) : undefined} />
+    <CaveLinePlotViewer linePlot={activeLinePlot} open={!!activeLinePlot}
+      onClose={() => setActiveLinePlot(undefined)} />
   </Space></Spin>;
 };

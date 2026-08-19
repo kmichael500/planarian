@@ -13,6 +13,7 @@ type MockPlanarianButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "t
   loading?: boolean;
   icon?: ReactNode;
   danger?: boolean;
+  alwaysShowChildren?: boolean;
 };
 
 type MockPlanarianModalProps = {
@@ -37,12 +38,23 @@ jest.mock("../Components/AddCaveComponent", () => {
 });
 
 jest.mock("../Components/CaveRevisionDiff", () => ({
-  CaveRevisionDiff: () => <div data-testid="revision-diff" />,
+  CaveRevisionDiff: ({ assetActions }: { assetActions?: { files?: Record<string, unknown>; linePlots?: Record<string, unknown> } }) =>
+    <div data-testid="revision-diff"
+      data-file-actions={Object.keys(assetActions?.files ?? {}).join(",")}
+      data-line-plot-actions={Object.keys(assetActions?.linePlots ?? {}).join(",")} />,
+}));
+
+jest.mock("../../Files/Components/FileViewerComponent", () => ({
+  FileViewer: () => null,
+}));
+
+jest.mock("../Components/CaveLinePlotViewer", () => ({
+  CaveLinePlotViewer: () => null,
 }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianButtton", () => ({
   PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger, type: _type,
-    ...props }: MockPlanarianButtonProps) => <button {...props}>{children}</button>,
+    alwaysShowChildren: _alwaysShowChildren, ...props }: MockPlanarianButtonProps) => <button {...props}>{children}</button>,
 }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
@@ -97,7 +109,7 @@ const emptyDiff = (): CaveRevisionDiffVm => ({
 
 const previewResult = (hasMeaningfulChanges: boolean): CaveChangePreviewVm => ({
   base: previewSnapshot(), proposed: { ...previewSnapshot(), name: "Changed cave" },
-  diff: emptyDiff(), countyNumberIntent: "Manual", hasMeaningfulChanges,
+  diff: emptyDiff(), countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges,
 });
 
 const mockAuthoringContext = () =>
@@ -248,4 +260,26 @@ it("only protects browser unload after the author makes a change", async () => {
   const dirtyUnload = new Event("beforeunload", { cancelable: true });
   window.dispatchEvent(dirtyUnload);
   expect(dirtyUnload.defaultPrevented).toBe(true);
+});
+
+it("keeps removed published files and line plots reviewable in preview", async () => {
+  mockAuthoringContext();
+  const base = previewSnapshot();
+  base.files = [{ id: "removed-file", fileTypeTagId: "type", fileTypeNameAtRevision: "Map",
+    name: "Old map", extension: ".pdf" }];
+  base.linePlots = [{ id: "removed-line", name: "Old survey", contentHash: "hash" }];
+  const removedPreview: CaveChangePreviewVm = {
+    base, proposed: previewSnapshot(), countyNumberIntent: "Manual", hasMeaningfulChanges: true,
+    diff: { ...emptyDiff(), removedFiles: ["removed-file"], removedLinePlots: ["removed-line"] },
+    linePlots: [], removedLinePlots: [{ id: "removed-line", name: "Old survey",
+      geoJson: '{"type":"FeatureCollection","features":[]}' }],
+  };
+  jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue(removedPreview);
+
+  renderWithDataRouter();
+  fireEvent.click(await screen.findByRole("button", { name: "Review changes" }));
+
+  const diff = await screen.findByTestId("revision-diff");
+  expect(diff).toHaveAttribute("data-file-actions", "removed-file");
+  expect(diff).toHaveAttribute("data-line-plot-actions", "removed-line");
 });

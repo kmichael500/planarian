@@ -20,6 +20,9 @@ jest.mock("../Components/CaveRevisionDiff", () => ({
   CaveRevisionDiff: () => <div data-testid="revision-diff" />,
 }));
 
+jest.mock("../../Files/Components/FileViewerComponent", () => ({ FileViewer: () => null }));
+jest.mock("../Components/CaveLinePlotViewer", () => ({ CaveLinePlotViewer: () => null }));
+
 jest.mock("../../../Shared/Components/Buttons/PlanarianButtton", () => ({
   PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger, ...props }: any) =>
     <button {...props}>{children}</button>,
@@ -62,7 +65,7 @@ const mockPendingRequest = () => {
       changeSummary: { caveFields: 0, entrances: { added: 0, removed: 0, changed: 0, total: 0 }, files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 },
     },
     base: {} as any, proposed: {} as any, current: {} as any, diff: {} as any,
-    versions: [], countyNumberIntent: "Manual", activeStagedFiles: [], unavailableStagedFileIds: [],
+    versions: [], countyNumberIntent: "Manual", linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [],
   });
   jest.spyOn(CaveService, "GetProposalVersion").mockResolvedValue({
     base: {} as any, proposed: {} as any, diffFromBase: {} as any,
@@ -85,7 +88,7 @@ it("prevents saving a proposal version when the authoritative preview is semanti
   mockPendingRequest();
   jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
     base: {} as any, proposed: {} as any, diff: {} as any,
-    countyNumberIntent: "Manual", hasMeaningfulChanges: false,
+    countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: false,
   });
   const revise = jest.spyOn(CaveService, "ReviseChanges").mockResolvedValue("proposal02");
   renderPage();
@@ -118,7 +121,7 @@ it("clears the dirty guard before navigating after a successful revision save", 
   mockPendingRequest();
   jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
     base: {} as any, proposed: {} as any, diff: {} as any,
-    countyNumberIntent: "Manual", hasMeaningfulChanges: true,
+    countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: true,
   });
   const revise = jest.spyOn(CaveService, "ReviseChanges").mockResolvedValue("proposal02");
   renderPage();

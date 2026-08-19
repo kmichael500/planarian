@@ -7,6 +7,7 @@ using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Files.Services;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Files.Controllers;
 
@@ -45,11 +46,25 @@ public class FileController : PlanarianControllerBase<FileService>
             cancellationToken, uuid));
 
     [HttpGet("staged/{fileId:length(10)}")]
-    public async Task<IActionResult> DownloadAuthoringStagedFile(string fileId,
+    public Task<IActionResult> DownloadAuthoringStagedFile(string fileId, CancellationToken cancellationToken) =>
+        OpenAuthoringStagedFileResponse(fileId, requestedDownload: true, cancellationToken);
+
+    [HttpGet("staged/{fileId:length(10)}/view")]
+    public Task<IActionResult> ViewAuthoringStagedFile(string fileId, CancellationToken cancellationToken) =>
+        OpenAuthoringStagedFileResponse(fileId, requestedDownload: false, cancellationToken);
+
+    [HttpGet("staged/{fileId:length(10)}/download")]
+    public Task<IActionResult> DownloadAuthoringStagedFileExplicit(string fileId, CancellationToken cancellationToken) =>
+        OpenAuthoringStagedFileResponse(fileId, requestedDownload: true, cancellationToken);
+
+    private async Task<IActionResult> OpenAuthoringStagedFileResponse(string fileId, bool requestedDownload,
         CancellationToken cancellationToken)
     {
         var file = await Service.OpenAuthoringStagedFileAsync(fileId, cancellationToken);
-        return File(file.Stream, "application/octet-stream", file.FileName);
+        var response = FileResponsePolicy.Resolve(file.FileName, "application/octet-stream", requestedDownload);
+        return response.ForceDownload
+            ? File(file.Stream, response.ContentType, file.FileName)
+            : File(file.Stream, response.ContentType);
     }
 
     [HttpDelete("staged/{fileId:length(10)}")]

@@ -1,6 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { CaveRevisionDiff } from "./CaveRevisionDiff";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "../Models/CaveRevisionVm";
+
+jest.mock("../../../Shared/Components/Display/PlanarianTag", () => ({
+  PlanarianTag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
 
 let desktopLayout = false;
 
@@ -204,13 +209,13 @@ it("uses a unified signed scalar diff on mobile without repeated Before / After 
 });
 
 it.each([
-  ["AutomaticNext", "Auto-assigned on approval"],
-  ["FirstAvailable", "First available on approval"],
-] as const)("presents %s county-number intent without a fake zero", (countyNumberIntent, label) => {
+  ["AutomaticNext", "Likely 48 · assigned on approval"],
+  ["FirstAvailable", "Likely 48 · first available on approval"],
+] as const)("presents %s county-number intent with a clearly provisional likely value", (countyNumberIntent, label) => {
   render(<CaveRevisionDiff
     diff={{ ...diff, scalars: [{ path: "CountyNumber", previous: 12, current: 0 }] }}
     previous={snapshot(false)} current={{ ...snapshot(true), countyNumber: 0 }}
-    countyNumberIntent={countyNumberIntent} />);
+    countyNumberIntent={countyNumberIntent} likelyCountyNumber={48} />);
   expect(document.body).toHaveTextContent(label);
   expect(document.body).not.toHaveTextContent("County Number0");
 });
@@ -261,10 +266,43 @@ it("renders complete added and removed entrance and file state", () => {
   expect(document.body).toHaveTextContent("Old entrance description");
   expect(document.body).toHaveTextContent("Survey MapAdded");
   expect(document.body).toHaveTextContent("SurveyRemoved");
-  expect(document.body).toHaveTextContent(".pdf");
-  expect(document.body).toHaveTextContent(".txt");
-  expect(document.body).toHaveTextContent("Map");
-  expect(document.body).toHaveTextContent("Report");
+  expect(screen.getByText("pdf")).toBeInTheDocument();
+  expect(screen.getByText("txt")).toBeInTheDocument();
+});
+
+it("puts file and line-plot actions on compact asset rows", async () => {
+  const current = snapshot(true);
+  current.files[0] = { ...current.files[0], id: "added-file" };
+  current.linePlots[0] = { ...current.linePlots[0], id: "added-line" };
+  const onViewFile = jest.fn();
+  const onDownloadFile = jest.fn();
+  const onViewLinePlot = jest.fn();
+  const onDownloadLinePlot = jest.fn();
+
+  render(<CaveRevisionDiff diff={{ ...diff,
+    scalars: [], addedTags: [], removedTags: [],
+    addedEntrances: [], removedEntrances: [], changedEntrances: [], entranceChanges: [],
+    addedFiles: ["added-file"], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: ["added-line"], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [],
+  }} current={current} assetActions={{
+    files: { "added-file": { onView: onViewFile, onDownload: onDownloadFile } },
+    linePlots: { "added-line": { onView: onViewLinePlot, onDownload: onDownloadLinePlot } },
+  }} />);
+
+  expect(screen.getByRole("button", { name: /Files/ })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: /Line Plots/ })).toHaveAttribute("aria-expanded", "true");
+  const fileRow = screen.getByRole("group", { name: "Survey Map file" });
+  const linePlotRow = screen.getByRole("group", { name: "Main line line plot" });
+  expect(fileRow).toHaveTextContent("pdf");
+  expect(linePlotRow).not.toHaveTextContent("GeoJSON");
+  await userEvent.click(within(fileRow).getByText("View"));
+  await userEvent.click(within(fileRow).getByText("Download"));
+  await userEvent.click(within(linePlotRow).getByText("View"));
+  await userEvent.click(within(linePlotRow).getByText("Download"));
+  expect(onViewFile).toHaveBeenCalledTimes(1);
+  expect(onDownloadFile).toHaveBeenCalledTimes(1);
+  expect(onViewLinePlot).toHaveBeenCalledTimes(1);
+  expect(onDownloadLinePlot).toHaveBeenCalledTimes(1);
 });
 
 it("keeps added entity snapshots readable without inventing Before / After values", () => {
@@ -285,7 +323,7 @@ it("keeps added entity snapshots readable without inventing Before / After value
   expect(document.body).toHaveTextContent("Carr EntranceAdded");
   expect(document.body).toHaveTextContent("Survey MapAdded");
   expect(document.body).toHaveTextContent("Main lineAdded");
-  expect(screen.getByText("GeoJSON content")).toBeInTheDocument();
+  expect(screen.queryByText("GeoJSON")).not.toBeInTheDocument();
   expect(document.body).not.toHaveTextContent("newhash");
   expect(screen.queryByText("Before")).not.toBeInTheDocument();
   expect(screen.queryByText("After")).not.toBeInTheDocument();

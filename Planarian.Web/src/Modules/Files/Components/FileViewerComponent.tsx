@@ -64,6 +64,8 @@ interface FileViewerProps {
   onPrevious?: () => void;
   canGoNext?: boolean;
   canGoPrevious?: boolean;
+  viewUrl?: string;
+  onDownload?: () => void;
 }
 
 const FileViewer: React.FC<FileViewerProps> = ({
@@ -76,6 +78,8 @@ const FileViewer: React.FC<FileViewerProps> = ({
   onPrevious,
   canGoNext,
   canGoPrevious,
+  viewUrl,
+  onDownload,
 }) => {
   const isImage = isImageFileType(fileType);
   const isPdf = isPdfFileType(fileType);
@@ -93,8 +97,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const downloadButton = fileId ? (
     <PlanarianButton
       icon={<CloudDownloadOutlined />}
-      onClick={async () => {
-        FileService.startFileDownload(fileId);
+      onClick={() => {
+        if (onDownload) onDownload();
+        else FileService.startFileDownload(fileId);
       }}
     >
       Download
@@ -131,7 +136,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     let isCancelled = false;
     const loadFileAccessUrl = async () => {
       try {
-        const accessUrl = FileService.getFileAccessUrl(fileId, FileAccessAction.View);
+        const accessUrl = viewUrl ?? FileService.getFileAccessUrl(fileId, FileAccessAction.View);
         if (isCancelled) {
           return;
         }
@@ -155,7 +160,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [open, fileId, fileType]);
+  }, [open, fileId, fileType, viewUrl]);
 
   useEffect(() => {
     if (!open || !fileEmbedUrl) {

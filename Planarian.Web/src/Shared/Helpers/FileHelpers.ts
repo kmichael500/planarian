@@ -53,6 +53,10 @@ export const downloadFile = (filename: string, content: string) => {
     case "csv":
       blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
       break;
+    case "geojson":
+    case "json":
+      blob = new Blob([content], { type: "application/geo+json;charset=utf-8;" });
+      break;
     default:
       throw new Error("File type not supported");
       break;
@@ -65,4 +69,5 @@ export const downloadFile = (filename: string, content: string) => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };

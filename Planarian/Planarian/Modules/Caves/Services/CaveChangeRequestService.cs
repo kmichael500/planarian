@@ -67,8 +67,13 @@ public sealed class CaveChangeRequestService
         var (proposed, hasMeaningfulChanges) = await EvaluateMeaningfulChangesAsync(
             proposal, current, null, cancellationToken);
         await RequireCurrentRevisionAsync(caveId, expectedBaseRevisionId, cancellationToken);
+        var likelyCountyNumber = await GetLikelyCountyNumberAsync(proposal, current);
+        var removedLinePlots = await GetRemovedLinePlotsAsync(caveId, current, proposal, cancellationToken);
         return new CaveChangePreviewVm(current, proposed, Map(_diff.Compare(current, proposed)),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, hasMeaningfulChanges);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, likelyCountyNumber,
+            proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
+            { Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson }).ToList(),
+            removedLinePlots, hasMeaningfulChanges);
     }
 
     public async Task<CaveChangePreviewVm> PreviewVersionAsync(string requestId, AddCaveVm values,
@@ -95,8 +100,14 @@ public sealed class CaveChangeRequestService
             proposal, baseSnapshot, semanticPrevious, cancellationToken);
         var latest = await RequireReadableAsync(requestId, cancellationToken);
         RequireExpectedEditorState(latest, expectedBaseRevisionId, expectedProposalVersionId, againstCurrent);
+        var likelyCountyNumber = await GetLikelyCountyNumberAsync(proposal, baseSnapshot);
+        var removedLinePlots = await GetRemovedLinePlotsAsync(row.Request.CaveId, baseSnapshot, proposal,
+            cancellationToken);
         return new CaveChangePreviewVm(baseSnapshot, proposed, Map(_diff.Compare(baseSnapshot, proposed)),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, hasMeaningfulChanges);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, likelyCountyNumber,
+            proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
+            { Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson }).ToList(),
+            removedLinePlots, hasMeaningfulChanges);
     }
 
     public async Task<string> CreateAsync(string caveId, AddCaveVm values, string expectedBaseRevisionId,
@@ -144,9 +155,10 @@ public sealed class CaveChangeRequestService
     }
 
     public async Task<PagedResult<CaveChangeRequestSummaryVm>> ListMineAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null)
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
+        CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.UpdatedOn, bool sortDescending = true)
     {
-        var page = await _requests.ListMineAsync(pageNumber, pageSize, cancellationToken, status);
+        var page = await _requests.ListMineAsync(pageNumber, pageSize, cancellationToken, status, sortBy, sortDescending);
         return new PagedResult<CaveChangeRequestSummaryVm>(page.PageNumber, page.PageSize, page.TotalCount,
             page.Results.Select(row => MapSummary(row, row.CurrentCanReview)).ToList());
     }
@@ -155,9 +167,10 @@ public sealed class CaveChangeRequestService
         (await ListMineAsync(1, QueryConstants.MaxPageSize, cancellationToken)).Results.ToList();
 
     public async Task<PagedResult<CaveChangeRequestSummaryVm>> ListForReviewAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
+        CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.SubmittedOn, bool sortDescending = false)
     {
-        var page = await _requests.ListForReviewAsync(pageNumber, pageSize, cancellationToken);
+        var page = await _requests.ListForReviewAsync(pageNumber, pageSize, cancellationToken, status, sortBy, sortDescending);
         return new PagedResult<CaveChangeRequestSummaryVm>(page.PageNumber, page.PageSize, page.TotalCount,
             page.Results.Select(row => MapSummary(row, true)).ToList());
     }
@@ -182,6 +195,11 @@ public sealed class CaveChangeRequestService
         var activeStagedFiles = proposedSnapshot.Files.Where(file => activeStagedFileIds.Contains(file.Id) &&
             !unavailableStagedFileIds.Contains(file.Id)).ToList();
         var versions = await _requests.ListVersionsAsync(requestId, cancellationToken);
+        var likelyCountyNumber = row.Request.Status == CaveChangeRequestStatus.Pending
+            ? await GetLikelyCountyNumberAsync(proposal, baseSnapshot)
+            : null;
+        var removedLinePlots = await GetRemovedLinePlotsAsync(row.Request.CaveId, baseSnapshot, proposal,
+            cancellationToken);
         return new CaveChangeRequestDetailVm(MapSummary(row, canReview), baseSnapshot, proposedSnapshot, currentSnapshot,
             Map(_diff.Compare(baseSnapshot, proposedSnapshot)),
             isStale ? Map(_diff.Compare(baseSnapshot, currentSnapshot)) : null,
@@ -189,8 +207,11 @@ public sealed class CaveChangeRequestService
                 version.Version.PreviousProposalVersionId, version.Version.BaseRevisionId,
                 version.Version.CreatedByUserId, version.ActorName,
                 version.Version.CreatedOn, version.Version.Id == row.Request.CurrentProposalVersionId)).ToList(),
-            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, activeStagedFiles,
-            presentation.UnavailableStagedFileIds);
+            proposal.CountyNumberIntent, proposal.RequestedCountyNumber, likelyCountyNumber,
+            proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
+            {
+                Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson
+            }).ToList(), removedLinePlots, activeStagedFiles, presentation.UnavailableStagedFileIds);
     }
 
     public async Task<CaveProposalVersionDetailVm> GetVersionAsync(string requestId, string versionId,
@@ -228,7 +249,7 @@ public sealed class CaveChangeRequestService
             countyNumberChange,
             row.PreviousVersion is not null && row.PreviousVersion.BaseRevisionId != row.Version.BaseRevisionId,
             row.PreviousVersion?.BaseRevisionId, row.Version.BaseRevisionId, proposal.CountyNumberIntent,
-            proposal.RequestedCountyNumber,
+            proposal.RequestedCountyNumber, await GetLikelyCountyNumberAsync(proposal, baseSnapshot),
             proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
             {
                 Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson
@@ -327,6 +348,17 @@ public sealed class CaveChangeRequestService
     private Task<bool> CanReviewAsync(CaveChangeRequestReadRow row, bool throwIfDenied) =>
         _user.HasCavePermission(PermissionPolicyKey.Manager, row.Request.CaveId,
             null, null, throwIfDenied);
+
+    private async Task<int?> GetLikelyCountyNumberAsync(CaveProposalSnapshotV1 proposal,
+        CavePublishedSnapshotV1 baseSnapshot)
+    {
+        if (proposal.CountyNumberIntent == CountyNumberIntent.Manual)
+            return proposal.RequestedCountyNumber;
+        if (proposal.CountyId == baseSnapshot.County.Id)
+            return baseSnapshot.CountyNumber;
+        return await _caves.GetNewDisplayId(proposal.CountyId,
+            proposal.CountyNumberIntent == CountyNumberIntent.FirstAvailable);
+    }
 
     private async Task<string> GetCurrentRevisionIdAsync(string caveId, CancellationToken cancellationToken)
     {
@@ -657,6 +689,23 @@ public sealed class CaveChangeRequestService
                 }).ToList()
         };
         return new ProposalPresentation(snapshot, unavailableStagedFileIds);
+    }
+
+    private async Task<IReadOnlyList<GeoJsonUploadVm>> GetRemovedLinePlotsAsync(string caveId,
+        CavePublishedSnapshotV1 baseSnapshot, CaveProposalSnapshotV1 proposal, CancellationToken cancellationToken)
+    {
+        var proposedIds = proposal.LinePlots.Select(linePlot => linePlot.Id).ToHashSet(StringComparer.Ordinal);
+        var baseById = baseSnapshot.LinePlots.ToDictionary(linePlot => linePlot.Id, StringComparer.Ordinal);
+        var result = new List<GeoJsonUploadVm>();
+        foreach (var published in await _caves.GetCaveLinePlotsAsync(caveId, cancellationToken))
+        {
+            if (published.Id is null || proposedIds.Contains(published.Id) ||
+                !baseById.TryGetValue(published.Id, out var baseLinePlot)) continue;
+            if (CaveJsonContent.NormalizeAndHash(published.GeoJson).ContentHash != baseLinePlot.ContentHash) continue;
+            result.Add(new GeoJsonUploadVm
+                { Id = published.Id, Name = baseLinePlot.Name, GeoJson = published.GeoJson });
+        }
+        return result.OrderBy(linePlot => linePlot.Id, StringComparer.Ordinal).ToList();
     }
 
     private static AddCaveVm ToAddCave(CaveProposalSnapshotV1 proposal)

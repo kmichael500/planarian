@@ -22,6 +22,7 @@ import {
   CaveChangeRequestDecisionVm,
   CaveChangeRequestDetailVm,
   CaveChangeRequestSummaryVm,
+  CaveChangeRequestSortBy,
   CaveChangeRequestStatus,
   CaveChangePreviewVm,
   CaveEditAuthoringContextVm,
@@ -158,20 +159,35 @@ const CaveService = {
   async DeleteAuthoringStagedFile(fileId: string): Promise<void> {
     await HttpClient.delete(`api/files/staged/${encodeURIComponent(fileId)}`);
   },
-  GetStagedChangeRequestFileUrl(requestId: string, fileId: string): string {
+  GetAuthoringStagedFileUrl(fileId: string, action: "view" | "download"): string {
     return HttpHelpers.BuildAuthenticatedApiUrl(
-      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}`
+      `api/files/staged/${encodeURIComponent(fileId)}/${action}`
     );
   },
-  async GetMyChangeRequests(pageNumber = 1, pageSize = 10,
-    status?: CaveChangeRequestStatus): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+  StartAuthoringStagedFileDownload(fileId: string): void {
+    HttpHelpers.NavigateToApiUrl(`api/files/staged/${encodeURIComponent(fileId)}/download`);
+  },
+  GetStagedChangeRequestFileUrl(requestId: string, fileId: string, action: "view" | "download" = "download"): string {
+    return HttpHelpers.BuildAuthenticatedApiUrl(
+      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}/${action}`
+    );
+  },
+  StartStagedChangeRequestFileDownload(requestId: string, fileId: string): void {
+    HttpHelpers.NavigateToApiUrl(
+      `${changeRequestUrl}/${encodeURIComponent(requestId)}/files/${encodeURIComponent(fileId)}/download`
+    );
+  },
+  async GetMyChangeRequests(pageNumber = 1, pageSize = 10, status?: CaveChangeRequestStatus,
+    sortBy: CaveChangeRequestSortBy = "UpdatedOn", sortDescending = true): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
     const statusQuery = status ? `&status=${encodeURIComponent(status)}` : "";
     return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(
-      `${changeRequestUrl}/mine?pageNumber=${pageNumber}&pageSize=${pageSize}${statusQuery}`)).data;
+      `${changeRequestUrl}/mine?pageNumber=${pageNumber}&pageSize=${pageSize}${statusQuery}&sortBy=${sortBy}&sortDescending=${sortDescending}`)).data;
   },
-  async GetReviewQueue(pageNumber = 1, pageSize = 10): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+  async GetReviewQueue(pageNumber = 1, pageSize = 10, status?: CaveChangeRequestStatus,
+    sortBy: CaveChangeRequestSortBy = "SubmittedOn", sortDescending = false): Promise<PagedResult<CaveChangeRequestSummaryVm>> {
+    const statusQuery = status ? `&status=${encodeURIComponent(status)}` : "";
     return (await HttpClient.get<PagedResult<CaveChangeRequestSummaryVm>>(
-      `${changeRequestUrl}/review?pageNumber=${pageNumber}&pageSize=${pageSize}`)).data;
+      `${changeRequestUrl}/review?pageNumber=${pageNumber}&pageSize=${pageSize}${statusQuery}&sortBy=${sortBy}&sortDescending=${sortDescending}`)).data;
   },
   async GetChangeRequest(id: string): Promise<CaveChangeRequestDetailVm> {
     return (await HttpClient.get<CaveChangeRequestDetailVm>(`${changeRequestUrl}/${id}`)).data;

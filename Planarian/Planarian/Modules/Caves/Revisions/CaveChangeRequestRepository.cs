@@ -5,6 +5,7 @@ using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Helpers;
+using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Modules.Tags;
@@ -278,16 +279,16 @@ public sealed class CaveChangeRequestRepository
     }
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null) =>
-        PageAsync(Query(createdByUserId: _user.Id, status: status)
-            .OrderByDescending(row => row.Request.Status == CaveChangeRequestStatus.Pending)
-            .ThenByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
-            .ThenByDescending(row => row.Request.Id),
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
+        CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.UpdatedOn, bool sortDescending = true) =>
+        PageAsync(Order(Query(createdByUserId: _user.Id, status: status), sortBy, sortDescending, pendingFirst: true),
             pageNumber, pageSize, cancellationToken);
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListForReviewAsync(int pageNumber, int pageSize,
-        CancellationToken cancellationToken) => PageAsync(Query(status: CaveChangeRequestStatus.Pending)
-            .Where(row => row.CurrentCanReview).OrderBy(row => row.Request.CreatedOn).ThenBy(row => row.Request.Id),
+        CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
+        CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.SubmittedOn,
+        bool sortDescending = false) => PageAsync(Order(Query(status: status)
+            .Where(row => row.CurrentCanReview), sortBy, sortDescending, pendingFirst: true),
             pageNumber, pageSize, cancellationToken);
 
     public Task<CaveChangeRequestReadRow?> GetAsync(string requestId, CancellationToken cancellationToken) =>
@@ -515,6 +516,45 @@ public sealed class CaveChangeRequestRepository
                 permission.UserId == _user.Id && permission.CaveId == request.CaveId &&
                 permission.PermissionKey == PermissionPolicyKey.Manager)
         };
+
+    private static IOrderedQueryable<CaveChangeRequestReadRow> Order(
+        IQueryable<CaveChangeRequestReadRow> query, CaveChangeRequestSortBy sortBy, bool descending, bool pendingFirst)
+    {
+        IOrderedQueryable<CaveChangeRequestReadRow> ordered;
+        if (pendingFirst)
+        {
+            var pending = query.OrderByDescending(row => row.Request.Status == CaveChangeRequestStatus.Pending);
+            ordered = sortBy switch
+            {
+                CaveChangeRequestSortBy.SubmittedOn => descending
+                    ? pending.ThenByDescending(row => row.Request.CreatedOn)
+                    : pending.ThenBy(row => row.Request.CreatedOn),
+                CaveChangeRequestSortBy.CaveName => descending
+                    ? pending.ThenByDescending(row => row.LiveCaveName)
+                    : pending.ThenBy(row => row.LiveCaveName),
+                _ => descending
+                    ? pending.ThenByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
+                    : pending.ThenBy(row => row.Request.ModifiedOn ?? row.Request.CreatedOn),
+            };
+        }
+        else
+        {
+            ordered = sortBy switch
+            {
+                CaveChangeRequestSortBy.SubmittedOn => descending
+                    ? query.OrderByDescending(row => row.Request.CreatedOn)
+                    : query.OrderBy(row => row.Request.CreatedOn),
+                CaveChangeRequestSortBy.CaveName => descending
+                    ? query.OrderByDescending(row => row.LiveCaveName)
+                    : query.OrderBy(row => row.LiveCaveName),
+                _ => descending
+                    ? query.OrderByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
+                    : query.OrderBy(row => row.Request.ModifiedOn ?? row.Request.CreatedOn),
+            };
+        }
+
+        return descending ? ordered.ThenByDescending(row => row.Request.Id) : ordered.ThenBy(row => row.Request.Id);
+    }
 
     private static async Task<PagedResult<CaveChangeRequestReadRow>> PageAsync(
         IQueryable<CaveChangeRequestReadRow> query, int pageNumber, int pageSize,

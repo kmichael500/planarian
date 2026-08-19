@@ -59,7 +59,7 @@ export const FileListComponent = ({
   const activeFile = activeIndex >= 0 ? orderedFiles[activeIndex] : null;
 
   const openViewer = useCallback(
-    (file: FileVm) => {
+    (file: { id: string }) => {
       if (file?.id) {
         setActiveFileId(file.id);
       }

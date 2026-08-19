@@ -1,5 +1,5 @@
 import { Fragment, ReactNode } from "react";
-import { Alert, Card, Grid, Space, Tag, theme, Typography } from "antd";
+import { Alert, Card, Collapse, Grid, List, Space, Tag, theme, Typography } from "antd";
 import { CaveRevisionDiffVm, CaveSnapshotVm, SnapshotTagReference } from "../Models/CaveRevisionVm";
 import { CaveProposalCountyNumberChangeVm, CountyNumberIntent } from "../Models/CaveChangeRequestVm";
 import {
@@ -16,6 +16,7 @@ import {
   TagChangeGroup,
 } from "./CaveRevisionDiffPresentation";
 import { CaveTextDiff } from "./CaveTextDiff";
+import { FileListItemComponent } from "../../Files/Components/FileListItemComponent";
 import {
   defaultIfEmpty,
   DistanceFormat,
@@ -307,33 +308,48 @@ const Entrance = ({ entrance, isDesktop }: { entrance: AffectedEntrancePresentat
   </Card>;
 };
 
-const File = ({ file, isDesktop }: { file: AffectedFilePresentation; isDesktop: boolean }) => {
+interface FileDiffAssetAction { onView?: () => void; onDownload?: () => void; unavailable?: boolean }
+interface LinePlotDiffAssetAction { onView?: () => void; onDownload?: () => void }
+
+export interface CaveRevisionDiffAssetActions {
+  files?: Record<string, FileDiffAssetAction>;
+  linePlots?: Record<string, LinePlotDiffAssetAction>;
+}
+
+const File = ({ file, isDesktop, actions }: { file: AffectedFilePresentation; isDesktop: boolean;
+  actions?: FileDiffAssetAction }) => {
   const snapshot = file.snapshot;
-  return <Card size="small" title={<EntityTitle heading={file.heading} status={file.status} />}>
+  const rowFile = { id: file.id, name: file.heading, extension: snapshot?.extension ?? "" };
+  return <>
+    <FileListItemComponent file={rowFile}
+      onView={actions?.onView ? () => actions.onView?.() : undefined}
+      onDownload={actions?.onDownload ? () => actions.onDownload?.() : undefined}
+      status={{ label: statusLabel[file.status], color: statusColor(file.status) }}
+      unavailableText={actions?.unavailable ? "File no longer available" : undefined}
+      ariaLabel={`${file.heading} file`} allowDefaultDownload={false} />
     {!file.detailsAvailable && <Alert type="warning" showIcon message="File details unavailable"
       description={`File ID: ${file.id}`} />}
     {file.detailsAvailable && file.status === "changed" &&
       <ComparisonBlock items={file.fields.map(scalarComparisonItem)} isDesktop={isDesktop}
         label={`${file.heading} changes`} />}
-    {file.detailsAvailable && file.status !== "changed" && snapshot && <SnapshotDetails isDesktop={isDesktop}
-      columns={2} items={[
-        { key: "extension", label: "Extension", value: defaultIfEmpty(snapshot.extension) },
-        { key: "file-type", label: "File Type", value: defaultIfEmpty(snapshot.fileTypeNameAtRevision) },
-      ]} />}
-  </Card>;
+  </>;
 };
 
-const LinePlot = ({ linePlot, isDesktop }: { linePlot: AffectedLinePlotPresentation; isDesktop: boolean }) => {
-  const snapshot = linePlot.snapshot;
-  return <Card size="small" title={<EntityTitle heading={linePlot.heading} status={linePlot.status} />}>
+const LinePlot = ({ linePlot, isDesktop, actions }: { linePlot: AffectedLinePlotPresentation; isDesktop: boolean;
+  actions?: LinePlotDiffAssetAction }) => {
+  const rowFile = { id: linePlot.id, name: linePlot.heading, extension: "" };
+  return <>
+    <FileListItemComponent file={rowFile} showFileType={false}
+      onView={actions?.onView ? () => actions.onView?.() : undefined}
+      onDownload={actions?.onDownload ? () => actions.onDownload?.() : undefined}
+      status={{ label: statusLabel[linePlot.status], color: statusColor(linePlot.status) }}
+      ariaLabel={`${linePlot.heading} line plot`} allowDefaultDownload={false} />
     {!linePlot.detailsAvailable && <Alert type="warning" showIcon message="Line plot details unavailable"
       description={`Line plot ID: ${linePlot.id}`} />}
     {linePlot.detailsAvailable && linePlot.status === "changed" &&
       <ComparisonBlock items={linePlot.fields.map(scalarComparisonItem)} isDesktop={isDesktop}
         label={`${linePlot.heading} changes`} />}
-    {linePlot.detailsAvailable && linePlot.status !== "changed" && snapshot && <SnapshotDetails isDesktop={isDesktop}
-      columns={1} items={[{ key: "content", label: "Content", value: "GeoJSON content" }]} />}
-  </Card>;
+  </>;
 };
 
 const countLabel = (count: number, singular: string, plural = `${singular}s`) =>
@@ -354,12 +370,15 @@ const ScopeSummary = ({ summary }: { summary: CaveRevisionDiffSummaryPresentatio
 const SectionTitle = ({ children }: { children: ReactNode }) =>
   <Typography.Title level={5} style={{ margin: 0 }}>{children}</Typography.Title>;
 
-export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, proposalCountyNumberChange }: {
+export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, proposalCountyNumberChange, likelyCountyNumber, assetActions, showSummary = true }: {
   diff?: CaveRevisionDiffVm;
   previous?: CaveSnapshotVm;
   current?: CaveSnapshotVm;
   countyNumberIntent?: CountyNumberIntent;
   proposalCountyNumberChange?: CaveProposalCountyNumberChangeVm;
+  likelyCountyNumber?: number;
+  assetActions?: CaveRevisionDiffAssetActions;
+  showSummary?: boolean;
 }) => {
   const screens = Grid.useBreakpoint();
   const { token } = theme.useToken();
@@ -367,7 +386,7 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, 
   if (!diff) return <Typography.Text type="secondary">Initial publication</Typography.Text>;
 
   const model = buildCaveRevisionDiffPresentation(diff, previous, current, countyNumberIntent,
-    proposalCountyNumberChange);
+    proposalCountyNumberChange, likelyCountyNumber);
   const hasChanges = model.caveInformation.length || model.entrances.length || model.narrative || model.files.length ||
     model.linePlots.length || model.fallbackScalars.length || model.fallbackMetadata.length;
   if (!hasChanges) return <Typography.Text type="secondary">No visible field changes</Typography.Text>;
@@ -384,7 +403,7 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, 
   ];
 
   return <Space direction="vertical" size="large" style={{ width: "100%" }}>
-    <ScopeSummary summary={model.summary} />
+    {showSummary && <ScopeSummary summary={model.summary} />}
 
     {!!model.caveInformation.length && <section>
       <SectionTitle>Cave Information</SectionTitle>
@@ -409,19 +428,21 @@ export const CaveRevisionDiff = ({ diff, previous, current, countyNumberIntent, 
       </div>
     </section>}
 
-    {!!model.files.length && <section>
-      <SectionTitle>Files</SectionTitle>
-      <Space direction="vertical" size="small" style={{ width: "100%", marginTop: token.marginSM }}>
-        {model.files.map(file => <File key={`${file.status}-${file.id}`} file={file} isDesktop={isDesktop} />)}
-      </Space>
-    </section>}
-
-    {!!model.linePlots.length && <section>
-      <SectionTitle>Line Plots</SectionTitle>
-      <Space direction="vertical" size="small" style={{ width: "100%", marginTop: token.marginSM }}>
-        {model.linePlots.map(linePlot => <LinePlot key={`${linePlot.status}-${linePlot.id}`}
-          linePlot={linePlot} isDesktop={isDesktop} />)}
-      </Space>
+    {(!!model.files.length || !!model.linePlots.length) && <section aria-label="Request assets">
+      <Collapse bordered defaultActiveKey={["files", "line-plots"]} items={[
+        ...(model.files.length ? [{
+          key: "files", label: "Files", children: <List split={false}>
+            {model.files.map(file => <File key={`${file.status}-${file.id}`} file={file} isDesktop={isDesktop}
+              actions={assetActions?.files?.[file.id]} />)}
+          </List>,
+        }] : []),
+        ...(model.linePlots.length ? [{
+          key: "line-plots", label: "Line Plots", children: <List split={false}>
+            {model.linePlots.map(linePlot => <LinePlot key={`${linePlot.status}-${linePlot.id}`}
+              linePlot={linePlot} isDesktop={isDesktop} actions={assetActions?.linePlots?.[linePlot.id]} />)}
+          </List>,
+        }] : []),
+      ]} />
     </section>}
 
     {!!fallbackItems.length && <section>

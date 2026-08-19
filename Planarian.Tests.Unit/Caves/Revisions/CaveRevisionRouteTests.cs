@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Modules.Caves.Controllers;
+using Planarian.Modules.Files.Controllers;
 using Xunit;
 
 namespace Planarian.Tests.Caves.Revisions;
@@ -26,6 +27,26 @@ public sealed class CaveRevisionRouteTests
 
         Assert.Equal("caves/{caveId:length(10)}/authoring-context", route.Template);
         Assert.Empty(action.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false));
+    }
+
+    [Fact]
+    public void RequestStagedFileHasSeparateInlineViewRoute()
+    {
+        var action = typeof(CaveChangeRequestController).GetMethod(nameof(CaveChangeRequestController.ViewStagedFile));
+        var route = Assert.Single(action!.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false)
+            .Cast<HttpGetAttribute>());
+
+        Assert.Equal("{requestId:length(10)}/files/{fileId:length(10)}/view", route.Template);
+    }
+
+    [Fact]
+    public void AuthoringStagedFileHasSeparateInlineViewRoute()
+    {
+        var action = typeof(FileController).GetMethod(nameof(FileController.ViewAuthoringStagedFile));
+        var route = Assert.Single(action!.GetCustomAttributes(typeof(HttpGetAttribute), inherit: false)
+            .Cast<HttpGetAttribute>());
+
+        Assert.Equal("staged/{fileId:length(10)}/view", route.Template);
     }
 
     [Fact]

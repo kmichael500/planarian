@@ -37,12 +37,17 @@ public sealed record CaveChangeRequestDetailVm(
     IReadOnlyList<CaveProposalVersionVm> Versions,
     CountyNumberIntent CountyNumberIntent,
     int? RequestedCountyNumber,
+    int? LikelyCountyNumber,
+    IReadOnlyList<GeoJsonUploadVm> LinePlots,
+    IReadOnlyList<GeoJsonUploadVm> RemovedLinePlots,
     IReadOnlyList<CaveFileSnapshotV1> ActiveStagedFiles,
     IReadOnlyList<string> UnavailableStagedFileIds);
 
 public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
-    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber, bool HasMeaningfulChanges);
+    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber, int? LikelyCountyNumber,
+    IReadOnlyList<GeoJsonUploadVm> LinePlots, IReadOnlyList<GeoJsonUploadVm> RemovedLinePlots,
+    bool HasMeaningfulChanges);
 
 public sealed record CreateCaveChangeRequestVm(AddCaveVm Cave, string ExpectedBaseRevisionId);
 
@@ -103,7 +108,7 @@ public sealed record CaveProposalVersionDetailVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1? PreviousProposed, CaveRevisionDiffVm? DiffFromPreviousVersion,
     CaveProposalCountyNumberChangeVm? CountyNumberChange,
     bool BaseRevisionChanged, string? PreviousBaseRevisionId, string BaseRevisionId,
-    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber,
+    CountyNumberIntent CountyNumberIntent, int? RequestedCountyNumber, int? LikelyCountyNumber,
     IReadOnlyList<GeoJsonUploadVm> LinePlots,
     IReadOnlyList<string> UnavailableStagedFileIds);
 

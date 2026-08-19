@@ -51,7 +51,8 @@ export const CaveFileAuthoringEditor = ({ form, onAuthoringChange }: {
           const file = files[field.name];
           return <Col xs={24} lg={12} key={field.key}>
             <Card size="small" title={file?.name ?? "File"}
-              extra={<Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
+              extra={<Button type="text" danger icon={<DeleteOutlined />} aria-label={`Remove ${file?.name ?? "file"}`}
+                onClick={() => { remove(field.name); onAuthoringChange?.(); }} />}>
               <Form.Item name={[field.name, "id"]} hidden><Input /></Form.Item>
               <Form.Item name={[field.name, "fileTypeKey"]} hidden><Input /></Form.Item>
               <Form.Item label="Name" name={[field.name, "name"]}

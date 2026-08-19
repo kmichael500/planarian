@@ -22,10 +22,11 @@ beforeAll(() => {
 
 const page = (id: string, totalCount = 1) => ({ pageNumber: 1, pageSize: 10, totalCount,
   totalPages: Math.max(1, Math.ceil(totalCount / 10)), results: [{ id } as any] });
+const setHeaderTitle = jest.fn();
 
 const AppContextOverride: React.FC<{ manager?: boolean; children: React.ReactNode }> = ({ manager = false, children }) => {
   const defaults = useContext(AppContext);
-  return <AppContext.Provider value={{ ...defaults,
+  return <AppContext.Provider value={{ ...defaults, setHeaderTitle,
     hasPermission: permission => manager && permission === PermissionKey.Manager }}>{children}</AppContext.Provider>;
 };
 
@@ -36,45 +37,64 @@ const renderPage = (manager = false, initialEntry = "/caves/changes") => render(
 );
 
 describe("CaveChangeRequestsPage", () => {
-  beforeEach(() => jest.restoreAllMocks());
-
-  it("uses one Cave Changes workspace and only shows the review tab to managers", async () => {
-    jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine"));
-    const view = renderPage(false);
-    await screen.findByText("mine");
-    await screen.findByText("1 submission");
-    expect(screen.getByRole("tab", { name: "My submissions" })).toBeVisible();
-    expect(screen.queryByRole("tab", { name: "Review queue" })).not.toBeInTheDocument();
-    view.unmount();
-
-    jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review"));
-    renderPage(true);
-    await screen.findByText("mine");
-    expect(screen.getByRole("tab", { name: "Review queue" })).toBeVisible();
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    setHeaderTitle.mockClear();
   });
 
-  it("switches to the review queue without mixing its paging state with My submissions", async () => {
+  it("shows a simple Submissions workspace to users who cannot review", async () => {
     jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine"));
-    const getReview = jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review"));
-    renderPage(true);
-    await screen.findByText("mine");
-    await screen.findByText("1 submission");
+    renderPage(false);
 
-    await userEvent.click(screen.getByRole("tab", { name: "Review queue" }));
+    await screen.findByText("mine");
+    expect(setHeaderTitle).toHaveBeenLastCalledWith(["Submissions"]);
+    expect(screen.queryByText("My submissions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Review submissions")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Submission status" })).toBeInTheDocument();
+  });
+  it("defaults managers to Review submissions and keeps My submissions available", async () => {
+    const getReview = jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review"));
+    jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine"));
+    renderPage(true);
+
     await screen.findByText("review");
-    expect(getReview).toHaveBeenCalledWith(1, 10);
+    expect(setHeaderTitle).toHaveBeenLastCalledWith(["Cave Changes"]);
+    expect(screen.getByText("Review submissions")).toBeVisible();
+    expect(screen.getByText("My submissions")).toBeVisible();
+    expect(getReview).toHaveBeenCalledWith(1, 10, undefined, "SubmittedOn", false);
     expect(screen.getByTestId("requests")).toHaveAttribute("data-review", "yes");
   });
 
-  it("filters My submissions on the server and resets to page one", async () => {
-    const getMine = jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine", 11));
+  it("filters Review submissions on the server", async () => {
+    const getReview = jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review", 11));
     renderPage(true);
-    await screen.findByText("mine");
-    await screen.findByText("11 submissions");
+    await screen.findByText("review");
 
     await userEvent.click(screen.getByRole("combobox", { name: "Submission status" }));
     await userEvent.click(await screen.findByText("Approved"));
 
-    await waitFor(() => expect(getMine).toHaveBeenLastCalledWith(1, 10, "Approved"));
+    await waitFor(() => expect(getReview).toHaveBeenLastCalledWith(1, 10, "Approved", "SubmittedOn", false));
+  });
+
+  it("switches to My submissions with its own default sort", async () => {
+    jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review"));
+    const getMine = jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine"));
+    renderPage(true);
+    await screen.findByText("review");
+
+    await userEvent.click(screen.getByText("My submissions"));
+    await screen.findByText("mine");
+    expect(getMine).toHaveBeenLastCalledWith(1, 10, undefined, "UpdatedOn", true);
+    expect(screen.getByTestId("requests")).toHaveAttribute("data-review", "no");
+  });
+  it("sorts through the server-paged Review query", async () => {
+    const getReview = jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review", 11));
+    renderPage(true);
+    await screen.findByText("review");
+
+    await userEvent.click(screen.getByRole("button", { name: /Submitted/i }));
+    await userEvent.click(await screen.findByText("Cave name"));
+
+    await waitFor(() => expect(getReview).toHaveBeenLastCalledWith(1, 10, undefined, "CaveName", false));
   });
 });

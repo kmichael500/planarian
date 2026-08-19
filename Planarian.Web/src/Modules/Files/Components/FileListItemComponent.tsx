@@ -1,38 +1,57 @@
-import { List, Typography } from "antd";
+import { List, Tag, Typography } from "antd";
 import { FileVm } from "../Models/FileVm";
 import { getFileType } from "../Services/FileHelpers";
 import { FileService } from "../Services/FileService";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 import "./FileListItemComponent.scss";
 
+type FileListItemFile = Pick<FileVm, "id" | "name" | "extension"> &
+  Partial<Pick<FileVm, "uuid" | "fileTypeTagId" | "fileTypeKey">>;
+
 interface FileListItemComponentProps {
-  file: FileVm;
-  onView: (file: FileVm) => void;
+  file: FileListItemFile;
+  onView?: (file: FileListItemFile) => void;
+  onDownload?: (file: FileListItemFile) => void;
+  status?: { label: string; color: string };
+  unavailableText?: string;
+  ariaLabel?: string;
+  allowDefaultDownload?: boolean;
+  showFileType?: boolean;
 }
 
 const FileListItemComponent = ({
   file,
   onView,
+  onDownload,
+  status,
+  unavailableText,
+  ariaLabel,
+  allowDefaultDownload = true,
+  showFileType = true,
 }: FileListItemComponentProps) => {
   const fileType = getFileType(file.extension);
 
   return (
     <List.Item
       className="planarian-file-list-item"
+      role="group" aria-label={ariaLabel ?? `${file.name} file`}
       actions={[
-        <Typography.Link onClick={() => onView(file)}>View</Typography.Link>,
-        <Typography.Link
-          onClick={async () => {
-            FileService.startFileDownload(file.id);
-          }}
-        >
-          Download
-        </Typography.Link>,
+        ...(onView ? [<Typography.Link key="view" aria-label={`View ${file.name}`}
+          onClick={() => onView(file)}>View</Typography.Link>] : []),
+        ...((onDownload || (allowDefaultDownload && !unavailableText)) ? [<Typography.Link key="download"
+          aria-label={`Download ${file.name}`} onClick={() => {
+            if (onDownload) onDownload(file);
+            else FileService.startFileDownload(file.id);
+          }}>Download</Typography.Link>] : []),
       ]}
     >
       <Typography.Text>
-        <PlanarianTag>{fileType}</PlanarianTag>
+        {showFileType && <PlanarianTag>{fileType}</PlanarianTag>}
         {file.name}
+        {status && <Tag color={status.color} style={{ marginInlineStart: 8 }}>{status.label}</Tag>}
+        {unavailableText && <Typography.Text type="secondary" style={{ marginInlineStart: 8 }}>
+          {unavailableText}
+        </Typography.Text>}
       </Typography.Text>
     </List.Item>
   );

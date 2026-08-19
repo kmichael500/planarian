@@ -4,6 +4,7 @@ import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
 
 export type CaveChangeRequestStatus = "Pending" | "Approved" | "Rejected";
+export type CaveChangeRequestSortBy = "UpdatedOn" | "SubmittedOn" | "CaveName";
 
 export interface DiffEntitySummaryVm {
   added: number;
@@ -78,6 +79,7 @@ export interface CaveProposalVersionDetailVm {
   baseRevisionId: string;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
+  likelyCountyNumber?: number;
   linePlots: GeoJsonUploadVm[];
   unavailableStagedFileIds: string[];
 }
@@ -102,6 +104,9 @@ export interface CaveChangeRequestDetailVm {
   versions: CaveProposalVersionVm[];
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
+  likelyCountyNumber?: number;
+  linePlots?: GeoJsonUploadVm[];
+  removedLinePlots?: GeoJsonUploadVm[];
   activeStagedFiles: CaveSnapshotVm["files"];
   unavailableStagedFileIds: string[];
 }
@@ -119,6 +124,9 @@ export interface CaveChangePreviewVm {
   diff: CaveRevisionDiffVm;
   countyNumberIntent: CountyNumberIntent;
   requestedCountyNumber?: number;
+  likelyCountyNumber?: number;
+  linePlots?: GeoJsonUploadVm[];
+  removedLinePlots?: GeoJsonUploadVm[];
   hasMeaningfulChanges: boolean;
 }
 

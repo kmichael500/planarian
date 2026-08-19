@@ -6,6 +6,7 @@ using Planarian.Modules.Caves.Services;
 using Planarian.Modules.Query.Constants;
 using Planarian.Modules.Query.Extensions;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Caves.Controllers;
 
@@ -94,25 +95,47 @@ public sealed class CaveChangeRequestController : ControllerBase
     }
 
     [HttpGet("{requestId:length(10)}/files/{fileId:length(10)}")]
-    public async Task<IActionResult> DownloadStagedFile(string requestId, string fileId,
+    public Task<IActionResult> DownloadStagedFile(string requestId, string fileId,
+        CancellationToken cancellationToken) =>
+        OpenStagedFileResponse(requestId, fileId, requestedDownload: true, cancellationToken);
+
+    [HttpGet("{requestId:length(10)}/files/{fileId:length(10)}/view")]
+    public Task<IActionResult> ViewStagedFile(string requestId, string fileId,
+        CancellationToken cancellationToken) =>
+        OpenStagedFileResponse(requestId, fileId, requestedDownload: false, cancellationToken);
+
+    [HttpGet("{requestId:length(10)}/files/{fileId:length(10)}/download")]
+    public Task<IActionResult> DownloadStagedFileExplicit(string requestId, string fileId,
+        CancellationToken cancellationToken) =>
+        OpenStagedFileResponse(requestId, fileId, requestedDownload: true, cancellationToken);
+
+    private async Task<IActionResult> OpenStagedFileResponse(string requestId, string fileId, bool requestedDownload,
         CancellationToken cancellationToken)
     {
         var file = await _service.OpenStagedFileAsync(requestId, fileId, cancellationToken);
-        return File(file.Stream, "application/octet-stream", file.FileName);
+        var response = FileResponsePolicy.Resolve(file.FileName, "application/octet-stream", requestedDownload);
+        return response.ForceDownload
+            ? File(file.Stream, response.ContentType, file.FileName)
+            : File(file.Stream, response.ContentType);
     }
 
     [HttpGet("mine")]
     public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> Mine(
         CancellationToken cancellationToken, [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = QueryConstants.DefaultPageSize,
-        [FromQuery] CaveChangeRequestStatus? status = null) =>
-        new JsonResult(await _service.ListMineAsync(pageNumber, pageSize, cancellationToken, status));
+        [FromQuery] CaveChangeRequestStatus? status = null,
+        [FromQuery] CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.UpdatedOn,
+        [FromQuery] bool sortDescending = true) =>
+        new JsonResult(await _service.ListMineAsync(pageNumber, pageSize, cancellationToken, status, sortBy, sortDescending));
 
     [HttpGet("review")]
     public async Task<ActionResult<PagedResult<CaveChangeRequestSummaryVm>>> ReviewQueue(
         CancellationToken cancellationToken, [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = QueryConstants.DefaultPageSize) =>
-        new JsonResult(await _service.ListForReviewAsync(pageNumber, pageSize, cancellationToken));
+        [FromQuery] int pageSize = QueryConstants.DefaultPageSize,
+        [FromQuery] CaveChangeRequestStatus? status = null,
+        [FromQuery] CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.SubmittedOn,
+        [FromQuery] bool sortDescending = false) =>
+        new JsonResult(await _service.ListForReviewAsync(pageNumber, pageSize, cancellationToken, status, sortBy, sortDescending));
 
     [HttpGet("{requestId:length(10)}")]
     public async Task<ActionResult<CaveChangeRequestDetailVm>> Get(string requestId,

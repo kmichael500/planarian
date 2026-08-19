@@ -18,8 +18,9 @@ import { PlanarianMenuItem } from "./PlanarianMenuComponent";
 import { ClientRoutes } from "../Routing/ClientRoutes.generated";
 
 const useSideBarMenuItems = () => {
-  const { currentAccountId } = useContext(AppContext);
+  const { currentAccountId, hasPermission } = useContext(AppContext);
   const hasAccount = currentAccountId != null;
+  const canReviewCaveChanges = hasPermission(PermissionKey.Manager);
 
   return useMemo(() => {
     const authenticatedMenuItems = [
@@ -46,7 +47,7 @@ const useSideBarMenuItems = () => {
       {
         key: ClientRoutes.caveChanges.path,
         icon: <Link to={ClientRoutes.caveChanges.path}><FormOutlined /></Link>,
-        label: "Cave Changes",
+        label: canReviewCaveChanges ? "Cave Changes" : "Submissions",
         isVisible: hasAccount,
       },
       {
@@ -146,7 +147,7 @@ const useSideBarMenuItems = () => {
     });
 
     return [...authenticatedMenuItems, ...unauthenticatedMenuItems];
-  }, [hasAccount]);
+  }, [hasAccount, canReviewCaveChanges]);
 };
 
 export { useSideBarMenuItems };
