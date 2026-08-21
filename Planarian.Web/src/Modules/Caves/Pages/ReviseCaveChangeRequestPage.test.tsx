@@ -24,8 +24,8 @@ jest.mock("../../Files/Components/FileViewerComponent", () => ({ FileViewer: () 
 jest.mock("../Components/CaveLinePlotViewer", () => ({ CaveLinePlotViewer: () => null }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianButtton", () => ({
-  PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger, ...props }: any) =>
-    <button {...props}>{children}</button>,
+  PlanarianButton: ({ children, loading: _loading, icon: _icon, danger: _danger,
+    alwaysShowChildren: _alwaysShowChildren, ...props }: any) => <button {...props}>{children}</button>,
 }));
 
 jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
@@ -34,7 +34,7 @@ jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
 }));
 
 jest.mock("../Helpers/CaveFormMapper", () => ({
-  caveToForm: () => ({ id: "cave000001", name: "Proposed name" }),
+  caveToForm: (cave: any) => ({ id: cave?.id ?? "cave000001", name: cave?.name ?? "Proposed name" }),
   snapshotToForm: () => ({ id: "cave000001", name: "Proposed name" }),
 }));
 
@@ -83,6 +83,94 @@ const renderPage = () => {
   render(<RouterProvider router={router} />);
   return router;
 };
+
+it("keeps stale comparisons contextual and loads the latest Cave as the re-review baseline", async () => {
+  const base = { caveId: "cave000001", accountId: "account", name: "Base Cave", alternateNames: [],
+    state: { id: "tn", nameAtRevision: "Tennessee" }, county: { id: "county", nameAtRevision: "Coffee" },
+    countyNumber: 1, isArchived: false, tags: [], entrances: [], files: [], linePlots: [] } as any;
+  const emptyDiff = { scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [],
+    changedEntrances: [], entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [] };
+  jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
+    request: { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, status: "Pending",
+      submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z", originalBaseRevisionId: "revision01",
+      proposalBaseRevisionId: "revision01", currentRevisionId: "revision02", currentProposalVersionId: "proposal01",
+      isStale: true, canEdit: true, canReview: false,
+      changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 },
+        files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 } },
+    base, proposed: { ...base, name: "Earlier proposal" }, current: { ...base, lengthFeet: 120 },
+    diff: { ...emptyDiff, scalars: [{ path: "Name", previous: "Base Cave", current: "Earlier proposal" }] },
+    publishedSinceBase: { ...emptyDiff, scalars: [{ path: "LengthFeet", previous: 100, current: 120 }] },
+    versions: [], countyNumberIntent: "Manual", linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [],
+  });
+  const context = jest.spyOn(CaveService, "GetProposalAuthoringContext").mockResolvedValue({
+    cave: { id: "cave000001", name: "Current Cave" } as any, expectedBaseRevisionId: "revision02", linePlots: [],
+  });
+  const version = jest.spyOn(CaveService, "GetProposalVersion");
+  const preview = jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
+    base: { ...base, lengthFeet: 120 }, proposed: { ...base, name: "Proposed name", lengthFeet: 120 },
+    diff: { ...emptyDiff, scalars: [{ path: "Name", previous: "Base Cave", current: "Proposed name" }] },
+    countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: true,
+  });
+
+  renderPage();
+  await screen.findByRole("textbox", { name: "Name" });
+  expect(context).toHaveBeenCalledWith("cave000001");
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Current Cave");
+  expect(version).not.toHaveBeenCalled();
+  expect(screen.getByText("This cave changed after these edits were submitted.")).toBeInTheDocument();
+  expect(screen.getByText("No parts of this submission were changed again")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Original submission/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Changes made after submission/ })).toBeInTheDocument();
+  expect(screen.queryByText("Original proposal changes")).not.toBeInTheDocument();
+  expect(screen.queryByText("Published changes since that proposal")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+  await waitFor(() => expect(preview).toHaveBeenCalledWith(
+    "request0001", expect.objectContaining({ name: "Current Cave" }), true, "revision02", "proposal01"));
+});
+
+it("realigns stale guidance and editor state when the Cave changes while the page is loading", async () => {
+  const base = { caveId: "cave000001", accountId: "account", name: "Base Cave", alternateNames: [],
+    state: { id: "tn", nameAtRevision: "Tennessee" }, county: { id: "county", nameAtRevision: "Coffee" },
+    countyNumber: 1, isArchived: false, tags: [], entrances: [], files: [], linePlots: [] } as any;
+  const emptyDiff = { scalars: [], addedTags: [], removedTags: [], addedEntrances: [], removedEntrances: [],
+    changedEntrances: [], entranceChanges: [], addedFiles: [], removedFiles: [], changedFiles: [], fileChanges: [],
+    addedLinePlots: [], removedLinePlots: [], changedLinePlots: [], linePlotChanges: [], referenceMetadataChanges: [] };
+  const request = { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true, status: "Pending" as const,
+    submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z", originalBaseRevisionId: "revision01",
+    proposalBaseRevisionId: "revision01", currentProposalVersionId: "proposal01", isStale: true, canEdit: true, canReview: false,
+    changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 },
+      files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 } };
+  const initial = { request: { ...request, currentRevisionId: "revision02" }, base,
+    proposed: { ...base, name: "Earlier proposal" }, current: { ...base, lengthFeet: 120 },
+    diff: { ...emptyDiff, scalars: [{ path: "Name", previous: "Base Cave", current: "Earlier proposal" }] },
+    publishedSinceBase: { ...emptyDiff, scalars: [{ path: "LengthFeet", previous: 100, current: 120 }] },
+    versions: [], countyNumberIntent: "Manual" as const, linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [] };
+  const refreshed = { ...initial, request: { ...request, currentRevisionId: "revision03" },
+    current: { ...base, name: "Current Cave v3" },
+    publishedSinceBase: { ...emptyDiff, scalars: [{ path: "Name", previous: "Base Cave", current: "Current Cave v3" }] } };
+  jest.spyOn(CaveService, "GetChangeRequest")
+    .mockResolvedValueOnce(initial).mockResolvedValueOnce(refreshed);
+  const context = jest.spyOn(CaveService, "GetProposalAuthoringContext").mockResolvedValue({
+    cave: { id: "cave000001", name: "Current Cave v3" } as any,
+    expectedBaseRevisionId: "revision03", linePlots: [],
+  });
+  const preview = jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
+    base, proposed: { ...base, name: "Current Cave v3" }, diff: emptyDiff,
+    countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: true,
+  });
+
+  renderPage();
+  const name = await screen.findByRole("textbox", { name: "Name" });
+
+  expect(name).toHaveValue("Current Cave v3");
+  expect(context).toHaveBeenCalledTimes(1);
+  expect(screen.getByText("1 part of this submission was changed again later")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+  await waitFor(() => expect(preview).toHaveBeenCalledWith(
+    "request0001", expect.objectContaining({ name: "Current Cave v3" }), true, "revision03", "proposal01"));
+});
 
 it("prevents saving a proposal version when the authoritative preview is semantically unchanged", async () => {
   mockPendingRequest();

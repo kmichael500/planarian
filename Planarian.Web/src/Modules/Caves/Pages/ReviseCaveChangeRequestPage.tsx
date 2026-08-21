@@ -10,6 +10,7 @@ import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesG
 import { AddCaveComponent } from "../Components/AddCaveComponent";
 import { CaveRevisionDiff, CaveRevisionDiffAssetActions } from "../Components/CaveRevisionDiff";
 import { CaveLinePlotViewer } from "../Components/CaveLinePlotViewer";
+import { CaveStaleReviewContext, CaveStaleReviewNotice } from "../Components/CaveStaleReviewContext";
 import { FileViewer } from "../../Files/Components/FileViewerComponent";
 import { FileService } from "../../Files/Services/FileService";
 import { getFileType } from "../../Files/Services/FileHelpers";
@@ -47,35 +48,54 @@ export const ReviseCaveChangeRequestPage = () => {
     }
     const load = async () => {
       try {
-        const loaded = await CaveService.GetChangeRequest(requestId);
-        setDetail(loaded);
-        setExpectedProposalVersionId(loaded.request.currentProposalVersionId);
+        let loaded = await CaveService.GetChangeRequest(requestId);
+        let values: AddCaveVm | undefined;
+        let baseRevisionId: string | undefined;
 
-        let values: AddCaveVm;
         if (loaded.request.isStale) {
-          const context = await CaveService.GetProposalAuthoringContext(loaded.request.caveId);
-          values = caveToForm(context.cave, context.linePlots);
-          const existingIds = new Set((values.files ?? []).map((file) => file.id));
-          values.files = [
-            ...(values.files ?? []),
-            ...loaded.activeStagedFiles.filter((file) => !existingIds.has(file.id)).map((file) => ({
-              id: file.id,
-              name: file.name,
-              fileTypeTagId: file.fileTypeTagId,
-              fileTypeKey: file.fileTypeNameAtRevision,
-            })),
-          ];
-          setExpectedBaseRevisionId(context.expectedBaseRevisionId);
-        } else {
+          let context = await CaveService.GetProposalAuthoringContext(loaded.request.caveId);
+          if (loaded.request.currentRevisionId !== context.expectedBaseRevisionId) {
+            loaded = await CaveService.GetChangeRequest(requestId);
+            if (loaded.request.isStale && loaded.request.currentRevisionId !== context.expectedBaseRevisionId)
+              context = await CaveService.GetProposalAuthoringContext(loaded.request.caveId);
+          }
+          if (loaded.request.isStale && loaded.request.currentRevisionId !== context.expectedBaseRevisionId)
+            throw new Error("CaveChangedWhileLoading");
+
+          if (loaded.request.isStale) {
+            values = caveToForm(context.cave, context.linePlots);
+            const existingIds = new Set((values.files ?? []).map((file) => file.id));
+            values.files = [
+              ...(values.files ?? []),
+              ...loaded.activeStagedFiles.filter((file) => !existingIds.has(file.id)).map((file) => ({
+                id: file.id,
+                name: file.name,
+                fileTypeTagId: file.fileTypeTagId,
+                fileTypeKey: file.fileTypeNameAtRevision,
+              })),
+            ];
+            baseRevisionId = context.expectedBaseRevisionId;
+          }
+        }
+
+        if (!loaded.request.isStale) {
           const version = await CaveService.GetProposalVersion(requestId, loaded.request.currentProposalVersionId);
           values = snapshotToForm(version.proposed, version.countyNumberIntent,
             version.requestedCountyNumber, loaded.activeStagedFiles, version.linePlots);
-          setExpectedBaseRevisionId(version.baseRevisionId);
+          baseRevisionId = version.baseRevisionId;
         }
+
+        if (!values || !baseRevisionId) throw new Error("ChangeRequestEditorUnavailable");
+        setDetail(loaded);
+        setHeaderTitle([loaded.request.isStale ? "Re-review changes" : "Revise changes"]);
+        setExpectedProposalVersionId(loaded.request.currentProposalVersionId);
+        setExpectedBaseRevisionId(baseRevisionId);
         setEditorValues(values);
         form.setFieldsValue(values);
-      } catch {
-        message.error("The change request could not be loaded.");
+      } catch (error) {
+        if (error instanceof Error && error.message === "CaveChangedWhileLoading")
+          message.warning("The Cave changed while this page was loading. Reload and try again.");
+        else message.error("The change request could not be loaded.");
       } finally {
         setLoading(false);
       }
@@ -85,22 +105,33 @@ export const ReviseCaveChangeRequestPage = () => {
 
   if (!requestId) return null;
   const againstCurrent = detail?.request.isStale === true;
-  const previewFiles = preview
-    ? [...new Map([...(preview.base.files ?? []), ...(preview.proposed.files ?? [])].map(file => [file.id, file])).values()]
+  const detailFiles = detail
+    ? [...new Map([...(detail.base.files ?? []), ...(detail.current.files ?? []), ...(detail.proposed.files ?? [])]
+      .map(file => [file.id, file])).values()]
     : [];
-  const publishedFileIds = new Set((preview?.base.files ?? []).map(file => file.id));
+  const previewFiles = preview
+    ? [...new Map([...(preview.base.files ?? []), ...(preview.proposed.files ?? [])]
+      .map(file => [file.id, file])).values()]
+    : [];
+  const reviewFiles = [...new Map([...detailFiles, ...previewFiles].map(file => [file.id, file])).values()];
+  const publishedFileIds = new Set([
+    ...(detail?.base.files ?? []), ...(detail?.current.files ?? []), ...(preview?.base.files ?? []),
+  ].map(file => file.id));
   const existingStagedFileIds = new Set(detail?.activeStagedFiles.map(file => file.id) ?? []);
-  const activeFile = previewFiles.find(file => file.id === activeFileId);
-  const reviewLinePlots = [...(preview?.linePlots ?? []), ...(preview?.removedLinePlots ?? [])];
+  const activeFile = reviewFiles.find(file => file.id === activeFileId);
+  const detailLinePlots = [...(detail?.linePlots ?? []), ...(detail?.removedLinePlots ?? [])];
+  const previewLinePlots = [...(preview?.linePlots ?? []), ...(preview?.removedLinePlots ?? [])];
+  const reviewLinePlots = [...new Map([...detailLinePlots, ...previewLinePlots]
+    .filter(linePlot => !!linePlot.id).map(linePlot => [linePlot.id!, linePlot])).values()];
   const assetActions: CaveRevisionDiffAssetActions = {
-    files: Object.fromEntries(previewFiles.map(file => [file.id, {
+    files: Object.fromEntries(reviewFiles.map(file => [file.id, {
       onView: () => setActiveFileId(file.id),
       onDownload: () => publishedFileIds.has(file.id) ? FileService.startFileDownload(file.id)
         : existingStagedFileIds.has(file.id)
           ? CaveService.StartStagedChangeRequestFileDownload(requestId, file.id)
           : CaveService.StartAuthoringStagedFileDownload(file.id),
     }])),
-    linePlots: Object.fromEntries(reviewLinePlots.filter(linePlot => !!linePlot.id).map(linePlot => [linePlot.id!, {
+    linePlots: Object.fromEntries(reviewLinePlots.map(linePlot => [linePlot.id!, {
       onView: () => setActiveLinePlot(linePlot),
       onDownload: () => downloadFile(`${linePlot.name}.geojson`, linePlot.geoJson),
     }])),
@@ -146,15 +177,8 @@ export const ReviseCaveChangeRequestPage = () => {
       onDiscardChanges={unsaved.discardChanges}
     />
     {detail?.request.isStale && <>
-      <Alert type="warning" showIcon message="Revise against the current published Cave"
-        description="The editor starts from the current Cave. Reapply the changes you still want; the older proposal remains unchanged in the version history." />
-      <Card title="Original proposal changes">
-        <CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed}
-          countyNumberIntent={detail.countyNumberIntent} />
-      </Card>
-      {detail.publishedSinceBase && <Card title="Published changes since that proposal">
-        <CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} />
-      </Card>}
+      <CaveStaleReviewNotice />
+      <CaveStaleReviewContext detail={detail} assetActions={assetActions} showOriginalSubmission />
     </>}
     {preview && draft && <Card title="Review revised proposal">
       {!preview.hasMeaningfulChanges &&
@@ -175,7 +199,9 @@ export const ReviseCaveChangeRequestPage = () => {
     {detail && editorValues && detail.request.status === "Pending" &&
       (detail.request.canEdit || detail.request.canReview) && !preview && <Card>
       <Typography.Paragraph type="secondary">
-        Update the proposed changes, then review them before saving a new version.
+        {detail.request.isStale
+          ? "The form below starts with the latest cave information. Reapply only the edits you still want to keep; use the comparisons above if you need to check the original submission or newer cave changes."
+          : "Update the proposed changes, then review them before saving a new version."}
       </Typography.Paragraph>
       <Form form={form} layout="vertical" onFinish={previewChanges} onValuesChange={unsaved.markDirty}>
         <AddCaveComponent isEditing form={form} cave={editorValues} submitLabel="Review changes"

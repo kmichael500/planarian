@@ -13,6 +13,7 @@ import { CaveRevisionDiff, CaveRevisionDiffAssetActions } from "../Components/Ca
 import { CaveLinePlotViewer } from "../Components/CaveLinePlotViewer";
 import { useLikelyCountyNumber } from "../Components/useLikelyCountyNumber";
 import { formatChangeScopeSummary } from "../Components/CaveChangeRequestList";
+import { CaveStaleReviewContext, CaveStaleReviewNotice } from "../Components/CaveStaleReviewContext";
 import { FileViewer } from "../../Files/Components/FileViewerComponent";
 import { FileService } from "../../Files/Services/FileService";
 import { getFileType } from "../../Files/Services/FileHelpers";
@@ -104,10 +105,10 @@ export const CaveChangeRequestPage = () => {
       <CaveAvailability key="open-cave" request={request} />,
       ...(request.status === "Pending" && (request.canEdit || request.canReview) ? [
         <PlanarianButton key="revise" icon={<EditOutlined />} alwaysShowChildren
-          aria-label={request.isStale ? "Revise against current Cave" : "Revise changes"}
+          aria-label={request.isStale ? "Re-review changes" : "Revise changes"}
           type={request.isStale ? "primary" : "default"}
           onClick={() => navigate(ClientRoutes.caveChangeRequestRevise.get(request.id))}>
-          {request.isStale ? "Revise against current Cave" : "Revise changes"}
+          {request.isStale ? "Re-review changes" : "Revise changes"}
         </PlanarianButton>,
       ] : []),
       <BackButtonComponent key="back" to={ClientRoutes.caveChanges.path} />,
@@ -210,8 +211,7 @@ export const CaveChangeRequestPage = () => {
   return <Space direction="vertical" size="middle" style={{ width: "100%" }}>
     <UnavailableProposalFilesAlert fileIds={detail.unavailableStagedFileIds}
       snapshots={[detail.proposed, detail.current, detail.base]} />
-    {request.isStale && <Alert type="warning" showIcon message="These requested changes need to be revised."
-      description="The published Cave changed after this request was created. Review both comparisons, then revise the request against the current Cave." />}
+    {request.isStale && <CaveStaleReviewNotice />}
 
     <section aria-label="Change request">
       <Card>
@@ -238,6 +238,8 @@ export const CaveChangeRequestPage = () => {
             </div>}
           </div>}
 
+          {request.isStale && <CaveStaleReviewContext detail={detail} assetActions={assetActions} />}
+
           <CaveRevisionDiff diff={detail.diff} previous={detail.base} current={detail.proposed}
             countyNumberIntent={detail.countyNumberIntent} likelyCountyNumber={likelyCountyNumber}
             assetActions={assetActions} showSummary={false} />
@@ -260,10 +262,6 @@ export const CaveChangeRequestPage = () => {
         </Space>
       </Card>
     </section>
-
-    {request.isStale && detail.publishedSinceBase && <Card title="Changes published since this request">
-      <CaveRevisionDiff diff={detail.publishedSinceBase} previous={detail.base} current={detail.current} />
-    </Card>}
 
     {detail.versions.length > 1 && <section aria-label="Proposal history">
       <Card size="small" title="Proposal history">

@@ -248,13 +248,22 @@ it("keeps reviewer and revise actions explicitly named at the mobile breakpoint"
   expect(within(actions).getByRole("button", { name: "Reject" })).toBeInTheDocument();
 });
 
-it("makes stale requests non-approvable and directs the reviewer to revise against the current Cave", async () => {
-  renderRequestPage(pageDetail({ request: pageRequest({ isStale: true }) }));
+it("makes stale requests non-approvable and keeps the newer published comparison contextual", async () => {
+  const stale = pageDetail({
+    request: pageRequest({ isStale: true }),
+    current: { ...snapshot("Helms Deep Cave"), lengthFeet: 120 },
+    publishedSinceBase: { ...emptyDiff(), scalars: [{ path: "LengthFeet", previous: 100, current: 120 }] },
+  });
+  renderRequestPage(stale);
 
-  await waitFor(() => expect(headerButton("Revise against current Cave")).toBeDefined());
+  await waitFor(() => expect(headerButton("Re-review changes")).toBeDefined());
   expect(screen.getByRole("button", { name: "Approve and publish" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
-  expect(screen.getByText("These requested changes need to be revised.")).toBeInTheDocument();
+  expect(screen.getByText("This cave changed after these edits were submitted.")).toBeInTheDocument();
+  expect(screen.getByText("No parts of this submission were changed again")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Changes made after submission/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Original submission/ })).not.toBeInTheDocument();
+  expect(screen.queryByText("Changes published since this request")).not.toBeInTheDocument();
 });
 
 it("asks for confirmation before approval and submits the current proposal version only after confirmation", async () => {
