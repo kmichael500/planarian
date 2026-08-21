@@ -65,10 +65,10 @@ public sealed class CaveChangeRequestPagingIntegrationTests(PostgresTestServer f
 
 
     [Fact]
-    public async Task MinePutsPendingFirstAndFiltersStatusesBeforePaging()
+    public async Task MinePutsOpenRequestsFirstAndFiltersStatusesBeforePaging()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(MinePutsPendingFirstAndFiltersStatusesBeforePaging));
+            nameof(MinePutsOpenRequestsFirstAndFiltersStatusesBeforePaging));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
         var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00b");
@@ -77,12 +77,15 @@ public sealed class CaveChangeRequestPagingIntegrationTests(PostgresTestServer f
         await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
 
         string olderPendingId;
+        string changesRequestedId;
         string rejectedId;
         string newerPendingId;
         await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
         {
             olderPendingId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
                 PublishableValues(tenant, quality.Id, "Older pending"), tenant.RevisionId, default);
+            changesRequestedId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Changes requested"), tenant.RevisionId, default);
             rejectedId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
                 PublishableValues(tenant, quality.Id, "Rejected"), tenant.RevisionId, default);
             newerPendingId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
@@ -90,15 +93,28 @@ public sealed class CaveChangeRequestPagingIntegrationTests(PostgresTestServer f
         }
 
         await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+        {
+            await reviewer.ChangeRequests.RequestChangesAsync(changesRequestedId,
+                await CurrentVersionAsync(reviewer.Db, changesRequestedId), "Please revise", default);
             await reviewer.ChangeRequests.RejectAsync(rejectedId,
                 await CurrentVersionAsync(reviewer.Db, rejectedId), "Not ready", default);
+        }
 
         await using var contributorReader = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor");
         var all = await contributorReader.ChangeRequests.ListMineAsync(1, 10, default);
+        var changesRequested = await contributorReader.ChangeRequests.ListMineAsync(1, 10, default,
+            CaveChangeRequestStatus.ChangesRequested);
         var rejected = await contributorReader.ChangeRequests.ListMineAsync(1, 10, default,
             CaveChangeRequestStatus.Rejected);
 
-        Assert.Equal([newerPendingId, olderPendingId, rejectedId], all.Results.Select(row => row.Id));
+        var ids = all.Results.Select(row => row.Id).ToList();
+        Assert.Equal(4, ids.Count);
+        Assert.Equal(rejectedId, ids[^1]);
+        Assert.Contains(changesRequestedId, ids.Take(3));
+        Assert.Contains(newerPendingId, ids.Take(3));
+        Assert.Contains(olderPendingId, ids.Take(3));
+        Assert.Single(changesRequested.Results);
+        Assert.Equal(changesRequestedId, changesRequested.Results.Single().Id);
         Assert.Single(rejected.Results);
         Assert.Equal(rejectedId, rejected.Results.Single().Id);
         Assert.Equal(CaveChangeRequestStatus.Rejected, rejected.Results.Single().Status);

@@ -465,3 +465,72 @@ it("lets reviewers open published files and line plots that the request removes"
   fireEvent.click(within(linePlotRow).getByText("View"));
   expect(screen.getByRole("dialog", { name: "Line plot viewer Old survey" })).toBeInTheDocument();
 });
+it("requires reviewer feedback before handing a request back to the submitter", async () => {
+  const returned = pageDetail({
+    request: pageRequest({ status: "ChangesRequested", canEdit: true, canReview: false }),
+    reviewEvents: [{ id: "event01", proposalVersionId: "version0002", action: "ChangesRequested",
+      actorUserId: "reviewer", actorName: "Riley Reviewer", message: "Verify the survey notes.",
+      createdOn: "2026-08-17T18:00:00Z" }],
+  });
+  const requestChanges = jest.spyOn(CaveService, "RequestChangeRequestChanges").mockResolvedValue({
+    result: "ChangesRequested", requestId: "request0001", currentRevisionId: "base000001",
+  });
+  renderRequestPage(pageDetail(), returned);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Request changes" }));
+  const dialog = screen.getByRole("dialog", { name: "Request changes" });
+  const submit = within(dialog).getByRole("button", { name: "Request changes" });
+  expect(submit).toBeDisabled();
+  expect(requestChanges).not.toHaveBeenCalled();
+
+  const feedback = within(dialog).getByRole("textbox", { name: "Message to submitter" });
+  fireEvent.change(feedback, { target: { value: "  Verify the survey notes.  " } });
+  await waitFor(() => expect(within(dialog).getByRole("button", { name: "Request changes" })).toBeEnabled());
+  fireEvent.click(within(dialog).getByRole("button", { name: "Request changes" }));
+
+  await waitFor(() => expect(requestChanges).toHaveBeenCalledWith(
+    "request0001", "version0002", "Verify the survey notes."));
+  expect((await screen.findAllByText("Changes requested")).length).toBeGreaterThanOrEqual(1);
+  expect(screen.getAllByText("Verify the survey notes.").length).toBeGreaterThanOrEqual(1);
+});
+
+it("keeps changes requested with the author until a newer draft exists", async () => {
+  renderRequestPage(pageDetail({
+    request: pageRequest({ status: "ChangesRequested", canEdit: true, canReview: false }),
+    reviewEvents: [{ id: "event01", proposalVersionId: "version0002", action: "ChangesRequested",
+      actorUserId: "reviewer", actorName: "Riley Reviewer", message: "Update the entrance notes.",
+      createdOn: "2026-08-17T18:00:00Z" }],
+  }));
+
+  await screen.findAllByText("Changes requested");
+  await waitFor(() => expect(headerButton("Revise changes")).toBeDefined());
+  expect(screen.getByRole("button", { name: "Resubmit for review" })).toBeDisabled();
+  expect(screen.getByText("Save a new draft before resubmitting.")).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Reviewer actions" })).not.toBeInTheDocument();
+  const history = screen.getByRole("region", { name: "Review history" });
+  expect(within(history).getByText("Changes requested")).toBeInTheDocument();
+  expect(within(history).getByText("Update the entrance notes.")).toBeInTheDocument();
+});
+
+it("explicitly resubmits a newer author draft for review", async () => {
+  const awaitingAuthor = pageDetail({
+    request: pageRequest({ status: "ChangesRequested", canEdit: true, canReview: false,
+      currentProposalVersionId: "version0003" }),
+    reviewEvents: [{ id: "event01", proposalVersionId: "version0002", action: "ChangesRequested",
+      actorUserId: "reviewer", actorName: "Riley Reviewer", message: "Please revise this.",
+      createdOn: "2026-08-17T18:00:00Z" }],
+  });
+  const resubmitted = pageDetail({ request: pageRequest({ status: "Pending", canEdit: true, canReview: true,
+    currentProposalVersionId: "version0003" }) });
+  const resubmit = jest.spyOn(CaveService, "ResubmitChangeRequest").mockResolvedValue({
+    result: "Resubmitted", requestId: "request0001", currentRevisionId: "base000001",
+  });
+  renderRequestPage(awaitingAuthor, resubmitted);
+
+  const button = await screen.findByRole("button", { name: "Resubmit for review" });
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+
+  await waitFor(() => expect(resubmit).toHaveBeenCalledWith("request0001", "version0003"));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Resubmit for review" })).not.toBeInTheDocument());
+});

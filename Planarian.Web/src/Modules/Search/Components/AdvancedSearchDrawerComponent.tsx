@@ -41,6 +41,7 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   onSortChange?: (sortBy: string) => Promise<void> | void;
   toolbarMetrics?: ToolbarMetric[];
   hidePersistentContentOnMobile?: boolean;
+  drawerTitle?: string;
   inlineControls?: (
     context: AdvancedSearchInlineControlsContext<T>
   ) => React.ReactNode;
@@ -72,6 +73,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   onSortChange,
   toolbarMetrics,
   hidePersistentContentOnMobile = false,
+  drawerTitle = "Advanced Search",
   inlineControls,
 }: AdvancedSearchDrawerComponentProps<T>) => {
   const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
@@ -266,7 +268,7 @@ const AdvancedSearchDrawerComponent = <T extends object>({
     <>
       {inlineControlsNode}
       <Drawer
-        title="Advanced Search"
+        title={drawerTitle}
         open={isAdvancedSearchOpen}
         onClose={() => setIsAdvancedSearchOpen(false)}
         footer={

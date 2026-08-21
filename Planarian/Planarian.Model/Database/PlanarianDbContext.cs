@@ -69,6 +69,7 @@ public partial class PlanarianDbContextBase : DbContext
     public DbSet<CaveRevision> CaveRevisions { get; set; } = null!;
     public DbSet<CaveImportBatch> CaveImportBatches { get; set; } = null!;
     public DbSet<CaveChangeRequest> CaveChangeRequests { get; set; } = null!;
+    public DbSet<CaveChangeRequestReviewEvent> CaveChangeRequestReviewEvents { get; set; } = null!;
     public DbSet<CaveProposalVersion> CaveProposalVersions { get; set; } = null!;
     public DbSet<CaveChangeRequestStagedFile> CaveChangeRequestStagedFiles { get; set; } = null!;
     public DbSet<CaveGeoJson> CaveGeoJsons { get; set; } = null!;

@@ -87,7 +87,7 @@ export const ReviseCaveChangeRequestPage = () => {
 
         if (!values || !baseRevisionId) throw new Error("ChangeRequestEditorUnavailable");
         setDetail(loaded);
-        setHeaderTitle([loaded.request.isStale ? "Re-review changes" : "Revise changes"]);
+        setHeaderTitle([loaded.request.status === "ChangesRequested" ? "Revise requested changes" : loaded.request.isStale ? "Re-review changes" : "Revise changes"]);
         setExpectedProposalVersionId(loaded.request.currentProposalVersionId);
         setExpectedBaseRevisionId(baseRevisionId);
         setEditorValues(values);
@@ -104,6 +104,9 @@ export const ReviseCaveChangeRequestPage = () => {
   }, [requestId, form, setHeaderButtons, setHeaderTitle]);
 
   if (!requestId) return null;
+  const isRevisable = detail?.request.status === "Pending" || detail?.request.status === "ChangesRequested";
+  const latestChangesRequested = [...(detail?.reviewEvents ?? [])].reverse()
+    .find(reviewEvent => reviewEvent.action === "ChangesRequested");
   const againstCurrent = detail?.request.isStale === true;
   const detailFiles = detail
     ? [...new Map([...(detail.base.files ?? []), ...(detail.current.files ?? []), ...(detail.proposed.files ?? [])]
@@ -158,7 +161,7 @@ export const ReviseCaveChangeRequestPage = () => {
     try {
       await CaveService.ReviseChanges(requestId, draft, againstCurrent,
         expectedBaseRevisionId!, expectedProposalVersionId!);
-      message.success("A new proposal version was saved.");
+      message.success(detail?.request.status === "ChangesRequested" ? "A new draft proposal version was saved. Resubmit it for review when you are ready." : "A new proposal version was saved.");
       unsaved.markClean();
       navigate(ClientRoutes.caveChangeRequest.get(requestId));
     } catch (error: any) {
@@ -176,6 +179,8 @@ export const ReviseCaveChangeRequestPage = () => {
       onKeepEditing={unsaved.keepEditing}
       onDiscardChanges={unsaved.discardChanges}
     />
+    {detail?.request.status === "ChangesRequested" && latestChangesRequested &&
+      <Alert type="warning" showIcon message="Reviewer requested changes" description={latestChangesRequested.message} />}
     {detail?.request.isStale && <>
       <CaveStaleReviewNotice />
       <CaveStaleReviewContext detail={detail} assetActions={assetActions} showOriginalSubmission />
@@ -188,20 +193,24 @@ export const ReviseCaveChangeRequestPage = () => {
         countyNumberIntent={preview.countyNumberIntent} assetActions={assetActions} />
       <Space style={{ marginTop: 16 }}>
         <PlanarianButton icon={undefined} type="primary" loading={saving} onClick={save}
-          disabled={!preview.hasMeaningfulChanges}>Save proposal version</PlanarianButton>
+          disabled={!preview.hasMeaningfulChanges}>{detail?.request.status === "ChangesRequested" ? "Save draft version" : "Save proposal version"}</PlanarianButton>
         <PlanarianButton icon={undefined} onClick={() => { setPreview(undefined); setDraft(undefined); }}>Keep editing</PlanarianButton>
       </Space>
     </Card>}
-    {detail && detail.request.status !== "Pending" &&
+    {detail && !isRevisable &&
       <Alert type="info" showIcon message={`This request is ${detail.request.status.toLowerCase()} and can no longer be revised.`} />}
-    {detail && detail.request.status === "Pending" && !detail.request.canEdit && !detail.request.canReview &&
+    {detail && isRevisable && !detail.request.canEdit && !detail.request.canReview &&
       <Alert type="error" showIcon message="You do not have permission to revise this request." />}
-    {detail && editorValues && detail.request.status === "Pending" &&
+    {detail && editorValues && isRevisable &&
       (detail.request.canEdit || detail.request.canReview) && !preview && <Card>
       <Typography.Paragraph type="secondary">
-        {detail.request.isStale
-          ? "The form below starts with the latest cave information. Reapply only the edits you still want to keep; use the comparisons above if you need to check the original submission or newer cave changes."
-          : "Update the proposed changes, then review them before saving a new version."}
+        {detail.request.status === "ChangesRequested"
+          ? detail.request.isStale
+            ? "Start with the latest cave information and reapply the requested edits you still want to keep. Saving creates a draft version; it will not return to review until you explicitly resubmit it."
+            : "Update the proposal to address the reviewer feedback. Saving creates a draft version; it will not return to review until you explicitly resubmit it."
+          : detail.request.isStale
+            ? "The form below starts with the latest cave information. Reapply only the edits you still want to keep; use the comparisons above if you need to check the original submission or newer cave changes."
+            : "Update the proposed changes, then review them before saving a new version."}
       </Typography.Paragraph>
       <Form form={form} layout="vertical" onFinish={previewChanges} onValuesChange={unsaved.markDirty}>
         <AddCaveComponent isEditing form={form} cave={editorValues} submitLabel="Review changes"

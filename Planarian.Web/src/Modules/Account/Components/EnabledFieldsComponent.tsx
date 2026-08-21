@@ -23,7 +23,7 @@ const displayNameMap: { [key in FeatureKey]: string } = {
   EnabledFieldCaveGeologicAgeTags: "Geologic Age",
   EnabledFieldCavePhysiographicProvinceTags: "Physiographic Province",
   EnabledFieldCaveBiologyTags: "Biology",
-  EnabledFieldCaveArcheologyTags: "Archeology",
+  EnabledFieldCaveArcheologyTags: "Archaeology",
   EnabledFieldCaveCartographerNameTags: "Cartographers",
   EnabledFieldCaveReportedByNameTags: "Reported By",
   EnabledFieldCaveOtherTags: "Other",

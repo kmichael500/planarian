@@ -262,6 +262,7 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
         onExportCsv={onExportCsv}
         onFiltersCleared={onFiltersCleared}
         inlineControls={inlineControls}
+        drawerTitle="Filters"
       >
         <Divider>Cave</Divider>
         <Row gutter={[12, 12]} align="middle" wrap>
@@ -474,7 +475,7 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
             tagType={TagType.Archeology}
             queryBuilder={queryBuilder}
             field={"archaeologyTagIds" as any}
-            label={"Archeology"}
+            label={"Archaeology"}
           />
         </ShouldDisplay>
         <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveOtherTags}>

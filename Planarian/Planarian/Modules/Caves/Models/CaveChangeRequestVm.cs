@@ -41,7 +41,17 @@ public sealed record CaveChangeRequestDetailVm(
     IReadOnlyList<GeoJsonUploadVm> LinePlots,
     IReadOnlyList<GeoJsonUploadVm> RemovedLinePlots,
     IReadOnlyList<CaveFileSnapshotV1> ActiveStagedFiles,
-    IReadOnlyList<string> UnavailableStagedFileIds);
+    IReadOnlyList<string> UnavailableStagedFileIds,
+    IReadOnlyList<CaveChangeRequestReviewEventVm> ReviewEvents);
+
+public sealed record CaveChangeRequestReviewEventVm(
+    string Id,
+    string ProposalVersionId,
+    CaveChangeRequestReviewAction Action,
+    string ActorUserId,
+    string? ActorName,
+    string? Message,
+    DateTime CreatedOn);
 
 public sealed record CaveChangePreviewVm(CavePublishedSnapshotV1 Base,
     CavePublishedSnapshotV1 Proposed, CaveRevisionDiffVm Diff,
@@ -116,6 +126,8 @@ public sealed record CaveChangeRequestDecisionRequestVm(string? Notes, string Ex
 
 public enum CaveChangeRequestDecisionResult
 {
+    ChangesRequested,
+    Resubmitted,
     Approved,
     Rejected,
     Conflict

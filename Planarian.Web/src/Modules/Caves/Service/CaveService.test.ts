@@ -54,3 +54,15 @@ it("stages an authoring file through the generic file endpoint", async () => {
     expect.objectContaining({ headers: { "Content-Type": "multipart/form-data" } })
   );
 });
+
+it("posts request-changes and resubmit decisions against the expected proposal version", async () => {
+  const post = jest.spyOn(HttpClient, "post").mockResolvedValue({ data: { result: "ChangesRequested" } });
+
+  await CaveService.RequestChangeRequestChanges("request-a", "version-a", "Please verify this.");
+  expect(post).toHaveBeenLastCalledWith("api/cave-change-requests/request-a/request-changes",
+    { notes: "Please verify this.", expectedProposalVersionId: "version-a" });
+
+  await CaveService.ResubmitChangeRequest("request-a", "version-b");
+  expect(post).toHaveBeenLastCalledWith("api/cave-change-requests/request-a/resubmit",
+    { expectedProposalVersionId: "version-b" });
+});

@@ -3,7 +3,7 @@ import { CaveRevisionDiffVm, CaveSnapshotVm } from "./CaveRevisionVm";
 
 export type CountyNumberIntent = "AutomaticNext" | "FirstAvailable" | "Manual";
 
-export type CaveChangeRequestStatus = "Pending" | "Approved" | "Rejected";
+export type CaveChangeRequestStatus = "Pending" | "ChangesRequested" | "Approved" | "Rejected";
 export type CaveChangeRequestSortBy = "UpdatedOn" | "SubmittedOn" | "CaveName";
 
 export interface DiffEntitySummaryVm {
@@ -109,10 +109,23 @@ export interface CaveChangeRequestDetailVm {
   removedLinePlots?: GeoJsonUploadVm[];
   activeStagedFiles: CaveSnapshotVm["files"];
   unavailableStagedFileIds: string[];
+  reviewEvents?: CaveChangeRequestReviewEventVm[];
+}
+
+export type CaveChangeRequestReviewAction = "ChangesRequested" | "Resubmitted" | "Approved" | "Rejected";
+
+export interface CaveChangeRequestReviewEventVm {
+  id: string;
+  proposalVersionId: string;
+  action: CaveChangeRequestReviewAction;
+  actorUserId: string;
+  actorName?: string;
+  message?: string;
+  createdOn: string;
 }
 
 export interface CaveChangeRequestDecisionVm {
-  result: "Approved" | "Rejected" | "Conflict";
+  result: "ChangesRequested" | "Resubmitted" | "Approved" | "Rejected" | "Conflict";
   requestId: string;
   publishedRevisionId?: string;
   currentRevisionId?: string;

@@ -3,6 +3,8 @@ import React from "react";
 import { CaveService } from "../Service/CaveService";
 import { CavesComponent } from "./CavesComponent";
 
+let mockHasFilters = false;
+
 jest.mock("../Service/CaveService", () => ({
   CaveService: {
     GetCaves: jest.fn(),
@@ -14,11 +16,22 @@ jest.mock("../../../Shared/Permissioning/Components/ShouldDisplay", () => ({
 }));
 
 jest.mock("./CaveAdvancedSearchDrawer", () => ({
-  CaveAdvancedSearchDrawer: () => null,
+  CaveAdvancedSearchDrawer: (props: any) => props.inlineControls?.({
+    defaultControls: null,
+    openDrawer: jest.fn(),
+    clearFilters: jest.fn(async () => undefined),
+    onSearch: props.onSearch,
+    setMainSearchValue: jest.fn(),
+    mainSearchValue: "",
+    mainSearchFieldLabel: "Name or ID",
+    hasFilters: mockHasFilters,
+    queryBuilder: props.queryBuilder,
+  }) ?? null,
 }));
 
-jest.mock("./FeatureCheckboxGroup", () => ({
-  FeatureCheckboxGroup: () => null,
+
+jest.mock("../../Search/Components/SplitSortControl", () => ({
+  SplitSortControl: () => <button type="button">Sort</button>,
 }));
 
 jest.mock("./FavoriteCave", () => ({
@@ -68,6 +81,13 @@ jest.mock("../../../Shared/Scroll/useScrollRevealVisibility", () => ({
   }),
 }));
 
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: () => ({ matches: false, addListener: () => undefined, removeListener: () => undefined }),
+  });
+});
+
 const getCavesMock = CaveService.GetCaves as jest.Mock;
 
 const caveResult = (narrativeSnippet: string) => ({
@@ -112,6 +132,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("selectedFeatures", "[]");
   getCavesMock.mockReset();
+  mockHasFilters = false;
 });
 
 describe("CavesComponent narrative HTML", () => {
@@ -141,4 +162,29 @@ describe("CavesComponent narrative HTML", () => {
       );
     }
   });
+});
+
+
+it("only shows Clear when there is something to clear", async () => {
+  getCavesMock.mockResolvedValue(caveResult(""));
+  const view = render(<CavesComponent />);
+  expect(await screen.findByText("1 result")).toBeInTheDocument();
+  expect(screen.queryByText("Clear")).not.toBeInTheDocument();
+
+  mockHasFilters = true;
+  view.rerender(<CavesComponent />);
+  expect(screen.getByText("Clear")).toBeInTheDocument();
+});
+
+it("keeps search primary and moves filters, display, and sort into one compact toolbar", async () => {
+  getCavesMock.mockResolvedValue(caveResult(""));
+  render(<CavesComponent />);
+
+  expect(screen.getByRole("search")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Search caves" })).toBeInTheDocument();
+  expect(screen.getByText("Filters")).toBeInTheDocument();
+  expect(screen.getByText("Display")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Sort" })).toBeInTheDocument();
+  expect(screen.queryByText("Display Attributes")).not.toBeInTheDocument();
+  expect(await screen.findByText("1 result")).toBeInTheDocument();
 });

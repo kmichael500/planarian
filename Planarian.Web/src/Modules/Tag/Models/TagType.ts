@@ -17,3 +17,7 @@ export enum TagType {
   MapStatus = "MapStatus",
   CaveOther = "CaveOther",
 }
+
+export const TagTypeDisplayNames: Partial<Record<TagType, string>> = {
+  [TagType.Archeology]: "Archaeology",
+};

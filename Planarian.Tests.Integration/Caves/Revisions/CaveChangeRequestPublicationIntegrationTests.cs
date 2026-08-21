@@ -321,7 +321,7 @@ public sealed class CaveChangeRequestPublicationIntegrationTests(PostgresTestSer
             await CavePermissions.AuthenticateAsync(manager, tenant.AccountId);
             var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
                 IntegrationTestServices.For(manager).Caves.DeleteCave(tenant.CaveId, default));
-            Assert.Contains("Pending proposed changes", failure.Message);
+            Assert.Contains("Open proposed changes", failure.Message);
         }
         await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
         {

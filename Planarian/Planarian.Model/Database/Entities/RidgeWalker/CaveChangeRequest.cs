@@ -9,6 +9,28 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public enum CaveChangeRequestStatus
 {
     Pending,
+    ChangesRequested,
+    Approved,
+    Rejected
+}
+
+public static class CaveChangeRequestStatePolicy
+{
+    public static readonly CaveChangeRequestStatus[] OpenStatuses = [CaveChangeRequestStatus.Pending, CaveChangeRequestStatus.ChangesRequested];
+    public const CaveChangeRequestStatus AwaitingReviewerStatus = CaveChangeRequestStatus.Pending;
+    public const CaveChangeRequestStatus AwaitingAuthorStatus = CaveChangeRequestStatus.ChangesRequested;
+    public static bool IsOpen(CaveChangeRequestStatus status) => OpenStatuses.Contains(status);
+    public static bool IsAwaitingReviewer(CaveChangeRequestStatus status) => status == AwaitingReviewerStatus;
+    public static bool IsAwaitingAuthor(CaveChangeRequestStatus status) => status == AwaitingAuthorStatus;
+    public static bool CanReceiveProposalVersions(CaveChangeRequestStatus status) => IsOpen(status);
+    public static bool CanBePublished(CaveChangeRequestStatus status) => IsAwaitingReviewer(status);
+    public static bool BlocksHardDelete(CaveChangeRequestStatus status) => IsOpen(status);
+}
+
+public enum CaveChangeRequestReviewAction
+{
+    ChangesRequested,
+    Resubmitted,
     Approved,
     Rejected
 }
@@ -64,6 +86,35 @@ public class CaveChangeRequestConfiguration : BaseEntityTypeConfiguration<CaveCh
             .HasPrincipalKey(e => new { e.AccountId, e.Id })
             .HasForeignKey(e => new { e.AccountId, e.ProposedCountyId })
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class CaveChangeRequestReviewEvent : EntityBase
+{
+    [MaxLength(PropertyLength.Id)] public string AccountId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string ChangeRequestId { get; set; } = null!;
+    [MaxLength(PropertyLength.Id)] public string ProposalVersionId { get; set; } = null!;
+    public CaveChangeRequestReviewAction Action { get; set; }
+    [MaxLength(PropertyLength.Id)] public string ActorUserId { get; set; } = null!;
+    public string? Message { get; set; }
+}
+
+public class CaveChangeRequestReviewEventConfiguration : BaseEntityTypeConfiguration<CaveChangeRequestReviewEvent>
+{
+    public override void Configure(EntityTypeBuilder<CaveChangeRequestReviewEvent> builder)
+    {
+        builder.HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.Action).HasConversion<string>().HasMaxLength(PropertyLength.Key);
+        builder.HasIndex(e => new { e.AccountId, e.ChangeRequestId, e.CreatedOn });
+        builder.HasOne<CaveChangeRequest>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CaveProposalVersion>().WithMany()
+            .HasPrincipalKey(e => new { e.AccountId, e.ChangeRequestId, e.Id })
+            .HasForeignKey(e => new { e.AccountId, e.ChangeRequestId, Id = e.ProposalVersionId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(e => e.ActorUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -1,4 +1,4 @@
-import { Typography, Form, Space, message } from "antd";
+import { Checkbox, Form, Input, Popover, Space, Typography, message } from "antd";
 import { useContext, useState, useEffect } from "react";
 import { CardGridComponent } from "../../../Shared/Components/CardGrid/CardGridComponent";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
@@ -19,7 +19,7 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { EyeOutlined, CompassOutlined } from "@ant-design/icons";
+import { AppstoreOutlined, ClearOutlined, CompassOutlined, EyeOutlined, SearchOutlined, SlidersOutlined } from "@ant-design/icons";
 import {
   GridCard,
   GridCardAction,
@@ -34,17 +34,15 @@ import { useFeatureEnabled } from "../../../Shared/Permissioning/Components/Shou
 import { NavigationService } from "../../../Shared/Services/NavigationService";
 import FavoriteCave from "./FavoriteCave";
 import { LocationHelpers } from "../../../Shared/Helpers/LocationHelpers";
-import { FeatureCheckboxGroup } from "./FeatureCheckboxGroup";
 import { CaveAdvancedSearchDrawer } from "./CaveAdvancedSearchDrawer";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
-import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
+import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import {
   applyEntranceLocationFilterToQuery,
   EntranceLocationFilter,
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
 import {
   CAVE_SEARCH_DISPLAY_FEATURE_LABELS,
   CAVE_SEARCH_DISPLAY_FEATURES,
@@ -54,12 +52,9 @@ import {
   migrateCaveSearchDisplayFeatureKeys,
 } from "./CaveSearchDisplayFields";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
-import type { ScrollState } from "../../../Shared/Scroll/ScrollState";
-import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
 import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
 const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
-const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -68,9 +63,6 @@ const CavesComponent: React.FC = () => {
   let [selectedFeatures, setSelectedFeatures] = useState<
     NestedKeyOf<CaveSearchVm>[]
   >([]);
-  const [hasAppliedFilters, setHasAppliedFilters] = useState(
-    queryBuilder.hasFilters()
-  );
   const [filterClearSignal, setFilterClearSignal] = useState(0);
   const [polygonResetSignal, setPolygonResetSignal] = useState(0);
 
@@ -79,12 +71,6 @@ const CavesComponent: React.FC = () => {
   const [expandedNarratives, setExpandedNarratives] = useState<
     Record<string, boolean>
   >({});
-  const [isDisplayCollapsed, setIsDisplayCollapsed] = useState(false);
-  const [hasAutoCollapsedDisplay, setHasAutoCollapsedDisplay] = useState(false);
-  const [isResultsScrolled, setIsResultsScrolled] = useState(false);
-  const [isBelowToolbarBreakpoint, setIsBelowToolbarBreakpoint] = useState(
-    window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
-  );
 
   const { currentAccountId: accountId } = useContext(AppContext);
   const featureStorageKey = accountId
@@ -113,17 +99,6 @@ const CavesComponent: React.FC = () => {
     );
   const [isFetchingEntranceLocation, setIsFetchingEntranceLocation] =
     useState(false);
-
-  useEffect(() => {
-    const updateBreakpoint = () => {
-      setIsBelowToolbarBreakpoint(
-        window.innerWidth < SEARCH_TOOLBAR_BREAKPOINT_PX
-      );
-    };
-
-    window.addEventListener("resize", updateBreakpoint);
-    return () => window.removeEventListener("resize", updateBreakpoint);
-  }, []);
 
 
   const handleSortChange = async (sortValue: string) => {
@@ -239,7 +214,6 @@ const CavesComponent: React.FC = () => {
 
     const cavesResponse = await CaveService.GetCaves(queryBuilder);
     setCaves(cavesResponse);
-    setHasAppliedFilters(queryBuilder.hasFilters());
     setIsCavesLoading(false);
   };
 
@@ -418,45 +392,102 @@ const CavesComponent: React.FC = () => {
     value: feature.value,
   }));
 
-  const isMobile = isBelowToolbarBreakpoint;
-  const mobileToolbarVisibility = useScrollRevealVisibility({
-    enabled: isMobile,
-    mode: "thresholdLockout",
-  });
-
-  const handleGridScrollStateChange = (
-    isScrolled: boolean,
-    state?: ScrollState
+  const renderSearchControls = (
+    context: AdvancedSearchInlineControlsContext<CaveSearchParamsVm>,
   ) => {
-    if (isScrolled && !hasAutoCollapsedDisplay) {
-      setIsDisplayCollapsed(true);
-      setHasAutoCollapsedDisplay(true);
-    }
+    const total = caves?.totalCount ?? 0;
+    const resultLabel = isCavesLoading
+      ? "Loading…"
+      : `${formatNumber(total)} ${total === 1 ? "result" : "results"}`;
 
-    if (!isMobile) {
-      setIsResultsScrolled(isScrolled);
-      return;
-    }
-
-    mobileToolbarVisibility.handleScrollStateChange(isScrolled, state);
+    return (
+      <div className="caves-search-toolbar">
+        <div className="caves-search-toolbar__search" role="search">
+          <Input
+            aria-label="Search caves"
+            placeholder={context.mainSearchFieldLabel}
+            value={context.mainSearchValue}
+            onChange={(event) => context.setMainSearchValue(event.target.value)}
+            onPressEnter={() => void context.onSearch()}
+          />
+          <PlanarianButton
+            alwaysShowChildren
+            aria-label="Search caves"
+            icon={<SearchOutlined />}
+            onClick={() => void context.onSearch()}
+            type="primary"
+          >
+            Search
+          </PlanarianButton>
+        </div>
+        <div className="caves-search-toolbar__controls">
+          <PlanarianButton
+            alwaysShowChildren
+            icon={<SlidersOutlined />}
+            onClick={context.openDrawer}
+          >
+            Filters
+          </PlanarianButton>
+          <Popover
+            content={
+              <div className="caves-display-popover">
+                <Typography.Text strong>Display</Typography.Text>
+                <Checkbox.Group
+                  value={selectedFeatures}
+                  onChange={(values) =>
+                    void handleDisplayFeaturesChange(
+                      values as NestedKeyOf<CaveSearchVm>[],
+                    )
+                  }
+                >
+                  {displayFeatureOptions.map((option) => (
+                    <Checkbox key={String(option.value)} value={option.value}>
+                      {option.label}
+                    </Checkbox>
+                  ))}
+                </Checkbox.Group>
+              </div>
+            }
+            placement="bottomRight"
+            trigger="click"
+          >
+            <span>
+              <PlanarianButton alwaysShowChildren icon={<AppstoreOutlined />}>
+                Display
+              </PlanarianButton>
+            </span>
+          </Popover>
+          <SplitSortControl
+            compact
+            isDescending={queryBuilder.getSortDescending() ?? false}
+            onSelect={handleSortChange}
+            onToggleDirection={async () => {
+              queryBuilder.setSortDescending(!queryBuilder.getSortDescending());
+              await getCaves();
+            }}
+            selectedValue={queryBuilder.getSortBy()}
+            sortOptions={sortOptions}
+          />
+          {context.hasFilters && (
+            <PlanarianButton
+              alwaysShowChildren
+              icon={<ClearOutlined />}
+              onClick={() => void context.clearFilters()}
+              type="text"
+            >
+              Clear
+            </PlanarianButton>
+          )}
+          <Typography.Text
+            className="caves-search-toolbar__result-count"
+            type="secondary"
+          >
+            {resultLabel}
+          </Typography.Text>
+        </div>
+      </div>
+    );
   };
-
-  useEffect(() => {
-    if (isMobile) {
-      setIsResultsScrolled(!mobileToolbarVisibility.isVisible);
-    }
-  }, [isMobile, mobileToolbarVisibility.isVisible]);
-
-  const toolbarMetrics: ToolbarMetric[] = [
-    {
-      key: "results",
-      className: "import-files-dashboard__toolbar-metric",
-      label: hasAppliedFilters ? "Filtered" : "Results",
-      value: isCavesLoading ? "..." : formatNumber(caves?.totalCount ?? 0),
-    },
-  ];
-  const showMobileRows = isMobile ? mobileToolbarVisibility.isVisible : !isResultsScrolled;
-  const mobileResultsMetric = toolbarMetrics[0];
 
   return (
     <div className="caves-component">
@@ -466,7 +497,7 @@ const CavesComponent: React.FC = () => {
         form={form}
         sortOptions={sortOptions}
         onSortChange={handleSortChange}
-        toolbarMetrics={isMobile ? [] : toolbarMetrics}
+        inlineControls={renderSearchControls}
         onFiltersCleared={() => {
           applyEntranceLocationFilter({});
           setFilterClearSignal((previous) => previous + 1);
@@ -482,77 +513,6 @@ const CavesComponent: React.FC = () => {
       />
 
       <div className="caves-component__results">
-        {isMobile ? (
-          <ScrollCollapseSection
-            contentRef={mobileToolbarVisibility.contentRef}
-            visible={showMobileRows}
-          >
-            <div className="caves-mobile-toolbar-section__inner">
-              <FeatureCheckboxGroup
-                collapsible
-                collapsed={isDisplayCollapsed}
-                onCollapsedChange={(collapsed) => {
-                  setIsDisplayCollapsed(collapsed);
-                  if (!collapsed) {
-                    setHasAutoCollapsedDisplay(true);
-                  }
-                }}
-                title="Display Attributes"
-                options={displayFeatureOptions}
-                value={selectedFeatures}
-                onChange={handleDisplayFeaturesChange}
-              />
-              <div className="caves-mobile-toolbar-row">
-                <div className="caves-mobile-toolbar-row__sort">
-                  <SplitSortControl
-                    compact
-                    isDescending={queryBuilder.getSortDescending() ?? false}
-                    onSelect={handleSortChange}
-                    onToggleDirection={async () => {
-                      queryBuilder.setSortDescending(!queryBuilder.getSortDescending());
-                      await getCaves();
-                    }}
-                    selectedValue={queryBuilder.getSortBy()}
-                    sortOptions={sortOptions}
-                  />
-                </div>
-                {mobileResultsMetric ? (
-                  <div
-                    className={[
-                      "caves-mobile-toolbar-row__metric",
-                      "planarian-search-toolbar__metric",
-                      mobileResultsMetric.className,
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <span className="planarian-search-toolbar__metric-label">
-                      {mobileResultsMetric.label}
-                    </span>
-                    <span className="planarian-search-toolbar__metric-value">
-                      {mobileResultsMetric.value}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </ScrollCollapseSection>
-        ) : (
-          <FeatureCheckboxGroup
-            collapsible
-            collapsed={isDisplayCollapsed}
-            onCollapsedChange={(collapsed) => {
-              setIsDisplayCollapsed(collapsed);
-              if (!collapsed) {
-                setHasAutoCollapsedDisplay(true);
-              }
-            }}
-            title="Display Attributes"
-            options={displayFeatureOptions}
-            value={selectedFeatures}
-            onChange={handleDisplayFeaturesChange}
-          />
-        )}
         <SpinnerCardComponent spinning={isCavesLoading}>
           <CardGridComponent
             fillHeight
@@ -698,7 +658,6 @@ const CavesComponent: React.FC = () => {
             pagedItems={caves}
             queryBuilder={queryBuilder}
             onSearch={onSearch}
-            onScrollStateChange={handleGridScrollStateChange}
           />
         </SpinnerCardComponent>
       </div>

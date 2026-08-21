@@ -98,3 +98,21 @@ describe("CaveChangeRequestsPage", () => {
     await waitFor(() => expect(getReview).toHaveBeenLastCalledWith(1, 10, undefined, "CaveName", false));
   });
 });
+
+it("offers Changes requested only in My submissions, not the reviewer queue", async () => {
+  jest.spyOn(CaveService, "GetReviewQueue").mockResolvedValue(page("review"));
+  const getMine = jest.spyOn(CaveService, "GetMyChangeRequests").mockResolvedValue(page("mine"));
+  renderPage(true);
+  await screen.findByText("review");
+
+  await userEvent.click(screen.getByRole("combobox", { name: "Submission status" }));
+  expect(screen.queryByText("Changes requested")).not.toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await userEvent.click(screen.getByText("My submissions"));
+  await screen.findByText("mine");
+
+  await userEvent.click(screen.getByRole("combobox", { name: "Submission status" }));
+  await userEvent.click(await screen.findByText("Changes requested"));
+  await waitFor(() => expect(getMine).toHaveBeenLastCalledWith(
+    1, 10, "ChangesRequested", "UpdatedOn", true));
+});

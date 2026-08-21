@@ -29,6 +29,7 @@ public sealed class CaveChangeRequestReadRow
 public sealed record CaveProposalVersionReadRow(CaveProposalVersion Version, string? ActorName);
 public sealed record CaveProposalVersionDetailReadRow(CaveProposalVersion Version, CaveRevision BaseRevision,
     CaveProposalVersion? PreviousVersion, CaveRevision? PreviousBaseRevision);
+public sealed record CaveChangeRequestReviewEventReadRow(CaveChangeRequestReviewEvent Event, string? ActorName);
 
 public sealed class CaveChangeRequestRepository
 {
@@ -100,8 +101,8 @@ public sealed class CaveChangeRequestRepository
         var request = await _db.CaveChangeRequests.FromSqlInterpolated(
                 $"SELECT *, xmin FROM \"CaveChangeRequests\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {requestId} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken) ?? throw ApiExceptionDictionary.NotFound("Change request");
-        if (request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("Only pending requests can be revised.");
+        if (!CaveChangeRequestStatePolicy.CanReceiveProposalVersions(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request can no longer be revised.");
         var visible = await _db.UserCavePermissionView.AnyAsync(permission =>
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId, cancellationToken);
@@ -110,7 +111,9 @@ public sealed class CaveChangeRequestRepository
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId && permission.PermissionKey == PermissionPolicyKey.Manager,
             cancellationToken);
-        if (!reviewer && request.CreatedByUserId != _user.Id)
+        if (CaveChangeRequestStatePolicy.IsAwaitingAuthor(request.Status) && request.CreatedByUserId != _user.Id)
+            throw ApiExceptionDictionary.Forbidden("Only the submitter can revise a request while changes are requested.");
+        if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status) && !reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only revise your own request.");
         if (request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
@@ -147,8 +150,8 @@ public sealed class CaveChangeRequestRepository
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
-        if (request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("Only pending requests can receive files.");
+        if (!CaveChangeRequestStatePolicy.CanReceiveProposalVersions(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request can no longer receive files.");
         var visible = await _db.UserCavePermissionView.AnyAsync(permission =>
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId, cancellationToken);
@@ -157,7 +160,9 @@ public sealed class CaveChangeRequestRepository
             permission.AccountId == _scope.AccountId && permission.UserId == _user.Id &&
             permission.CaveId == request.CaveId && permission.PermissionKey == PermissionPolicyKey.Manager,
             cancellationToken);
-        if (!reviewer && request.CreatedByUserId != _user.Id)
+        if (CaveChangeRequestStatePolicy.IsAwaitingAuthor(request.Status) && request.CreatedByUserId != _user.Id)
+            throw ApiExceptionDictionary.Forbidden("Only the submitter can add files while changes are requested.");
+        if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status) && !reviewer && request.CreatedByUserId != _user.Id)
             throw ApiExceptionDictionary.Forbidden("You can only add files to your own request.");
 
         var fileSnapshot = await (from file in _db.Files.AsNoTracking()
@@ -262,7 +267,7 @@ public sealed class CaveChangeRequestRepository
                     on new { staged.AccountId, Id = staged.ChangeRequestId }
                     equals new { request.AccountId, request.Id }
                 where staged.AccountId == _scope.AccountId && ids.Contains(staged.FileId) &&
-                      staged.ChangeRequestId != requestId && request.Status == CaveChangeRequestStatus.Pending
+                      staged.ChangeRequestId != requestId && CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status)
                 select staged.FileId)
             .FirstOrDefaultAsync(cancellationToken);
         if (sharedPendingFileId is not null)
@@ -281,14 +286,16 @@ public sealed class CaveChangeRequestRepository
     public Task<PagedResult<CaveChangeRequestReadRow>> ListMineAsync(int pageNumber, int pageSize,
         CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
         CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.UpdatedOn, bool sortDescending = true) =>
-        PageAsync(Order(Query(createdByUserId: _user.Id, status: status), sortBy, sortDescending, pendingFirst: true),
+        PageAsync(Order(Query(createdByUserId: _user.Id, status: status), sortBy, sortDescending, openFirst: true),
             pageNumber, pageSize, cancellationToken);
 
     public Task<PagedResult<CaveChangeRequestReadRow>> ListForReviewAsync(int pageNumber, int pageSize,
         CancellationToken cancellationToken, CaveChangeRequestStatus? status = null,
         CaveChangeRequestSortBy sortBy = CaveChangeRequestSortBy.SubmittedOn,
         bool sortDescending = false) => PageAsync(Order(Query(status: status)
-            .Where(row => row.CurrentCanReview), sortBy, sortDescending, pendingFirst: true),
+            .Where(row => row.CurrentCanReview &&
+                          row.Request.Status != CaveChangeRequestStatePolicy.AwaitingAuthorStatus),
+            sortBy, sortDescending, openFirst: true),
             pageNumber, pageSize, cancellationToken);
 
     public Task<CaveChangeRequestReadRow?> GetAsync(string requestId, CancellationToken cancellationToken) =>
@@ -364,23 +371,74 @@ public sealed class CaveChangeRequestRepository
         return (pair.StateName, pair.Abbreviation, pair.CountyName, pair.DisplayId);
     }
 
+    public async Task<IReadOnlyList<CaveChangeRequestReviewEventReadRow>> ListReviewEventsAsync(string requestId,
+        CancellationToken cancellationToken) =>
+        await (from reviewEvent in _db.CaveChangeRequestReviewEvents.AsNoTracking()
+               join actorValue in _db.Users.AsNoTracking() on reviewEvent.ActorUserId equals actorValue.Id into actors
+               from actor in actors.DefaultIfEmpty()
+               where reviewEvent.AccountId == _scope.AccountId && reviewEvent.ChangeRequestId == requestId
+               orderby reviewEvent.CreatedOn, reviewEvent.Id
+               select new CaveChangeRequestReviewEventReadRow(reviewEvent,
+                   actor == null ? null : actor.FirstName + " " + actor.LastName)).ToListAsync(cancellationToken);
+
+    public async Task RequestChangesAsync(string requestId, string expectedProposalVersionId, string message,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            throw ApiExceptionDictionary.BadRequest("A message is required when requesting changes.");
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var request = await LockedAsync(requestId, cancellationToken);
+        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireExpectedProposalVersion(request, expectedProposalVersionId);
+        request.Status = CaveChangeRequestStatePolicy.AwaitingAuthorStatus;
+        AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.ChangesRequested, message.Trim());
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task ResubmitAsync(string requestId, string expectedProposalVersionId,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        var request = await LockedAsync(requestId, cancellationToken);
+        if (!CaveChangeRequestStatePolicy.IsAwaitingAuthor(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting changes from the submitter.");
+        if (request.CreatedByUserId != _user.Id)
+            throw ApiExceptionDictionary.Forbidden("Only the submitter can resubmit requested changes.");
+        RequireExpectedProposalVersion(request, expectedProposalVersionId);
+        var requestedVersionId = await _db.CaveChangeRequestReviewEvents.AsNoTracking()
+            .Where(reviewEvent => reviewEvent.AccountId == _scope.AccountId &&
+                                  reviewEvent.ChangeRequestId == requestId &&
+                                  reviewEvent.Action == CaveChangeRequestReviewAction.ChangesRequested)
+            .OrderByDescending(reviewEvent => reviewEvent.CreatedOn).ThenByDescending(reviewEvent => reviewEvent.Id)
+            .Select(reviewEvent => reviewEvent.ProposalVersionId).FirstOrDefaultAsync(cancellationToken);
+        if (requestedVersionId is null)
+            throw new InvalidOperationException("A changes-requested request is missing its review event.");
+        if (requestedVersionId == expectedProposalVersionId)
+            throw ApiExceptionDictionary.BadRequest("Save a newer proposal version before resubmitting for review.");
+        request.Status = CaveChangeRequestStatePolicy.AwaitingReviewerStatus;
+        AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.Resubmitted, null);
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> RejectAsync(string requestId,
         string expectedProposalVersionId, string? notes,
         CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
-        if (request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
-        if (request.CurrentProposalVersionId != expectedProposalVersionId)
-            throw new CaveProposalVersionConflictException(expectedProposalVersionId,
-                request.CurrentProposalVersionId);
+        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireExpectedProposalVersion(request, expectedProposalVersionId);
         if (string.IsNullOrWhiteSpace(notes))
             throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
         request.Status = CaveChangeRequestStatus.Rejected;
         request.ReviewerUserId = _user.Id;
         request.ReviewerNotes = notes.Trim();
         request.ReviewedOn = DateTime.UtcNow;
+        AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.Rejected, request.ReviewerNotes);
         var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -394,16 +452,15 @@ public sealed class CaveChangeRequestRepository
         if (!mutation.CreatedRevision || mutation.RevisionId is null)
             throw ApiExceptionDictionary.BadRequest("The proposal does not contain a publishable change.");
         var request = await LockedAsync(requestId, cancellationToken);
-        if (request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
-        if (request.CurrentProposalVersionId != expectedProposalVersionId)
-            throw new CaveProposalVersionConflictException(expectedProposalVersionId,
-                request.CurrentProposalVersionId);
+        if (!CaveChangeRequestStatePolicy.CanBePublished(request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireExpectedProposalVersion(request, expectedProposalVersionId);
         request.Status = CaveChangeRequestStatus.Approved;
         request.ApprovedRevisionId = mutation.RevisionId;
         request.ReviewerUserId = _user.Id;
         request.ReviewerNotes = notes?.Trim();
         request.ReviewedOn = DateTime.UtcNow;
+        AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.Approved, request.ReviewerNotes);
         var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return blobs;
@@ -473,6 +530,26 @@ public sealed class CaveChangeRequestRepository
         }
     }
 
+    private static void RequireExpectedProposalVersion(CaveChangeRequest request, string expectedProposalVersionId)
+    {
+        if (request.CurrentProposalVersionId != expectedProposalVersionId)
+            throw new CaveProposalVersionConflictException(expectedProposalVersionId, request.CurrentProposalVersionId);
+    }
+
+    private void AddReviewEvent(CaveChangeRequest request, string proposalVersionId,
+        CaveChangeRequestReviewAction action, string? message)
+    {
+        _db.CaveChangeRequestReviewEvents.Add(new CaveChangeRequestReviewEvent
+        {
+            AccountId = request.AccountId,
+            ChangeRequestId = request.Id,
+            ProposalVersionId = proposalVersionId,
+            Action = action,
+            ActorUserId = _user.Id!,
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim()
+        });
+    }
+
     private async Task<CaveChangeRequest> LockedAsync(string requestId, CancellationToken cancellationToken) =>
         await _db.CaveChangeRequests.FromSqlInterpolated(
                 $"SELECT *, xmin FROM \"CaveChangeRequests\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {requestId} FOR UPDATE")
@@ -518,23 +595,23 @@ public sealed class CaveChangeRequestRepository
         };
 
     private static IOrderedQueryable<CaveChangeRequestReadRow> Order(
-        IQueryable<CaveChangeRequestReadRow> query, CaveChangeRequestSortBy sortBy, bool descending, bool pendingFirst)
+        IQueryable<CaveChangeRequestReadRow> query, CaveChangeRequestSortBy sortBy, bool descending, bool openFirst)
     {
         IOrderedQueryable<CaveChangeRequestReadRow> ordered;
-        if (pendingFirst)
+        if (openFirst)
         {
-            var pending = query.OrderByDescending(row => row.Request.Status == CaveChangeRequestStatus.Pending);
+            var open = query.OrderByDescending(row => CaveChangeRequestStatePolicy.OpenStatuses.Contains(row.Request.Status));
             ordered = sortBy switch
             {
                 CaveChangeRequestSortBy.SubmittedOn => descending
-                    ? pending.ThenByDescending(row => row.Request.CreatedOn)
-                    : pending.ThenBy(row => row.Request.CreatedOn),
+                    ? open.ThenByDescending(row => row.Request.CreatedOn)
+                    : open.ThenBy(row => row.Request.CreatedOn),
                 CaveChangeRequestSortBy.CaveName => descending
-                    ? pending.ThenByDescending(row => row.LiveCaveName)
-                    : pending.ThenBy(row => row.LiveCaveName),
+                    ? open.ThenByDescending(row => row.LiveCaveName)
+                    : open.ThenBy(row => row.LiveCaveName),
                 _ => descending
-                    ? pending.ThenByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
-                    : pending.ThenBy(row => row.Request.ModifiedOn ?? row.Request.CreatedOn),
+                    ? open.ThenByDescending(row => row.Request.ModifiedOn ?? row.Request.CreatedOn)
+                    : open.ThenBy(row => row.Request.ModifiedOn ?? row.Request.CreatedOn),
             };
         }
         else

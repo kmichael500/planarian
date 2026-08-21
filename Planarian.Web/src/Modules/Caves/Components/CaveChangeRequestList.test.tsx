@@ -39,3 +39,10 @@ it("uses a neutral empty-state explanation for My submissions", () => {
   expect(screen.getByText("No submissions found")).toBeInTheDocument();
   expect(screen.getByText("Try a different status filter, or submit changes to a Cave.")).toBeInTheDocument();
 });
+
+it("labels submissions that are waiting on the author as Changes requested", () => {
+  render(<MemoryRouter><CaveChangeRequestList requests={[summary("ChangesRequested")]} /></MemoryRouter>);
+
+  expect(screen.getByText("Changes requested")).toBeInTheDocument();
+  expect(screen.queryByText("Pending review")).not.toBeInTheDocument();
+});

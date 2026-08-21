@@ -382,7 +382,7 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
         finishCreating.SetResult();
         var requestId = await createTask;
         var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => deleteTask);
-        Assert.Contains("Pending proposed changes", failure.Message);
+        Assert.Contains("Open proposed changes", failure.Message);
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == tenant.CaveId));

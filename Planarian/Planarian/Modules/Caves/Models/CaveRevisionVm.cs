@@ -14,6 +14,9 @@ public sealed record CaveRevisionListItemVm(
     CaveRevisionOperation Operation,
     string? ChangeRequestId,
     string? ImportBatchId,
+    string? ChangeRequestSubmitterUserId,
+    string? ChangeRequestSubmitterName,
+    string? ChangeRequestReviewerName,
     bool IsCurrent);
 
 public sealed record CaveRevisionHistoryVm(string CaveId, string? CurrentRevisionId,

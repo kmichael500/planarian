@@ -1163,9 +1163,9 @@ public class CaveService : ServiceBase<CaveRepository>
 
             if (entity == null) throw ApiExceptionDictionary.NotFound(nameof(entity.Id));
             await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
-            if (await Repository.HasPendingChangeRequestsAsync(caveId, cancellationToken))
+            if (await Repository.HasOpenChangeRequestsAsync(caveId, cancellationToken))
                 throw ApiExceptionDictionary.BadRequest(
-                    "Pending proposed changes must be approved or rejected before this Cave can be deleted.");
+                    "Open proposed changes must be resolved before this Cave can be deleted.");
 
             var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
                 entity.Id, entity.CurrentRevisionId, cancellationToken);

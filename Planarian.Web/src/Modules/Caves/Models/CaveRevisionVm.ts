@@ -9,6 +9,9 @@ export interface CaveRevisionListItemVm {
   operation: "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
   changeRequestId?: string;
   importBatchId?: string;
+  changeRequestSubmitterUserId?: string;
+  changeRequestSubmitterName?: string;
+  changeRequestReviewerName?: string;
   isCurrent: boolean;
 }
 

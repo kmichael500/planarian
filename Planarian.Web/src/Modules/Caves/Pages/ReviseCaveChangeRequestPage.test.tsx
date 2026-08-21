@@ -225,3 +225,32 @@ it("clears the dirty guard before navigating after a successful revision save", 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(revise).toHaveBeenCalledTimes(1);
 });
+
+it("saves reviewer-requested edits as a draft without implicitly resubmitting", async () => {
+  jest.spyOn(CaveService, "GetChangeRequest").mockResolvedValue({
+    request: { id: "request0001", caveId: "cave000001", caveName: "Cave", caveExists: true,
+      status: "ChangesRequested", submitterUserId: "contributor", submittedOn: "2026-08-16T00:00:00Z",
+      originalBaseRevisionId: "revision01", proposalBaseRevisionId: "revision01", currentRevisionId: "revision01",
+      currentProposalVersionId: "proposal01", isStale: false, canEdit: true, canReview: false,
+      changeSummary: { caveFields: 1, entrances: { added: 0, removed: 0, changed: 0, total: 0 }, files: { added: 0, removed: 0, changed: 0, total: 0 }, linePlots: { added: 0, removed: 0, changed: 0, total: 0 }, otherChanges: 0 } },
+    base: {} as any, proposed: {} as any, current: {} as any, diff: {} as any, versions: [], countyNumberIntent: "Manual",
+    linePlots: [], activeStagedFiles: [], unavailableStagedFileIds: [], reviewEvents: [{ id: "event01",
+      proposalVersionId: "proposal01", action: "ChangesRequested", actorUserId: "reviewer",
+      actorName: "Riley Reviewer", message: "Clarify the entrance description.", createdOn: "2026-08-17T18:00:00Z" }],
+  });
+  jest.spyOn(CaveService, "GetProposalVersion").mockResolvedValue({ base: {} as any, proposed: {} as any,
+    diffFromBase: {} as any, baseRevisionChanged: false, baseRevisionId: "revision01", countyNumberIntent: "Manual",
+    linePlots: [], unavailableStagedFileIds: [] });
+  jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({ base: {} as any, proposed: {} as any,
+    diff: {} as any, countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: true });
+  const revise = jest.spyOn(CaveService, "ReviseChanges").mockResolvedValue("proposal02");
+  const resubmit = jest.spyOn(CaveService, "ResubmitChangeRequest").mockResolvedValue({ result: "Resubmitted", requestId: "request0001" });
+  renderPage();
+
+  expect(await screen.findByText("Reviewer requested changes")).toBeInTheDocument();
+  expect(screen.getByText("Clarify the entrance description.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Save draft version" }));
+  await waitFor(() => expect(revise).toHaveBeenCalledTimes(1));
+  expect(resubmit).not.toHaveBeenCalled();
+});

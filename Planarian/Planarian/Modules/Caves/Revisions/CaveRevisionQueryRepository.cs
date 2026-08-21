@@ -5,7 +5,12 @@ using Planarian.Model.Shared;
 
 namespace Planarian.Modules.Caves.Revisions;
 
-public sealed record CaveRevisionQueryRow(CaveRevision Revision, string? ActorName);
+public sealed record CaveRevisionQueryRow(
+    CaveRevision Revision,
+    string? ActorName,
+    string? ChangeRequestSubmitterUserId,
+    string? ChangeRequestSubmitterName,
+    string? ChangeRequestReviewerName);
 
 public sealed class CaveRevisionQueryRepository
 {
@@ -31,11 +36,30 @@ public sealed class CaveRevisionQueryRepository
             return null;
 
         var rows = await (from revision in _db.CaveRevisions.AsNoTracking()
-                join user in _db.Users.AsNoTracking() on revision.CreatedByUserId equals user.Id into actors
-                from actor in actors.DefaultIfEmpty()
-                where revision.AccountId == _scope.AccountId && revision.CaveId == caveId
-                select new CaveRevisionQueryRow(revision,
-                    actor == null ? null : actor.FirstName + " " + actor.LastName))
+                          join user in _db.Users.AsNoTracking() on revision.CreatedByUserId equals user.Id into actors
+                          from actor in actors.DefaultIfEmpty()
+                          join requestEntity in _db.CaveChangeRequests.AsNoTracking()
+                              on new { revision.AccountId, revision.CaveId, ChangeRequestId = revision.ChangeRequestId }
+                              equals new
+                              {
+                                  requestEntity.AccountId,
+                                  requestEntity.CaveId,
+                                  ChangeRequestId = (string?)requestEntity.Id
+                              } into requestRows
+                          from request in requestRows.DefaultIfEmpty()
+                          join submitterEntity in _db.Users.AsNoTracking() on request.CreatedByUserId equals submitterEntity.Id
+                              into submitters
+                          from submitter in submitters.DefaultIfEmpty()
+                          join reviewerEntity in _db.Users.AsNoTracking() on request.ReviewerUserId equals reviewerEntity.Id
+                              into reviewers
+                          from reviewer in reviewers.DefaultIfEmpty()
+                          where revision.AccountId == _scope.AccountId && revision.CaveId == caveId
+                          select new CaveRevisionQueryRow(
+                              revision,
+                              actor == null ? null : actor.FirstName + " " + actor.LastName,
+                              request == null ? null : request.CreatedByUserId,
+                              submitter == null ? null : submitter.FirstName + " " + submitter.LastName,
+                              reviewer == null ? null : reviewer.FirstName + " " + reviewer.LastName))
             .ToListAsync(cancellationToken);
 
         return (currentRevisionId, OrderByChain(currentRevisionId, rows));
@@ -44,11 +68,30 @@ public sealed class CaveRevisionQueryRepository
     public async Task<CaveRevisionQueryRow?> GetAsync(string caveId, string revisionId,
         CancellationToken cancellationToken) =>
         await (from revision in _db.CaveRevisions.AsNoTracking()
-                join user in _db.Users.AsNoTracking() on revision.CreatedByUserId equals user.Id into actors
-                from actor in actors.DefaultIfEmpty()
-                where revision.AccountId == _scope.AccountId && revision.CaveId == caveId && revision.Id == revisionId
-                select new CaveRevisionQueryRow(revision,
-                    actor == null ? null : actor.FirstName + " " + actor.LastName))
+               join user in _db.Users.AsNoTracking() on revision.CreatedByUserId equals user.Id into actors
+               from actor in actors.DefaultIfEmpty()
+               join requestEntity in _db.CaveChangeRequests.AsNoTracking()
+                   on new { revision.AccountId, revision.CaveId, ChangeRequestId = revision.ChangeRequestId }
+                   equals new
+                   {
+                       requestEntity.AccountId,
+                       requestEntity.CaveId,
+                       ChangeRequestId = (string?)requestEntity.Id
+                   } into requestRows
+               from request in requestRows.DefaultIfEmpty()
+               join submitterEntity in _db.Users.AsNoTracking() on request.CreatedByUserId equals submitterEntity.Id
+                   into submitters
+               from submitter in submitters.DefaultIfEmpty()
+               join reviewerEntity in _db.Users.AsNoTracking() on request.ReviewerUserId equals reviewerEntity.Id
+                   into reviewers
+               from reviewer in reviewers.DefaultIfEmpty()
+               where revision.AccountId == _scope.AccountId && revision.CaveId == caveId && revision.Id == revisionId
+               select new CaveRevisionQueryRow(
+                   revision,
+                   actor == null ? null : actor.FirstName + " " + actor.LastName,
+                   request == null ? null : request.CreatedByUserId,
+                   submitter == null ? null : submitter.FirstName + " " + submitter.LastName,
+                   reviewer == null ? null : reviewer.FirstName + " " + reviewer.LastName))
             .SingleOrDefaultAsync(cancellationToken);
 
     private static IReadOnlyList<CaveRevisionQueryRow> OrderByChain(string? currentRevisionId,

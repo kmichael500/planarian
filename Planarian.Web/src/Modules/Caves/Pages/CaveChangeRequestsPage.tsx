@@ -9,15 +9,22 @@ import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { CaveService } from "../Service/CaveService";
 
 const pageSize = 10;
-const statusOptions: { label: string; value: "All" | CaveChangeRequestStatus }[] = [
+const reviewStatusOptions: { label: string; value: "All" | CaveChangeRequestStatus }[] = [
   { label: "All", value: "All" },
   { label: "Pending review", value: "Pending" },
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
 ];
+const myStatusOptions: { label: string; value: "All" | CaveChangeRequestStatus }[] = [
+  { label: "All", value: "All" },
+  { label: "Pending review", value: "Pending" },
+  { label: "Changes requested", value: "ChangesRequested" },
+  { label: "Approved", value: "Approved" },
+  { label: "Rejected", value: "Rejected" },
+];
 
 const isStatus = (value: string | null): value is CaveChangeRequestStatus =>
-  value === "Pending" || value === "Approved" || value === "Rejected";
+  value === "Pending" || value === "ChangesRequested" || value === "Approved" || value === "Rejected";
 
 const sortOptions = [
   { display: "Updated", value: "UpdatedOn" },
@@ -40,7 +47,9 @@ export const CaveChangeRequestsPage = () => {
   const canReview = hasPermission(PermissionKey.Manager);
   const activeTab = canReview && searchParams.get("tab") !== "mine" ? "review" : "mine";
   const statusParam = searchParams.get("status");
-  const status = isStatus(statusParam) ? statusParam : undefined;
+  const parsedStatus = isStatus(statusParam) ? statusParam : undefined;
+  const status = activeTab === "review" && parsedStatus === "ChangesRequested" ? undefined : parsedStatus;
+  const statusOptions = activeTab === "review" ? reviewStatusOptions : myStatusOptions;
   const defaultSortBy: CaveChangeRequestSortBy = activeTab === "review" ? "SubmittedOn" : "UpdatedOn";
   const defaultSortDescending = activeTab !== "review";
   const sortParam = searchParams.get("sortBy");
@@ -82,8 +91,10 @@ export const CaveChangeRequestsPage = () => {
 
   const changeTab = (key: string) => {
     const next = new URLSearchParams(searchParams);
-    if (key === "review") next.delete("tab");
-    else next.set("tab", "mine");
+    if (key === "review") {
+      next.delete("tab");
+      if (next.get("status") === "ChangesRequested") next.delete("status");
+    } else next.set("tab", "mine");
     next.delete("sortBy");
     next.delete("sortDescending");
     setSearchParams(next, { replace: true });

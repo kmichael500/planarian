@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ProjectService } from "../../Project/Services/ProjectService";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import { TagType } from "../Models/TagType";
+import { TagType, TagTypeDisplayNames } from "../Models/TagType";
 import { sortSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
 import { splitCamelCase } from "../../../Shared/Helpers/StringHelpers";
 
@@ -13,6 +13,9 @@ export interface TagSelectComponentProps extends Omit<SelectProps<string>, "mode
   allowCustomTags?: boolean;
   mode?: "multiple";
 }
+
+export const getTagSelectPlaceholder = (tagType: TagType) =>
+  `Select ${TagTypeDisplayNames[tagType] ?? splitCamelCase(tagType) ?? "tag"}`;
 
 export const resolveTagSelectMode = (
   tagType: TagType,
@@ -70,7 +73,7 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
           showSearch
           loading={isLoading}
           notFoundContent={isLoading ? <Spin size="small" /> : null}
-          placeholder={`Select ${splitCamelCase(tagType) ?? "tag"}`}
+          placeholder={getTagSelectPlaceholder(tagType)}
           allowClear
           mode={resolvedMode}
           onChange={(value, option) => {

@@ -20,7 +20,8 @@ export const formatChangeScopeSummary = (summary: CaveChangeScopeSummaryVm) => {
 const statusTag = (request: CaveChangeRequestSummaryVm) => <Space size={4} wrap>
   {request.status === "Approved" ? <Tag color="success">Approved</Tag>
     : request.status === "Rejected" ? <Tag color="error">Rejected</Tag>
-      : <Tag color="processing">Pending review</Tag>}
+      : request.status === "ChangesRequested" ? <Tag color="warning">Changes requested</Tag>
+        : <Tag color="processing">Pending review</Tag>}
   {request.isStale && <Tag color="warning">Needs re-review</Tag>}
 </Space>;
 

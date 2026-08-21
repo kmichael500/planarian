@@ -207,6 +207,15 @@ const CaveService = {
     return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/reject`,
       { notes, expectedProposalVersionId })).data;
   },
+  async RequestChangeRequestChanges(id: string, expectedProposalVersionId: string,
+    message: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/request-changes`,
+      { notes: message, expectedProposalVersionId })).data;
+  },
+  async ResubmitChangeRequest(id: string, expectedProposalVersionId: string): Promise<CaveChangeRequestDecisionVm> {
+    return (await HttpClient.post<CaveChangeRequestDecisionVm>(`${changeRequestUrl}/${id}/resubmit`,
+      { expectedProposalVersionId })).data;
+  },
   async GetNextCountyNumber(
     countyId: string,
     useFirstAvailableCountyNumber: boolean = false

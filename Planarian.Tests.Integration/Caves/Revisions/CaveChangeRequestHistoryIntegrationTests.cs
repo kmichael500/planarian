@@ -21,6 +21,56 @@ namespace Planarian.Tests.Integration.Caves.Revisions;
 public sealed class CaveChangeRequestHistoryIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     [Fact]
+    public async Task RevisionHistoryIncludesApprovedRequestSubmitterAndReviewerAttribution()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RevisionHistoryIncludesApprovedRequestSubmitterAndReviewerAttribution));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var location = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqualhis");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string contributorId;
+        string reviewerId;
+        await using (var contributorIdentity = database.CreateDbContext("contributor", tenant.AccountId))
+            contributorId = contributorIdentity.RequestUser.Id!;
+        await using (var reviewerIdentity = database.CreateDbContext("reviewer", tenant.AccountId))
+            reviewerId = reviewerIdentity.RequestUser.Id!;
+        await using (var names = database.CreateDbContext("names", tenant.AccountId))
+        {
+            var contributor = await names.Users.SingleAsync(user => user.Id == contributorId);
+            contributor.FirstName = "Casey";
+            contributor.LastName = "Submitter";
+            var reviewer = await names.Users.SingleAsync(user => user.Id == reviewerId);
+            reviewer.FirstName = "Riley";
+            reviewer.LastName = "Reviewer";
+            await names.SaveChangesAsync();
+        }
+
+        string requestId;
+        await using (var contributor = database.CreateDbContext("contributor", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(contributor, tenant.AccountId);
+            requestId = await new CaveChangeRequestRepository(contributor, contributor.RequestUser)
+                .CreateAsync(tenant.CaveId, tenant.RevisionId,
+                    PublishableProposal(tenant, location.Id, "Attributed proposal"), default);
+        }
+
+        await using var reviewerDb = database.CreateDbContext("reviewer", tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(reviewerDb, tenant.AccountId);
+        var requestService = IntegrationTestServices.For(reviewerDb).CaveChangeRequests;
+        await requestService.ApproveAsync(requestId, await CurrentVersionAsync(reviewerDb, requestId), null, default);
+        var history = await new CaveRevisionService(new CaveRepository(reviewerDb, reviewerDb.RequestUser),
+            new CaveRevisionQueryRepository(reviewerDb, reviewerDb.RequestUser)).ListAsync(tenant.CaveId, default);
+
+        var approved = Assert.Single(history.Revisions, revision => revision.ChangeRequestId == requestId);
+        Assert.Equal(contributorId, approved.ChangeRequestSubmitterUserId);
+        Assert.Equal("Casey Submitter", approved.ChangeRequestSubmitterName);
+        Assert.Equal("Riley Reviewer", approved.ChangeRequestReviewerName);
+    }
+
+    [Fact]
     public async Task HistoricalProposalVersionCanBeInspectedOnlyWithinItsReadableRequest()
     {
         await using var database = await fixture.CreateDatabaseAsync(

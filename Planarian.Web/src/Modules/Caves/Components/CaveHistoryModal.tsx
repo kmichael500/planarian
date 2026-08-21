@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Alert, Collapse, Spin, Tag, Timeline, Typography } from "antd";
+import { useContext, useEffect, useState } from "react";
+import { Alert, Collapse, Space, Spin, Tag, Timeline, Typography } from "antd";
 import { HistoryOutlined } from "@ant-design/icons";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
@@ -7,9 +7,12 @@ import { CaveService } from "../Service/CaveService";
 import { CaveRevisionComparisonVm, CaveRevisionHistoryVm, CaveRevisionListItemVm } from "../Models/CaveRevisionVm";
 import { CaveRevisionDiff } from "./CaveRevisionDiff";
 import { formatDateTime } from "../../../Shared/Helpers/StringHelpers";
+import { Link } from "react-router-dom";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 
 const sourceLabel = (revision: CaveRevisionListItemVm) => {
-  if (revision.changeRequestId) return "Approved change request";
+  if (revision.changeRequestId) return "Changes approved";
   if (revision.source === "Import") return "Imported";
   if (revision.source === "SystemBaseline") return "Revision tracking initialized";
   if (revision.operation === "Create") return "Created";
@@ -18,7 +21,8 @@ const sourceLabel = (revision: CaveRevisionListItemVm) => {
   return "Edited";
 };
 
-export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
+export const CaveHistoryModal = ({ caveId, canReviewChangeRequests = false }: { caveId: string; canReviewChangeRequests?: boolean }) => {
+  const { currentUser } = useContext(AppContext);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<CaveRevisionHistoryVm>();
@@ -75,12 +79,15 @@ export const CaveHistoryModal = ({ caveId }: { caveId: string }) => {
               children: (
                 <Collapse onChange={loadRevision} ghost items={[{
                   key: revision.id,
-                  label: <div><strong>{sourceLabel(revision)}</strong>{revision.isCurrent && <Tag color="success" style={{ marginLeft: 8 }}>Current</Tag>}<div><Typography.Text type="secondary">Revision {revision.sequence} · {formatDateTime(revision.publishedOn)}{revision.actorName ? ` · ${revision.actorName}` : ""}</Typography.Text></div></div>,
-                  children: comparisons[revision.id]
-                    ? <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} />
-                    : revisionErrors[revision.id]
-                      ? <Alert type="error" showIcon message={revisionErrors[revision.id]} />
-                      : <Spin size="small" />,
+                  label: <div><strong>{sourceLabel(revision)}</strong>{revision.isCurrent && <Tag color="success" style={{ marginLeft: 8 }}>Current</Tag>}<div><Typography.Text type="secondary">Revision {revision.sequence} · {formatDateTime(revision.publishedOn)}{!revision.changeRequestId && revision.actorName ? ` · ${revision.actorName}` : ""}</Typography.Text></div>{revision.changeRequestId && <div><Typography.Text type="secondary">Submitted by {revision.changeRequestSubmitterName || "Unknown"} · Approved by {revision.changeRequestReviewerName || revision.actorName || "Unknown"}</Typography.Text></div>}</div>,
+                  children: <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                    {revision.changeRequestId && (canReviewChangeRequests || currentUser?.id === revision.changeRequestSubmitterUserId) && <Link to={ClientRoutes.caveChangeRequest.get(revision.changeRequestId)}>Review</Link>}
+                    {comparisons[revision.id]
+                      ? <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} />
+                      : revisionErrors[revision.id]
+                        ? <Alert type="error" showIcon message={revisionErrors[revision.id]} />
+                        : <Spin size="small" />}
+                  </Space>,
                 }]} />
               ),
             })) ?? []}

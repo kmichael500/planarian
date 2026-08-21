@@ -84,8 +84,7 @@ public sealed class CaveChangeRequestService
         if (values.Id != row.Request.CaveId)
             throw ApiExceptionDictionary.BadRequest("The proposed Cave does not match the request.");
         var canReview = await CanReviewAsync(row, false);
-        if (row.Request.CreatedByUserId != _user.Id && !canReview)
-            throw ApiExceptionDictionary.Forbidden("You cannot revise this request.");
+        RequireCanRevise(row, canReview);
         RequireExpectedEditorState(row, expectedBaseRevisionId, expectedProposalVersionId, againstCurrent);
         var baseRevision = againstCurrent ? row.CurrentRevision : row.ProposalBaseRevision;
         if (baseRevision is null) throw ApiExceptionDictionary.NotFound("Cave revision");
@@ -128,6 +127,7 @@ public sealed class CaveChangeRequestService
         if (values.Id != row.Request.CaveId)
             throw ApiExceptionDictionary.BadRequest("The proposed Cave does not match the request.");
         var reviewer = await CanReviewAsync(row, false);
+        RequireCanRevise(row, reviewer);
         RequireExpectedEditorState(row, expectedBaseRevisionId, expectedProposalVersionId, againstCurrent);
         var stagedIds = await _requests.GetStagedFileIdsAsync(row.Request.Id, cancellationToken);
         var previous = CaveProposalJson.Deserialize(row.ProposalVersion.ProposalJson,
@@ -195,11 +195,12 @@ public sealed class CaveChangeRequestService
         var activeStagedFiles = proposedSnapshot.Files.Where(file => activeStagedFileIds.Contains(file.Id) &&
             !unavailableStagedFileIds.Contains(file.Id)).ToList();
         var versions = await _requests.ListVersionsAsync(requestId, cancellationToken);
-        var likelyCountyNumber = row.Request.Status == CaveChangeRequestStatus.Pending
+        var likelyCountyNumber = CaveChangeRequestStatePolicy.CanReceiveProposalVersions(row.Request.Status)
             ? await GetLikelyCountyNumberAsync(proposal, baseSnapshot)
             : null;
         var removedLinePlots = await GetRemovedLinePlotsAsync(row.Request.CaveId, baseSnapshot, proposal,
             cancellationToken);
+        var reviewEvents = await _requests.ListReviewEventsAsync(requestId, cancellationToken);
         return new CaveChangeRequestDetailVm(MapSummary(row, canReview), baseSnapshot, proposedSnapshot, currentSnapshot,
             Map(_diff.Compare(baseSnapshot, proposedSnapshot)),
             isStale ? Map(_diff.Compare(baseSnapshot, currentSnapshot)) : null,
@@ -211,7 +212,11 @@ public sealed class CaveChangeRequestService
             proposal.LinePlots.Select(linePlot => new GeoJsonUploadVm
             {
                 Id = linePlot.Id, Name = linePlot.Name, GeoJson = linePlot.GeoJson
-            }).ToList(), removedLinePlots, activeStagedFiles, presentation.UnavailableStagedFileIds);
+            }).ToList(), removedLinePlots, activeStagedFiles, presentation.UnavailableStagedFileIds,
+            reviewEvents.Select(reviewEvent => new CaveChangeRequestReviewEventVm(
+                reviewEvent.Event.Id, reviewEvent.Event.ProposalVersionId, reviewEvent.Event.Action,
+                reviewEvent.Event.ActorUserId, reviewEvent.ActorName, reviewEvent.Event.Message,
+                reviewEvent.Event.CreatedOn)).ToList());
     }
 
     public async Task<CaveProposalVersionDetailVm> GetVersionAsync(string requestId, string versionId,
@@ -263,8 +268,8 @@ public sealed class CaveChangeRequestService
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
-        if (row.Request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
+        if (!CaveChangeRequestStatePolicy.CanBePublished(row.Request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
@@ -313,14 +318,42 @@ public sealed class CaveChangeRequestService
             publishedRevisionId, publishedRevisionId);
     }
 
+    public async Task<CaveChangeRequestDecisionVm> RequestChangesAsync(string requestId,
+        string expectedProposalVersionId, string? message, CancellationToken cancellationToken)
+    {
+        var row = await _requests.GetAsync(requestId, cancellationToken)
+                  ?? throw ApiExceptionDictionary.NotFound("Change request");
+        await CanReviewAsync(row, true);
+        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
+            throw new CaveProposalVersionConflictException(expectedProposalVersionId, row.Request.CurrentProposalVersionId);
+        if (string.IsNullOrWhiteSpace(message))
+            throw ApiExceptionDictionary.BadRequest("A message is required when requesting changes.");
+        await _requests.RequestChangesAsync(requestId, expectedProposalVersionId, message.Trim(), cancellationToken);
+        return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.ChangesRequested, requestId, null,
+            row.CurrentRevision?.Id);
+    }
+
+    public async Task<CaveChangeRequestDecisionVm> ResubmitAsync(string requestId,
+        string expectedProposalVersionId, CancellationToken cancellationToken)
+    {
+        var row = await RequireReadableAsync(requestId, cancellationToken);
+        if (row.Request.CreatedByUserId != _user.Id)
+            throw ApiExceptionDictionary.Forbidden("Only the submitter can resubmit requested changes.");
+        await _requests.ResubmitAsync(requestId, expectedProposalVersionId, cancellationToken);
+        return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Resubmitted, requestId, null,
+            row.CurrentRevision?.Id);
+    }
+
     public async Task<CaveChangeRequestDecisionVm> RejectAsync(string requestId,
         string expectedProposalVersionId, string? notes, CancellationToken cancellationToken)
     {
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
-        if (row.Request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
+        if (!CaveChangeRequestStatePolicy.CanBePublished(row.Request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
@@ -374,11 +407,21 @@ public sealed class CaveChangeRequestService
             throw new CaveRevisionConflictException(caveId, expectedRevisionId, actual);
     }
 
+    private void RequireCanRevise(CaveChangeRequestReadRow row, bool canReview)
+    {
+        if (CaveChangeRequestStatePolicy.IsAwaitingAuthor(row.Request.Status) &&
+            row.Request.CreatedByUserId != _user.Id)
+            throw ApiExceptionDictionary.Forbidden("Only the submitter can revise a request while changes are requested.");
+        if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status) &&
+            row.Request.CreatedByUserId != _user.Id && !canReview)
+            throw ApiExceptionDictionary.Forbidden("You cannot revise this request.");
+    }
+
     private static void RequireExpectedEditorState(CaveChangeRequestReadRow row, string expectedBaseRevisionId,
         string expectedProposalVersionId, bool againstCurrent)
     {
-        if (row.Request.Status != CaveChangeRequestStatus.Pending)
-            throw ApiExceptionDictionary.BadRequest("Only pending requests can be revised.");
+        if (!CaveChangeRequestStatePolicy.CanReceiveProposalVersions(row.Request.Status))
+            throw ApiExceptionDictionary.BadRequest("This request can no longer be revised.");
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
@@ -788,13 +831,13 @@ public sealed class CaveChangeRequestService
             row.Request.ReviewedOn, row.Request.ReviewerUserId, row.ReviewerName, row.Request.ReviewerNotes,
             row.Request.BaseRevisionId!, row.ProposalVersion.BaseRevisionId, row.CurrentRevision?.Id,
             row.Request.CurrentProposalVersionId!, IsStale(row), row.Request.ApprovedRevisionId,
-            row.Request.CreatedByUserId == _user.Id && row.Request.Status == CaveChangeRequestStatus.Pending,
-            canReview && row.Request.Status == CaveChangeRequestStatus.Pending,
+            row.Request.CreatedByUserId == _user.Id && CaveChangeRequestStatePolicy.CanReceiveProposalVersions(row.Request.Status),
+            canReview && CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status),
             CaveProposalChangeScopeSummary.Build(baseSnapshot, proposal));
     }
 
     private static bool IsStale(CaveChangeRequestReadRow row) =>
-        row.Request.Status == CaveChangeRequestStatus.Pending &&
+        CaveChangeRequestStatePolicy.IsOpen(row.Request.Status) &&
         row.ProposalVersion.BaseRevisionId != row.CurrentRevision?.Id;
 
     private static CaveRevisionDiffVm Map(CaveRevisionDiff diff) => new(

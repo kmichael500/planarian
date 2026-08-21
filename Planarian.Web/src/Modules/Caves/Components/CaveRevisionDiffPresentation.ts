@@ -119,7 +119,7 @@ export const roleLabels: Record<string, string> = {
   GeologicAge: "Geologic Age",
   PhysiographicProvince: "Physiographic Province",
   Biology: "Biology",
-  Archeology: "Archeology",
+  Archeology: "Archaeology",
   MapStatus: "Map Status",
   Cartographer: "Cartographers",
   CaveReportedBy: "Reported By",

@@ -11,6 +11,7 @@ import {
   DatePicker,
   InputNumber,
   Skeleton,
+  Typography,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
@@ -219,7 +220,7 @@ const CaveComponent = ({
       </Descriptions.Item>
     ),
     isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && (
-      <Descriptions.Item label="Archeology" key="archeology">
+      <Descriptions.Item label="Archaeology" key="archeology">
         {generateTags(cave?.archeologyTagIds)}
       </Descriptions.Item>
     ),
@@ -318,7 +319,7 @@ const CaveComponent = ({
           {generateTags(entrance.entranceOtherTagIds)}
         </Descriptions.Item>
       ),
-      <Descriptions.Item label="Land Access" span={3}>
+      <Descriptions.Item label="Land Access" key="land-access" span={3}>
         <PublicAccessDetails lat={entrance.latitude} lng={entrance.longitude} />
       </Descriptions.Item>,
     ].filter(Boolean);
@@ -406,155 +407,163 @@ const CaveComponent = ({
 
       {cave?.entrances && cave?.entrances.length > 0 && selectedEntrance && (
         <>
-          <PlanarianDividerComponent
-            title="Geology"
-            secondaryTitle="from Macrostrat and NGMDB Map Viewer"
-            element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGeology(!showGeology)}>
-                  {showGeology ? "Show less" : "Show more"}
-                </a>
-              </div>
-            }
+          <PlanarianDividerComponent title="Nearby Data" />
+          <Collapse
+            size="small"
+            destroyInactivePanel
+            activeKey={[
+              ...(showGeology ? ["geology"] : []),
+              ...(showGages ? ["gages"] : []),
+            ]}
+            onChange={(keys) => {
+              const activeKeys = new Set(Array.isArray(keys) ? keys : [keys]);
+              setShowGeology(activeKeys.has("geology"));
+              setShowGages(activeKeys.has("gages"));
+            }}
+            items={[
+              {
+                key: "geology",
+                label: (
+                  <div>
+                    <Space size={6} wrap>
+                      <Typography.Text strong>Geology</Typography.Text>
+                      <Typography.Text type="secondary">
+                        Macrostrat · NGMDB
+                      </Typography.Text>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary">
+                        Regional geology and geologic maps near an entrance.
+                      </Typography.Text>
+                    </div>
+                  </div>
+                ),
+                children:
+                  selectedEntrance.latitude && selectedEntrance.longitude ? (
+                    <div>
+                      {cave.entrances.length > 1 && (
+                        <Row style={{ marginBottom: "16px" }}>
+                          <Col>
+                            <Select
+                              value={selectedEntrance.id}
+                              style={{ width: 200 }}
+                              onChange={(value) => {
+                                const newEntrance = cave.entrances.find(
+                                  (entrance) => entrance.id === value,
+                                );
+                                if (newEntrance)
+                                  setSelectedEntrance(newEntrance);
+                              }}
+                            >
+                              {cave.entrances.map((entrance, index) => (
+                                <Option
+                                  key={entrance.id || index}
+                                  value={entrance.id || index}
+                                >
+                                  {entrance.name
+                                    ? entrance.name
+                                    : `Entrance ${index + 1}`}
+                                </Option>
+                              ))}
+                            </Select>
+                          </Col>
+                        </Row>
+                      )}
+                      <Macrostrat
+                        lat={selectedEntrance.latitude}
+                        lng={selectedEntrance.longitude}
+                      />
+                    </div>
+                  ) : (
+                    <Typography.Text type="secondary">
+                      Coordinates are required to load nearby geology.
+                    </Typography.Text>
+                  ),
+              },
+              {
+                key: "gages",
+                label: (
+                  <div>
+                    <Space size={6} wrap>
+                      <Typography.Text strong>Stream Gages</Typography.Text>
+                      <Typography.Text type="secondary">
+                        USGS NWIS
+                      </Typography.Text>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary">
+                        Nearby real-time water levels and streamflow.
+                      </Typography.Text>
+                    </div>
+                  </div>
+                ),
+                children:
+                  selectedGageEntrance?.latitude &&
+                  selectedGageEntrance.longitude ? (
+                    <div>
+                      <Row gutter={[16, 16]}>
+                        {cave.entrances.length > 1 && (
+                          <Col xs={24} sm={24} md={8} lg={8}>
+                            <Select
+                              value={selectedGageEntrance.id}
+                              style={{ width: "100%" }}
+                              onChange={(value) => {
+                                const newEntrance = cave.entrances.find(
+                                  (entrance) => entrance.id === value,
+                                );
+                                if (newEntrance)
+                                  setSelectedGageEntrance(newEntrance);
+                              }}
+                            >
+                              {cave.entrances.map((entrance, index) => (
+                                <Option
+                                  key={entrance.id || index}
+                                  value={entrance.id || index}
+                                >
+                                  {entrance.name
+                                    ? entrance.name
+                                    : `Entrance ${index + 1}`}
+                                </Option>
+                              ))}
+                            </Select>
+                          </Col>
+                        )}
+                        <Col xs={24} sm={12} md={6} lg={6}>
+                          <InputNumber
+                            value={gageDistance}
+                            addonAfter="Miles"
+                            min={1}
+                            max={50}
+                            onChange={(value) =>
+                              setGageDistance(value as number)
+                            }
+                            style={{ width: "100%" }}
+                          />
+                        </Col>
+                        <Col xs={24} sm={12} md={10} lg={10}>
+                          <PlanarianDateRange
+                            value={gageDateRange}
+                            onChange={(range) =>
+                              setGageDateRange(range || [null, null])
+                            }
+                          />
+                        </Col>
+                      </Row>
+                      <GageList
+                        lat={selectedGageEntrance.latitude}
+                        lng={selectedGageEntrance.longitude}
+                        distanceMiles={gageDistance}
+                        dateRange={gageDateRange}
+                      />
+                    </div>
+                  ) : (
+                    <Typography.Text type="secondary">
+                      Coordinates are required to load nearby stream gages.
+                    </Typography.Text>
+                  ),
+              },
+            ]}
           />
-          {!showGeology && (
-            <div style={{ marginBottom: "8px" }}>
-              <p>
-                Access geological data through Macrostrat's comprehensive
-                database and view geologic maps from the National Geologic Map
-                Database Mapviewer.
-              </p>
-            </div>
-          )}
-          {showGeology &&
-            selectedEntrance.latitude &&
-            selectedEntrance.longitude && (
-              <div>
-                {cave.entrances.length > 1 && (
-                  <Row style={{ marginBottom: "16px" }}>
-                    <Col>
-                      <Select
-                        value={selectedEntrance.id}
-                        style={{ width: 200 }}
-                        onChange={(value) => {
-                          const newEntrance = cave.entrances.find(
-                            (entrance) => entrance.id === value
-                          );
-                          if (newEntrance) {
-                            setSelectedEntrance(newEntrance);
-                          }
-                        }}
-                      >
-                        {cave.entrances.map((entrance, index) => (
-                          <Option
-                            key={entrance.id || index}
-                            value={entrance.id || index}
-                          >
-                            {entrance.name
-                              ? entrance.name
-                              : `Entrance ${index + 1}`}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Col>
-                  </Row>
-                )}
-                <h4>Geology Information</h4>
-                <Macrostrat
-                  lat={selectedEntrance.latitude}
-                  lng={selectedEntrance.longitude}
-                />
-              </div>
-            )}
-
-          <PlanarianDividerComponent
-            title="Stream Gages"
-            secondaryTitle="from USGS NWIS"
-            element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGages(!showGages)}>
-                  {showGages ? "Show less" : "Show more"}
-                </a>
-              </div>
-            }
-          />
-          {!showGages && (
-            <div style={{ marginBottom: "8px" }}>
-              <p>
-                View real-time water data from USGS's network of over 11,800
-                streamgages across the United States. These monitoring stations
-                measure and transmit water levels and flow rates, providing
-                valuable information about local water conditions.
-              </p>
-            </div>
-          )}
-          {showGages &&
-            selectedGageEntrance &&
-            selectedGageEntrance.latitude &&
-            selectedGageEntrance.longitude && (
-              <div style={{}}>
-                <Row gutter={[16, 16]}>
-                  {cave.entrances.length > 1 && (
-                    <Col xs={24} sm={24} md={8} lg={8}>
-                      <Select
-                        value={selectedGageEntrance?.id}
-                        style={{ width: "100%" }}
-                        onChange={(value) => {
-                          const newEntrance = cave.entrances.find(
-                            (entrance) => entrance.id === value
-                          );
-                          if (newEntrance) {
-                            setSelectedGageEntrance(newEntrance);
-                          }
-                        }}
-                      >
-                        {cave.entrances.map((entrance, index) => (
-                          <Option
-                            key={entrance.id || index}
-                            value={entrance.id || index}
-                          >
-                            {entrance.name
-                              ? entrance.name
-                              : `Entrance ${index + 1}`}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Col>
-                  )}
-                  <Col xs={24} sm={12} md={6} lg={6}>
-                    <InputNumber
-                      value={gageDistance}
-                      addonAfter="Miles"
-                      min={1}
-                      max={50}
-                      onChange={(value) => setGageDistance(value as number)}
-                      style={{ width: "100%" }}
-                    />
-                  </Col>
-                  <Col
-                    style={{ marginBottom: "16px" }}
-                    xs={24}
-                    sm={12}
-                    md={10}
-                    lg={10}
-                  >
-                    <PlanarianDateRange
-                      value={gageDateRange}
-                      onChange={(range, dateStrings) =>
-                        setGageDateRange(range || [null, null])
-                      }
-                    />
-                  </Col>
-                </Row>
-
-                <GageList
-                  lat={selectedGageEntrance.latitude}
-                  lng={selectedGageEntrance.longitude}
-                  distanceMiles={gageDistance}
-                  dateRange={gageDateRange}
-                />
-              </div>
-            )}
         </>
       )}
 

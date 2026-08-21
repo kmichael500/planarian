@@ -77,8 +77,9 @@ export const CaveChangeRequestPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [deciding, setDeciding] = useState(false);
-  const [decisionDialog, setDecisionDialog] = useState<"approve" | "reject">();
+  const [decisionDialog, setDecisionDialog] = useState<"approve" | "requestChanges" | "reject">();
   const [approvalNote, setApprovalNote] = useState("");
+  const [requestedChangesMessage, setRequestedChangesMessage] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionError, setRejectionError] = useState<string>();
   const [versionDetails, setVersionDetails] = useState<Record<string, CaveProposalVersionDetailVm>>({});
@@ -103,7 +104,8 @@ export const CaveChangeRequestPage = () => {
     setHeaderTitle([`Review ${request.caveName}`]);
     setHeaderButtons([
       <CaveAvailability key="open-cave" request={request} />,
-      ...(request.status === "Pending" && (request.canEdit || request.canReview) ? [
+      ...(((request.status === "Pending" && (request.canEdit || request.canReview)) ||
+        (request.status === "ChangesRequested" && request.canEdit)) ? [
         <PlanarianButton key="revise" icon={<EditOutlined />} alwaysShowChildren
           aria-label={request.isStale ? "Re-review changes" : "Revise changes"}
           type={request.isStale ? "primary" : "default"}
@@ -121,15 +123,19 @@ export const CaveChangeRequestPage = () => {
     setDecisionDialog(undefined);
   };
 
-  const decide = async (decision: { kind: "approve"; note?: string } | { kind: "reject"; reason: string }) => {
+  const decide = async (decision: { kind: "approve"; note?: string } |
+    { kind: "requestChanges"; message: string } | { kind: "reject"; reason: string }) => {
     if (!requestId || !detail) return;
     setDeciding(true);
     try {
       const expectedProposalVersionId = detail.request.currentProposalVersionId;
       if (decision.kind === "approve")
         await CaveService.ApproveChangeRequest(requestId, expectedProposalVersionId, decision.note);
+      else if (decision.kind === "requestChanges")
+        await CaveService.RequestChangeRequestChanges(requestId, expectedProposalVersionId, decision.message);
       else await CaveService.RejectChangeRequest(requestId, expectedProposalVersionId, decision.reason);
-      message.success(decision.kind === "approve" ? "Changes approved and published." : "Change request rejected.");
+      message.success(decision.kind === "approve" ? "Changes approved and published."
+        : decision.kind === "requestChanges" ? "Changes sent back to the submitter." : "Change request rejected.");
       setDetail(await CaveService.GetChangeRequest(requestId));
       setDecisionDialog(undefined);
     } catch (error: any) {
@@ -151,6 +157,28 @@ export const CaveChangeRequestPage = () => {
     }
     setRejectionError(undefined);
     await decide({ kind: "reject", reason });
+  };
+
+
+  const requestChanges = async () => {
+    const feedback = requestedChangesMessage.trim();
+    if (!feedback) return;
+    await decide({ kind: "requestChanges", message: feedback });
+  };
+
+  const resubmit = async () => {
+    if (!requestId || !detail) return;
+    setDeciding(true);
+    try {
+      await CaveService.ResubmitChangeRequest(requestId, detail.request.currentProposalVersionId);
+      message.success("Changes resubmitted for review.");
+      setDetail(await CaveService.GetChangeRequest(requestId));
+    } catch (error: any) {
+      if (error?.conflictKind === "ActiveProposalVersionChanged") {
+        message.warning("The proposal changed. Reload and review the latest draft before resubmitting.");
+        await refreshAfterConflict();
+      } else message.error("The changes could not be resubmitted.");
+    } finally { setDeciding(false); }
   };
 
   const toggleVersion = async (versionId: string) => {
@@ -177,8 +205,16 @@ export const CaveChangeRequestPage = () => {
   const submitted = formatDateTime(request.submittedOn) ?? "Unknown time";
   const updated = request.updatedOn ? formatDateTime(request.updatedOn) : undefined;
   const reviewed = request.reviewedOn ? formatDateTime(request.reviewedOn) : undefined;
-  const statusColor = request.status === "Approved" ? "success" : request.status === "Rejected" ? "error" : "processing";
-  const statusLabel = request.status === "Pending" ? "Pending review" : request.status;
+  const reviewEvents = detail.reviewEvents ?? [];
+  const latestChangesRequested = [...reviewEvents].reverse()
+    .find(reviewEvent => reviewEvent.action === "ChangesRequested");
+  const canResubmit = request.status === "ChangesRequested" && request.canEdit && !!latestChangesRequested &&
+    request.currentProposalVersionId !== latestChangesRequested.proposalVersionId;
+  const isFinalDecision = request.status === "Approved" || request.status === "Rejected";
+  const statusColor = request.status === "Approved" ? "success" : request.status === "Rejected" ? "error"
+    : request.status === "ChangesRequested" ? "warning" : "processing";
+  const statusLabel = request.status === "Pending" ? "Pending review"
+    : request.status === "ChangesRequested" ? "Changes requested" : request.status;
   const versionNumbers = new Map(detail.versions.map((version, index) => [version.id, index + 1]));
 
   const fileById = new Map([...detail.base.files, ...detail.current.files, ...detail.proposed.files]
@@ -212,6 +248,14 @@ export const CaveChangeRequestPage = () => {
     <UnavailableProposalFilesAlert fileIds={detail.unavailableStagedFileIds}
       snapshots={[detail.proposed, detail.current, detail.base]} />
     {request.isStale && <CaveStaleReviewNotice />}
+    {request.status === "ChangesRequested" && <Alert type="warning" showIcon message="Changes requested"
+      description={<Space direction="vertical" size={2}>
+        {latestChangesRequested?.message && <Typography.Text>{latestChangesRequested.message}</Typography.Text>}
+        <Typography.Text type="secondary">
+          {canResubmit ? "A newer draft is saved. Resubmit it when you are ready for another review."
+            : "Revise the proposal and save a new draft before resubmitting it for review."}
+        </Typography.Text>
+      </Space>} />}
 
     <section aria-label="Change request">
       <Card>
@@ -228,7 +272,7 @@ export const CaveChangeRequestPage = () => {
             </Typography.Text>
           </div>
 
-          {request.status !== "Pending" && <div>
+          {isFinalDecision && reviewEvents.length === 0 && <div>
             <Typography.Text type="secondary">
               {request.reviewerName ?? "Unknown reviewer"}{reviewed ? ` · reviewed ${reviewed}` : ""}
             </Typography.Text>
@@ -252,6 +296,10 @@ export const CaveChangeRequestPage = () => {
                   aria-label="Approve and publish" disabled={request.isStale} onClick={() => setDecisionDialog("approve")}>
                   Approve and publish
                 </PlanarianButton>
+                <PlanarianButton icon={<EditOutlined />} alwaysShowChildren block={!screens.md}
+                  aria-label="Request changes" onClick={() => setDecisionDialog("requestChanges")}>
+                  Request changes
+                </PlanarianButton>
                 <PlanarianButton icon={<CloseOutlined />} alwaysShowChildren block={!screens.md} danger
                   aria-label="Reject" onClick={() => { setRejectionError(undefined); setDecisionDialog("reject"); }}>
                   Reject
@@ -259,9 +307,52 @@ export const CaveChangeRequestPage = () => {
               </Space>
             </div>
           </>}
+
+          {request.status === "ChangesRequested" && request.canEdit && <>
+            <Divider style={{ margin: `${token.marginXS}px 0 0` }} />
+            <div role="region" aria-label="Author actions" style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Space direction={screens.md ? "horizontal" : "vertical"} size="small"
+                style={{ width: screens.md ? undefined : "100%", alignItems: screens.md ? "center" : undefined }}>
+                {!canResubmit && <Typography.Text type="secondary">Save a new draft before resubmitting.</Typography.Text>}
+                <PlanarianButton icon={<CheckOutlined />} alwaysShowChildren block={!screens.md} type="primary"
+                  aria-label="Resubmit for review" disabled={!canResubmit} loading={deciding} onClick={resubmit}>
+                  Resubmit for review
+                </PlanarianButton>
+              </Space>
+            </div>
+          </>}
         </Space>
       </Card>
     </section>
+
+    {reviewEvents.length > 0 && <section aria-label="Review history">
+      <Card size="small" title="Review history">
+        <Space direction="vertical" size="small" style={{ width: "100%" }}>
+          {reviewEvents.slice().reverse().map((reviewEvent, index) => {
+            const label = reviewEvent.action === "ChangesRequested" ? "Changes requested"
+              : reviewEvent.action === "Resubmitted" ? "Resubmitted for review" : reviewEvent.action;
+            const color = reviewEvent.action === "Approved" ? "success" : reviewEvent.action === "Rejected" ? "error"
+              : reviewEvent.action === "ChangesRequested" ? "warning" : "processing";
+            return <div key={reviewEvent.id} style={{
+              paddingTop: index ? token.paddingXS : 0,
+              borderTop: index ? `1px solid ${token.colorSplit}` : undefined,
+            }}>
+              <Space direction="vertical" size={2}>
+                <Space wrap size="small">
+                  <Tag color={color}>{label}</Tag>
+                  <Typography.Text type="secondary">
+                    {reviewEvent.actorName ?? "Unknown user"} · {formatDateTime(reviewEvent.createdOn) ?? "Unknown time"}
+                  </Typography.Text>
+                </Space>
+                {reviewEvent.message && <Typography.Paragraph style={{ marginBottom: 0 }}>
+                  {reviewEvent.message}
+                </Typography.Paragraph>}
+              </Space>
+            </div>;
+          })}
+        </Space>
+      </Card>
+    </section>}
 
     {detail.versions.length > 1 && <section aria-label="Proposal history">
       <Card size="small" title="Proposal history">
@@ -321,6 +412,24 @@ export const CaveChangeRequestPage = () => {
         <div>
           <label htmlFor="approval-note"><Typography.Text>Reviewer note (optional)</Typography.Text></label>
           <Input.TextArea id="approval-note" value={approvalNote} onChange={event => setApprovalNote(event.target.value)} rows={3} />
+        </div>
+      </Space>
+    </PlanarianModal>
+
+    <PlanarianModal open={decisionDialog === "requestChanges"} onClose={() => setDecisionDialog(undefined)}
+      header="Request changes" footer={[
+        <PlanarianButton key="cancel" icon={undefined} alwaysShowChildren onClick={() => setDecisionDialog(undefined)}>Cancel</PlanarianButton>,
+        <PlanarianButton key="request" icon={<EditOutlined />} alwaysShowChildren type="primary" loading={deciding}
+          aria-label="Request changes" disabled={!requestedChangesMessage.trim()} onClick={requestChanges}>Request changes</PlanarianButton>,
+      ]}>
+      <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>
+          The submitter can revise the proposal and explicitly resubmit it when it is ready for another review.
+        </Typography.Paragraph>
+        <div>
+          <label htmlFor="requested-changes-message"><Typography.Text>Message to submitter</Typography.Text></label>
+          <Input.TextArea id="requested-changes-message" value={requestedChangesMessage}
+            onChange={event => setRequestedChangesMessage(event.target.value)} rows={3} />
         </div>
       </Space>
     </PlanarianModal>

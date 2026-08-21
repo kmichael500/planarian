@@ -43,7 +43,7 @@ const CavePage = () => {
   useEffect(() => {
     setHeaderButtons([
       <FavoriteCave caveId={caveId} />,
-      <CaveHistoryModal caveId={caveId} />,
+      <CaveHistoryModal caveId={caveId} canReviewChangeRequests={hasEditPermission} />,
       ...(isPermissionResolved && hasEditPermission ? [
         <Link to={`/caves/${caveId}/edit`}>
           <PlanarianButton icon={<EditOutlined />} type="primary">Edit</PlanarianButton>
@@ -53,7 +53,7 @@ const CavePage = () => {
           <PlanarianButton icon={<FormOutlined />} type="primary">Suggest Changes</PlanarianButton>
         </Link>,
       ] : []),
-      <BackButtonComponent to={"./.."} />,
+      <BackButtonComponent to={"./.."} type="text" tooltip="Back to Caves" />,
     ]);
   }, [cave, hasEditPermission, isPermissionResolved]);
 

@@ -1072,10 +1072,10 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .FirstOrDefaultAsync();
     }
 
-    public Task<bool> HasPendingChangeRequestsAsync(string caveId, CancellationToken cancellationToken = default) =>
+    public Task<bool> HasOpenChangeRequestsAsync(string caveId, CancellationToken cancellationToken = default) =>
         DbContext.CaveChangeRequests.AsNoTracking().AnyAsync(request =>
             request.AccountId == RequestUser.AccountId && request.CaveId == caveId &&
-            request.Status == CaveChangeRequestStatus.Pending, cancellationToken);
+            CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status), cancellationToken);
 
     public async Task LockForHardDeleteAsync(string caveId, CancellationToken cancellationToken = default)
     {
@@ -1313,7 +1313,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                     equals new { request.AccountId, request.Id }
                 where staged.AccountId == RequestUser.AccountId && ids.Contains(staged.FileId) &&
                       staged.ChangeRequestId != changeRequestId &&
-                      request.Status == CaveChangeRequestStatus.Pending
+                      CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status)
                 select staged.FileId)
             .FirstOrDefaultAsync(cancellationToken);
         if (sharedPendingFileId is not null)

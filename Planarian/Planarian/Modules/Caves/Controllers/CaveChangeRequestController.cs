@@ -168,6 +168,36 @@ public sealed class CaveChangeRequestController : ControllerBase
         }
     }
 
+    [HttpPost("{requestId:length(10)}/request-changes")]
+    public async Task<ActionResult<CaveChangeRequestDecisionVm>> RequestChanges(string requestId,
+        CaveChangeRequestDecisionRequestVm request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.RequestChangesAsync(requestId, request.ExpectedProposalVersionId,
+                request.Notes, cancellationToken));
+        }
+        catch (CaveProposalVersionConflictException conflict)
+        {
+            return ProposalVersionConflict(conflict);
+        }
+    }
+
+    [HttpPost("{requestId:length(10)}/resubmit")]
+    public async Task<ActionResult<CaveChangeRequestDecisionVm>> Resubmit(string requestId,
+        CaveChangeRequestDecisionRequestVm request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return new JsonResult(await _service.ResubmitAsync(requestId, request.ExpectedProposalVersionId,
+                cancellationToken));
+        }
+        catch (CaveProposalVersionConflictException conflict)
+        {
+            return ProposalVersionConflict(conflict);
+        }
+    }
+
     [HttpPost("{requestId:length(10)}/reject")]
     public async Task<ActionResult<CaveChangeRequestDecisionVm>> Reject(string requestId,
         CaveChangeRequestDecisionRequestVm request, CancellationToken cancellationToken)

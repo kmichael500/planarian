@@ -164,10 +164,10 @@ const caveImportHeadersData = [
     },
   },
   {
-    display: "Archeology",
+    display: "Archaeology",
     value: "Archeology",
     data: {
-      description: "Comma-seperated list of the archeological tags.",
+      description: "Comma-seperated list of the archaeological tags.",
       example: "Yes, No",
       isRequired: false,
     },

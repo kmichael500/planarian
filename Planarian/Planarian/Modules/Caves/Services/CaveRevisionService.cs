@@ -61,7 +61,8 @@ public sealed class CaveRevisionService
     private static CaveRevisionListItemVm Map(CaveRevisionQueryRow row, int sequence, bool isCurrent) => new(
         row.Revision.Id, row.Revision.CaveId, sequence, row.Revision.CreatedOn,
         row.Revision.CreatedByUserId, row.ActorName, row.Revision.Source, row.Revision.Operation,
-        row.Revision.ChangeRequestId, row.Revision.ImportBatchId, isCurrent);
+        row.Revision.ChangeRequestId, row.Revision.ImportBatchId,
+        row.ChangeRequestSubmitterUserId, row.ChangeRequestSubmitterName, row.ChangeRequestReviewerName, isCurrent);
 
     private static CaveRevisionDiffVm Map(CaveRevisionDiff diff) => new(
         diff.Scalars.Select(change => new CaveScalarChangeVm(change.Key, change.Value.Previous,

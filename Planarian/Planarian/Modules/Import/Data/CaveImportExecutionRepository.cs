@@ -131,13 +131,13 @@ public sealed class CaveImportExecutionRepository
         if (deletionIds.Count == 0) return;
         foreach (var chunk in deletionIds.Chunk(LookupBatchSize))
         {
-            var hasPending = await _db.CaveChangeRequests.IgnoreQueryFilters().AsNoTracking()
+            var hasOpen = await _db.CaveChangeRequests.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(request => request.AccountId == _scope.AccountId &&
-                                     request.Status == CaveChangeRequestStatus.Pending &&
+                                     CaveChangeRequestStatePolicy.OpenStatuses.Contains(request.Status) &&
                                      chunk.Contains(request.CaveId), cancellationToken);
-            if (hasPending)
+            if (hasOpen)
                 throw new ImportPlanConcurrencyException(
-                    "One or more Caves selected for sync deletion have pending change requests. " +
+                    "One or more Caves selected for sync deletion have open change requests. " +
                     "Re-plan after those requests are resolved.");
         }
     }

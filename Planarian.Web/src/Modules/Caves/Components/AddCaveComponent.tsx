@@ -641,7 +641,7 @@ const AddCaveComponent = ({
       <ShouldDisplay featureKey={FeatureKey.EnabledFieldCaveArcheologyTags}>
         <Col {...twoColProps}>
           <Form.Item
-            label="Archeology"
+            label="Archaeology"
             name={nameof<AddCaveVm>("archeologyTagIds")}
           >
             <TagSelectComponent
