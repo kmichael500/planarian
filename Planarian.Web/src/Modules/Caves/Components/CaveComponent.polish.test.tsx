@@ -47,3 +47,18 @@ it("uses Archaeology copy and keeps nearby integrations compact until expanded",
   fireEvent.click(screen.getByRole("button", { name: /Stream Gages USGS/i }));
   expect(screen.getByText("Gage content")).toBeInTheDocument();
 });
+
+it("treats zero latitude or longitude as valid nearby-data coordinates", () => {
+  const zeroCoordinateCave = {
+    ...cave,
+    entrances: [{ ...cave.entrances[0], longitude: 0 }],
+    primaryEntrance: { ...cave.primaryEntrance, longitude: 0 },
+  };
+  render(<CaveComponent cave={zeroCoordinateCave} isLoading={false} options={{ showMap: false }} />);
+
+  fireEvent.click(screen.getByRole("button", { name: /Geology Macrostrat/i }));
+  expect(screen.getByText("Macrostrat content")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Stream Gages USGS/i }));
+  expect(screen.getByText("Gage content")).toBeInTheDocument();
+  expect(screen.queryByText(/Coordinates are required/)).not.toBeInTheDocument();
+});

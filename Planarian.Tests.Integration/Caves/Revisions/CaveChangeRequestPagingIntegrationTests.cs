@@ -121,6 +121,42 @@ public sealed class CaveChangeRequestPagingIntegrationTests(PostgresTestServer f
         Assert.Equal(1, rejected.TotalCount);
     }
 
+    [Fact]
+    public async Task ReviewQueuePrioritizesWaitingWorkAndOrdersItOldestFirst()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ReviewQueuePrioritizesWaitingWorkAndOrdersItOldestFirst));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'c');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00c");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantViewAsync(database, tenant, "reviewer");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        string resolvedOldestId;
+        string waitingOlderId;
+        string waitingNewerId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            resolvedOldestId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Resolved oldest"), tenant.RevisionId, default);
+            waitingOlderId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Waiting older"), tenant.RevisionId, default);
+            waitingNewerId = await contributor.ChangeRequests.CreateAsync(tenant.CaveId,
+                PublishableValues(tenant, quality.Id, "Waiting newer"), tenant.RevisionId, default);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+            await reviewer.ChangeRequests.RejectAsync(resolvedOldestId,
+                await CurrentVersionAsync(reviewer.Db, resolvedOldestId), "Resolved", default);
+
+        await using var reviewerReader = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer");
+        var page = await reviewerReader.ChangeRequests.ListForReviewAsync(1, 10, default);
+
+        Assert.Equal([waitingOlderId, waitingNewerId, resolvedOldestId],
+            page.Results.Select(row => row.Id));
+    }
+
     private sealed class CommandCounter : DbCommandInterceptor
     {
         private readonly ConcurrentQueue<string> _commands = new();

@@ -46,6 +46,8 @@ export interface AddCaveComponentProps {
   cave?: AddCaveVm | CaveVm;
   submitLabel?: string;
   onAuthoringChange?: () => void;
+  stagedFileRequestId?: string;
+  existingRequestStagedFileIds?: readonly string[];
   stickySubmit?: boolean;
 }
 const AddCaveComponent = ({
@@ -54,6 +56,8 @@ const AddCaveComponent = ({
   cave,
   submitLabel = "Submit",
   onAuthoringChange,
+  stagedFileRequestId,
+  existingRequestStagedFileIds,
   stickySubmit = false,
 }: AddCaveComponentProps) => {
   const { isFeatureEnabled } = useFeatureEnabled();
@@ -1065,7 +1069,9 @@ const AddCaveComponent = ({
       </Col>
       <Col span={24}>
         <PlanarianDividerComponent title={"Files"} />
-        <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange} />
+        <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange}
+              stagedFileRequestId={stagedFileRequestId}
+              existingRequestStagedFileIds={existingRequestStagedFileIds} />
       </Col>
       <Col span={24}>
         <PlanarianDividerComponent title={"Line Plots"} />

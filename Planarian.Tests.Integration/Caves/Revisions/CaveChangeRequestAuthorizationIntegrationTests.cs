@@ -200,4 +200,34 @@ public sealed class CaveChangeRequestAuthorizationIntegrationTests(PostgresTestS
         Assert.Empty(await verifyInvisible.CaveChangeRequests.ToListAsync());
         Assert.Empty(await verifyInvisible.CaveProposalVersions.ToListAsync());
     }
+    [Fact]
+    public async Task ReviewEventsFailClosedAcrossAccountQueryFilters()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ReviewEventsFailClosedAcrossAccountQueryFilters));
+        var tenantA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var tenantB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        await CavePermissions.GrantViewAsync(database, tenantA, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenantA, "reviewer");
+
+        string requestId;
+        string versionId;
+        await using (var contributor = database.CreateDbContext("contributor", tenantA.AccountId))
+        {
+            var requests = new CaveChangeRequestRepository(contributor, contributor.RequestUser);
+            requestId = await requests.CreateAsync(tenantA.CaveId, tenantA.RevisionId,
+                Proposal(tenantA, "Tenant-scoped review event"), default);
+            versionId = await CurrentVersionAsync(contributor, requestId);
+        }
+
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenantA.AccountId, "reviewer"))
+            await reviewer.ChangeRequests.RequestChangesAsync(requestId, versionId, "Please revise.", default);
+
+        await using var accountA = database.CreateDbContext("verify-a", tenantA.AccountId);
+        Assert.Single(await accountA.CaveChangeRequestReviewEvents.ToListAsync());
+
+        await using var accountB = database.CreateDbContext("verify-b", tenantB.AccountId);
+        Assert.Empty(await accountB.CaveChangeRequestReviewEvents.ToListAsync());
+    }
+
 }

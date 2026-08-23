@@ -429,6 +429,42 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
     }
 
     [Fact]
+    public async Task RequestBoundStagedFileRequiresRequestScopedAccess()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RequestBoundStagedFileRequiresRequestScopedAccess));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'b', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000b");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        var blobs = new TestFileBlobStore();
+
+        await using var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs);
+        await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("request-bound bytes"));
+        var staged = await contributor.Services.Files.StageAuthoringFile(content, "evidence.pdf", default);
+        var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+        var values = ValuesFromCave(context.Cave);
+        values.Name = "Proposal with request-bound staged file";
+        values.Files = [new EditFileMetadataVm
+        {
+            Id = staged.Id,
+            FileTypeTagId = staged.FileTypeTagId,
+            Name = staged.Name!
+        }];
+        var requestId = await contributor.ChangeRequests.CreateAsync(
+            tenant.CaveId, values, context.ExpectedBaseRevisionId, default);
+
+        var genericFailure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() =>
+            contributor.Services.Files.OpenAuthoringStagedFileAsync(staged.Id, default));
+        Assert.Equal(404, genericFailure.StatusCode);
+
+        var requestScoped = await contributor.ChangeRequests.OpenStagedFileAsync(requestId, staged.Id, default);
+        Assert.Equal("evidence.pdf", requestScoped.FileName);
+        await using var reader = new StreamReader(requestScoped.Stream);
+        Assert.Equal("request-bound bytes", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
     public async Task ProposalVersionKeepsExactLinePlotPayloadAfterPublishedCaveChanges()
     {
         await using var database = await fixture.CreateDatabaseAsync(

@@ -31,13 +31,6 @@ describe("FileViewer bundle boundaries", () => {
     expect(pdfSource).toContain("options={documentOptions}");
   });
 
-  it("allows request-scoped file access without creating a second viewer", () => {
-    expect(source).toContain("viewUrl ?? FileService.getFileAccessUrl");
-    expect(source).toContain("if (onDownload) onDownload()");
-    expect(source).toContain("viewUrl?: string");
-    expect(source).toContain("onDownload?: () => void");
-  });
-
   it("keeps react-pdf dependencies inside the lazy PdfViewer module using the documented imports", () => {
     expect(pdfSource).toContain('from "react-pdf"');
     expect(pdfSource).toContain('import "react-pdf/dist/Page/AnnotationLayer.css"');

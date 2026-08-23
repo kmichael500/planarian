@@ -10,6 +10,7 @@ using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Import.Planning;
 using Planarian.Tests;
 using Planarian.Tests.Integration.Infrastructure.Actors;
+using Planarian.Tests.Integration.Infrastructure.Concurrency;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
@@ -188,7 +189,7 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         Assert.Equal(CaveChangeRequestStatus.ChangesRequested,
             (await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId)).Status);
-        Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == tenant.CaveId));
+        Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.AccountId == tenant.AccountId && cave.Id == tenant.CaveId));
         Assert.True(await verify.CaveChangeRequestStagedFiles.AnyAsync(link =>
             link.ChangeRequestId == requestId && link.FileId == staged.FileId));
         Assert.True(await verify.Files.AnyAsync(file => file.Id == staged.FileId));
@@ -339,29 +340,39 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
             versionId = await CurrentVersionAsync(contributor, requestId);
         }
 
-        await using var reviewerOne = database.CreateDbContext("reviewer", tenant.AccountId);
-        await using var reviewerTwo = database.CreateDbContext("reviewer", tenant.AccountId);
-        await CavePermissions.AuthenticateAsync(reviewerOne, tenant.AccountId);
-        await CavePermissions.AuthenticateAsync(reviewerTwo, tenant.AccountId);
-        var requestChanges = IntegrationTestServices.For(reviewerOne).CaveChangeRequests
-            .RequestChangesAsync(requestId, versionId, "Please revise this.", default);
-        var reject = IntegrationTestServices.For(reviewerTwo).CaveChangeRequests
-            .RejectAsync(requestId, versionId, "Reject instead", default);
-        var outcomes = await Task.WhenAll(CaptureAsync(requestChanges), CaptureAsync(reject));
+        var pause = new PauseChangeRequestUpdateInterceptor();
+        await using var requestChangesDb = database.CreateDbContext("reviewer", tenant.AccountId, pause);
+        await using var rejectDb = database.CreateDbContext("reviewer", tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(requestChangesDb, tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(rejectDb, tenant.AccountId);
+        await rejectDb.Database.OpenConnectionAsync();
+        var rejectPid = await PostgresLockAssertions.BackendPidAsync(rejectDb);
 
-        Assert.Single(outcomes.Where(outcome => outcome.Decision is not null));
-        var failure = Assert.IsType<ApiException>(Assert.Single(outcomes.Where(outcome => outcome.Error is not null)).Error);
+        var requestChanges = IntegrationTestServices.For(requestChangesDb).CaveChangeRequests
+            .RequestChangesAsync(requestId, versionId, "Please revise this.", default);
+        await pause.ChangeRequestUpdateReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var reject = IntegrationTestServices.For(rejectDb).CaveChangeRequests
+            .RejectAsync(requestId, versionId, "Reject instead", default);
+        try
+        {
+            await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, rejectPid, reject);
+        }
+        finally
+        {
+            pause.ContinueUpdate.TrySetResult();
+        }
+
+        var requestChangesDecision = await requestChanges;
+        Assert.Equal(CaveChangeRequestDecisionResult.ChangesRequested, requestChangesDecision.Result);
+        var failure = await Assert.ThrowsAsync<ApiException>(() => reject);
         Assert.Equal(400, failure.StatusCode);
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
-        Assert.Contains(request.Status, new[]
-            { CaveChangeRequestStatus.ChangesRequested, CaveChangeRequestStatus.Rejected });
+        Assert.Equal(CaveChangeRequestStatus.ChangesRequested, request.Status);
         var reviewEvent = Assert.Single(await verify.CaveChangeRequestReviewEvents
             .Where(row => row.ChangeRequestId == requestId).ToListAsync());
-        Assert.Equal(request.Status == CaveChangeRequestStatus.ChangesRequested
-            ? CaveChangeRequestReviewAction.ChangesRequested
-            : CaveChangeRequestReviewAction.Rejected, reviewEvent.Action);
+        Assert.Equal(CaveChangeRequestReviewAction.ChangesRequested, reviewEvent.Action);
     }
 
     [Fact]
@@ -383,45 +394,40 @@ public sealed class CaveChangeRequestChangesRequestedIntegrationTests(PostgresTe
             versionId = await CurrentVersionAsync(contributor.Db, requestId);
         }
 
-        await using var reviewerOne = database.CreateDbContext("reviewer", tenant.AccountId);
-        await using var reviewerTwo = database.CreateDbContext("reviewer", tenant.AccountId);
-        await CavePermissions.AuthenticateAsync(reviewerOne, tenant.AccountId);
-        await CavePermissions.AuthenticateAsync(reviewerTwo, tenant.AccountId);
-        var requestChanges = IntegrationTestServices.For(reviewerOne).CaveChangeRequests
-            .RequestChangesAsync(requestId, versionId, "Please revise this instead.", default);
-        var approve = IntegrationTestServices.For(reviewerTwo).CaveChangeRequests
-            .ApproveAsync(requestId, versionId, null, default);
-        var outcomes = await Task.WhenAll(CaptureAsync(requestChanges), CaptureAsync(approve));
+        var pause = new PauseChangeRequestUpdateInterceptor();
+        await using var requestChangesDb = database.CreateDbContext("reviewer", tenant.AccountId, pause);
+        await using var approveDb = database.CreateDbContext("reviewer", tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(requestChangesDb, tenant.AccountId);
+        await CavePermissions.AuthenticateAsync(approveDb, tenant.AccountId);
+        await approveDb.Database.OpenConnectionAsync();
+        var approvePid = await PostgresLockAssertions.BackendPidAsync(approveDb);
 
-        Assert.Single(outcomes.Where(outcome => outcome.Decision is not null));
-        var failure = Assert.Single(outcomes.Where(outcome => outcome.Error is not null)).Error;
-        Assert.True(failure is ApiException or CaveProposalVersionConflictException,
-            $"Unexpected losing race error: {failure?.GetType().Name}");
+        var requestChanges = IntegrationTestServices.For(requestChangesDb).CaveChangeRequests
+            .RequestChangesAsync(requestId, versionId, "Please revise this instead.", default);
+        await pause.ChangeRequestUpdateReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var approve = IntegrationTestServices.For(approveDb).CaveChangeRequests
+            .ApproveAsync(requestId, versionId, null, default);
+        try
+        {
+            await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, approvePid, approve);
+        }
+        finally
+        {
+            pause.ContinueUpdate.TrySetResult();
+        }
+
+        var requestChangesDecision = await requestChanges;
+        Assert.Equal(CaveChangeRequestDecisionResult.ChangesRequested, requestChangesDecision.Result);
+        var failure = await Assert.ThrowsAsync<ApiException>(() => approve);
+        Assert.Equal(400, failure.StatusCode);
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
-        Assert.Contains(request.Status, new[]
-            { CaveChangeRequestStatus.ChangesRequested, CaveChangeRequestStatus.Approved });
+        Assert.Equal(CaveChangeRequestStatus.ChangesRequested, request.Status);
+        Assert.Null(request.ApprovedRevisionId);
         var reviewEvent = Assert.Single(await verify.CaveChangeRequestReviewEvents
             .Where(row => row.ChangeRequestId == requestId).ToListAsync());
-        if (request.Status == CaveChangeRequestStatus.Approved)
-        {
-            Assert.Equal(CaveChangeRequestReviewAction.Approved, reviewEvent.Action);
-            Assert.NotNull(request.ApprovedRevisionId);
-            Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
-        }
-        else
-        {
-            Assert.Equal(CaveChangeRequestReviewAction.ChangesRequested, reviewEvent.Action);
-            Assert.Null(request.ApprovedRevisionId);
-            Assert.Single(await verify.CaveRevisions.Where(row => row.CaveId == tenant.CaveId).ToListAsync());
-        }
-    }
-
-    private static async Task<(CaveChangeRequestDecisionVm? Decision, Exception? Error)> CaptureAsync(
-        Task<CaveChangeRequestDecisionVm> task)
-    {
-        try { return (await task, null); }
-        catch (Exception exception) { return (null, exception); }
+        Assert.Equal(CaveChangeRequestReviewAction.ChangesRequested, reviewEvent.Action);
+        Assert.Single(await verify.CaveRevisions.Where(row => row.CaveId == tenant.CaveId).ToListAsync());
     }
 }

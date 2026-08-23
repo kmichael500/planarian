@@ -181,6 +181,8 @@ public class PlanarianDbContext : PlanarianDbContextBase
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveChangeRequest>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
+        modelBuilder.Entity<CaveChangeRequestReviewEvent>().HasQueryFilter(row =>
+            CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveProposalVersion>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveChangeRequestStagedFile>().HasQueryFilter(row =>

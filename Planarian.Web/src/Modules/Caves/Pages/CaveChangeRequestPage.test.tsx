@@ -494,6 +494,23 @@ it("requires reviewer feedback before handing a request back to the submitter", 
   expect(screen.getAllByText("Verify the survey notes.").length).toBeGreaterThanOrEqual(1);
 });
 
+it("renders review history in chronological conversation order", async () => {
+  renderRequestPage(pageDetail({
+    reviewEvents: [
+      { id: "event01", proposalVersionId: "version0002", action: "ChangesRequested",
+        actorUserId: "reviewer", actorName: "Riley Reviewer", message: "First feedback",
+        createdOn: "2026-08-17T18:00:00Z" },
+      { id: "event02", proposalVersionId: "version0003", action: "Resubmitted",
+        actorUserId: "submitter", actorName: "Michael Test",
+        createdOn: "2026-08-17T19:00:00Z" },
+    ],
+  }));
+
+  const history = await screen.findByRole("region", { name: "Review history" });
+  const text = history.textContent ?? "";
+  expect(text.indexOf("Changes requested")).toBeLessThan(text.indexOf("Resubmitted for review"));
+});
+
 it("keeps changes requested with the author until a newer draft exists", async () => {
   renderRequestPage(pageDetail({
     request: pageRequest({ status: "ChangesRequested", canEdit: true, canReview: false }),

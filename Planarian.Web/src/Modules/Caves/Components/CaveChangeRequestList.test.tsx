@@ -26,11 +26,17 @@ const summary = (status: CaveChangeRequestSummaryVm["status"] = "Pending"): Cave
     otherChanges: 0,
   },
 });
-it("shows status on submissions that are available for review", () => {
+it("does not repeat Pending review on ordinary reviewer-queue rows", () => {
   render(<MemoryRouter><CaveChangeRequestList requests={[summary()]} review /></MemoryRouter>);
 
-  expect(screen.getByText("Pending review")).toBeInTheDocument();
+  expect(screen.queryByText("Pending review")).not.toBeInTheDocument();
   expect(document.body).toHaveTextContent(/Michael Test · Submitted 2026 Aug-19/);
+});
+
+it("still shows Pending review in My submissions", () => {
+  render(<MemoryRouter><CaveChangeRequestList requests={[summary()]} /></MemoryRouter>);
+
+  expect(screen.getByText("Pending review")).toBeInTheDocument();
 });
 
 it("uses a neutral empty-state explanation for My submissions", () => {
@@ -45,4 +51,26 @@ it("labels submissions that are waiting on the author as Changes requested", () 
 
   expect(screen.getByText("Changes requested")).toBeInTheDocument();
   expect(screen.queryByText("Pending review")).not.toBeInTheDocument();
+});
+
+it("makes the whole request row navigate to the request detail and summarizes semantic scope", () => {
+  render(<MemoryRouter><CaveChangeRequestList requests={[summary()]} /></MemoryRouter>);
+
+  expect(screen.getByRole("link", { name: /Helms Deep Cave/ })).toHaveAttribute(
+    "href", "/caves/requests/request001");
+  expect(screen.getByText("2 cave fields · 1 file")).toBeInTheDocument();
+});
+
+it("surfaces stale requests as needing re-review without hiding their scope", () => {
+  render(<MemoryRouter><CaveChangeRequestList requests={[{ ...summary(), isStale: true }]} review /></MemoryRouter>);
+
+  expect(screen.getByText("Needs re-review")).toBeInTheDocument();
+  expect(screen.getByText("2 cave fields · 1 file")).toBeInTheDocument();
+});
+
+it("uses an intentional reviewer-queue empty state", () => {
+  render(<MemoryRouter><CaveChangeRequestList requests={[]} review /></MemoryRouter>);
+
+  expect(screen.getByText("No review submissions found")).toBeInTheDocument();
+  expect(screen.getByText("Try a different status filter, or check back later.")).toBeInTheDocument();
 });

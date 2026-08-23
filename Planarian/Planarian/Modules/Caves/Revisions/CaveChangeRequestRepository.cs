@@ -388,8 +388,7 @@ public sealed class CaveChangeRequestRepository
             throw ApiExceptionDictionary.BadRequest("A message is required when requesting changes.");
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
-        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(request.Status);
         RequireExpectedProposalVersion(request, expectedProposalVersionId);
         request.Status = CaveChangeRequestStatePolicy.AwaitingAuthorStatus;
         AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.ChangesRequested, message.Trim());
@@ -429,8 +428,7 @@ public sealed class CaveChangeRequestRepository
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var request = await LockedAsync(requestId, cancellationToken);
-        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(request.Status);
         RequireExpectedProposalVersion(request, expectedProposalVersionId);
         if (string.IsNullOrWhiteSpace(notes))
             throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
@@ -452,8 +450,7 @@ public sealed class CaveChangeRequestRepository
         if (!mutation.CreatedRevision || mutation.RevisionId is null)
             throw ApiExceptionDictionary.BadRequest("The proposal does not contain a publishable change.");
         var request = await LockedAsync(requestId, cancellationToken);
-        if (!CaveChangeRequestStatePolicy.CanBePublished(request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(request.Status);
         RequireExpectedProposalVersion(request, expectedProposalVersionId);
         request.Status = CaveChangeRequestStatus.Approved;
         request.ApprovedRevisionId = mutation.RevisionId;
@@ -528,6 +525,14 @@ public sealed class CaveChangeRequestRepository
                 FileId = fileId
             });
         }
+    }
+
+    private static void RequireAwaitingReviewer(CaveChangeRequestStatus status)
+    {
+        if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(status)) return;
+        if (!CaveChangeRequestStatePolicy.IsOpen(status))
+            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
+        throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
     }
 
     private static void RequireExpectedProposalVersion(CaveChangeRequest request, string expectedProposalVersionId)

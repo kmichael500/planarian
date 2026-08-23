@@ -43,6 +43,10 @@ import { DistanceFromMeComponent } from "../../../Shared/Components/Display/Dist
 const { Panel } = Collapse;
 const { Option } = Select;
 
+const hasCoordinates = (entrance?: Pick<EntranceVm, "latitude" | "longitude"> | null) =>
+  typeof entrance?.latitude === "number" && Number.isFinite(entrance.latitude) &&
+  typeof entrance.longitude === "number" && Number.isFinite(entrance.longitude);
+
 const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
   <Descriptions bordered>
     {Array.from({ length: rows }, (_, index) => (
@@ -439,7 +443,7 @@ const CaveComponent = ({
                   </div>
                 ),
                 children:
-                  selectedEntrance.latitude && selectedEntrance.longitude ? (
+                  hasCoordinates(selectedEntrance) ? (
                     <div>
                       {cave.entrances.length > 1 && (
                         <Row style={{ marginBottom: "16px" }}>
@@ -498,8 +502,7 @@ const CaveComponent = ({
                   </div>
                 ),
                 children:
-                  selectedGageEntrance?.latitude &&
-                  selectedGageEntrance.longitude ? (
+                  hasCoordinates(selectedGageEntrance) ? (
                     <div>
                       <Row gutter={[16, 16]}>
                         {cave.entrances.length > 1 && (

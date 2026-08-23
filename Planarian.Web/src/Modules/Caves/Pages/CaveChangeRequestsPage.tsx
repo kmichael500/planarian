@@ -59,7 +59,7 @@ export const CaveChangeRequestsPage = () => {
     : sortDirectionParam === "false" ? false : defaultSortDescending;
 
   const workspaceOptions = useMemo(() => canReview ? [
-    { value: "review", label: "Review submissions" },
+    { value: "review", label: "Review queue" },
     { value: "mine", label: "My submissions" },
   ] : [], [canReview]);
 
@@ -82,7 +82,7 @@ export const CaveChangeRequestsPage = () => {
       setTotal(result.totalCount);
       setPage(result.pageNumber);
     }).catch(() => {
-      if (active) message.error(activeTab === "review" ? "Review submissions could not be loaded." : "Submissions could not be loaded.");
+      if (active) message.error(activeTab === "review" ? "Review queue could not be loaded." : "Submissions could not be loaded.");
     }).finally(() => {
       if (active) setLoading(false);
     });

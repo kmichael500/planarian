@@ -1,11 +1,24 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form } from 'antd';
 import { CaveFileAuthoringEditor } from './CaveFileAuthoringEditor';
 import { CaveLinePlotAuthoringEditor } from './CaveLinePlotAuthoringEditor';
 
+jest.mock("./CaveLinePlotViewer", () => ({
+  CaveLinePlotViewer: ({ open, linePlot }: { open: boolean; linePlot?: { name: string } }) =>
+    open ? <div>Viewing line plot {linePlot?.name}</div> : null,
+}));
+import { CaveService } from '../Service/CaveService';
+import { FileService } from '../../Files/Services/FileService';
+
 jest.mock('../../Tag/Components/TagSelectComponent', () => ({
   TagSelectComponent: () => <div>File type</div>,
+}));
+
+jest.mock('../../Files/Components/FileViewerComponent', () => ({
+  FileViewer: ({ open, viewUrl, onDownload }: { open: boolean; viewUrl?: string; onDownload?: () => void }) =>
+    open ? <div role="dialog" aria-label="File preview"><span>{viewUrl}</span>
+      <button onClick={onDownload}>Viewer download</button></div> : null,
 }));
 
 beforeAll(() => {
@@ -16,15 +29,21 @@ beforeAll(() => {
   });
 });
 
-const FileHarness = ({ onFinish, onAuthoringChange, onValuesChange }: {
+afterEach(() => jest.restoreAllMocks());
+
+const FileHarness = ({ onFinish, onAuthoringChange, onValuesChange, stagedFileRequestId,
+  existingRequestStagedFileIds }: {
   onFinish: jest.Mock;
   onAuthoringChange?: jest.Mock;
   onValuesChange?: jest.Mock;
+  stagedFileRequestId?: string;
+  existingRequestStagedFileIds?: readonly string[];
 }) => {
   const [form] = Form.useForm<any>();
   return <Form form={form} onValuesChange={onValuesChange} initialValues={{ files: [{ id: 'file-existing', name: 'IRT',
     extension: '.DAT', fileTypeTagId: 'type-file', fileTypeKey: 'Data' }] }}>
-    <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange} />
+    <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange}
+      stagedFileRequestId={stagedFileRequestId} existingRequestStagedFileIds={existingRequestStagedFileIds} />
     <button type="button" onClick={() => onFinish(form.getFieldsValue())}>Read files</button>
   </Form>;
 };
@@ -99,4 +118,29 @@ it('surfaces line-plot metadata edits through the parent form change handler', a
   await userEvent.type(name, 'Updated line plot name');
 
   expect(onValuesChange).toHaveBeenCalled();
+});
+
+it('keeps existing request-staged files on request-scoped view and download access', async () => {
+  const viewUrl = jest.spyOn(CaveService, 'GetStagedChangeRequestFileUrl')
+    .mockReturnValue('/api/cave-change-requests/request001/files/file-existing/view');
+  const stagedDownload = jest.spyOn(CaveService, 'StartStagedChangeRequestFileDownload')
+    .mockImplementation(() => undefined);
+  const publishedDownload = jest.spyOn(FileService, 'startFileDownload').mockImplementation(() => undefined);
+
+  render(<FileHarness onFinish={jest.fn()} stagedFileRequestId="request001"
+    existingRequestStagedFileIds={['file-existing']} />);
+
+  const fileEditor = screen.getByRole('group', { name: 'IRT file editor' });
+  await userEvent.click(within(fileEditor).getByRole('button', { name: /Download/i }));
+  expect(stagedDownload).toHaveBeenCalledWith('request001', 'file-existing');
+  expect(publishedDownload).not.toHaveBeenCalled();
+
+  await userEvent.click(within(fileEditor).getByRole('button', { name: /View/i }));
+  expect(viewUrl).toHaveBeenCalledWith('request001', 'file-existing', 'view');
+  expect(screen.getByRole('dialog', { name: 'File preview' })).toHaveTextContent(
+    '/api/cave-change-requests/request001/files/file-existing/view');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Viewer download' }));
+  expect(stagedDownload).toHaveBeenCalledTimes(2);
+  expect(publishedDownload).not.toHaveBeenCalled();
 });

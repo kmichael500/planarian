@@ -17,11 +17,11 @@ export const formatChangeScopeSummary = (summary: CaveChangeScopeSummaryVm) => {
   return parts.length ? parts.join(" · ") : "No visible changes";
 };
 
-const statusTag = (request: CaveChangeRequestSummaryVm) => <Space size={4} wrap>
+const statusTag = (request: CaveChangeRequestSummaryVm, review: boolean) => <Space size={4} wrap>
   {request.status === "Approved" ? <Tag color="success">Approved</Tag>
     : request.status === "Rejected" ? <Tag color="error">Rejected</Tag>
       : request.status === "ChangesRequested" ? <Tag color="warning">Changes requested</Tag>
-        : <Tag color="processing">Pending review</Tag>}
+        : !review ? <Tag color="processing">Pending review</Tag> : null}
   {request.isStale && <Tag color="warning">Needs re-review</Tag>}
 </Space>;
 
@@ -74,7 +74,7 @@ export const CaveChangeRequestList = ({ requests, review = false }: {
                 )}
               </Space>
               <Space direction="vertical" size={4} align="end" style={{ marginLeft: "auto" }}>
-                {statusTag(request)}
+                {statusTag(request, review)}
                 <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                   Updated {formatDateTime(request.updatedOn ?? request.submittedOn)}
                 </Typography.Text>

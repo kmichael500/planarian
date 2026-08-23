@@ -328,7 +328,7 @@ export const CaveChangeRequestPage = () => {
     {reviewEvents.length > 0 && <section aria-label="Review history">
       <Card size="small" title="Review history">
         <Space direction="vertical" size="small" style={{ width: "100%" }}>
-          {reviewEvents.slice().reverse().map((reviewEvent, index) => {
+          {reviewEvents.map((reviewEvent, index) => {
             const label = reviewEvent.action === "ChangesRequested" ? "Changes requested"
               : reviewEvent.action === "Resubmitted" ? "Resubmitted for review" : reviewEvent.action;
             const color = reviewEvent.action === "Approved" ? "success" : reviewEvent.action === "Rejected" ? "error"

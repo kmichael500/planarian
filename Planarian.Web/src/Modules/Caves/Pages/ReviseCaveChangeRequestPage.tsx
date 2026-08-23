@@ -72,6 +72,7 @@ export const ReviseCaveChangeRequestPage = () => {
                 name: file.name,
                 fileTypeTagId: file.fileTypeTagId,
                 fileTypeKey: file.fileTypeNameAtRevision,
+                extension: file.extension,
               })),
             ];
             baseRevisionId = context.expectedBaseRevisionId;
@@ -214,7 +215,8 @@ export const ReviseCaveChangeRequestPage = () => {
       </Typography.Paragraph>
       <Form form={form} layout="vertical" onFinish={previewChanges} onValuesChange={unsaved.markDirty}>
         <AddCaveComponent isEditing form={form} cave={editorValues} submitLabel="Review changes"
-          onAuthoringChange={unsaved.markDirty} stickySubmit />
+          onAuthoringChange={unsaved.markDirty} stagedFileRequestId={requestId}
+          existingRequestStagedFileIds={detail.activeStagedFiles.map(file => file.id)} stickySubmit />
       </Form>
     </Card>}
     <FileViewer open={!!activeFile} onCancel={() => setActiveFileId(undefined)}

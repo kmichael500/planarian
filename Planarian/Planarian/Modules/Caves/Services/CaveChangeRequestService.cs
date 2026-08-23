@@ -268,8 +268,7 @@ public sealed class CaveChangeRequestService
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
-        if (!CaveChangeRequestStatePolicy.CanBePublished(row.Request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(row.Request.Status);
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
@@ -324,8 +323,7 @@ public sealed class CaveChangeRequestService
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
-        if (!CaveChangeRequestStatePolicy.IsAwaitingReviewer(row.Request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(row.Request.Status);
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId, row.Request.CurrentProposalVersionId);
         if (string.IsNullOrWhiteSpace(message))
@@ -352,8 +350,7 @@ public sealed class CaveChangeRequestService
         var row = await _requests.GetAsync(requestId, cancellationToken)
                   ?? throw ApiExceptionDictionary.NotFound("Change request");
         await CanReviewAsync(row, true);
-        if (!CaveChangeRequestStatePolicy.CanBePublished(row.Request.Status))
-            throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
+        RequireAwaitingReviewer(row.Request.Status);
         if (row.Request.CurrentProposalVersionId != expectedProposalVersionId)
             throw new CaveProposalVersionConflictException(expectedProposalVersionId,
                 row.Request.CurrentProposalVersionId);
@@ -366,6 +363,14 @@ public sealed class CaveChangeRequestService
                 new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Rejected, requestId, null,
             row.CurrentRevision?.Id);
+    }
+
+    private static void RequireAwaitingReviewer(CaveChangeRequestStatus status)
+    {
+        if (CaveChangeRequestStatePolicy.IsAwaitingReviewer(status)) return;
+        if (!CaveChangeRequestStatePolicy.IsOpen(status))
+            throw ApiExceptionDictionary.BadRequest("This request has already been reviewed.");
+        throw ApiExceptionDictionary.BadRequest("This request is not awaiting review.");
     }
 
     private async Task<CaveChangeRequestReadRow> RequireReadableAsync(string requestId,
