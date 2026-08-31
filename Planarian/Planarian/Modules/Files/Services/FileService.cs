@@ -420,6 +420,10 @@ public class FileService : ServiceBase<FileRepository>
 
         // Attempt to delete the entire container
         await containerClient.DeleteIfExistsAsync();
+
+        // A successful create is cached to avoid repeated container-existence checks.
+        // Resetting an account deletes the container, so invalidate that cached result.
+        ContainerInitializationTasks.TryRemove(containerClient.Name, out _);
     }
 
 
