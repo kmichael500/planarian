@@ -15,7 +15,7 @@ public class File : EntityBase
     [MaxLength(PropertyLength.Key)] public string? BlobKey { get; set; }
     [MaxLength(PropertyLength.Key)] public string? BlobContainer { get; set; }
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string? DisplayName { get; set; }
     public DateTime? ExpiresOn { get; set; } = null!;
     public TagType FileTypeTag { get; set; } = null!;
 

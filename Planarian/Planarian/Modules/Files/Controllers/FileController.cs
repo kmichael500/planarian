@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Database.Entities.RidgeWalker;
@@ -49,6 +50,6 @@ public class FileController : PlanarianControllerBase<FileService>
 public class EditFileMetadataVm
 {
     public string Id { get; set; }
-    public string DisplayName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string DisplayName { get; set; }
     public string FileTypeTagId { get; set; }
 }
