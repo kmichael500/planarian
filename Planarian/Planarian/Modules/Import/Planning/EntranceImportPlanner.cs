@@ -83,7 +83,8 @@ public sealed class EntranceImportPlanner
                     ResolveMany(tagSets, TagTypeKeyConstant.EntranceStatus, record.EntranceStatuses),
                     ResolveMany(tagSets, TagTypeKeyConstant.EntranceHydrology, record.EntranceHydrology),
                     ResolveMany(tagSets, TagTypeKeyConstant.FieldIndication, record.FieldIndication),
-                    ResolveMany(tagSets, TagTypeKeyConstant.People, record.ReportedByNames));
+                    ResolveMany(tagSets, TagTypeKeyConstant.People, record.ReportedByNames),
+                    ResolveMany(tagSets, TagTypeKeyConstant.CaveOther, record.EntranceOtherTags));
 
                 ValidateNormalized(normalized, validationRowNumber, failedRecords);
                 if (failedRecords.Count == failureCountBefore) parsed.Add(normalized);
@@ -119,6 +120,7 @@ public sealed class EntranceImportPlanner
             AddTags(tags, row.Id, row.HydrologyTags, EntranceImportTagRole.Hydrology);
             AddTags(tags, row.Id, row.FieldIndicationTags, EntranceImportTagRole.FieldIndication);
             AddTags(tags, row.Id, row.ReportedByTags, EntranceImportTagRole.ReportedBy);
+            AddTags(tags, row.Id, row.OtherTags, EntranceImportTagRole.Other);
             planned.Add(new PlannedEntrance(
                 row.Id, row.SourceIndex + 2, cave.Id, row.CountyDisplayId, row.CountyCaveNumber, cave.Name,
                 row.Name, row.IsPrimary, row.Description, row.Latitude, row.Longitude, row.Elevation,
@@ -126,7 +128,8 @@ public sealed class EntranceImportPlanner
                 row.StatusTags.Select(t => t.Name).ToList(),
                 row.HydrologyTags.Select(t => t.Name).ToList(),
                 row.FieldIndicationTags.Select(t => t.Name).ToList(),
-                row.ReportedByTags.Select(t => t.Name).ToList()));
+                row.ReportedByTags.Select(t => t.Name).ToList(),
+                row.OtherTags.Select(t => t.Name).ToList()));
         }
 
         ValidatePrimaryCounts(planned, existingPrimaryCounts, syncExisting, failedRecords);
@@ -188,7 +191,8 @@ public sealed class EntranceImportPlanner
             (TagTypeKeyConstant.EntranceStatus, records.SelectMany(r => r.EntranceStatuses.SplitAndTrim())),
             (TagTypeKeyConstant.EntranceHydrology, records.SelectMany(r => r.EntranceHydrology.SplitAndTrim())),
             (TagTypeKeyConstant.FieldIndication, records.SelectMany(r => r.FieldIndication.SplitAndTrim())),
-            (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim()))
+            (TagTypeKeyConstant.People, records.SelectMany(r => r.ReportedByNames.SplitAndTrim())),
+            (TagTypeKeyConstant.CaveOther, records.SelectMany(r => r.EntranceOtherTags.SplitAndTrim()))
         };
         return ImportTagResolver.Resolve(state.AccountId, state.EligibleTags, requested, cancellationToken);
     }
@@ -229,7 +233,8 @@ public sealed class EntranceImportPlanner
         string? Name, bool IsPrimary, string? Description, double Latitude, double Longitude, double Elevation,
         ImportTagLookup LocationQuality, DateTime? ReportedOn, double? PitDepthFeet,
         IReadOnlyList<ImportTagLookup> StatusTags, IReadOnlyList<ImportTagLookup> HydrologyTags,
-        IReadOnlyList<ImportTagLookup> FieldIndicationTags, IReadOnlyList<ImportTagLookup> ReportedByTags);
+        IReadOnlyList<ImportTagLookup> FieldIndicationTags, IReadOnlyList<ImportTagLookup> ReportedByTags,
+        IReadOnlyList<ImportTagLookup> OtherTags);
 }
 
 internal static class PlannedEntranceSourceExtensions
@@ -249,6 +254,7 @@ internal static class PlannedEntranceSourceExtensions
         EntranceHydrology = string.Join(",", row.EntranceHydrology),
         FieldIndication = string.Join(",", row.FieldIndication),
         ReportedByNames = string.Join(",", row.ReportedByNames),
+        EntranceOtherTags = string.Join(",", row.EntranceOtherTags),
         IsPrimaryEntrance = row.IsPrimary,
         ReportedOnDate = row.ReportedOn?.ToString(CultureInfo.InvariantCulture)
     };

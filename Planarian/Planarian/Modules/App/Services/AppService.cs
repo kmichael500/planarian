@@ -1,4 +1,5 @@
 using Planarian.Library.Options;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.App.Models;
 using Planarian.Modules.App.Repositories;
@@ -37,9 +38,11 @@ public class AppService : ServiceBase<AppRepository>
 
         var defaultAccountId = accountIds.FirstOrDefault()?.Value;
         var currentAccountId = RequestUser.AccountId ?? defaultAccountId;
-        var permissions = string.IsNullOrWhiteSpace(currentAccountId)
-            ? Array.Empty<string>()
-            : (await _userRepository.GetPermissions(RequestUser.Id, currentAccountId)).ToArray();
+        var permissions = new HashSet<string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(currentAccountId))
+            permissions.UnionWith(await _userRepository.GetPermissions(RequestUser.Id, currentAccountId));
+        if (await RequestUser.HasCavePermission(PermissionPolicyKey.PlanarianAdmin, false))
+            permissions.Add(PermissionPolicyKey.PlanarianAdmin);
 
         result.CurrentUser = new AppInitializeCurrentUserVm(
             RequestUser.Id,

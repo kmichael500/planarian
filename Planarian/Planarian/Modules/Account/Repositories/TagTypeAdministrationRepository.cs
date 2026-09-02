@@ -4,51 +4,51 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Model.Shared.Base;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Tags.Repositories;
+using Planarian.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Account.Repositories;
 
-public sealed class TagTypeMergeExecutionRepository
+public sealed class TagTypeAdministrationRepository : RepositoryBase
 {
     private const int BatchSize = 500;
-    private readonly PlanarianDbContext _db;
+    private const int DeleteBatchSize = 100;
     private readonly AccountExecutionScope _scope;
     private readonly TagReferenceLockRepository _tagLocks;
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly CaveBulkRevisionRepository _revisions;
-    private readonly RequestUser _requestUser;
 
-    public TagTypeMergeExecutionRepository(PlanarianDbContext db, RequestUser requestUser,
+    public TagTypeAdministrationRepository(PlanarianDbContext db, RequestUser requestUser,
         TagReferenceLockRepository tagLocks, CavePublishedSnapshotRepository snapshots,
-        CaveBulkRevisionRepository revisions)
+        CaveBulkRevisionRepository revisions) : base(db, requestUser)
     {
-        _db = db;
         _scope = AccountExecutionScope.Require(requestUser);
         _tagLocks = tagLocks;
         _snapshots = snapshots;
         _revisions = revisions;
-        _requestUser = requestUser;
     }
 
-    public async Task ExecuteAsync(IEnumerable<string> sourceTagTypeIds, string destinationTagTypeId,
+    public async Task MergeAsync(IEnumerable<string> sourceTagTypeIds, string destinationTagTypeId,
         CancellationToken cancellationToken = default)
     {
         var mutationTimestamp = DateTime.UtcNow;
-        var actorUserId = !string.IsNullOrWhiteSpace(_requestUser.Id)
-            ? _requestUser.Id
+        var actorUserId = !string.IsNullOrWhiteSpace(RequestUser.Id)
+            ? RequestUser.Id
             : throw new InvalidOperationException("A current actor is required for TagType merge.");
         if (string.IsNullOrWhiteSpace(destinationTagTypeId))
             throw ApiExceptionDictionary.BadRequest("A destination tag type is required.");
         var destinationId = destinationTagTypeId.Trim();
         var sourceIds = sourceTagTypeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim())
             .Where(id => id != destinationId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
             var requestedIds = sourceIds.Append(destinationId).Distinct(StringComparer.Ordinal)
@@ -74,7 +74,7 @@ public sealed class TagTypeMergeExecutionRepository
             await LockCavesAsync(affectedIds, cancellationToken);
             var expected = affectedIds.Count == 0
                 ? new Dictionary<string, string?>(StringComparer.Ordinal)
-                : await _db.Caves.IgnoreQueryFilters().AsNoTracking()
+                : await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
                     .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id))
                     .ToDictionaryAsync(cave => cave.Id, cave => cave.CurrentRevisionId,
                         StringComparer.Ordinal, cancellationToken);
@@ -111,6 +111,119 @@ public sealed class TagTypeMergeExecutionRepository
         }
     }
 
+    public async Task<IEnumerable<TagTypeTableVm>> GetTagsForTable(string key, CancellationToken cancellationToken)
+    {
+        var result = await DbContext.TagTypes
+            .Where(e => e.Key == key)
+            .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault)
+            .Select(e => new TagTypeTableVm
+            {
+                TagTypeId = e.Id,
+                Name = e.Name,
+                IsUserModifiable = !string.IsNullOrWhiteSpace(e.AccountId) || !e.IsDefault,
+                Occurrences = e.TripTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.LeadTags.Count(ee => ee.TagType.AccountId == RequestUser.AccountId) +
+                              e.EntranceStatusTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceHydrologyTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.FieldIndicationTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceLocationQualitiesTags.Count(ee =>
+                                  ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.GeologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CaveReportedByNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CartographerNameTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceReportedByNameTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId) +
+                              e.FileTypeTags.Count(ee =>
+                                  ee.ExpiresOn == null && ee.Cave.AccountId == RequestUser.AccountId) + // temp files don't count
+                              e.MapStatusTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.GeologicAgeTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.PhysiographicProvinceTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.BiologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.ArcheologyTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.CaveOtherTags.Count(ee => ee.Cave.AccountId == RequestUser.AccountId) +
+                              e.EntranceOtherTags.Count(ee => ee.Entrance.Cave.AccountId == RequestUser.AccountId)
+            })
+            .OrderBy(e => e.Name).ToListAsync(cancellationToken);
+
+        if (key.Equals(TagTypeKeyConstant.File) || key.Equals(TagTypeKeyConstant.LocationQuality))
+            foreach (var tag in result)
+                tag.IsUserModifiable = tag is { IsUserModifiable: true, Occurrences: 0 };
+        return result;
+    }
+
+    public async Task<int> GetNumberOfOccurrences(string tagTypeId, CancellationToken cancellationToken = default)
+    {
+        var result = await DbContext.TagTypes
+            .Where(e => e.Id == tagTypeId)
+            .Select(e => e.TripTags.Count +
+                         e.LeadTags.Count +
+                         e.EntranceStatusTags.Count +
+                         e.EntranceHydrologyTags.Count +
+                         e.FieldIndicationTags.Count +
+                         e.EntranceLocationQualitiesTags.Count +
+                         e.GeologyTags.Count +
+                         e.CaveReportedByNameTags.Count +
+                         e.CartographerNameTags.Count +
+                         e.EntranceReportedByNameTags.Count +
+                         e.FileTypeTags.Count +
+                         e.MapStatusTags.Count +
+                         e.GeologicAgeTags.Count +
+                         e.PhysiographicProvinceTags.Count +
+                         e.BiologyTags.Count +
+                         e.ArcheologyTags.Count +
+                         e.CaveOtherTags.Count +
+                         e.EntranceOtherTags.Count
+            ).FirstOrDefaultAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<TagType?> GetAccountAdministrativeTagAsync(string tagTypeId,
+        CancellationToken cancellationToken = default) =>
+        await DbContext.TagTypes.FirstOrDefaultAsync(tag => tag.Id == tagTypeId &&
+            (tag.AccountId == RequestUser.AccountId || tag.IsDefault), cancellationToken);
+
+    public async Task<int> DeleteAsync(IEnumerable<string> tagTypeIds,
+        CancellationToken cancellationToken = default)
+    {
+        var accountId = RequestUser.AccountId
+            ?? throw new InvalidOperationException("A current account is required for TagType deletion.");
+        var ids = tagTypeIds.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim())
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        if (ids.Count == 0) return 0;
+
+        await using var transaction = await BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var chunk in ids.Chunk(DeleteBatchSize))
+                await DbContext.TagTypes.FromSqlInterpolated($"""
+                        select * from "TagTypes"
+                        where "AccountId" = {accountId} and "Id" = any({chunk})
+                        order by "Id" collate "C" for update
+                        """)
+                    .IgnoreQueryFilters().AsNoTracking().ToListAsync(cancellationToken);
+
+            var deleted = 0;
+            try
+            {
+                foreach (var chunk in ids.Chunk(DeleteBatchSize))
+                    deleted += await DbContext.TagTypes.IgnoreQueryFilters()
+                        .Where(tag => tag.AccountId == accountId && chunk.Contains(tag.Id))
+                        .ExecuteDeleteAsync(cancellationToken);
+            }
+            catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+            {
+                throw ApiExceptionDictionary.BadRequest("Cannot delete tag type because it is in use.");
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return deleted;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
     private static ApiException TagMergeConcurrencyConflict() => ApiExceptionDictionary.Conflict(
         "One or more affected Caves changed or disappeared during tag merge. Retry with current data.");
 
@@ -124,53 +237,53 @@ public sealed class TagTypeMergeExecutionRepository
         }
 
         if (key == TagTypeKeyConstant.Archeology)
-            await AddAsync(_db.ArcheologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.ArcheologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.Biology)
-            await AddAsync(_db.BiologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.BiologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.GeologicAge)
-            await AddAsync(_db.GeologicAgeTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.GeologicAgeTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.Geology)
-            await AddAsync(_db.GeologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.GeologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.MapStatus)
-            await AddAsync(_db.MapStatusTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.MapStatusTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.PhysiographicProvince)
-            await AddAsync(_db.PhysiographicProvinceTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.PhysiographicProvinceTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
         else if (key == TagTypeKeyConstant.CaveOther)
         {
-            await AddAsync(_db.CaveOtherTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.CaveOtherTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
-            await AddAsync(_db.EntranceOtherTag.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.EntranceOtherTag.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Entrance!.Cave!.AccountId == _scope.AccountId).Select(tag => tag.Entrance!.CaveId));
         }
         else if (key == TagTypeKeyConstant.People)
         {
-            await AddAsync(_db.CartographerNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.CartographerNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
-            await AddAsync(_db.CaveReportedByNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.CaveReportedByNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Cave!.AccountId == _scope.AccountId).Select(tag => tag.CaveId));
-            await AddAsync(_db.EntranceReportedByNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.EntranceReportedByNameTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Entrance!.Cave!.AccountId == _scope.AccountId).Select(tag => tag.Entrance!.CaveId));
         }
         else if (key == TagTypeKeyConstant.EntranceHydrology)
-            await AddAsync(_db.EntranceHydrologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.EntranceHydrologyTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Entrance!.Cave!.AccountId == _scope.AccountId).Select(tag => tag.Entrance!.CaveId));
         else if (key == TagTypeKeyConstant.EntranceStatus)
-            await AddAsync(_db.EntranceStatusTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.EntranceStatusTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Entrance!.Cave!.AccountId == _scope.AccountId).Select(tag => tag.Entrance!.CaveId));
         else if (key == TagTypeKeyConstant.FieldIndication)
-            await AddAsync(_db.FieldIndicationTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
+            await AddAsync(DbContext.FieldIndicationTags.IgnoreQueryFilters().Where(tag => sourceIds.Contains(tag.TagTypeId) &&
                 tag.Entrance!.Cave!.AccountId == _scope.AccountId).Select(tag => tag.Entrance!.CaveId));
         else if (key == TagTypeKeyConstant.LocationQuality)
-            await AddAsync(_db.Entrances.IgnoreQueryFilters().Where(entrance => sourceIds.Contains(entrance.LocationQualityTagId) &&
+            await AddAsync(DbContext.Entrances.IgnoreQueryFilters().Where(entrance => sourceIds.Contains(entrance.LocationQualityTagId) &&
                 entrance.Cave!.AccountId == _scope.AccountId).Select(entrance => entrance.CaveId));
         else if (key == TagTypeKeyConstant.File)
-            await AddAsync(_db.Files.IgnoreQueryFilters().Where(file => sourceIds.Contains(file.FileTypeTagId) &&
+            await AddAsync(DbContext.Files.IgnoreQueryFilters().Where(file => sourceIds.Contains(file.FileTypeTagId) &&
                 file.CaveId != null && file.Cave!.AccountId == _scope.AccountId).Select(file => file.CaveId!));
 
         return result.Order(StringComparer.Ordinal).ToList();
@@ -179,9 +292,9 @@ public sealed class TagTypeMergeExecutionRepository
     private async Task LockCavesAsync(IReadOnlyList<string> caveIds, CancellationToken cancellationToken)
     {
         if (caveIds.Count == 0) return;
-        var connection = (NpgsqlConnection)_db.Database.GetDbConnection();
+        var connection = (NpgsqlConnection)DbContext.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(cancellationToken);
-        var transaction = _db.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
+        var transaction = DbContext.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
             ?? throw new InvalidOperationException("Tag merge transaction is not active.");
         foreach (var chunk in caveIds.Order(StringComparer.Ordinal).Chunk(BatchSize))
         {
@@ -206,75 +319,75 @@ public sealed class TagTypeMergeExecutionRepository
         DateTime mutationTimestamp, string actorUserId,
         CancellationToken cancellationToken)
     {
-        var caves = _db.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == _scope.AccountId);
-        var entrances = _db.Entrances.IgnoreQueryFilters()
+        var caves = DbContext.Caves.IgnoreQueryFilters().Where(cave => cave.AccountId == _scope.AccountId);
+        var entrances = DbContext.Entrances.IgnoreQueryFilters()
             .Where(entrance => entrance.Cave!.AccountId == _scope.AccountId);
 
         if (key == TagTypeKeyConstant.Archeology)
             await MergeCollectionAsync(caves, cave => cave.ArcheologyTags, sourceId, destinationId,
-                _db.ArcheologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.ArcheologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.Biology)
             await MergeCollectionAsync(caves, cave => cave.BiologyTags, sourceId, destinationId,
-                _db.BiologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.BiologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.GeologicAge)
             await MergeCollectionAsync(caves, cave => cave.GeologicAgeTags, sourceId, destinationId,
-                _db.GeologicAgeTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.GeologicAgeTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.Geology)
             await MergeCollectionAsync(caves, cave => cave.GeologyTags, sourceId, destinationId,
-                _db.GeologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.GeologyTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.MapStatus)
             await MergeCollectionAsync(caves, cave => cave.MapStatusTags, sourceId, destinationId,
-                _db.MapStatusTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.MapStatusTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.PhysiographicProvince)
             await MergeCollectionAsync(caves, cave => cave.PhysiographicProvinceTags, sourceId, destinationId,
-                _db.PhysiographicProvinceTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.PhysiographicProvinceTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.CaveOther)
         {
             await MergeCollectionAsync(caves, cave => cave.CaveOtherTags, sourceId, destinationId,
-                _db.CaveOtherTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.CaveOtherTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
             await MergeCollectionAsync(entrances, entrance => entrance.EntranceOtherTags, sourceId, destinationId,
-                _db.EntranceOtherTag, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
+                DbContext.EntranceOtherTag, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         }
         else if (key == TagTypeKeyConstant.People)
         {
             await MergeCollectionAsync(caves, cave => cave.CartographerNameTags, sourceId, destinationId,
-                _db.CartographerNameTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.CartographerNameTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
             await MergeCollectionAsync(caves, cave => cave.CaveReportedByNameTags, sourceId, destinationId,
-                _db.CaveReportedByNameTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
+                DbContext.CaveReportedByNameTags, tag => tag.TagTypeId, tag => tag.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
             await MergeCollectionAsync(entrances, entrance => entrance.EntranceReportedByNameTags, sourceId, destinationId,
-                _db.EntranceReportedByNameTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
+                DbContext.EntranceReportedByNameTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         }
         else if (key == TagTypeKeyConstant.EntranceHydrology)
             await MergeCollectionAsync(entrances, entrance => entrance.EntranceHydrologyTags, sourceId, destinationId,
-                _db.EntranceHydrologyTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
+                DbContext.EntranceHydrologyTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.EntranceStatus)
             await MergeCollectionAsync(entrances, entrance => entrance.EntranceStatusTags, sourceId, destinationId,
-                _db.EntranceStatusTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
+                DbContext.EntranceStatusTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.FieldIndication)
             await MergeCollectionAsync(entrances, entrance => entrance.FieldIndicationTags, sourceId, destinationId,
-                _db.FieldIndicationTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
+                DbContext.FieldIndicationTags, tag => tag.TagTypeId, tag => tag.Entrance!.Cave!.AccountId,
                 mutationTimestamp, actorUserId, cancellationToken);
         else if (key == TagTypeKeyConstant.LocationQuality)
-            await _db.Entrances.IgnoreQueryFilters().Where(entrance => entrance.LocationQualityTagId == sourceId &&
+            await DbContext.Entrances.IgnoreQueryFilters().Where(entrance => entrance.LocationQualityTagId == sourceId &&
                 entrance.Cave!.AccountId == _scope.AccountId).ExecuteUpdateAsync(
                 setters => setters.SetProperty(entrance => entrance.LocationQualityTagId, destinationId)
                     .SetProperty(entrance => entrance.ModifiedOn, mutationTimestamp)
                     .SetProperty(entrance => entrance.ModifiedByUserId, actorUserId), cancellationToken);
         else if (key == TagTypeKeyConstant.File)
-            await _db.Files.IgnoreQueryFilters().Where(file => file.FileTypeTagId == sourceId && file.CaveId != null &&
+            await DbContext.Files.IgnoreQueryFilters().Where(file => file.FileTypeTagId == sourceId && file.CaveId != null &&
                 file.Cave!.AccountId == _scope.AccountId).ExecuteUpdateAsync(
                 setters => setters.SetProperty(file => file.FileTypeTagId, destinationId)
                     .SetProperty(file => file.ModifiedOn, mutationTimestamp)

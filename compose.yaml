@@ -211,6 +211,7 @@ services:
       PGUSER: planarian
       PGPASSWORD: planarian
       PGDATABASE: ${PLANARIAN_DATABASE:-planarian_dev_generic}
+      PLANARIAN_TEST_POSTGRES_CONNECTION_STRING: "Host=postgres;Port=5432;Database=postgres;Username=planarian;Password=planarian"
       PLANARIAN_DATASET: ${PLANARIAN_AGENT_DATASET:-generic}
       PLAYWRIGHT_CDP_URL: http://browser:9222
       PLANARIAN_URL: https://planarian.local

@@ -10,6 +10,8 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { CaveVm } from "../Models/CaveVm";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 import { caveToForm } from "../Helpers/CaveFormMapper";
+import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
+import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
 
 const EditCavePage: React.FC = () => {
   const { caveId } = useParams();
@@ -23,25 +25,7 @@ const EditCavePage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   const navigate = useNavigate();
-
-  const [isFormDirty, setIsFormDirty] = useState<boolean>(false);
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (isFormDirty) {
-        event.preventDefault();
-        event.returnValue =
-          "You have unsaved changes! Are you sure you want to leave?";
-      }
-    };
-
-    // Attach the event listener
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // Cleanup the event listener on component unmount
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isFormDirty]);
+  const unsaved = useUnsavedChangesGuard();
 
   useEffect(() => {
     const getCave = async () => {
@@ -62,6 +46,7 @@ const EditCavePage: React.FC = () => {
               message.success(
                 `'${caveResponse?.name}' has been deleted successfully`
               );
+              unsaved.markClean();
               navigate(`/caves`);
             } catch (e: any) {
               const error = e as ApiErrorResponse;
@@ -83,6 +68,7 @@ const EditCavePage: React.FC = () => {
       setIsLoading(true);
       await CaveService.UpdateCave(values);
       message.success(`'${values?.name}' has been updated successfully`);
+      unsaved.markClean();
       navigate(`/caves/${cave?.id}`);
     } catch (e: any) {
       const error = e as ApiErrorResponse & { conflictKind?: string };
@@ -97,21 +83,24 @@ const EditCavePage: React.FC = () => {
   };
 
   const [form] = Form.useForm<AddCaveVm>();
-  const handleFormChange = () => {
-    setIsFormDirty(true);
-  };
   return (
     <>
+      <UnsavedChangesModal
+        open={unsaved.isBlocked}
+        onKeepEditing={unsaved.keepEditing}
+        onDiscardChanges={unsaved.discardChanges}
+      />
       <Card loading={isLoading}>
         {cave && (
           <Form<AddCaveVm>
             layout="vertical"
             initialValues={cave}
             onFinish={handleFormSubmit}
-            onChange={handleFormChange}
+            onValuesChange={unsaved.markDirty}
             form={form}
           >
-            <AddCaveComponent isEditing={true} form={form} cave={cave} />
+            <AddCaveComponent isEditing={true} form={form} cave={cave}
+              onAuthoringChange={unsaved.markDirty} />
           </Form>
         )}
       </Card>

@@ -18,6 +18,12 @@ Application orchestration depends on feature capabilities, not database infrastr
 repositories own EF Core, Npgsql, and PostgreSQL access; there is no generic CRUD repository. Repositories return
 materialized projections, never `IQueryable`.
 
+For ordinary tracked mutations, a service may coordinate application intent through its feature repository and use that
+repository's unit-of-work helpers such as `Add`, `Delete`, and `SaveChanges`; those calls are not themselves a persistence
+leak. Prefer cohesive resource- or capability-oriented repositories over one repository per command. Extract persistence
+behind a stronger repository capability when the operation requires provider-specific SQL, row-lock ordering, set-based
+rewrites, provider exception translation, or another database algorithm that application orchestration should not know.
+
 Repository implementations may use EF projections, tracking where mutation needs it, set-based operations, explicit
 PostgreSQL SQL, row locks, and bounded batches. Provider-specific behavior is appropriate when it protects correctness
 or throughput. `IgnoreQueryFilters` requires an explicit account predicate and behavioral tenant-isolation coverage.

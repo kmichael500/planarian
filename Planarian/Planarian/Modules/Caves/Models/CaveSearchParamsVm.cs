@@ -43,6 +43,7 @@ public class CaveSearchParamsVm
     public int EntrancePitDepthFeet { get; set; }
     public string LocationQualityTagIds { get; set; }
     public string EntranceHydrologyTagIds { get; set; }
+    public string EntranceOtherTagIds { get; set; }
     public string EntranceLocation { get; set; }
     public string EntrancePolygon { get; set; }
     public string EntranceReportedByPeopleTagIds { get; set; }

@@ -7,7 +7,6 @@ using Planarian.Modules.Account.Import.Services;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.Authentication.Services;
-using Planarian.Modules.Caves.Services;
 using Planarian.Shared.Base;
 
 // ReSharper disable once CheckNamespace ( for partial class compatability )
@@ -22,7 +21,7 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
     private readonly ImportService _importService;
 
     public AccountController(RequestUser requestUser, TokenService tokenService, AccountService service,
-        CaveService caveService, ImportService importService) : base(
+        ImportService importService) : base(
         requestUser, tokenService, service)
     {
         _importService = importService;
@@ -131,11 +130,11 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
 
     [HttpPost("states/{stateId:length(10)}/counties/merge/{destinationCountyId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> MergeCounties([FromQuery] string sourceCountyIds, string destinationCountyId,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult> MergeCounties(string stateId, [FromQuery] string sourceCountyIds,
+        string destinationCountyId, CancellationToken cancellationToken)
     {
         var ids = sourceCountyIds.SplitAndTrim();
-        await Service.MergeCounties(ids, destinationCountyId, cancellationToken);
+        await Service.MergeCounties(stateId, ids, destinationCountyId, cancellationToken);
         return Ok();
     }
 

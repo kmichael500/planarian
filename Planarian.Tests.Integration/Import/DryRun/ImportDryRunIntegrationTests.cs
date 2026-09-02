@@ -10,7 +10,7 @@ namespace Planarian.Tests;
 public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     internal const string CaveHeader = "CaveName,CountyName,CountyCode,CountyCaveNumber,State,AlternateNames,MapStatuses,CartographerNames,CaveLengthFt,CaveDepthFt,MaxPitDepthFt,NumberOfPits,Geology,GeologicAges,PhysiographicProvinces,Archeology,Biology,ReportedOnDate,ReportedByNames,IsArchived,OtherTags,Narrative";
-    internal const string EntranceHeader = "EntranceName,CountyCode,CountyCaveNumber,IsPrimaryEntrance,DecimalLatitude,DecimalLongitude,EntranceElevationFt,LocationQuality,EntrancePitDepth,EntranceStatuses,EntranceHydrology,FieldIndication,ReportedOnDate,ReportedByNames,EntranceDescription";
+    internal const string EntranceHeader = "EntranceName,CountyCode,CountyCaveNumber,IsPrimaryEntrance,DecimalLatitude,DecimalLongitude,EntranceElevationFt,LocationQuality,EntrancePitDepth,EntranceStatuses,EntranceHydrology,FieldIndication,ReportedOnDate,ReportedByNames,EntranceDescription,EntranceOtherTags";
 
     internal static MemoryStream CsvStream(string csv) => new(Encoding.UTF8.GetBytes(csv));
 
@@ -61,11 +61,13 @@ public sealed class ImportDryRunIntegrationTests(PostgresTestServer fixture) : I
         {
             var import = new EntranceImportTestHarness(db, db.RequestUser);
             var csv = EntranceHeader +
-                "\nMain,A01,1,true,35.1,-86.2,612,Brand New Quality,20,Open,Wet,Sink,2026-08-01,Surveyor,Description\n";
+                "\nMain,A01,1,true,35.1,-86.2,612,Brand New Quality,20,Open,Wet,Sink,2026-08-01,Surveyor,Description,Distinctive\n";
             var plan = await import.PlanCsvAsync(csv, sync);
 
-            Assert.Single(plan.CreatePreview());
-            Assert.NotEmpty(plan.TagCreations);
+            var preview = Assert.Single(plan.CreatePreview());
+            Assert.Contains("Distinctive", preview.EntranceOtherTags);
+            Assert.Contains(plan.TagCreations, tag => tag.Key == Planarian.Model.Shared.TagTypeKeyConstant.CaveOther &&
+                                                     tag.Name == "Distinctive");
         }
 
         // Assert

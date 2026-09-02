@@ -237,10 +237,15 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
                 FileTypeTagId = file.FileTypeId,
                 Name = "Rollback attachment"
             }];
-            await Assert.ThrowsAsync<InvalidOperationException>(() => IntegrationTestServices.For(reviewer).Caves
-                .ApproveChangeRequestAsync(values, tenant.RevisionId, requestId,
-                    [new StagedCaveFilePublication(file.FileId, "seed-a", "test", ".pdf")],
-                    (_, _) => throw new InvalidOperationException("Simulated approval failure"), default));
+            var services = IntegrationTestServices.For(reviewer);
+            var mutations = new CaveMutationCoordinator(new CaveMutationRepository(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser)));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => mutations.ExecuteOwnedTransactionAsync(async token =>
+            {
+                await services.Caves.ApproveChangeRequestAsync(values, tenant.RevisionId, requestId,
+                    [new StagedCaveFilePublication(file.FileId, "seed-a", "test", ".pdf")], token);
+                throw new InvalidOperationException("Simulated approval failure");
+            }, default));
         }
 
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);

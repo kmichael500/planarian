@@ -38,10 +38,16 @@ public class FeatureSettingRepository : RepositoryBase
     
     private IQueryable<FeatureSetting> GetFeatureSettingsQuery()
     {
-        // TODO: Account creation currently persists overrides for every feature key, including keys
-        // that also have global defaults. Avoid creating redundant account rows (or otherwise
-        // guarantee one effective row per key) so consumers such as ToDictionary cannot see duplicates.
+        // An account override wins over the global default for the same key. Some existing
+        // accounts persist overrides for globally defaulted keys, so resolve precedence in
+        // the query rather than returning duplicate effective settings to callers.
+        var accountId = RequestUser.AccountId;
+        if (string.IsNullOrWhiteSpace(accountId))
+            return DbContext.FeatureSettings.Where(setting => setting.IsDefault);
+
         return DbContext.FeatureSettings
-            .Where(e => e.AccountId == RequestUser.AccountId || e.IsDefault == true);
+            .Where(setting => setting.AccountId == accountId ||
+                setting.IsDefault && !DbContext.FeatureSettings.Any(accountSetting =>
+                    accountSetting.AccountId == accountId && accountSetting.Key == setting.Key));
     }
 }

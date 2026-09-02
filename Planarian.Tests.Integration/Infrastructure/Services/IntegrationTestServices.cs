@@ -32,7 +32,6 @@ namespace Planarian.Tests.Integration.Infrastructure.Services;
 internal sealed class IntegrationTestServices
 {
     private readonly PlanarianDbContext _db;
-    private readonly TagRepository _tags;
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly TagReferenceLockRepository _tagLocks;
     private AccountService? _account;
@@ -52,11 +51,10 @@ internal sealed class IntegrationTestServices
             new SettingsRepository(db, user), caves, CreateThrottle(db), mutations, tagLocks, blobs);
 
         Files = files;
-        Caves = new CaveService(caves, user, files, tags, new FeatureSettingRepository(db, user),
+        Caves = new CaveService(caves, user, files, new FeatureSettingRepository(db, user),
             new ClientUrlBuilder(new FixedClientRequestOrigin()), mutations, tagLocks, countyLocks);
         CaveChangeRequests = new CaveChangeRequestService(new CaveChangeRequestRepository(db, user), caves, Caves,
             new CaveRevisionQueryRepository(db, user), mutations, files, user);
-        _tags = tags;
         _snapshots = snapshots;
         _tagLocks = tagLocks;
     }
@@ -90,15 +88,13 @@ internal sealed class IntegrationTestServices
     {
         var user = _db.RequestUser;
         var serviceProvider = new ServiceCollection().BuildServiceProvider();
-        return new AccountService(new AccountRepository(_db, user), user, Files, new FileRepository(_db, user),
-            new NotificationService(new NoOpNotificationHubContext()), _tags,
-            new FeatureSettingRepository(_db, user), Caves,
+        return new AccountService(new AccountRepository(_db, user), user, Files,
+            new NotificationService(new NoOpNotificationHubContext()), new FeatureSettingRepository(_db, user),
             new ArchiveJobCoordinator(serviceProvider.GetRequiredService<IServiceScopeFactory>()), CreateThrottle(_db),
-            new TagTypeMergeExecutionRepository(_db, user, _tagLocks, _snapshots,
+            new TagTypeAdministrationRepository(_db, user, _tagLocks, _snapshots,
                 new CaveBulkRevisionRepository(_db, user)),
-            new TagTypeDeleteExecutionRepository(_db, user),
-            new CountyReferenceLockRepository(_db, user),
-            new CountyDeleteExecutionRepository(_db, user, new CountyReferenceLockRepository(_db, user)));
+            new CountyAdministrationRepository(_db, user, new CountyReferenceLockRepository(_db, user), _snapshots,
+                new CaveBulkRevisionRepository(_db, user)));
     }
 
     private static RequestThrottleService CreateThrottle(PlanarianDbContext db)

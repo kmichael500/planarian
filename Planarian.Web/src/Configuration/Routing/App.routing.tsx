@@ -86,6 +86,20 @@ export const AppRouting: React.FC = () => {
           <Route path="/account/settings" element={<AccountSettingsPage />} />
           <Route path="/account/import" element={<ImportPage />} />
         </Route>
+        <Route path="/projects" element={<ProjectsPage />}></Route>
+        <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
+        <Route
+          path="/projects/:projectId/trip/:tripId"
+          element={<TripPage />}
+        ></Route>
+        <Route
+          path="/projects/:projectId/trip/:tripId/uploadPhotos"
+          element={<TripPhotoUploadPage />}
+        ></Route>
+        <Route
+          path="/projects/:projectId/trip/:tripId/addLeads"
+          element={<LeadAddPage />}
+        ></Route>
         <Route
           element={
             <ProtectedRoutesComponent
@@ -93,23 +107,9 @@ export const AppRouting: React.FC = () => {
             />
           }
         >
-          <Route path="/projects" element={<ProjectsPage />}></Route>
           <Route
             path="/planarian-settings"
             element={<PlanarianSettingsPage />}
-          ></Route>
-          <Route path="/projects/:projectId" element={<ProjectPage />}></Route>
-          <Route
-            path="/projects/:projectId/trip/:tripId"
-            element={<TripPage />}
-          ></Route>
-          <Route
-            path="/projects/:projectId/trip/:tripId/uploadPhotos"
-            element={<TripPhotoUploadPage />}
-          ></Route>
-          <Route
-            path="/projects/:projectId/trip/:tripId/addLeads"
-            element={<LeadAddPage />}
           ></Route>
         </Route>
 

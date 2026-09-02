@@ -519,6 +519,7 @@ public class ExportService
                 FieldIndication = NullIfWhiteSpace(entrance.FieldIndication),
                 ReportedOnDate = entrance.ReportedOnDate,
                 ReportedByNames = NullIfWhiteSpace(entrance.ReportedByNames),
+                EntranceOtherTags = NullIfWhiteSpace(entrance.EntranceOtherTags),
                 IsPrimaryEntrance = entrance.IsPrimaryEntrance
             })
             .ToList();

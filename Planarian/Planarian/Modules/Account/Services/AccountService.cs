@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Azure;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
@@ -11,12 +10,9 @@ using Planarian.Modules.Account.Controller;
 using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Authentication.Services;
-using Planarian.Modules.Caves.Services;
-using Planarian.Modules.Files.Repositories;
 using Planarian.Modules.Files.Services;
 using Planarian.Modules.Import.Models;
 using Planarian.Modules.Notifications.Services;
-using Planarian.Modules.Tags.Repositories;
 using Planarian.Shared.Base;
 using Planarian.Shared.Models;
 using Planarian.Shared.Services;
@@ -27,96 +23,42 @@ namespace Planarian.Modules.Account.Services;
 public class AccountService : ServiceBase<AccountRepository>
 {
     private readonly FileService _fileService;
-    private readonly FileRepository _fileRepository;
     private readonly NotificationService _notificationService;
-    private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
-    private readonly CaveService _caveService;
     private readonly ArchiveJobCoordinator _archiveJobCoordinator;
     private readonly RequestThrottleService _requestThrottleService;
-    private readonly TagTypeMergeExecutionRepository _tagMerge;
-    private readonly TagTypeDeleteExecutionRepository _tagDelete;
-    private readonly CountyReferenceLockRepository _countyLocks;
-    private readonly CountyDeleteExecutionRepository _countyDelete;
+    private readonly TagTypeAdministrationRepository _tagTypes;
+    private readonly CountyAdministrationRepository _counties;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
-        FileRepository fileRepository, NotificationService notificationService, TagRepository tagRepository,
-        FeatureSettingRepository featureSettingRepository, CaveService caveService,
+        NotificationService notificationService, FeatureSettingRepository featureSettingRepository,
         ArchiveJobCoordinator archiveJobCoordinator, RequestThrottleService requestThrottleService,
-        TagTypeMergeExecutionRepository tagMerge, TagTypeDeleteExecutionRepository tagDelete,
-        CountyReferenceLockRepository countyLocks, CountyDeleteExecutionRepository countyDelete) : base(
-        repository, requestUser)
+        TagTypeAdministrationRepository tagTypes, CountyAdministrationRepository counties) : base(repository, requestUser)
     {
         _fileService = fileService;
-        _fileRepository = fileRepository;
         _notificationService = notificationService;
-        _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
-        _caveService = caveService;
         _archiveJobCoordinator = archiveJobCoordinator;
         _requestThrottleService = requestThrottleService;
-        _tagMerge = tagMerge;
-        _tagDelete = tagDelete;
-        _countyLocks = countyLocks;
-        _countyDelete = countyDelete;
+        _tagTypes = tagTypes;
+        _counties = counties;
     }
     public async Task ResetAccount(CancellationToken cancellationToken)
     {
-        await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        var fileObjects = await Repository.GetFileObjectAddressesForResetAsync(cancellationToken);
+        var group = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
+        await _notificationService.SendNotificationToGroupAsync(group, "Resetting cave and account data.");
+        var fileObjects = await Repository.ExecuteResetAsync(cancellationToken);
+        await _notificationService.SendNotificationToGroupAsync(group, "Finished resetting cave and account data.");
 
-        var deleteAllCavesSignalRGroupName = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Getting associated files.");
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Done getting associated files.");
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleted 0 of 0 caves.");
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, "Deleting associated cave permissions.");
-        await Repository.DeleteAllCavePermissions();
-
-        async void DeleteCavesProgressHandler(string message)
-        {
-            await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName, message);
-        }
-
-        await Repository.DeleteCaveWithRelatedData(new Progress<string>(DeleteCavesProgressHandler),
-            cancellationToken);
-
-        await Repository.DeleteAllTagTypes(new Progress<string>(DeleteCavesProgressHandler), cancellationToken);
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated counties");
-        await Repository.DeleteAllCounties();
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Finished deleting associated counties");
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated states");
-        await Repository.DeleteAllAccountStates();
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Finished deleting associated states");
-
-        // Commit the relational purge before deleting external object storage. If object
-        // cleanup fails, the durable database outcome must not be rolled back while the
-        // bytes have already been destroyed.
-        await dbTransaction.CommitAsync(cancellationToken);
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Deleting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(group, "Deleting associated files.");
         foreach (var fileObject in fileObjects)
             await _fileService.DeleteObjectBestEffortAsync(
                 new StorageObjectAddress(fileObject.Partition, fileObject.Key));
 
         // Legacy account-owned assets (archives/photos/import transport) still share the
-        // Azure account container. Keep that broader cleanup separate from the durable
-        // provider-neutral Cave File contract above.
+        // Azure account container. Keep that cleanup after the relational reset commits.
         await _fileService.DeleteContainer(RequestUser.AccountContainerName);
-
-        await _notificationService.SendNotificationToGroupAsync(deleteAllCavesSignalRGroupName,
-            "Done deleting associated files.");
+        await _notificationService.SendNotificationToGroupAsync(group, "Done deleting associated files.");
     }
 
     #region Tags
@@ -124,7 +66,7 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task<IEnumerable<TagTypeTableVm>> GetTagsForTable(string tagTypeKey,
         CancellationToken cancellationToken)
     {
-        return await Repository.GetTagsForTable(tagTypeKey, cancellationToken);
+        return await _tagTypes.GetTagsForTable(tagTypeKey, cancellationToken);
     }
 
     public async Task<TagTypeTableVm> CreateOrUpdateTagType(CreateEditTagTypeVm tag, string tagTypeId,
@@ -134,7 +76,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
         var isNewTagType = string.IsNullOrWhiteSpace(tagTypeId);
         var entity = !isNewTagType
-            ? await _tagRepository.GetAccountAdministrativeTagAsync(tagTypeId, cancellationToken)
+            ? await _tagTypes.GetAccountAdministrativeTagAsync(tagTypeId, cancellationToken)
             : new TagType();
 
         if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
@@ -151,17 +93,17 @@ public class AccountService : ServiceBase<AccountRepository>
 
             entity.Key = tag.Key;
             entity.AccountId = RequestUser.AccountId;
-            _tagRepository.Add(entity);
+            _tagTypes.Add(entity);
         }
 
-        await _tagRepository.SaveChangesAsync();
+        await _tagTypes.SaveChangesAsync(cancellationToken);
 
         var result = new TagTypeTableVm
         {
             TagTypeId = entity.Id,
             Name = entity.Name,
             IsUserModifiable = !string.IsNullOrWhiteSpace(entity.AccountId),
-            Occurrences = await Repository.GetNumberOfOccurrences(entity.Id)
+            Occurrences = await _tagTypes.GetNumberOfOccurrences(entity.Id, cancellationToken)
         };
 
         return result;
@@ -169,7 +111,7 @@ public class AccountService : ServiceBase<AccountRepository>
 
     public async Task<int> DeleteTagTypes(IEnumerable<string> tagTypeIds)
     {
-        var result = await _tagDelete.ExecuteAsync(tagTypeIds, CancellationToken.None);
+        var result = await _tagTypes.DeleteAsync(tagTypeIds, CancellationToken.None);
 
         return result;
     }
@@ -177,7 +119,7 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task MergeTagTypes(string[] tagTypeIds, string destinationTagTypeId,
         CancellationToken cancellationToken)
     {
-        await _tagMerge.ExecuteAsync(tagTypeIds, destinationTagTypeId, cancellationToken);
+        await _tagTypes.MergeAsync(tagTypeIds, destinationTagTypeId, cancellationToken);
     }
 
 
@@ -187,7 +129,7 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task<IEnumerable<TagTypeTableCountyVm>> GetCountiesForTable(string stateId,
         CancellationToken cancellationToken)
     {
-        return await Repository.GetCountiesForTable(stateId, cancellationToken);
+        return await _counties.GetCountiesForTable(stateId, cancellationToken);
     }
 
     public async Task<TagTypeTableCountyVm> CreateOrUpdateCounty(string stateId, CreateCountyVm county,
@@ -197,81 +139,26 @@ public class AccountService : ServiceBase<AccountRepository>
         if (string.IsNullOrWhiteSpace(county.CountyDisplayId))
             throw ApiExceptionDictionary.BadRequest("County Code cannot be empty.");
 
-        var isNewCounty = string.IsNullOrWhiteSpace(countyId);
-        if (isNewCounty)
+        var result = await _counties.CreateOrUpdateAsync(stateId, county.Name, county.CountyDisplayId, countyId,
+            cancellationToken);
+        return new TagTypeTableCountyVm
         {
-            await ValidateCountyMutationAsync(stateId, county.CountyDisplayId, null, cancellationToken);
-            var entity = new County
-            {
-                Name = county.Name,
-                DisplayId = county.CountyDisplayId,
-                StateId = stateId,
-                AccountId = RequestUser.AccountId ?? throw new InvalidOperationException()
-            };
-            Repository.Add(entity);
-            await Repository.SaveChangesAsync();
-            return CountyResult(entity);
-        }
-
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            var locked = await _countyLocks.LockForMutationAsync([countyId!], cancellationToken);
-            if (locked.Count != 1) throw ApiExceptionDictionary.NotFound("County Id");
-
-            var entity = await Repository.GetCounty(countyId, cancellationToken);
-            if (entity == null) throw ApiExceptionDictionary.NotFound("County Id");
-
-            await ValidateCountyMutationAsync(stateId, county.CountyDisplayId, entity.Id, cancellationToken);
-            if (entity.StateId != stateId &&
-                await Repository.IsCountyReferencedByCave(entity.Id, cancellationToken))
-                throw ApiExceptionDictionary.BadRequest(
-                    "Cannot move county to another state because it is in use.");
-
-            entity.Name = county.Name;
-            entity.DisplayId = county.CountyDisplayId;
-            entity.StateId = stateId;
-            await Repository.SaveChangesAsync();
-            await transaction.CommitAsync(cancellationToken);
-            return CountyResult(entity);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
+            TagTypeId = result.Id,
+            Name = result.Name,
+            IsUserModifiable = true,
+            Occurrences = 0,
+            CountyDisplayId = result.DisplayId
+        };
     }
-
-    private async Task ValidateCountyMutationAsync(string stateId, string displayId, string? excludedCountyId,
-        CancellationToken cancellationToken)
-    {
-        if (!await Repository.StateExistsAsync(stateId, cancellationToken))
-            throw ApiExceptionDictionary.BadRequest("The selected State does not exist.");
-        if (await Repository.IsDuplicateCountyCode(displayId, stateId, excludedCountyId, cancellationToken))
-            throw ApiExceptionDictionary.BadRequest(
-                $"The county code '{displayId}' is already in use for the selected state.");
-    }
-
-    private static TagTypeTableCountyVm CountyResult(County entity) => new()
-    {
-        TagTypeId = entity.Id,
-        Name = entity.Name,
-        IsUserModifiable = true,
-        Occurrences = 0,
-        CountyDisplayId = entity.DisplayId
-    };
 
     public async Task DeleteCounties(IEnumerable<string> countyIds, CancellationToken cancellationToken)
     {
-        await _countyDelete.ExecuteAsync(countyIds, cancellationToken);
+        await _counties.DeleteAsync(countyIds, cancellationToken);
     }
 
-    public async Task MergeCounties(string[] countyIds, string destinationCountyId, CancellationToken cancellationToken)
-    {
-        // TODO: County merge must be implemented as a published bulk Cave mutation that validates State/County and
-        // County-number invariants and atomically advances every affected Cave revision.
-        throw new NotImplementedException();
-    }
+    public Task MergeCounties(string stateId, string[] countyIds, string destinationCountyId,
+        CancellationToken cancellationToken) =>
+        _counties.MergeAsync(stateId, countyIds, destinationCountyId, cancellationToken);
 
     #endregion
 
@@ -305,7 +192,7 @@ public class AccountService : ServiceBase<AccountRepository>
             _featureSettingRepository.Add(featureSetting);
         }
 
-        await Repository.SaveChangesAsync(cancellationToken);
+        await _featureSettingRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
@@ -321,66 +208,37 @@ public class AccountService : ServiceBase<AccountRepository>
     public async Task<string> UpdateMiscAccountSettingsVm(MiscAccountSettingsVm values,
         CancellationToken cancellationToken)
     {
-        var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         var account = await Repository.GetAccount(cancellationToken);
-
         if (account == null) throw ApiExceptionDictionary.NotFound("Account");
 
-        try
+        account.Name = values.AccountName;
+        account.CountyIdDelimiter = values.CountyIdDelimiter;
+        account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
+        account.ExportEnabled = values.ExportEnabled;
+
+        var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
+        var deletedStateIds = account.AccountStates.Select(x => x.StateId).Except(values.StateIds).ToList();
+
+        foreach (var deletedStateId in deletedStateIds)
         {
-            account.Name = values.AccountName;
-            account.CountyIdDelimiter = values.CountyIdDelimiter;
+            if (await Repository.GetNumberOfCavesForState(deletedStateId, cancellationToken) > 0)
+                throw ApiExceptionDictionary.BadRequest(
+                    "One or more states have caves associated with them. Please remove the caves before removing the state.");
 
-            account.DefaultViewAccessAllCaves = values.DefaultViewAccessAllCaves;
-            account.ExportEnabled = values.ExportEnabled;
-
-            // check which states are missing
-            var newStateIds = values.StateIds.Except(account.AccountStates.Select(x => x.StateId)).ToList();
-
-            // check which states are new
-            var deletedStateIds = account.AccountStates.Select(x => x.StateId).Except(values.StateIds).ToList();
-
-            foreach (var deletedStateId in deletedStateIds)
-            {
-                var numberOfCavesForState =
-                    await Repository.GetNumberOfCavesForState(deletedStateId, cancellationToken);
-
-                if (numberOfCavesForState > 0)
-                {
-                    throw ApiExceptionDictionary.BadRequest(
-                        $"One or more states have caves associated with them. Please remove the caves before removing the state.");
-                }
-                var accountState = await Repository.GetAccountState(account.Id, deletedStateId);
-                if (accountState == null)
-                {
-                    throw ApiExceptionDictionary.NotFound("Account State");
-                }
-
-                Repository.Delete(accountState);
-                await Repository.SaveChangesAsync(cancellationToken);
-            }
-
-            foreach (var newStateId in newStateIds)
-            {
-                var state = new AccountState()
-                {
-                    StateId = newStateId,
-                    AccountId = RequestUser.AccountId ?? throw new InvalidOperationException()
-                };
-
-                Repository.Add(state);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return account.Id;
+            var accountState = await Repository.GetAccountState(account.Id, deletedStateId)
+                ?? throw ApiExceptionDictionary.NotFound("Account State");
+            Repository.Delete(accountState);
         }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+
+        foreach (var newStateId in newStateIds)
+            Repository.Add(new AccountState
+            {
+                StateId = newStateId,
+                AccountId = RequestUser.AccountId ?? throw new InvalidOperationException()
+            });
+
+        await Repository.SaveChangesAsync(cancellationToken);
+        return account.Id;
     }
 
     #region Archive

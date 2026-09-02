@@ -11,36 +11,16 @@ import CreateEditCountiesComponent from "./CreateEditCountiesComponent";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { MiscAccountSettings } from "./MiscAccountSettingsComponent";
 import { EnabledFieldsComponent } from "./EnabledFieldsComponent";
-import { FeatureKey, FeatureSettingVm } from "../Models/FeatureSettingVm";
+import { FeatureSettingVm } from "../Models/FeatureSettingVm";
 import { AccountService } from "../Services/AccountService";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ArchiveCardComponent } from "./ArchiveCardComponent";
+import { isTagTypeEnabled, tagTypeFeatureMap } from "../Models/TagTypeFeaturePolicy";
 
 const AccountSettingsComponent = () => {
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
   const tagTabPosition = screens.md ? "left" : "top";
-
-  const tagTypeFeatureMap: { [key in TagType]?: FeatureKey | null } = {
-    [TagType.EntranceHydrology]: FeatureKey.EnabledFieldEntranceHydrologyTags,
-    [TagType.People]:
-      FeatureKey.EnabledFieldCaveReportedByNameTags ||
-      FeatureKey.EnabledFieldEntranceReportedByNameTags ||
-      FeatureKey.EnabledFieldCaveCartographerNameTags,
-    [TagType.EntranceStatus]: FeatureKey.EnabledFieldEntranceStatusTags,
-    [TagType.LocationQuality]: FeatureKey.EnabledFieldEntranceLocationQuality,
-    [TagType.FieldIndication]:
-      FeatureKey.EnabledFieldEntranceFieldIndicationTags,
-    [TagType.File]: null,
-    [TagType.Geology]: FeatureKey.EnabledFieldCaveGeologyTags,
-    [TagType.GeologicAge]: FeatureKey.EnabledFieldCaveGeologicAgeTags,
-    [TagType.PhysiographicProvince]:
-      FeatureKey.EnabledFieldCavePhysiographicProvinceTags,
-    [TagType.Biology]: FeatureKey.EnabledFieldCaveBiologyTags,
-    [TagType.Archeology]: FeatureKey.EnabledFieldCaveArcheologyTags,
-    [TagType.MapStatus]: FeatureKey.EnabledFieldCaveMapStatusTags,
-    [TagType.CaveOther]: FeatureKey.EnabledFieldCaveOtherTags,
-  };
 
   const { currentAccountId, setPermissions } = useContext(AppContext);
 
@@ -55,24 +35,9 @@ const AccountSettingsComponent = () => {
     );
     setPermissions({ visibleFields: enabledFeatures });
 
-    // Check for People tag feature keys
-    const peopleFeatureKeys = [
-      FeatureKey.EnabledFieldCaveReportedByNameTags,
-      FeatureKey.EnabledFieldEntranceReportedByNameTags,
-      FeatureKey.EnabledFieldCaveCartographerNameTags,
-    ];
-
-    const isPeopleTagEnabled = peopleFeatureKeys.some((key) =>
-      enabledFeatures.some((f) => f.key === key && f.isEnabled)
+    const enabledTagTypes = includedTagTypes.filter((tagType) =>
+      isTagTypeEnabled(tagType, enabledFeatures)
     );
-
-    const enabledTagTypes = includedTagTypes.filter((tagType) => {
-      if (tagType === TagType.People) return isPeopleTagEnabled;
-
-      const featureKey = tagTypeFeatureMap[tagType];
-      if (!featureKey) return true;
-      return enabledFeatures.some((f) => f.key === featureKey && f.isEnabled);
-    });
 
     setFeatureSettings(enabledFeatures);
     setFilteredTagTypes(enabledTagTypes);

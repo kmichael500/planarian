@@ -1,10 +1,14 @@
 import { Form } from "antd";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveFileAuthoringEditor } from "./CaveFileAuthoringEditor";
 
 jest.mock("../../Tag/Components/TagSelectComponent", () => ({
   TagSelectComponent: () => <div>File type selector</div>,
+}));
+
+jest.mock("../../Files/Components/FileViewerComponent", () => ({
+  FileViewer: () => null,
 }));
 
 beforeAll(() => {
@@ -27,7 +31,8 @@ const Editor = () => {
 it("renders the extension as a read-only suffix beside the editable name", () => {
   render(<Editor />);
 
-  expect(screen.getByLabelText("Name")).toHaveValue("Entrance Survey");
-  expect(screen.getByText(".pdf")).toBeInTheDocument();
+  const name = screen.getByLabelText("Name");
+  expect(name).toHaveValue("Entrance Survey");
+  expect(within(name.closest(".ant-input-group-wrapper")!).getByText(".pdf")).toBeInTheDocument();
   expect(screen.queryByLabelText("Extension")).not.toBeInTheDocument();
 });

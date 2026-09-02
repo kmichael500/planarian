@@ -24,6 +24,20 @@ public sealed class CountyReferenceLockRepository
             ?? throw new InvalidOperationException("A current account is required for County locking.");
     }
 
+    /// <summary>
+    /// Serializes County-code administration for the current account without locking the Account row itself.
+    /// Cave inserts already take County locks before PostgreSQL acquires Account FK key-share locks, so using
+    /// the Account row as this mutex would invert that ordering and can deadlock. A transaction-scoped advisory
+    /// lock provides the same account-local serialization without joining the relational FK lock graph.
+    /// </summary>
+    public async Task LockAdministrationNamespaceAsync(CancellationToken cancellationToken = default)
+    {
+        RequireTransaction();
+        await _db.Database.ExecuteSqlRawAsync(
+            "select pg_advisory_xact_lock(1885434478, hashtext(@account_id))",
+            [new NpgsqlParameter<string>("account_id", _accountId)], cancellationToken);
+    }
+
     public Task<IReadOnlyList<LockedCounty>> LockForReferenceAsync(IEnumerable<string> countyIds,
         CancellationToken cancellationToken = default) =>
         LockForReferenceCoreAsync(Normalize(countyIds), cancellationToken);

@@ -2,9 +2,11 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.App.Controllers;
 using Planarian.Modules.Authentication.Controllers;
 using Planarian.Modules.Register.Controllers;
+using Planarian.Modules.PlanarianSettings.Controllers;
 using Planarian.Modules.Users.Controllers;
 using Planarian.Shared.Email.Controllers;
 using Xunit;
@@ -45,6 +47,16 @@ public sealed class ControllerSecurityContractTests
             .ToArray();
 
         Assert.Equal(AntiforgeryBypassAllowlist.OrderBy(endpoint => endpoint), actual);
+    }
+
+    [Fact]
+    public void PlanarianSettingsControllerRequiresPlatformAdminPolicy()
+    {
+        var policies = typeof(PlanarianSettingsController)
+            .GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .Select(attribute => attribute.Policy);
+
+        Assert.Contains(PermissionPolicyKey.PlanarianAdmin, policies);
     }
 
     [Fact]

@@ -32,6 +32,7 @@ export interface CaveSearchParamsVm {
   entrancePitDepthFeet: number;
   locationQualityTagIds: string;
   entranceHydrologyTagIds: string;
+  entranceOtherTagIds: string;
   entranceLocation: string;
   entrancePolygon: string;
   entranceReportedByPeopleTagIds: string;

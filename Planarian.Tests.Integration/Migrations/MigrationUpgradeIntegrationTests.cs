@@ -180,6 +180,53 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
+    public async Task EntranceOtherBackfillRollbackPreservesPreexistingAccountOverride()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(EntranceOtherBackfillRollbackPreservesPreexistingAccountOverride));
+        var migrations = database.GetMigrationNames().ToList();
+        var previous = migrations.FindIndex(migration =>
+            migration.EndsWith("_CaveChangeRequestReviewEvents", StringComparison.Ordinal));
+        Assert.True(previous >= 0);
+        await database.MigrateAsync(migrations[previous]);
+        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        var generatedAccount = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'b');
+
+        await using (var seed = database.CreateDbContext("seed", account.AccountId))
+        {
+            seed.FeatureSettings.Add(new FeatureSetting
+            {
+                Id = "manualothr",
+                AccountId = account.AccountId,
+                Key = FeatureKey.EnabledFieldEntranceOtherTags,
+                IsEnabled = false,
+                IsDefault = false
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await database.MigrateAsync(null);
+        await using (var afterUp = database.CreateDbContext("after-up", generatedAccount.AccountId))
+        {
+            var generated = await afterUp.FeatureSettings.SingleAsync(row =>
+                row.AccountId == generatedAccount.AccountId &&
+                row.Key == FeatureKey.EnabledFieldEntranceOtherTags);
+            Assert.True(generated.IsEnabled);
+            Assert.False(generated.IsDefault);
+        }
+
+        await database.MigrateAsync(migrations[previous]);
+
+        await using var verify = database.CreateDbContext("verify", account.AccountId);
+        var setting = await verify.FeatureSettings.SingleAsync(row => row.Id == "manualothr");
+        Assert.False(setting.IsEnabled);
+        Assert.Equal(FeatureKey.EnabledFieldEntranceOtherTags, setting.Key);
+        Assert.False(await verify.FeatureSettings.IgnoreQueryFilters().AnyAsync(row =>
+            row.AccountId == generatedAccount.AccountId &&
+            row.Key == FeatureKey.EnabledFieldEntranceOtherTags));
+    }
+
+    [Fact]
     public async Task ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData()
     {
         // Arrange the exact pre-foundation production schema and representative data.
@@ -229,6 +276,12 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
                 (files[0].AccountId, files[0].CaveId, files[0].Name, files[0].Extension));
             Assert.Equal(("mainacct01", (string?)null, "temporary", ".csv"),
                 (files[1].AccountId, files[1].CaveId, files[1].Name, files[1].Extension));
+
+            var entranceOtherSetting = await verify.FeatureSettings.SingleAsync(setting =>
+                setting.AccountId == "mainacct01" &&
+                setting.Key == FeatureKey.EnabledFieldEntranceOtherTags);
+            Assert.True(entranceOtherSetting.IsEnabled);
+            Assert.False(entranceOtherSetting.IsDefault);
         }
 
         // The newly-added xmin concurrency token must also work after upgrade.

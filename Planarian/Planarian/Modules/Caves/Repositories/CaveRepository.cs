@@ -647,6 +647,21 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
                     break;
+                case nameof(CaveSearchParamsVm.EntranceOtherTagIds):
+                    var entranceOtherTagIds = queryCondition.Value.SplitAndTrim();
+
+                    if (entranceOtherTagIds.Length == 0)
+                    {
+                        break;
+                    }
+                    query = queryCondition.Operator switch
+                    {
+                        QueryOperator.In => query.Where(e =>
+                            e.Entrances.SelectMany(ee => ee.EntranceOtherTags)
+                                .Any(ee => entranceOtherTagIds.Contains(ee.TagTypeId))),
+                        _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
+                    };
+                    break;
                 case nameof(CaveSearchParamsVm.EntranceLocation):
                     var rawLocationValue = queryCondition.Value;
 
@@ -1173,6 +1188,20 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             DbContext.Entry(association).State = EntityState.Detached;
     }
 
+    public async Task SaveAggregateChangesAsync(string caveId, string? expectedRevisionId,
+        bool translateCaveConcurrency, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await DbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception) when (translateCaveConcurrency &&
+            exception.Entries.Any(entry => entry.Entity is Cave))
+        {
+            throw new CaveRevisionConflictException(caveId, expectedRevisionId, null);
+        }
+    }
+
     public async Task<IReadOnlySet<string>> GetPublishedFileIdsAsync(string caveId,
         CancellationToken cancellationToken = default)
     {
@@ -1251,6 +1280,79 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             !string.Equals(existing.StoragePartition, file.BlobContainer, StringComparison.Ordinal) ||
             !string.Equals(existing.StorageKey, file.BlobKey, StringComparison.Ordinal))
             throw new InvalidOperationException("Historical File identity cannot be repointed to different content.");
+    }
+
+    public async Task<IReadOnlyList<StorageObjectAddress>> DeleteAggregateForHardDeleteAsync(
+        Cave entity, CancellationToken cancellationToken = default)
+    {
+        if (entity.AccountId != RequestUser.AccountId)
+            throw new InvalidOperationException("The Cave does not belong to the current account.");
+
+        var geoJsons = await GetCaveGeoJsonsAsync(entity.Id);
+        foreach (var geoJson in geoJsons)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DbContext.CaveGeoJsons.Remove(geoJson);
+        }
+        await DbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var entrance in entity.Entrances)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DbContext.RemoveRange(entrance.EntranceStatusTags);
+            await DbContext.SaveChangesAsync(cancellationToken);
+            DbContext.RemoveRange(entrance.EntranceHydrologyTags);
+            await DbContext.SaveChangesAsync(cancellationToken);
+            DbContext.RemoveRange(entrance.FieldIndicationTags);
+            await DbContext.SaveChangesAsync(cancellationToken);
+            DbContext.RemoveRange(entrance.EntranceReportedByNameTags);
+            await DbContext.SaveChangesAsync(cancellationToken);
+            DbContext.RemoveRange(entrance.EntranceOtherTags);
+            await DbContext.SaveChangesAsync(cancellationToken);
+            DbContext.Remove(entrance);
+        }
+        await DbContext.SaveChangesAsync(cancellationToken);
+
+        await DeleteHardDeleteCaveAssociationsAsync(entity, cancellationToken);
+
+        var files = entity.Files.ToList();
+        var retainedObjects = await RemoveRetainedFileObjectsForHardDeleteAsync(entity.Id, cancellationToken);
+        DbContext.RemoveRange(entity.CavePermissions);
+        await DeleteStagedFileReferencesAsync(files.Select(file => file.Id), cancellationToken);
+        DbContext.RemoveRange(files);
+        await DbContext.SaveChangesAsync(cancellationToken);
+
+        DbContext.Remove(entity);
+        await DbContext.SaveChangesAsync(cancellationToken);
+
+        return files
+            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) && !string.IsNullOrWhiteSpace(file.BlobContainer))
+            .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
+            .Concat(retainedObjects).Distinct().ToList();
+    }
+
+    private async Task DeleteHardDeleteCaveAssociationsAsync(Cave entity, CancellationToken cancellationToken)
+    {
+        async Task DeleteAndSaveAsync<T>(IEnumerable<T> values) where T : class
+        {
+            foreach (var value in values)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                DbContext.Remove(value);
+            }
+            await DbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await DeleteAndSaveAsync(entity.GeologyTags);
+        await DeleteAndSaveAsync(entity.MapStatusTags);
+        await DeleteAndSaveAsync(entity.GeologicAgeTags);
+        await DeleteAndSaveAsync(entity.PhysiographicProvinceTags);
+        await DeleteAndSaveAsync(entity.BiologyTags);
+        await DeleteAndSaveAsync(entity.ArcheologyTags);
+        await DeleteAndSaveAsync(entity.CartographerNameTags);
+        await DeleteAndSaveAsync(entity.CaveReportedByNameTags);
+        await DeleteAndSaveAsync(entity.CaveOtherTags);
+        await DeleteAndSaveAsync(entity.Favorites);
     }
 
     public async Task<IReadOnlyList<StorageObjectAddress>> RemoveRetainedFileObjectsForHardDeleteAsync(
@@ -1479,11 +1581,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     public async Task<IEnumerable<CaveGeoJson>> GetCaveGeoJsonsAsync(string caveId)
     {
         return await DbContext.CaveGeoJsons.Where(c => c.CaveId == caveId).ToListAsync();
-    }
-
-    public void AddCaveGeoJson(CaveGeoJson geoJson)
-    {
-        DbContext.CaveGeoJsons.Add(geoJson);
     }
 
     public void RemoveCaveGeoJson(CaveGeoJson geoJson)

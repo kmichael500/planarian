@@ -43,7 +43,9 @@ import { DistanceFromMeComponent } from "../../../Shared/Components/Display/Dist
 const { Panel } = Collapse;
 const { Option } = Select;
 
-const hasCoordinates = (entrance?: Pick<EntranceVm, "latitude" | "longitude"> | null) =>
+const hasCoordinates = (
+  entrance?: EntranceVm | null
+): entrance is EntranceVm & { latitude: number; longitude: number } =>
   typeof entrance?.latitude === "number" && Number.isFinite(entrance.latitude) &&
   typeof entrance.longitude === "number" && Number.isFinite(entrance.longitude);
 

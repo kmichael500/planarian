@@ -14,6 +14,9 @@ public class PlanarianSettingsService : ServiceBase<PlanarianSettingsRepository>
     {
     }
 
+    public Task<List<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken) =>
+        Repository.GetAllStates(cancellationToken);
+
     public async Task<string> CreateAccount(CreateAccountVm account, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(account.Name))

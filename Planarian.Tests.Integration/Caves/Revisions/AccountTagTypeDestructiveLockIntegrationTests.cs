@@ -32,8 +32,7 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
         {
-            var deleted = await new TagTypeDeleteExecutionRepository(db, db.RequestUser)
-                .ExecuteAsync([first.Id, $" {second.Id} ", first.Id, global.Id, "missing"]);
+            var deleted = await TagAdministration(db).DeleteAsync([first.Id, $" {second.Id} ", first.Id, global.Id, "missing"]);
             Assert.Equal(2, deleted);
         }
 
@@ -62,8 +61,7 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         await using var pidCommand = deleteDb.Database.GetDbConnection().CreateCommand();
         pidCommand.CommandText = "select pg_backend_pid()";
         var deletePid = Convert.ToInt32(await pidCommand.ExecuteScalarAsync());
-        var deletion = new TagTypeDeleteExecutionRepository(deleteDb, deleteDb.RequestUser)
-            .ExecuteAsync([tag.Id]);
+        var deletion = TagAdministration(deleteDb).DeleteAsync([tag.Id]);
         await WaitForLockWaitAsync(database, cave.AccountId, deletePid);
 
         await referenceTransaction.CommitAsync();
@@ -85,7 +83,7 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
         {
             var exception = await Assert.ThrowsAsync<ApiException>(() =>
-                new TagTypeDeleteExecutionRepository(db, db.RequestUser).ExecuteAsync([tag.Id]));
+                TagAdministration(db).DeleteAsync([tag.Id]));
             Assert.Equal(400, exception.StatusCode);
             Assert.Equal("Cannot delete tag type because it is in use.", exception.Message);
         }
@@ -123,7 +121,7 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         await using var pidCommand = deleteDb.Database.GetDbConnection().CreateCommand();
         pidCommand.CommandText = "select pg_backend_pid()";
         var deletePid = Convert.ToInt32(await pidCommand.ExecuteScalarAsync());
-        var deletion = new TagTypeDeleteExecutionRepository(deleteDb, deleteDb.RequestUser).ExecuteAsync([tag.Id]);
+        var deletion = TagAdministration(deleteDb).DeleteAsync([tag.Id]);
         await WaitForLockWaitAsync(database, cave.AccountId, deletePid);
 
         pause.Resume.TrySetResult();
@@ -141,6 +139,15 @@ public sealed class AccountTagTypeDestructiveLockIntegrationTests(PostgresTestSe
         Assert.Equal(cave.RevisionId, writerRevision.PreviousRevisionId);
         Assert.Equal(CaveRevisionSource.ManagerEdit, writerRevision.Source);
         Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == cave.CaveId));
+    }
+
+    private static TagTypeAdministrationRepository TagAdministration(
+        Planarian.Model.Database.PlanarianDbContext db)
+    {
+        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        return new TagTypeAdministrationRepository(db, db.RequestUser,
+            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionRepository(db, db.RequestUser));
     }
 
     private static async Task<string> AttachBiologyAndPublishAsync(PostgresTestDatabase database,

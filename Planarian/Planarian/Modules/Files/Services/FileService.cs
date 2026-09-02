@@ -72,110 +72,18 @@ public class FileService : ServiceBase<FileRepository>
     {
         var parsedFileName = FileNamePolicy.Parse(fileName);
         fileName = parsedFileName.CompleteName;
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
         var caveEntity = await _caveRepository.GetCave(caveId);
-        if (caveEntity == null)
-        {
-            throw ApiExceptionDictionary.NotFound("Cave");
-        }
-
+        if (caveEntity == null) throw ApiExceptionDictionary.NotFound("Cave");
         await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId, caveEntity.StateId);
+
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
-
-        // check if tag type name exists in the file name
-        var autoTagType =
-            allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
-
-        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
-
-        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
-
-        if (tagTypeId == null)
-            throw ApiExceptionDictionary.NotFound("File type");
-        await LockPublishedFileTypeAsync(tagTypeId, cancellationToken);
-        var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
-            caveId, cancellationToken: cancellationToken);
-
-
-        var entity = new File()
-        {
-            Id = IdGenerator.Generate(),
-            CaveId = caveId,
-            Name = parsedFileName.Name,
-            Extension = parsedFileName.Extension,
-            AccountId = RequestUser.AccountId,
-            FileTypeTagId = tagTypeId
-        };
-
-        Repository.Add(entity);
-        await Repository.SaveChangesAsync(cancellationToken);
-
-        var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
-
-        try
-        {
-            if (stream.CanSeek) stream.Position = 0;
-            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
-                cancellationToken);
-
-            entity.BlobKey = address.Key;
-            entity.BlobContainer = address.Partition;
-            await Repository.SaveChangesAsync(cancellationToken);
-            await _caveMutationCoordinator.PublishPreparedAsync(
-                revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
-                cancellationToken: cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            // The blob store is outside the PostgreSQL transaction. The key is
-            // unique to this newly-created File, so deleting it is safe even if
-            // upload failed before the blob became visible.
-            await BestEffortDeleteObjectAsync(address);
-            throw;
-        }
-
-        var fileInformation = new FileVm
-        {
-            Id = entity.Id,
-            Name = entity.Name,
-            Extension = entity.Extension,
-            FileTypeTagId = entity.FileTypeTagId,
-            Uuid = uuid
-        };
-        return fileInformation;
-    }
-
-    public async Task<FileVm> PublishStagedCaveFile(string sourceBlobKey, string caveId, string fileName,
-        CancellationToken cancellationToken, string? uuid = null)
-    {
-        var parsedFileName = FileNamePolicy.Parse(fileName);
-        fileName = parsedFileName.CompleteName;
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
-
-        var caveEntity = await _caveRepository.GetCave(caveId);
-        if (caveEntity == null)
-        {
-            throw ApiExceptionDictionary.NotFound("Cave");
-        }
-
-        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId,  caveEntity.StateId);
-        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
-
-        var autoTagType =
-            allFileTypes.FirstOrDefault(e => fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
-
+        var autoTagType = allFileTypes.FirstOrDefault(e =>
+            fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
         var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
         var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
-
-        if (tagTypeId == null)
-            throw ApiExceptionDictionary.NotFound("File type");
-        await LockPublishedFileTypeAsync(tagTypeId, cancellationToken);
-        var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
-            caveId, cancellationToken: cancellationToken);
+        if (tagTypeId == null) throw ApiExceptionDictionary.NotFound("File type");
 
         var entity = new File
         {
@@ -186,40 +94,37 @@ public class FileService : ServiceBase<FileRepository>
             AccountId = RequestUser.AccountId,
             FileTypeTagId = tagTypeId
         };
-
-        Repository.Add(entity);
-        await Repository.SaveChangesAsync(cancellationToken);
-
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
+
         try
         {
-            // Chunked import staging is still an Azure transport concern. The durable Cave File
-            // destination is provider-neutral, so a future storage provider can receive the same
-            // staged bytes without changing Cave/File domain semantics.
-            var sourceContainer = await GetBlobContainerClient(RequestUser.AccountContainerName,
-                createIfNotExists: false);
-            await using var source = await OpenBlobReadStream(sourceContainer, sourceBlobKey, cancellationToken);
-            await _objectStorage.PutAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
+            if (stream.CanSeek) stream.Position = 0;
+            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
-
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
-            await Repository.SaveChangesAsync(cancellationToken);
-            await _caveMutationCoordinator.PublishPreparedAsync(
-                revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
-                cancellationToken: cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+
+            await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(async token =>
+            {
+                await LockPublishedFileTypeAsync(tagTypeId, token);
+                var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                    caveId, cancellationToken: token);
+                Repository.Add(entity);
+                await Repository.SaveChangesAsync(token);
+                await _caveMutationCoordinator.PublishPreparedAsync(
+                    revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                    cancellationToken: token);
+            }, cancellationToken);
         }
         catch
         {
-            // Compensate only the deterministic destination created by this
-            // publication attempt. The staged source belongs to the upload-
-            // session lifecycle and is cleaned by its caller.
+            // The object address is unique to this File. If relational publication fails,
+            // compensate the already-written object without falsifying the database outcome.
             await BestEffortDeleteObjectAsync(address);
             throw;
         }
 
-        var fileInformation = new FileVm
+        return new FileVm
         {
             Id = entity.Id,
             Name = entity.Name,
@@ -227,7 +132,75 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = entity.FileTypeTagId,
             Uuid = uuid
         };
-        return fileInformation;
+    }
+
+    public async Task<FileVm> PublishStagedCaveFile(string sourceBlobKey, string caveId, string fileName,
+        CancellationToken cancellationToken, string? uuid = null)
+    {
+        var parsedFileName = FileNamePolicy.Parse(fileName);
+        fileName = parsedFileName.CompleteName;
+        if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+
+        var caveEntity = await _caveRepository.GetCave(caveId);
+        if (caveEntity == null) throw ApiExceptionDictionary.NotFound("Cave");
+        await RequestUser.HasCavePermission(PermissionKey.Manager, caveId, caveEntity.CountyId, caveEntity.StateId);
+
+        var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
+        var autoTagType = allFileTypes.FirstOrDefault(e =>
+            fileName.Contains(e.Display, StringComparison.InvariantCultureIgnoreCase));
+        var other = await _tagRepository.GetFileTypeTagByName(FileTypeTagName.Other, RequestUser.AccountId);
+        var tagTypeId = !string.IsNullOrWhiteSpace(autoTagType?.Value) ? autoTagType.Value : other?.Id;
+        if (tagTypeId == null) throw ApiExceptionDictionary.NotFound("File type");
+
+        var entity = new File
+        {
+            Id = IdGenerator.Generate(),
+            CaveId = caveId,
+            Name = parsedFileName.Name,
+            Extension = parsedFileName.Extension,
+            AccountId = RequestUser.AccountId,
+            FileTypeTagId = tagTypeId
+        };
+        var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
+
+        try
+        {
+            // Chunked import staging remains an Azure transport concern, but the durable
+            // object write happens before PostgreSQL publication and is compensated on failure.
+            var sourceContainer = await GetBlobContainerClient(RequestUser.AccountContainerName,
+                createIfNotExists: false);
+            await using var source = await OpenBlobReadStream(sourceContainer, sourceBlobKey, cancellationToken);
+            await _objectStorage.PutAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
+                cancellationToken);
+            entity.BlobKey = address.Key;
+            entity.BlobContainer = address.Partition;
+
+            await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(async token =>
+            {
+                await LockPublishedFileTypeAsync(tagTypeId, token);
+                var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
+                    caveId, cancellationToken: token);
+                Repository.Add(entity);
+                await Repository.SaveChangesAsync(token);
+                await _caveMutationCoordinator.PublishPreparedAsync(
+                    revisionPreparation, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Update,
+                    cancellationToken: token);
+            }, cancellationToken);
+        }
+        catch
+        {
+            await BestEffortDeleteObjectAsync(address);
+            throw;
+        }
+
+        return new FileVm
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Extension = entity.Extension,
+            FileTypeTagId = entity.FileTypeTagId,
+            Uuid = uuid
+        };
     }
 
     public async Task<FileVm> AddTemporaryAccountFile(Stream stream, string fileName, string fileTypeTagName,
@@ -236,10 +209,11 @@ public class FileService : ServiceBase<FileRepository>
     {
         var parsedFileName = FileNamePolicy.Parse(fileName);
         fileName = parsedFileName.CompleteName;
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
         var expiredObjects = await RemoveExpiredFiles(cancellationToken);
+        foreach (var expiredObject in expiredObjects)
+            await BestEffortDeleteObjectAsync(expiredObject);
 
         var tempCaveImportTagType =
             await _tagRepository.GetFileTypeTagByName(fileTypeTagName, RequestUser.AccountId);
@@ -268,18 +242,16 @@ public class FileService : ServiceBase<FileRepository>
             entity.BlobKey = blobKey;
             entity.BlobContainer = RequestUser.AccountContainerName;
 
+            // The transport object is written before the relational row. Do not hold a database
+            // transaction open across external storage; compensate the object if persistence fails.
             Repository.Add(entity);
             await Repository.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
         }
         catch
         {
             await BestEffortDeleteObjectAsync(new StorageObjectAddress(RequestUser.AccountContainerName, blobKey));
             throw;
         }
-
-        foreach (var expiredObject in expiredObjects)
-            await BestEffortDeleteObjectAsync(expiredObject);
 
         var fileInformation = new FileVm
         {
@@ -335,18 +307,8 @@ public class FileService : ServiceBase<FileRepository>
             // Do not hold a database transaction open while a potentially large
             // object is uploaded. The object has a unique immutable address and
             // is compensated if the short relational transaction cannot commit.
-            await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                Repository.Add(entity);
-                await Repository.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                throw;
-            }
+            Repository.Add(entity);
+            await Repository.SaveChangesAsync(cancellationToken);
         }
         catch
         {
@@ -367,14 +329,12 @@ public class FileService : ServiceBase<FileRepository>
 
     public async Task DeleteUnpublishedFileAsync(string fileId, CancellationToken cancellationToken)
     {
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         var entity = await Repository.GetDeletableUnpublishedFileByIdAsync(fileId, cancellationToken);
         if (entity is null) return;
         var blobKey = entity.BlobKey;
         var blobContainer = entity.BlobContainer;
         Repository.Delete(entity);
         await Repository.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         if (!string.IsNullOrWhiteSpace(blobKey) && !string.IsNullOrWhiteSpace(blobContainer))
             await BestEffortDeleteObjectAsync(new StorageObjectAddress(blobContainer, blobKey));
     }

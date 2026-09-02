@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Modules.Caves.Revisions;
+using Planarian.Tests.Integration.Infrastructure.Actors;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
+using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
 
 namespace Planarian.Tests.Integration.AccountReset;
 
@@ -14,6 +17,7 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(ResetAccountCommitsRelationalPurgeBeforeDeletingExternalContainer));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CavePermissions.GrantViewAsync(database, tenant, "a");
         var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
             fileId: "resetfilea");
         const string portablePartition = "portable-store";
@@ -32,6 +36,13 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
             StorageKey = retainedKey
         });
         await db.SaveChangesAsync();
+
+        var requests = new CaveChangeRequestRepository(db, db.RequestUser);
+        var requestId = await requests.CreateAsync(tenant.CaveId, tenant.RevisionId,
+            Proposal(tenant, "Reviewed proposal"), default);
+        var versionId = await CurrentVersionAsync(db, requestId);
+        await requests.RequestChangesAsync(requestId, versionId, "Please revise before reset.", default);
+        Assert.Single(await db.CaveChangeRequestReviewEvents.ToListAsync());
 
         var blobs = new TestFileBlobStore();
         blobs.Seed(portablePartition, liveKey, [1]);

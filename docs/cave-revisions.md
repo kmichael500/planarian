@@ -36,8 +36,8 @@ resource class are acquired in deterministic ordinal order. The application orde
 `StringComparer.Ordinal`; PostgreSQL multi-row lock queries explicitly use the `C` collation for their `ORDER BY`, so
 database locale/collation cannot change the row-lock acquisition sequence. Planarian-generated IDs are ASCII. Direct
 Cave mutations that need County-number or County-transition
-serialization acquire the County mutation lock before TagType reference locks. Account County State moves and deletes
-use that same conflicting County mutation lock, while Cave import uses a County key-share lock to keep existing target
+serialization acquire the County mutation lock before TagType reference locks. Account County State moves, deletes,
+and merges use that same conflicting County mutation lock, while Cave import uses a County key-share lock to keep existing target
 metadata stable through relational writes and revision commit. Ordinary Entrance import, File mutation, and Tag Merge
 do not acquire County locks because they do not mutate Cave County membership.
 
@@ -46,6 +46,13 @@ in that same ordering; ordinary published reference writers use key-share locks.
 affected Caves, rewrite relationships set-wise, and publish the corresponding revisions in the same transaction. A
 merge replaces one stable identity with another, so every semantically affected Cave advances `CurrentRevisionId` with
 a published revision.
+
+County merge is likewise a published bulk Cave mutation. It is restricted to source and destination Counties in the
+current account and selected State, locks those County rows before affected Cave rows, preserves every Cave's existing
+County Number, and rejects the entire merge if the destination would contain a duplicate County Number. Successful
+merge remaps each affected Cave to the destination County and publishes one `ManagerEdit` revision per affected Cave in
+the same transaction. Source County rows are retained as unused administrative values rather than being implicitly
+deleted.
 
 ## Proposed state
 

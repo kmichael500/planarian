@@ -22,16 +22,13 @@ import { SearchOutlined } from "@ant-design/icons";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { SettingsService } from "../../Setting/Services/SettingsService";
-import { TagType } from "../../Tag/Models/TagType";
 import { AccountService } from "../Services/AccountService";
-import { CreateEditTagTypeVm } from "../Models/CreateEditTagTypeVm";
 import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
 import { searchFilterSelectListItems } from "../../../Shared/Helpers/ArrayHelpers";
 import { TagTypeTableCountyVm } from "../Models/TagTypeTableCountyVm";
-import { MergeForm } from "../Models/MergeForm";
 import { CreateCountyVm } from "../Models/CreateEditCountyVm";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
@@ -40,59 +37,59 @@ interface CreateEditCountiesComponentProps {
   stateId: string;
 }
 
+interface CountyMergeForm {
+  destinationCounty: string;
+}
+
 const CreateEditCountiesComponent = (
   props: CreateEditCountiesComponentProps
 ) => {
-  const [editedTagType, setEditedTagType] =
-    useState<TagTypeTableCountyVm | null>(null);
+  const [editedCounty, setEditedCounty] = useState<TagTypeTableCountyVm | null>(
+    null
+  );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15); // Assuming default page size is 10
+  const [pageSize, setPageSize] = useState(15);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [tagTypes, setTagTypes] = useState<TagTypeTableCountyVm[]>([]);
+  const [counties, setCounties] = useState<TagTypeTableCountyVm[]>([]);
   useEffect(() => {
-    const getTags = async () => {
-      var tags = await AccountService.GetCountiesForTable(props.stateId);
-      setTagTypes(tags);
+    const getCounties = async () => {
+      const result = await AccountService.GetCountiesForTable(props.stateId);
+      setCounties(result);
       setIsLoading(false);
     };
-    getTags();
-  }, []);
+    getCounties();
+  }, [props.stateId]);
 
-  const [localTagTypes, setLocalTagTypes] =
-    useState<TagTypeTableCountyVm[]>(tagTypes);
+  const [localCounties, setLocalCounties] =
+    useState<TagTypeTableCountyVm[]>(counties);
   const [form] = Form.useForm<CreateCountyVm>();
-  const [mergeForm] = Form.useForm<MergeForm>();
+  const [mergeForm] = Form.useForm<CountyMergeForm>();
 
   const [searchText, setSearchText] = useState<string>("");
-  const [singleMergeTagTypeId, setSingleMergeTagTypeId] = useState<
-    string | null
-  >(null);
-
   const [searchedColumn, setSearchedColumn] = useState<string>("");
   const searchInput = useRef<InputRef>(null);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
-  const [isDeleteSelectedDisabled, setIsDeleteSelectedDisabled] =
-    useState(false);
+  const [canDeleteSelected, setCanDeleteSelected] = useState(false);
   const onSelectChange = (selectedKeys: string[]) => {
     setSelectedRowKeys(selectedKeys);
 
-    const anyNonModifiable = !selectedKeys.some(
+    const allSelectedAreUnused = selectedKeys.every(
       (key) =>
-        !localTagTypes.find((tagType) => tagType.tagTypeId === key)
+        localCounties.find((county) => county.tagTypeId === key)
           ?.isUserModifiable
     );
 
-    setIsDeleteSelectedDisabled(anyNonModifiable);
+    setCanDeleteSelected(allSelectedAreUnused);
   };
 
   useEffect(() => {
-    setLocalTagTypes(tagTypes);
-  }, [tagTypes]);
+    setLocalCounties(counties);
+  }, [counties]);
 
   const onAdd = async () => {
     let values: CreateCountyVm;
@@ -104,11 +101,11 @@ const CreateEditCountiesComponent = (
       }
 
       setIsLoading(true);
-      const newTagType = await AccountService.AddCounty(values, props.stateId);
+      const newCounty = await AccountService.AddCounty(values, props.stateId);
       const insertionIndex = (currentPage - 1) * pageSize;
-      setLocalTagTypes((prev) => [
+      setLocalCounties((prev) => [
         ...prev.slice(0, insertionIndex),
-        newTagType,
+        newCounty,
         ...prev.slice(insertionIndex),
       ]);
       form.resetFields();
@@ -132,35 +129,35 @@ const CreateEditCountiesComponent = (
     try {
       setIsLoading(true);
       await AccountService.DeleteCounties(selectedRowKeys, props.stateId);
-      setLocalTagTypes((prev) =>
+      setLocalCounties((prev) =>
         prev.filter((t) => !selectedRowKeys.includes(t.tagTypeId))
       );
-      message.success("Tag Types deleted successfully!");
+      message.success("Counties deleted successfully!");
     } catch (error) {
-      message.error("Failed to delete some Tag Types!");
+      message.error("Failed to delete some Counties!");
     } finally {
       setIsLoading(false);
       setSelectedRowKeys([]); // Clear the selection
     }
   };
 
-  const onSave = async (tagType: TagTypeTableCountyVm) => {
+  const onSave = async (county: TagTypeTableCountyVm) => {
     try {
-      if (isNullOrWhiteSpace(tagType.name)) {
+      if (isNullOrWhiteSpace(county.name)) {
         message.error("Name is required");
         return;
       }
-      if (isNullOrWhiteSpace(tagType.countyDisplayId)) {
+      if (isNullOrWhiteSpace(county.countyDisplayId)) {
         message.error("County code is required");
         return;
       }
-      if (tagType.countyDisplayId.length > PropertyLength.SMALL_TEXT) {
+      if (county.countyDisplayId.length > PropertyLength.SMALL_TEXT) {
         message.error(
           `County code must be less than ${PropertyLength.SMALL_TEXT} characters!`
         );
         return;
       }
-      if (tagType.name.length > PropertyLength.NAME) {
+      if (county.name.length > PropertyLength.NAME) {
         message.error(
           `County name must be less than ${PropertyLength.NAME} characters!`
         );
@@ -168,15 +165,15 @@ const CreateEditCountiesComponent = (
       }
       setIsLoading(true);
       await AccountService.UpdateCounties(
-        tagType.tagTypeId,
+        county.tagTypeId,
         props.stateId,
-        tagType
+        county
       );
-      setLocalTagTypes((prev) =>
-        prev.map((t) => (t.tagTypeId === tagType.tagTypeId ? tagType : t))
+      setLocalCounties((prev) =>
+        prev.map((t) => (t.tagTypeId === county.tagTypeId ? county : t))
       );
-      message.success("Tag Type saved successfully!");
-      setEditedTagType(null);
+      message.success("County saved successfully!");
+      setEditedCounty(null);
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
@@ -185,14 +182,14 @@ const CreateEditCountiesComponent = (
     }
   };
 
-  const onDelete = async (tagTypeId: string) => {
+  const onDelete = async (countyId: string) => {
     try {
       setIsLoading(true);
-      await AccountService.DeleteCounties([tagTypeId], props.stateId);
-      setLocalTagTypes((prev) => prev.filter((t) => t.tagTypeId !== tagTypeId));
-      message.success("Tag Type deleted successfully!");
+      await AccountService.DeleteCounties([countyId], props.stateId);
+      setLocalCounties((prev) => prev.filter((t) => t.tagTypeId !== countyId));
+      message.success("County deleted successfully!");
     } catch (error) {
-      message.error("Failed to delete Tag Type!");
+      message.error("Failed to delete County!");
     } finally {
       setIsLoading(false);
     }
@@ -294,9 +291,9 @@ const CreateEditCountiesComponent = (
         a.name.localeCompare(b.name),
 
       render: (text: string, record: TagTypeTableCountyVm) => {
-        if (editedTagType && editedTagType.tagTypeId === record.tagTypeId) {
+        if (editedCounty && editedCounty.tagTypeId === record.tagTypeId) {
           return (
-            <Form onFinish={() => onSave(editedTagType)}>
+            <Form onFinish={() => onSave(editedCounty)}>
               <Form.Item
                 name={nameof<TagTypeTableCountyVm>("name")}
                 initialValue={text}
@@ -305,7 +302,7 @@ const CreateEditCountiesComponent = (
                 <Input
                   autoFocus
                   onChange={(e) =>
-                    setEditedTagType({ ...editedTagType, name: e.target.value })
+                    setEditedCounty({ ...editedCounty, name: e.target.value })
                   }
                 />
               </Form.Item>
@@ -323,9 +320,9 @@ const CreateEditCountiesComponent = (
       sorter: (a: TagTypeTableCountyVm, b: TagTypeTableCountyVm) =>
         a.countyDisplayId.localeCompare(b.countyDisplayId),
       render: (text: string, record: TagTypeTableCountyVm) => {
-        if (editedTagType && editedTagType.tagTypeId === record.tagTypeId) {
+        if (editedCounty && editedCounty.tagTypeId === record.tagTypeId) {
           return (
-            <Form onFinish={() => onSave(editedTagType)}>
+            <Form onFinish={() => onSave(editedCounty)}>
               <Form.Item
                 name={nameof<TagTypeTableCountyVm>("countyDisplayId")}
                 initialValue={text}
@@ -334,8 +331,8 @@ const CreateEditCountiesComponent = (
                 <Input
                   autoFocus
                   onChange={(e) =>
-                    setEditedTagType({
-                      ...editedTagType,
+                    setEditedCounty({
+                      ...editedCounty,
                       countyDisplayId: e.target.value,
                     })
                   }
@@ -361,45 +358,31 @@ const CreateEditCountiesComponent = (
       render: (text: string, record: TagTypeTableCountyVm) => (
         <span>
           <Space>
-            {editedTagType && editedTagType.tagTypeId === record.tagTypeId ? (
+            {editedCounty && editedCounty.tagTypeId === record.tagTypeId ? (
               <>
-                <Button onClick={() => onSave(editedTagType)} type="primary">
+                <Button onClick={() => onSave(editedCounty)} type="primary">
                   Save
                 </Button>
-                <Button onClick={() => setEditedTagType(null)}>Cancel</Button>
+                <Button onClick={() => setEditedCounty(null)}>Cancel</Button>
               </>
             ) : (
-              <Button onClick={() => setEditedTagType(record)}>Edit</Button>
+              <Button onClick={() => setEditedCounty(record)}>Edit</Button>
             )}
-            {/* {record.tagTypeId !== editedTagType?.tagTypeId && (
-              <Button
-                onClick={() => {
-                  setSingleMergeTagTypeId(record.tagTypeId);
-                  setIsMergeModalOpen(true);
-                }}
-              >
-                Merge
-              </Button>
-            )} */}
             {record.isUserModifiable && (
-              <>
-                <ConfirmationModalComponent
-                  okText="Yes"
-                  cancelText="No"
-                  modalMessage={
-                    <>
-                      Are you positive you want to delete <b>ALL</b> '
-                      {record.name}' tags?! It will remove the tag from{" "}
-                      {record.occurrences} caves. This is an irreversible
-                      action!
-                    </>
-                  }
-                  confirmationWord={`DELETE ALL ${record.name.toUpperCase()} TAGS`}
-                  onConfirm={() => onDelete(record.tagTypeId)}
-                >
-                  Delete
-                </ConfirmationModalComponent>
-              </>
+              <ConfirmationModalComponent
+                okText="Yes"
+                cancelText="No"
+                modalMessage={
+                  <>
+                    Are you sure you want to delete <b>{record.name}</b>? This
+                    County is unused and deleting it is irreversible.
+                  </>
+                }
+                confirmationWord={`DELETE ${record.name.toUpperCase()}`}
+                onConfirm={() => onDelete(record.tagTypeId)}
+              >
+                Delete
+              </ConfirmationModalComponent>
             )}
           </Space>
         </span>
@@ -410,12 +393,11 @@ const CreateEditCountiesComponent = (
   const onMassMerge = async () => {
     try {
       const values = await mergeForm.validateFields();
-      const destinationTagTypeId = values.destinationTag;
-      let sourceTagTypeIds = selectedRowKeys;
-      if (singleMergeTagTypeId) sourceTagTypeIds = [singleMergeTagTypeId];
+      const destinationCountyId = values.destinationCounty;
+      const sourceCountyIds = selectedRowKeys;
 
-      if (!destinationTagTypeId || sourceTagTypeIds.length === 0) {
-        message.error("Please select tags and a target tag for merging!");
+      if (!destinationCountyId || sourceCountyIds.length === 0) {
+        message.error("Please select Counties and a destination County.");
         return;
       }
 
@@ -423,52 +405,29 @@ const CreateEditCountiesComponent = (
       mergeForm.resetFields();
       setIsLoading(true);
 
-      // Perform the merge operation on the server
-      await AccountService.MergeTagTypes(
-        sourceTagTypeIds,
-        destinationTagTypeId
+      await AccountService.MergeCounties(
+        sourceCountyIds,
+        destinationCountyId,
+        props.stateId
       );
-
-      // Manually calculate the new occurrences for the merged tag type and adjust the local state
-      setLocalTagTypes((prev) => {
-        let newOccurrence = 0;
-
-        // First map to adjust sourceTagType occurrences and calculate newOccurrence
-        const intermediateTagTypes = prev.map((t) => {
-          if (sourceTagTypeIds.includes(t.tagTypeId)) {
-            newOccurrence += t.occurrences;
-            return { ...t, occurrences: 0 }; // Return a new object with occurrences set to 0
-          }
-          return t; // Return the original object if no change is needed
-        });
-
-        // Second map to adjust the destinationTagType occurrences
-        const updatedTagTypes = intermediateTagTypes.map((t) => {
-          if (t.tagTypeId === destinationTagTypeId) {
-            return { ...t, occurrences: t.occurrences + newOccurrence }; // Return a new object with updated occurrences
-          }
-          return t; // Return the original object if no change is needed
-        });
-
-        return updatedTagTypes;
-      });
-
-      message.success("Tag Types merged successfully!");
-    } catch (error) {
-      message.error("Failed to merge Tag Types!");
+      const counties = await AccountService.GetCountiesForTable(props.stateId);
+      setCounties(counties);
+      setLocalCounties(counties);
+      message.success("Counties merged successfully!");
+    } catch (err) {
+      const error = err as ApiErrorResponse;
+      message.error(error.message || "Failed to merge Counties.");
     } finally {
       setIsLoading(false);
-      setSelectedRowKeys([]); // Clear the selection
-      setSingleMergeTagTypeId(null); // Clear the single merge tag type id
+      setSelectedRowKeys([]);
     }
   };
 
-  const sortedAndFilteredTagTypes = useMemo(() => {
-    return localTagTypes
-      .filter((tagType) => !selectedRowKeys.includes(tagType.tagTypeId)) // Exclude selected items
-      .filter((tagType) => tagType.tagTypeId !== singleMergeTagTypeId) // Exclude the single merge tag type
+  const sortedAndFilteredCounties = useMemo(() => {
+    return localCounties
+      .filter((county) => !selectedRowKeys.includes(county.tagTypeId)) // Exclude selected Counties
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [localTagTypes, selectedRowKeys, singleMergeTagTypeId]);
+  }, [localCounties, selectedRowKeys]);
 
   return (
     <div>
@@ -523,17 +482,17 @@ const CreateEditCountiesComponent = (
             <Button type="primary" onClick={() => setIsMergeModalOpen(true)}>
               Merge Selected
             </Button>
-            {isDeleteSelectedDisabled && (
+            {canDeleteSelected && (
               <ConfirmationModalComponent
                 okText="Yes"
                 cancelText="No"
                 modalMessage={
                   <>
-                    Are you sure you want to delete these tag types? This is an
-                    irreversible action!
+                    Are you sure you want to delete these unused Counties? This
+                    is an irreversible action!
                   </>
                 }
-                confirmationWord={`DELETE SELECTED TAGS`}
+                confirmationWord={`DELETE SELECTED COUNTIES`}
                 onConfirm={onMassDeleteConfirm}
               >
                 Delete Selected
@@ -543,7 +502,7 @@ const CreateEditCountiesComponent = (
         )}
         <Table
           columns={columns}
-          dataSource={localTagTypes}
+          dataSource={localCounties}
           rowKey="tagTypeId"
           loading={isLoading}
           scroll={{ x: "max-content" }}
@@ -559,33 +518,31 @@ const CreateEditCountiesComponent = (
         />
       </Space>
       <Modal
-        title="Merge Selected Items"
+        title="Merge Selected Counties"
         open={isMergeModalOpen}
         onOk={onMassMerge}
-        onCancel={
-          () => {
-            setIsMergeModalOpen(false);
-          } // Clear the single merge tag type id
-        }
+        onCancel={() => {
+          setIsMergeModalOpen(false);
+        }}
       >
         <Form form={mergeForm}>
           <Form.Item
-            name={nameof<MergeForm>("destinationTag")}
+            name={nameof<CountyMergeForm>("destinationCounty")}
             rules={[
-              { required: true, message: "Please select the destination tag!" },
+              {
+                required: true,
+                message: "Please select the destination County!",
+              },
             ]}
           >
             <Select
               showSearch
               filterOption={searchFilterSelectListItems}
-              placeholder="Select Destination Tag "
+              placeholder="Select Destination County"
             >
-              {sortedAndFilteredTagTypes.map((tagType) => (
-                <Select.Option
-                  key={tagType.tagTypeId}
-                  value={tagType.tagTypeId}
-                >
-                  {tagType.name}
+              {sortedAndFilteredCounties.map((county) => (
+                <Select.Option key={county.tagTypeId} value={county.tagTypeId}>
+                  {county.name}
                 </Select.Option>
               ))}
             </Select>

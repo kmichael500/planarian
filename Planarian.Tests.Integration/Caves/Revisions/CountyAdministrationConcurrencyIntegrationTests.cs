@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Modules.Account.Model;
+using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Import.Planning;
 using Planarian.Tests.Integration.Infrastructure.Actors;
 using Planarian.Tests.Integration.Infrastructure.Concurrency;
@@ -164,6 +165,115 @@ public sealed class CountyAdministrationConcurrencyIntegrationTests(PostgresTest
     }
 
     [Fact]
+    public async Task ConcurrentCaseVariantCountyCreatesSerializeAndRejectDuplicate()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ConcurrentCaseVariantCountyCreatesSerializeAndRejectDuplicate));
+        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        var pause = new HoldCountyAdministrationLockInterceptor();
+
+        await using var firstDb = database.CreateDbContext("first-admin", account.AccountId, pause);
+        var first = IntegrationTestServices.For(firstDb).Account.CreateOrUpdateCounty(account.StateId,
+            new CreateCountyVm { Name = "First", CountyDisplayId = "A99" }, null, default);
+        await pause.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+        await using var secondDb = database.CreateDbContext("second-admin", account.AccountId);
+        await secondDb.Database.OpenConnectionAsync();
+        var secondPid = await PostgresLockAssertions.BackendPidAsync(secondDb);
+        var second = IntegrationTestServices.For(secondDb).Account.CreateOrUpdateCounty(account.StateId,
+            new CreateCountyVm { Name = "Second", CountyDisplayId = "a99" }, null, default);
+        await PostgresLockAssertions.AssertBlockedAsync(database, account.AccountId, secondPid, second);
+
+        pause.Resume.TrySetResult();
+        await first;
+        var failure = await Assert.ThrowsAsync<ApiException>(() => second);
+        Assert.Equal(400, failure.StatusCode);
+        Assert.Contains("already in use", failure.Message);
+
+        await using var verify = database.CreateDbContext("verify", account.AccountId);
+        var codes = await verify.Counties.Where(row => row.StateId == account.StateId)
+            .Select(row => row.DisplayId).ToListAsync();
+        Assert.Single(codes.Where(code => code.Equals("A99", StringComparison.InvariantCultureIgnoreCase)));
+    }
+
+    [Fact]
+    public async Task ImportCountyCreateSerializesWithCaseVariantAdministrationCreate()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ImportCountyCreateSerializesWithCaseVariantAdministrationCreate));
+        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+
+        CaveImportPlan plan;
+        await using (var planner = database.CreateDbContext("planner", account.AccountId))
+            plan = await new CaveImportTestHarness(planner, planner.RequestUser).PlanCsvAsync(
+                ImportDryRunIntegrationTests.CaveHeader + "\n" +
+                "Imported,Imported County,A99,1,AA,,,,,,,1,,,,,,,,false,,\n", false);
+
+        var pause = new HoldCountyAdministrationLockInterceptor();
+        await using var importer = database.CreateDbContext("importer", account.AccountId, pause);
+        var import = new CaveImportTestHarness(importer, importer.RequestUser)
+            .ExecuteAsync(plan, "county-admin-serialization.csv");
+        await pause.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+        await using var admin = database.CreateDbContext("admin", account.AccountId);
+        await admin.Database.OpenConnectionAsync();
+        var adminPid = await PostgresLockAssertions.BackendPidAsync(admin);
+        var create = IntegrationTestServices.For(admin).Account.CreateOrUpdateCounty(account.StateId,
+            new CreateCountyVm { Name = "Conflicting", CountyDisplayId = "a99" }, null, default);
+        await PostgresLockAssertions.AssertBlockedAsync(database, account.AccountId, adminPid, create);
+
+        pause.Resume.TrySetResult();
+        await import;
+        var failure = await Assert.ThrowsAsync<ApiException>(() => create);
+        Assert.Equal(400, failure.StatusCode);
+
+        await using var verify = database.CreateDbContext("verify", account.AccountId);
+        Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(row => row.Name == "Imported"));
+        var codes = await verify.Counties.Where(row => row.StateId == account.StateId)
+            .Select(row => row.DisplayId).ToListAsync();
+        Assert.Single(codes.Where(code => code.Equals("A99", StringComparison.InvariantCultureIgnoreCase)));
+    }
+
+    [Fact]
+    public async Task CountyMergeWinsThenWaitingCaveWriterRejectsStaleRevision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(CountyMergeWinsThenWaitingCaveWriterRejectsStaleRevision));
+        var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var location = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
+            Planarian.Model.Shared.TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        const string destinationCountyId = "county00az";
+        await AddCountyAsync(database, cave.AccountId, cave.StateId, destinationCountyId, "Destination", "A99");
+        await CavePermissions.GrantManagerAsync(database, cave, "writer");
+        var staleValues = PublishableValues(cave, location.Id, "Stale writer");
+
+        var pause = new HoldCountyLockInterceptor("for update");
+        await using var admin = database.CreateDbContext("admin", cave.AccountId, pause);
+        var merge = IntegrationTestServices.For(admin).Account.MergeCounties(
+            cave.StateId, [cave.CountyId], destinationCountyId, default);
+        await pause.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+        await using var writer = database.CreateDbContext("writer", cave.AccountId);
+        await CavePermissions.AuthenticateAsync(writer, cave.AccountId);
+        await writer.Database.OpenConnectionAsync();
+        var writerPid = await PostgresLockAssertions.BackendPidAsync(writer);
+        var write = IntegrationTestServices.For(writer).Caves.AddCave(staleValues, default);
+        await PostgresLockAssertions.AssertBlockedAsync(database, cave.AccountId, writerPid, write);
+
+        pause.Resume.TrySetResult();
+        await merge;
+        await Assert.ThrowsAsync<CaveRevisionConflictException>(() => write);
+
+        await using var verify = database.CreateDbContext("verify", cave.AccountId);
+        var persisted = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == cave.CaveId);
+        Assert.Equal(destinationCountyId, persisted.CountyId);
+        Assert.Equal(cave.CaveName, persisted.Name);
+        var mergeRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == persisted.CurrentRevisionId);
+        Assert.Equal(cave.RevisionId, mergeRevision.PreviousRevisionId);
+        Assert.Equal(CaveRevisionSource.ManagerEdit, mergeRevision.Source);
+    }
+
+    [Fact]
     public async Task CaveWriterMakesCountyDeleteWaitThenForeignKeyFailureIsControlled()
     {
         var scenario = await CreateMoveScenarioAsync(nameof(CaveWriterMakesCountyDeleteWaitThenForeignKeyFailureIsControlled));
@@ -238,6 +348,25 @@ public sealed class CountyAdministrationConcurrencyIntegrationTests(PostgresTest
 
     private sealed record MoveScenario(PostgresTestDatabase Database, PublishedCaveTestData Cave,
         string TargetCountyId, string OtherStateId, Planarian.Modules.Caves.Models.AddCaveVm Values);
+}
+
+internal sealed class HoldCountyAdministrationLockInterceptor : DbCommandInterceptor
+{
+    private int _paused;
+    public TaskCompletionSource LockAcquired { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource Resume { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public override async ValueTask<int> NonQueryExecutedAsync(DbCommand command,
+        CommandExecutedEventData eventData, int result, CancellationToken cancellationToken = default)
+    {
+        if (command.CommandText.Contains("pg_advisory_xact_lock", StringComparison.OrdinalIgnoreCase) &&
+            Interlocked.Exchange(ref _paused, 1) == 0)
+        {
+            LockAcquired.TrySetResult();
+            await Resume.Task.WaitAsync(cancellationToken);
+        }
+        return result;
+    }
 }
 
 internal sealed class HoldCountyLockInterceptor(string lockClause) : DbCommandInterceptor

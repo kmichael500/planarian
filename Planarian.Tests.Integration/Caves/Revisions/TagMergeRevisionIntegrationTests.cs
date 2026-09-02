@@ -51,7 +51,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             biologyModifiedBefore = (await before.BiologyTags.SingleAsync()).ModifiedOn ?? DateTime.MinValue;
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(destination.Id, (await verify.BiologyTags.SingleAsync()).TagTypeId);
@@ -92,7 +92,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         var secondBefore = await AttachBiologyAndPublishAsync(database, second, source.Id);
 
         await using (var db = database.CreateDbContext("manager", first.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", first.AccountId);
         var pointers = await verify.Caves.IgnoreQueryFilters()
@@ -119,7 +119,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         var before = await AttachBiologyAndPublishAsync(database, cave, source.Id);
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Assert.ThrowsAsync<ApiException>(() => Repository(db).ExecuteAsync([source.Id], destination.Id));
+            await Assert.ThrowsAsync<ApiException>(() => Repository(db).MergeAsync([source.Id], destination.Id));
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(source.Id, (await verify.BiologyTags.SingleAsync()).TagTypeId);
@@ -139,7 +139,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             TagTypeKeyConstant.Trip, "Trip Destination", "triptag00b");
 
         await using var db = database.CreateDbContext("manager", cave.AccountId);
-        await Assert.ThrowsAsync<ApiException>(() => Repository(db).ExecuteAsync([source.Id], destination.Id));
+        await Assert.ThrowsAsync<ApiException>(() => Repository(db).MergeAsync([source.Id], destination.Id));
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId, fault))
             await Assert.ThrowsAsync<DbUpdateException>(
-                () => Repository(db).ExecuteAsync([source.Id], destination.Id));
+                () => Repository(db).MergeAsync([source.Id], destination.Id));
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(source.Id, (await verify.BiologyTags.SingleAsync()).TagTypeId);
@@ -193,7 +193,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         }
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using (var reviewer = await CaveTestActor.CreateAsync(database, cave.AccountId, "reviewer"))
         {
@@ -225,7 +225,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         var before = await PublishCurrentSnapshotAsync(database, cave);
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(destination.Id, (await verify.EntranceStatusTags.SingleAsync()).TagTypeId);
@@ -254,7 +254,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         var before = await PublishCurrentSnapshotAsync(database, cave);
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         Assert.Equal(destination.Id, (await verify.Files.SingleAsync()).FileTypeTagId);
@@ -280,7 +280,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         await PublishCurrentSnapshotAsync(database, cave);
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         var entrance = await verify.Entrances.SingleAsync();
@@ -307,7 +307,7 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         }
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).ExecuteAsync([source.Id], destination.Id);
+            await Repository(db).MergeAsync([source.Id], destination.Id);
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
         var pointer = await verify.Caves.IgnoreQueryFilters().Where(row => row.Id == cave.CaveId)
@@ -322,10 +322,10 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
             tag => tag.TagTypeId == destination.Id);
     }
 
-    private static TagTypeMergeExecutionRepository Repository(Planarian.Model.Database.PlanarianDbContext db)
+    private static TagTypeAdministrationRepository Repository(Planarian.Model.Database.PlanarianDbContext db)
     {
         var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
-        return new TagTypeMergeExecutionRepository(db, db.RequestUser,
+        return new TagTypeAdministrationRepository(db, db.RequestUser,
             new TagReferenceLockRepository(db, db.RequestUser), snapshots,
             new CaveBulkRevisionRepository(db, db.RequestUser));
     }

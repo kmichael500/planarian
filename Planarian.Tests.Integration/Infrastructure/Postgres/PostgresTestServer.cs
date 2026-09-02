@@ -14,9 +14,11 @@ using Xunit;
 namespace Planarian.Tests;
 
 /// <summary>
-/// Real PostgreSQL/PostGIS fixture. All fixture instances in the test process
-/// share one Testcontainers server; individual tests create isolated databases.
-/// Docker is required and tests never silently opt out.
+/// Real PostgreSQL/PostGIS fixture. All fixture instances in the test process share one server;
+/// individual tests always create isolated databases. Testcontainers is the default server provider,
+/// while PLANARIAN_TEST_POSTGRES_CONNECTION_STRING may supply an administrative test server (for
+/// example the compose PostGIS service used by dc-agent-planarian). Tests never reuse its database
+/// as scenario state and never silently opt out of real PostgreSQL validation.
 /// </summary>
 public sealed class PostgresTestServer : IAsyncLifetime
 {
@@ -29,11 +31,14 @@ public sealed class PostgresTestServer : IAsyncLifetime
     private static readonly string? ExternalConnectionString = Environment.GetEnvironmentVariable("PLANARIAN_TEST_POSTGRES_CONNECTION_STRING");
     private static bool _latestSchemaTemplateCreated;
     private static TimeSpan _templateCreationDuration;
+    private static int _externalTemplateCleanupRegistered;
 
     public string ConnectionString => !string.IsNullOrWhiteSpace(ExternalConnectionString)
         ? ExternalConnectionString
         : _sharedContainer?.GetConnectionString()
           ?? throw new InvalidOperationException("PostgreSQL integration fixture has not been initialized.");
+
+    public string TemplateDatabaseName => LatestSchemaTemplateDatabaseName;
 
     public TimeSpan TemplateCreationDuration => _latestSchemaTemplateCreated
         ? _templateCreationDuration
@@ -41,9 +46,8 @@ public sealed class PostgresTestServer : IAsyncLifetime
 
     public async Task InitializeAsync() => await EnsureSharedContainerAsync();
 
-    // The Testcontainers resource reaper owns process-level cleanup. Disposing a
-    // class fixture must not stop the server because other xUnit class fixtures
-    // in the same process intentionally share it.
+    // The Testcontainers resource reaper owns its process-level server cleanup. The external-server
+    // path registers equivalent process-level cleanup for the template database after creating it.
     public Task DisposeAsync() => Task.CompletedTask;
 
     public PlanarianDbContext CreateDbContext(string userId, string? accountId) =>
@@ -113,12 +117,33 @@ public sealed class PostgresTestServer : IAsyncLifetime
                 stopwatch.Stop();
                 _templateCreationDuration = stopwatch.Elapsed;
                 _latestSchemaTemplateCreated = true;
+                RegisterExternalTemplateCleanup();
             }
         }
         finally
         {
             SharedInitializationGate.Release();
         }
+    }
+
+    private static void RegisterExternalTemplateCleanup()
+    {
+        if (string.IsNullOrWhiteSpace(ExternalConnectionString) ||
+            Interlocked.Exchange(ref _externalTemplateCleanupRegistered, 1) != 0) return;
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                DropTemplateDatabaseAsync(ExternalConnectionString, LatestSchemaTemplateDatabaseName)
+                    .GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine(
+                    $"Failed to remove external PostgreSQL test template '{LatestSchemaTemplateDatabaseName}': {exception.Message}");
+            }
+        };
     }
 
     private static async Task CreateLatestSchemaTemplateAsync(string adminConnectionString)
@@ -182,37 +207,41 @@ public sealed class PostgresTestServer : IAsyncLifetime
     {
         try
         {
-            using (var templateConnection = new NpgsqlConnection(
-                       new NpgsqlConnectionStringBuilder(adminConnectionString) { Database = databaseName }
-                           .ConnectionString))
-                NpgsqlConnection.ClearPool(templateConnection);
-        }
-        catch
-        {
-            // Continue with server-side cleanup even if local pool cleanup fails.
-        }
-
-        try
-        {
-            await using var admin = new NpgsqlConnection(adminConnectionString);
-            await admin.OpenAsync();
-            try
-            {
-                await TerminateDatabaseConnectionsAsync(admin, databaseName);
-            }
-            catch
-            {
-                // DROP may still succeed when termination itself fails or no sessions remain.
-            }
-
-            await using var drop = admin.CreateCommand();
-            drop.CommandText = $"DROP DATABASE IF EXISTS {QuoteIdentifier(databaseName)}";
-            await drop.ExecuteNonQueryAsync();
+            await DropTemplateDatabaseAsync(adminConnectionString, databaseName);
         }
         catch
         {
             // Cleanup must never replace the template initialization exception.
         }
+    }
+
+    internal static async Task DropTemplateDatabaseAsync(string adminConnectionString, string databaseName)
+    {
+        using (var templateConnection = new NpgsqlConnection(
+                   new NpgsqlConnectionStringBuilder(adminConnectionString) { Database = databaseName }
+                       .ConnectionString))
+            NpgsqlConnection.ClearPool(templateConnection);
+
+        await using var admin = new NpgsqlConnection(adminConnectionString);
+        await admin.OpenAsync();
+
+        await using var metadata = admin.CreateCommand();
+        metadata.CommandText = "select datistemplate from pg_database where datname = @database";
+        metadata.Parameters.AddWithValue("database", databaseName);
+        if (await metadata.ExecuteScalarAsync() is not bool isTemplate) return;
+
+        await TerminateDatabaseConnectionsAsync(admin, databaseName);
+        if (isTemplate)
+        {
+            await using var unseal = admin.CreateCommand();
+            unseal.CommandText =
+                $"ALTER DATABASE {QuoteIdentifier(databaseName)} WITH IS_TEMPLATE false ALLOW_CONNECTIONS false";
+            await unseal.ExecuteNonQueryAsync();
+        }
+
+        await using var drop = admin.CreateCommand();
+        drop.CommandText = $"DROP DATABASE IF EXISTS {QuoteIdentifier(databaseName)} WITH (FORCE)";
+        await drop.ExecuteNonQueryAsync();
     }
 
     private static async Task TerminateDatabaseConnectionsAsync(NpgsqlConnection admin, string databaseName)

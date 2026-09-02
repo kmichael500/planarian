@@ -276,7 +276,7 @@ public class UserRepository : RepositoryBase
     public async Task<IEnumerable<string>> GetPermissions(string userId, string accountId)
     {
         var userPermissions = await DbContext.UserPermissions
-            .Where(e => e.UserId == userId && (e.AccountId == accountId || string.IsNullOrWhiteSpace(e.AccountId)))
+            .Where(e => e.UserId == userId && e.AccountId == accountId)
             .Select(e => e.Permission!.Key)
             .ToListAsync();
 
@@ -302,10 +302,7 @@ public class UserRepository : RepositoryBase
                 .AnyAsync(e =>
                     e.UserId == userId
                     && e.AccountId == accountId
-                    && (
-                        PermissionKey.Admin == e.Permission!.Key
-                        || PermissionKey.PlanarianAdmin == e.Permission!.Key
-                    )
+                    && PermissionKey.Admin == e.Permission!.Key
                 );
         }
 
@@ -314,7 +311,11 @@ public class UserRepository : RepositoryBase
             cavePermissions.Add(PermissionPolicyKey.AdminManager);
         }
 
-        var exportEnabled = await RequestUser.HasCavePermission(PermissionPolicyKey.Export, false);
+        var exportEnabled = userPermissions.Contains(PermissionPolicyKey.Admin) ||
+                            await DbContext.Accounts
+                                .Where(e => e.Id == accountId)
+                                .Select(e => e.ExportEnabled)
+                                .FirstOrDefaultAsync();
         if (exportEnabled)
         {
             cavePermissions.Add(PermissionPolicyKey.Export);

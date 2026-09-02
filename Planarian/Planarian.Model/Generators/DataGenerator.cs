@@ -427,7 +427,7 @@ public class DataGenerator
         {
             Id = "PlAnArIaNz",
             Name = "Planarian Admin",
-            Description = "Planarian Admins have access to super secret settings.",
+            Description = "Planarian Admins can manage platform-level Planarian settings and account provisioning.",
             IsHidden = true,
             Key = PermissionKey.PlanarianAdmin,
             PermissionType = PermissionType.User,

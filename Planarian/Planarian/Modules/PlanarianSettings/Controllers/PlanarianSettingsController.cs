@@ -18,6 +18,12 @@ public class PlanarianSettingsController : PlanarianControllerBase<PlanarianSett
     {
     }
 
+    [HttpGet("states")]
+    public async Task<ActionResult<IEnumerable<SelectListItem<string>>>> GetAllStates(CancellationToken cancellationToken)
+    {
+        return Ok(await Service.GetAllStates(cancellationToken));
+    }
+
     [HttpPost("accounts")]
     public async Task<ActionResult<string>> CreateAccount([FromBody] CreateAccountVm account,
         CancellationToken cancellationToken)

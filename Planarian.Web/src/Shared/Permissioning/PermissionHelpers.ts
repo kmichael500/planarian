@@ -8,32 +8,26 @@ const hasPermission = (
     return (
       permissionKeys.includes(PermissionKey.View) ||
       permissionKeys.includes(PermissionKey.Manager) ||
-      permissionKeys.includes(PermissionKey.Admin) ||
-      permissionKeys.includes(PermissionKey.PlanarianAdmin)
+      permissionKeys.includes(PermissionKey.Admin)
     );
   }
 
   if (permission === PermissionKey.Manager) {
     return (
       permissionKeys.includes(PermissionKey.Manager) ||
-      permissionKeys.includes(PermissionKey.Admin) ||
-      permissionKeys.includes(PermissionKey.PlanarianAdmin)
+      permissionKeys.includes(PermissionKey.Admin)
     );
   }
 
   if (permission === PermissionKey.AdminManager) {
     return (
       permissionKeys.includes(PermissionKey.AdminManager) ||
-      permissionKeys.includes(PermissionKey.Admin) ||
-      permissionKeys.includes(PermissionKey.PlanarianAdmin)
+      permissionKeys.includes(PermissionKey.Admin)
     );
   }
 
   if (permission === PermissionKey.Admin) {
-    return (
-      permissionKeys.includes(PermissionKey.Admin) ||
-      permissionKeys.includes(PermissionKey.PlanarianAdmin)
-    );
+    return permissionKeys.includes(PermissionKey.Admin);
   }
 
   if (permission === PermissionKey.PlanarianAdmin) {

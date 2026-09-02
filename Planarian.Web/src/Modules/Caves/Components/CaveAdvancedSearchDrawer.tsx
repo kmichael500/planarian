@@ -105,6 +105,7 @@ const exportFeatureOrder: FeatureKey[] = [
   FeatureKey.EnabledFieldEntranceFieldIndicationTags,
   FeatureKey.EnabledFieldEntranceHydrologyTags,
   FeatureKey.EnabledFieldEntranceReportedByNameTags,
+  FeatureKey.EnabledFieldEntranceOtherTags,
 ];
 
 const getFeatureOrder = (key: FeatureKey) => {
@@ -555,6 +556,14 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
             queryBuilder={queryBuilder}
             field={"entranceHydrologyTagIds"}
             label={"Entrance Hydrology"}
+          />
+        </ShouldDisplay>
+        <ShouldDisplay featureKey={FeatureKey.EnabledFieldEntranceOtherTags}>
+          <TagFilterFormItem
+            tagType={TagType.CaveOther}
+            queryBuilder={queryBuilder}
+            field={"entranceOtherTagIds"}
+            label={"Entrance Other"}
           />
         </ShouldDisplay>
         <ShouldDisplay

@@ -103,7 +103,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var import = new EntranceImportTestHarness(db, db.RequestUser);
         var csv = EntranceCsv("Main,A01,1,true,35.123456,-86.654321,612.5,Survey Grade,22.5," +
-                              "Open,Wet,Sink,2026-08-01,Surveyor,Full description");
+                              "Open,Wet,Sink,2026-08-01,Surveyor,Full description,Distinctive");
 
         // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: false);
@@ -126,7 +126,8 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
             (SnapshotTagRole.EntranceStatus, "Open"),
             (SnapshotTagRole.EntranceHydrology, "Wet"),
             (SnapshotTagRole.FieldIndication, "Sink"),
-            (SnapshotTagRole.EntranceReportedBy, "Surveyor"));
+            (SnapshotTagRole.EntranceReportedBy, "Surveyor"),
+            (SnapshotTagRole.EntranceOther, "Distinctive"));
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
             .CurrentRevisionId;
         var import = new EntranceImportTestHarness(db, db.RequestUser);
         var csv = EntranceCsv("Replacement,A01,1,true,35.2,-86.2,520,Survey Grade,7.5," +
-                              "Open,Wet,Sink,2026-08-02,Surveyor,Replacement description");
+                              "Open,Wet,Sink,2026-08-02,Surveyor,Replacement description,Replacement Other");
 
         // Act
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
@@ -156,6 +157,8 @@ public sealed class EntranceImportCompatibilityTests(PostgresTestServer fixture)
         Assert.Equal(planned.Id, entrance.Id);
         Assert.DoesNotContain(snapshot.Entrances, row => row.Id == "existing00");
         Assert.True(entrance.IsPrimary);
+        Assert.Contains(entrance.Tags, tag => tag.Role == SnapshotTagRole.EntranceOther &&
+                                              tag.NameAtRevision == "Replacement Other");
         var cave = await db.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
         Assert.NotEqual(priorRevision, cave.CurrentRevisionId);
         var revision = await db.CaveRevisions.SingleAsync(row => row.Id == cave.CurrentRevisionId);

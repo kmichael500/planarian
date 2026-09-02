@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -48,8 +49,9 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
         await using var templatePolicy = new NpgsqlCommand("""
             select datistemplate, datallowconn
             from pg_database
-            where datname = 'planarian_test_template'
+            where datname = @template_database
             """, admin);
+        templatePolicy.Parameters.AddWithValue("template_database", fixture.TemplateDatabaseName);
         await using var templateReader = await templatePolicy.ExecuteReaderAsync();
         Assert.True(await templateReader.ReadAsync());
         Assert.True(templateReader.GetBoolean(0));
@@ -94,6 +96,41 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
     }
 
     [Fact]
+    public async Task ExternalServerTemplateIsRemovedWhenChildTestProcessExits()
+    {
+        var externalConnectionString = Environment.GetEnvironmentVariable("PLANARIAN_TEST_POSTGRES_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(externalConnectionString))
+            return; // Testcontainers owns process-level cleanup when an external server is not configured.
+
+        var before = await GetTemplateDatabaseNamesAsync(fixture.ConnectionString);
+        var assemblyPath = typeof(PostgresTemplateDatabaseIntegrationTests).Assembly.Location;
+        var testName =
+            $"{typeof(PostgresTemplateDatabaseIntegrationTests).FullName}.{nameof(LatestSchemaCloneHasCurrentPostgresSchemaWithoutDomainData)}";
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("vstest");
+        startInfo.ArgumentList.Add(assemblyPath);
+        startInfo.ArgumentList.Add($"--TestCaseFilter:FullyQualifiedName={testName}");
+        startInfo.Environment["PLANARIAN_TEST_POSTGRES_CONNECTION_STRING"] = externalConnectionString;
+
+        using var child = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start the PostgreSQL cleanup probe process.");
+        var stdout = child.StandardOutput.ReadToEndAsync();
+        var stderr = child.StandardError.ReadToEndAsync();
+        await child.WaitForExitAsync();
+        var output = await stdout;
+        var error = await stderr;
+
+        Assert.True(child.ExitCode == 0,
+            $"Child PostgreSQL test process failed with exit code {child.ExitCode}.\n{output}\n{error}");
+        Assert.Equal(before, await GetTemplateDatabaseNamesAsync(fixture.ConnectionString));
+    }
+
+    [Fact]
     public async Task FailedTemplateInitializationPreservesOriginalFailureAndDropsPartialDatabase()
     {
         var databaseName = $"planarian_failed_template_{Guid.NewGuid():N}";
@@ -117,6 +154,19 @@ public sealed class PostgresTemplateDatabaseIntegrationTests(
         exists.Parameters.AddWithValue("database", databaseName);
         Assert.False((bool)(await exists.ExecuteScalarAsync())!);
         await partialConnection!.DisposeAsync();
+    }
+
+    private static async Task<List<string>> GetTemplateDatabaseNamesAsync(string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "select datname from pg_database where datname like 'planarian_test_template_%' order by datname",
+            connection);
+        var result = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) result.Add(reader.GetString(0));
+        return result;
     }
 
     private static async Task<long> CountRowsAsync(PostgresTestDatabase database, string table)

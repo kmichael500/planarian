@@ -38,6 +38,47 @@ public sealed class CaveMutationRepository
     }
 
     /// <summary>
+    /// Executes relational Cave publication work inside the shared scoped transaction.
+    /// The outermost repository call owns begin/commit/rollback; nested workflow composition
+    /// (for example approval publishing Cave state plus request state) joins that transaction.
+    /// </summary>
+    public Task ExecuteTransactionAsync(Func<CancellationToken, Task> work,
+        CancellationToken cancellationToken = default) =>
+        ExecuteTransactionAsync(async token => { await work(token); return true; }, cancellationToken);
+
+    public async Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        if (_db.Database.CurrentTransaction is not null)
+            return await work(cancellationToken);
+        return await ExecuteOwnedTransactionAsync(work, cancellationToken);
+    }
+
+    public Task ExecuteOwnedTransactionAsync(Func<CancellationToken, Task> work,
+        CancellationToken cancellationToken = default) =>
+        ExecuteOwnedTransactionAsync(async token => { await work(token); return true; }, cancellationToken);
+
+    public async Task<T> ExecuteOwnedTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
+        CancellationToken cancellationToken = default)
+    {
+        if (_db.Database.CurrentTransaction is not null)
+            throw new InvalidOperationException("This Cave workflow requires ownership of its database transaction.");
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var result = await work(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Initializes revision tracking for an existing Cave without otherwise mutating it.
     /// The Cave row lock makes concurrent authoring-context requests converge on one baseline.
     /// </summary>
@@ -55,12 +96,12 @@ public sealed class CaveMutationRepository
             }
             catch (DbUpdateConcurrencyException) when (attempt < 2)
             {
-                await transaction.RollbackAsync(cancellationToken);
+                await transaction.RollbackAsync(CancellationToken.None);
                 _db.ChangeTracker.Clear();
             }
             catch
             {
-                await transaction.RollbackAsync(cancellationToken);
+                await transaction.RollbackAsync(CancellationToken.None);
                 throw;
             }
         }
@@ -89,7 +130,7 @@ public sealed class CaveMutationRepository
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction.RollbackAsync(CancellationToken.None);
             throw;
         }
     }
@@ -116,7 +157,7 @@ public sealed class CaveMutationRepository
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction.RollbackAsync(CancellationToken.None);
             throw;
         }
     }
@@ -131,7 +172,16 @@ public sealed class CaveMutationRepository
         CancellationToken cancellationToken = default)
     {
         RequireCallerTransaction();
+        var tracked = _db.ChangeTracker.Entries<Cave>()
+            .SingleOrDefault(entry => entry.Entity.Id == caveId && entry.Entity.AccountId == _scope.AccountId);
         var cave = await GetOwnedCaveAsync(caveId, cancellationToken);
+        if (tracked is not null)
+        {
+            // This DbContext may have loaded the Cave before waiting on County or TagType locks. EF tracking
+            // queries preserve already-tracked values, so refresh before evaluating the expected revision.
+            await tracked.ReloadAsync(cancellationToken);
+            cave = tracked.Entity;
+        }
         if (expectedRevisionId is not null && cave.CurrentRevisionId != expectedRevisionId)
             throw new CaveRevisionConflictException(caveId, expectedRevisionId, cave.CurrentRevisionId);
 

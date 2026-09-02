@@ -21,5 +21,6 @@ public sealed class EntranceCsvModelMap : ClassMap<EntranceCsvModel>
         Map(m => m.ReportedOnDate);
         Map(m => m.ReportedByNames);
         Map(m => m.EntranceDescription);
+        Map(m => m.EntranceOtherTags).Optional();
     }
 }

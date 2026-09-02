@@ -78,7 +78,9 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
         return await DbContext.Files.AsNoTracking()
             .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId &&
-                           file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null)
+                           file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null &&
+                           !DbContext.CaveChangeRequestStagedFiles.Any(staged =>
+                               staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id))
             .Select(file => new FileAccessInfoResult(
                 file.Id, file.Name, file.Extension, file.BlobKey, file.BlobContainer, file.CaveId, null, null))
             .SingleOrDefaultAsync(cancellationToken);
@@ -97,7 +99,9 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return await DbContext.Files.AsNoTracking()
             .Where(file => ids.Contains(file.Id) && file.AccountId == RequestUser.AccountId &&
                            file.CreatedByUserId == RequestUser.Id && file.CaveId == null && file.ExpiresOn != null &&
-                           file.BlobKey != null && file.BlobContainer != null)
+                           file.BlobKey != null && file.BlobContainer != null &&
+                           !DbContext.CaveChangeRequestStagedFiles.Any(staged =>
+                               staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id))
             .Select(file => new AuthoringStagedObjectResult(
                 file.Id, file.BlobKey!, file.BlobContainer!, file.ExpiresOn!.Value))
             .ToListAsync(cancellationToken);
@@ -125,10 +129,10 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         string? StateId
         );
 
-    public async Task<FileAccessInfoResult?> GetFileAccessInfo(string id, bool checkRequestUserAccountId = true)
+    public async Task<FileAccessInfoResult?> GetFileAccessInfo(string id)
     {
         return await DbContext.Files
-            .Where(e => e.Id == id && (!checkRequestUserAccountId || e.AccountId == RequestUser.AccountId))
+            .Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
             .Select(e => new FileAccessInfoResult(
                 e.Id,
                 e.Name,

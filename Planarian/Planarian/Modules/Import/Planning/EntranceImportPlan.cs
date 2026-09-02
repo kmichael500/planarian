@@ -9,7 +9,8 @@ public enum EntranceImportTagRole
     Status,
     Hydrology,
     FieldIndication,
-    ReportedBy
+    ReportedBy,
+    Other
 }
 
 public sealed record PlannedEntranceTag(
@@ -49,7 +50,8 @@ public sealed record PlannedEntrance(
     IReadOnlyList<string> EntranceStatuses,
     IReadOnlyList<string> EntranceHydrology,
     IReadOnlyList<string> FieldIndication,
-    IReadOnlyList<string> ReportedByNames);
+    IReadOnlyList<string> ReportedByNames,
+    IReadOnlyList<string> EntranceOtherTags);
 
 public sealed class EntranceImportPlan
 {
@@ -99,6 +101,7 @@ public sealed class EntranceImportPlan
                 FieldIndication = row.FieldIndication.ToList(),
                 ReportedOnDate = row.ReportedOn,
                 ReportedByNames = row.ReportedByNames.ToList(),
+                EntranceOtherTags = row.EntranceOtherTags.ToList(),
                 EntranceDescription = row.Description
             };
         }).ToList();

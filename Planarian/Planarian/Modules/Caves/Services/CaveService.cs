@@ -2,8 +2,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
@@ -36,7 +34,6 @@ namespace Planarian.Modules.Caves.Services;
 public class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
-    private readonly TagRepository _tagRepository;
     private readonly FeatureSettingRepository _featureSettingRepository;
     private readonly ClientUrlBuilder _clientUrlBuilder;
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
@@ -44,14 +41,12 @@ public class CaveService : ServiceBase<CaveRepository>
     private readonly CountyReferenceLockRepository _countyReferenceLocks;
 
     public CaveService(CaveRepository repository, RequestUser requestUser, FileService fileService,
-        TagRepository tagRepository,
         FeatureSettingRepository featureSettingRepository, ClientUrlBuilder clientUrlBuilder,
         CaveMutationCoordinator caveMutationCoordinator, TagReferenceLockRepository tagReferenceLocks,
         CountyReferenceLockRepository countyReferenceLocks) : base(
         repository, requestUser)
     {
         _fileService = fileService;
-        _tagRepository = tagRepository;
         _featureSettingRepository = featureSettingRepository;
         _clientUrlBuilder = clientUrlBuilder;
         _caveMutationCoordinator = caveMutationCoordinator;
@@ -497,42 +492,41 @@ public class CaveService : ServiceBase<CaveRepository>
         return memoryStream.ToArray();
     }
 
-    public Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken) =>
-        SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId, null, null, null, null, null,
-            cancellationToken);
+    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken) =>
+        (await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId, null, null, null,
+            null, cancellationToken)).CaveId;
 
-    internal Task<string> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId, string changeRequestId,
-        IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
-        IReadOnlySet<string> authorizedNewEntranceIds,
-        IReadOnlySet<string> authorizedNewLinePlotIds,
-        CavePeoplePublicationContext peoplePublicationContext,
-        Func<CaveMutationResult, CancellationToken, Task> beforeCommit, CancellationToken cancellationToken) =>
+    internal Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
+        string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
+        IReadOnlySet<string> authorizedNewEntranceIds, IReadOnlySet<string> authorizedNewLinePlotIds,
+        CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
-            beforeCommit, cancellationToken);
+            cancellationToken);
 
-    public Task<string> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId, string changeRequestId,
-        IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
-        Func<CaveMutationResult, CancellationToken, Task> beforeCommit, CancellationToken cancellationToken) =>
+    public Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
+        string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
+        CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, new HashSet<string>(StringComparer.Ordinal),
-            new HashSet<string>(StringComparer.Ordinal), null, beforeCommit, cancellationToken);
+            new HashSet<string>(StringComparer.Ordinal), null, cancellationToken);
 
-    private async Task<string> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
+    private async Task<CaveMutationResult> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
         string? changeRequestId, string? expectedRevisionId,
         IReadOnlyList<StagedCaveFilePublication>? stagedFilePublications,
         IReadOnlySet<string>? authorizedNewEntranceIds,
         IReadOnlySet<string>? authorizedNewLinePlotIds,
-        CavePeoplePublicationContext? peoplePublicationContext,
-        Func<CaveMutationResult, CancellationToken, Task>? beforeCommit, CancellationToken cancellationToken)
+        CavePeoplePublicationContext? peoplePublicationContext, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-        if (revisionSource == CaveRevisionSource.UserSubmission)
-            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, null, null);
-        else
-            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, values.CountyId, values.StateId);
         var isNew = string.IsNullOrWhiteSpace(values.Id);
+        if (isNew)
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, null, values.CountyId, values.StateId);
+        else
+            // Existing Cave authority comes from the Cave's current effective permission projection.
+            // A client-supplied destination County/State must never grant authority to move the Cave there.
+            await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, values.Id, null, null);
         if (!isNew && revisionSource == CaveRevisionSource.ManagerEdit &&
             string.IsNullOrWhiteSpace(expectedRevisionId))
             throw ApiExceptionDictionary.BadRequest("ExpectedRevisionId is required when editing an existing Cave.");
@@ -557,9 +551,7 @@ public class CaveService : ServiceBase<CaveRepository>
             }
         }
 
-        await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
-        string savedCaveId;
-        try
+        return await _caveMutationCoordinator.ExecuteTransactionAsync(async _ =>
         {
             var entity = isNew ? new Cave { Id = IdGenerator.Generate() } : await Repository.GetAsync(values.Id);
 
@@ -915,15 +907,8 @@ public class CaveService : ServiceBase<CaveRepository>
             // Delete removed join rows explicitly inside this transaction, then detach their stale tracked instances.
             await Repository.DeleteTagAssociationsAsync(entity.Id, removedTagAssociations, cancellationToken);
 
-            try
-            {
-                await Repository.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateConcurrencyException exception) when (changeRequestId is not null &&
-                exception.Entries.Any(entry => entry.Entity is Cave))
-            {
-                throw new CaveRevisionConflictException(entity.Id, expectedRevisionId, null);
-            }
+            await Repository.SaveAggregateChangesAsync(entity.Id, expectedRevisionId,
+                !isNew, cancellationToken);
 
             CaveMutationResult mutationResult;
             if (isNew)
@@ -939,18 +924,8 @@ public class CaveService : ServiceBase<CaveRepository>
                     cancellationToken: cancellationToken);
             }
 
-            if (beforeCommit is not null) await beforeCommit(mutationResult, cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-            savedCaveId = entity.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-
-        return savedCaveId;
+            return mutationResult;
+        }, cancellationToken);
     }
 
     private sealed record PeopleTagBinding(string Id, TagType? NewTag);
@@ -1146,17 +1121,9 @@ public class CaveService : ServiceBase<CaveRepository>
         return cave;
     }
 
-    public async Task DeleteCave(string caveId, CancellationToken cancellationToken,
-        IDbContextTransaction? transaction = null, List<File>? deferredFileDeletes = null,
-        List<StorageObjectAddress>? deferredObjectDeletes = null)
+    public async Task DeleteCave(string caveId, CancellationToken cancellationToken)
     {
-        var outsideTransaction = transaction != null;
-        transaction ??= await Repository.BeginTransactionAsync(cancellationToken);
-
-        var files = new List<File>();
-        var retainedObjects = new List<StorageObjectAddress>();
-        var isSuccessful = false;
-        try
+        var objectAddresses = await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(async _ =>
         {
             await Repository.LockForHardDeleteAsync(caveId, cancellationToken);
             var entity = await Repository.GetAsync(caveId);
@@ -1170,210 +1137,19 @@ public class CaveService : ServiceBase<CaveRepository>
             var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
                 entity.Id, entity.CurrentRevisionId, cancellationToken);
 
-            var geoJsons = await Repository.GetCaveGeoJsonsAsync(caveId);
-            foreach (var geoJson in geoJsons)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.RemoveCaveGeoJson(geoJson);
-            }
+            var deletedObjectAddresses = await Repository.DeleteAggregateForHardDeleteAsync(
+                entity, cancellationToken);
 
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var entrance in entity.Entrances)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                foreach (var tag in entrance.EntranceStatusTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Repository.Delete(tag);
-                }
-
-                await Repository.SaveChangesAsync(cancellationToken);
-
-                foreach (var tag in entrance.EntranceHydrologyTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Repository.Delete(tag);
-                }
-
-                await Repository.SaveChangesAsync(cancellationToken);
-
-                foreach (var tag in entrance.FieldIndicationTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Repository.Delete(tag);
-                }
-
-                await Repository.SaveChangesAsync(cancellationToken);
-
-                foreach (var tag in entrance.EntranceReportedByNameTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Repository.Delete(tag);
-                }
-
-                await Repository.SaveChangesAsync(cancellationToken);
-
-                foreach (var tag in entrance.EntranceOtherTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Repository.Delete(tag);
-                }
-
-                await Repository.SaveChangesAsync(cancellationToken);
-
-                Repository.Delete(entrance);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-
-            foreach (var tag in entity.GeologyTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.MapStatusTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.GeologicAgeTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.PhysiographicProvinceTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.BiologyTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.ArcheologyTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.CartographerNameTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.CaveReportedByNameTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var tag in entity.CaveOtherTags)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(tag);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            foreach (var favorite in entity.Favorites)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(favorite);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            files = entity.Files.ToList();
-            retainedObjects = (await Repository.RemoveRetainedFileObjectsForHardDeleteAsync(
-                caveId, cancellationToken)).ToList();
-
-            foreach (var permission in entity.CavePermissions)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(permission);
-            }
-
-            await Repository.DeleteStagedFileReferencesAsync(files.Select(file => file.Id), cancellationToken);
-
-            foreach (var file in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Repository.Delete(file);
-            }
-
-            await Repository.SaveChangesAsync(cancellationToken);
-
-            Repository.Delete(entity);
-            await Repository.SaveChangesAsync(cancellationToken);
             await _caveMutationCoordinator.PublishPreparedDeleteAsync(
                 revisionPreparation, CaveRevisionSource.ManagerEdit, cancellationToken: cancellationToken);
 
-            if (!outsideTransaction)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
+            return deletedObjectAddresses;
+        }, cancellationToken);
 
-            isSuccessful = true;
-        }
-        catch (Exception)
-        {
-            if (!outsideTransaction)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-
-            throw;
-        }
-
-        if (isSuccessful)
-        {
-            var objectAddresses = files
-                .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) &&
-                               !string.IsNullOrWhiteSpace(file.BlobContainer))
-                .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
-                .Concat(retainedObjects)
-                .Distinct()
-                .ToList();
-
-            if (outsideTransaction)
-            {
-                deferredFileDeletes?.AddRange(files);
-                deferredObjectDeletes?.AddRange(objectAddresses);
-                // The caller owns commit/rollback. External object deletion cannot be
-                // made safe here before that decision; production hard delete uses the
-                // internally-owned transaction path below.
-            }
-            else
-            {
-                foreach (var address in objectAddresses)
-                    await _fileService.DeleteObjectBestEffortAsync(address);
-            }
-        }
+        // Object storage is outside PostgreSQL. Purge bytes only after the owned relational
+        // transaction has committed so a database rollback can never lose historical content.
+        foreach (var address in objectAddresses)
+            await _fileService.DeleteObjectBestEffortAsync(address);
     }
 
     public async Task ArchiveCave(string caveId)

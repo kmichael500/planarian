@@ -86,6 +86,7 @@ public sealed class EntranceImportCsvParser
             CsvFieldReader.TryGet(csv, nameof(record.FieldIndication), false, errors, out string? indication); record.FieldIndication = indication;
             CsvFieldReader.TryGet(csv, nameof(record.ReportedOnDate), false, errors, out string? reportedOn); record.ReportedOnDate = reportedOn;
             CsvFieldReader.TryGet(csv, nameof(record.ReportedByNames), false, errors, out string? reportedBy); record.ReportedByNames = reportedBy;
+            CsvFieldReader.TryGet(csv, nameof(record.EntranceOtherTags), false, errors, out string? other); record.EntranceOtherTags = other;
             CsvFieldReader.TryGet(csv, nameof(record.IsPrimaryEntrance), false, errors, out bool primary); record.IsPrimaryEntrance = primary;
             if (errors.Count == 0) records.Add(record);
             else foreach (var error in errors) failures.Add(new(record, rowNumber, error));

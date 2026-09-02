@@ -287,25 +287,25 @@ public sealed class CaveChangeRequestService
             stagedFileExtensions, cancellationToken);
         await _files.RequireStoredObjectsAvailableAsync(publications.Select(publication =>
             new StorageObjectAddress(publication.StoragePartition, publication.StorageKey)), cancellationToken);
-        string? publishedRevisionId = null;
-        IReadOnlyList<StagedFileObjectDeleteTarget> discardedStagedObjects = [];
         var baseSnapshot = Deserialize(row.ProposalBaseRevision);
-        await _caveService.ApproveChangeRequestAsync(values, row.ProposalVersion.BaseRevisionId, requestId,
-            publications, proposal.Entrances.Select(entrance => entrance.EntranceId)
-                .Except(baseSnapshot.Entrances.Select(entrance => entrance.Id))
-                .ToHashSet(StringComparer.Ordinal),
-            proposal.LinePlots.Select(linePlot => linePlot.Id)
-                .Except(baseSnapshot.LinePlots.Select(linePlot => linePlot.Id))
-                .ToHashSet(StringComparer.Ordinal),
-            ToPeoplePublicationContext(proposal),
-            async (mutation, token) =>
-            {
-                publishedRevisionId = mutation.RevisionId;
-                discardedStagedObjects = await _requests.MarkApprovedAsync(requestId,
-                    expectedProposalVersionId, mutation, notes, token);
-            }, cancellationToken);
+        var approval = await _mutations.ExecuteOwnedTransactionAsync(async token =>
+        {
+            var mutation = await _caveService.ApproveChangeRequestAsync(values,
+                row.ProposalVersion.BaseRevisionId, requestId, publications,
+                proposal.Entrances.Select(entrance => entrance.EntranceId)
+                    .Except(baseSnapshot.Entrances.Select(entrance => entrance.Id))
+                    .ToHashSet(StringComparer.Ordinal),
+                proposal.LinePlots.Select(linePlot => linePlot.Id)
+                    .Except(baseSnapshot.LinePlots.Select(linePlot => linePlot.Id))
+                    .ToHashSet(StringComparer.Ordinal),
+                ToPeoplePublicationContext(proposal), token);
+            var discardedObjects = await _requests.MarkApprovedAsync(requestId,
+                expectedProposalVersionId, mutation, notes, token);
+            return (Mutation: mutation, DiscardedObjects: discardedObjects);
+        }, cancellationToken);
+        var publishedRevisionId = approval.Mutation.RevisionId;
 
-        foreach (var objectAddress in discardedStagedObjects)
+        foreach (var objectAddress in approval.DiscardedObjects)
             await _files.DeleteObjectBestEffortAsync(
                 new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
 

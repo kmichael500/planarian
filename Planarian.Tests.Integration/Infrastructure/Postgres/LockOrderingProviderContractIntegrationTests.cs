@@ -99,8 +99,7 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
 
         await AssertNextLockAsync(interceptor, "TagTypes", "for update", async () =>
         {
-            Assert.Equal(2, await new TagTypeDeleteExecutionRepository(db, db.RequestUser)
-                .ExecuteAsync([secondDeleteTag.Id, firstDeleteTag.Id]));
+            Assert.Equal(2, await TagAdministration(db).DeleteAsync([secondDeleteTag.Id, firstDeleteTag.Id]));
         });
 
         var currentCaves = await db.Caves.IgnoreQueryFilters().AsNoTracking().Where(cave =>
@@ -116,7 +115,7 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
         var tagReferenceLocks = new TagReferenceLockRepository(rawDb, rawDb.RequestUser);
 
         await using var rawCommandTransaction = await rawDb.Database.BeginTransactionAsync();
-        var mergeRepository = new TagTypeMergeExecutionRepository(rawDb, rawDb.RequestUser, tagReferenceLocks,
+        var mergeRepository = new TagTypeAdministrationRepository(rawDb, rawDb.RequestUser, tagReferenceLocks,
             snapshots, revisions);
         await InvokePrivateLockMethodAsync(mergeRepository, "LockCavesAsync", caveIds, CancellationToken.None);
         var mergeLockCommand = await rawCommandObserver.ReadLastCommandAsync(rawDb);
@@ -146,6 +145,15 @@ public sealed class LockOrderingProviderContractIntegrationTests(PostgresTestSer
         Assert.Equal(2, rawCommandObserver.Commands.Count);
         foreach (var commandText in rawCommandObserver.Commands)
             MultiRowLockOrderingCommandInterceptor.AssertContract(commandText, "for update");
+    }
+
+    private static TagTypeAdministrationRepository TagAdministration(
+        Planarian.Model.Database.PlanarianDbContext db)
+    {
+        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        return new TagTypeAdministrationRepository(db, db.RequestUser,
+            new TagReferenceLockRepository(db, db.RequestUser), snapshots,
+            new CaveBulkRevisionRepository(db, db.RequestUser));
     }
 
     private static async Task AssertNextLockAsync(MultiRowLockOrderingCommandInterceptor interceptor,

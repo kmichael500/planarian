@@ -54,6 +54,8 @@ public sealed class CaveImportExecutionRepository
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            if (plan.CountyCreations.Count > 0)
+                await _countyReferenceLocks.LockAdministrationNamespaceAsync(cancellationToken);
             await LockAndVerifyExistingCountyReferencesAsync(plan, cancellationToken);
             await LockAndVerifyExistingTagReferencesAsync(plan, cancellationToken);
             await LockAndVerifyExistingCavesAsync(plan, cancellationToken);
@@ -236,9 +238,15 @@ public sealed class CaveImportExecutionRepository
         }
         if (plan.CountyCreations.Count > 0)
         {
-            var displayIds = plan.CountyCreations.Select(c => c.DisplayId).ToList();
-            if (await _db.Counties.AsNoTracking().AnyAsync(c => c.AccountId == _scope.AccountId && displayIds.Contains(c.DisplayId), cancellationToken))
-                throw new ImportPlanConcurrencyException("A County was created after import planning; re-plan before committing.");
+            var plannedDisplayIds = plan.CountyCreations.Select(c => c.DisplayId)
+                .ToHashSet(StringComparer.InvariantCultureIgnoreCase);
+            var currentDisplayIds = await _db.Counties.AsNoTracking()
+                .Where(c => c.AccountId == _scope.AccountId)
+                .Select(c => c.DisplayId)
+                .ToListAsync(cancellationToken);
+            if (currentDisplayIds.Any(plannedDisplayIds.Contains))
+                throw new ImportPlanConcurrencyException(
+                    "A County was created after import planning; re-plan before committing.");
         }
 
     }

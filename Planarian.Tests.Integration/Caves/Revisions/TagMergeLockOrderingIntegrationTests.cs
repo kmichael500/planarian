@@ -37,7 +37,7 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
 
         var pause = new HoldDestructiveTagLockInterceptor();
         await using var mergeDb = database.CreateDbContext("manager", cave.AccountId, pause);
-        var merge = MergeRepository(mergeDb).ExecuteAsync([source.Id], destination.Id);
+        var merge = MergeRepository(mergeDb).MergeAsync([source.Id], destination.Id);
         await pause.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
 
         await using var importDb = database.CreateDbContext("importer", cave.AccountId);
@@ -80,7 +80,7 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
 
         var pause = new HoldDestructiveTagLockInterceptor();
         await using var mergeDb = database.CreateDbContext("manager", cave.AccountId, pause);
-        var merge = MergeRepository(mergeDb).ExecuteAsync([source.Id], destination.Id);
+        var merge = MergeRepository(mergeDb).MergeAsync([source.Id], destination.Id);
         await pause.LockAcquired.Task.WaitAsync(TimeSpan.FromSeconds(15));
 
         await using var importDb = database.CreateDbContext("importer", cave.AccountId);
@@ -130,7 +130,7 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
         await using var mergeDb = database.CreateDbContext("manager", cave.AccountId);
         await mergeDb.Database.OpenConnectionAsync();
         var mergePid = await BackendPidAsync(mergeDb);
-        var merge = MergeRepository(mergeDb).ExecuteAsync([source.Id], destination.Id);
+        var merge = MergeRepository(mergeDb).MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
 
         pause.Resume.TrySetResult();
@@ -180,7 +180,7 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
         await using var mergeDb = database.CreateDbContext("manager", cave.AccountId);
         await mergeDb.Database.OpenConnectionAsync();
         var mergePid = await BackendPidAsync(mergeDb);
-        var merge = MergeRepository(mergeDb).ExecuteAsync([source.Id], destination.Id);
+        var merge = MergeRepository(mergeDb).MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
 
         pause.Resume.TrySetResult();
@@ -197,7 +197,7 @@ public sealed class TagMergeLockOrderingIntegrationTests(PostgresTestServer fixt
             (await verify.CaveRevisions.SingleAsync(row => row.Id == currentRevisionId)).Source);
     }
 
-    private static TagTypeMergeExecutionRepository MergeRepository(
+    private static TagTypeAdministrationRepository MergeRepository(
         Planarian.Model.Database.PlanarianDbContext db) => new(db, db.RequestUser,
         new TagReferenceLockRepository(db, db.RequestUser),
         new CavePublishedSnapshotRepository(db, db.RequestUser),

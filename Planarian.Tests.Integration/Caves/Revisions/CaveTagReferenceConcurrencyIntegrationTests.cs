@@ -103,10 +103,10 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
             mergeBackendPid = Convert.ToInt32(await pidCommand.ExecuteScalarAsync());
         }
         var snapshots = new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser);
-        var mergeRepository = new TagTypeMergeExecutionRepository(mergeDb, mergeDb.RequestUser,
+        var mergeRepository = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
             new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser), snapshots,
             new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser));
-        var merge = mergeRepository.ExecuteAsync([source.Id], destination.Id);
+        var merge = mergeRepository.MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergeBackendPid);
 
         holdReferenceLock.Resume.TrySetResult();
@@ -170,11 +170,11 @@ public sealed class CaveTagReferenceConcurrencyIntegrationTests(PostgresTestServ
             command.CommandText = "select pg_backend_pid()";
             mergeBackendPid = Convert.ToInt32(await command.ExecuteScalarAsync());
         }
-        var mergeRepository = new TagTypeMergeExecutionRepository(mergeDb, mergeDb.RequestUser,
+        var mergeRepository = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
             new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
             new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
             new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser));
-        var merge = mergeRepository.ExecuteAsync([source.Id], destination.Id);
+        var merge = mergeRepository.MergeAsync([source.Id], destination.Id);
         await WaitForLockWaitAsync(database, cave.AccountId, mergeBackendPid);
 
         holdReferenceLock.Resume.TrySetResult();

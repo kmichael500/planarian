@@ -288,6 +288,17 @@ const AccountService = {
     return response.data;
   },
 
+  async MergeCounties(
+    sourceCountyIds: string[],
+    destinationCountyId: string,
+    stateId: string
+  ): Promise<void> {
+    const queryString = `sourceCountyIds=${sourceCountyIds.join(",")}`;
+    await HttpClient.post<void>(
+      `${baseUrl}/states/${stateId}/counties/merge/${destinationCountyId}?${queryString}`
+    );
+  },
+
   async AddTagType(tag: CreateEditTagTypeVm): Promise<TagTypeTableVm> {
     const response = await HttpClient.post<TagTypeTableVm>(
       `${baseUrl}/tags/`,

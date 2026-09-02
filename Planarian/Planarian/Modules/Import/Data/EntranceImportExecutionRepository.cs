@@ -246,6 +246,7 @@ public sealed class EntranceImportExecutionRepository
         EntranceImportTagRole.Hydrology => new EntranceHydrologyTag { Id = tag.Id, EntranceId = tag.EntranceId, TagTypeId = tag.TagTypeId },
         EntranceImportTagRole.FieldIndication => new FieldIndicationTag { Id = tag.Id, EntranceId = tag.EntranceId, TagTypeId = tag.TagTypeId },
         EntranceImportTagRole.ReportedBy => new EntranceReportedByNameTag { Id = tag.Id, EntranceId = tag.EntranceId, TagTypeId = tag.TagTypeId },
+        EntranceImportTagRole.Other => new EntranceOtherTag { Id = tag.Id, EntranceId = tag.EntranceId, TagTypeId = tag.TagTypeId },
         _ => throw new ArgumentOutOfRangeException(nameof(tag.Role))
     };
 }

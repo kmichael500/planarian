@@ -237,10 +237,9 @@ builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<PhotoService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AccountService>();
-builder.Services.AddScoped<TagTypeMergeExecutionRepository>();
-builder.Services.AddScoped<TagTypeDeleteExecutionRepository>();
+builder.Services.AddScoped<TagTypeAdministrationRepository>();
 builder.Services.AddScoped<CountyReferenceLockRepository>();
-builder.Services.AddScoped<CountyDeleteExecutionRepository>();
+builder.Services.AddScoped<CountyAdministrationRepository>();
 builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
@@ -413,35 +412,7 @@ builder.Services.AddSession();
 
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy(PermissionPolicyKey.Admin, policy =>
-    {
-        policy.Requirements.Add(new PermissionRequirement([PermissionKey.PlanarianAdmin, PermissionKey.Admin]));
-    });
-    options.AddPolicy(PermissionPolicyKey.PlanarianAdmin, policy =>
-    {
-        policy.Requirements.Add(new PermissionRequirement([PermissionKey.PlanarianAdmin]));
-    });
-    options.AddPolicy(PermissionPolicyKey.Manager, policy =>
-    {
-        policy.Requirements.Add(new PermissionRequirement([
-            PermissionKey.PlanarianAdmin, PermissionKey.Admin, PermissionKey.Manager
-        ]));
-    });
-    options.AddPolicy(PermissionPolicyKey.View, policy =>
-    {
-        policy.Requirements.Add(new PermissionRequirement([
-            PermissionKey.PlanarianAdmin, PermissionKey.Admin, PermissionKey.Manager, PermissionKey.View
-        ]));
-    });
-    options.AddPolicy(PermissionPolicyKey.Export, policy =>
-    {
-        policy.Requirements.Add(new PermissionRequirement([
-            PermissionPolicyKey.Export
-        ]));
-    });
-});
+builder.Services.AddAuthorization(PermissionPolicyConfiguration.Configure);
 
 
 

@@ -13,6 +13,14 @@ public class PlanarianSettingsRepository : RepositoryBase
     {
     }
 
+    public async Task<List<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
+    {
+        return await DbContext.States.AsNoTracking()
+            .OrderBy(state => state.Name)
+            .Select(state => new SelectListItem<string> { Display = state.Name, Value = state.Id })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<string>> GetExistingStateIds(IEnumerable<string> stateIds,
         CancellationToken cancellationToken)
     {

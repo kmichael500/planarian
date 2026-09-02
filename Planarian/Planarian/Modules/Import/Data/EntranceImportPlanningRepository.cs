@@ -22,7 +22,8 @@ public sealed class EntranceImportPlanningRepository
         CancellationToken cancellationToken = default)
     {
         var tagKeys = new[] { TagTypeKeyConstant.LocationQuality, TagTypeKeyConstant.EntranceStatus,
-            TagTypeKeyConstant.EntranceHydrology, TagTypeKeyConstant.FieldIndication, TagTypeKeyConstant.People };
+            TagTypeKeyConstant.EntranceHydrology, TagTypeKeyConstant.FieldIndication, TagTypeKeyConstant.People,
+            TagTypeKeyConstant.CaveOther };
         var tags = await _db.TagTypes.Where(t => tagKeys.Contains(t.Key) && (t.AccountId == _scope.AccountId || t.IsDefault))
             .AsNoTracking().Select(t => new ImportTagLookup(t.Id, t.Key, t.Name, t.AccountId, t.IsDefault, false))
             .ToListAsync(cancellationToken);

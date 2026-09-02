@@ -4,6 +4,7 @@ public static class PermissionKey
 {
     public const string View = "View";
     public const string Manager = "Manager";
+    // Platform-scoped administration. It does not imply Account Admin, Manager, or View access.
     public const string PlanarianAdmin = "PlanarianAdmin";
     public const string Admin = "Admin";
 }

@@ -67,11 +67,11 @@ public sealed class CaveChangeRequestFileConcurrencyIntegrationTests(PostgresTes
                 command.CommandText = "select pg_backend_pid()";
                 mergePid = Convert.ToInt32(await command.ExecuteScalarAsync());
             }
-            var merge = new TagTypeMergeExecutionRepository(mergeDb, mergeDb.RequestUser,
+            var merge = new TagTypeAdministrationRepository(mergeDb, mergeDb.RequestUser,
                 new TagReferenceLockRepository(mergeDb, mergeDb.RequestUser),
                 new CavePublishedSnapshotRepository(mergeDb, mergeDb.RequestUser),
                 new CaveBulkRevisionRepository(mergeDb, mergeDb.RequestUser))
-                .ExecuteAsync([file.FileTypeId], mergeDestination.Id);
+                .MergeAsync([file.FileTypeId], mergeDestination.Id);
             await WaitForLockWaitAsync(database, cave.AccountId, mergePid);
 
             hold.Resume.TrySetResult();

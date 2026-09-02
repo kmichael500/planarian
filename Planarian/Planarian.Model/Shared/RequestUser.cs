@@ -117,10 +117,7 @@ public class RequestUser
             return false;
 
         var userPermissions = await _dbContext.UserPermissions
-            .Where(e =>
-                e.UserId == Id
-                && (e.AccountId == AccountId || e.AccountId == null)
-            )
+            .Where(e => e.UserId == Id && e.AccountId == AccountId)
             .Select(e => e.Permission!.Key).ToListAsync();
 
         var satisfyingPermissionKeys = GetSatisfyingPermissionKeys(permissionKey);
@@ -128,8 +125,7 @@ public class RequestUser
 
         if (permissionKey == PermissionPolicyKey.AdminManager)
         {
-            hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
-                                userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
+            hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin);
 
 
             if (!hasUserPermission)
@@ -153,8 +149,7 @@ public class RequestUser
 
             if (!hasUserPermission)
             {
-                hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin) ||
-                                    userPermissions.Contains(PermissionPolicyKey.PlanarianAdmin);
+                hasUserPermission = userPermissions.Contains(PermissionPolicyKey.Admin);
             }
         }
 
@@ -225,12 +220,9 @@ public class RequestUser
 
     private static string[] GetSatisfyingPermissionKeys(string permissionKey) => permissionKey switch
     {
-        PermissionKey.View =>
-            [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin,
-                PermissionPolicyKey.PlanarianAdmin],
-        PermissionKey.Manager =>
-            [PermissionPolicyKey.Manager, PermissionPolicyKey.Admin, PermissionPolicyKey.PlanarianAdmin],
-        PermissionKey.Admin => [PermissionPolicyKey.Admin, PermissionPolicyKey.PlanarianAdmin],
+        PermissionKey.View => [PermissionPolicyKey.View, PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
+        PermissionKey.Manager => [PermissionPolicyKey.Manager, PermissionPolicyKey.Admin],
+        PermissionKey.Admin => [PermissionPolicyKey.Admin],
         PermissionKey.PlanarianAdmin => [PermissionPolicyKey.PlanarianAdmin],
         _ => [permissionKey]
     };

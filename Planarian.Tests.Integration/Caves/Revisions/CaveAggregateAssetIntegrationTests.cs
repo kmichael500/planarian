@@ -7,6 +7,7 @@ using Planarian.Modules.Caves.Revisions;
 using Planarian.Modules.Files.Controllers;
 using Planarian.Tests;
 using Planarian.Tests.Integration.Infrastructure.Actors;
+using Planarian.Tests.Integration.Infrastructure.Concurrency;
 using Planarian.Tests.Integration.Infrastructure.Services;
 using Xunit;
 using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSupport;
@@ -43,6 +44,44 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
         await using var verify = database.CreateDbContext("verify", tenant.AccountId);
         var cave = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
         Assert.Equal("First manager wins", cave.Name);
+        Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
+    }
+
+    [Fact]
+    public async Task RacingDirectManagerEditsReturnRevisionConflictAndCommitOnlyWinner()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(RacingDirectManagerEditsReturnRevisionConflictAndCommitOnlyWinner));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var quality = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager-a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager-b");
+
+        var pausedValues = PublishableValues(tenant, quality.Id, "Paused manager loses");
+        var winningValues = PublishableValues(tenant, quality.Id, "Concurrent manager wins");
+        pausedValues.IsCountyNumberManuallySet = false;
+        winningValues.IsCountyNumberManuallySet = false;
+
+        var pause = new PauseCaveUpdateInterceptor();
+        await using var pausedDb = database.CreateDbContext("manager-a", tenant.AccountId, pause);
+        await CavePermissions.AuthenticateAsync(pausedDb, tenant.AccountId);
+        var pausedSave = IntegrationTestServices.For(pausedDb).Caves.AddCave(pausedValues, default);
+        await pause.CaveUpdateReached.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await using (var winnerDb = database.CreateDbContext("manager-b", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(winnerDb, tenant.AccountId);
+            await IntegrationTestServices.For(winnerDb).Caves.AddCave(winningValues, default);
+        }
+
+        pause.ContinueUpdate.TrySetResult();
+        var conflict = await Assert.ThrowsAsync<CaveRevisionConflictException>(() => pausedSave);
+        Assert.Equal(tenant.RevisionId, conflict.ExpectedRevisionId);
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var cave = await verify.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == tenant.CaveId);
+        Assert.Equal("Concurrent manager wins", cave.Name);
         Assert.Equal(2, await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
     }
 
@@ -460,7 +499,7 @@ public sealed class CaveAggregateAssetIntegrationTests(PostgresTestServer fixtur
 
         var requestScoped = await contributor.ChangeRequests.OpenStagedFileAsync(requestId, staged.Id, default);
         Assert.Equal("evidence.pdf", requestScoped.FileName);
-        await using var reader = new StreamReader(requestScoped.Stream);
+        using var reader = new StreamReader(requestScoped.Stream);
         Assert.Equal("request-bound bytes", await reader.ReadToEndAsync());
     }
 

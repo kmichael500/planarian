@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { SaveButtonComponent } from "../../../Shared/Components/Buttons/SaveButtonComponent";
 import { PropertyLength } from "../../../Shared/Constants/PropertyLengthConstant";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
-import { AccountService } from "../../Account/Services/AccountService";
 import { AuthenticationService } from "../../Authentication/Services/AuthenticationService";
 import { CreateAccountVm } from "../Models/CreateAccountVm";
 import { PlanarianSettingsService } from "../Services/PlanarianSettingsService";
@@ -18,7 +17,7 @@ const CreateAccountComponent = () => {
     const loadStates = async () => {
       setIsLoading(true);
       try {
-        setStates(await AccountService.GetAllStates());
+        setStates(await PlanarianSettingsService.GetAllStates());
       } catch (error: any) {
         message.error(error?.message ?? "Failed to load states.");
       } finally {

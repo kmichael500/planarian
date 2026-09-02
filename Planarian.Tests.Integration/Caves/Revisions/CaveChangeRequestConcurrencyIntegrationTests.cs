@@ -416,7 +416,14 @@ public sealed class CaveChangeRequestConcurrencyIntegrationTests(PostgresTestSer
             PublishableValues(tenant, locationTag.Id, "Loses to delete"), tenant.RevisionId, default);
         await PostgresLockAssertions.AssertBlockedAsync(database, tenant.AccountId, contributorPid, createTask);
 
-        await IntegrationTestServices.For(manager).Caves.DeleteCave(tenant.CaveId, default, deleteTransaction);
+        // This test isolates lock ordering. Once the hard-delete lock wins, remove the minimal
+        // relational rows directly inside that transaction so no service API needs to accept a DB transaction.
+        await manager.CavePermissions.IgnoreQueryFilters()
+            .Where(permission => permission.AccountId == tenant.AccountId && permission.CaveId == tenant.CaveId)
+            .ExecuteDeleteAsync();
+        await manager.Caves.IgnoreQueryFilters()
+            .Where(cave => cave.AccountId == tenant.AccountId && cave.Id == tenant.CaveId)
+            .ExecuteDeleteAsync();
         await deleteTransaction.CommitAsync();
         var failure = await Assert.ThrowsAsync<Planarian.Library.Exceptions.ApiException>(() => createTask);
         Assert.Contains("Cave", failure.Message);

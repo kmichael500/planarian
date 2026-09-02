@@ -26,4 +26,5 @@ public class EntranceDryRun
     public IEnumerable<string> EntranceHydrology { get; set; } = new HashSet<string>();
 
     public IEnumerable<string> ReportedByNames { get; set; } = new HashSet<string>();
+    public IEnumerable<string> EntranceOtherTags { get; set; } = new HashSet<string>();
 }
