@@ -1,11 +1,13 @@
 import { FC, useEffect, useState } from "react";
-import { Descriptions, Grid, InputNumber, DatePicker } from "antd";
+import { InputNumber, DatePicker } from "antd";
 
 import dayjs, { Dayjs } from "dayjs";
-import { CopyOutlined } from "@ant-design/icons";
 import { Macrostrat } from "./Macrostrat";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import {
+  PlanarianDescription,
+  type PlanarianDescriptionItem,
+} from "../../../Shared/Components/Buttons/PlanarianDescription";
 import {
   defaultIfEmpty,
   DistanceFormat,
@@ -55,13 +57,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
     dayjs().subtract(1, "month"),
     dayjs(),
   ]);
-
-  const screens = Grid.useBreakpoint();
-  const descriptionLayout = screens.sm ? "horizontal" : "vertical";
-
-  const copyCoordinates = () => {
-    navigator.clipboard.writeText(`${lat}, ${lng}`);
-  };
 
   // Debounce the distance input
   useEffect(() => {
@@ -119,6 +114,51 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
     fetchAddress();
   }, [lat, lng]);
 
+  const locationItems: PlanarianDescriptionItem[] = [
+    {
+      key: "coordinates",
+      copyText: `${lat}, ${lng}`,
+      label: "Coordinates",
+      children: formatCoordinates(lat, lng),
+    },
+    {
+      key: "elevation",
+      label: "Elevation",
+      children: loadingElevation
+        ? "Loading..."
+        : errorElevation
+        ? errorElevation
+        : elevation
+        ? formatDistance(elevation, DistanceFormat.feet)
+        : defaultIfEmpty(""),
+    },
+    {
+      key: "address",
+      label: "Address",
+      children: loadingAddress ? (
+        "Loading..."
+      ) : errorAddress ? (
+        errorAddress
+      ) : address ? (
+        <>
+          {address.road && <div>{address.road}</div>}
+          {address.city && <div>{address.city}</div>}
+          {address.county && <div>{address.county}</div>}
+          {address.state && <div>{address.state}</div>}
+          {address.country && <div>{address.country}</div>}
+        </>
+      ) : (
+        defaultIfEmpty("")
+      ),
+    },
+    {
+      key: "land-access",
+      label: "Land Access",
+      span: "filled",
+      children: <PublicAccessDetails lat={lat} lng={lng} />,
+    },
+  ];
+
   return (
     <PlanarianModal
       open={isModalVisible}
@@ -126,55 +166,10 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
       footer={[]}
       header={`${address?.county || ""}, ${address?.state || ""} `}
     >
-      <Descriptions
-        layout={descriptionLayout}
-        bordered
+      <PlanarianDescription
         title="Location Information"
-      >
-        <Descriptions.Item
-          label={
-            <span>
-              Coordinates{" "}
-              <PlanarianButton
-                type="link"
-                icon={<CopyOutlined />}
-                onClick={copyCoordinates}
-              />
-            </span>
-          }
-        >
-          {formatCoordinates(lat, lng)}
-        </Descriptions.Item>
-        <Descriptions.Item label="Elevation">
-          {loadingElevation
-            ? "Loading..."
-            : errorElevation
-            ? errorElevation
-            : elevation
-            ? formatDistance(elevation, DistanceFormat.feet)
-            : defaultIfEmpty("")}
-        </Descriptions.Item>
-        <Descriptions.Item label="Address">
-          {loadingAddress ? (
-            "Loading..."
-          ) : errorAddress ? (
-            errorAddress
-          ) : address ? (
-            <>
-              {address.road && <div>{address.road}</div>}
-              {address.city && <div>{address.city}</div>}
-              {address.county && <div>{address.county}</div>}
-              {address.state && <div>{address.state}</div>}
-              {address.country && <div>{address.country}</div>}
-            </>
-          ) : (
-            defaultIfEmpty("")
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label="Land Access" span={3}>
-          <PublicAccessDetails lat={lat} lng={lng} />
-        </Descriptions.Item>
-      </Descriptions>
+        items={locationItems}
+      />
 
       <PlanarianDividerComponent
         title="Geology"

@@ -32,6 +32,10 @@ import { NavigationService } from "../../../Shared/Services/NavigationService";
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
+import {
+  entranceVisibleMinZoom,
+  findNearbyEntranceCaveId,
+} from "../Helpers/MapHitTesting";
 import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
@@ -50,6 +54,7 @@ import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "../../../Shared/Models/ApiErrorResponse";
+import "./MapBaseComponent.scss";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -687,6 +692,16 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       }
     }
 
+    const nearbyEntranceCaveId = findNearbyEntranceCaveId(
+      mapRef.current,
+      event.point
+    );
+    if (nearbyEntranceCaveId) {
+      onCaveClicked(nearbyEntranceCaveId);
+      setPopupInfo(null);
+      return;
+    }
+
     // Fallback for non-cave clicks.
     if (onNonCaveClicked) {
       const { lat, lng } = event.lngLat;
@@ -890,10 +905,14 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   const bodyPaddingReady = manageBodyPadding ? hideBodyPadding : true;
 
   return (
-    <Spin spinning={isLoading}>
-      {!isLoading && AppOptions.apiBaseUrl && bodyPaddingReady && (
+    <div className="planarian-map-container" aria-busy={isLoading}>
+      {isLoading ? (
+        <div className="planarian-map-container__loading">
+          <Spin />
+        </div>
+      ) : AppOptions.apiBaseUrl && bodyPaddingReady ? (
         <div
-          style={{ position: "relative", width: "100%", height: "100%" }}
+          className="planarian-map-container__content"
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -1125,9 +1144,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     "circle-opacity": [
                       "step",
                       ["zoom"],
-                      0, // invisible at zoom levels < 13
-                      9,
-                      0.6, // visible at zoom levels >= 13
+                      0,
+                      entranceVisibleMinZoom,
+                      0.6,
                     ],
                     "circle-color": [
                       "case",
@@ -1292,8 +1311,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
             </Map>
           </MapProvider>
         </div>
-      )}
-    </Spin>
+      ) : null}
+    </div>
   );
 };
 

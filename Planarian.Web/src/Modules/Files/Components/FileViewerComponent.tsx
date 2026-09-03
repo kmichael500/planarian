@@ -292,20 +292,17 @@ const FileViewer: React.FC<FileViewerProps> = ({
           onClose?.();
         }}
       >
-        <Spin spinning={isLoading}>
-          {fileAccessError && !isLoading ? (
+        <div className="planarian-file-viewer" aria-busy={isLoading}>
+          {isLoading ? (
+            <div className="planarian-file-viewer__loading">
+              <Spin />
+            </div>
+          ) : fileAccessError ? (
             <Result status="warning" title={fileAccessError} extra={downloadButton} />
-          ) : !fileAccessError && isSupported ? (
+          ) : isSupported ? (
             <>
               {isImage && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100%",
-                  }}
-                >
+                <div className="planarian-file-viewer__image">
                   <img
                     src={fileEmbedUrl}
                     alt="file"
@@ -332,7 +329,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
                     padding: "1rem",
                   }}
                 >
-                  {isLoading ? <Spin /> : fileContent}
+                  {fileContent}
                 </pre>
               )}
               {isVectorDataset && fileEmbedUrl && (
@@ -351,14 +348,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 <GpxViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />
               )}
             </>
-          ) : !fileAccessError ? (
+          ) : (
             <Result
               status="warning"
               title={`The filetype '${fileType}' is not currently supported.`}
               extra={downloadButton}
             />
-          ) : null}
-        </Spin>
+          )}
+        </div>
       </PlanarianModal>
     </>
   );

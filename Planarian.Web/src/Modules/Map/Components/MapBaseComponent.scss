@@ -1,0 +1,19 @@
+.planarian-map-container {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.planarian-map-container__content,
+.planarian-map-container__loading {
+  height: 100%;
+  width: 100%;
+}
+
+.planarian-map-container__loading {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
