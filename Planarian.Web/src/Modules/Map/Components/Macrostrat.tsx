@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import {
   Collapse,
-  Descriptions,
   List,
   Spin,
   Typography,
@@ -18,7 +17,12 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { MapService, GeologicMapResult } from "../Services/MapService";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
+import {
+  PlanarianDescription,
+  type PlanarianDescriptionItem,
+} from "../../../Shared/Components/Buttons/PlanarianDescription";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
+import "./Macrostrat.scss";
 
 const { Panel } = Collapse;
 const { Text, Paragraph } = Typography;
@@ -54,7 +58,10 @@ interface ExternalHttpLinkProps {
   children: React.ReactNode;
 }
 
-const ExternalHttpLink: React.FC<ExternalHttpLinkProps> = ({ url, children }) => {
+const ExternalHttpLink: React.FC<ExternalHttpLinkProps> = ({
+  url,
+  children,
+}) => {
   const safeUrl = HttpHelpers.GetSafeExternalHttpUrl(url);
   return safeUrl ? (
     <a href={safeUrl} target="_blank" rel="noreferrer">
@@ -174,17 +181,6 @@ const Macrostrat: React.FC<MacrostratProps> = ({
         }
       : {};
   };
-
-  const highlightCSS = `
-    .clickable-list-item {
-      border: 1px solid #f0f0f0;
-      border-radius: 8px;
-      padding: 8px;
-    }
-    .clickable-list-item:hover {
-      background-color: #fafafa;
-    }
-  `;
 
   const fetchMacrostratData = async () => {
     try {
@@ -420,156 +416,306 @@ const Macrostrat: React.FC<MacrostratProps> = ({
       ? `${min_min_thick} – ${max_thick} m`
       : defaultIfEmpty("");
 
+  const geologicMapsContent = geologicMapsLoading ? (
+    <Text>Loading...</Text>
+  ) : geologicMapsError ? (
+    <Text type="danger">{geologicMapsError}</Text>
+  ) : geologicMapsData.length > 0 ? (
+    <>
+      <div>
+        <Text>Scale: </Text>
+        <Checkbox.Group
+          options={groupOptions}
+          value={selectedScales}
+          onChange={handleScaleChange}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        />
+      </div>
+      {filteredGeologicMaps.map((map) => (
+        <a
+          key={map.id}
+          href={`https://ngmdb.usgs.gov/Prodesc/proddesc_${map.id}.htm`}
+          target="_blank"
+          rel="noreferrer"
+          className="macrostrat-geologic-map-link"
+        >
+          <div>
+            <Row gutter={[16, 16]} style={{ width: "100%" }} align="middle">
+              <Col
+                xs={24}
+                sm={24}
+                md={map.thumbnail ? 16 : 24}
+                lg={map.thumbnail ? 18 : 24}
+              >
+                <Typography>
+                  {" "}
+                  <Text>{map.title}</Text>
+                  <br />
+                  <Text type="secondary">
+                    Scale: {map.scale === -1 ? "N/A" : formatNumber(map.scale)}
+                  </Text>
+                  <br />
+                  <Text type="secondary">Authors: {map.authors}</Text>
+                  <br />
+                  <Text type="secondary">
+                    Source: {map.publisher} ({map.series}, {map.year})
+                  </Text>
+                </Typography>
+              </Col>
+              {map.thumbnail && (
+                <Col xs={24} sm={24} md={8} lg={6}>
+                  <img
+                    style={{
+                      maxHeight: "300px",
+                      maxWidth: "100%",
+                      display: "block",
+                      margin:
+                        screens.xs || screens.sm ? "8px auto 0" : "0 auto",
+                    }}
+                    src={`https://ngmdb.usgs.gov${map.thumbnail}`}
+                    alt={map.title}
+                  />
+                </Col>
+              )}
+            </Row>
+          </div>
+        </a>
+      ))}
+    </>
+  ) : (
+    defaultIfEmpty(null)
+  );
+
+  const geologicMapItems: PlanarianDescriptionItem[] = [
+    { key: "name", label: "Name", children: name },
+    {
+      key: "ngmdb-geologic-maps",
+      label: "NGMDB Geologic Maps",
+      span: 1,
+      children: geologicMapsContent,
+    },
+    {
+      key: "age",
+      label: "Age",
+      children: (
+        <PlanarianTag color={color || "default"} style={getTagStyle(color)}>
+          {age}
+        </PlanarianTag>
+      ),
+    },
+    {
+      key: "interval",
+      label: "Interval",
+      children:
+        b_int && t_int ? (
+          <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
+            {b_int.int_name} ({b_int.b_age}–{t_int.t_age} Ma)
+          </PlanarianTag>
+        ) : (
+          defaultIfEmpty("")
+        ),
+    },
+    {
+      key: "stratigraphic-names",
+      label: "Stratigraphic Name(s)",
+      children: strat_name,
+    },
+    { key: "lithology", label: "Lithology", children: lith },
+    {
+      key: "lithology-details",
+      label: "Lithology Details",
+      children:
+        mainLiths.length > 0
+          ? mainLiths.map((l: any, idx: number) => (
+              <PlanarianTag
+                key={idx}
+                color={l.color || "default"}
+                style={getTagStyle(l.color)}
+              >
+                {l.lith} ({l.lith_type})
+              </PlanarianTag>
+            ))
+          : defaultIfEmpty(""),
+    },
+    {
+      key: "description",
+      label: "Description",
+      children: <ExpandableText text={descriptionText} maxChars={300} />,
+    },
+    {
+      key: "comments",
+      label: "Comments",
+      children: <ExpandableText text={commentsText} maxChars={300} />,
+    },
+    {
+      key: "source",
+      label: "Source",
+      children: ref ? (
+        <ExternalHttpLink url={ref.url}>
+          {ref.name} ({ref.ref_source}, {ref.ref_year})
+        </ExternalHttpLink>
+      ) : (
+        defaultIfEmpty("")
+      ),
+    },
+  ];
+
+  const macrostratItems: PlanarianDescriptionItem[] = [
+    {
+      key: "matched-stratigraphic-unit",
+      label: "Matched Stratigraphic Unit",
+      children: strat_names.map((sn: any) => sn.rank_name).join(", "),
+    },
+    {
+      key: "age",
+      label: "Age",
+      children: (
+        <PlanarianTag
+          color={(b_int && b_int.color) || "default"}
+          style={getTagStyle(b_int && b_int.color)}
+        >
+          {macroAgeRange}
+        </PlanarianTag>
+      ),
+    },
+    { key: "thickness", label: "Thickness", children: thicknessRange },
+    {
+      key: "base-interval",
+      label: "Base Interval",
+      children: b_int ? (
+        <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
+          {b_int.int_name}
+        </PlanarianTag>
+      ) : (
+        defaultIfEmpty("")
+      ),
+    },
+    {
+      key: "top-interval",
+      label: "Top Interval",
+      children: t_int ? (
+        <PlanarianTag color={t_int.color} style={getTagStyle(t_int.color)}>
+          {t_int.int_name}
+        </PlanarianTag>
+      ) : (
+        defaultIfEmpty("")
+      ),
+    },
+    {
+      key: "lithology-parsed",
+      label: "Lithology (parsed)",
+      children:
+        macroLiths.length > 0
+          ? macroLiths.map((l: any, idx: number) => (
+              <PlanarianTag
+                key={idx}
+                color={l.color || "default"}
+                style={getTagStyle(l.color)}
+              >
+                {l.lith} ({l.lith_type})
+              </PlanarianTag>
+            ))
+          : defaultIfEmpty(""),
+    },
+    {
+      key: "environments",
+      label: "Environments",
+      children:
+        environs.length > 0
+          ? environs.map((env: any, idx: number) => (
+              <PlanarianTag
+                key={idx}
+                color={env.color || "default"}
+                style={getTagStyle(env.color)}
+              >
+                {env.environ}
+              </PlanarianTag>
+            ))
+          : defaultIfEmpty(""),
+    },
+  ];
+
+  const getSnippetItems = (snippet: any): PlanarianDescriptionItem[] => [
+    { key: "title", label: "Title", children: snippet.title },
+    { key: "authors", label: "Authors", children: snippet.authors },
+    {
+      key: "doi",
+      label: "DOI",
+      children: (
+        <a
+          href={snippet.doi ? `https://doi.org/${snippet.doi}` : "#"}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {snippet.doi || "N/A"}
+        </a>
+      ),
+    },
+    {
+      key: "highlights",
+      label: "Highlights",
+      children: (
+        <List
+          dataSource={snippet.highlight}
+          renderItem={(highlight: string, hIdx) => (
+            <List.Item key={hIdx}>
+              <span
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(highlight, {
+                    ALLOWED_TAGS: ["mark", "em", "br"],
+                    ALLOWED_ATTR: [],
+                    ALLOW_DATA_ATTR: false,
+                    ALLOW_ARIA_ATTR: false,
+                  }),
+                }}
+              />
+            </List.Item>
+          )}
+        />
+      ),
+    },
+  ];
+
+  const getRegionItems = (region: any): PlanarianDescriptionItem[] => {
+    const items: PlanarianDescriptionItem[] = [
+      { key: "group", label: "Group", children: region.boundary_group },
+      { key: "type", label: "Type", children: region.boundary_type },
+      { key: "class", label: "Class", children: region.boundary_class },
+      { key: "description", label: "Description", children: region.descrip },
+    ];
+
+    if (region.wiki_link) {
+      items.push({
+        key: "wiki-link",
+        label: "Wiki Link",
+        children: (
+          <ExternalHttpLink url={region.wiki_link}>
+            {region.wiki_link}
+          </ExternalHttpLink>
+        ),
+      });
+    }
+
+    return items;
+  };
+
   return (
     <div>
-      <style>{highlightCSS}</style>
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Collapse defaultActiveKey={openByDefault ? ["1"] : []}>
             <Panel header="Geologic map" key="1">
-              <Descriptions
+              <PlanarianDescription
+                copyable={false}
                 layout={descriptionLayout}
-                bordered
                 column={1}
                 size="small"
-              >
-                <Descriptions.Item label="Name">{name}</Descriptions.Item>
-                <Descriptions.Item label="NGMDB Geologic Maps" span={1}>
-                  {geologicMapsLoading ? (
-                    <Text>Loading...</Text>
-                  ) : geologicMapsError ? (
-                    <Text type="danger">{geologicMapsError}</Text>
-                  ) : geologicMapsData.length > 0 ? (
-                    <>
-                      <div>
-                        <Text>Scale: </Text>
-                        <Checkbox.Group
-                          options={groupOptions}
-                          value={selectedScales}
-                          onChange={handleScaleChange}
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                          }}
-                        />
-                      </div>
-                      {filteredGeologicMaps.map((map) => (
-                        <a
-                          key={map.id}
-                          href={`https://ngmdb.usgs.gov/Prodesc/proddesc_${map.id}.htm`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ display: "block", marginTop: "8px" }}
-                          className="clickable-list-item"
-                        >
-                          <div>
-                            <Row
-                              gutter={[16, 16]}
-                              style={{ width: "100%" }}
-                              align="middle"
-                            >
-                              <Col
-                                xs={24}
-                                sm={24}
-                                md={map.thumbnail ? 16 : 24}
-                                lg={map.thumbnail ? 18 : 24}
-                              >
-                                <Typography>
-                                  {" "}
-                                  {/* Using Typography for consistent text styling */}
-                                  <Text>{map.title}</Text>
-                                  <br />
-                                  <Text type="secondary">
-                                    Scale:{" "}
-                                    {map.scale === -1
-                                      ? "N/A"
-                                      : formatNumber(map.scale)}
-                                  </Text>
-                                  <br />
-                                  <Text type="secondary">
-                                    Authors: {map.authors}
-                                  </Text>
-                                  <br />
-                                  <Text type="secondary">
-                                    Source: {map.publisher} ({map.series},{" "}
-                                    {map.year})
-                                  </Text>
-                                </Typography>
-                              </Col>
-                              {map.thumbnail && (
-                                <Col xs={24} sm={24} md={8} lg={6}>
-                                  <img
-                                    style={{
-                                      maxHeight: "300px",
-                                      maxWidth: "100%",
-                                      display: "block",
-                                      margin:
-                                        screens.xs || screens.sm
-                                          ? "8px auto 0"
-                                          : "0 auto",
-                                    }}
-                                    src={`https://ngmdb.usgs.gov${map.thumbnail}`}
-                                    alt={map.title}
-                                  />
-                                </Col>
-                              )}
-                            </Row>
-                          </div>
-                        </a>
-                      ))}
-                    </>
-                  ) : (
-                    defaultIfEmpty(null)
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Age">
-                  <PlanarianTag color={color || "default"} style={getTagStyle(color)}>
-                    {age}
-                  </PlanarianTag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Interval">
-                  {b_int && t_int ? (
-                    <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
-                      {b_int.int_name} ({b_int.b_age}–{t_int.t_age} Ma)
-                    </PlanarianTag>
-                  ) : (
-                    defaultIfEmpty("")
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Stratigraphic Name(s)">
-                  {strat_name}
-                </Descriptions.Item>
-                <Descriptions.Item label="Lithology">{lith}</Descriptions.Item>
-                <Descriptions.Item label="Lithology Details">
-                  {mainLiths.length > 0
-                    ? mainLiths.map((l: any, idx: number) => (
-                        <PlanarianTag
-                          key={idx}
-                          color={l.color || "default"}
-                          style={getTagStyle(l.color)}
-                        >
-                          {l.lith} ({l.lith_type})
-                        </PlanarianTag>
-                      ))
-                    : defaultIfEmpty("")}
-                </Descriptions.Item>
-                <Descriptions.Item label="Description">
-                  <ExpandableText text={descriptionText} maxChars={300} />
-                </Descriptions.Item>
-                <Descriptions.Item label="Comments">
-                  <ExpandableText text={commentsText} maxChars={300} />
-                </Descriptions.Item>
-                <Descriptions.Item label="Source">
-                  {ref ? (
-                    <ExternalHttpLink url={ref.url}>
-                      {ref.name} ({ref.ref_source}, {ref.ref_year})
-                    </ExternalHttpLink>
-                  ) : (
-                    defaultIfEmpty("")
-                  )}
-                </Descriptions.Item>
-              </Descriptions>
+                items={geologicMapItems}
+              />
               <Typography>
                 {" "}
                 Macrostrat coverage varies by region and may be less detailed
@@ -579,71 +725,13 @@ const Macrostrat: React.FC<MacrostratProps> = ({
 
             {/* Macrostrat-linked data panel */}
             <Panel header="Macrostrat-linked data" key="2">
-              <Descriptions
+              <PlanarianDescription
+                copyable={false}
                 layout={descriptionLayout}
-                bordered
                 column={1}
                 size="small"
-              >
-                <Descriptions.Item label="Matched Stratigraphic Unit">
-                  {strat_names.map((sn: any) => sn.rank_name).join(", ")}
-                </Descriptions.Item>
-                <Descriptions.Item label="Age">
-                  <PlanarianTag
-                    color={(b_int && b_int.color) || "default"}
-                    style={getTagStyle(b_int && b_int.color)}
-                  >
-                    {macroAgeRange}
-                  </PlanarianTag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Thickness">
-                  {thicknessRange}
-                </Descriptions.Item>
-                <Descriptions.Item label="Base Interval">
-                  {b_int ? (
-                    <PlanarianTag color={b_int.color} style={getTagStyle(b_int.color)}>
-                      {b_int.int_name}
-                    </PlanarianTag>
-                  ) : (
-                    defaultIfEmpty("")
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Top Interval">
-                  {t_int ? (
-                    <PlanarianTag color={t_int.color} style={getTagStyle(t_int.color)}>
-                      {t_int.int_name}
-                    </PlanarianTag>
-                  ) : (
-                    defaultIfEmpty("")
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Lithology (parsed)">
-                  {macroLiths.length > 0
-                    ? macroLiths.map((l: any, idx: number) => (
-                        <PlanarianTag
-                          key={idx}
-                          color={l.color || "default"}
-                          style={getTagStyle(l.color)}
-                        >
-                          {l.lith} ({l.lith_type})
-                        </PlanarianTag>
-                      ))
-                    : defaultIfEmpty("")}
-                </Descriptions.Item>
-                <Descriptions.Item label="Environments">
-                  {environs.length > 0
-                    ? environs.map((env: any, idx: number) => (
-                        <PlanarianTag
-                          key={idx}
-                          color={env.color || "default"}
-                          style={getTagStyle(env.color)}
-                        >
-                          {env.environ}
-                        </PlanarianTag>
-                      ))
-                    : defaultIfEmpty("")}
-                </Descriptions.Item>
-              </Descriptions>
+                items={macrostratItems}
+              />
             </Panel>
 
             {/* Primary Literature panel */}
@@ -662,51 +750,13 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                       }
                       key={idx}
                     >
-                      <Descriptions
+                      <PlanarianDescription
+                        copyable={false}
                         layout={descriptionLayout}
                         column={1}
                         size="small"
-                        bordered
-                      >
-                        <Descriptions.Item label="Title">
-                          {snippet.title}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Authors">
-                          {snippet.authors}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="DOI">
-                          <a
-                            href={
-                              snippet.doi
-                                ? `https://doi.org/${snippet.doi}`
-                                : "#"
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {snippet.doi || "N/A"}
-                          </a>
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Highlights">
-                          <List
-                            dataSource={snippet.highlight}
-                            renderItem={(highlight: string, hIdx) => (
-                              <List.Item key={hIdx}>
-                                <span
-                                  dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(highlight, {
-                                      ALLOWED_TAGS: ["mark", "em", "br"],
-                                      ALLOWED_ATTR: [],
-                                      ALLOW_DATA_ATTR: false,
-                                      ALLOW_ARIA_ATTR: false,
-                                    }),
-                                  }}
-                                />
-                              </List.Item>
-                            )}
-                          />
-                        </Descriptions.Item>
-                      </Descriptions>
+                        items={getSnippetItems(snippet)}
+                      />
                     </Panel>
                   ))}
                 </Collapse>
@@ -719,32 +769,13 @@ const Macrostrat: React.FC<MacrostratProps> = ({
                 <Collapse>
                   {regions.map((region: any, index: number) => (
                     <Panel header={region.name} key={index}>
-                      <Descriptions
+                      <PlanarianDescription
+                        copyable={false}
                         layout={descriptionLayout}
-                        bordered
                         column={1}
                         size="small"
-                      >
-                        <Descriptions.Item label="Group">
-                          {region.boundary_group}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Type">
-                          {region.boundary_type}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Class">
-                          {region.boundary_class}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Description">
-                          {region.descrip}
-                        </Descriptions.Item>
-                        {region.wiki_link && (
-                          <Descriptions.Item label="Wiki Link">
-                            <ExternalHttpLink url={region.wiki_link}>
-                              {region.wiki_link}
-                            </ExternalHttpLink>
-                          </Descriptions.Item>
-                        )}
-                      </Descriptions>
+                        items={getRegionItems(region)}
+                      />
                     </Panel>
                   ))}
                 </Collapse>

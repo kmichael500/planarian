@@ -1,0 +1,48 @@
+td.planarian-description-copyable-item {
+  cursor: pointer;
+}
+
+.planarian-description-copyable-value {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.planarian-description-copyable-value__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.planarian-description-copyable-value__button {
+  flex: 0 0 auto;
+  margin: -2px -4px -2px 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+td.planarian-description-copyable-item:hover
+  .planarian-description-copyable-value__button,
+td.planarian-description-copyable-item:focus-within
+  .planarian-description-copyable-value__button {
+  opacity: 0.65;
+}
+
+@media (hover: none) {
+  .planarian-description-copyable-value__button {
+    opacity: 0.28;
+  }
+}
+
+.planarian-description-copyable-value__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

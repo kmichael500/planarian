@@ -1,0 +1,12 @@
+.macrostrat-geologic-map-link {
+  display: block;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.macrostrat-geologic-map-link:hover,
+.macrostrat-geologic-map-link:focus-visible {
+  background: var(--hover-surface-color);
+}

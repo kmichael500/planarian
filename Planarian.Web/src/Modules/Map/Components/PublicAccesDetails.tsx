@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from "react";
 import { Spin, Typography } from "antd";
 import { defaultIfEmpty } from "../../../Shared/Helpers/StringHelpers";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { PlanarianTag } from "../../../Shared/Components/Display/PlanarianTag";
 
 const { Text } = Typography;
@@ -194,7 +195,9 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
       </div>
 
       <div>
-        {access && <PlanarianTag color={access.color}>{access.label}</PlanarianTag>}{" "}
+        {access && (
+          <PlanarianTag color={access.color}>{access.label}</PlanarianTag>
+        )}{" "}
         <Text type="secondary">{access?.description || "No description"}</Text>
       </div>
 
@@ -208,7 +211,9 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
 
           <div>
             <Text>IUCN Category:</Text>{" "}
-            {iucn && <PlanarianTag color={iucn.color}>{iucn.label}</PlanarianTag>}{" "}
+            {iucn && (
+              <PlanarianTag color={iucn.color}>{iucn.label}</PlanarianTag>
+            )}{" "}
             <Text type="secondary">
               {iucn?.description || "No description"}
             </Text>
@@ -243,13 +248,21 @@ const PublicAccessDetails: FC<ProtectedAreaDetailsProps> = ({ lat, lng }) => {
       )}
 
       <div style={{ marginTop: 4 }}>
-        <Text
-          type="secondary"
-          style={{ cursor: "pointer" }}
-          onClick={() => setShowMore(!showMore)}
+        <PlanarianButton
+          alwaysShowChildren
+          aria-expanded={showMore}
+          debounceTime={0}
+          icon={null}
+          onClick={() => setShowMore((current) => !current)}
+          style={{
+            color: "var(--text-secondary-color)",
+            height: "auto",
+            padding: 0,
+          }}
+          type="link"
         >
           {showMore ? "Show less..." : "Show more..."}
-        </Text>
+        </PlanarianButton>
       </div>
 
       <div style={{ marginTop: 12 }}>

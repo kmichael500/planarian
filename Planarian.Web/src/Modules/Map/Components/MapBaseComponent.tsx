@@ -50,6 +50,7 @@ import {
   ApiErrorResponse,
   ApiExceptionType,
 } from "../../../Shared/Models/ApiErrorResponse";
+import "./MapBaseComponent.scss";
 
 interface MapBaseComponentProps {
   initialCenter?: [number, number];
@@ -890,10 +891,14 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
   const bodyPaddingReady = manageBodyPadding ? hideBodyPadding : true;
 
   return (
-    <Spin spinning={isLoading}>
-      {!isLoading && AppOptions.apiBaseUrl && bodyPaddingReady && (
+    <div className="planarian-map-container" aria-busy={isLoading}>
+      {isLoading ? (
+        <div className="planarian-map-container__loading">
+          <Spin />
+        </div>
+      ) : AppOptions.apiBaseUrl && bodyPaddingReady ? (
         <div
-          style={{ position: "relative", width: "100%", height: "100%" }}
+          className="planarian-map-container__content"
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -1292,8 +1297,8 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
             </Map>
           </MapProvider>
         </div>
-      )}
-    </Spin>
+      ) : null}
+    </div>
   );
 };
 

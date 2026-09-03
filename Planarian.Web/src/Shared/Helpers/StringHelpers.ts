@@ -172,9 +172,11 @@ export function splitCamelCase(input: string): string {
   return result;
 }
 
+export const EMPTY_DISPLAY_VALUE = "-";
+
 export function defaultIfEmpty(value: string | null | undefined) {
   if (isNullOrWhiteSpace(value)) {
-    return "-";
+    return EMPTY_DISPLAY_VALUE;
   } else return value;
 }
 

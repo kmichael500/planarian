@@ -7,12 +7,7 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import "./CavesPage.scss";
 
 const CavesPage: React.FC = () => {
-  const {
-    resetContentStyle,
-    setFullHeightContentStyle,
-    setHeaderTitle,
-    setHeaderButtons,
-  } = useContext(AppContext);
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
     setHeaderButtons([
@@ -21,17 +16,7 @@ const CavesPage: React.FC = () => {
       </ShouldDisplay>,
     ]);
     setHeaderTitle([`Caves`]);
-    setFullHeightContentStyle();
-
-    return () => {
-      resetContentStyle();
-    };
-  }, [
-    resetContentStyle,
-    setFullHeightContentStyle,
-    setHeaderButtons,
-    setHeaderTitle,
-  ]);
+  }, [setHeaderButtons, setHeaderTitle]);
 
   return (
     <div className="caves-page">
