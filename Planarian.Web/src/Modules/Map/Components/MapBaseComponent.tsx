@@ -32,6 +32,10 @@ import { NavigationService } from "../../../Shared/Services/NavigationService";
 import bbox from "@turf/bbox";
 import { FeatureCollection } from "geojson";
 import { MapService } from "../Services/MapService";
+import {
+  entranceVisibleMinZoom,
+  findNearbyEntranceCaveId,
+} from "../Helpers/MapHitTesting";
 import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import { AdvancedSearchInlineControlsContext } from "../../Search/Components/AdvancedSearchDrawerComponent";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
@@ -688,6 +692,16 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
       }
     }
 
+    const nearbyEntranceCaveId = findNearbyEntranceCaveId(
+      mapRef.current,
+      event.point
+    );
+    if (nearbyEntranceCaveId) {
+      onCaveClicked(nearbyEntranceCaveId);
+      setPopupInfo(null);
+      return;
+    }
+
     // Fallback for non-cave clicks.
     if (onNonCaveClicked) {
       const { lat, lng } = event.lngLat;
@@ -1130,9 +1144,9 @@ const MapBaseComponent: React.FC<MapBaseComponentProps> = ({
                     "circle-opacity": [
                       "step",
                       ["zoom"],
-                      0, // invisible at zoom levels < 13
-                      9,
-                      0.6, // visible at zoom levels >= 13
+                      0,
+                      entranceVisibleMinZoom,
+                      0.6,
                     ],
                     "circle-color": [
                       "case",
