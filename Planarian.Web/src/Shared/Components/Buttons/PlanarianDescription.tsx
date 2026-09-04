@@ -151,12 +151,17 @@ const PlanarianDescription: React.FC<PlanarianDescriptionProps> = ({
   const screens = Grid.useBreakpoint();
   const useCompactLabelWidth = layout === "horizontal" && screens.md === false;
 
-  const mergedStyles = useCompactLabelWidth
-    ? {
-        ...styles,
-        label: { width: "40%", ...styles?.label },
-      }
-    : styles;
+  const mergedStyles: DescriptionsProps["styles"] = {
+    ...styles,
+    content: {
+      wordBreak: "normal",
+      overflowWrap: "break-word",
+      ...styles?.content,
+    },
+    ...(useCompactLabelWidth
+      ? { label: { width: "40%", ...styles?.label } }
+      : {}),
+  };
 
   const renderedItems: NonNullable<DescriptionsProps["items"]> = items.map(
     ({ children, className, copyLabel, copyText, label, ...item }) => {

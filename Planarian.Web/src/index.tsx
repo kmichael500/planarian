@@ -39,12 +39,6 @@ function configureBootstrap(): void {
   });
   configureHttpClient(baseUrl);
 
-  const setVh = () => {
-    document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-  };
-  setVh();
-  window.addEventListener("resize", setVh);
-
   const umamiWebsiteId = process.env.REACT_APP_UMAMI_WEBSITE_ID?.trim();
   if (umamiWebsiteId) {
     const script = document.createElement("script");

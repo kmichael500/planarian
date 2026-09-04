@@ -20,15 +20,12 @@ const caveDetailContentStyle: CSSProperties = {
 
 const importContentStyle: CSSProperties = {
   ...defaultAppContentStyle,
-  height: "calc((var(--vh, 1vh) * 100) - 102px)",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
 };
 const invitationContentStyle: CSSProperties = {
   margin: 0,
-  minHeight: "calc((var(--vh, 1vh) * 100) - 70px)",
-  overflow: "visible",
   display: "flex",
   background: "var(--background-color)",
 };

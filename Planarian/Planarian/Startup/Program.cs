@@ -75,7 +75,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 
 var appConfigConnectionString = builder.Configuration.GetConnectionString("AppConfigConnectionString");
 
-var isDevelopment = builder.Environment.IsDevelopment();
+var isDevelopment = true;
 var isAzureAppService = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"));
 var isHostedDeployment = isAzureAppService || !isDevelopment;
 if (isAzureAppService && !string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_FORWARDEDHEADERS_ENABLED"), "true", StringComparison.OrdinalIgnoreCase))

@@ -599,14 +599,17 @@ const CavesComponent: React.FC = () => {
                   stickyHeader
                   header={
                     <div className="caves-result-card__header">
-                      <div className="caves-result-card__title">
+                      <Typography.Text
+                        ellipsis
+                        className="caves-result-card__title"
+                      >
                         <span className="caves-result-card__display-id">
                           {cave.displayId}
                         </span>{" "}
                         <span className="caves-result-card__name">
                           {cave.name}
                         </span>
-                      </div>
+                      </Typography.Text>
                       {shouldShowDistanceFromMe && (
                         <div className="caves-result-card__distance-from-me">
                           <DistanceFromMeComponent
