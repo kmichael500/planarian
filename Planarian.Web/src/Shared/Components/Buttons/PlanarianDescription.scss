@@ -1,22 +1,13 @@
 td.planarian-description-copyable-item {
+  position: relative;
   cursor: pointer;
 }
 
-.planarian-description-copyable-value {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
-.planarian-description-copyable-value__content {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .planarian-description-copyable-value__button {
-  flex: 0 0 auto;
-  margin: -2px -4px -2px 0;
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  margin: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;

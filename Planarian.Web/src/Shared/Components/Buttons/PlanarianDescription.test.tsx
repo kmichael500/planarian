@@ -34,6 +34,20 @@ beforeEach(() => {
 });
 
 describe("PlanarianDescription", () => {
+  it("preserves normal word boundaries in description values", () => {
+    render(
+      <PlanarianDescription
+        items={[{ key: "name", label: "Name", children: "NO NAME" }]}
+      />
+    );
+
+    const contentCell = screen.getByRole("cell", { name: /NO NAME/ });
+    expect(contentCell).toHaveStyle({
+      wordBreak: "normal",
+      overflowWrap: "break-word",
+    });
+  });
+
   it("copies when any non-interactive area of the value cell is clicked", async () => {
     render(
       <PlanarianDescription

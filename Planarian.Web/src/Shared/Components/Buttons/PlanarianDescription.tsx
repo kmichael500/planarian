@@ -1,5 +1,5 @@
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Descriptions, DescriptionsProps, Grid } from "antd";
 import {
   getCopyTokenElements,
@@ -37,11 +37,14 @@ const getRenderedCopyText = (element: HTMLElement) => {
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
 
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parentElement = node.parentElement;
+    if (parentElement?.closest("[data-planarian-copy-control]")) continue;
+
     const chunk = normalizeCopyText(node.textContent);
     if (!chunk) continue;
 
     chunks.push(chunk);
-    if (!isWithinCopyToken(node.parentElement)) {
+    if (!isWithinCopyToken(parentElement)) {
       hasTextOutsideTokens = true;
     }
   }
@@ -62,7 +65,6 @@ const CopyableDescriptionValue = ({
   copyLabel,
   copyText,
 }: CopyableDescriptionValueProps) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -71,10 +73,9 @@ const CopyableDescriptionValue = ({
     return () => window.clearTimeout(resetTimer);
   }, [copied]);
 
-  const copyValue = async () => {
+  const copyValue = async (cell: HTMLElement | null) => {
     const text = normalizeCopyText(
-      copyText ??
-        (contentRef.current ? getRenderedCopyText(contentRef.current) : "")
+      copyText ?? (cell ? getRenderedCopyText(cell) : "")
     );
 
     if (isEmptyCopyText(text)) return;
@@ -88,21 +89,17 @@ const CopyableDescriptionValue = ({
   };
 
   return (
-    <div className="planarian-description-copyable-value">
-      <div
-        ref={contentRef}
-        className="planarian-description-copyable-value__content"
-      >
-        {children}
-      </div>
+    <>
+      {children}
       <PlanarianButton
         aria-label={`Copy ${copyLabel}`}
         className="planarian-description-copyable-value__button"
+        data-planarian-copy-control
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}
         neverShowChildren
         onClick={(event) => {
           event.stopPropagation();
-          void copyValue();
+          void copyValue(event.currentTarget.closest("td"));
         }}
         size="small"
         type="text"
@@ -110,10 +107,11 @@ const CopyableDescriptionValue = ({
       <span
         aria-live="polite"
         className="planarian-description-copyable-value__status"
+        data-planarian-copy-control
       >
         {copied ? `${copyLabel} copied` : ""}
       </span>
-    </div>
+    </>
   );
 };
 
@@ -151,12 +149,17 @@ const PlanarianDescription: React.FC<PlanarianDescriptionProps> = ({
   const screens = Grid.useBreakpoint();
   const useCompactLabelWidth = layout === "horizontal" && screens.md === false;
 
-  const mergedStyles = useCompactLabelWidth
-    ? {
-        ...styles,
-        label: { width: "40%", ...styles?.label },
-      }
-    : styles;
+  const mergedStyles: DescriptionsProps["styles"] = {
+    ...styles,
+    content: {
+      wordBreak: "normal",
+      overflowWrap: "break-word",
+      ...styles?.content,
+    },
+    ...(useCompactLabelWidth
+      ? { label: { width: "40%", ...styles?.label } }
+      : {}),
+  };
 
   const renderedItems: NonNullable<DescriptionsProps["items"]> = items.map(
     ({ children, className, copyLabel, copyText, label, ...item }) => {
