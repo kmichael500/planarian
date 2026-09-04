@@ -34,11 +34,14 @@ describe("getAppContentStyle", () => {
       flexDirection: "column",
       overflow: "hidden",
     });
-    expect(getAppContentStyle("/user/invitations/code-123")).toMatchObject({
+    const invitationStyle = getAppContentStyle(
+      "/user/invitations/code-123"
+    );
+    expect(invitationStyle).toMatchObject({
       margin: 0,
       display: "flex",
-      overflow: "visible",
     });
+    expect(invitationStyle).not.toHaveProperty("overflow");
   });
 
   test("uses the default layout for ordinary routes", () => {

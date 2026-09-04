@@ -31,7 +31,7 @@ export const AppShell: React.FC = () => {
     return (
       <Layout
         style={{
-          height: "calc(var(--vh, 1vh) * 100)",
+          height: "100%",
           minHeight: 0,
           overflow: "hidden",
         }}
@@ -53,7 +53,7 @@ export const AppShell: React.FC = () => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        height: "calc(var(--vh, 1vh) * 100)",
+        height: "100%",
       }}
     >
       <LogoIcon

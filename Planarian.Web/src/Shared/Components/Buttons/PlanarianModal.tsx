@@ -43,7 +43,7 @@ export function PlanarianModal({
 
   const computedWidth = finalFullScreen ? "100vw" : width || "80%";
   const computedHeight = finalFullScreen
-    ? "calc(var(--vh, 1vh) * 100)"
+    ? "var(--planarian-viewport-height)"
     : height || "80%";
 
   const headerContent = Array.isArray(headerItems)
