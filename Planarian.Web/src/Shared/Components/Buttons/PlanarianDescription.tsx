@@ -1,5 +1,5 @@
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Descriptions, DescriptionsProps, Grid } from "antd";
 import {
   getCopyTokenElements,
@@ -37,14 +37,11 @@ const getRenderedCopyText = (element: HTMLElement) => {
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
 
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const parentElement = node.parentElement;
-    if (parentElement?.closest("[data-planarian-copy-control]")) continue;
-
     const chunk = normalizeCopyText(node.textContent);
     if (!chunk) continue;
 
     chunks.push(chunk);
-    if (!isWithinCopyToken(parentElement)) {
+    if (!isWithinCopyToken(node.parentElement)) {
       hasTextOutsideTokens = true;
     }
   }
@@ -65,6 +62,7 @@ const CopyableDescriptionValue = ({
   copyLabel,
   copyText,
 }: CopyableDescriptionValueProps) => {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -73,9 +71,10 @@ const CopyableDescriptionValue = ({
     return () => window.clearTimeout(resetTimer);
   }, [copied]);
 
-  const copyValue = async (cell: HTMLElement | null) => {
+  const copyValue = async () => {
     const text = normalizeCopyText(
-      copyText ?? (cell ? getRenderedCopyText(cell) : "")
+      copyText ??
+        (contentRef.current ? getRenderedCopyText(contentRef.current) : "")
     );
 
     if (isEmptyCopyText(text)) return;
@@ -89,17 +88,21 @@ const CopyableDescriptionValue = ({
   };
 
   return (
-    <>
-      {children}
+    <div className="planarian-description-copyable-value">
+      <div
+        ref={contentRef}
+        className="planarian-description-copyable-value__content"
+      >
+        {children}
+      </div>
       <PlanarianButton
         aria-label={`Copy ${copyLabel}`}
         className="planarian-description-copyable-value__button"
-        data-planarian-copy-control
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}
         neverShowChildren
         onClick={(event) => {
           event.stopPropagation();
-          void copyValue(event.currentTarget.closest("td"));
+          void copyValue();
         }}
         size="small"
         type="text"
@@ -107,11 +110,10 @@ const CopyableDescriptionValue = ({
       <span
         aria-live="polite"
         className="planarian-description-copyable-value__status"
-        data-planarian-copy-control
       >
         {copied ? `${copyLabel} copied` : ""}
       </span>
-    </>
+    </div>
   );
 };
 

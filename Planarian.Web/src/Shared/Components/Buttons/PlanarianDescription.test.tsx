@@ -48,6 +48,19 @@ describe("PlanarianDescription", () => {
     });
   });
 
+  it("copies only the value in borderless horizontal descriptions", async () => {
+    render(
+      <PlanarianDescription
+        bordered={false}
+        items={[{ key: "name", label: "Name", children: "NO NAME" }]}
+      />
+    );
+
+    userEvent.click(screen.getByText("NO NAME"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("NO NAME"));
+  });
+
   it("copies when any non-interactive area of the value cell is clicked", async () => {
     render(
       <PlanarianDescription

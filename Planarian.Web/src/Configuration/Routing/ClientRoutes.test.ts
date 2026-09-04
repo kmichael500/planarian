@@ -1,4 +1,4 @@
-import { matchPath } from "react-router-dom";
+import { matchRoutes } from "react-router-dom";
 import { ClientRoutes } from "./ClientRoutes.generated";
 
 describe("generated client routes", () => {
@@ -12,10 +12,13 @@ describe("generated client routes", () => {
   it("builds a dynamic path that React Router matches back to the original value", () => {
     const invitationCode = "code/?# ü";
     const builtPath = ClientRoutes.invitation.get(invitationCode);
-    const match = matchPath(ClientRoutes.invitation.path, builtPath);
+    const matches = matchRoutes(
+      [{ path: ClientRoutes.invitation.path }],
+      builtPath
+    );
 
-    expect(match).not.toBeNull();
-    expect(match?.params.invitationCode).toBe(invitationCode);
+    expect(matches).not.toBeNull();
+    expect(matches?.[0].params.invitationCode).toBe(invitationCode);
   });
 
   it.each([
