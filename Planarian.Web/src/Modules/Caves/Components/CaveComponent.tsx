@@ -388,7 +388,7 @@ const CaveComponent = ({
       {cave?.entrances && cave?.entrances.length > 0 && (
         <>
           <PlanarianDividerComponent title="Entrances" />
-          <Collapse bordered defaultActiveKey={["0"]}>
+          <Collapse bordered defaultActiveKey={["0"]} size="small">
             {cave.entrances.map((entrance, index) => (
               <Panel
                 header={
@@ -409,7 +409,10 @@ const CaveComponent = ({
                 }
                 key={index}
               >
-                <PlanarianDescription items={entranceItems(entrance)} />
+                <PlanarianDescription
+                  items={entranceItems(entrance)}
+                  size="small"
+                />
               </Panel>
             ))}
           </Collapse>
