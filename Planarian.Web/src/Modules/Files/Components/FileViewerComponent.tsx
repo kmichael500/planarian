@@ -2,6 +2,7 @@ import { Spin, Result } from "antd";
 import { lazy, Suspense, useState, useEffect } from "react";
 import {
   CloudDownloadOutlined,
+  EyeOutlined,
   LeftOutlined,
   RightOutlined,
 } from "@ant-design/icons";
@@ -61,10 +62,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const isPlt = isPltFileType(fileType);
   const isSupported = isSupportedFileType(fileType);
   const headerTitle = (
-    <>
-      {displayName}
-      {fileType && <PlanarianTag style={{ marginLeft: "0.5rem" }}>{fileType}</PlanarianTag>}
-    </>
+    <div className="planarian-file-viewer__title">
+      <span className="planarian-file-viewer__title-name" title={displayName ?? undefined}>
+        {displayName}
+      </span>
+      {fileType && (
+        <PlanarianTag className="planarian-file-viewer__type">{fileType}</PlanarianTag>
+      )}
+    </div>
   );
 
   const downloadButton = fileId ? (
@@ -79,14 +84,12 @@ const FileViewer: React.FC<FileViewerProps> = ({
   ) : null;
 
   const [fileContent, setFileContent] = useState<string | null>(null);
-  const [pdfFile, setPdfFile] = useState<Blob | null>(null);
   const [fileEmbedUrl, setFileEmbedUrl] = useState<string | undefined>(undefined);
   const [fileAccessError, setFileAccessError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setPdfFile(null);
       setFileContent(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
@@ -95,7 +98,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
 
     if (!fileId) {
-      setPdfFile(null);
       setFileEmbedUrl(undefined);
       setFileAccessError(null);
       setFileContent(null);
@@ -104,7 +106,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
 
     setFileContent(null);
-    setPdfFile(null);
     setFileEmbedUrl(undefined);
     setFileAccessError(null);
     setIsLoading(true);
@@ -118,7 +119,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
         }
 
         setFileEmbedUrl(accessUrl);
-        if (!isTextFileType(fileType) && !isCsvFileType(fileType) && !isPdf) {
+        if (!isTextFileType(fileType) && !isCsvFileType(fileType)) {
           setIsLoading(false);
         }
       } catch {
@@ -136,7 +137,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [open, fileId, fileType, isPdf]);
+  }, [open, fileId, fileType]);
 
   useEffect(() => {
     if (!open || !fileEmbedUrl) {
@@ -185,38 +186,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     }
   }, [open, fileEmbedUrl, fileType, fileAccessError]);
 
-  useEffect(() => {
-    if (!open || !fileId || !isPdf) {
-      return;
-    }
-
-    let isCancelled = false;
-    setIsLoading(true);
-    setPdfFile(null);
-
-    const loadPdf = async () => {
-      try {
-        const pdfBlob = await FileService.getFileBlob(fileId);
-        if (isCancelled) {
-          return;
-        }
-
-        setPdfFile(pdfBlob);
-        setIsLoading(false);
-      } catch {
-        if (!isCancelled) {
-          setFileAccessError("Unable to load file.");
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadPdf();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [open, fileId, isPdf]);
 
   const hasPrevious = typeof onPrevious === "function";
   const hasNext = typeof onNext === "function";
@@ -258,6 +227,21 @@ const FileViewer: React.FC<FileViewerProps> = ({
     };
   }, [open, hasPrevious, previousDisabled, hasNext, nextDisabled, onPrevious, onNext]);
 
+  const openInBrowserButton =
+    isPdf && fileEmbedUrl ? (
+      <PlanarianButton
+        key="open-in-browser"
+        icon={<EyeOutlined />}
+        tooltip="Open in browser"
+        aria-label="Open PDF in browser"
+        onClick={() => {
+          window.open(fileEmbedUrl, "_blank", "noopener,noreferrer");
+        }}
+      >
+        Open in browser
+      </PlanarianButton>
+    ) : null;
+
   const actionButtons = [
     hasPrevious ? (
       <PlanarianButton
@@ -277,7 +261,8 @@ const FileViewer: React.FC<FileViewerProps> = ({
         aria-label="Next file"
       />
     ) : null,
-    downloadButton,
+    openInBrowserButton,
+    isPdf ? null : downloadButton,
   ].filter(Boolean);
 
   const headerItems = [headerTitle, ...actionButtons];
@@ -288,6 +273,10 @@ const FileViewer: React.FC<FileViewerProps> = ({
         open={open}
         fullScreen
         header={headerItems}
+        headerStyle={{
+          padding: "calc(0.75rem + env(safe-area-inset-top)) calc(0.75rem + env(safe-area-inset-right)) 0.75rem calc(0.75rem + env(safe-area-inset-left))",
+        }}
+        contentStyle={isPdf ? { overflow: "hidden", padding: 0 } : undefined}
         onClose={() => {
           onClose?.();
         }}
@@ -310,13 +299,9 @@ const FileViewer: React.FC<FileViewerProps> = ({
                   />
                 </div>
               )}
-              {isPdf && pdfFile && (
+              {isPdf && fileEmbedUrl && (
                 <Suspense fallback={<Spin />}>
-                  <PdfViewer
-                    file={pdfFile}
-                    openUrl={fileEmbedUrl}
-                    downloadButton={downloadButton}
-                  />
+                  <PdfViewer fileUrl={fileEmbedUrl} />
                 </Suspense>
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}

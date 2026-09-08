@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node for shared client routes
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Prepare shared client routes
         run: npm run prepare:client-routes

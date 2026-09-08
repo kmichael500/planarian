@@ -108,7 +108,7 @@ export function buildContentSecurityPolicy(apiOrigins) {
     ["connect-src", connectSources],
     ["worker-src", ["'self'", "blob:"]],
     ["child-src", ["blob:"]],
-    ["frame-src", ["'none'"]],
+    ["frame-src", ["'self'"]],
     ["media-src", ["'self'", "blob:"]],
     ["manifest-src", ["'self'"]],
     ["object-src", ["'none'"]],

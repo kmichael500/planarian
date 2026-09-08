@@ -1,3 +1,23 @@
+.planarian-file-viewer__title {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.planarian-file-viewer__title-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planarian-file-viewer__type {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+}
+
 .planarian-file-viewer {
   height: 100%;
   min-height: 0;
@@ -20,4 +40,10 @@
   color: var(--text-color);
   border: 1px solid var(--border-color);
   border-radius: 8px;
+}
+
+@media (max-width: 767px) {
+  .planarian-file-viewer__type {
+    display: none;
+  }
 }
