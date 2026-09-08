@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
@@ -6,6 +7,19 @@ namespace Planarian.Modules.Map.Services;
 public class GeologicMapHttpClient
 {
     private const int PageSize = 50;
+    private const int MinimumTileZoom = 4;
+    private const int MaximumTileZoom = 15;
+    private static readonly IReadOnlyDictionary<string, string> TileServices =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["500K"] = "mvCache500K",
+            ["250K"] = "mvCache250K",
+            ["125K"] = "mvCache125K",
+            ["100K"] = "mvCache100K",
+            ["63K"] = "mvCache63K",
+            ["48K"] = "mvCache48K",
+            ["24K"] = "mvCache24K"
+        };
     private readonly HttpClient _httpClient;
 
     public GeologicMapHttpClient(HttpClient httpClient)
@@ -48,6 +62,48 @@ public class GeologicMapHttpClient
         };
     }
 
+    public async Task<GeologicTileResult?> GetTileAsync(
+        string scale,
+        int z,
+        int x,
+        int y,
+        CancellationToken cancellationToken)
+    {
+        if (!TileServices.TryGetValue(scale, out var service) ||
+            z is < MinimumTileZoom or > MaximumTileZoom)
+        {
+            return null;
+        }
+
+        var maximumCoordinate = (1 << z) - 1;
+        if (x < 0 || x > maximumCoordinate || y < 0 || y > maximumCoordinate)
+        {
+            return null;
+        }
+
+        var url = $"imagery/rest/services/mvCaches/{service}/ImageServer/tile/{z}/{y}/{x}";
+        using var response = await _httpClient.GetAsync(
+            url,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+        if (contentType is not ("image/png" or "image/jpeg"))
+        {
+            throw new InvalidOperationException("NGMDB returned a non-image tile response.");
+        }
+
+        var content = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        return new GeologicTileResult(content, contentType);
+    }
+
     private static string BuildPageUrl(string encodedLlb, int pageNumber)
         => $"connect/apiv1/mv/?" +
            $"llb={encodedLlb}" +
@@ -57,3 +113,5 @@ public class GeologicMapHttpClient
            $"&page_size={PageSize}" +
            $"&page={pageNumber}";
 }
+
+public sealed record GeologicTileResult(byte[] Content, string ContentType);
