@@ -3,16 +3,13 @@ import { PdfViewer } from "./PdfViewer";
 import { PDF_STREAM_SESSION_HEADER } from "./PdfViewerRequest";
 
 const mockOpen = jest.fn().mockResolvedValue(undefined);
+const mockSetViewerOptions = jest.fn().mockResolvedValue({ viewerOptions: {} });
+
 class MockPdfViewerElement extends HTMLElement {
-  iframe = document.createElement("iframe");
-  initPromise = Promise.resolve({
-    viewerApp: {
-      initializedPromise: Promise.resolve(),
-      initialized: true,
-      eventBus: {},
-      open: mockOpen,
-    },
-  });
+  initPromise = Promise.resolve({ viewerApp: { open: mockOpen } });
+  setViewerOptions = mockSetViewerOptions;
+
+  async injectViewerStyles() {}
 }
 
 if (!customElements.get("pdfjs-viewer-element")) {
@@ -22,9 +19,10 @@ if (!customElements.get("pdfjs-viewer-element")) {
 describe("PdfViewer", () => {
   beforeEach(() => {
     mockOpen.mockClear();
+    mockSetViewerOptions.mockClear();
   });
 
-  it("delegates rendering and interactions to the full PDF.js viewer", async () => {
+  it("opens the requested PDF through the configured read-only PDF.js viewer", async () => {
     render(
       <PdfViewer fileUrl="https://planarian.test/api/files/file/view?account_id=account" />
     );
@@ -38,6 +36,18 @@ describe("PdfViewer", () => {
         httpHeaders: expect.objectContaining({
           [PDF_STREAM_SESSION_HEADER]: expect.stringMatching(/^[0-9a-f-]{36}$/i),
         }),
+      })
+    );
+
+    expect(mockSetViewerOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        annotationEditorMode: -1,
+        enableAltText: false,
+        enableComment: false,
+        enableMerge: false,
+        enableSignatureEditor: false,
+        enableSplitMerge: false,
+        supportsDownloading: false,
       })
     );
 

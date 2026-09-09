@@ -15,6 +15,53 @@ const pdfAssetUrl = (path: string) =>
   `${process.env.PUBLIC_URL ?? ""}/pdfjs/${path}`;
 
 const PDF_VIEWER_ELEMENT_TAG = "pdfjs-viewer-element";
+const PDF_VIEWER_READ_ONLY_OPTIONS = {
+  annotationEditorMode: -1,
+  disableHistory: true,
+  enableAltText: false,
+  enableAltTextModelDownload: false,
+  enableComment: false,
+  enableGuessAltText: false,
+  enableHighlightFloatingButton: false,
+  enableMerge: false,
+  enableNewAltTextWhenAddingImage: false,
+  enableSignatureEditor: false,
+  enableSplitMerge: false,
+  historyUpdateUrl: false,
+  supportsDownloading: false,
+};
+
+const PDF_VIEWER_READ_ONLY_STYLES = `
+  #editorModeButtons,
+  #editorModeSeparator,
+  #downloadButton,
+  #secondaryDownload,
+  #downloadFromUrl,
+  #openFile,
+  #secondaryOpenFile,
+  #presentationMode,
+  #viewBookmark,
+  #viewBookmarkSeparator,
+  #scrollPage,
+  #scrollVertical,
+  #scrollHorizontal,
+  #scrollWrapped,
+  #spreadNone,
+  #spreadOdd,
+  #spreadEven,
+  #imageAltTextSettings,
+  #imageAltTextSettingsSeparator,
+  #documentProperties,
+  #attachmentsViewMenu,
+  #attachmentsView,
+  #viewsManagerAddFileButton,
+  #viewsManagerStatus,
+  #editorCommentsSidebar,
+  #editorUndoBar {
+    display: none !important;
+  }
+`;
+
 let pdfViewerElementLoadPromise: Promise<void> | null = null;
 
 const loadPdfViewerElement = () => {
@@ -77,7 +124,11 @@ export function PdfViewer({ fileUrl }: PdfViewerProps) {
       viewer = document.createElement("pdfjs-viewer-element") as PdfjsViewerElement;
       configureViewer(viewer);
       host.replaceChildren(viewer);
+
+      const optionsPromise = viewer.setViewerOptions(PDF_VIEWER_READ_ONLY_OPTIONS);
+      const stylesPromise = viewer.injectViewerStyles(PDF_VIEWER_READ_ONLY_STYLES);
       const { viewerApp } = await viewer.initPromise;
+      await Promise.all([optionsPromise, stylesPromise]);
       if (cancelled || !viewerApp) {
         return;
       }

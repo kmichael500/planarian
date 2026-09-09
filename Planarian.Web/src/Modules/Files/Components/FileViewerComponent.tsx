@@ -2,7 +2,6 @@ import { Spin, Result } from "antd";
 import { lazy, Suspense, useState, useEffect } from "react";
 import {
   CloudDownloadOutlined,
-  EyeOutlined,
   LeftOutlined,
   RightOutlined,
 } from "@ant-design/icons";
@@ -227,21 +226,6 @@ const FileViewer: React.FC<FileViewerProps> = ({
     };
   }, [open, hasPrevious, previousDisabled, hasNext, nextDisabled, onPrevious, onNext]);
 
-  const openInBrowserButton =
-    isPdf && fileEmbedUrl ? (
-      <PlanarianButton
-        key="open-in-browser"
-        icon={<EyeOutlined />}
-        tooltip="Open in browser"
-        aria-label="Open PDF in browser"
-        onClick={() => {
-          window.open(fileEmbedUrl, "_blank", "noopener,noreferrer");
-        }}
-      >
-        Open in browser
-      </PlanarianButton>
-    ) : null;
-
   const actionButtons = [
     hasPrevious ? (
       <PlanarianButton
@@ -261,8 +245,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
         aria-label="Next file"
       />
     ) : null,
-    openInBrowserButton,
-    isPdf ? null : downloadButton,
+    downloadButton,
   ].filter(Boolean);
 
   const headerItems = [headerTitle, ...actionButtons];
