@@ -340,7 +340,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<AuthenticatedFileResponse> CreateFileResponse(string fileId, bool isDownload,
         CancellationToken cancellationToken)
     {
-        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, fileId);
+        await _requestThrottleService.CountFileAccessAttempt(fileId);
 
         var file = await Repository.GetFileAccessInfo(fileId);
         if (file == null || string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))

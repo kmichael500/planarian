@@ -11,6 +11,8 @@ interface DialogModalProps {
   header?: string | React.ReactNode | (string | React.ReactNode)[];
   footer?: string | React.ReactNode | (string | React.ReactNode)[];
   footerStyle?: React.CSSProperties; // New prop for footer style override
+  headerStyle?: React.CSSProperties;
+  contentStyle?: React.CSSProperties;
   children?: React.ReactNode;
 
   width?: string | number;
@@ -26,6 +28,8 @@ export function PlanarianModal({
   header: headerItems,
   footer: footerItems,
   footerStyle,
+  headerStyle,
+  contentStyle,
   children,
   width,
   height,
@@ -175,6 +179,7 @@ export function PlanarianModal({
           flexShrink: 0,
           background: "var(--surface-color)",
           color: "var(--text-color)",
+          ...headerStyle,
         }}
       >
         <div
@@ -184,7 +189,7 @@ export function PlanarianModal({
           }}
         >
           {/* Left header item (if any) */}
-          <div style={{ marginRight: "auto" }}>{leftHeaderItem}</div>
+          <div style={{ marginRight: "auto", minWidth: 0 }}>{leftHeaderItem}</div>
 
           {/* Right side items + close button */}
           <Space>
@@ -210,6 +215,7 @@ export function PlanarianModal({
           padding: "1rem",
           background: "var(--modal-background)",
           color: "var(--text-color)",
+          ...contentStyle,
         }}
       >
         {shouldRenderChildren && children}

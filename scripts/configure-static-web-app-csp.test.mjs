@@ -33,7 +33,7 @@ test("restricts script execution to the app, PDF WebAssembly, and Umami", () => 
   assert.deepEqual(parsed.get("object-src"), ["'none'"]);
   assert.deepEqual(parsed.get("base-uri"), ["'none'"]);
   assert.deepEqual(parsed.get("frame-ancestors"), ["'none'"]);
-  assert.deepEqual(parsed.get("frame-src"), ["'none'"]);
+  assert.deepEqual(parsed.get("frame-src"), ["'self'"]);
 });
 
 test("includes required API and map origins without blanket network allowances", () => {

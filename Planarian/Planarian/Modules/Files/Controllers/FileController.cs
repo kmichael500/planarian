@@ -13,13 +13,14 @@ namespace Planarian.Modules.Files.Controllers;
 [Authorize]
 public class FileController : PlanarianControllerBase<FileService>
 {
+    private const int FileTransportRequestsPerMinute = 1200;
     public FileController(RequestUser requestUser, TokenService tokenService, FileService service) : base(requestUser,
         tokenService, service)
     {
     }
 
     [HttpGet("{fileId:length(10)}/view")]
-    [Throttle]
+    [Throttle(RequestsPerMinute = FileTransportRequestsPerMinute)]
     public async Task<IActionResult> ViewFile(
         string fileId,
         CancellationToken cancellationToken)
@@ -29,7 +30,7 @@ public class FileController : PlanarianControllerBase<FileService>
     }
 
     [HttpGet("{fileId:length(10)}/download")]
-    [Throttle]
+    [Throttle(RequestsPerMinute = FileTransportRequestsPerMinute)]
     public async Task<IActionResult> DownloadFile(string fileId, CancellationToken cancellationToken)
     {
         var result = await Service.CreateFileResponse(fileId, true, cancellationToken);

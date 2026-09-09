@@ -512,7 +512,7 @@ app.UseCors(x =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()
-        .WithExposedHeaders("Content-Disposition")
+        .WithExposedHeaders("Content-Disposition", "Accept-Ranges", "Content-Range", "Content-Encoding")
 );
 
 app.UseAuthentication();

@@ -1,6 +1,9 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Net.Http.Headers;
+using Planarian.Modules.Authentication.Services;
 using Planarian.Shared.Base;
 using Planarian.Shared.Models;
 using Planarian.Shared.Services;
@@ -84,6 +87,106 @@ public sealed class FileResponseSecurityTests
         var fileResult = Assert.IsType<FileStreamResult>(actionResult);
         Assert.Equal("payload.svg", fileResult.FileDownloadName);
         Assert.Equal("application/octet-stream", fileResult.ContentType);
+    }
+
+    [Fact]
+    public async Task OrdinaryFileResultPreservesValidatorsAndEnablesRanges()
+    {
+        var controller = new TestController();
+        var lastModified = new DateTimeOffset(2026, 9, 8, 12, 0, 0, TimeSpan.Zero);
+        var entityTag = EntityTagHeaderValue.Parse("\"file-etag\"");
+        var response = new AuthenticatedFileResponse
+        {
+            OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([1, 2, 3])),
+            ContentType = "application/pdf",
+            EntityTag = entityTag,
+            LastModified = lastModified
+        };
+
+        var result = Assert.IsType<FileStreamResult>(await controller.CreateResult(response));
+
+        Assert.True(result.EnableRangeProcessing);
+        Assert.Equal(entityTag, result.EntityTag);
+        Assert.Equal(lastModified, result.LastModified);
+        Assert.Equal("private, no-cache", controller.Response.Headers[HeaderNames.CacheControl].ToString());
+    }
+
+    [Fact]
+    public async Task OrdinaryConditionalGetStillReturnsNotModified()
+    {
+        var controller = new TestController();
+        controller.HttpContext.RequestServices = new ServiceCollection()
+            .AddLogging()
+            .AddMvcCore()
+            .Services
+            .BuildServiceProvider();
+        controller.Request.Method = HttpMethods.Get;
+        controller.Request.Headers[HeaderNames.IfNoneMatch] = "\"file-etag\"";
+        controller.Response.Body = new MemoryStream();
+        var response = new AuthenticatedFileResponse
+        {
+            OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([10, 20, 30, 40])),
+            ContentType = "application/pdf",
+            EntityTag = EntityTagHeaderValue.Parse("\"file-etag\"")
+        };
+
+        var result = Assert.IsType<FileStreamResult>(await controller.CreateResult(response));
+        await result.ExecuteResultAsync(controller.ControllerContext);
+
+        Assert.Equal(StatusCodes.Status304NotModified, controller.Response.StatusCode);
+        Assert.Equal(0, controller.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task RangeRequestExecutesAsPartialContentWithCorrectBytes()
+    {
+        var controller = new TestController();
+        controller.HttpContext.RequestServices = new ServiceCollection()
+            .AddLogging()
+            .AddMvcCore()
+            .Services
+            .BuildServiceProvider();
+        controller.Request.Method = HttpMethods.Get;
+        controller.Request.Headers[HeaderNames.Range] = "bytes=1-2";
+        controller.Response.Body = new MemoryStream();
+        var response = new AuthenticatedFileResponse
+        {
+            OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([10, 20, 30, 40])),
+            ContentType = "application/pdf"
+        };
+
+        var result = Assert.IsType<FileStreamResult>(await controller.CreateResult(response));
+        await result.ExecuteResultAsync(controller.ControllerContext);
+
+        Assert.Equal(StatusCodes.Status206PartialContent, controller.Response.StatusCode);
+        Assert.Equal("bytes", controller.Response.Headers[HeaderNames.AcceptRanges].ToString());
+        Assert.Equal("bytes 1-2/4", controller.Response.Headers[HeaderNames.ContentRange].ToString());
+        controller.Response.Body.Position = 0;
+        Assert.Equal([20, 30], ((MemoryStream)controller.Response.Body).ToArray());
+    }
+
+    [Fact]
+    public async Task PdfStreamSessionUsesNoStoreAndOmitsConditionalValidators()
+    {
+        var controller = new TestController();
+        controller.Request.QueryString = QueryString.Create(
+            RequestThrottleService.FileStreamSessionQueryParameterName,
+            Guid.NewGuid().ToString());
+        controller.Request.Headers[HeaderNames.Range] = "bytes=0-1023";
+        var response = new AuthenticatedFileResponse
+        {
+            OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([1, 2, 3])),
+            ContentType = "application/pdf",
+            EntityTag = EntityTagHeaderValue.Parse("\"pdf-etag\""),
+            LastModified = DateTimeOffset.UtcNow
+        };
+
+        var result = Assert.IsType<FileStreamResult>(await controller.CreateResult(response));
+
+        Assert.True(result.EnableRangeProcessing);
+        Assert.Null(result.EntityTag);
+        Assert.Null(result.LastModified);
+        Assert.Equal("private, no-store", controller.Response.Headers[HeaderNames.CacheControl].ToString());
     }
 
     private static (string ContentType, bool ForceDownload) Resolve(
