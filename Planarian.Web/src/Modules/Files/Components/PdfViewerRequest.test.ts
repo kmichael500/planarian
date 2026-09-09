@@ -1,7 +1,7 @@
 import {
   createPdfDocumentRequestOptions,
   createPdfStreamSessionId,
-  PDF_STREAM_SESSION_HEADER,
+  PDF_STREAM_SESSION_QUERY_PARAMETER,
 } from "./PdfViewerRequest";
 
 describe("PDF document request options", () => {
@@ -11,11 +11,14 @@ describe("PDF document request options", () => {
       "3a3f8e88-aac9-4aba-9982-44ec03d340ab"
     );
 
-    expect(options.url).toContain("/api/files/abcdefghij/view");
+    const requestUrl = new URL(options.url);
+    expect(requestUrl.pathname).toBe("/api/files/abcdefghij/view");
+    expect(requestUrl.searchParams.get("account_id")).toBe("account");
+    expect(
+      requestUrl.searchParams.get(PDF_STREAM_SESSION_QUERY_PARAMETER)
+    ).toBe("3a3f8e88-aac9-4aba-9982-44ec03d340ab");
     expect(options.withCredentials).toBe(true);
-    expect(options.httpHeaders).toEqual({
-      [PDF_STREAM_SESSION_HEADER]: "3a3f8e88-aac9-4aba-9982-44ec03d340ab",
-    });
+    expect(options).not.toHaveProperty("httpHeaders");
   });
 
   it("creates a backend-compatible stream session identifier", () => {

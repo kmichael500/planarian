@@ -284,7 +284,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
               )}
               {isPdf && fileEmbedUrl && (
                 <Suspense fallback={<Spin />}>
-                  <PdfViewer fileUrl={fileEmbedUrl} />
+                  <PdfViewer fileUrl={fileEmbedUrl} onRequestClose={onClose} />
                 </Suspense>
               )}
               {isCsvFileType(fileType) && <CSVDisplay data={fileContent} />}

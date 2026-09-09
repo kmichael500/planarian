@@ -18,31 +18,56 @@ namespace Planarian.Tests.EmailDelivery.Authentication;
 public sealed class RequestThrottlePdfStreamTests
 {
     [Fact]
-    public async Task RangeRequestsInOnePdfSessionCountAsOneFileAccess()
+    public async Task ConcurrentRangeRequestsInOnePdfSessionCountAsOneFileAccess()
     {
         using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
         var requestUser = new RequestUser(db) { Id = "viewer" };
         using var cache = new MemoryCache(new MemoryCacheOptions());
-        var context = CreateThrottledContext();
-        var accessor = new FixedHttpContextAccessor(context);
-        var service = CreateService(cache, accessor, requestUser, perFileLimit: 2);
         const string fileId = "abcdefghij";
+        var sessionId = Guid.NewGuid().ToString();
+        var services = Enumerable.Range(0, 40)
+            .Select(_ =>
+            {
+                var context = CreateThrottledContext();
+                context.Request.QueryString = QueryString.Create(
+                    RequestThrottleService.FileStreamSessionQueryParameterName,
+                    sessionId);
+                context.Request.Headers[HeaderNames.Range] = "bytes=0-65535";
+                return CreateService(
+                    cache,
+                    new FixedHttpContextAccessor(context),
+                    requestUser,
+                    perFileLimit: 2);
+            })
+            .ToArray();
 
-        context.Request.Headers[RequestThrottleService.FileStreamSessionHeaderName] = Guid.NewGuid().ToString();
-        context.Request.Headers[HeaderNames.Range] = "bytes=0-65535";
-        for (var i = 0; i < 40; i++)
-            await service.CountFileAccessAttempt(fileId);
+        var start = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rangeRequests = services
+            .Select(async service =>
+            {
+                await start.Task;
+                await service.CountFileAccessAttempt(fileId);
+            })
+            .ToArray();
 
-        context.Request.Headers.Remove(HeaderNames.Range);
-        await service.CountAttempt(ThrottleProfile.FileAccess, fileId);
+        start.SetResult(true);
+        await Task.WhenAll(rangeRequests);
+
+        var verificationContext = CreateThrottledContext();
+        var verificationService = CreateService(
+            cache,
+            new FixedHttpContextAccessor(verificationContext),
+            requestUser,
+            perFileLimit: 2);
+        await verificationService.CountAttempt(ThrottleProfile.FileAccess, fileId);
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            service.CountAttempt(ThrottleProfile.FileAccess, fileId));
+            verificationService.CountAttempt(ThrottleProfile.FileAccess, fileId));
 
         Assert.Equal(StatusCodes.Status429TooManyRequests, exception.StatusCode);
     }
 
     [Fact]
-    public async Task MalformedPdfSessionHeaderCannotGroupRangeRequests()
+    public async Task MalformedPdfSessionCannotGroupRangeRequests()
     {
         using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
         var requestUser = new RequestUser(db) { Id = "viewer" };
@@ -51,7 +76,9 @@ public sealed class RequestThrottlePdfStreamTests
         var service = CreateService(cache, new FixedHttpContextAccessor(context), requestUser, perFileLimit: 2);
         const string fileId = "abcdefghij";
 
-        context.Request.Headers[RequestThrottleService.FileStreamSessionHeaderName] = "not-a-guid";
+        context.Request.QueryString = QueryString.Create(
+            RequestThrottleService.FileStreamSessionQueryParameterName,
+            "not-a-guid");
         context.Request.Headers[HeaderNames.Range] = "bytes=0-65535";
         await service.CountFileAccessAttempt(fileId);
         await service.CountFileAccessAttempt(fileId);
@@ -62,7 +89,7 @@ public sealed class RequestThrottlePdfStreamTests
     }
 
     [Fact]
-    public async Task NonRangeRequestsStillCountWhenAValidSessionHeaderIsReused()
+    public async Task NonRangeRequestsStillCountWhenAValidSessionIsReused()
     {
         using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
         var requestUser = new RequestUser(db) { Id = "viewer" };
@@ -71,7 +98,9 @@ public sealed class RequestThrottlePdfStreamTests
         var service = CreateService(cache, new FixedHttpContextAccessor(context), requestUser, perFileLimit: 2);
         const string fileId = "abcdefghij";
 
-        context.Request.Headers[RequestThrottleService.FileStreamSessionHeaderName] = Guid.NewGuid().ToString();
+        context.Request.QueryString = QueryString.Create(
+            RequestThrottleService.FileStreamSessionQueryParameterName,
+            Guid.NewGuid().ToString());
         await service.CountFileAccessAttempt(fileId);
         await service.CountFileAccessAttempt(fileId);
 

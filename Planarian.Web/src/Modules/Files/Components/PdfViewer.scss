@@ -6,6 +6,17 @@
   width: 100%;
 }
 
+.pdf-viewer__host {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.pdf-viewer__host--hidden {
+  display: none;
+}
+
 .pdf-viewer__element {
   display: block;
   height: 100%;

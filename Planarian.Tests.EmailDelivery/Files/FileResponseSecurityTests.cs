@@ -169,7 +169,9 @@ public sealed class FileResponseSecurityTests
     public async Task PdfStreamSessionUsesNoStoreAndOmitsConditionalValidators()
     {
         var controller = new TestController();
-        controller.Request.Headers[RequestThrottleService.FileStreamSessionHeaderName] = Guid.NewGuid().ToString();
+        controller.Request.QueryString = QueryString.Create(
+            RequestThrottleService.FileStreamSessionQueryParameterName,
+            Guid.NewGuid().ToString());
         controller.Request.Headers[HeaderNames.Range] = "bytes=0-1023";
         var response = new AuthenticatedFileResponse
         {

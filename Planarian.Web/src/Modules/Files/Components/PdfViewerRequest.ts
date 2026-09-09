@@ -1,5 +1,4 @@
-export const PDF_STREAM_SESSION_HEADER = "X-Planarian-File-Stream-Session";
-
+export const PDF_STREAM_SESSION_QUERY_PARAMETER = "file_stream_session";
 
 const formatUuidV4 = (bytes: Uint8Array) => {
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -27,16 +26,17 @@ export const createPdfStreamSessionId = () => {
 export interface PdfDocumentRequestOptions {
   url: string;
   withCredentials: true;
-  httpHeaders: Record<string, string>;
 }
 
 export const createPdfDocumentRequestOptions = (
   url: string,
   sessionId: string
-): PdfDocumentRequestOptions => ({
-  url,
-  withCredentials: true,
-  httpHeaders: {
-    [PDF_STREAM_SESSION_HEADER]: sessionId,
-  },
-});
+): PdfDocumentRequestOptions => {
+  const requestUrl = new URL(url);
+  requestUrl.searchParams.set(PDF_STREAM_SESSION_QUERY_PARAMETER, sessionId);
+
+  return {
+    url: requestUrl.toString(),
+    withCredentials: true,
+  };
+};

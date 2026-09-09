@@ -9,6 +9,7 @@ import "./PdfViewer.scss";
 
 interface PdfViewerProps {
   fileUrl: string;
+  onRequestClose?: () => void;
 }
 
 const pdfAssetUrl = (path: string) =>
@@ -16,6 +17,8 @@ const pdfAssetUrl = (path: string) =>
 
 const PDF_VIEWER_ELEMENT_TAG = "pdfjs-viewer-element";
 const PDF_VIEWER_READ_ONLY_OPTIONS = {
+  // Render annotations, but keep interactive form controls non-editable.
+  annotationMode: 1,
   annotationEditorMode: -1,
   disableHistory: true,
   enableAltText: false,
@@ -69,17 +72,33 @@ const loadPdfViewerElement = () => {
     return Promise.resolve();
   }
 
-  pdfViewerElementLoadPromise ??= new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.type = "module";
-    script.src = pdfAssetUrl("viewer/pdfjs-viewer-element.js");
-    script.dataset.pdfjsViewerElement = "true";
-    script.addEventListener("error", () => reject(new Error("Unable to load PDF.js viewer.")), {
-      once: true,
+  if (!pdfViewerElementLoadPromise) {
+    const loadPromise = new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.type = "module";
+      script.src = pdfAssetUrl("viewer/pdfjs-viewer-element.js");
+      script.dataset.pdfjsViewerElement = "true";
+      script.addEventListener(
+        "error",
+        () => {
+          script.remove();
+          reject(new Error("Unable to load PDF.js viewer."));
+        },
+        { once: true }
+      );
+      document.head.appendChild(script);
+      void customElements
+        .whenDefined(PDF_VIEWER_ELEMENT_TAG)
+        .then(() => resolve());
     });
-    document.head.appendChild(script);
-    void customElements.whenDefined(PDF_VIEWER_ELEMENT_TAG).then(() => resolve());
-  });
+
+    pdfViewerElementLoadPromise = loadPromise;
+    void loadPromise.catch(() => {
+      if (pdfViewerElementLoadPromise === loadPromise) {
+        pdfViewerElementLoadPromise = null;
+      }
+    });
+  }
 
   return pdfViewerElementLoadPromise;
 };
@@ -97,9 +116,14 @@ const configureViewer = (viewer: PdfjsViewerElement) => {
   viewer.setAttribute("wasm-url", pdfAssetUrl("wasm/"));
 };
 
-export function PdfViewer({ fileUrl }: PdfViewerProps) {
+export function PdfViewer({ fileUrl, onRequestClose }: PdfViewerProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const onRequestCloseRef = useRef(onRequestClose);
   const [initializationError, setInitializationError] = useState(false);
+
+  useEffect(() => {
+    onRequestCloseRef.current = onRequestClose;
+  }, [onRequestClose]);
   const documentOptions = useMemo(
     () => createPdfDocumentRequestOptions(fileUrl, createPdfStreamSessionId()),
     [fileUrl]
@@ -113,6 +137,15 @@ export function PdfViewer({ fileUrl }: PdfViewerProps) {
 
     let cancelled = false;
     let viewer: PdfjsViewerElement | null = null;
+    let viewerWindow: Window | null = null;
+    const handleViewerKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      onRequestCloseRef.current?.();
+    };
 
     setInitializationError(false);
 
@@ -133,6 +166,8 @@ export function PdfViewer({ fileUrl }: PdfViewerProps) {
         return;
       }
 
+      viewerWindow = viewer.iframe?.contentWindow ?? null;
+      viewerWindow?.addEventListener("keydown", handleViewerKeyDown, true);
       await viewerApp.open(documentOptions);
     };
 
@@ -144,14 +179,26 @@ export function PdfViewer({ fileUrl }: PdfViewerProps) {
 
     return () => {
       cancelled = true;
+      viewerWindow?.removeEventListener("keydown", handleViewerKeyDown, true);
       viewer?.remove();
       host.replaceChildren();
     };
   }, [documentOptions]);
 
-  if (initializationError) {
-    return <Result status="warning" title="Unable to render this PDF in the app." />;
-  }
-
-  return <div ref={hostRef} className="pdf-viewer" aria-label="PDF viewer" />;
+  return (
+    <div className="pdf-viewer" aria-label="PDF viewer">
+      <div
+        ref={hostRef}
+        className={`pdf-viewer__host${
+          initializationError ? " pdf-viewer__host--hidden" : ""
+        }`}
+      />
+      {initializationError && (
+        <Result
+          status="warning"
+          title="Unable to render this PDF in the app."
+        />
+      )}
+    </div>
+  );
 }

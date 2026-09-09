@@ -12,7 +12,7 @@ namespace Planarian.Modules.Authentication.Services;
 
 public class RequestThrottleService
 {
-    public const string FileStreamSessionHeaderName = "X-Planarian-File-Stream-Session";
+    public const string FileStreamSessionQueryParameterName = "file_stream_session";
     private static readonly object FileStreamSessionStateCreationLock = new();
 
     #region Constructor/Fields
@@ -334,7 +334,7 @@ public class RequestThrottleService
 
     private static string? GetNormalizedFileStreamSessionId(HttpRequest? request)
     {
-        var sessionId = request?.Headers[FileStreamSessionHeaderName].ToString();
+        var sessionId = request?.Query[FileStreamSessionQueryParameterName].ToString();
         return Guid.TryParse(sessionId, out var parsedSessionId)
             ? parsedSessionId.ToString("N")
             : null;
