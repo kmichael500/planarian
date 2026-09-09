@@ -8,17 +8,16 @@ public class GeologicMapHttpClient
 {
     private const int PageSize = 50;
     private const int MinimumTileZoom = 4;
-    private const int MaximumTileZoom = 15;
-    private static readonly IReadOnlyDictionary<string, string> TileServices =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<string, (string Service, int MaximumZoom)> TileServices =
+        new Dictionary<string, (string Service, int MaximumZoom)>(StringComparer.OrdinalIgnoreCase)
         {
-            ["500K"] = "mvCache500K",
-            ["250K"] = "mvCache250K",
-            ["125K"] = "mvCache125K",
-            ["100K"] = "mvCache100K",
-            ["63K"] = "mvCache63K",
-            ["48K"] = "mvCache48K",
-            ["24K"] = "mvCache24K"
+            ["500K"] = ("mvCache500K", 12),
+            ["250K"] = ("mvCache250K", 12),
+            ["125K"] = ("mvCache125K", 14),
+            ["100K"] = ("mvCache100K", 14),
+            ["63K"] = ("mvCache63K", 14),
+            ["48K"] = ("mvCache48K", 14),
+            ["24K"] = ("mvCache24K", 15)
         };
     private readonly HttpClient _httpClient;
 
@@ -69,8 +68,8 @@ public class GeologicMapHttpClient
         int y,
         CancellationToken cancellationToken)
     {
-        if (!TileServices.TryGetValue(scale, out var service) ||
-            z is < MinimumTileZoom or > MaximumTileZoom)
+        if (!TileServices.TryGetValue(scale, out var tileService) ||
+            z < MinimumTileZoom || z > tileService.MaximumZoom)
         {
             return null;
         }
@@ -81,7 +80,7 @@ public class GeologicMapHttpClient
             return null;
         }
 
-        var url = $"imagery/rest/services/mvCaches/{service}/ImageServer/tile/{z}/{y}/{x}";
+        var url = $"imagery/rest/services/mvCaches/{tileService.Service}/ImageServer/tile/{z}/{y}/{x}";
         using var response = await _httpClient.GetAsync(
             url,
             HttpCompletionOption.ResponseHeadersRead,

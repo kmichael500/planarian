@@ -48,6 +48,7 @@ test("includes required API and map origins without blanket network allowances",
     "https://api.mapbox.com",
     "https://tiles.arcgis.com",
     "https://macrostrat.org",
+    "https://tiles.mapterhorn.com",
     "https://nominatim.openstreetmap.org",
   ]) {
     assert.ok(connect.includes(source), `connect-src should allow ${source}`);
@@ -57,6 +58,7 @@ test("includes required API and map origins without blanket network allowances",
     "https://api.example.test",
     "https://saplanarian.blob.core.windows.net",
     "https://ngmdb.usgs.gov",
+    "https://tiles.mapterhorn.com",
     "https://tile.openstreetmap.org",
   ]) {
     assert.ok(images.includes(source), `img-src should allow ${source}`);

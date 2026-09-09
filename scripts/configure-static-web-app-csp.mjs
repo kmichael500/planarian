@@ -10,6 +10,7 @@ const CONNECT_SOURCES = [
   "https://epqs.nationalmap.gov",
   "https://hydro.nationalmap.gov",
   "https://macrostrat.org",
+  "https://tiles.mapterhorn.com",
   "https://nominatim.openstreetmap.org",
   "https://services.arcgis.com",
   "https://services.arcgisonline.com",
@@ -32,6 +33,7 @@ const IMAGE_SOURCES = [
   "https://tile.opentopomap.org",
   "https://tiles.arcgis.com",
   "https://tiles.macrostrat.org",
+  "https://tiles.mapterhorn.com",
 ];
 
 const unique = (values) => [...new Set(values)];

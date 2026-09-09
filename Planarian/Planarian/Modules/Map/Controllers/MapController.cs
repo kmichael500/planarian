@@ -90,7 +90,8 @@ public class MapController : PlanarianControllerBase<MapService>
     {
         var data = await Service.GetGeologicMaps(latitude, longitude, cancellationToken);
         Response.Headers["Cache-Control"] = "public, max-age=2592000"; // cache for 30 days
-        return new JsonResult(data);    }
+        return new JsonResult(data);
+    }
 
     [HttpGet("ngmdb/{scale}/{z:int}/{x:int}/{y:int}")]
     [Throttle(RequestsPerMinute = 2400)]

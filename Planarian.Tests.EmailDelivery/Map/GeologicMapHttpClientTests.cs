@@ -35,6 +35,7 @@ public sealed class GeologicMapHttpClientTests
     [Theory]
     [InlineData("../../anything", 10, 265, 401)]
     [InlineData("24K", 3, 1, 1)]
+    [InlineData("500K", 13, 1, 1)]
     [InlineData("24K", 10, 1024, 401)]
     public async Task GetTileAsyncRejectsInvalidRequestsWithoutCallingUpstream(
         string scale,

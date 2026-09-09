@@ -74,6 +74,39 @@ const MAPBOX_ACCESS_TOKEN =
 
 const MAPTERHORN_TILEJSON_URL = "https://tiles.mapterhorn.com/tilejson.json";
 
+const NGMDB_LAYER_SPECS = [
+  { scale: "500K", maximumTileZoom: 12 },
+  { scale: "250K", maximumTileZoom: 12 },
+  { scale: "125K", maximumTileZoom: 14 },
+  { scale: "100K", maximumTileZoom: 14 },
+  { scale: "63K", maximumTileZoom: 14 },
+  { scale: "48K", maximumTileZoom: 14 },
+  { scale: "24K", maximumTileZoom: 15 },
+] as const;
+
+const ngmdbLayerId = (scale: string) =>
+  `usgs-${scale.toLowerCase()}-geology`;
+
+const createNgmdbLayer = ({
+  scale,
+  maximumTileZoom,
+}: (typeof NGMDB_LAYER_SPECS)[number]): PlanarianMapLayer => ({
+  id: ngmdbLayerId(scale),
+  displayName: scale,
+  type: "raster",
+  source: {
+    type: "raster",
+    tiles: [`/api/map/ngmdb/${scale}/{z}/{x}/{y}`],
+    tileSize: 256,
+    minzoom: 4,
+    maxzoom: maximumTileZoom,
+  },
+  isActive: false,
+  opacity: 1,
+  isGroupMember: true,
+  attribution: "NGMDB Map Viewer",
+});
+
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
   [
     "match",
@@ -260,129 +293,10 @@ const LAYERS: PlanarianMapLayer[] = [
     type: "group",
     isActive: false,
     opacity: 1,
-    memberLayerIds: [
-      "usgs-500k-geology",
-      "usgs-250k-geology",
-      "usgs-125k-geology",
-      "usgs-100k-geology",
-      "usgs-63k-geology",
-      "usgs-48k-geology",
-      "usgs-24k-geology",
-    ],
+    memberLayerIds: NGMDB_LAYER_SPECS.map(({ scale }) => ngmdbLayerId(scale)),
     attribution: "NGMDB Map Viewer",
   },
-  {
-    id: "usgs-500k-geology",
-    displayName: "500K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/500K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-250k-geology",
-    displayName: "250K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/250K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-125k-geology",
-    displayName: "125K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/125K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-100k-geology",
-    displayName: "100K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/100K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-63k-geology",
-    displayName: "63K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/63K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-48k-geology",
-    displayName: "48K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/48K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-24k-geology",
-    displayName: "24K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: ["/api/map/ngmdb/24K/{z}/{x}/{y}"],
-      tileSize: 256,
-      minzoom: 4,
-      maxzoom: 15,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
+  ...NGMDB_LAYER_SPECS.map(createNgmdbLayer),
   {
     id: "usgs-hydro",
     displayName: "Hydrology",
