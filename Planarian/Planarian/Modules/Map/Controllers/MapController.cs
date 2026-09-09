@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Map.Models;
+using Planarian.Modules.Map.Services;
 using Planarian.Modules.Query.Models;
 using Planarian.Shared.Attributes;
 using Planarian.Shared.Base;
@@ -89,5 +90,34 @@ public class MapController : PlanarianControllerBase<MapService>
     {
         var data = await Service.GetGeologicMaps(latitude, longitude, cancellationToken);
         Response.Headers["Cache-Control"] = "public, max-age=2592000"; // cache for 30 days
-        return new JsonResult(data);    }
+        return new JsonResult(data);
+    }
+
+    [HttpGet("ngmdb/{scale}/{z:int}/{x:int}/{y:int}")]
+    [Throttle(RequestsPerMinute = 2400)]
+    public async Task<IActionResult> GetNgmdbTile(
+        string scale,
+        int z,
+        int x,
+        int y,
+        CancellationToken cancellationToken)
+    {
+        GeologicTileResult? tile;
+        try
+        {
+            tile = await Service.GetGeologicTile(scale, z, x, y, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway);
+        }
+
+        if (tile == null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["Cache-Control"] = "public, max-age=2592000"; // cache for 30 days
+        return File(tile.Content, tile.ContentType);
+    }
 }

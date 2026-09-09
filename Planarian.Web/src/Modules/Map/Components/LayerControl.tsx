@@ -12,6 +12,7 @@ import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { AppContext } from "../../../Configuration/Context/AppContext";
+import { AppOptions } from "../../../Shared/Services/AppService";
 
 interface PlanarianMapLayer {
   displayName: string;
@@ -25,8 +26,12 @@ interface PlanarianMapLayer {
   source?: {
     layerName?: string;
     type: string;
-    tiles: string[];
+    tiles?: string[];
+    url?: string;
     tileSize?: number;
+    minzoom?: number;
+    maxzoom?: number;
+    encoding?: "terrarium" | "mapbox";
   };
   paint?: { "raster-opacity"?: number };
   fillLayer?: {
@@ -66,6 +71,41 @@ interface PlanarianMapLayer {
 
 const MAPBOX_ACCESS_TOKEN =
   "pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ";
+
+const MAPTERHORN_TILEJSON_URL = "https://tiles.mapterhorn.com/tilejson.json";
+
+const NGMDB_LAYER_SPECS = [
+  { scale: "500K", maximumTileZoom: 12 },
+  { scale: "250K", maximumTileZoom: 12 },
+  { scale: "125K", maximumTileZoom: 14 },
+  { scale: "100K", maximumTileZoom: 14 },
+  { scale: "63K", maximumTileZoom: 14 },
+  { scale: "48K", maximumTileZoom: 14 },
+  { scale: "24K", maximumTileZoom: 15 },
+] as const;
+
+const ngmdbLayerId = (scale: string) =>
+  `usgs-${scale.toLowerCase()}-geology`;
+
+const createNgmdbLayer = ({
+  scale,
+  maximumTileZoom,
+}: (typeof NGMDB_LAYER_SPECS)[number]): PlanarianMapLayer => ({
+  id: ngmdbLayerId(scale),
+  displayName: scale,
+  type: "raster",
+  source: {
+    type: "raster",
+    tiles: [`/api/map/ngmdb/${scale}/{z}/{x}/{y}`],
+    tileSize: 256,
+    minzoom: 4,
+    maxzoom: maximumTileZoom,
+  },
+  isActive: false,
+  opacity: 1,
+  isGroupMember: true,
+  attribution: "NGMDB Map Viewer",
+});
 
 const publicAccessColorExpression: DataDrivenPropertyValueSpecification<string> =
   [
@@ -126,18 +166,18 @@ const LAYERS: PlanarianMapLayer[] = [
   },
 
   {
-    id: "3-dep-hillshade-usgs",
+    id: "mapterhorn-hillshade",
     displayName: "Hillshade",
-    type: "raster",
+    type: "hillshade",
     source: {
-      type: "raster",
-      tiles: [
-        "https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=3DEPElevation:Hillshade Multidirectional",
-      ],
+      type: "raster-dem",
+      url: MAPTERHORN_TILEJSON_URL,
+      tileSize: 512,
+      encoding: "terrarium",
     },
     isActive: false,
     opacity: 1,
-    attribution: "USGS 3DEP Elevation Program",
+    attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
   },
   {
     id: "arcgis-public-access",
@@ -253,129 +293,10 @@ const LAYERS: PlanarianMapLayer[] = [
     type: "group",
     isActive: false,
     opacity: 1,
-    memberLayerIds: [
-      "usgs-500k-geology",
-      "usgs-250k-geology",
-      "usgs-125k-geology",
-      "usgs-100k-geology",
-      "usgs-62k-geology",
-      "usgs-48k-geology",
-      "usgs-24k-geology",
-    ],
+    memberLayerIds: NGMDB_LAYER_SPECS.map(({ scale }) => ngmdbLayerId(scale)),
     attribution: "NGMDB Map Viewer",
   },
-  {
-    id: "usgs-500k-geology",
-    displayName: "500K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache500K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-250k-geology",
-    displayName: "250K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache250K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-125k-geology",
-    displayName: "125K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache125K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-100k-geology",
-    displayName: "100K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache100K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-62k-geology",
-    displayName: "62K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache62K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-48k-geology",
-    displayName: "48K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache48K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
-  {
-    id: "usgs-24k-geology",
-    displayName: "24K",
-    type: "raster",
-    source: {
-      type: "raster",
-      tiles: [
-        "https://ngmdb-tiles.usgs.gov/arcgis/rest/services/mvCaches/mvCache24K/ImageServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-    },
-    isActive: false,
-    opacity: 1,
-    isGroupMember: true,
-    attribution: "NGMDB Map Viewer",
-  },
+  ...NGMDB_LAYER_SPECS.map(createNgmdbLayer),
   {
     id: "usgs-hydro",
     displayName: "Hydrology",
@@ -523,7 +444,7 @@ const LayerControl: React.FC<{
       const mapInstance = map.getMap();
       if (isTerrainActive) {
         mapInstance.setTerrain({
-          source: "terrainLayer",
+          source: "mapterhorn-terrain",
           exaggeration: terrainExaggeration,
         });
       } else {
@@ -696,21 +617,28 @@ const LayerControl: React.FC<{
         </p>
       </PlanarianModal>
       <Source
-        id="terrainLayer"
+        id="mapterhorn-terrain"
         type="raster-dem"
-        url="https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=G0kZR1vCDJukD1MigCcI"
-        tileSize={256}
-        encoding="mapbox"
+        url={MAPTERHORN_TILEJSON_URL}
+        tileSize={512}
+        encoding="terrarium"
       />
 
       {mapLayers.map((layer) => {
-        if (layer.type === "raster" && layer.source) {
+        if (layer.type === "raster" && layer.source?.tiles) {
           return (
             <Source
               key={layer.id}
               id={layer.id}
               type="raster"
-              tiles={layer.source.tiles}
+              tiles={layer.source.tiles.map((tile) =>
+                tile.startsWith("/api/")
+                  ? `${AppOptions.apiBaseUrl}${tile}`
+                  : tile
+              )}
+              tileSize={layer.source.tileSize}
+              minzoom={layer.source.minzoom}
+              maxzoom={layer.source.maxzoom}
               attribution={layer.attribution}
             >
               <Layer
@@ -719,6 +647,34 @@ const LayerControl: React.FC<{
                 source={layer.id}
                 type="raster"
                 paint={{ "raster-opacity": layer.opacity }}
+                layout={{ visibility: layer.isActive ? "visible" : "none" }}
+                {...(layer.minzoom !== undefined && {
+                  minzoom: layer.minzoom,
+                })}
+                {...(layer.maxzoom !== undefined && {
+                  maxzoom: layer.maxzoom,
+                })}
+              />
+            </Source>
+          );
+        }
+        if (layer.type === "hillshade" && layer.source) {
+          return (
+            <Source
+              key={layer.id}
+              id={layer.id}
+              type="raster-dem"
+              url={layer.source.url}
+              tileSize={layer.source.tileSize}
+              encoding={layer.source.encoding}
+              attribution={layer.attribution}
+            >
+              <Layer
+                id={layer.id}
+                key={layer.id}
+                source={layer.id}
+                type="hillshade"
+                paint={{ "hillshade-exaggeration": layer.opacity }}
                 layout={{ visibility: layer.isActive ? "visible" : "none" }}
                 {...(layer.minzoom !== undefined && {
                   minzoom: layer.minzoom,

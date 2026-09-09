@@ -10,7 +10,7 @@ const CONNECT_SOURCES = [
   "https://epqs.nationalmap.gov",
   "https://hydro.nationalmap.gov",
   "https://macrostrat.org",
-  "https://ngmdb-tiles.usgs.gov",
+  "https://tiles.mapterhorn.com",
   "https://nominatim.openstreetmap.org",
   "https://services.arcgis.com",
   "https://services.arcgisonline.com",
@@ -26,7 +26,6 @@ const IMAGE_SOURCES = [
   "https://api.maptiler.com",
   "https://elevation.nationalmap.gov",
   "https://hydro.nationalmap.gov",
-  "https://ngmdb-tiles.usgs.gov",
   "https://ngmdb.usgs.gov",
   "https://saplanarian.blob.core.windows.net",
   "https://services.arcgisonline.com",
@@ -34,6 +33,7 @@ const IMAGE_SOURCES = [
   "https://tile.opentopomap.org",
   "https://tiles.arcgis.com",
   "https://tiles.macrostrat.org",
+  "https://tiles.mapterhorn.com",
 ];
 
 const unique = (values) => [...new Set(values)];

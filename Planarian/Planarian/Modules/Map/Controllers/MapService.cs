@@ -53,4 +53,12 @@ public class MapService : ServiceBase<MapRepository>
         return result.Results;
     }
 
+    public Task<GeologicTileResult?> GetGeologicTile(
+        string scale,
+        int z,
+        int x,
+        int y,
+        CancellationToken cancellationToken) =>
+        _geologicMapHttpClient.GetTileAsync(scale, z, x, y, cancellationToken);
+
 }
