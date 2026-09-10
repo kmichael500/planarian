@@ -1,6 +1,6 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { ExploreMap } from "../Components/ExploreMap";
+import { MapComponent } from "../Components/MapComponent";
 import { useLocation } from "react-router-dom";
 
 const MapPage = () => {
@@ -25,7 +25,7 @@ const MapPage = () => {
 
   return (
     <>
-      <ExploreMap
+      <MapComponent
         initialCenter={initialCenter}
         initialZoom={initialZoom}
         onMoveEnd={(event) => {

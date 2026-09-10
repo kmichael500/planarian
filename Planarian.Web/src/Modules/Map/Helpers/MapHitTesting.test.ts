@@ -37,8 +37,8 @@ const createMap = (features: MapGeoJSONFeature[], zoom = 12) => {
 };
 
 describe("findNearbyEntranceCaveId", () => {
-  test("accepts a near-miss tap across the enlarged touch target", () => {
-    const { map } = createMap([entranceFeature("nearby", 123, 100)], 10);
+  test("expands entrance selection to the configured hit radius", () => {
+    const { map } = createMap([entranceFeature("nearby", 113, 100)], 10);
 
     expect(findNearbyEntranceCaveId(map, { x: 100, y: 100 })).toBe("nearby");
   });
@@ -60,7 +60,7 @@ describe("findNearbyEntranceCaveId", () => {
   });
 
   test("rejects a cave outside the circular tolerance", () => {
-    const { map } = createMap([entranceFeature("corner", 118, 118)]);
+    const { map } = createMap([entranceFeature("corner", 110, 110)]);
 
     expect(findNearbyEntranceCaveId(map, { x: 100, y: 100 })).toBeUndefined();
   });

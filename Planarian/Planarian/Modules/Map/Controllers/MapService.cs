@@ -15,9 +15,13 @@ public class MapService : ServiceBase<MapRepository>
         _geologicMapHttpClient = geologicMapHttpClient;
     }
 
-    public Task<IEnumerable<object>> GetMapData(
-        double north, double south, double east, double west, int zoom, CancellationToken cancellationToken) =>
-        Repository.GetMapData(north, south, east, west, zoom, cancellationToken);
+    public async Task<IEnumerable<object>> GetMapData(double north, double south, double east, double west, int zoom,
+        CancellationToken cancellationToken)
+    {
+        var result = await Repository.GetMapData(north, south, east, west, zoom, cancellationToken);
+
+        return result;
+    }
 
     public async Task<CoordinateDto> GetMapCenter()
     {

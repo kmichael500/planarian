@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import bbox from "@turf/bbox";
 import proj4 from "proj4";
-import { SpatialFileMap } from "../../Map/Components/SpatialFileMap";
-import { Source, Layer } from "react-map-gl/maplibre";
+import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
+import { Source, Layer, useMap } from "react-map-gl/maplibre";
+import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
 
 const FEET_TO_METERS = 0.3048;
 const PLT_SOURCE_ID = "plt-viewer-source";
@@ -128,24 +129,38 @@ export const PltViewer: React.FC<PltViewerProps> = ({
 
   return (
     <div style={{ width: "100%", height: "100%" }}>
-      <SpatialFileMap
+      <MapBaseComponent
+        key={embedUrl}
         initialCenter={center}
         initialZoom={10}
-        bounds={bounds}
-        fitBoundsOptions={{ maxZoom: 15 }}
-        interactiveLayerIds={[PLT_LAYER_ID]}
+        initialBounds={bounds}
+        initialFitBoundsOptions={{ maxZoom: 15 }}
+        onCaveClicked={() => { }}
+        onNonCaveClicked={() => { }}
+        manageBodyPadding={false}
+        showFullScreenControl={false}
+        onMoveEnd={() => { }}
+        additionalInteractiveLayerIds={[PLT_LAYER_ID]}
+        reuseMaps={false}
       >
-        <PltOverlay data={result.collection} />
-      </SpatialFileMap>
+        <PltOverlay data={result.collection} bounds={bounds} />
+      </MapBaseComponent>
     </div>
   );
 };
 
 interface PltOverlayProps {
   data: FeatureCollection;
+  bounds: BoundsTuple;
 }
 
-const PltOverlay: React.FC<PltOverlayProps> = ({ data }) => (
+const PltOverlay: React.FC<PltOverlayProps> = ({ data, bounds }) => {
+  const map = useMap();
+  const mapRef = map?.current;
+
+  useFitMapBounds(mapRef, bounds, { maxZoom: 15, padding: 20 });
+
+  return (
     <Source id={PLT_SOURCE_ID} type="geojson" data={data}>
       <Layer
         id={PLT_LAYER_ID}
@@ -163,7 +178,8 @@ const PltOverlay: React.FC<PltOverlayProps> = ({ data }) => (
         ]}
       />
     </Source>
-);
+  );
+};
 
 function parsePlt(raw: string): PltParseResult | null {
   const lines = raw.split(/\r?\n/);

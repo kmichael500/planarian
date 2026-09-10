@@ -1,44 +1,82 @@
-import type { FeatureCollection } from "geojson";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
-
+import { FeatureCollection } from "geojson";
 const baseUrl = "api/map";
+const cacheDuration = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
 const MapService = {
-  async getMapCenter() {
+  // getMapData: async (
+  //   north: number,
+  //   south: number,
+  //   east: number,
+  //   west: number,
+  //   zoom: number
+  // ) => {
+  //   const accountId = AuthenticationService.GetAccountId();
+  //   if (!accountId) {
+  //     throw new PlanarianError("No account id found");
+  //   }
+  //   const cacheKey = `caves-${accountId}`;
+  //   const cachedData = localStorage.getItem(cacheKey);
+  //   const now = Date.now();
+
+  //   if (cachedData) {
+  //     const { data, timestamp } = JSON.parse(cachedData);
+  //     if (now - timestamp < cacheDuration) {
+  //       return data;
+  //     }
+  //   }
+
+  //   const response = await HttpClient.get<MapData[]>(`${baseUrl}`, {
+  //     params: { north, south, east, west, zoom },
+  //   });
+  //   localStorage.setItem(
+  //     cacheKey,
+  //     JSON.stringify({ data: response.data, timestamp: now })
+  //   );
+  //   return response.data;
+  // },
+
+  getMapCenter: async () => {
     const response = await HttpClient.get<CoordinateDto>(`${baseUrl}/center`);
+
     return response.data;
   },
-
-  async getLinePlotIds(
-    north: number,
-    south: number,
-    east: number,
-    west: number,
+  getLinePlotIds: async (
+    tileNorth: number,
+    tileSouth: number,
+    tileEast: number,
+    tileWest: number,
     zoom: number
-  ) {
-    const params = new URLSearchParams({
-      north: north.toString(),
-      south: south.toString(),
-      east: east.toString(),
-      west: west.toString(),
-      zoom: zoom.toString(),
-    });
-    const response = await HttpClient.get<string[]>(`${baseUrl}/lineplots/ids?${params}`);
+  ) => {
+    const params = new URLSearchParams();
+    params.append("north", tileNorth.toString());
+    params.append("south", tileSouth.toString());
+    params.append("east", tileEast.toString());
+    params.append("west", tileWest.toString());
+    params.append("zoom", zoom.toString());
+    const response = await HttpClient.get<string[]>(
+      `${baseUrl}/lineplots/ids?${params}`
+    );
+
     return response.data;
   },
 
+  getLinePlot: async (linePlotId: string) => {
+    const response = await HttpClient.get<FeatureCollection>(
+      `${baseUrl}/lineplots/${linePlotId}`
+    );
 
-  async getLinePlot(linePlotId: string) {
-    const response = await HttpClient.get<FeatureCollection>(`${baseUrl}/lineplots/${linePlotId}`);
     return response.data;
   },
 
-  async getGeologicMaps(latitude: number, longitude: number) {
-    const params = new URLSearchParams({
-      latitude: latitude.toString(),
-      longitude: longitude.toString(),
-    });
-    const response = await HttpClient.get<GeologicMapResult[]>(`${baseUrl}/geologic-maps?${params}`);
+  getGeologicMaps: async (latitude: number, longitude: number) => {
+    const params = new URLSearchParams();
+    params.append("latitude", latitude.toString());
+    params.append("longitude", longitude.toString());
+    const response = await HttpClient.get<GeologicMapResult[]>(
+      `${baseUrl}/geologic-maps?${params}`
+    );
+
     return response.data;
   },
 };

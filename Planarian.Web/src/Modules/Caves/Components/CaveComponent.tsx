@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CloudUploadOutlined } from "@ant-design/icons";
+import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Col,
   Collapse,
@@ -29,7 +30,7 @@ import {
   type PlanarianDescriptionItem,
 } from "../../../Shared/Components/Buttons/PlanarianDescription";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
-import { CaveMap } from "../../Map/Components/CaveMap";
+import { MapComponent } from "../../Map/Components/MapComponent";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { FileService } from "../../Files/Services/FileService";
@@ -45,7 +46,7 @@ import { StateTagComponent } from "../../../Shared/Components/Display/StateTagCo
 import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
 import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
-import { CaveSpatialDataImport } from "./CaveSpatialDataImport";
+import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
@@ -143,7 +144,22 @@ const CaveComponent = ({
   const [showGeology, setShowGeology] = useState(false);
   const [showGages, setShowGages] = useState(false);
 
-  const [lineworkRefreshToken, setLineworkRefreshToken] = useState(0);
+  const [geoJsonToSave, setGeoJsonToSave] = useState<string | null>(null);
+  const [isGeoJsonModalVisible, setIsGeoJsonModalVisible] = useState(false);
+
+  const handleGeoJsonReceived = (
+    data: FeatureCollection<Geometry, GeoJsonProperties>[]
+  ) => {
+    if (data && data.length > 0) {
+      const geoJsonString = JSON.stringify(data, null, 2);
+      setGeoJsonToSave(geoJsonString);
+      setIsGeoJsonModalVisible(true);
+    } else {
+      // Optionally handle the case when data is empty.
+      setGeoJsonToSave(null);
+      setIsGeoJsonModalVisible(false);
+    }
+  };
 
   const descriptionItemCandidates: (PlanarianDescriptionItem | false)[] = [
     isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && {
@@ -618,24 +634,20 @@ const CaveComponent = ({
 
       {showMap && options && options.showMap == true && (
         <>
-          <PlanarianDividerComponent
-            title="Map"
-            element={
-              cave ? (
-                <CaveSpatialDataImport
-                  caveId={cave.id}
-                  disabled={!hasEditPermission}
-                  onSaved={() => {
-                    setLineworkRefreshToken((value) => value + 1);
-                    updateCave?.();
-                  }}
-                />
-              ) : undefined
-            }
-          />
-          {cave?.primaryEntrance && (
+          <PlanarianDividerComponent title="Map" />
+          {cave?.primaryEntrance !== null && (
             <div style={{ height: "590px" }}>
-              <CaveMap key={cave.id} cave={cave} lineworkRefreshToken={lineworkRefreshToken} />
+              <MapComponent
+                initialCenter={[
+                  cave?.primaryEntrance?.latitude as number,
+                  cave?.primaryEntrance?.longitude as number,
+                ]}
+                initialZoom={15}
+                showFullScreenControl
+                showSearchBar={false}
+                showGeolocateControl={false}
+                onShapefileUploaded={handleGeoJsonReceived}
+              />
             </div>
           )}
         </>
@@ -643,7 +655,28 @@ const CaveComponent = ({
     </>
   );
 
-  return <>{inCardContainer ? isLoading ? <CaveDetailSkeleton /> : content : content}</>;
+  return (
+    <>
+      {inCardContainer ? isLoading ? <CaveDetailSkeleton /> : content : content}
+
+      {geoJsonToSave && (
+        <GeoJsonSaveModal
+          isVisible={isGeoJsonModalVisible}
+          caveId={cave?.id as string}
+          geoJson={geoJsonToSave}
+          onCancel={() => {
+            setIsGeoJsonModalVisible(false);
+            setGeoJsonToSave(null);
+          }}
+          onSaved={() => {
+            setIsGeoJsonModalVisible(false);
+            setGeoJsonToSave(null);
+            updateCave && updateCave();
+          }}
+        />
+      )}
+    </>
+  );
 };
 
 export { CaveComponent };
