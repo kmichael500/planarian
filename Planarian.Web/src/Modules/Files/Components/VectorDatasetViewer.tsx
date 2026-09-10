@@ -4,9 +4,8 @@ import type { ReactNode } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import bbox from "@turf/bbox";
 import { kml as convertKmlToGeoJson } from "@tmcw/togeojson";
-import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
-import { Source, Layer, useMap } from "react-map-gl/maplibre";
-import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
+import { SpatialFileMap } from "../../Map/Components/SpatialFileMap";
+import { Source, Layer } from "react-map-gl/maplibre";
 
 const VECTOR_SOURCE_ID = "vector-dataset-viewer-source";
 const VECTOR_FILL_LAYER_ID = "vector-dataset-viewer-fill";
@@ -142,138 +141,64 @@ export const VectorDatasetViewer: React.FC<VectorDatasetViewerProps> = ({
 
   return (
     <div style={{ width: "100%", height: "100%" }}>
-      <MapBaseComponent
-        key={embedUrl}
+      <SpatialFileMap
         initialCenter={center}
         initialZoom={10}
-        initialBounds={bounds}
-        initialFitBoundsOptions={{ maxZoom: 15 }}
-        onCaveClicked={() => { }}
-        onNonCaveClicked={() => { }}
-        manageBodyPadding={false}
-        showFullScreenControl={false}
-        onMoveEnd={() => { }}
-        additionalInteractiveLayerIds={[
+        bounds={bounds}
+        fitBoundsOptions={{ maxZoom: 15 }}
+        interactiveLayerIds={[
           VECTOR_FILL_LAYER_ID,
           VECTOR_LINE_LAYER_ID,
           VECTOR_POINT_LAYER_ID,
         ]}
-        reuseMaps={false}
       >
-        <VectorOverlay data={collection} bounds={bounds} />
-      </MapBaseComponent>
+        <VectorOverlay data={collection} />
+      </SpatialFileMap>
     </div>
   );
 };
 
 interface VectorOverlayProps {
   data: FeatureCollection;
-  bounds: BoundsTuple;
 }
 
-const VectorOverlay: React.FC<VectorOverlayProps> = ({ data, bounds }) => {
-  const map = useMap();
-  const mapRef = map?.current;
-
-  useFitMapBounds(mapRef, bounds, { maxZoom: 15, padding: 20 });
-
-  useEffect(() => {
-    if (!mapRef) {
-      return;
-    }
-
-    const mapInstance = mapRef.getMap();
-    const layerIds = [
-      VECTOR_FILL_LAYER_ID,
-      VECTOR_LINE_LAYER_ID,
-      VECTOR_POINT_LAYER_ID,
-    ];
-
-    const handleMouseEnter = () => {
-      mapInstance.getCanvas().style.cursor = "pointer";
-    };
-
-    const handleMouseLeave = () => {
-      mapInstance.getCanvas().style.cursor = "";
-    };
-
-    layerIds.forEach((layerId) => {
-      mapInstance.on("mouseenter", layerId, handleMouseEnter);
-      mapInstance.on("mouseleave", layerId, handleMouseLeave);
-    });
-
-    return () => {
-      layerIds.forEach((layerId) => {
-        mapInstance.off("mouseenter", layerId, handleMouseEnter);
-        mapInstance.off("mouseleave", layerId, handleMouseLeave);
-      });
-      mapInstance.getCanvas().style.cursor = "";
-    };
-  }, [mapRef]);
-
-  return (
-    <>
-      <Source id={VECTOR_SOURCE_ID} type="geojson" data={data}>
-        <Layer
-          id={VECTOR_FILL_LAYER_ID}
-          type="fill"
-          paint={{
-            "fill-color": "#FF0000",
-            "fill-opacity": 0.8,
-            "fill-outline-color": "#B22222",
-          }}
-          filter={[
-            "any",
-            ["==", ["geometry-type"], "Polygon"],
-            ["==", ["geometry-type"], "MultiPolygon"],
-          ]}
-        />
-        <Layer
-          id={VECTOR_LINE_LAYER_ID}
-          type="line"
-          layout={{ "line-join": "round", "line-cap": "round" }}
-          paint={{
-            "line-color": "#00008B",
-            "line-width": 2,
-            "line-opacity": 0.9,
-          }}
-          filter={[
-            "any",
-            ["==", ["geometry-type"], "LineString"],
-            ["==", ["geometry-type"], "MultiLineString"],
-          ]}
-        />
-        <Layer
-          id={VECTOR_POINT_LAYER_ID}
-          type="circle"
-          paint={{
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              0,
-              1,
-              12,
-              1.5,
-              16,
-              2.5,
-            ],
-            "circle-color": "#ff5722",
-            "circle-stroke-color": "#ffffff",
-            "circle-stroke-width": 0.5,
-            "circle-opacity": 0.85,
-          }}
-          filter={[
-            "any",
-            ["==", ["geometry-type"], "Point"],
-            ["==", ["geometry-type"], "MultiPoint"],
-          ]}
-        />
-      </Source>
-
-    </>
-  );
-};
+const VectorOverlay: React.FC<VectorOverlayProps> = ({ data }) => (
+  <Source id={VECTOR_SOURCE_ID} type="geojson" data={data}>
+    <Layer
+      id={VECTOR_FILL_LAYER_ID}
+      type="fill"
+      paint={{
+        "fill-color": "#FF0000",
+        "fill-opacity": 0.8,
+        "fill-outline-color": "#B22222",
+      }}
+      filter={["==", ["geometry-type"], "Polygon"]}
+    />
+    <Layer
+      id={VECTOR_LINE_LAYER_ID}
+      type="line"
+      layout={{ "line-join": "round", "line-cap": "round" }}
+      paint={{
+        "line-color": "#00008B",
+        "line-width": 2,
+        "line-opacity": 0.9,
+      }}
+      filter={["==", ["geometry-type"], "LineString"]}
+    />
+    <Layer
+      id={VECTOR_POINT_LAYER_ID}
+      type="circle"
+      paint={{
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 1.5, 16, 2.5],
+        "circle-color": "#ff5722",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 0.5,
+        "circle-opacity": 0.85,
+      }}
+      filter={["==", ["geometry-type"], "Point"]}
+    />
+  </Source>
+);
 
 function normalizeToFeatureCollection(input: unknown): FeatureCollection | null {
   if (!input) {

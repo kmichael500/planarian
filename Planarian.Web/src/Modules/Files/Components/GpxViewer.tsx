@@ -3,10 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { FeatureCollection, Feature, Position } from "geojson";
 import bbox from "@turf/bbox";
-import { Source, Layer, useMap } from "react-map-gl/maplibre";
+import { Source, Layer } from "react-map-gl/maplibre";
 import { gpx as convertGpxToGeoJson } from "@tmcw/togeojson";
-import { MapBaseComponent } from "../../Map/Components/MapBaseComponent";
-import { useFitMapBounds } from "../../Map/Hooks/useFitMapBounds";
+import { SpatialFileMap } from "../../Map/Components/SpatialFileMap";
 
 const GPX_LAYER_ID = "gpx-viewer-layer";
 const GPX_SOURCE_ID = "gpx-viewer-source";
@@ -259,37 +258,23 @@ export const GpxViewer: React.FC<GpxViewerProps> = ({
 
   return (
     <div style={{ width: "100%", height: "100%" }}>
-      <MapBaseComponent
-        key={embedUrl}
+      <SpatialFileMap
         initialCenter={center}
         initialZoom={12}
-        initialBounds={gpxBounds}
-        initialFitBoundsOptions={{ maxZoom: 15 }}
-        onCaveClicked={() => { }}
-        onNonCaveClicked={() => { }}
-        manageBodyPadding={false}
-        showFullScreenControl={false}
-        onMoveEnd={() => { }}
-        reuseMaps={false}
+        bounds={gpxBounds}
+        fitBoundsOptions={{ maxZoom: 16 }}
       >
-        <GpxOverlay data={gpxGeoJson} bounds={gpxBounds} />
-      </MapBaseComponent>
+        <GpxOverlay data={gpxGeoJson} />
+      </SpatialFileMap>
     </div>
   );
 };
 
 interface GpxOverlayProps {
   data: FeatureCollection;
-  bounds: BoundsTuple;
 }
 
-const GpxOverlay: React.FC<GpxOverlayProps> = ({ data, bounds }) => {
-  const map = useMap();
-  const mapRef = map?.current;
-
-  useFitMapBounds(mapRef, bounds, { maxZoom: 16, padding: 20 });
-
-  return (
+const GpxOverlay: React.FC<GpxOverlayProps> = ({ data }) => (
     <Source id={GPX_SOURCE_ID} type="geojson" data={data}>
       <Layer
         id={GPX_LAYER_ID}
@@ -307,5 +292,4 @@ const GpxOverlay: React.FC<GpxOverlayProps> = ({ data, bounds }) => {
         ]}
       />
     </Source>
-  );
-};
+);
