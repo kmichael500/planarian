@@ -19,14 +19,18 @@ public class MapController : PlanarianControllerBase<MapService>
     {
     }
 
+
     [HttpGet]
     [Throttle(RequestsPerMinute = 600)]
-    public async Task<ActionResult<IEnumerable<object>>> GetMapData([FromQuery] double north, [FromQuery] double south,
+    public async Task<ActionResult<IEnumerable<object>>> GetMapData(
+        [FromQuery] double north,
+        [FromQuery] double south,
         [FromQuery] double east,
-        [FromQuery] double west, [FromQuery] int zoom, CancellationToken cancellationToken)
+        [FromQuery] double west,
+        [FromQuery] int zoom,
+        CancellationToken cancellationToken)
     {
-        var data = await Service.GetMapData(north, south, east, west, zoom, cancellationToken);
-        return Ok(data);
+        return Ok(await Service.GetMapData(north, south, east, west, zoom, cancellationToken));
     }
 
     [HttpGet("center")]
@@ -50,6 +54,7 @@ public class MapController : PlanarianControllerBase<MapService>
 
         return File(mvtData, "application/vnd.mapbox-vector-tile");
     }
+
 
     [HttpGet("lineplots/ids")]
     [Throttle(RequestsPerMinute = 600)]
@@ -77,7 +82,7 @@ public class MapController : PlanarianControllerBase<MapService>
         if (element == null)
             return NotFound();
 
-        Response.Headers["Cache-Control"] = "public, max-age=2678400"; // cache for 31 days
+        Response.Headers["Cache-Control"] = "private, no-cache";
         return new JsonResult(element.Value);
     }
     

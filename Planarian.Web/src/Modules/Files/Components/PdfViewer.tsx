@@ -63,6 +63,14 @@ const PDF_VIEWER_READ_ONLY_STYLES = `
   #editorUndoBar {
     display: none !important;
   }
+
+  #viewerContainer {
+    /*
+     * PDF.js handles pinch zoom itself. Keep single-finger panning native, but
+     * prevent the browser from starting a competing viewport pinch gesture.
+     */
+    touch-action: pan-x pan-y;
+  }
 `;
 
 let pdfViewerElementLoadPromise: Promise<void> | null = null;

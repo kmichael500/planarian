@@ -63,6 +63,9 @@ describe("PdfViewer", () => {
         supportsDownloading: false,
       })
     );
+    expect(mockInjectViewerStyles).toHaveBeenCalledWith(
+      expect.stringContaining("touch-action: pan-x pan-y")
+    );
 
     const viewer = document.querySelector("pdfjs-viewer-element");
     expect(viewer).not.toBeNull();

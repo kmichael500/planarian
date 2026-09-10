@@ -1,6 +1,6 @@
 import type { MapRef } from "react-map-gl/maplibre";
 
-export const entranceHitRadiusPixels = 14;
+export const entranceHitRadiusPixels = 24;
 export const entranceVisibleMinZoom = 9;
 
 type MapHitTestApi = Pick<
