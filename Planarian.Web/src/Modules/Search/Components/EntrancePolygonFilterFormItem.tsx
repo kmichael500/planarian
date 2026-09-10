@@ -16,7 +16,7 @@ import {
 } from "../Services/QueryBuilder";
 import { MapService } from "../../Map/Services/MapService";
 import type { LngLatBoundsLike } from "maplibre-gl";
-import { LayerControl } from "../../Map/Components/LayerControl";
+import { MapLayerControl } from "../../Map/Components/MapLayerControl";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import bbox from "@turf/bbox";
 
@@ -540,7 +540,7 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
                 }}
               >
                 <div id="layer-control-container">
-                  <LayerControl position={LAYER_CONTROL_POSITION} />
+                  <MapLayerControl position={LAYER_CONTROL_POSITION} />
                 </div>
                 {polygonFeature && (
                   <Source id="entrance-polygon" type="geojson" data={polygonFeature}>
