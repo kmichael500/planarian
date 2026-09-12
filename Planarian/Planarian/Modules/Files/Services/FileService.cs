@@ -449,7 +449,7 @@ public class FileTypeTagName
 public class FileVm
 {
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string? DisplayName { get; set; }
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;
