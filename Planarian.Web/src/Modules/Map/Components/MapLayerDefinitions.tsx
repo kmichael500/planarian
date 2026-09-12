@@ -13,13 +13,24 @@ export interface MapLayerSourceDefinition {
   encoding?: "terrarium" | "mapbox";
 }
 
+export type MapLayerSectionId = "cave-data" | "hydrology" | "base-layers" | "reference";
+
+export const MAP_LAYER_SECTIONS: Array<{ id: MapLayerSectionId; displayName: string }> = [
+  { id: "base-layers", displayName: "Base Layers" },
+  { id: "hydrology", displayName: "Hydrology" },
+  { id: "reference", displayName: "Reference" },
+  { id: "cave-data", displayName: "Cave Data" },
+];
+
 interface BaseMapLayerDefinition {
   id: string;
   displayName: string;
   defaultVisible: boolean;
   defaultOpacity: number;
   attribution?: string;
+  description?: string;
   groupId?: string;
+  sectionId?: MapLayerSectionId;
   minzoom?: number;
   maxzoom?: number;
 }
@@ -32,6 +43,10 @@ export interface RasterMapLayerDefinition extends BaseMapLayerDefinition {
 export interface HillshadeMapLayerDefinition extends BaseMapLayerDefinition {
   type: "hillshade";
   source: MapLayerSourceDefinition;
+}
+
+export interface OverlayMapLayerDefinition extends BaseMapLayerDefinition {
+  type: "overlay";
 }
 
 export interface VectorMapLayerDefinition extends BaseMapLayerDefinition {
@@ -62,6 +77,7 @@ export interface MapLayerGroupDefinition extends BaseMapLayerDefinition {
 export type MapLayerDefinition =
   | RasterMapLayerDefinition
   | HillshadeMapLayerDefinition
+  | OverlayMapLayerDefinition
   | VectorMapLayerDefinition
   | MapLayerGroupDefinition;
 
@@ -108,6 +124,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     source: { tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256 },
     defaultVisible: true,
     defaultOpacity: 1,
+    sectionId: "base-layers",
     attribution: "© OpenStreetMap contributors",
   },
   {
@@ -117,6 +134,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     source: { tiles: ["https://tile.opentopomap.org/{z}/{x}/{y}.png"], tileSize: 256 },
     defaultVisible: false,
     defaultOpacity: 1,
+    sectionId: "base-layers",
     attribution: "© OpenStreetMap contributors",
   },
   {
@@ -129,16 +147,24 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     },
     defaultVisible: false,
     defaultOpacity: 1,
+    sectionId: "base-layers",
     attribution: "Esri",
   },
   {
-    id: "mapterhorn-hillshade",
-    displayName: "Hillshade",
-    type: "hillshade",
-    source: { url: MAPTERHORN_TILEJSON_URL, tileSize: 512, encoding: "terrarium" },
-    defaultVisible: false,
+    id: "entrances",
+    displayName: "Cave Entrances",
+    type: "overlay",
+    defaultVisible: true,
     defaultOpacity: 1,
-    attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+    sectionId: "cave-data",
+  },
+  {
+    id: "line-plots",
+    displayName: "Line Plots",
+    type: "overlay",
+    defaultVisible: true,
+    defaultOpacity: 1,
+    sectionId: "cave-data",
   },
   {
     id: "arcgis-public-access",
@@ -150,6 +176,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     },
     defaultVisible: false,
     defaultOpacity: 0.8,
+    sectionId: "reference",
     attribution: "PADUS 4.0",
     fillLayer: {
       id: "arcgis-public-access-fill",
@@ -193,6 +220,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     },
     defaultVisible: false,
     defaultOpacity: 1,
+    sectionId: "reference",
     attribution: "Regrid Nationwide Parcel Boundaries v1",
   },
   {
@@ -202,6 +230,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     source: { tiles: ["https://tiles.macrostrat.org/carto/{z}/{x}/{y}.png"], tileSize: 256 },
     defaultVisible: false,
     defaultOpacity: 1,
+    sectionId: "base-layers",
     attribution: "Macrostrat",
   },
   {
@@ -211,12 +240,42 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     memberLayerIds: NGMDB_LAYER_SPECS.map(({ scale }) => ngmdbLayerId(scale)),
     defaultVisible: false,
     defaultOpacity: 1,
+    sectionId: "base-layers",
     attribution: "NGMDB Map Viewer",
   },
   ...NGMDB_LAYER_SPECS.map(createNgmdbLayer),
   {
-    id: "usgs-hydro",
+    id: "mapterhorn-hillshade",
+    displayName: "Hillshade",
+    type: "hillshade",
+    source: { url: MAPTERHORN_TILEJSON_URL, tileSize: 512, encoding: "terrarium" },
+    defaultVisible: false,
+    defaultOpacity: 1,
+    sectionId: "base-layers",
+    attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
+  },
+  {
+    id: "usgs-hydrology-group",
     displayName: "Hydrology",
+    description: "USGS surface-water features, monitoring stations, and drainage boundaries.",
+    type: "group",
+    memberLayerIds: [
+      "usgs-hydro",
+      "usgs-3dhp-springs",
+      "usgs-3dhp-sinks",
+      "usgs-3dhp-waterbody-outlets",
+      "usgs-stream-gages",
+      "usgs-drainage-basins-16digit",
+    ],
+    defaultVisible: false,
+    defaultOpacity: 1,
+    sectionId: "hydrology",
+    attribution: "USGS",
+  },
+  {
+    id: "usgs-hydro",
+    displayName: "Hydrography",
+    description: "Mapped streams, rivers, lakes, canals, and other surface-water features.",
     type: "raster",
     source: {
       tiles: ["https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=0,1,2,3,4,5,6,7,8,9,10,11,12&styles="],
@@ -224,11 +283,57 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     },
     defaultVisible: false,
     defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
     attribution: "USGS",
+  },
+  {
+    id: "usgs-3dhp-springs",
+    displayName: "Springs",
+    description: "Locations where groundwater naturally emerges at the land surface.",
+    type: "overlay",
+    defaultVisible: false,
+    defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
+    minzoom: 9,
+    attribution: "USGS 3DHP",
+  },
+  {
+    id: "usgs-3dhp-sinks",
+    displayName: "Hydrologic Sinks",
+    description: "Locations where surface flow enters underground or terminates in a closed depression.",
+    type: "overlay",
+    defaultVisible: false,
+    defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
+    minzoom: 9,
+    attribution: "USGS 3DHP",
+  },
+  {
+    id: "usgs-3dhp-waterbody-outlets",
+    displayName: "Waterbody Outlets",
+    description: "Locations where flow exits a lake, pond, reservoir, or other waterbody into the downstream network.",
+    type: "overlay",
+    defaultVisible: false,
+    defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
+    minzoom: 9,
+    attribution: "USGS 3DHP",
+  },
+  {
+    id: "usgs-stream-gages",
+    displayName: "Stream Gages",
+    description: "Active USGS monitoring stations that record streamflow, stage, or other water conditions.",
+    type: "overlay",
+    defaultVisible: false,
+    defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
+    minzoom: 8,
+    attribution: "USGS Water Data",
   },
   {
     id: "usgs-drainage-basins-16digit",
     displayName: "Watershed Boundary",
+    description: "USGS drainage-area boundaries showing land that contributes surface runoff to a common outlet.",
     type: "raster",
     source: {
       tiles: ["https://hydro.nationalmap.gov/arcgis/services/wbd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=8&styles="],
@@ -236,6 +341,7 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
     },
     defaultVisible: false,
     defaultOpacity: 1,
+    groupId: "usgs-hydrology-group",
     attribution: "USGS Watershed Boundary Dataset",
   },
 ];

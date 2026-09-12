@@ -15,6 +15,7 @@ import { MapLayerControl } from "./MapLayerControl";
 import { MapLinePlotLayer } from "./MapLinePlotLayer";
 import { PlanarianBaseMap } from "./PlanarianBaseMap";
 import { MapLayerProvider } from "./MapLayerContext";
+import { hasHydrologyOverlayFeatureAtPoint } from "./MapHydrologyOverlayLayer";
 import { MapLayers } from "./MapLayers";
 
 interface CaveMapProps {
@@ -57,6 +58,8 @@ export const CaveMap: React.FC<CaveMapProps> = ({ cave, lineworkRefreshToken = 0
       void openCave(exactCaveId);
       return;
     }
+
+    if (hasHydrologyOverlayFeatureAtPoint(mapRef.current, event.point)) return;
 
     const nearbyCaveId = findNearbyEntranceCaveId(mapRef.current, event.point);
     if (nearbyCaveId) {
