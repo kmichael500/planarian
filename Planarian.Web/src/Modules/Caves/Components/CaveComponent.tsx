@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CloudUploadOutlined } from "@ant-design/icons";
 import {
+  Button,
   Col,
   Collapse,
   Row,
   Space,
   Select,
-  DatePicker,
-  InputNumber,
   Skeleton,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
@@ -39,18 +38,15 @@ import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
-import dayjs, { Dayjs } from "dayjs";
+import { StreamGages } from "../../Map/Components/StreamGages";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
-import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
-import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
 import { CaveSpatialDataImport } from "./CaveSpatialDataImport";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
   <PlanarianDescription
@@ -131,17 +127,9 @@ const CaveComponent = ({
   const [selectedEntrance, setSelectedEntrance] = useState<EntranceVm | null>(
     null
   );
-  const [selectedGageEntrance, setSelectedGageEntrance] =
-    useState<EntranceVm | null>(null);
-
-  const [gageDateRange, setGageDateRange] = useState<
-    [Dayjs | null, Dayjs | null]
-  >([dayjs().subtract(1, "month"), dayjs()]);
-
-  const [gageDistance, setGageDistance] = useState<number>(25);
 
   const [showGeology, setShowGeology] = useState(false);
-  const [showGages, setShowGages] = useState(false);
+  const [showStreamGages, setShowStreamGages] = useState(false);
 
   const [lineworkRefreshToken, setLineworkRefreshToken] = useState(0);
 
@@ -360,7 +348,6 @@ const CaveComponent = ({
         (entrance) => entrance.isPrimary
       );
       setSelectedEntrance(primaryEntrance || cave.entrances[0]);
-      setSelectedGageEntrance(primaryEntrance || cave.entrances[0]);
     }
   }, [cave]);
 
@@ -529,14 +516,16 @@ const CaveComponent = ({
             title="Stream Gages"
             secondaryTitle="from USGS NWIS"
             element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGages(!showGages)}>
-                  {showGages ? "Show less" : "Show more"}
-                </a>
-              </div>
+              <Button
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => setShowStreamGages(!showStreamGages)}
+              >
+                {showStreamGages ? "Show less" : "Show more"}
+              </Button>
             }
           />
-          {!showGages && (
+          {!showStreamGages && (
             <div style={{ marginBottom: "8px" }}>
               <p>
                 View real-time water data from USGS's network of over 11,800
@@ -546,73 +535,15 @@ const CaveComponent = ({
               </p>
             </div>
           )}
-          {showGages &&
-            selectedGageEntrance &&
-            selectedGageEntrance.latitude &&
-            selectedGageEntrance.longitude && (
-              <div style={{}}>
-                <Row gutter={[16, 16]}>
-                  {cave.entrances.length > 1 && (
-                    <Col xs={24} sm={24} md={8} lg={8}>
-                      <Select
-                        value={selectedGageEntrance?.id}
-                        style={{ width: "100%" }}
-                        onChange={(value) => {
-                          const newEntrance = cave.entrances.find(
-                            (entrance) => entrance.id === value
-                          );
-                          if (newEntrance) {
-                            setSelectedGageEntrance(newEntrance);
-                          }
-                        }}
-                      >
-                        {cave.entrances.map((entrance, index) => (
-                          <Option
-                            key={entrance.id || index}
-                            value={entrance.id || index}
-                          >
-                            {entrance.name
-                              ? entrance.name
-                              : `Entrance ${index + 1}`}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Col>
-                  )}
-                  <Col xs={24} sm={12} md={6} lg={6}>
-                    <InputNumber
-                      value={gageDistance}
-                      addonAfter="Miles"
-                      min={1}
-                      max={50}
-                      onChange={(value) => setGageDistance(value as number)}
-                      style={{ width: "100%" }}
-                    />
-                  </Col>
-                  <Col
-                    style={{ marginBottom: "16px" }}
-                    xs={24}
-                    sm={12}
-                    md={10}
-                    lg={10}
-                  >
-                    <PlanarianDateRange
-                      value={gageDateRange}
-                      onChange={(range, dateStrings) =>
-                        setGageDateRange(range || [null, null])
-                      }
-                    />
-                  </Col>
-                </Row>
-
-                <GageList
-                  lat={selectedGageEntrance.latitude}
-                  lng={selectedGageEntrance.longitude}
-                  distanceMiles={gageDistance}
-                  dateRange={gageDateRange}
-                />
-              </div>
-            )}
+          {showStreamGages && (
+            <div style={{ marginBottom: 24 }}>
+              <StreamGages
+                caveName={cave.name}
+                entrances={cave.entrances}
+                showDivider={false}
+              />
+            </div>
+          )}
         </>
       )}
 

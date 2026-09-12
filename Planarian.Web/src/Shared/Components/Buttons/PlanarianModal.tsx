@@ -109,9 +109,12 @@ export function PlanarianModal({
 
   useEffect(() => {
     return () => {
-      // this runs on unmount / route change
-      // restore scroll when the modal is closed
-      handleClose();
+      // An unmount is lifecycle cleanup, not a user close action. Calling
+      // onClose here breaks conditionally mounted dialogs in React StrictMode.
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollPositionRef.current);
     };
   }, []);
 

@@ -14,6 +14,8 @@ namespace Planarian.Modules.Map.Controllers;
 [Route("api/map")]
 public class MapController : PlanarianControllerBase<MapService>
 {
+    private static readonly TimeSpan MaximumStreamGageObservationRange = TimeSpan.FromDays(90);
+
     public MapController(RequestUser requestUser, TokenService tokenService, MapService service) : base(requestUser,
         tokenService, service)
     {
@@ -43,7 +45,12 @@ public class MapController : PlanarianControllerBase<MapService>
 
     [HttpGet("{z:int}/{x:int}/{y:int}.mvt")]
     [Throttle(RequestsPerMinute = 600)]
-    public async Task<IActionResult> GetTile(int z, int x, int y, [FromQuery] FilterQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTile(
+        int z,
+        int x,
+        int y,
+        [FromQuery] FilterQuery query,
+        CancellationToken cancellationToken)
     {
         var mvtData = await Service.GetEntrancesMVTAsync(z, x, y, query, cancellationToken);
         // Response.Headers.Add("Cache-Control", "public, max-age=86400"); // cache for 1 day
@@ -86,6 +93,107 @@ public class MapController : PlanarianControllerBase<MapService>
         return new JsonResult(element.Value);
     }
     
+    [HttpPost("hydrology/gages")]
+    [Throttle(RequestsPerMinute = 60)]
+    public async Task<ActionResult<IReadOnlyList<NearbyStreamGage>>> GetNearbyStreamGages(
+        [FromBody] StreamGageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsValidOrigins(request.Origins) || request.DistanceMiles is <= 0 or > 50)
+        {
+            return BadRequest("Stream gage search parameters are outside the supported range.");
+        }
+
+        var gages = await Service.GetNearbyStreamGages(request, cancellationToken);
+        Response.Headers["Cache-Control"] = "private, max-age=300";
+        return Ok(gages);
+    }
+
+    [HttpGet("hydrology/gages/{siteCode}/observations")]
+    [Throttle(RequestsPerMinute = 120)]
+    public async Task<ActionResult<IReadOnlyList<StreamGageParameter>>> GetStreamGageObservations(
+        string siteCode,
+        [FromQuery] DateTimeOffset startDate,
+        [FromQuery] DateTimeOffset endDate,
+        CancellationToken cancellationToken = default)
+    {
+        if (siteCode.Length is < 8 or > 15 ||
+            !siteCode.All(char.IsDigit) ||
+            endDate < startDate ||
+            endDate - startDate > MaximumStreamGageObservationRange)
+        {
+            return BadRequest("USGS stream gage observation parameters are invalid or exceed the 90-day range limit.");
+        }
+
+        var observations = await Service.GetStreamGageObservations(
+            siteCode,
+            startDate,
+            endDate,
+            cancellationToken);
+        Response.Headers["Cache-Control"] = "private, max-age=300";
+        return Ok(observations);
+    }
+
+    [HttpGet("hydrology/gages/{siteCode}/peaks")]
+    [Throttle(RequestsPerMinute = 120)]
+    public async Task<ActionResult<StreamGagePeakSummary>> GetStreamGagePeakSummary(
+        string siteCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (siteCode.Length is < 8 or > 15 || !siteCode.All(char.IsDigit))
+        {
+            return BadRequest("USGS stream gage site code is invalid.");
+        }
+
+        var summary = await Service.GetStreamGagePeakSummary(siteCode, cancellationToken);
+        Response.Headers["Cache-Control"] = "private, max-age=86400";
+        return Ok(summary);
+    }
+
+    [HttpGet("hydrology/gages/bounds")]
+    [Throttle(RequestsPerMinute = 120)]
+    public async Task<ActionResult<IReadOnlyList<StreamGageLocation>>> GetStreamGagesInBounds(
+        [FromQuery] double north,
+        [FromQuery] double south,
+        [FromQuery] double east,
+        [FromQuery] double west,
+        CancellationToken cancellationToken = default)
+    {
+        if (north is < -90 or > 90 || south is < -90 or > 90 ||
+            east is < -180 or > 180 || west is < -180 or > 180 ||
+            north <= south || east <= west || north - south > 10 || east - west > 10)
+        {
+            return BadRequest("Stream gage bounds are outside the supported range.");
+        }
+
+        var gages = await Service.GetStreamGagesInBounds(
+            north, south, east, west, cancellationToken);
+        Response.Headers["Cache-Control"] = "private, max-age=300";
+        return Ok(gages);
+    }
+
+    [HttpGet("hydrology/features/bounds")]
+    [Throttle(RequestsPerMinute = 120)]
+    public async Task<ActionResult<IReadOnlyList<HydrologyFeature>>> GetHydrologyFeaturesInBounds(
+        [FromQuery] double north,
+        [FromQuery] double south,
+        [FromQuery] double east,
+        [FromQuery] double west,
+        CancellationToken cancellationToken = default)
+    {
+        if (north is < -90 or > 90 || south is < -90 or > 90 ||
+            east is < -180 or > 180 || west is < -180 or > 180 ||
+            north <= south || east <= west || north - south > 10 || east - west > 10)
+        {
+            return BadRequest("Hydrology bounds are outside the supported range.");
+        }
+
+        var features = await Service.GetHydrologyFeaturesInBounds(
+            north, south, east, west, cancellationToken);
+        Response.Headers["Cache-Control"] = "private, max-age=300";
+        return Ok(features);
+    }
+
     [HttpGet("geologic-maps")]
     [Throttle(RequestsPerMinute = 60)]
     public async Task<ActionResult<object>> GetMapCenter(
@@ -125,4 +233,10 @@ public class MapController : PlanarianControllerBase<MapService>
         Response.Headers["Cache-Control"] = "public, max-age=2592000"; // cache for 30 days
         return File(tile.Content, tile.ContentType);
     }
+
+    private static bool IsValidOrigins(IReadOnlyList<StreamGageSearchOrigin>? origins) =>
+        origins is { Count: > 0 and <= 100 } &&
+        origins.All(origin =>
+            origin.Latitude is >= -90 and <= 90 &&
+            origin.Longitude is >= -180 and <= 180);
 }

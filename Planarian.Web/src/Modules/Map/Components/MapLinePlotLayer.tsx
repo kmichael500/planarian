@@ -3,6 +3,9 @@ import { Layer, Source, useMap } from "react-map-gl/maplibre";
 import type { FeatureCollection } from "geojson";
 import { message } from "antd";
 import { MapService } from "../Services/MapService";
+import { useMapLayers } from "./MapLayerContext";
+
+export const MAP_LINE_PLOT_LAYER_SETTING_ID = "line-plots";
 
 interface MapLinePlotLayerProps {
   viewportRevision?: number;
@@ -16,6 +19,9 @@ export const MapLinePlotLayer: React.FC<MapLinePlotLayerProps> = ({
   attribution,
 }) => {
   const { current: map } = useMap();
+  const { isVisible, opacity } = useMapLayers();
+  const visible = isVisible(MAP_LINE_PLOT_LAYER_SETTING_ID);
+  const layerOpacity = opacity(MAP_LINE_PLOT_LAYER_SETTING_ID);
   const [linework, setLinework] = useState<LoadedLinework[]>([]);
   const requestedIds = useRef(new Set<string>());
   const mounted = useRef(true);
@@ -28,6 +34,8 @@ export const MapLinePlotLayer: React.FC<MapLinePlotLayerProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!visible) return;
+
     const load = async () => {
       try {
         const instance = map?.getMap();
@@ -70,7 +78,9 @@ export const MapLinePlotLayer: React.FC<MapLinePlotLayerProps> = ({
     };
 
     void load();
-  }, [map, viewportRevision]);
+  }, [map, viewportRevision, visible]);
+
+  if (!visible) return null;
 
   return (
     <>
@@ -80,13 +90,17 @@ export const MapLinePlotLayer: React.FC<MapLinePlotLayerProps> = ({
             id={`linework-${id}-fill`}
             type="fill"
             filter={["==", ["geometry-type"], "Polygon"]}
-            paint={{ "fill-color": "#FF0000", "fill-opacity": 0.8, "fill-outline-color": "#B22222" }}
+            paint={{
+              "fill-color": "#FF0000",
+              "fill-opacity": 0.8 * layerOpacity,
+              "fill-outline-color": "#B22222",
+            }}
           />
           <Layer
             id={`linework-${id}-line`}
             type="line"
             filter={["==", ["geometry-type"], "LineString"]}
-            paint={{ "line-color": "#00008B" }}
+            paint={{ "line-color": "#00008B", "line-opacity": layerOpacity }}
           />
           <Layer
             id={`linework-${id}-point`}
@@ -96,8 +110,9 @@ export const MapLinePlotLayer: React.FC<MapLinePlotLayerProps> = ({
             paint={{
               "circle-color": "#ff5722",
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 16, 0.5, 18, 4, 20, 8],
-              "circle-opacity": 0.8,
+              "circle-opacity": 0.8 * layerOpacity,
               "circle-stroke-color": "#0f1720",
+              "circle-stroke-opacity": layerOpacity,
               "circle-stroke-width": 0.5,
             }}
           />

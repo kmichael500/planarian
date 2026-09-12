@@ -5,6 +5,7 @@ import { CaveService } from "../../Caves/Service/CaveService";
 import { ExploreMap } from "./ExploreMap";
 
 let mockMapOnClick: ((event: any) => void) | undefined;
+let mockHydrologyOverlayHit = false;
 const mockQueryRenderedFeatures = jest.fn();
 const mockMapApi = {
   getMap: () => mockMapApi,
@@ -51,6 +52,9 @@ jest.mock("./MapLinePlotLayer", () => ({ MapLinePlotLayer: () => null }));
 jest.mock("./CaveSearchMapControl", () => ({ CaveSearchMapControl: () => null }));
 jest.mock("./ExploreMapFilters", () => ({ ExploreMapFilters: () => null }));
 jest.mock("./MapLayerControl", () => ({ MapLayerControl: () => null }));
+jest.mock("./MapHydrologyOverlayLayer", () => ({
+  hasHydrologyOverlayFeatureAtPoint: () => mockHydrologyOverlayHit,
+}));
 jest.mock("./MapClickCaveModal", () => ({ MapClickCaveModal: () => null }));
 jest.mock("./MapClickPointModal", () => ({
   MapClickPointModal: ({ isModalVisible }: { isModalVisible: boolean }) =>
@@ -92,6 +96,7 @@ describe("ExploreMap click routing", () => {
 
   beforeEach(() => {
     mockMapOnClick = undefined;
+    mockHydrologyOverlayHit = false;
     mockQueryRenderedFeatures.mockReset();
     mockMapApi.getZoom.mockReturnValue(10);
     mockMapApi.getLayer.mockReturnValue({ id: "entrances" });
@@ -120,4 +125,15 @@ describe("ExploreMap click routing", () => {
     expect(CaveService.GetCave).not.toHaveBeenCalled();
     expect(await screen.findByTestId("point-modal")).toBeInTheDocument();
   });
+  test("does not open generic point details when a Hydrology overlay was clicked", async () => {
+    mockHydrologyOverlayHit = true;
+    mockQueryRenderedFeatures.mockReturnValue([]);
+
+    render(<ExploreMap initialCenter={[35, -87]} initialZoom={10} />);
+    await clickMap();
+
+    expect(CaveService.GetCave).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("point-modal")).not.toBeInTheDocument();
+  });
+
 });
