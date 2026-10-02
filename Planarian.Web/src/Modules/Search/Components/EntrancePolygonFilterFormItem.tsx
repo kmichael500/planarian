@@ -10,6 +10,7 @@ import {
   Source,
 } from "react-map-gl/maplibre";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
+import { AppOptions } from "../../../Shared/Services/AppService";
 import {
   QueryBuilder,
   QueryOperator,
@@ -17,6 +18,10 @@ import {
 import { MapService } from "../../Map/Services/MapService";
 import type { LngLatBoundsLike } from "maplibre-gl";
 import { MapLayerControl } from "../../Map/Components/MapLayerControl";
+import { MapLayerProvider } from "../../Map/Components/MapLayerContext";
+import { MapLayers } from "../../Map/Components/MapLayers";
+import { MapEntranceTileLayer } from "../../Map/Components/MapEntranceTileLayer";
+import { MAP_OVERLAY_ANCHOR_LAYER_ID } from "../../Map/Components/PlanarianBaseMap";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import bbox from "@turf/bbox";
 
@@ -25,7 +30,13 @@ const mapStyle: StyleSpecification = {
     "https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=pk.eyJ1IjoibWljaGFlbGtldHpuZXIiLCJhIjoiY2xvODFyN3lqMDl3bzJxbm56d3lzOTBkNyJ9.9_UNmt2gelLuQ-BPQjPiCQ",
   version: 8,
   sources: {},
-  layers: [],
+  layers: [
+    {
+      id: MAP_OVERLAY_ANCHOR_LAYER_ID,
+      type: "background",
+      paint: { "background-opacity": 0 },
+    },
+  ],
 } as StyleSpecification;
 
 const LAYER_CONTROL_POSITION = {
@@ -154,6 +165,13 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
   const [initialViewState, setInitialViewState] = useState<InitialViewState | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [dragActive, setDragActive] = useState(false);
+
+  const transformRequest = useCallback((url: string) => {
+    if (AppOptions.apiBaseUrl && url.startsWith(AppOptions.apiBaseUrl)) {
+      return { url, credentials: "include" as const };
+    }
+    return { url };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -511,13 +529,15 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
               </Typography.Text>
             </div>
           )}
-          <MapProvider>
-            {initialViewState ? (
+          <MapLayerProvider>
+            <MapProvider>
+              {initialViewState ? (
               <Map
                 ref={mapRef}
                 initialViewState={initialViewState as any}
                 mapStyle={mapStyle}
                 style={{ width: "100%", height: "100%" }}
+                transformRequest={transformRequest}
                 onClick={handleMapClick}
                 cursor={isDrawing ? "crosshair" : "grab"}
                 reuseMaps
@@ -539,8 +559,10 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
                   }
                 }}
               >
+                <MapLayers />
+                <MapEntranceTileLayer />
                 <div id="layer-control-container">
-                  <MapLayerControl position={LAYER_CONTROL_POSITION} />
+                  <MapLayerControl position={LAYER_CONTROL_POSITION} excludedLayerIds={["line-plots"]} />
                 </div>
                 {polygonFeature && (
                   <Source id="entrance-polygon" type="geojson" data={polygonFeature}>
@@ -589,8 +611,9 @@ const EntrancePolygonFilterFormItem = <T extends object,>(
               >
                 <Spin spinning={isInitializing} />
               </div>
-            )}
-          </MapProvider>
+              )}
+            </MapProvider>
+          </MapLayerProvider>
         </div>
         <Space wrap>
           {isDrawing ? (

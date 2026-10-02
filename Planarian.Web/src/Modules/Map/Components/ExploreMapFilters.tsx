@@ -153,7 +153,7 @@ export const ExploreMapFilters: React.FC<ExploreMapFiltersProps> = ({ onQueryCha
 
 const FloatingPanel = styled.div`
   position: absolute;
-  top: 100px;
+  top: 150px;
   right: 0;
   z-index: 100;
   margin: 20px;

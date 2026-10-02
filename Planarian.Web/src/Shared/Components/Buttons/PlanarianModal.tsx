@@ -109,9 +109,10 @@ export function PlanarianModal({
 
   useEffect(() => {
     return () => {
-      // this runs on unmount / route change
-      // restore scroll when the modal is closed
-      handleClose();
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollPositionRef.current);
     };
   }, []);
 

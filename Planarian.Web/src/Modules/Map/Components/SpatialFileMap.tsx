@@ -6,6 +6,7 @@ import { MapLayerControl } from "./MapLayerControl";
 import { PlanarianBaseMap } from "./PlanarianBaseMap";
 import { MapLayerProvider } from "./MapLayerContext";
 import { MapLayers } from "./MapLayers";
+import { MapEntranceTileLayer } from "./MapEntranceTileLayer";
 
 interface SpatialFileMapProps {
   initialCenter: [number, number];
@@ -55,7 +56,8 @@ export const SpatialFileMap: React.FC<SpatialFileMapProps> = ({
         reuseMaps={false}
       >
         <MapLayers />
-        <MapLayerControl position={{ top: "0", right: "0" }} />
+        <MapEntranceTileLayer />
+        <MapLayerControl position={{ top: "0", right: "0" }} excludedLayerIds={["line-plots"]} />
         {children}
         {popup && (
           <Popup

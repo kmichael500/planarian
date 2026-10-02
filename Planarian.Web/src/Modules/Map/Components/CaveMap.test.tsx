@@ -32,6 +32,9 @@ jest.mock("./MapClickCaveModal", () => ({
 jest.mock("./MapLayerContext", () => ({ MapLayerProvider: ({ children }: any) => <>{children}</> }));
 jest.mock("./MapLayers", () => ({ MapLayers: () => null }));
 jest.mock("./MapLayerControl", () => ({ MapLayerControl: () => null }));
+jest.mock("./MapHydrologyOverlayLayer", () => ({
+  hasHydrologyOverlayFeatureAtPoint: () => false,
+}));
 jest.mock("./MapEntranceTileLayer", () => ({
   MAP_ENTRANCE_LAYER_ID: "entrances",
   MapEntranceTileLayer: () => <div data-testid="nearby-entrances" />,

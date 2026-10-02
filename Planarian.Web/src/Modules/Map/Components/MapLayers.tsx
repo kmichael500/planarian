@@ -3,6 +3,8 @@ import { Layer, Source, useMap } from "react-map-gl/maplibre";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { MAP_LAYER_DEFINITIONS, MAPTERHORN_TILEJSON_URL } from "./MapLayerDefinitions";
 import { useMapLayers } from "./MapLayerContext";
+import { MapHydrologyOverlayLayer } from "./MapHydrologyOverlayLayer";
+import { MapStreamGageOverlayLayer } from "./MapStreamGageOverlayLayer";
 import { MAP_OVERLAY_ANCHOR_LAYER_ID } from "./PlanarianBaseMap";
 
 const resolveTiles = (tiles: string[] | undefined) =>
@@ -15,17 +17,39 @@ const TerrainController = () => {
   useEffect(() => {
     const instance = map?.getMap();
     if (!instance) return;
-    if (terrainEnabled && instance.getSource("mapterhorn-terrain")) {
-      instance.setTerrain({ source: "mapterhorn-terrain", exaggeration: terrainExaggeration });
-    } else if (!terrainEnabled) {
-      instance.setTerrain(null);
+
+    const applyTerrain = () => {
+      if (!instance.isStyleLoaded()) return;
+
+      if (terrainEnabled && instance.getSource("mapterhorn-terrain")) {
+        instance.setTerrain({
+          source: "mapterhorn-terrain",
+          exaggeration: terrainExaggeration,
+        });
+      } else if (!terrainEnabled && instance.getTerrain()) {
+        instance.setTerrain(null);
+      }
+    };
+
+    if (instance.isStyleLoaded()) {
+      applyTerrain();
+      return;
     }
+
+    instance.once("load", applyTerrain);
+    return () => {
+      instance.off("load", applyTerrain);
+    };
   }, [map, terrainEnabled, terrainExaggeration]);
 
   return null;
 };
 
-export const MapLayers = () => {
+interface MapLayersProps {
+  includeDataOverlays?: boolean;
+}
+
+export const MapLayers: React.FC<MapLayersProps> = ({ includeDataOverlays = true }) => {
   const { isVisible, opacity } = useMapLayers();
 
   return (
@@ -33,7 +57,7 @@ export const MapLayers = () => {
       <Source id="mapterhorn-terrain" type="raster-dem" url={MAPTERHORN_TILEJSON_URL} tileSize={512} encoding="terrarium" />
       <TerrainController />
       {MAP_LAYER_DEFINITIONS.map((definition) => {
-        if (definition.type === "group") return null;
+        if (definition.type === "group" || definition.type === "overlay") return null;
         const visible = isVisible(definition.id);
         const layerOpacity = opacity(definition.id);
 
@@ -77,7 +101,12 @@ export const MapLayers = () => {
                 id={definition.id}
                 type="hillshade"
                 beforeId={MAP_OVERLAY_ANCHOR_LAYER_ID}
-                paint={{ "hillshade-exaggeration": layerOpacity }}
+                paint={{
+                  "hillshade-exaggeration": 1,
+                  "hillshade-shadow-color": `rgba(0, 0, 0, ${layerOpacity})`,
+                  "hillshade-highlight-color": `rgba(255, 255, 255, ${layerOpacity})`,
+                  "hillshade-accent-color": `rgba(0, 0, 0, ${layerOpacity})`,
+                }}
                 layout={{ visibility: visible ? "visible" : "none" }}
               />
             </Source>
@@ -113,6 +142,12 @@ export const MapLayers = () => {
           </React.Fragment>
         );
       })}
+      {includeDataOverlays && (
+        <>
+          <MapHydrologyOverlayLayer />
+          <MapStreamGageOverlayLayer />
+        </>
+      )}
     </>
   );
 };

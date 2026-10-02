@@ -3,6 +3,8 @@ import type { FeatureCollection } from "geojson";
 import { MapLinePlotLayer } from "./MapLinePlotLayer";
 import { MapService } from "../Services/MapService";
 
+let mockLinePlotsVisible = true;
+let mockLinePlotsOpacity = 1;
 let mockMapRef: {
   getMap: () => {
     getZoom: () => number;
@@ -25,6 +27,13 @@ jest.mock("react-map-gl/maplibre", () => ({
 
 jest.mock("antd", () => ({
   message: { error: jest.fn() },
+}));
+
+jest.mock("./MapLayerContext", () => ({
+  useMapLayers: () => ({
+    isVisible: () => mockLinePlotsVisible,
+    opacity: () => mockLinePlotsOpacity,
+  }),
 }));
 
 jest.mock("../Services/MapService", () => ({
@@ -50,8 +59,32 @@ const deferred = <T,>() => {
 describe("MapLinePlotLayer", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLinePlotsVisible = true;
+    mockLinePlotsOpacity = 1;
     mockMapRef = undefined;
   });
+
+  test("does not request line plots when the shared map-data layer is disabled", async () => {
+    mockLinePlotsVisible = false;
+    mockMapRef = {
+      getMap: () => ({
+        getZoom: () => 12,
+        getBounds: () => ({
+          getNorth: () => 36,
+          getSouth: () => 35,
+          getEast: () => -85,
+          getWest: () => -86,
+        }),
+      }),
+    };
+
+    render(<MapLinePlotLayer />);
+
+    await act(async () => undefined);
+    expect(MapService.getLinePlotIds).not.toHaveBeenCalled();
+    expect(MapService.getLinePlot).not.toHaveBeenCalled();
+  });
+
   test("renders linework that loads successfully when another plot fails", async () => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     const mapInstance = {

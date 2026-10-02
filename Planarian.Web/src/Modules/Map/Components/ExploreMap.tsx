@@ -19,6 +19,7 @@ import { PlanarianBaseMap } from "./PlanarianBaseMap";
 import { MapClickCaveModal } from "./MapClickCaveModal";
 import { MapClickPointModal } from "./MapClickPointModal";
 import { MapLayerProvider } from "./MapLayerContext";
+import { hasHydrologyOverlayFeatureAtPoint } from "./MapHydrologyOverlayLayer";
 import { MapLayers } from "./MapLayers";
 
 interface ExploreMapProps {
@@ -95,6 +96,12 @@ export const ExploreMap: React.FC<ExploreMapProps> = ({ initialCenter, initialZo
       setLineworkPopup(null);
       setPoint(null);
       void openCave(exactCaveId);
+      return;
+    }
+
+    if (hasHydrologyOverlayFeatureAtPoint(mapRef.current, event.point)) {
+      setLineworkPopup(null);
+      setPoint(null);
       return;
     }
 
