@@ -52,8 +52,10 @@ const TagComponent: React.FC<TripTagComponentProps> = (props) => {
         color={props.color}
         colorKey={colorKey}
         style={{
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
+          maxWidth: "100%",
+          whiteSpace: "normal",
+          wordBreak: "normal",
+          overflowWrap: "break-word",
         }}
       >
         {defaultIfEmpty(displayValue)}

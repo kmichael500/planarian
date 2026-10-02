@@ -19,7 +19,9 @@ public class ProjectRepository : RepositoryBase
 
     public async Task<Member?> GetProjectMember(string projectId, string userId)
     {
-        return await DbContext.Members.FirstOrDefaultAsync(e => e.UserId == userId && e.ProjectId == projectId);
+        return await DbContext.Members.FirstOrDefaultAsync(e =>
+            e.UserId == userId && e.ProjectId == projectId &&
+            e.Project!.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     #endregion
@@ -55,7 +57,8 @@ public class ProjectRepository : RepositoryBase
 
     public async Task<int> GetNumberOfTrips(string projectId)
     {
-        return await DbContext.Trips.Where(e => e.ProjectId == projectId).CountAsync();
+        return await DbContext.Trips.CountAsync(e =>
+            e.ProjectId == projectId && e.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     #endregion
@@ -64,15 +67,17 @@ public class ProjectRepository : RepositoryBase
 
     public async Task<ProjectVm?> GetProjectVm(string projectId)
     {
-        var query = DbContext.Projects.Where(e => e.Id == projectId);
+        var query = DbContext.Projects.Where(e =>
+            e.Id == projectId && e.Members.Any(member => member.UserId == RequestUser.Id));
 
         return await ToProjectVm(query).FirstOrDefaultAsync();
     }
 
 
-    public async Task<Project?> GetProject(string ProjectId)
+    public async Task<Project?> GetProject(string projectId)
     {
-        return await DbContext.Projects.Where(e => e.Id == ProjectId).FirstOrDefaultAsync();
+        return await DbContext.Projects.FirstOrDefaultAsync(e =>
+            e.Id == projectId && e.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     private static IQueryable<ProjectVm> ToProjectVm(IQueryable<Project> query)

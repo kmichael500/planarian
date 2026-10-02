@@ -12,6 +12,7 @@ namespace Planarian.Modules.Authentication.Services;
 public class TokenService
 {
     public static readonly string UserIdClaimType = nameof(UserToken.Id).ToCamelCase();
+    public static readonly string SessionVersionClaimType = nameof(UserToken.SessionVersion).ToCamelCase();
     private readonly AuthOptions _authOptions;
     private readonly JwtSecurityTokenHandler _tokenHandler = new();
 
@@ -25,7 +26,8 @@ public class TokenService
         var claims = new List<Claim>()
         {
             new(ClaimTypes.Name, user.FullName),
-            new(UserIdClaimType, user.Id)
+            new(UserIdClaimType, user.Id),
+            new(SessionVersionClaimType, user.SessionVersion.ToString())
         };
 
         if (!string.IsNullOrWhiteSpace(user.CurrentAccountId))
@@ -40,6 +42,12 @@ public class TokenService
     public string? GetUserId(ClaimsPrincipal principal)
     {
         return principal.FindFirst(UserIdClaimType)?.Value;
+    }
+
+    public static int GetSessionVersion(ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirst(SessionVersionClaimType)?.Value;
+        return int.TryParse(value, out var sessionVersion) ? sessionVersion : 0;
     }
 
     public TokenValidationParameters GetTokenValidationParameters()

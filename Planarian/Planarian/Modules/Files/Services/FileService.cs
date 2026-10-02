@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using Azure.Storage.Blobs;
 using Planarian.Library.Exceptions;
+using Planarian.Library.Helpers;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
@@ -62,6 +63,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
         CancellationToken cancellationToken, string? uuid = null)
     {
+        fileName = FileValidation.NormalizeUploadedFileName(fileName);
         await using var transaction = await Repository.BeginTransactionAsync(cancellationToken);
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
@@ -417,7 +419,7 @@ public class FileService : ServiceBase<FileRepository>
     public async Task<AuthenticatedFileResponse> CreateFileResponse(string fileId, bool isDownload,
         CancellationToken cancellationToken)
     {
-        await _requestThrottleService.CountAttempt(ThrottleProfile.FileAccess, fileId);
+        await _requestThrottleService.CountFileAccessAttempt(fileId);
 
         var file = await Repository.GetFileAccessInfo(fileId);
         if (file == null || string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.ContainerName))
@@ -504,11 +506,9 @@ public class FileService : ServiceBase<FileRepository>
         }
         finally
         {
-            // A successful initialization is cached to prevent concurrent
-            // requests from creating the same container. Once a reset deletes
-            // that container, the cached task must be discarded so the next
-            // upload creates it again.
-            ContainerInitializationTasks.TryRemove(normalizedContainerName, out _);
+            // A successful initialization is cached to avoid repeated container-existence checks.
+            // Invalidate it even when deletion fails so a later upload can re-establish the container safely.
+            ContainerInitializationTasks.TryRemove(containerClient.Name, out _);
         }
     }
 
@@ -535,7 +535,7 @@ public class FileTypeTagName
 public class FileVm
 {
     [MaxLength(PropertyLength.FileName)] public string FileName { get; set; } = null!;
-    [MaxLength(PropertyLength.Name)] public string? DisplayName { get; set; }
+    [MaxLength(PropertyLength.FileName)] public string? DisplayName { get; set; }
     [MaxLength(PropertyLength.Id)] public string Id { get; set; } = null!;
     [MaxLength(PropertyLength.Id)] public string FileTypeTagId { get; set; } = null!;
     [MaxLength(PropertyLength.Key)] public string FileTypeKey { get; set; } = null!;

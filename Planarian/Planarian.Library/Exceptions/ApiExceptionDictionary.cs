@@ -101,7 +101,7 @@ public static class ApiExceptionDictionary
         new(StatusCodes.Status400BadRequest, ApiExceptionType.InvalidEmailConfirmationCode, "The email confirmation code does not exist");
 
     public static ApiException EmailNotConfirmed => new(StatusCodes.Status400BadRequest, ApiExceptionType.EmailNotConfirmed,
-        "Please confirm your email! A new confirmation code has been sent to your email address.");
+        "Please confirm your email address before logging in.");
 
     #endregion
 

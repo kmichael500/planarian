@@ -1,26 +1,52 @@
 import { DeleteOutlined } from "@ant-design/icons";
+import { Popconfirm, PopconfirmProps } from "antd";
+import { ReactNode } from "react";
 import {
   PlanarianButton,
   PlanarianButtonTypeWithoutIcon,
 } from "./PlanarianButtton";
-import { Popconfirm, PopconfirmProps } from "antd";
-import { ReactNode } from "react";
 
-type DeleteButtonComponentType = PopconfirmProps &
-  PlanarianButtonTypeWithoutIcon & {
+type DeleteButtonConfirmationProps = Pick<
+  PopconfirmProps,
+  "title" | "description" | "onConfirm" | "onCancel" | "okText" | "cancelText"
+>;
+
+type DeleteButtonComponentType = Omit<
+  PlanarianButtonTypeWithoutIcon,
+  keyof DeleteButtonConfirmationProps | "title"
+> &
+  DeleteButtonConfirmationProps & {
     children?: ReactNode;
+    icon?: ReactNode;
   };
 
-const DeleteButtonComponent: React.FC<DeleteButtonComponentType> = (props) => {
+const DeleteButtonComponent: React.FC<DeleteButtonComponentType> = ({
+  title,
+  description,
+  onConfirm,
+  onCancel,
+  okText,
+  cancelText,
+  children,
+  icon = <DeleteOutlined />,
+  ...buttonProps
+}) => {
   return (
-    <Popconfirm {...props}>
+    <Popconfirm
+      title={title}
+      description={description}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      okText={okText}
+      cancelText={cancelText}
+    >
       <PlanarianButton
-        {...props}
-        danger={props.danger ?? true}
-        type={props.type ?? "primary"}
-        icon={<DeleteOutlined />}
+        {...buttonProps}
+        danger={buttonProps.danger ?? true}
+        type={buttonProps.type ?? "primary"}
+        icon={icon}
       >
-        {props.children || "Delete"}
+        {children || "Delete"}
       </PlanarianButton>
     </Popconfirm>
   );

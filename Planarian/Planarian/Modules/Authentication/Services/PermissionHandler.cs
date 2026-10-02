@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Models;
@@ -53,7 +54,12 @@ public class RequestUserMiddleware
             var userId = tokenService.GetUserId(context.User);
             if (!string.IsNullOrWhiteSpace(userId))
             {
-                await requestUser.Initialize(accountId, userId, throwOnInvalidAccountId);
+                var sessionVersion = TokenService.GetSessionVersion(context.User);
+                await requestUser.Initialize(accountId, userId, sessionVersion, throwOnInvalidAccountId);
+                if (!requestUser.IsAuthenticated)
+                {
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity());
+                }
             }
         }
 

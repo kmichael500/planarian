@@ -12,7 +12,13 @@ import {
   isNullOrWhiteSpace,
   nameof,
 } from "../../../Shared/Helpers/StringHelpers";
-import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import {
+  ApiErrorResponse,
+  ApiExceptionType,
+} from "../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
+import { ClientRoutes } from "../../../Configuration/Routing/ClientRoutes.generated";
+import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 
 import { BrowserLoginVm } from "../Models/BrowserLoginVm";
 import React from "react";
@@ -28,18 +34,9 @@ const LoginPage: React.FC = () => {
   }, []);
 
   const location = useLocation();
-  const encodedRedirectUrl = new URLSearchParams(location.search).get(
-    "redirectUrl"
-  );
-
-  let redirectUrl = "/";
-  if (!isNullOrWhiteSpace(encodedRedirectUrl)) {
-    redirectUrl = decodeURIComponent(encodedRedirectUrl as string);
-  }
-
   const navigate = useNavigate();
-
   const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = HttpHelpers.GetLocalRedirectUrl(queryParams.get("redirectUrl"));
   const invitationCode = queryParams.get("invitationCode") || undefined;
 
   const onSubmit = async (values: BrowserLoginVm) => {
@@ -48,13 +45,33 @@ const LoginPage: React.FC = () => {
       await login(values, invitationCode);
 
       if (!isNullOrWhiteSpace(invitationCode)) {
-        navigate(`/user/invitations/${invitationCode}`);
+        navigate(ClientRoutes.invitation.get(invitationCode));
       } else {
         navigate(redirectUrl);
       }
     } catch (e) {
       const error = e as ApiErrorResponse;
-      message.error(error.message);
+      if (error.errorCode === ApiExceptionType.EmailNotConfirmed) {
+        const emailNotConfirmedData = error.data as
+          | { confirmationEmailDeliveryStatus?: MessageDeliveryStatus }
+          | undefined;
+        navigate(
+          {
+            pathname: ClientRoutes.emailConfirmationPending.path,
+            search: location.search,
+          },
+          {
+            state: {
+              emailAddress: values.emailAddress,
+              confirmationEmailJustSent: false,
+              confirmationEmailDeliveryStatus:
+                emailNotConfirmedData?.confirmationEmailDeliveryStatus,
+            },
+          }
+        );
+      } else {
+        message.error(error.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +102,7 @@ const LoginPage: React.FC = () => {
             Register
           </PlanarianButton>
         </Link>,
-        <Link to={"../reset-password"}>
+        <Link to={ClientRoutes.passwordReset.path}>
           <PlanarianButton
             tooltip="Forgot Password"
             icon={<QuestionCircleOutlined />}

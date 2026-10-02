@@ -1,29 +1,19 @@
 import { FC, useEffect, useState } from "react";
-import { Descriptions, Grid, InputNumber, DatePicker } from "antd";
-
-import dayjs, { Dayjs } from "dayjs";
-import { CopyOutlined } from "@ant-design/icons";
 import { Macrostrat } from "./Macrostrat";
+import { StreamGages } from "./StreamGages";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
-import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import {
+  PlanarianDescription,
+  type PlanarianDescriptionItem,
+} from "../../../Shared/Components/Buttons/PlanarianDescription";
 import {
   defaultIfEmpty,
   DistanceFormat,
   formatCoordinates,
   formatDistance,
 } from "../../../Shared/Helpers/StringHelpers";
-import { GageList } from "./GaugeList";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { PublicAccessDetails } from "./PublicAccesDetails";
-import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
-
-const { RangePicker } = DatePicker;
-
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
-  return date.toLocaleString();
-}
 
 /** MapClickPointModal Props */
 interface MapClickPointModalProps {
@@ -47,29 +37,6 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
   const [address, setAddress] = useState<any>(null);
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
-
-  const [pendingDistanceMiles, setPendingDistanceMiles] = useState(20);
-  const [distanceMiles, setDistanceMiles] = useState(25);
-
-  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([
-    dayjs().subtract(1, "month"),
-    dayjs(),
-  ]);
-
-  const screens = Grid.useBreakpoint();
-  const descriptionLayout = screens.sm ? "horizontal" : "vertical";
-
-  const copyCoordinates = () => {
-    navigator.clipboard.writeText(`${lat}, ${lng}`);
-  };
-
-  // Debounce the distance input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDistanceMiles(pendingDistanceMiles);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [pendingDistanceMiles]);
 
   // --- Fetch Elevation ---
   useEffect(() => {
@@ -119,6 +86,51 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
     fetchAddress();
   }, [lat, lng]);
 
+  const locationItems: PlanarianDescriptionItem[] = [
+    {
+      key: "coordinates",
+      copyText: `${lat}, ${lng}`,
+      label: "Coordinates",
+      children: formatCoordinates(lat, lng),
+    },
+    {
+      key: "elevation",
+      label: "Elevation",
+      children: loadingElevation
+        ? "Loading..."
+        : errorElevation
+        ? errorElevation
+        : elevation
+        ? formatDistance(elevation, DistanceFormat.feet)
+        : defaultIfEmpty(""),
+    },
+    {
+      key: "address",
+      label: "Address",
+      children: loadingAddress ? (
+        "Loading..."
+      ) : errorAddress ? (
+        errorAddress
+      ) : address ? (
+        <>
+          {address.road && <div>{address.road}</div>}
+          {address.city && <div>{address.city}</div>}
+          {address.county && <div>{address.county}</div>}
+          {address.state && <div>{address.state}</div>}
+          {address.country && <div>{address.country}</div>}
+        </>
+      ) : (
+        defaultIfEmpty("")
+      ),
+    },
+    {
+      key: "land-access",
+      label: "Land Access",
+      span: "filled",
+      children: <PublicAccessDetails lat={lat} lng={lng} />,
+    },
+  ];
+
   return (
     <PlanarianModal
       open={isModalVisible}
@@ -126,55 +138,10 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
       footer={[]}
       header={`${address?.county || ""}, ${address?.state || ""} `}
     >
-      <Descriptions
-        layout={descriptionLayout}
-        bordered
+      <PlanarianDescription
         title="Location Information"
-      >
-        <Descriptions.Item
-          label={
-            <span>
-              Coordinates{" "}
-              <PlanarianButton
-                type="link"
-                icon={<CopyOutlined />}
-                onClick={copyCoordinates}
-              />
-            </span>
-          }
-        >
-          {formatCoordinates(lat, lng)}
-        </Descriptions.Item>
-        <Descriptions.Item label="Elevation">
-          {loadingElevation
-            ? "Loading..."
-            : errorElevation
-            ? errorElevation
-            : elevation
-            ? formatDistance(elevation, DistanceFormat.feet)
-            : defaultIfEmpty("")}
-        </Descriptions.Item>
-        <Descriptions.Item label="Address">
-          {loadingAddress ? (
-            "Loading..."
-          ) : errorAddress ? (
-            errorAddress
-          ) : address ? (
-            <>
-              {address.road && <div>{address.road}</div>}
-              {address.city && <div>{address.city}</div>}
-              {address.county && <div>{address.county}</div>}
-              {address.state && <div>{address.state}</div>}
-              {address.country && <div>{address.country}</div>}
-            </>
-          ) : (
-            defaultIfEmpty("")
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label="Land Access" span={3}>
-          <PublicAccessDetails lat={lat} lng={lng} />
-        </Descriptions.Item>
-      </Descriptions>
+        items={locationItems}
+      />
 
       <PlanarianDividerComponent
         title="Geology"
@@ -182,39 +149,7 @@ export const MapClickPointModal: FC<MapClickPointModalProps> = ({
       />
       <Macrostrat lat={lat} lng={lng} />
 
-      <PlanarianDividerComponent
-        title="Water Gages"
-        secondaryTitle="from USGS NWIS"
-        element={
-          <div style={{ display: "flex", gap: 8 }}>
-            <InputNumber
-              addonAfter="Miles"
-              min={1}
-              max={50}
-              value={pendingDistanceMiles}
-              onChange={(val) => {
-                if (typeof val === "number") {
-                  setPendingDistanceMiles(val);
-                }
-              }}
-            />
-
-            <PlanarianDateRange
-              value={dateRange}
-              onChange={(range, dateStrings) =>
-                setDateRange(range || [null, null])
-              }
-            />
-          </div>
-        }
-      />
-
-      <GageList
-        lat={lat}
-        lng={lng}
-        distanceMiles={distanceMiles}
-        dateRange={dateRange}
-      />
+      <StreamGages lat={lat} lng={lng} />
     </PlanarianModal>
   );
 };

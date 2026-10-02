@@ -87,8 +87,9 @@ public class BlobService
                 {
                     try
                     {
-                        var blobDownload = await blobClient.DownloadStreamingAsync(cancellationToken: readCancellationToken);
-                        return blobDownload.Value.Content;
+                        return await blobClient.OpenReadAsync(
+                            new BlobOpenReadOptions(allowModifications: false),
+                            readCancellationToken);
                     }
                     catch (RequestFailedException ex) when (ex.Status == 404)
                     {

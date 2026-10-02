@@ -3,29 +3,14 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 import { ImportComponent } from "../Components/ImportComponent";
 
 const ImportPage = () => {
-  const { setHeaderTitle, setHeaderButtons, setContentStyle, defaultContentStyle } =
-    useContext(AppContext);
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
     setHeaderButtons([]);
     setHeaderTitle(["Import"]);
-    setContentStyle({
-      ...defaultContentStyle,
-      height: "calc((var(--vh, 1vh) * 100) - 102px)",
-      overflow: "hidden",
-      display: "flex",
-      flexDirection: "column",
-    });
+  }, [setHeaderButtons, setHeaderTitle]);
 
-    return () => {
-      setContentStyle(defaultContentStyle);
-    };
-  }, [defaultContentStyle, setContentStyle, setHeaderButtons, setHeaderTitle]);
-  return (
-    <>
-      <ImportComponent />
-    </>
-  );
+  return <ImportComponent />;
 };
 
 export { ImportPage };

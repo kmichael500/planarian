@@ -8,4 +8,5 @@ public class EmailOptions : MailGunOptions
 
     public string MjmlApplicationId { get; set; } = null!;
     public string MjmlSecretKey { get; set; } = null!;
+    public string? WebhookSigningKey { get; set; }
 }

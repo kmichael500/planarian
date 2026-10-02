@@ -13,17 +13,12 @@ const AcceptInvitationPage = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const {
-    setHeaderTitle,
-    setHeaderButtons,
-    setContentStyle,
-    defaultContentStyle,
-  } = useContext(AppContext);
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const { invitationCode } = useParams();
 
   useEffect(() => {
     setHeaderButtons([]);
-  }, [invitation]);
+  }, [setHeaderButtons]);
 
   if (invitationCode === undefined) {
     throw new NotFoundError("invitationCode");
@@ -31,45 +26,47 @@ const AcceptInvitationPage = () => {
 
   useEffect(() => {
     setHeaderTitle(["Invitation"]);
-    setContentStyle({
-      margin: 0,
-      minHeight: "calc((var(--vh, 1vh) * 100) - 70px)",
-      overflow: "visible",
-      display: "flex",
-      background: "var(--background-color)",
-    });
-
-    return () => {
-      setContentStyle(defaultContentStyle);
-    };
-  }, [defaultContentStyle, setContentStyle, setHeaderTitle]);
+  }, [setHeaderTitle]);
   useEffect(() => {
+    let isCurrent = true;
+    setInvitation(undefined);
+    setIsLoading(true);
+
     const getInvitation = async () => {
       try {
         const res = await UserService.GetInvitation(invitationCode);
+        if (!isCurrent) return;
         setInvitation(res);
       } catch (err) {
+        if (!isCurrent) return;
         const error = err as ApiErrorResponse;
         message.error(error.message);
       } finally {
-        setIsLoading(false);
+        if (isCurrent) {
+          setIsLoading(false);
+        }
       }
     };
-    getInvitation();
-  }, []);
+
+    void getInvitation();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [invitationCode]);
+
+  const currentInvitation =
+    invitation?.invitationCode === invitationCode ? invitation : undefined;
+  const isCurrentInvitationLoading =
+    isLoading || (invitation != null && currentInvitation == null);
 
   return (
     <>
       <InvitationComponent
+        key={invitationCode}
         invitationCode={invitationCode}
-        invitation={invitation}
-        isLoading={isLoading}
-        updateInvitation={async () => {
-          setIsLoading(true);
-          const updatedCave = await UserService.GetInvitation(invitationCode);
-          setInvitation(updatedCave);
-          setIsLoading(false);
-        }}
+        invitation={currentInvitation}
+        isLoading={isCurrentInvitationLoading}
       />
     </>
   );

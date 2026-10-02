@@ -3,6 +3,8 @@ import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectList
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { PermissionType } from "../../Authentication/Models/PermissionType";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
+import { InviteUserResultVm } from "../Models/InviteUserResultVm";
+import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
 import {
@@ -23,14 +25,21 @@ const AccountUserManagerService = {
     );
     return response.data;
   },
-  async InviteUser(request: InviteUserRequest): Promise<string> {
-    return (await HttpClient.post<string>(`${baseUrl}`, request)).data;
+  async InviteUser(request: InviteUserRequest): Promise<InviteUserResultVm> {
+    return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request)).data;
   },
   async RevokeAccess(userId: string): Promise<void> {
     await HttpClient.delete(`${baseUrl}/${userId}`);
   },
   async ResendInvitation(userId: string): Promise<void> {
     await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {});
+  },
+  async GetInvitationEmailHistory(userId: string): Promise<InvitationEmailAttemptVm[]> {
+    return (
+      await HttpClient.get<InvitationEmailAttemptVm[]>(
+        `${baseUrl}/${userId}/invitation-email-history`
+      )
+    ).data;
   },
 
   //#region Manage Permissions

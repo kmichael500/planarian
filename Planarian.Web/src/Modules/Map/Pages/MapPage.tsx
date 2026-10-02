@@ -1,15 +1,10 @@
 import { useContext, useEffect } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { MapComponent } from "../Components/MapComponent";
+import { ExploreMap } from "../Components/ExploreMap";
 import { useLocation } from "react-router-dom";
 
 const MapPage = () => {
-  const {
-    setHeaderTitle,
-    setHeaderButtons,
-    setContentStyle,
-    defaultContentStyle,
-  } = useContext(AppContext);
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -26,16 +21,11 @@ const MapPage = () => {
   useEffect(() => {
     setHeaderTitle([`Map`]);
     setHeaderButtons([]);
-    setContentStyle({});
-
-    return () => {
-      setContentStyle(defaultContentStyle);
-    };
-  }, []);
+  }, [setHeaderButtons, setHeaderTitle]);
 
   return (
     <>
-      <MapComponent
+      <ExploreMap
         initialCenter={initialCenter}
         initialZoom={initialZoom}
         onMoveEnd={(event) => {

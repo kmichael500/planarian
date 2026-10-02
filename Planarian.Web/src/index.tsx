@@ -4,6 +4,7 @@ import utc from "dayjs/plugin/utc";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import dayjs from "dayjs";
 import { registerLicense } from "@syncfusion/ej2-base";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./index.css";
 import App from "./App";
 import reportWebVitals from "./reportWebVitals";
@@ -28,18 +29,15 @@ function showBootstrapError(): void {
 }
 
 function configureBootstrap(): void {
+  // Remove bearer credentials left by the pre-cookie browser authentication flow.
+  localStorage.removeItem("token");
+
   const baseUrl = resolveApiBaseUrl({
     hostname: window.location.hostname,
     nodeEnv: process.env.NODE_ENV,
     mappings: parseApiOriginMappings(process.env.REACT_APP_API_ORIGIN_MAPPINGS, process.env.NODE_ENV),
   });
   configureHttpClient(baseUrl);
-
-  const setVh = () => {
-    document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-  };
-  setVh();
-  window.addEventListener("resize", setVh);
 
   const umamiWebsiteId = process.env.REACT_APP_UMAMI_WEBSITE_ID?.trim();
   if (umamiWebsiteId) {

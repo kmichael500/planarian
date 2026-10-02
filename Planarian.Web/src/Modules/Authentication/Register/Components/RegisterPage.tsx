@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   Card,
   Col,
@@ -17,12 +17,14 @@ import { PasswordRegex } from "../../../../Shared/Constants/RegularExpressionCon
 import { RegisterUserVm } from "../../Models/RegisterUserVm";
 import { RegisterService } from "../Services/RegisterService";
 import { ApiErrorResponse } from "../../../../Shared/Models/ApiErrorResponse";
+import { MessageDeliveryStatus } from "../../../../Shared/Models/MessageDeliveryStatus";
 import { AppContext } from "../../../../Configuration/Context/AppContext";
 import { SubmitButtonComponent } from "../../../../Shared/Components/Buttons/SubmitButtonComponent";
 import { LoginButtonComponent } from "../../../../Shared/Components/Buttons/LoginButtonComponent";
 import { UserService } from "../../../User/UserService";
 import { PlanarianButton } from "../../../../Shared/Components/Buttons/PlanarianButtton";
 import { AcceptInvitationVm } from "../../../User/Models/AcceptInvitationVm";
+import { ClientRoutes } from "../../../../Configuration/Routing/ClientRoutes.generated";
 
 const { Text } = Typography;
 
@@ -54,7 +56,6 @@ const RegisterPage: React.FC = () => {
     undefined
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmissionSuccsess, setIsSubmissionSuccsess] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +64,7 @@ const RegisterPage: React.FC = () => {
 
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const passwordMessage =
     "Please choose a password that is at least 8 characters long and contains a combination of lowercase letters, uppercase letters, numbers, and special characters or is at least 15 characters long.";
@@ -73,14 +75,27 @@ const RegisterPage: React.FC = () => {
   }, [setHeaderTitle, setHeaderButtons]);
 
   useEffect(() => {
-    const fetchInvitationDetails = async () => {
-      if (!invitationCode) return;
+    setInvitation(undefined);
+    form.setFieldsValue({
+      [nameof<RegisterUserVm>("firstName")]: undefined,
+      [nameof<RegisterUserVm>("lastName")]: undefined,
+      [nameof<RegisterUserVm>("emailAddress")]: undefined,
+    });
 
-      setIsLoading(true);
+    if (!invitationCode) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsLoading(true);
+
+    const fetchInvitationDetails = async () => {
       try {
         const invitationDetails = await UserService.GetInvitation(
           invitationCode
         );
+        if (!isCurrent) return;
         setInvitation(invitationDetails);
         form.setFieldsValue({
           [nameof<RegisterUserVm>("firstName")]: invitationDetails.firstName,
@@ -88,46 +103,77 @@ const RegisterPage: React.FC = () => {
           [nameof<RegisterUserVm>("emailAddress")]: invitationDetails.email,
         });
       } catch (error) {
+        if (!isCurrent) return;
         message.error("Invalid or expired invitation code.");
       } finally {
-        setIsLoading(false);
+        if (isCurrent) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchInvitationDetails();
+    void fetchInvitationDetails();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [invitationCode, form]);
 
+  const currentInvitation =
+    invitationCode != null && invitation?.invitationCode === invitationCode
+      ? invitation
+      : undefined;
+
   const onFinish = async (values: RegisterUserVm) => {
+    if (
+      isSubmittingRef.current ||
+      (invitationCode != null && (isLoading || currentInvitation == null))
+    ) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     try {
-      // Append invitationCode if it exists
       const payload = { ...values, invitationCode };
 
-      await RegisterService.RegisterUser(payload);
-      message.success(
-        "Thanks! Please check your email to confirm your account!"
-      );
-      navigate("../login");
+      const result = await RegisterService.RegisterUser(payload);
+      navigate(ClientRoutes.emailConfirmationPending.path, {
+        replace: true,
+        state: {
+          emailAddress: values.emailAddress,
+          confirmationEmailJustSent:
+            result.confirmationEmailDeliveryStatus ===
+            MessageDeliveryStatus.Submitted,
+          confirmationEmailDeliveryStatus:
+            result.confirmationEmailDeliveryStatus,
+        },
+      });
     } catch (e) {
       const error = e as ApiErrorResponse;
       message.error(error.message);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
-    setIsLoading(false);
-    setIsSubmitting(false);
   };
 
   const twoPerColProps = { xs: 24, sm: 24, md: 12, lg: 12, xl: 12 } as ColProps;
 
   return (
     <>
-      <InvitationMessageCard invitation={invitation} isLoading={isLoading} />
+      <InvitationMessageCard
+        invitation={currentInvitation}
+        isLoading={isLoading}
+      />
       <Card
         title="Register"
         actions={[
           invitationCode ? (
             <PlanarianButton
               type="primary"
-              loading={isSubmitting}
+              loading={isSubmitting || isLoading}
+              disabled={isLoading || currentInvitation == null}
               onClick={() => form.submit()}
               icon={<CheckCircleOutlined />}
               alwaysShowChildren

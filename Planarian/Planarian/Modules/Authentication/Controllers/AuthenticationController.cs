@@ -43,6 +43,9 @@ public class AuthenticationController : PlanarianControllerBase<AuthenticationSe
         return Ok(new ApiTokenLoginResultVm(accessToken));
     }
 
+    // A revoked/deleted session is downgraded to anonymous before authorization. Logout must still
+    // be reachable so the browser can clear its HttpOnly cookies; unsafe POSTs remain antiforgery-protected.
+    [AllowAnonymous]
     [HttpPost("logout")]
     public IActionResult Logout()
     {

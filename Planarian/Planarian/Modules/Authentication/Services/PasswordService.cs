@@ -1,56 +1,73 @@
 using System.Security.Cryptography;
-using Planarian.Model.Shared;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Planarian.Model.Shared.Helpers;
 
 namespace Planarian.Modules.Authentication.Services;
 
 public static class PasswordService
 {
-    private const int SaltSize = 16; // 128 bit 
-    private const int KeySize = 32; // 256 bit
-    private const int Iterations = 10000;
-
-    public static string Hash(string password)
+    private const int LegacyKeySize = 32;
+    private const int CurrentIterations = 220_000;
+    private static readonly object PasswordHasherUser = new();
+    private static readonly PasswordHasher<object> PasswordHasher = new(Options.Create(new PasswordHasherOptions
     {
-        using var algorithm = new Rfc2898DeriveBytes(
-            password,
-            SaltSize,
-            Iterations,
-            HashAlgorithmName.SHA512);
-        var key = Convert.ToBase64String(algorithm.GetBytes(KeySize));
-        var salt = Convert.ToBase64String(algorithm.Salt);
+        CompatibilityMode = PasswordHasherCompatibilityMode.IdentityV3,
+        IterationCount = CurrentIterations
+    }));
 
-        return $"{Iterations}.{salt}.{key}";
-    }
+    public static string Hash(string password) => PasswordHasher.HashPassword(PasswordHasherUser, password);
 
     public static (bool Verified, bool NeedsUpgrade) Check(string hash, string password)
     {
-        var parts = hash.Split('.', 3);
+        if (string.IsNullOrWhiteSpace(hash)) return (false, false);
 
-        if (parts.Length != 3)
-            throw new FormatException("Unexpected hash format. " +
-                                      "Should be formatted as `{iterations}.{salt}.{hash}`");
+        if (!hash.Contains('.', StringComparison.Ordinal))
+        {
+            try
+            {
+                var result = PasswordHasher.VerifyHashedPassword(PasswordHasherUser, hash, password);
+                return result switch
+                {
+                    PasswordVerificationResult.Success => (true, false),
+                    PasswordVerificationResult.SuccessRehashNeeded => (true, true),
+                    _ => (false, false)
+                };
+            }
+            catch (FormatException)
+            {
+                return (false, false);
+            }
+        }
 
-        var iterations = Convert.ToInt32(parts[0]);
-        var salt = Convert.FromBase64String(parts[1]);
-        var key = Convert.FromBase64String(parts[2]);
-
-        var needsUpgrade = iterations != iterations;
-
-        using var algorithm = new Rfc2898DeriveBytes(
-            password,
-            salt,
-            iterations,
-            HashAlgorithmName.SHA512);
-        var keyToCheck = algorithm.GetBytes(KeySize);
-
-        var verified = keyToCheck.SequenceEqual(key);
-
-        return (verified, needsUpgrade);
+        return CheckLegacyHash(hash, password);
     }
 
-    public static string GenerateResetCode()
+    private static (bool Verified, bool NeedsUpgrade) CheckLegacyHash(string hash, string password)
     {
-        return IdGenerator.Generate(PropertyLength.InvitationCode);
+        try
+        {
+            var parts = hash.Split('.', 3);
+            if (parts.Length != 3 || !int.TryParse(parts[0], out var iterations) || iterations <= 0)
+                return (false, false);
+
+            var salt = Convert.FromBase64String(parts[1]);
+            var key = Convert.FromBase64String(parts[2]);
+            if (key.Length != LegacyKeySize) return (false, false);
+
+            var keyToCheck = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA512, key.Length);
+            var verified = CryptographicOperations.FixedTimeEquals(keyToCheck, key);
+            return (verified, verified);
+        }
+        catch (FormatException)
+        {
+            return (false, false);
+        }
+        catch (OverflowException)
+        {
+            return (false, false);
+        }
     }
+
+    public static string GenerateResetCode() => IdGenerator.GenerateSecureToken();
 }

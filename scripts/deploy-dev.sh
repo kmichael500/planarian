@@ -83,6 +83,13 @@ require_command npm
 require_command npx
 require_command zip
 
+echo "Preparing shared client route projections before either deployment target is built..."
+(
+  cd "${ROOT_DIR}/Planarian.Web"
+  npm run generate:client-routes
+  npm run check:client-routes
+)
+
 echo "Using Azure subscription: ${AZURE_SUBSCRIPTION_ID}"
 az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 

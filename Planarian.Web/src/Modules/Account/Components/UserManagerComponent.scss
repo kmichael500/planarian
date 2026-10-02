@@ -148,6 +148,16 @@
   overflow-wrap: anywhere;
 }
 
+.user-manager-grid-card__history {
+  display: flex;
+  margin-top: 2px;
+}
+
+.user-manager-grid-card__history .ant-btn {
+  height: auto;
+  padding: 0;
+}
+
 .user-manager-search {
   flex: 1 1 220px;
   min-width: 160px;

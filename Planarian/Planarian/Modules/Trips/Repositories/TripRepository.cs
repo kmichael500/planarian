@@ -23,25 +23,37 @@ public class TripRepository : RepositoryBase
     public async Task<Member?> GetTripMember(string tripId, string userId)
     {
         return await DbContext.Members.FirstOrDefaultAsync(e =>
-            e.UserId == userId && e.TripId == tripId);
+            e.UserId == userId && e.TripId == tripId &&
+            e.Trip!.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     #endregion
 
-    public TagType GetTripTag(string tagTypeId)
+    public TagType? GetAvailableTripTag(string tagTypeId, string projectId)
     {
-        return DbContext.TagTypes.First(e => e.Id == tagTypeId);
+        var accountId = RequestUser.AccountId;
+        return DbContext.TagTypes.FirstOrDefault(e =>
+            e.Id == tagTypeId &&
+            (e.IsDefault || e.ProjectId == projectId || accountId != null && e.AccountId == accountId));
+    }
+
+    public async Task<bool> CanAccessProject(string projectId)
+    {
+        return await DbContext.Projects.AnyAsync(e =>
+            e.Id == projectId && e.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     public async Task<TripIds?> GetIds(string tripId)
     {
-        return await DbContext.Trips.Where(e => e.Id == tripId)
+        return await DbContext.Trips.Where(e =>
+                e.Id == tripId && e.Project.Members.Any(member => member.UserId == RequestUser.Id))
             .Select(e => new TripIds(e.ProjectId, e.Id)).FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetTripMembers(string tripId)
     {
-        var tripMembers = await DbContext.Trips.Where(e => e.Id == tripId)
+        var tripMembers = await DbContext.Trips.Where(e =>
+                e.Id == tripId && e.Project.Members.Any(member => member.UserId == RequestUser.Id))
             .SelectMany(e => e.Members)
             .Select(e => new SelectListItem<string>(e.User.FullName, e.UserId))
             .ToListAsync();
@@ -51,7 +63,8 @@ public class TripRepository : RepositoryBase
 
     public async Task<IEnumerable<PhotoVm>> GetTripPhotos(string tripId)
     {
-        var photos = await DbContext.Trips.Where(e => e.Id == tripId)
+        var photos = await DbContext.Trips.Where(e =>
+                e.Id == tripId && e.Project.Members.Any(member => member.UserId == RequestUser.Id))
             .SelectMany(e => e.Photos)
             .Select(e => new PhotoVm(e.Id, e.Name, e.Description, e.BlobKey!))
             .ToListAsync();
@@ -61,7 +74,8 @@ public class TripRepository : RepositoryBase
 
     public async Task<int> GetNumberOfTripPhotos(string tripId)
     {
-        return await DbContext.Photos.CountAsync(e => e.Id == tripId);
+        return await DbContext.Photos.CountAsync(e =>
+            e.TripId == tripId && e.Trip!.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     public async Task<IEnumerable<LeadVm>> GetLeads(string tripId)
@@ -94,7 +108,8 @@ public class TripRepository : RepositoryBase
     public async Task<PagedResult<TripVm>> GetTripsByProjectIdAsQueryable(string projectId,
         FilterQuery query)
     {
-        var result = await DbContext.Trips.Where(e => e.ProjectId == projectId)
+        var result = await DbContext.Trips.Where(e =>
+                e.ProjectId == projectId && e.Project.Members.Any(member => member.UserId == RequestUser.Id))
             .Select(e => new TripVm
             {
                 Id = e.Id,
@@ -120,7 +135,8 @@ public class TripRepository : RepositoryBase
 
     public async Task<TripVm?> GetTripVm(string tripId)
     {
-        var query = DbContext.Trips.Where(e => e.Id == tripId);
+        var query = DbContext.Trips.Where(e =>
+            e.Id == tripId && e.Project.Members.Any(member => member.UserId == RequestUser.Id));
 
         return await ToTripVm(query).FirstOrDefaultAsync();
     }
@@ -137,7 +153,8 @@ public class TripRepository : RepositoryBase
 
     public async Task<Trip?> GetTrip(string tripId)
     {
-        return await DbContext.Trips.Where(e => e.Id == tripId).FirstOrDefaultAsync();
+        return await DbContext.Trips.FirstOrDefaultAsync(e =>
+            e.Id == tripId && e.Project.Members.Any(member => member.UserId == RequestUser.Id));
     }
 
     #endregion

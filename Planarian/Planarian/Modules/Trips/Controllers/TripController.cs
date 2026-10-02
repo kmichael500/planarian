@@ -95,7 +95,8 @@ public class TripController : PlanarianControllerBase<TripService>
         return new OkResult();
     }
 
-    [IgnoreAntiforgeryToken]
+    // TODO(security): Add endpoint-specific aggregate upload limits or move trip photos to the shared
+    // bounded streaming/chunked upload flow so large multipart requests are not buffered without a tight cap.
     [HttpPost("{tripId:length(10)}/photos")]
     public async Task<ActionResult> UploadTripPhotos([FromForm] IEnumerable<PhotoUpload> formData,
         string tripId)

@@ -1,0 +1,25 @@
+{
+  "routes": {
+    "invitationList": {
+      "path": "/user/invitations"
+    },
+    "invitation": {
+      "path": "/user/invitations/:invitationCode"
+    },
+    "emailConfirmation": {
+      "path": "/confirm-email",
+      "queryParameters": [
+        "code"
+      ]
+    },
+    "emailConfirmationPending": {
+      "path": "/confirm-email/pending"
+    },
+    "passwordReset": {
+      "path": "/reset-password",
+      "queryParameters": [
+        "code"
+      ]
+    }
+  }
+}

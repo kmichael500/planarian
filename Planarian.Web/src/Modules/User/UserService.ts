@@ -1,6 +1,8 @@
 import { HttpClient } from "../../Shared/Http/HttpClient";
 import { AcceptInvitationVm } from "./Models/AcceptInvitationVm";
 import { NameProfilePhotoVm } from "./Models/NameProfilePhotoVm";
+import { UpdateCurrentUserVm } from "./Models/UpdateCurrentUserVm";
+import { UpdatePasswordVm } from "./Models/UpdatePasswordVm";
 import { UserVm } from "./Models/UserVm";
 
 const baseUrl = "api/users";
@@ -15,17 +17,13 @@ const UserService = {
     );
     return response.data;
   },
-  async UpdateCurrentUser(user: UserVm): Promise<void> {
-    const response = await HttpClient.put(`${baseUrl}/current`, user);
+  async UpdateCurrentUser(user: UpdateCurrentUserVm): Promise<void> {
+    await HttpClient.put(`${baseUrl}/current`, user);
   },
-  async UpdateCurrentUserPassword(password: string): Promise<void> {
-    const response = await HttpClient.put(
-      `${baseUrl}/current/password`,
-      password,
-      {
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+  async UpdateCurrentUserPassword(
+    request: Pick<UpdatePasswordVm, "currentPassword" | "password">
+  ): Promise<void> {
+    await HttpClient.put(`${baseUrl}/current/password`, request);
   },
   async SendPasswordResetEmail(email: string): Promise<void> {
     const response = await HttpClient.post(
@@ -43,13 +41,16 @@ const UserService = {
     );
   },
   async ConfirmEmail(code: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/confirm-email?code=${code}`,
       {},
       {
         headers: { "Content-Type": "application/json" },
       }
     );
+  },
+  async ResendEmailConfirmation(emailAddress: string): Promise<void> {
+    await HttpClient.post(`${baseUrl}/confirm-email/resend`, { emailAddress });
   },
   async GetInvitation(invitationCode: string): Promise<AcceptInvitationVm> {
     const response = await HttpClient.get<AcceptInvitationVm>(

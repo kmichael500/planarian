@@ -1,17 +1,12 @@
 import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CloudUploadOutlined } from "@ant-design/icons";
-import { FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import {
   Col,
   Collapse,
-  Descriptions,
-  Grid,
   Row,
   Space,
   Select,
-  DatePicker,
-  InputNumber,
   Skeleton,
 } from "antd";
 import { TagComponent } from "../../Tag/Components/TagComponent";
@@ -27,8 +22,12 @@ import {
 } from "../../../Shared/Helpers/StringHelpers";
 import { ParagraphDisplayComponent } from "../../../Shared/Components/Display/ParagraphDisplayComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
+import {
+  PlanarianDescription,
+  type PlanarianDescriptionItem,
+} from "../../../Shared/Components/Buttons/PlanarianDescription";
 import { PlanarianDividerComponent } from "../../../Shared/Components/PlanarianDivider/PlanarianDividerComponent";
-import { MapComponent } from "../../Map/Components/MapComponent";
+import { CaveMap } from "../../Map/Components/CaveMap";
 import { FileListComponent } from "../../Files/Components/FileListComponent";
 import { UploadComponent } from "../../Files/Components/UploadComponent";
 import { FileService } from "../../Files/Services/FileService";
@@ -38,30 +37,25 @@ import { FeatureKey } from "../../Account/Models/FeatureSettingVm";
 import { EntranceVm } from "../Models/EntranceVm";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { Macrostrat } from "../../Map/Components/Macrostrat";
-import dayjs, { Dayjs } from "dayjs";
+import { StreamGages } from "../../Map/Components/StreamGages";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
-import { GageList } from "../../Map/Components/GaugeList";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
-import { PlanarianDateRange } from "../../../Shared/Components/Buttons/PlanarianDateRange";
-import { GeoJsonSaveModal } from "./GeoJsonSaveModal";
+import { CaveSpatialDataImport } from "./CaveSpatialDataImport";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 const SkeletonDescriptionGrid = ({ rows }: { rows: number }) => (
-  <Descriptions bordered>
-    {Array.from({ length: rows }, (_, index) => (
-      <Descriptions.Item
-        label={<Skeleton.Input active size="small" />}
-        key={index}
-      >
-        <Skeleton.Input active block size="small" />
-      </Descriptions.Item>
-    ))}
-  </Descriptions>
+  <PlanarianDescription
+    copyable={false}
+    items={Array.from({ length: rows }, (_, index) => ({
+      key: index,
+      label: <Skeleton.Input active size="small" />,
+      children: <Skeleton.Input active block size="small" />,
+    }))}
+  />
 );
 
 const CaveDetailSkeleton = () => (
@@ -110,6 +104,10 @@ const generateTags = (tagIds: string[] | undefined) => {
   );
 };
 
+const isDescriptionItem = (
+  item: PlanarianDescriptionItem | false
+): item is PlanarianDescriptionItem => item !== false;
+
 const CaveComponent = ({
   cave,
   isLoading,
@@ -128,47 +126,22 @@ const CaveComponent = ({
   const [selectedEntrance, setSelectedEntrance] = useState<EntranceVm | null>(
     null
   );
-  const [selectedGageEntrance, setSelectedGageEntrance] =
-    useState<EntranceVm | null>(null);
-
-  const [gageDateRange, setGageDateRange] = useState<
-    [Dayjs | null, Dayjs | null]
-  >([dayjs().subtract(1, "month"), dayjs()]);
-
-  const [gageDistance, setGageDistance] = useState<number>(25);
 
   const [showGeology, setShowGeology] = useState(false);
-  const [showGages, setShowGages] = useState(false);
+  const [showStreamGages, setShowStreamGages] = useState(false);
 
-  const [geoJsonToSave, setGeoJsonToSave] = useState<string | null>(null);
-  const [isGeoJsonModalVisible, setIsGeoJsonModalVisible] = useState(false);
+  const [lineworkRefreshToken, setLineworkRefreshToken] = useState(0);
 
-  const handleGeoJsonReceived = (
-    data: FeatureCollection<Geometry, GeoJsonProperties>[]
-  ) => {
-    if (data && data.length > 0) {
-      const geoJsonString = JSON.stringify(data, null, 2);
-      setGeoJsonToSave(geoJsonString);
-      setIsGeoJsonModalVisible(true);
-    } else {
-      // Optionally handle the case when data is empty.
-      setGeoJsonToSave(null);
-      setIsGeoJsonModalVisible(false);
-    }
-  };
-
-  const screens = Grid.useBreakpoint();
-  const descriptionLayout = screens.md ? "horizontal" : "vertical";
-
-  // have to do this because of a weird bug with the Descriptions component where wrappers don't work (elements still get displayed)
-  const descriptionItems = [
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && (
-      <Descriptions.Item label="ID" key="id">
-        {cave?.displayId}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveAlternateNames) && (
-      <Descriptions.Item label="Alternative Names" key="alternative-names">
+  const descriptionItemCandidates: (PlanarianDescriptionItem | false)[] = [
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && {
+      key: "id",
+      label: "ID",
+      children: cave?.displayId,
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveAlternateNames) && {
+      key: "alternative-names",
+      label: "Alternative Names",
+      children: (
         <Row>
           {cave?.alternateNames.length === 0 && (
             <Col>{defaultIfEmpty(null)}</Col>
@@ -179,172 +152,183 @@ const CaveComponent = ({
             </Col>
           ))}
         </Row>
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveState) && (
-      <Descriptions.Item label="State" key="state">
-        <StateTagComponent stateId={cave?.stateId} />
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveCounty) && (
-      <Descriptions.Item label="County" key="county">
-        <CountyTagComponent countyId={cave?.countyId} />
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && (
-      <Descriptions.Item label="Length" key="length">
-        {defaultIfEmpty(formatDistance(cave?.lengthFeet))}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && (
-      <Descriptions.Item label="Depth" key="depth">
-        {defaultIfEmpty(formatDistance(cave?.depthFeet, DistanceFormat.feet))}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && (
-      <Descriptions.Item label="Max Pit Depth" key="max-pit-depth">
-        {defaultIfEmpty(
-          formatDistance(cave?.maxPitDepthFeet, DistanceFormat.feet)
-        )}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && (
-      <Descriptions.Item label="Number of Pits" key="number-of-pits">
-        {defaultIfEmpty(formatNumber(cave?.numberOfPits))}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && (
-      <Descriptions.Item label="Reported On" key="reported-on">
-        {cave?.reportedOn ? formatDate(cave.reportedOn) : defaultIfEmpty(null)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && (
-      <Descriptions.Item label="Reported By" key="reported-by">
-        {generateTags(cave?.reportedByNameTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologyTags) && (
-      <Descriptions.Item label="Geology" key="geology">
-        {generateTags(cave?.geologyTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologicAgeTags) && (
-      <Descriptions.Item label="Geologic Age" key="geologic-age">
-        {generateTags(cave?.geologicAgeTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCavePhysiographicProvinceTags) && (
-      <Descriptions.Item
-        label="Physiographic Province"
-        key="physiographic-province"
-      >
-        {generateTags(cave?.physiographicProvinceTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveBiologyTags) && (
-      <Descriptions.Item label="Biology" key="biology">
-        {generateTags(cave?.biologyTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && (
-      <Descriptions.Item label="Archeology" key="archeology">
-        {generateTags(cave?.archeologyTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveMapStatusTags) && (
-      <Descriptions.Item label="Map Status" key="map-status">
-        {generateTags(cave?.mapStatusTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveCartographerNameTags) && (
-      <Descriptions.Item label="Cartographers" key="cartographers">
-        {generateTags(cave?.cartographerNameTagIds)}
-      </Descriptions.Item>
-    ),
-    isFeatureEnabled(FeatureKey.EnabledFieldCaveOtherTags) && (
-      <Descriptions.Item label="Other" key="other">
-        {generateTags(cave?.otherTagIds)}
-      </Descriptions.Item>
-    ),
-  ].filter(Boolean);
+      ),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveState) && {
+      key: "state",
+      label: "State",
+      children: <StateTagComponent stateId={cave?.stateId} />,
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveCounty) && {
+      key: "county",
+      label: "County",
+      children: <CountyTagComponent countyId={cave?.countyId} />,
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveLengthFeet) && {
+      key: "length",
+      label: "Length",
+      children: defaultIfEmpty(formatDistance(cave?.lengthFeet)),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveDepthFeet) && {
+      key: "depth",
+      label: "Depth",
+      children: defaultIfEmpty(
+        formatDistance(cave?.depthFeet, DistanceFormat.feet)
+      ),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveMaxPitDepthFeet) && {
+      key: "max-pit-depth",
+      label: "Max Pit Depth",
+      children: defaultIfEmpty(
+        formatDistance(cave?.maxPitDepthFeet, DistanceFormat.feet)
+      ),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveNumberOfPits) && {
+      key: "number-of-pits",
+      label: "Number of Pits",
+      children: defaultIfEmpty(formatNumber(cave?.numberOfPits)),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedOn) && {
+      key: "reported-on",
+      label: "Reported On",
+      children: cave?.reportedOn
+        ? formatDate(cave.reportedOn)
+        : defaultIfEmpty(null),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveReportedByNameTags) && {
+      key: "reported-by",
+      label: "Reported By",
+      children: generateTags(cave?.reportedByNameTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologyTags) && {
+      key: "geology",
+      label: "Geology",
+      children: generateTags(cave?.geologyTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveGeologicAgeTags) && {
+      key: "geologic-age",
+      label: "Geologic Age",
+      children: generateTags(cave?.geologicAgeTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCavePhysiographicProvinceTags) && {
+      key: "physiographic-province",
+      label: "Physiographic Province",
+      children: generateTags(cave?.physiographicProvinceTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveBiologyTags) && {
+      key: "biology",
+      label: "Biology",
+      children: generateTags(cave?.biologyTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveArcheologyTags) && {
+      key: "archeology",
+      label: "Archeology",
+      children: generateTags(cave?.archeologyTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveMapStatusTags) && {
+      key: "map-status",
+      label: "Map Status",
+      children: generateTags(cave?.mapStatusTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveCartographerNameTags) && {
+      key: "cartographers",
+      label: "Cartographers",
+      children: generateTags(cave?.cartographerNameTagIds),
+    },
+    isFeatureEnabled(FeatureKey.EnabledFieldCaveOtherTags) && {
+      key: "other",
+      label: "Other",
+      children: generateTags(cave?.otherTagIds),
+    },
+  ];
+  const descriptionItems = descriptionItemCandidates.filter(isDescriptionItem);
 
-  // Entrance details for each entrance panel
-  const entranceItems = (entrance: EntranceVm) =>
-    [
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && (
-        <Descriptions.Item
-          label={
-            <Space direction="vertical" size={0}>
-              <span>Coordinates</span>
-              <DistanceFromMeComponent
-                latitude={entrance.latitude}
-                longitude={entrance.longitude}
-              />
-            </Space>
-          }
-          key="coordinates"
-        >
-          {formatCoordinates(entrance.latitude, entrance.longitude)}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) && (
-        <Descriptions.Item label="Description" key="description">
-          {entrance.description}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && (
-        <Descriptions.Item label="Elevation" key="elevation">
-          {defaultIfEmpty(
-            formatDistance(entrance.elevationFeet, DistanceFormat.feet)
-          )}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && (
-        <Descriptions.Item label="Location Quality" key="location-quality">
-          <TagComponent tagId={entrance.locationQualityTagId} />
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceName) && (
-        <Descriptions.Item label="Name" key="name">
-          {entrance.name}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && (
-        <Descriptions.Item label="Reported On" key="reported-on">
-          {entrance.reportedOn
-            ? formatDate(entrance.reportedOn)
-            : defaultIfEmpty(null)}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && (
-        <Descriptions.Item label="Reported By" key="reported-by">
-          {generateTags(entrance.reportedByNameTagIds)}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && (
-        <Descriptions.Item label="Pit Depth" key="pit-depth">
-          {defaultIfEmpty(formatDistance(entrance.pitFeet))}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && (
-        <Descriptions.Item label="Status" key="status">
-          {generateTags(entrance.entranceStatusTagIds)}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) && (
-        <Descriptions.Item label="Field Indication" key="field-indication">
-          {generateTags(entrance.fieldIndicationTagIds)}
-        </Descriptions.Item>
-      ),
-      isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) && (
-        <Descriptions.Item label="Hydrology" key="hydrology">
-          {generateTags(entrance.entranceHydrologyTagIds)}
-        </Descriptions.Item>
-      ),
-      <Descriptions.Item label="Land Access" span={3}>
-        <PublicAccessDetails lat={entrance.latitude} lng={entrance.longitude} />
-      </Descriptions.Item>,
-    ].filter(Boolean);
+  const entranceItems = (entrance: EntranceVm): PlanarianDescriptionItem[] => {
+    const items: (PlanarianDescriptionItem | false)[] = [
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceCoordinates) && {
+        key: "coordinates",
+        label: (
+          <Space direction="vertical" size={0}>
+            <span>Coordinates</span>
+            <DistanceFromMeComponent
+              latitude={entrance.latitude}
+              longitude={entrance.longitude}
+            />
+          </Space>
+        ),
+        copyLabel: "Coordinates",
+        copyText: `${entrance.latitude}, ${entrance.longitude}`,
+        children: formatCoordinates(entrance.latitude, entrance.longitude),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceDescription) && {
+        key: "description",
+        label: "Description",
+        children: entrance.description,
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceElevation) && {
+        key: "elevation",
+        label: "Elevation",
+        children: defaultIfEmpty(
+          formatDistance(entrance.elevationFeet, DistanceFormat.feet)
+        ),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceLocationQuality) && {
+        key: "location-quality",
+        label: "Location Quality",
+        children: <TagComponent tagId={entrance.locationQualityTagId} />,
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceName) && {
+        key: "name",
+        label: "Name",
+        children: entrance.name,
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedOn) && {
+        key: "reported-on",
+        label: "Reported On",
+        children: entrance.reportedOn
+          ? formatDate(entrance.reportedOn)
+          : defaultIfEmpty(null),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceReportedByNameTags) && {
+        key: "reported-by",
+        label: "Reported By",
+        children: generateTags(entrance.reportedByNameTagIds),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntrancePitDepth) && {
+        key: "pit-depth",
+        label: "Pit Depth",
+        children: defaultIfEmpty(formatDistance(entrance.pitFeet)),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceStatusTags) && {
+        key: "status",
+        label: "Status",
+        children: generateTags(entrance.entranceStatusTagIds),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceFieldIndicationTags) && {
+        key: "field-indication",
+        label: "Field Indication",
+        children: generateTags(entrance.fieldIndicationTagIds),
+      },
+      isFeatureEnabled(FeatureKey.EnabledFieldEntranceHydrologyTags) && {
+        key: "hydrology",
+        label: "Hydrology",
+        children: generateTags(entrance.entranceHydrologyTagIds),
+      },
+      {
+        key: "land-access",
+        label: "Land Access",
+        span: "filled",
+        children: (
+          <PublicAccessDetails
+            lat={entrance.latitude}
+            lng={entrance.longitude}
+          />
+        ),
+      },
+    ];
+
+    return items.filter(isDescriptionItem);
+  };
 
   useEffect(() => {
     if (!cave?.primaryEntrance) {
@@ -363,16 +347,13 @@ const CaveComponent = ({
         (entrance) => entrance.isPrimary
       );
       setSelectedEntrance(primaryEntrance || cave.entrances[0]);
-      setSelectedGageEntrance(primaryEntrance || cave.entrances[0]);
     }
   }, [cave]);
 
   const content = (
     <>
       <PlanarianDividerComponent title="Information" hideTopSpacing />
-      <Descriptions layout={descriptionLayout} bordered>
-        {descriptionItems}
-      </Descriptions>
+      <PlanarianDescription items={descriptionItems} />
 
       {cave?.entrances && cave?.entrances.length > 0 && (
         <>
@@ -398,9 +379,7 @@ const CaveComponent = ({
                 }
                 key={index}
               >
-                <Descriptions bordered layout={descriptionLayout}>
-                  {entranceItems(entrance)}
-                </Descriptions>
+                <PlanarianDescription items={entranceItems(entrance)} />
               </Panel>
             ))}
           </Collapse>
@@ -475,11 +454,15 @@ const CaveComponent = ({
             title="Geology"
             secondaryTitle="from Macrostrat and NGMDB Map Viewer"
             element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGeology(!showGeology)}>
-                  {showGeology ? "Show less" : "Show more"}
-                </a>
-              </div>
+              <PlanarianButton
+                alwaysShowChildren
+                icon={undefined}
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => setShowGeology(!showGeology)}
+              >
+                {showGeology ? "Show less" : "Show more"}
+              </PlanarianButton>
             }
           />
           {!showGeology && (
@@ -536,14 +519,18 @@ const CaveComponent = ({
             title="Stream Gages"
             secondaryTitle="from USGS NWIS"
             element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGages(!showGages)}>
-                  {showGages ? "Show less" : "Show more"}
-                </a>
-              </div>
+              <PlanarianButton
+                alwaysShowChildren
+                icon={undefined}
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => setShowStreamGages(!showStreamGages)}
+              >
+                {showStreamGages ? "Show less" : "Show more"}
+              </PlanarianButton>
             }
           />
-          {!showGages && (
+          {!showStreamGages && (
             <div style={{ marginBottom: "8px" }}>
               <p>
                 View real-time water data from USGS's network of over 11,800
@@ -553,92 +540,38 @@ const CaveComponent = ({
               </p>
             </div>
           )}
-          {showGages &&
-            selectedGageEntrance &&
-            selectedGageEntrance.latitude &&
-            selectedGageEntrance.longitude && (
-              <div style={{}}>
-                <Row gutter={[16, 16]}>
-                  {cave.entrances.length > 1 && (
-                    <Col xs={24} sm={24} md={8} lg={8}>
-                      <Select
-                        value={selectedGageEntrance?.id}
-                        style={{ width: "100%" }}
-                        onChange={(value) => {
-                          const newEntrance = cave.entrances.find(
-                            (entrance) => entrance.id === value
-                          );
-                          if (newEntrance) {
-                            setSelectedGageEntrance(newEntrance);
-                          }
-                        }}
-                      >
-                        {cave.entrances.map((entrance, index) => (
-                          <Option
-                            key={entrance.id || index}
-                            value={entrance.id || index}
-                          >
-                            {entrance.name
-                              ? entrance.name
-                              : `Entrance ${index + 1}`}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Col>
-                  )}
-                  <Col xs={24} sm={12} md={6} lg={6}>
-                    <InputNumber
-                      value={gageDistance}
-                      addonAfter="Miles"
-                      min={1}
-                      max={50}
-                      onChange={(value) => setGageDistance(value as number)}
-                      style={{ width: "100%" }}
-                    />
-                  </Col>
-                  <Col
-                    style={{ marginBottom: "16px" }}
-                    xs={24}
-                    sm={12}
-                    md={10}
-                    lg={10}
-                  >
-                    <PlanarianDateRange
-                      value={gageDateRange}
-                      onChange={(range, dateStrings) =>
-                        setGageDateRange(range || [null, null])
-                      }
-                    />
-                  </Col>
-                </Row>
-
-                <GageList
-                  lat={selectedGageEntrance.latitude}
-                  lng={selectedGageEntrance.longitude}
-                  distanceMiles={gageDistance}
-                  dateRange={gageDateRange}
-                />
-              </div>
-            )}
+          {showStreamGages && (
+            <div style={{ marginBottom: 24 }}>
+              <StreamGages
+                caveName={cave.name}
+                entrances={cave.entrances}
+                showDivider={false}
+              />
+            </div>
+          )}
         </>
       )}
 
       {showMap && options && options.showMap == true && (
         <>
-          <PlanarianDividerComponent title="Map" />
-          {cave?.primaryEntrance !== null && (
+          <PlanarianDividerComponent
+            title="Map"
+            element={
+              cave ? (
+                <CaveSpatialDataImport
+                  caveId={cave.id}
+                  disabled={!hasEditPermission}
+                  onSaved={() => {
+                    setLineworkRefreshToken((value) => value + 1);
+                    updateCave?.();
+                  }}
+                />
+              ) : undefined
+            }
+          />
+          {cave?.primaryEntrance && (
             <div style={{ height: "590px" }}>
-              <MapComponent
-                initialCenter={[
-                  cave?.primaryEntrance?.latitude as number,
-                  cave?.primaryEntrance?.longitude as number,
-                ]}
-                initialZoom={15}
-                showFullScreenControl
-                showSearchBar={false}
-                showGeolocateControl={false}
-                onShapefileUploaded={handleGeoJsonReceived}
-              />
+              <CaveMap key={cave.id} cave={cave} lineworkRefreshToken={lineworkRefreshToken} />
             </div>
           )}
         </>
@@ -646,32 +579,7 @@ const CaveComponent = ({
     </>
   );
 
-  return (
-    <>
-      {inCardContainer ? (
-        isLoading ? <CaveDetailSkeleton /> : content
-      ) : (
-        content
-      )}
-
-      {geoJsonToSave && (
-        <GeoJsonSaveModal
-          isVisible={isGeoJsonModalVisible}
-          caveId={cave?.id as string}
-          geoJson={geoJsonToSave}
-          onCancel={() => {
-            setIsGeoJsonModalVisible(false);
-            setGeoJsonToSave(null);
-          }}
-          onSaved={() => {
-            setIsGeoJsonModalVisible(false);
-            setGeoJsonToSave(null);
-            updateCave && updateCave();
-          }}
-        />
-      )}
-    </>
-  );
+  return <>{inCardContainer ? isLoading ? <CaveDetailSkeleton /> : content : content}</>;
 };
 
 export { CaveComponent };

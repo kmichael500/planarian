@@ -8,6 +8,7 @@ on:
       - "Planarian.Tests/**"
       - "Planarian.Tests.Unit/**"
       - "Planarian.Tests.Integration/**"
+      - "Contracts/**"
       - "docs/**"
       - "AGENTS.md"
       - "scripts/**"
@@ -20,10 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ">=22.13.0 <23"
           cache: npm
           cache-dependency-path: Planarian.Web/package-lock.json
       - run: npm ci
+        working-directory: Planarian.Web
+      - run: npm run check:client-routes
         working-directory: Planarian.Web
       - run: scripts/validate-env-example.sh
       - run: npm test -- --watchAll=false --runInBand

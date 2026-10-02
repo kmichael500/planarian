@@ -11,6 +11,7 @@ import {
 } from "antd";
 import {
   EditOutlined,
+  MailOutlined,
   RedoOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
@@ -18,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 
 import { AccountUserManagerService } from "../Services/UserManagerService";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
+import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { UserManagerGridVm } from "../Models/UserManagerGridVm";
 import { PlanarianError } from "../../../Shared/Exceptions/PlanarianErrors";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
@@ -31,7 +33,9 @@ import {
   GridCardAction,
 } from "../../../Shared/Components/CardGrid/GridCard";
 import { SpinnerCardComponent } from "../../../Shared/Components/SpinnerCard/SpinnerCard";
+import { EmailHistoryModal } from "../../../Shared/Components/EmailHistoryModal/EmailHistoryModal";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
+import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliveryStatus";
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
@@ -56,6 +60,15 @@ const UserManagerComponent: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [sortBy, setSortBy] = useState<UserSortBy>("invitationSentOn");
   const [sortDescending, setSortDescending] = useState(true);
+  const [invitationHistoryVisible, setInvitationHistoryVisible] =
+    useState(false);
+  const [invitationHistoryLoading, setInvitationHistoryLoading] =
+    useState(false);
+  const [invitationHistoryUser, setInvitationHistoryUser] =
+    useState<UserManagerGridVm | null>(null);
+  const [invitationEmailHistory, setInvitationEmailHistory] = useState<
+    InvitationEmailAttemptVm[]
+  >([]);
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const toolbarVisibility = useScrollRevealVisibility({
@@ -83,18 +96,44 @@ const UserManagerComponent: React.FC = () => {
   const handleInviteUser = async (values: InviteUserRequest) => {
     try {
       setLoading(true);
-      const userId = await AccountUserManagerService.InviteUser(values);
-      message.success("Invitation sent successfully.");
+      const result = await AccountUserManagerService.InviteUser(values);
+      if (
+        result.invitationEmailDeliveryStatus ===
+        MessageDeliveryStatus.SendFailed
+      ) {
+        message.warning(
+          "Invitation created, but the email could not be sent. You can resend it from the user list."
+        );
+      } else {
+        message.success("Invitation sent successfully.");
+      }
       setInviteModalVisible(false);
       form.resetFields();
       // Navigate to userId/permissions/View relative to this page
-      navigate(`${userId}/permissions/${PermissionKey.View}`);
+      navigate(`${result.userId}/permissions/${PermissionKey.View}`);
       fetchUsers();
     } catch (err) {
       const error = err as ApiErrorResponse;
       message.error(error.message);
     }
     setLoading(false);
+  };
+
+  const handleShowInvitationHistory = async (user: UserManagerGridVm) => {
+    setInvitationHistoryUser(user);
+    setInvitationHistoryVisible(true);
+    setInvitationHistoryLoading(true);
+    try {
+      setInvitationEmailHistory(
+        await AccountUserManagerService.GetInvitationEmailHistory(user.userId)
+      );
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+      setInvitationEmailHistory([]);
+    } finally {
+      setInvitationHistoryLoading(false);
+    }
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
@@ -136,10 +175,8 @@ const UserManagerComponent: React.FC = () => {
     { display: "Last active", value: "lastActiveOn" },
   ];
 
-  const compareNullableDates = (
-    a?: string | null,
-    b?: string | null
-  ): number => new Date(a ?? 0).getTime() - new Date(b ?? 0).getTime();
+  const compareNullableDates = (a?: string | null, b?: string | null): number =>
+    new Date(a ?? 0).getTime() - new Date(b ?? 0).getTime();
 
   const filteredUsers = users
     .filter(
@@ -185,7 +222,7 @@ const UserManagerComponent: React.FC = () => {
     value ? formatDateTime(value) : "Not recorded";
 
   const renderUserCard = (user: UserManagerGridVm) => {
-    const isPending = user.invitationSentOn && !user.invitationAcceptedOn;
+    const isPending = user.hasActiveInvitation;
     const actions: GridCardAction[] = [
       {
         key: "edit",
@@ -260,6 +297,19 @@ const UserManagerComponent: React.FC = () => {
             <Text type="secondary">Last Active</Text>
             <span>{renderDate(user.lastActiveOn)}</span>
           </div>
+          {user.invitationEmailAttemptCount > 0 ? (
+            <div className="user-manager-grid-card__history">
+              <PlanarianButton
+                alwaysShowChildren
+                icon={<MailOutlined />}
+                size="small"
+                type="link"
+                onClick={() => handleShowInvitationHistory(user)}
+              >
+                Email History
+              </PlanarianButton>
+            </div>
+          ) : null}
         </div>
       </GridCard>
     );
@@ -332,6 +382,19 @@ const UserManagerComponent: React.FC = () => {
           </SpinnerCardComponent>
         </div>
       </div>
+
+      <EmailHistoryModal
+        open={invitationHistoryVisible}
+        loading={invitationHistoryLoading}
+        title={
+          invitationHistoryUser
+            ? `Invitation email history — ${invitationHistoryUser.fullName}`
+            : "Invitation email history"
+        }
+        attempts={invitationEmailHistory}
+        emptyText="No tracked invitation emails."
+        onClose={() => setInvitationHistoryVisible(false)}
+      />
 
       <Modal
         title="Invite User"

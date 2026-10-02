@@ -1,82 +1,119 @@
+import type { FeatureCollection } from "geojson";
 import { HttpClient } from "../../../Shared/Http/HttpClient";
-import { FeatureCollection } from "geojson";
+
 const baseUrl = "api/map";
-const cacheDuration = 24 * 60 * 60 * 1000; // 1 day in milliseconds
 
 const MapService = {
-  // getMapData: async (
-  //   north: number,
-  //   south: number,
-  //   east: number,
-  //   west: number,
-  //   zoom: number
-  // ) => {
-  //   const accountId = AuthenticationService.GetAccountId();
-  //   if (!accountId) {
-  //     throw new PlanarianError("No account id found");
-  //   }
-  //   const cacheKey = `caves-${accountId}`;
-  //   const cachedData = localStorage.getItem(cacheKey);
-  //   const now = Date.now();
-
-  //   if (cachedData) {
-  //     const { data, timestamp } = JSON.parse(cachedData);
-  //     if (now - timestamp < cacheDuration) {
-  //       return data;
-  //     }
-  //   }
-
-  //   const response = await HttpClient.get<MapData[]>(`${baseUrl}`, {
-  //     params: { north, south, east, west, zoom },
-  //   });
-  //   localStorage.setItem(
-  //     cacheKey,
-  //     JSON.stringify({ data: response.data, timestamp: now })
-  //   );
-  //   return response.data;
-  // },
-
-  getMapCenter: async () => {
+  async getMapCenter() {
     const response = await HttpClient.get<CoordinateDto>(`${baseUrl}/center`);
-
     return response.data;
   },
-  getLinePlotIds: async (
-    tileNorth: number,
-    tileSouth: number,
-    tileEast: number,
-    tileWest: number,
+
+  async getLinePlotIds(
+    north: number,
+    south: number,
+    east: number,
+    west: number,
     zoom: number
-  ) => {
-    const params = new URLSearchParams();
-    params.append("north", tileNorth.toString());
-    params.append("south", tileSouth.toString());
-    params.append("east", tileEast.toString());
-    params.append("west", tileWest.toString());
-    params.append("zoom", zoom.toString());
-    const response = await HttpClient.get<string[]>(
-      `${baseUrl}/lineplots/ids?${params}`
-    );
-
+  ) {
+    const params = new URLSearchParams({
+      north: north.toString(),
+      south: south.toString(),
+      east: east.toString(),
+      west: west.toString(),
+      zoom: zoom.toString(),
+    });
+    const response = await HttpClient.get<string[]>(`${baseUrl}/lineplots/ids?${params}`);
     return response.data;
   },
 
-  getLinePlot: async (linePlotId: string) => {
-    const response = await HttpClient.get<FeatureCollection>(
-      `${baseUrl}/lineplots/${linePlotId}`
-    );
 
+  async getLinePlot(linePlotId: string) {
+    const response = await HttpClient.get<FeatureCollection>(`${baseUrl}/lineplots/${linePlotId}`);
     return response.data;
   },
 
-  getGeologicMaps: async (latitude: number, longitude: number) => {
-    const params = new URLSearchParams();
-    params.append("latitude", latitude.toString());
-    params.append("longitude", longitude.toString());
-    const response = await HttpClient.get<GeologicMapResult[]>(
-      `${baseUrl}/geologic-maps?${params}`
+  async getNearbyStreamGages(
+    origins: StreamGageSearchOrigin[],
+    distanceMiles: number,
+    signal?: AbortSignal
+  ) {
+    const response = await HttpClient.post<NearbyStreamGage[]>(
+      `${baseUrl}/hydrology/gages`,
+      { origins, distanceMiles },
+      { signal }
     );
+    return response.data;
+  },
 
+  async getStreamGageObservations(
+    siteCode: string,
+    startDate: string,
+    endDate: string,
+    signal?: AbortSignal
+  ) {
+    const params = new URLSearchParams({ startDate, endDate });
+    const response = await HttpClient.get<StreamGageParameter[]>(
+      `${baseUrl}/hydrology/gages/${siteCode}/observations?${params}`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  async getStreamGagePeakSummary(siteCode: string, signal?: AbortSignal) {
+    const response = await HttpClient.get<StreamGagePeakSummary>(
+      `${baseUrl}/hydrology/gages/${siteCode}/peaks`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  async getStreamGagesInBounds(
+    north: number,
+    south: number,
+    east: number,
+    west: number,
+    signal?: AbortSignal
+  ) {
+    const params = new URLSearchParams({
+      north: north.toString(),
+      south: south.toString(),
+      east: east.toString(),
+      west: west.toString(),
+    });
+    const response = await HttpClient.get<StreamGageLocation[]>(
+      `${baseUrl}/hydrology/gages/bounds?${params}`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  async getHydrologyFeaturesInBounds(
+    north: number,
+    south: number,
+    east: number,
+    west: number,
+    signal?: AbortSignal
+  ) {
+    const params = new URLSearchParams({
+      north: north.toString(),
+      south: south.toString(),
+      east: east.toString(),
+      west: west.toString(),
+    });
+    const response = await HttpClient.get<HydrologyFeature[]>(
+      `${baseUrl}/hydrology/features/bounds?${params}`,
+      { signal }
+    );
+    return response.data;
+  },
+
+  async getGeologicMaps(latitude: number, longitude: number) {
+    const params = new URLSearchParams({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+    });
+    const response = await HttpClient.get<GeologicMapResult[]>(`${baseUrl}/geologic-maps?${params}`);
     return response.data;
   },
 };
@@ -84,6 +121,82 @@ const MapService = {
 export interface CoordinateDto {
   latitude: number;
   longitude: number;
+}
+
+export interface StreamGageSearchOrigin {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface HydrologyFeature {
+  id: string;
+  name?: string | null;
+  featureType: string;
+  latitude: number;
+  longitude: number;
+  source: string;
+}
+
+export interface StreamGageLocation {
+  id: string;
+  siteCode: string;
+  siteName: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface StreamGagePoint {
+  value: string;
+  dateTime: string;
+  approvalStatus?: string | null;
+}
+
+export interface StreamGageParameter {
+  parameterCode: string;
+  variableName: string;
+  unit: string;
+  points: StreamGagePoint[];
+}
+
+export interface NearbyStreamGage {
+  id: string;
+  siteCode: string;
+  siteName: string;
+  latitude: number;
+  longitude: number;
+  distanceMiles: number;
+  nearestOriginId?: string | null;
+  nearestOriginName?: string | null;
+  drainageAreaSquareMiles?: number | null;
+  contributingDrainageAreaSquareMiles?: number | null;
+  parameters: StreamGageParameter[];
+}
+
+export interface StreamGageAnnualPeak {
+  parameterCode: string;
+  variableName: string;
+  unit: string;
+  value: string;
+  date?: string | null;
+  waterYear: number;
+  qualifiers?: string[];
+  qualifier?: string | string[] | null;
+}
+
+export interface StreamGageHistoricalPeak extends StreamGageAnnualPeak {
+  firstWaterYear: number;
+  lastWaterYear: number;
+  annualPeakCount: number;
+}
+
+export interface StreamGagePeakSummary {
+  siteCode: string;
+  streamflow?: StreamGageHistoricalPeak | null;
+  gageHeight?: StreamGageHistoricalPeak | null;
+  streamflowHistory?: StreamGageAnnualPeak[];
+  gageHeightHistory?: StreamGageAnnualPeak[];
 }
 
 export interface GeologicMapResult {
