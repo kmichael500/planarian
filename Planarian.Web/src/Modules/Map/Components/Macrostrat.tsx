@@ -21,6 +21,7 @@ import {
   PlanarianDescription,
   type PlanarianDescriptionItem,
 } from "../../../Shared/Components/Buttons/PlanarianDescription";
+import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { HttpHelpers } from "../../../Shared/Helpers/HttpHelpers";
 import "./Macrostrat.scss";
 
@@ -80,8 +81,8 @@ interface ExpandableTextProps {
 /**
  * ExpandableText splits the text into paragraphs (by newline).
  * If the total character count exceeds maxChars, it shows a truncated
- * version along with a "Show more" link. When expanded, it shows all paragraphs
- * with a "Show less" link.
+ * version along with a "Show more" control. When expanded, it shows all paragraphs
+ * with a "Show less" control.
  */
 const ExpandableText: React.FC<ExpandableTextProps> = ({
   text,
@@ -125,7 +126,15 @@ const ExpandableText: React.FC<ExpandableTextProps> = ({
         {truncatedParagraphs.map((para, idx) => (
           <Paragraph key={idx}>{para}</Paragraph>
         ))}
-        <a onClick={() => setExpanded(true)}>Show more</a>
+        <PlanarianButton
+          alwaysShowChildren
+          icon={undefined}
+          type="link"
+          style={{ padding: 0 }}
+          onClick={() => setExpanded(true)}
+        >
+          Show more
+        </PlanarianButton>
       </>
     );
   }
@@ -135,7 +144,15 @@ const ExpandableText: React.FC<ExpandableTextProps> = ({
       {paragraphs.map((para, idx) => (
         <Paragraph key={idx}>{para}</Paragraph>
       ))}
-      <a onClick={() => setExpanded(false)}>Show less</a>
+      <PlanarianButton
+        alwaysShowChildren
+        icon={undefined}
+        type="link"
+        style={{ padding: 0 }}
+        onClick={() => setExpanded(false)}
+      >
+        Show less
+      </PlanarianButton>
     </>
   );
 };

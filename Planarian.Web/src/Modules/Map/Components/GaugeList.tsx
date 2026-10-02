@@ -284,7 +284,7 @@ function getPeakQualifiers(peak: StreamGageAnnualPeak): string[] {
         ]));
       }
     } catch {
-      // Fall through and preserve the legacy value as-is.
+      return Array.from(new Set([...qualifiers, trimmed]));
     }
   }
 
@@ -440,10 +440,16 @@ function StationDetails({ station, active, startDate, endDate }: StationDetailsP
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setDetailParameters(null);
     setDetailLoading(true);
     setDetailError(false);
-    MapService.getStreamGageObservations(station.siteCode, startDate, endDate)
+    MapService.getStreamGageObservations(
+      station.siteCode,
+      startDate,
+      endDate,
+      controller.signal
+    )
       .then((parameters) => {
         if (cancelled) return;
         setDetailParameters(parameters);
@@ -457,6 +463,7 @@ function StationDetails({ station, active, startDate, endDate }: StationDetailsP
         });
       })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.error("Unable to load USGS stream gage observations", error);
         if (!cancelled) {
           setDetailParameters([]);
@@ -469,20 +476,30 @@ function StationDetails({ station, active, startDate, endDate }: StationDetailsP
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [active, endDate, startDate, station.siteCode]);
 
   useEffect(() => {
-    if (!active || peakSummary || peakLoading || peakError) return;
+    if (!active || peakSummary || peakError) return;
+
+    const controller = new AbortController();
     setPeakLoading(true);
-    MapService.getStreamGagePeakSummary(station.siteCode)
-      .then(setPeakSummary)
+    MapService.getStreamGagePeakSummary(station.siteCode, controller.signal)
+      .then((summary) => {
+        if (!controller.signal.aborted) setPeakSummary(summary);
+      })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.error("Unable to load USGS annual peaks", error);
         setPeakError(true);
       })
-      .finally(() => setPeakLoading(false));
-  }, [active, peakError, peakLoading, peakSummary, station.siteCode]);
+      .finally(() => {
+        if (!controller.signal.aborted) setPeakLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [active, peakError, peakSummary, station.siteCode]);
 
   const selectedParameter = availableParameters.find((parameter) => parameter.parameterCode === selectedCode) ?? availableParameters[0];
   const latest = getLatestPoint(selectedParameter);

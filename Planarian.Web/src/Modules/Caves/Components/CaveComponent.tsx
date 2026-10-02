@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { CaveVm } from "../Models/CaveVm";
 import { CloudUploadOutlined } from "@ant-design/icons";
 import {
-  Button,
   Col,
   Collapse,
   Row,
@@ -455,11 +454,15 @@ const CaveComponent = ({
             title="Geology"
             secondaryTitle="from Macrostrat and NGMDB Map Viewer"
             element={
-              <div style={{ textAlign: "right" }}>
-                <a onClick={() => setShowGeology(!showGeology)}>
-                  {showGeology ? "Show less" : "Show more"}
-                </a>
-              </div>
+              <PlanarianButton
+                alwaysShowChildren
+                icon={undefined}
+                type="link"
+                style={{ padding: 0 }}
+                onClick={() => setShowGeology(!showGeology)}
+              >
+                {showGeology ? "Show less" : "Show more"}
+              </PlanarianButton>
             }
           />
           {!showGeology && (
@@ -516,13 +519,15 @@ const CaveComponent = ({
             title="Stream Gages"
             secondaryTitle="from USGS NWIS"
             element={
-              <Button
+              <PlanarianButton
+                alwaysShowChildren
+                icon={undefined}
                 type="link"
                 style={{ padding: 0 }}
                 onClick={() => setShowStreamGages(!showStreamGages)}
               >
                 {showStreamGages ? "Show less" : "Show more"}
-              </Button>
+              </PlanarianButton>
             }
           />
           {!showStreamGages && (

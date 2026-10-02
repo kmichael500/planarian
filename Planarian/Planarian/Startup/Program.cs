@@ -253,7 +253,7 @@ builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
-builder.Services.AddSingleton<UsgsWaterDataCache>();
+builder.Services.AddSingleton<HydrologyMemoryCache>();
 
 builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 
@@ -293,8 +293,10 @@ builder.Services.AddScoped<FeatureSettingRepository>();
 #region Http Clients
 
 builder.Services.AddHttpClient<GeologicMapHttpClient>();
-builder.Services.AddHttpClient<IHydrologyProvider, Usgs3DhpHydrologyProvider>();
-builder.Services.AddHttpClient<UsgsWaterDataClient>();
+builder.Services.AddHttpClient<IHydrologyProvider, Usgs3DhpHydrologyProvider>(client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient<UsgsWaterDataClient>(client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
 
 #endregion
 

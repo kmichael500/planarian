@@ -9,11 +9,16 @@ public class HttpResponseExceptionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ServerOptions _serverOptions;
+    private readonly ILogger<HttpResponseExceptionMiddleware> _logger;
 
-    public HttpResponseExceptionMiddleware(RequestDelegate next, ServerOptions serverOptions)
+    public HttpResponseExceptionMiddleware(
+        RequestDelegate next,
+        ServerOptions serverOptions,
+        ILogger<HttpResponseExceptionMiddleware> logger)
     {
         _next = next;
         _serverOptions = serverOptions;
+        _logger = logger;
     }
 
     public async Task Invoke(HttpContext context)
@@ -29,7 +34,22 @@ public class HttpResponseExceptionMiddleware
                 throw;
             }
 
+            if (e.StatusCode >= StatusCodes.Status500InternalServerError)
+            {
+                _logger.LogError(
+                    e,
+                    "API request failed with status {StatusCode} while processing {Method} {Path}. RequestId: {RequestId}",
+                    e.StatusCode,
+                    context.Request.Method,
+                    context.Request.Path,
+                    context.TraceIdentifier);
+            }
+
             await WriteErrorResponseAsync(context, e.StatusCode, e.Message, e.ErrorCode, e.Data, e.Headers, e.ShowContactInfo, _serverOptions);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The caller went away; there is no response left to write.
         }
         catch (Exception e)
         {
@@ -37,6 +57,13 @@ public class HttpResponseExceptionMiddleware
             {
                 throw;
             }
+
+            _logger.LogError(
+                e,
+                "Unhandled exception while processing {Method} {Path}. RequestId: {RequestId}",
+                context.Request.Method,
+                context.Request.Path,
+                context.TraceIdentifier);
 
             var error = new ApiErrorResponse(
                 $"There was an unexpected issue! This is likely a bug with Planarian. Please contact {_serverOptions.SupportName} at {_serverOptions.SupportEmail}.",
@@ -49,8 +76,12 @@ public class HttpResponseExceptionMiddleware
 
 #endif
 
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await WriteErrorResponseAsync(context, context.Response.StatusCode, error.Message, error.ErrorCode, error.Data);
+            await WriteErrorResponseAsync(
+                context,
+                StatusCodes.Status500InternalServerError,
+                error.Message,
+                error.ErrorCode,
+                error.Data);
         }
     }
 

@@ -8,24 +8,43 @@ namespace Planarian.Modules.Map.Services.Hydrology;
 public sealed class Usgs3DhpHydrologyProvider : IHydrologyProvider
 {
     private const int PageSize = 2500;
+    private const double BoundsCacheGridDegrees = 0.05;
+    private static readonly TimeSpan BoundsCacheLifetime = TimeSpan.FromHours(6);
     private readonly HttpClient _httpClient;
+    private readonly HydrologyMemoryCache _cache;
 
-    public Usgs3DhpHydrologyProvider(HttpClient httpClient)
+    public Usgs3DhpHydrologyProvider(HttpClient httpClient, HydrologyMemoryCache cache)
     {
         _httpClient = httpClient;
+        _cache = cache;
         _httpClient.BaseAddress = new Uri(
             "https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/FeatureServer/");
     }
 
-    public Task<IReadOnlyList<HydrologyFeature>> GetFeaturesInBoundsAsync(
+    public async Task<IReadOnlyList<HydrologyFeature>> GetFeaturesInBoundsAsync(
         double north,
         double south,
         double east,
         double west,
-        CancellationToken cancellationToken) =>
-        GetFeaturesAsync(
-            offset => BuildBoundsRequestUri(north, south, east, west, offset),
+        CancellationToken cancellationToken)
+    {
+        var expanded = ExpandBoundsForCache(north, south, east, west);
+        var key = FormattableString.Invariant(
+            $"usgs:3dhp-bounds:{expanded.South:F4}:{expanded.North:F4}:{expanded.West:F4}:{expanded.East:F4}");
+        var cached = await _cache.GetOrCreateAsync(
+            key,
+            BoundsCacheLifetime,
+            sharedCancellation => GetFeaturesAsync(
+                offset => BuildBoundsRequestUri(expanded.North, expanded.South, expanded.East, expanded.West, offset),
+                sharedCancellation),
+            features => Math.Max(1, features.Count),
             cancellationToken);
+
+        return cached
+            .Where(feature => feature.Latitude >= south && feature.Latitude <= north &&
+                              feature.Longitude >= west && feature.Longitude <= east)
+            .ToList();
+    }
 
     private async Task<IReadOnlyList<HydrologyFeature>> GetFeaturesAsync(
         Func<int, string> buildRequestUri,
@@ -94,6 +113,20 @@ public sealed class Usgs3DhpHydrologyProvider : IHydrologyProvider
             query.Select(pair => $"{pair.Key}={Uri.EscapeDataString(pair.Value)}"));
     }
 
+    private static SearchBounds ExpandBoundsForCache(double north, double south, double east, double west)
+    {
+        static double FloorGrid(double value) =>
+            Math.Floor(value / BoundsCacheGridDegrees) * BoundsCacheGridDegrees;
+        static double CeilingGrid(double value) =>
+            Math.Ceiling(value / BoundsCacheGridDegrees) * BoundsCacheGridDegrees;
+
+        return new SearchBounds(
+            Math.Max(-90d, FloorGrid(south)),
+            Math.Min(90d, CeilingGrid(north)),
+            Math.Max(-180d, FloorGrid(west)),
+            Math.Min(180d, CeilingGrid(east)));
+    }
+
     private static HydrologyFeature? NormalizeFeature(Usgs3DhpFeature feature)
     {
         if (feature.Geometry is null || feature.Attributes is null) return null;
@@ -119,6 +152,8 @@ public sealed class Usgs3DhpHydrologyProvider : IHydrologyProvider
             feature.Geometry.X,
             "USGS 3DHP");
     }
+
+    private sealed record SearchBounds(double South, double North, double West, double East);
 
     private sealed class Usgs3DhpResponse
     {

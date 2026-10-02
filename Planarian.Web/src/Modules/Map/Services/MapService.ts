@@ -35,11 +35,13 @@ const MapService = {
 
   async getNearbyStreamGages(
     origins: StreamGageSearchOrigin[],
-    distanceMiles: number
+    distanceMiles: number,
+    signal?: AbortSignal
   ) {
     const response = await HttpClient.post<NearbyStreamGage[]>(
       `${baseUrl}/hydrology/gages`,
-      { origins, distanceMiles }
+      { origins, distanceMiles },
+      { signal }
     );
     return response.data;
   },
@@ -47,18 +49,21 @@ const MapService = {
   async getStreamGageObservations(
     siteCode: string,
     startDate: string,
-    endDate: string
+    endDate: string,
+    signal?: AbortSignal
   ) {
     const params = new URLSearchParams({ startDate, endDate });
     const response = await HttpClient.get<StreamGageParameter[]>(
-      `${baseUrl}/hydrology/gages/${siteCode}/observations?${params}`
+      `${baseUrl}/hydrology/gages/${siteCode}/observations?${params}`,
+      { signal }
     );
     return response.data;
   },
 
-  async getStreamGagePeakSummary(siteCode: string) {
+  async getStreamGagePeakSummary(siteCode: string, signal?: AbortSignal) {
     const response = await HttpClient.get<StreamGagePeakSummary>(
-      `${baseUrl}/hydrology/gages/${siteCode}/peaks`
+      `${baseUrl}/hydrology/gages/${siteCode}/peaks`,
+      { signal }
     );
     return response.data;
   },
@@ -67,7 +72,8 @@ const MapService = {
     north: number,
     south: number,
     east: number,
-    west: number
+    west: number,
+    signal?: AbortSignal
   ) {
     const params = new URLSearchParams({
       north: north.toString(),
@@ -76,7 +82,8 @@ const MapService = {
       west: west.toString(),
     });
     const response = await HttpClient.get<StreamGageLocation[]>(
-      `${baseUrl}/hydrology/gages/bounds?${params}`
+      `${baseUrl}/hydrology/gages/bounds?${params}`,
+      { signal }
     );
     return response.data;
   },
@@ -85,7 +92,8 @@ const MapService = {
     north: number,
     south: number,
     east: number,
-    west: number
+    west: number,
+    signal?: AbortSignal
   ) {
     const params = new URLSearchParams({
       north: north.toString(),
@@ -94,7 +102,8 @@ const MapService = {
       west: west.toString(),
     });
     const response = await HttpClient.get<HydrologyFeature[]>(
-      `${baseUrl}/hydrology/features/bounds?${params}`
+      `${baseUrl}/hydrology/features/bounds?${params}`,
+      { signal }
     );
     return response.data;
   },

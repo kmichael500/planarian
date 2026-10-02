@@ -109,8 +109,6 @@ export function PlanarianModal({
 
   useEffect(() => {
     return () => {
-      // An unmount is lifecycle cleanup, not a user close action. Calling
-      // onClose here breaks conditionally mounted dialogs in React StrictMode.
       document.body.style.position = "";
       document.body.style.top = "";
       document.body.style.width = "";

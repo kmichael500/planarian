@@ -116,17 +116,20 @@ export const StreamGages: FC<StreamGagesProps> = ({
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setLoadingGages(true);
     setGageError(null);
 
     MapService.getNearbyStreamGages(
       searchOrigins,
-      distanceMiles
+      distanceMiles,
+      controller.signal
     )
       .then((result) => {
         if (!cancelled) setGages(result);
       })
       .catch((error) => {
+        if (controller.signal.aborted) return;
         console.error("Unable to load nearby stream gages", error);
         if (!cancelled) {
           setGages([]);
@@ -139,6 +142,7 @@ export const StreamGages: FC<StreamGagesProps> = ({
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [searchOrigins, distanceMiles]);
 

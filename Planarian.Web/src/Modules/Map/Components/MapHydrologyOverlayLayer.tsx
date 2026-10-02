@@ -64,11 +64,15 @@ export const MapHydrologyOverlayLayer: React.FC = () => {
   const [zoom, setZoom] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupFeature | null>(null);
   const requestRevision = useRef(0);
+  const requestAbortController = useRef<AbortController | null>(null);
   useEffect(() => {
     const instance = map?.getMap();
     if (!instance) return;
 
     const loadFeatures = () => {
+      requestAbortController.current?.abort();
+      requestAbortController.current = null;
+
       const nextZoom = instance.getZoom();
       setZoom(nextZoom);
       setPopup(null);
@@ -81,18 +85,27 @@ export const MapHydrologyOverlayLayer: React.FC = () => {
 
       const bounds = instance.getBounds();
       const revision = ++requestRevision.current;
+      const controller = new AbortController();
+      requestAbortController.current = controller;
       MapService.getHydrologyFeaturesInBounds(
         bounds.getNorth(),
         bounds.getSouth(),
         bounds.getEast(),
-        bounds.getWest()
+        bounds.getWest(),
+        controller.signal
       )
         .then((result) => {
           if (requestRevision.current === revision) setFeatures(result);
         })
         .catch((error) => {
+          if (controller.signal.aborted) return;
           console.error("Unable to load USGS 3DHP map features", error);
           if (requestRevision.current === revision) setFeatures([]);
+        })
+        .finally(() => {
+          if (requestAbortController.current === controller) {
+            requestAbortController.current = null;
+          }
         });
     };
 
@@ -105,6 +118,8 @@ export const MapHydrologyOverlayLayer: React.FC = () => {
 
     return () => {
       requestRevision.current += 1;
+      requestAbortController.current?.abort();
+      requestAbortController.current = null;
       instance.off("load", loadFeatures);
       instance.off("moveend", loadFeatures);
     };
