@@ -103,6 +103,9 @@ const isDescriptionItem = (
   item: PlanarianDescriptionItem | false
 ): item is PlanarianDescriptionItem => item !== false;
 
+const hasCoordinates = (entrance: EntranceVm) =>
+  Number.isFinite(entrance.latitude) && Number.isFinite(entrance.longitude);
+
 const CaveComponent = ({
   cave,
   isLoading,
@@ -431,9 +434,7 @@ const CaveComponent = ({
               </p>
             </div>
           )}
-          {showGeology &&
-            selectedEntrance.latitude &&
-            selectedEntrance.longitude && (
+          {showGeology && hasCoordinates(selectedEntrance) && (
               <div>
                 {cave.entrances.length > 1 && (
                   <Row style={{ marginBottom: "16px" }}>

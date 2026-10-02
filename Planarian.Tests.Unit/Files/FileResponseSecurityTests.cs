@@ -89,14 +89,7 @@ public sealed class FileResponseSecurityTests
     [Fact]
     public async Task FileResultsAlwaysDisableContentTypeSniffingAndHonorAttachmentDisposition()
     {
-        using var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
-        var controller = new TestController(
-            new RequestUser(db),
-            new TokenService(new AuthOptions
-            {
-                JwtSecret = new string('x', 32),
-                JwtIssuer = "planarian-tests"
-            }));
+        using var controller = new TestController();
         var response = new AuthenticatedFileResponse
         {
             OpenReadStreamAsync = _ => Task.FromResult<Stream>(new MemoryStream([1, 2, 3])),
@@ -116,7 +109,7 @@ public sealed class FileResponseSecurityTests
     [Fact]
     public async Task OrdinaryFileResultPreservesValidatorsAndEnablesRanges()
     {
-        var controller = new TestController();
+        using var controller = new TestController();
         var lastModified = new DateTimeOffset(2026, 9, 8, 12, 0, 0, TimeSpan.Zero);
         var entityTag = EntityTagHeaderValue.Parse("\"file-etag\"");
         var response = new AuthenticatedFileResponse
@@ -138,7 +131,7 @@ public sealed class FileResponseSecurityTests
     [Fact]
     public async Task OrdinaryConditionalGetStillReturnsNotModified()
     {
-        var controller = new TestController();
+        using var controller = new TestController();
         controller.HttpContext.RequestServices = new ServiceCollection()
             .AddLogging()
             .AddMvcCore()
@@ -164,7 +157,7 @@ public sealed class FileResponseSecurityTests
     [Fact]
     public async Task RangeRequestExecutesAsPartialContentWithCorrectBytes()
     {
-        var controller = new TestController();
+        using var controller = new TestController();
         controller.HttpContext.RequestServices = new ServiceCollection()
             .AddLogging()
             .AddMvcCore()
@@ -192,7 +185,7 @@ public sealed class FileResponseSecurityTests
     [Fact]
     public async Task PdfStreamSessionUsesNoStoreAndOmitsConditionalValidators()
     {
-        var controller = new TestController();
+        using var controller = new TestController();
         controller.Request.Headers[RequestThrottleService.FileStreamSessionHeaderName] =
             Guid.NewGuid().ToString();
         controller.Request.Headers[HeaderNames.Range] = "bytes=0-1023";
@@ -246,11 +239,18 @@ public sealed class FileResponseSecurityTests
             [extension, sourceContentType, requestedDownload])!;
     }
 
-    private sealed class TestController : PlanarianControllerBase
+    private sealed class TestController : PlanarianControllerBase, IDisposable
     {
-        public TestController(RequestUser? requestUser = null, TokenService? tokenService = null)
-            : base(requestUser!, tokenService!)
+        private readonly PlanarianDbContext _db;
+
+        public TestController() : this(CreateDependencies())
         {
+        }
+
+        private TestController(TestDependencies dependencies)
+            : base(dependencies.RequestUser, dependencies.TokenService)
+        {
+            _db = dependencies.Db;
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
@@ -258,5 +258,25 @@ public sealed class FileResponseSecurityTests
         }
 
         public Task<IActionResult> CreateResult(AuthenticatedFileResponse response) => CreateFileResult(response);
+
+        public void Dispose() => _db.Dispose();
+
+        private static TestDependencies CreateDependencies()
+        {
+            var db = new PlanarianDbContext(new DbContextOptionsBuilder<PlanarianDbContext>().Options);
+            return new TestDependencies(
+                db,
+                new RequestUser(db),
+                new TokenService(new AuthOptions
+                {
+                    JwtSecret = new string('x', 32),
+                    JwtIssuer = "planarian-tests"
+                }));
+        }
+
+        private sealed record TestDependencies(
+            PlanarianDbContext Db,
+            RequestUser RequestUser,
+            TokenService TokenService);
     }
 }
