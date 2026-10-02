@@ -257,7 +257,6 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
   {
     id: "usgs-hydrology-group",
     displayName: "Hydrology",
-    description: "USGS surface-water features, monitoring stations, and drainage boundaries.",
     type: "group",
     memberLayerIds: [
       "usgs-hydro",
@@ -275,7 +274,6 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
   {
     id: "usgs-hydro",
     displayName: "Hydrography",
-    description: "Mapped streams, rivers, lakes, canals, and other surface-water features.",
     type: "raster",
     source: {
       tiles: ["https://hydro.nationalmap.gov/arcgis/services/nhd/MapServer/WMSServer?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&transparent=true&width=256&height=256&layers=0,1,2,3,4,5,6,7,8,9,10,11,12&styles="],
