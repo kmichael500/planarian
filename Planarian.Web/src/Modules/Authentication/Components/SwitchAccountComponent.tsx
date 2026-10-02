@@ -1,4 +1,4 @@
-import { Form, List, Modal } from "antd";
+import { Form, List, Modal, Typography } from "antd";
 import React, { useContext, useMemo } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
@@ -13,12 +13,22 @@ const SwitchAccountComponent = ({
   isVisible: isOpen,
   handleCancel: onCancel,
 }: SwitchAccountComponentProps) => {
-  const { accountIds, currentAccountId, currentAccountName, switchAccount } =
-    useContext(AppContext);
+  const {
+    accountIds,
+    revokedAccountIds,
+    currentAccountId,
+    currentAccountName,
+    switchAccount,
+  } = useContext(AppContext);
 
   const accountList = useMemo(
-    () => accountIds.filter((item) => item.value !== currentAccountId),
-    [accountIds, currentAccountId]
+    () => [
+      ...accountIds
+        .filter((item) => item.value !== currentAccountId)
+        .map((item) => ({ ...item, isRevoked: false })),
+      ...revokedAccountIds.map((item) => ({ ...item, isRevoked: true })),
+    ],
+    [accountIds, revokedAccountIds, currentAccountId]
   );
 
   const handleSwitch = (accountId: string) => {
@@ -28,15 +38,17 @@ const SwitchAccountComponent = ({
 
   return (
     <Modal
-      title="Switch Accounts"
+      title={currentAccountId ? "Switch Accounts" : "Accounts"}
       open={isOpen}
       onCancel={onCancel}
       footer={[<CancelButtonComponent key="cancel" onClick={onCancel} />]}
     >
       <Form id="switchAccountForm">
-        <div className="planarian-account-banner">
-          Your Current Account: {currentAccountName}
-        </div>
+        {currentAccountId && (
+          <div className="planarian-account-banner">
+            Your Current Account: {currentAccountName}
+          </div>
+        )}
         <div
           style={{
             paddingTop: "10px",
@@ -44,27 +56,37 @@ const SwitchAccountComponent = ({
             fontWeight: "bold",
           }}
         >
-          Please select one of the accounts below to switch to:
+          {currentAccountId
+            ? "Please select one of the accounts below to switch to:"
+            : "Your accounts:"}
         </div>
         <Form.Item name="account">
           <List
             dataSource={accountList}
-            renderItem={(item) => (
-              <List.Item
-                className="planarian-account-option"
-                key={item.value}
-                onClick={() => handleSwitch(item.value)}
-                style={{
-                  cursor: "pointer",
-                  padding: "10px",
-                  border: "1px solid #d9d9d9",
-                  borderRadius: "4px",
-                  marginBottom: "10px",
-                }}
-              >
-                {item.display}
-              </List.Item>
-            )}
+            renderItem={(item) => {
+              const isRevoked = item.isRevoked;
+              return (
+                <List.Item
+                  className="planarian-account-option"
+                  key={item.value}
+                  aria-disabled={isRevoked}
+                  onClick={isRevoked ? undefined : () => handleSwitch(item.value)}
+                  style={{
+                    cursor: isRevoked ? "not-allowed" : "pointer",
+                    opacity: isRevoked ? 0.65 : 1,
+                    padding: "10px",
+                    border: "1px solid #d9d9d9",
+                    borderRadius: "4px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <span>{item.display}</span>
+                  {isRevoked && (
+                    <Typography.Text type="danger">Access revoked</Typography.Text>
+                  )}
+                </List.Item>
+              );
+            }}
           />
         </Form.Item>
       </Form>

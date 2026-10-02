@@ -33,6 +33,7 @@ interface AppContextProps {
   currentAccountName: string | null;
   userGroupPrefix: string | null;
   accountIds: SelectListItem<string>[];
+  revokedAccountIds: SelectListItem<string>[];
   hasPermission: (permission: PermissionKey) => boolean;
   permissions: FeaturePermissions;
   setPermissions: (permissions: FeaturePermissions) => void;
@@ -74,6 +75,7 @@ export const AppContext = createContext<AppContextProps>({
   currentAccountName: null,
   userGroupPrefix: null,
   accountIds: [],
+  revokedAccountIds: [],
   hasPermission: () => false,
   permissions: defaultFeaturePermissions,
   setPermissions: () => {},
@@ -117,6 +119,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     useState<AppInitializeCurrentUserVm | null>(null);
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountIds, setAccountIds] = useState<SelectListItem<string>[]>([]);
+  const [revokedAccountIds, setRevokedAccountIds] = useState<SelectListItem<string>[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =
@@ -149,6 +152,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setCurrentUser(null);
     setCurrentAccountId(null);
     setAccountIds([]);
+    setRevokedAccountIds([]);
     setPermissionKeys([]);
     setPermissions(defaultFeaturePermissions);
     setPendingInvitationCount(0);
@@ -202,6 +206,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
       setCurrentUser(appOptions.currentUser);
       setCurrentAccountId(resolvedCurrentAccountId);
       setAccountIds(appOptions.accountIds);
+      setRevokedAccountIds(appOptions.revokedAccountIds ?? []);
       setPermissionKeys(appOptions.permissions);
 
       const featureSettings =
@@ -337,6 +342,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         currentAccountName,
         userGroupPrefix,
         accountIds,
+        revokedAccountIds,
         hasPermission: hasCurrentPermission,
         permissions,
         setPermissions,

@@ -72,6 +72,7 @@ export interface AppOptionsVm {
 
 export interface AppInitializeVm extends AppOptionsVm {
   accountIds: SelectListItem<string>[];
+  revokedAccountIds?: SelectListItem<string>[];
   permissions: PermissionKey[];
   currentUser: AppInitializeCurrentUserVm | null;
   antiforgeryRequestToken: string | null;

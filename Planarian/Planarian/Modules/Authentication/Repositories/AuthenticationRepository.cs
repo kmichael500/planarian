@@ -17,7 +17,7 @@ public class AuthenticationRepository : RepositoryBase
     public async Task<IEnumerable<string>> GetAccountIdsByUserId(string userId)
     {
         return await DbContext.AccountUsers
-            .Where(e => e.UserId == userId)
+            .Where(e => e.UserId == userId && e.AccessRevokedOn == null)
             .OrderByDescending(e => e.Account!.Name)
             .Select(e => e.AccountId)
             .ToListAsync();

@@ -149,10 +149,64 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             throw ApiExceptionDictionary.NoAccount;
         }
 
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        if (userId == RequestUser.Id)
+        {
+            throw ApiExceptionDictionary.BadRequest("You cannot revoke your own account access.");
+        }
+
+        // Pending invitations are still removable. Accepted users keep their membership and
+        // permissions so access can be restored without reconstructing anything.
+        if (!accountUser.InvitationAcceptedOn.HasValue &&
+            !string.IsNullOrWhiteSpace(accountUser.InvitationCode))
+        {
+            await DeletePendingInvitationAccess(userId, RequestUser.AccountId, cancellationToken);
+            return;
+        }
+
+        if (accountUser.AccessRevokedOn.HasValue)
+        {
+            return;
+        }
+
+        accountUser.AccessRevokedOn = DateTime.UtcNow;
+        await _accountRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreAccess(string userId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+        {
+            throw ApiExceptionDictionary.NoAccount;
+        }
+
+        var accountUser = await _accountRepository.GetAccountUser(userId, RequestUser.AccountId);
+        if (accountUser == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        if (!accountUser.AccessRevokedOn.HasValue)
+        {
+            return;
+        }
+
+        accountUser.AccessRevokedOn = null;
+        await _accountRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task DeletePendingInvitationAccess(string userId, string accountId,
+        CancellationToken cancellationToken)
+    {
         await using var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
         try
         {
-            var accessDeleted = await Repository.DeleteAccountUserAccess(userId, RequestUser.AccountId, cancellationToken);
+            var accessDeleted = await Repository.DeleteAccountUserAccess(userId, accountId, cancellationToken);
             if (!accessDeleted)
             {
                 throw ApiExceptionDictionary.NotFound("User");

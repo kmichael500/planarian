@@ -1,4 +1,4 @@
-import { Card, Empty, List, Space, Typography, message } from "antd";
+import { Alert, Card, Empty, List, Space, Typography, message } from "antd";
 import { CheckCircleOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import React from "react";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -23,9 +23,13 @@ const InvitationsPage = () => {
     string | null
   >(null);
   const invitationActionInFlightRef = useRef(false);
-  const { setHeaderTitle, setHeaderButtons, refreshPendingInvitations } =
-    useContext(AppContext);
-
+  const {
+    revokedAccountIds,
+    currentAccountId,
+    setHeaderTitle,
+    setHeaderButtons,
+    refreshPendingInvitations,
+  } = useContext(AppContext);
   useEffect(() => {
     setHeaderTitle(["Invitations"]);
     setHeaderButtons([]);
@@ -103,6 +107,17 @@ const InvitationsPage = () => {
 
   return (
     <div style={styles.container}>
+      {!currentAccountId && revokedAccountIds.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Account access revoked"
+          description={`Your access to ${revokedAccountIds
+            .map((account) => account.display)
+            .join(", ")} has been revoked. Contact an account administrator if you think this is a mistake.`}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Title level={3}>Pending Invitations</Title>
       <List
         loading={isLoading}

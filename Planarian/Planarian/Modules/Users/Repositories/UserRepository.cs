@@ -347,6 +347,7 @@ public class UserRepository : RepositoryBase
             InvitationSentOn = e.InvitationSentOn,
             InvitationAcceptedOn = e.InvitationAcceptedOn,
             LastActiveOn = e.User.LastActiveOn,
+            AccessRevokedOn = e.AccessRevokedOn,
             HasActiveInvitation = e.InvitationAcceptedOn == null && e.InvitationCode != null,
             InvitationEmailAttemptCount = e.InvitationMessageLogs.Count
         });

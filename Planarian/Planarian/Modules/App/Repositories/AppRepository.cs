@@ -15,7 +15,16 @@ public class AppRepository : RepositoryBase
     public async Task<List<SelectListItem<string>>> GetAccountIds()
     {
         return await DbContext.AccountUsers
-            .Where(e => e.UserId == RequestUser.Id)
+            .Where(e => e.UserId == RequestUser.Id && e.AccessRevokedOn == null)
+            .OrderByDescending(e => e.Account!.Name)
+            .Select(e => new SelectListItem<string> { Display = e.Account!.Name, Value = e.AccountId })
+            .ToListAsync();
+    }
+
+    public async Task<List<SelectListItem<string>>> GetRevokedAccountIds()
+    {
+        return await DbContext.AccountUsers
+            .Where(e => e.UserId == RequestUser.Id && e.AccessRevokedOn != null)
             .OrderByDescending(e => e.Account!.Name)
             .Select(e => new SelectListItem<string> { Display = e.Account!.Name, Value = e.AccountId })
             .ToListAsync();
