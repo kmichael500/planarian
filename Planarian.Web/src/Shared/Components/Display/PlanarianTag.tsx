@@ -1,6 +1,7 @@
 import { Tag, TagProps } from "antd";
 import { CSSProperties } from "react";
 import { useTheme } from "../../../ThemeProvider";
+import { copyTokenAttributes } from "../../Helpers/CopyTokenHelpers";
 import {
   getPlanarianNeutralTagColor,
   getPlanarianTagPaletteColor,
@@ -23,6 +24,7 @@ const PlanarianTag: React.FC<PlanarianTagProps> = (props) => {
         {...rest}
         className={resolvedClassName}
         color={color}
+        {...copyTokenAttributes}
         style={style}
       />
     );
@@ -39,7 +41,14 @@ const PlanarianTag: React.FC<PlanarianTagProps> = (props) => {
     ...style,
   };
 
-  return <Tag {...rest} className={resolvedClassName} style={resolvedStyle} />;
+  return (
+    <Tag
+      {...rest}
+      className={resolvedClassName}
+      {...copyTokenAttributes}
+      style={resolvedStyle}
+    />
+  );
 };
 
 export { PlanarianTag };

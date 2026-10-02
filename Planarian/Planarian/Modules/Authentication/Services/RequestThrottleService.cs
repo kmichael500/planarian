@@ -243,7 +243,7 @@ public class RequestThrottleService
                 $"Endpoint '{requestPath}' must declare [Throttle] before using RequestThrottleService for profile '{expectedProfile}'.");
         }
 
-        if (throttleAttribute.RequestsPerMinute > 0)
+        if (throttleAttribute.RequestsPerMinute > 0 && expectedProfile != ThrottleProfile.FileAccess)
         {
             throw new InvalidOperationException(
                 $"Endpoint '{requestPath}' must use bare [Throttle] when using RequestThrottleService for profile '{expectedProfile}'.");

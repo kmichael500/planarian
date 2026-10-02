@@ -40,6 +40,7 @@ using Planarian.Modules.Import.Parsing;
 using Planarian.Modules.Import.Planning;
 using Planarian.Modules.Map.Controllers;
 using Planarian.Modules.Map.Services;
+using Planarian.Modules.Map.Services.Hydrology;
 using Planarian.Modules.Notifications.Hubs;
 using Planarian.Modules.Notifications.Services;
 using Planarian.Modules.Photos.Repositories;
@@ -207,6 +208,14 @@ var requestThrottleOptions =
     new RequestThrottleOptions();
 builder.Services.AddSingleton(requestThrottleOptions);
 
+var usgsWaterDataOptions =
+    builder.Configuration.GetSection(UsgsWaterDataOptions.Key).Get<UsgsWaterDataOptions>() ??
+    new UsgsWaterDataOptions();
+if (!isDevelopment && string.IsNullOrWhiteSpace(usgsWaterDataOptions.ApiKey))
+    throw new InvalidOperationException(
+        "UsgsWaterData:ApiKey is required outside the Development environment. Configure a USGS Water Data API key in Azure App Configuration for the deployment environment.");
+builder.Services.AddSingleton(usgsWaterDataOptions);
+
 builder.Services.AddSingleton(Options.Create<MailGunOptions>(emailOptions));
 builder.Services.AddSingleton(emailOptions);
 builder.Services.AddDataProtection();
@@ -270,6 +279,7 @@ builder.Services.AddScoped<EntranceImportExecutionRepository>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient<MjmlService>();
 builder.Services.AddSingleton<MemoryCache>();
+builder.Services.AddSingleton<HydrologyMemoryCache>();
 
 builder.Services.AddHttpClient<IEmailMessageFactory, MailGunMessageFactory>();
 
@@ -310,6 +320,10 @@ builder.Services.AddScoped<EntranceImportPlanningRepository>();
 #region Http Clients
 
 builder.Services.AddHttpClient<GeologicMapHttpClient>();
+builder.Services.AddHttpClient<IHydrologyProvider, Usgs3DhpHydrologyProvider>(client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient<UsgsWaterDataClient>(client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
 
 #endregion
 
@@ -502,7 +516,12 @@ app.UseCors(x =>
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()
-        .WithExposedHeaders("Content-Disposition", HeaderNames.AcceptRanges, HeaderNames.ContentRange, HeaderNames.ETag)
+        .WithExposedHeaders(
+            "Content-Disposition",
+            HeaderNames.AcceptRanges,
+            HeaderNames.ContentRange,
+            HeaderNames.ETag,
+            "Content-Encoding")
 );
 
 app.UseMiddleware<HttpResponseExceptionMiddleware>();

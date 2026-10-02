@@ -31,11 +31,9 @@ const SideBarComponent: React.FC = () => {
         }
       }}
       style={{
-        position: "sticky",
-        top: 0,
         zIndex: 1,
         width: "100%",
-        height: "calc(var(--vh, 1vh) * 100)",
+        height: "100%",
         minHeight: 0,
       }}
     >

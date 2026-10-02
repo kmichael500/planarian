@@ -88,10 +88,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
   const isPlt = isPltFileType(fileType);
   const isSupported = isSupportedFileType(fileType);
   const headerTitle = (
-    <>
-      {name}
-      {fileType && <PlanarianTag style={{ marginLeft: "0.5rem" }}>{fileType}</PlanarianTag>}
-    </>
+    <div className="planarian-file-viewer__title">
+      <span className="planarian-file-viewer__title-name" title={name ?? undefined}>
+        {name}
+      </span>
+      {fileType && (
+        <PlanarianTag className="planarian-file-viewer__type">{fileType}</PlanarianTag>
+      )}
+    </div>
   );
 
   const downloadButton = fileId ? (
@@ -279,24 +283,25 @@ const FileViewer: React.FC<FileViewerProps> = ({
         open={open}
         fullScreen
         header={headerItems}
+        headerStyle={{
+          padding: "calc(0.75rem + env(safe-area-inset-top)) calc(0.75rem + env(safe-area-inset-right)) 0.75rem calc(0.75rem + env(safe-area-inset-left))",
+        }}
+        contentStyle={isPdf ? { overflow: "hidden", padding: 0 } : undefined}
         onClose={() => {
           onClose?.();
         }}
       >
-        <Spin spinning={isLoading}>
-          {fileAccessError && !isLoading ? (
+        <div className="planarian-file-viewer" aria-busy={isLoading}>
+          {isLoading ? (
+            <div className="planarian-file-viewer__loading">
+              <Spin />
+            </div>
+          ) : fileAccessError ? (
             <Result status="warning" title={fileAccessError} extra={downloadButton} />
-          ) : !fileAccessError && isSupported ? (
+          ) : isSupported ? (
             <>
               {isImage && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100%",
-                  }}
-                >
+                <div className="planarian-file-viewer__image">
                   <img
                     src={fileEmbedUrl}
                     alt="file"
@@ -305,12 +310,11 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 </div>
               )}
               {isPdf && fileEmbedUrl && (
-                <LazyLoadErrorBoundary renderFallback={error => <LazyViewerLoadError error={error} />}>
+                <LazyLoadErrorBoundary
+                  renderFallback={(error) => <LazyViewerLoadError error={error} />}
+                >
                   <Suspense fallback={<Spin />}>
-                    <PdfViewer
-                      fileUrl={fileEmbedUrl}
-                      downloadButton={downloadButton}
-                    />
+                    <PdfViewer fileUrl={fileEmbedUrl} onRequestClose={onClose} />
                   </Suspense>
                 </LazyLoadErrorBoundary>
               )}
@@ -324,7 +328,7 @@ const FileViewer: React.FC<FileViewerProps> = ({
                     padding: "1rem",
                   }}
                 >
-                  {isLoading ? <Spin /> : fileContent}
+                  {fileContent}
                 </pre>
               )}
               {isVectorDataset && fileEmbedUrl && (
@@ -345,14 +349,14 @@ const FileViewer: React.FC<FileViewerProps> = ({
                 <GpxViewer embedUrl={fileEmbedUrl} downloadButton={downloadButton} />
               )}
             </>
-          ) : !fileAccessError ? (
+          ) : (
             <Result
               status="warning"
               title={`The filetype '${fileType}' is not currently supported.`}
               extra={downloadButton}
             />
-          ) : null}
-        </Spin>
+          )}
+        </div>
       </PlanarianModal>
     </>
   );

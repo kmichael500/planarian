@@ -625,11 +625,9 @@ public class FileService : ServiceBase<FileRepository>
         }
         finally
         {
-            // A successful initialization is cached to prevent concurrent
-            // requests from creating the same container. Once a reset deletes
-            // that container, the cached task must be discarded so the next
-            // upload creates it again.
-            ContainerInitializationTasks.TryRemove(normalizedContainerName, out _);
+            // A successful initialization is cached to avoid repeated container-existence checks.
+            // Invalidate it even when deletion fails so a later upload can re-establish the container safely.
+            ContainerInitializationTasks.TryRemove(containerClient.Name, out _);
         }
     }
 

@@ -799,3 +799,5 @@ FodyWeavers.xsd
 # End of https://www.toptal.com/developers/gitignore/api/macos,windows,linux,visualstudiocode,visualstudio,rider,jetbrains,react,node
 
 /build/*
+# Generated PDF.js runtime assets
+/public/pdfjs/

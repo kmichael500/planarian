@@ -19,6 +19,8 @@ import {
 import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
 import { SelectListItem } from "../../Shared/Models/SelectListItem";
 import { hasPermission } from "../../Shared/Permissioning/PermissionHelpers";
+import { useLocation } from "react-router-dom";
+import { defaultAppContentStyle } from "../Layout/AppContentLayout";
 
 interface FeaturePermissions {
   visibleFields: FeatureSettingVm[];
@@ -54,11 +56,6 @@ interface AppContextProps {
   logout: () => Promise<void>;
   switchAccount: (accountId: string, redirectPath?: string | null) => void;
   defaultContentStyle: React.CSSProperties;
-  contentStyle: React.CSSProperties | null;
-  setContentStyle: (style: React.CSSProperties) => void;
-  setContentStyleOverrides: (style: React.CSSProperties) => void;
-  setFullHeightContentStyle: (style?: React.CSSProperties) => void;
-  resetContentStyle: () => void;
   pendingInvitationCount: number;
   refreshPendingInvitations: () => Promise<void>;
 }
@@ -67,9 +64,8 @@ const defaultFeaturePermissions: FeaturePermissions = {
   visibleFields: [],
 };
 
-const defaultContentStyle = {
-  margin: "16px",
-} as React.CSSProperties;
+const emptyHeaderTitle: [React.ReactElement | string, string?] = ["", ""];
+const emptyHeaderButtons: React.ReactElement[] = [];
 
 export const AppContext = createContext<AppContextProps>({
   isAuthenticated: false,
@@ -94,12 +90,7 @@ export const AppContext = createContext<AppContextProps>({
   login: async () => {},
   logout: async () => {},
   switchAccount: () => {},
-  defaultContentStyle,
-  contentStyle: null,
-  setContentStyle: () => {},
-  setContentStyleOverrides: () => {},
-  setFullHeightContentStyle: () => {},
-  resetContentStyle: () => {},
+  defaultContentStyle: defaultAppContentStyle,
   pendingInvitationCount: 0,
   refreshPendingInvitations: async () => {},
 });
@@ -109,10 +100,15 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = (props) => {
-  const [headerTitle, setHeaderTitle] = useState<
-    [React.ReactElement | string, string?]
-  >(["", ""]);
-  const [headerButtons, setHeaderButtons] = useState<React.ReactElement[]>([]);
+  const location = useLocation();
+  const [headerTitleState, setHeaderTitleState] = useState({
+    pathname: location.pathname,
+    value: emptyHeaderTitle,
+  });
+  const [headerButtonsState, setHeaderButtonsState] = useState({
+    pathname: location.pathname,
+    value: emptyHeaderButtons,
+  });
   const [hideBodyPadding, setHideBodyPadding] = useState<boolean>(false);
   const [permissions, setPermissions] =
     useState<FeaturePermissions>(defaultFeaturePermissions);
@@ -127,8 +123,26 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     useState<ApiErrorResponse | null>(null);
   const [pendingInvitationCount, setPendingInvitationCount] =
     useState<number>(0);
-  const [contentStyle, setContentStyle] = useState<React.CSSProperties | null>(
-    defaultContentStyle
+
+  const headerTitle =
+    headerTitleState.pathname === location.pathname
+      ? headerTitleState.value
+      : emptyHeaderTitle;
+  const headerButtons =
+    headerButtonsState.pathname === location.pathname
+      ? headerButtonsState.value
+      : emptyHeaderButtons;
+  const setHeaderTitle = useCallback(
+    (title: [React.ReactElement | string, string?]) => {
+      setHeaderTitleState({ pathname: location.pathname, value: title });
+    },
+    [location.pathname]
+  );
+  const setHeaderButtons = useCallback(
+    (buttons: React.ReactElement[]) => {
+      setHeaderButtonsState({ pathname: location.pathname, value: buttons });
+    },
+    [location.pathname]
   );
 
   const clearSessionState = useCallback(() => {
@@ -139,31 +153,6 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     setPermissions(defaultFeaturePermissions);
     setPendingInvitationCount(0);
     AuthenticationService.ClearRuntimeSession();
-  }, []);
-
-  const setContentStyleOverrides = useCallback(
-    (style: React.CSSProperties) => {
-      setContentStyle({
-        ...defaultContentStyle,
-        ...style,
-      });
-    },
-    []
-  );
-
-  const setFullHeightContentStyle = useCallback(
-    (style?: React.CSSProperties) => {
-      setContentStyleOverrides({
-        display: "flex",
-        overflow: "hidden",
-        ...style,
-      });
-    },
-    [setContentStyleOverrides]
-  );
-
-  const resetContentStyle = useCallback(() => {
-    setContentStyle(defaultContentStyle);
   }, []);
 
   const refreshPendingInvitations = useCallback(async () => {
@@ -364,12 +353,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
         login,
         logout,
         switchAccount,
-        defaultContentStyle,
-        contentStyle,
-        setContentStyle,
-        setContentStyleOverrides,
-        setFullHeightContentStyle,
-        resetContentStyle,
+        defaultContentStyle: defaultAppContentStyle,
         pendingInvitationCount,
         refreshPendingInvitations,
       }}

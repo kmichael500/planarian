@@ -15,25 +15,16 @@ import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import FavoriteCave from "../Components/FavoriteCave";
 import { CaveHistoryModal } from "../Components/CaveHistoryModal";
 
-const CavePage = () => {
+interface CavePageContentProps {
+  caveId: string;
+}
+
+const CavePageContent = ({ caveId }: CavePageContentProps) => {
   const [cave, setCave] = useState<CaveVm>();
-
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  const {
-    setHeaderTitle,
-    setHeaderButtons,
-    defaultContentStyle,
-    setContentStyle,
-  } = useContext(AppContext);
-  const { caveId } = useParams();
-
-  if (isNullOrWhiteSpace(caveId)) {
-    throw new NotFoundError("caveid");
-  }
-
   const [hasEditPermission, setHasEditPermission] = useState<boolean>(false);
   const [isPermissionResolved, setIsPermissionResolved] = useState(false);
+  const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   const screens = Grid.useBreakpoint();
   const isLargeScreenSize = Object.entries(screens).some(
@@ -43,86 +34,106 @@ const CavePage = () => {
   useEffect(() => {
     setHeaderButtons([
       <FavoriteCave caveId={caveId} />,
-      <CaveHistoryModal caveId={caveId} canReviewChangeRequests={hasEditPermission} />,
-      ...(isPermissionResolved && hasEditPermission ? [
-        <Link to={`/caves/${caveId}/edit`}>
-          <PlanarianButton icon={<EditOutlined />} type="primary">Edit</PlanarianButton>
-        </Link>,
-      ] : isPermissionResolved ? [
-        <Link to={`/caves/${caveId}/suggest`}>
-          <PlanarianButton icon={<FormOutlined />} type="primary">Suggest Changes</PlanarianButton>
-        </Link>,
-      ] : []),
-      <BackButtonComponent to={"./.."} type="text" tooltip="Back to Caves" />,
+      <CaveHistoryModal
+        caveId={caveId}
+        canReviewChangeRequests={hasEditPermission}
+      />,
+      ...(isPermissionResolved && hasEditPermission
+        ? [
+            <Link to={`/caves/${caveId}/edit`}>
+              <PlanarianButton icon={<EditOutlined />} type="primary">
+                Edit
+              </PlanarianButton>
+            </Link>,
+          ]
+        : isPermissionResolved
+        ? [
+            <Link to={`/caves/${caveId}/suggest`}>
+              <PlanarianButton icon={<FormOutlined />} type="primary">
+                Suggest Changes
+              </PlanarianButton>
+            </Link>,
+          ]
+        : []),
+      <BackButtonComponent
+        to={"./.."}
+        type="text"
+        tooltip="Back to Caves"
+      />,
     ]);
-  }, [cave, hasEditPermission, isPermissionResolved]);
-
-  if (caveId === undefined) {
-    throw new NotFoundError("caveid");
-  }
+  }, [
+    caveId,
+    hasEditPermission,
+    isPermissionResolved,
+    setHeaderButtons,
+  ]);
 
   useEffect(() => {
-    if (!isNullOrWhiteSpace(cave?.name)) {
-      setHeaderTitle([
-        <>
-          {isLargeScreenSize && (
-            <Typography.Title level={4} ellipsis>
-              {`${cave?.displayId} ${cave?.name ?? ""}`}
-            </Typography.Title>
-          )}
-          {!isLargeScreenSize && (
-            <Typography.Text ellipsis>
-              {`${cave?.displayId} ${cave?.name ?? ""}`}
-            </Typography.Text>
-          )}
-        </>,
-      ]);
-    }
-  }, [cave]);
+    if (!cave || isNullOrWhiteSpace(cave.name)) return;
+
+    setHeaderTitle([
+      <>
+        {isLargeScreenSize ? (
+          <Typography.Title level={4} ellipsis>
+            {`${cave.displayId} ${cave.name}`}
+          </Typography.Title>
+        ) : (
+          <Typography.Text ellipsis>
+            {`${cave.displayId} ${cave.name}`}
+          </Typography.Text>
+        )}
+      </>,
+    ]);
+  }, [cave, isLargeScreenSize, setHeaderTitle]);
+
   useEffect(() => {
+    let isCurrent = true;
+
     const getCave = async () => {
-      const caveResponse = await CaveService.GetCave(caveId);
+      const [caveResponse, editPermission] = await Promise.all([
+        CaveService.GetCave(caveId),
+        AppService.HasCavePermission(PermissionKey.Manager, caveId),
+      ]);
+
+      if (!isCurrent) return;
+
       setCave(caveResponse);
-      const hasEditPermission = await AppService.HasCavePermission(
-        PermissionKey.Manager,
-        caveId
-      );
-      setHasEditPermission(hasEditPermission);
+      setHasEditPermission(editPermission);
       setIsPermissionResolved(true);
       setIsLoading(false);
     };
-    getCave();
 
-    setContentStyle({
-      ...defaultContentStyle,
-      margin: 0,
-      padding: defaultContentStyle.margin,
-      background: "var(--background-color)",
-    });
+    void getCave();
 
     return () => {
-      setContentStyle(defaultContentStyle);
+      isCurrent = false;
     };
-  }, []);
+  }, [caveId]);
 
   return (
-    <>
-      <CaveComponent
-        cave={cave}
-        isLoading={isLoading}
-        hasEditPermission={hasEditPermission}
-        options={{
-          showMap: true,
-        }}
-        updateCave={async () => {
-          setIsLoading(true);
-          const updatedCave = await CaveService.GetCave(caveId);
-          setCave(updatedCave);
-          setIsLoading(false);
-        }}
-      />
-    </>
+    <CaveComponent
+      cave={cave}
+      isLoading={isLoading}
+      hasEditPermission={hasEditPermission}
+      options={{ showMap: true }}
+      updateCave={async () => {
+        setIsLoading(true);
+        const updatedCave = await CaveService.GetCave(caveId);
+        setCave(updatedCave);
+        setIsLoading(false);
+      }}
+    />
   );
+};
+
+const CavePage = () => {
+  const { caveId } = useParams();
+
+  if (isNullOrWhiteSpace(caveId)) {
+    throw new NotFoundError("caveid");
+  }
+
+  return <CavePageContent key={caveId} caveId={caveId} />;
 };
 
 export { CavePage };

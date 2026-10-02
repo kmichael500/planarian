@@ -1,3 +1,12 @@
 .ant-layout-sider-zero-width-trigger.ant-layout-sider-zero-width-trigger-left {
   display: none;
 }
+
+/* The sidebar is its own scroll region so wheel/touch scrolling cannot chain
+   into the application shell. AntD reserves the trigger space on the Sider. */
+.sidebar .ant-layout-sider-children {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
