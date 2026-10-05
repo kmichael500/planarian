@@ -7,12 +7,15 @@ using Planarian.Model.Database;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
+using Planarian.Modules.Account.Model;
 using Planarian.Modules.Account.Repositories;
 using Planarian.Modules.Account.Services;
 using Planarian.Modules.App.Repositories;
 using Planarian.Modules.App.Services;
 using Planarian.Modules.Authentication.Repositories;
 using Planarian.Modules.Users.Repositories;
+using Planarian.Shared.Email.Services;
+using Planarian.Shared.Options;
 using Planarian.Shared.Services;
 using Xunit;
 
@@ -62,7 +65,8 @@ public sealed class AccountAccessRevocationTests
         {
             AccountId = OtherAccountId,
             UserId = TargetUserId,
-            AccessRevokedOn = revokedOn
+            AccessRevokedOn = revokedOn,
+            AccessRevokedReason = "Membership expired."
         });
         await context.SaveChangesAsync();
 
@@ -74,7 +78,9 @@ public sealed class AccountAccessRevocationTests
 
         Assert.Equal(AccountId, result.CurrentUser?.CurrentAccountId);
         Assert.Equal(AccountId, Assert.Single(result.AccountIds).Value);
-        Assert.Equal(OtherAccountId, Assert.Single(result.RevokedAccountIds).Value);
+        var revokedAccount = Assert.Single(result.RevokedAccountIds);
+        Assert.Equal(OtherAccountId, revokedAccount.Value);
+        Assert.Equal("Membership expired.", revokedAccount.Reason);
 
         var selectableAccounts = (await new AuthenticationRepository(context, requestUser)
             .GetAccountIdsByUserId(TargetUserId)).ToList();
@@ -95,7 +101,8 @@ public sealed class AccountAccessRevocationTests
             AccountId = AccountId,
             UserId = TargetUserId,
             InvitationAcceptedOn = DateTime.UtcNow,
-            AccessRevokedOn = revokedOn
+            AccessRevokedOn = revokedOn,
+            AccessRevokedReason = "Membership expired."
         });
         await context.SaveChangesAsync();
 
@@ -107,7 +114,9 @@ public sealed class AccountAccessRevocationTests
 
         Assert.Null(result.CurrentUser?.CurrentAccountId);
         Assert.Empty(result.AccountIds);
-        Assert.Equal(AccountId, Assert.Single(result.RevokedAccountIds).Value);
+        var revokedAccount = Assert.Single(result.RevokedAccountIds);
+        Assert.Equal(AccountId, revokedAccount.Value);
+        Assert.Equal("Membership expired.", revokedAccount.Reason);
     }
 
     [Fact]
@@ -116,7 +125,7 @@ public sealed class AccountAccessRevocationTests
         await using var context = CreateContext();
         var requestUser = SetRequestUser(context, TargetUserId, AccountId);
         var revokedOn = DateTime.UtcNow;
-        await SeedUserAndMembership(context, requestUser, revokedOn);
+        await SeedUserAndMembership(context, requestUser, revokedOn, "Membership expired.");
 
         var repository = new UserRepository(context, requestUser);
 
@@ -139,6 +148,24 @@ public sealed class AccountAccessRevocationTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, exception.StatusCode);
         Assert.Null((await context.AccountUsers.SingleAsync()).AccessRevokedOn);
+    }
+
+    [Fact]
+    public async Task RevokeWithoutReasonUsesExplicitCompatibilityFallback()
+    {
+        await using var context = CreateContext();
+        var requestUser = SetRequestUser(context, TargetUserId, AccountId);
+        await SeedUserAndMembership(context, requestUser);
+        requestUser.Id = AdminUserId;
+        var service = CreateService(context, requestUser);
+
+        await service.RevokeAccess(TargetUserId);
+
+        context.ChangeTracker.Clear();
+        var membership = await context.AccountUsers.SingleAsync();
+        Assert.Equal(
+            "No reason was provided. Contact someone who manages access for details.",
+            membership.AccessRevokedReason);
     }
 
     [Fact]
@@ -174,11 +201,17 @@ public sealed class AccountAccessRevocationTests
         requestUser.Id = AdminUserId;
         var service = CreateService(context, requestUser);
 
-        await service.RevokeAccess(TargetUserId);
+        var revokeResult = await service.RevokeAccess(TargetUserId, new RevokeAccountAccessRequest
+        {
+            Reason = "Membership expired."
+        });
+
+        Assert.Equal(MessageDeliveryStatus.SendFailed, revokeResult.NotificationEmailDeliveryStatus);
 
         context.ChangeTracker.Clear();
         membership = await context.AccountUsers.SingleAsync();
         var revokedOn = Assert.IsType<DateTime>(membership.AccessRevokedOn);
+        Assert.Equal("Membership expired.", membership.AccessRevokedReason);
         var persistedCavePermission = Assert.Single(await context.CavePermissions.AsNoTracking().ToListAsync());
         Assert.Equal(cavePermissionId, persistedCavePermission.Id);
         Assert.Equal(TargetUserId, persistedCavePermission.UserId);
@@ -195,12 +228,16 @@ public sealed class AccountAccessRevocationTests
         context.ChangeTracker.Clear();
         membership = await context.AccountUsers.SingleAsync();
         Assert.Equal(revokedOn, membership.AccessRevokedOn);
+        Assert.Equal("Membership expired.", membership.AccessRevokedReason);
 
-        await service.RestoreAccess(TargetUserId);
+        var restoreResult = await service.RestoreAccess(TargetUserId);
+
+        Assert.Equal(MessageDeliveryStatus.SendFailed, restoreResult.NotificationEmailDeliveryStatus);
 
         context.ChangeTracker.Clear();
         membership = await context.AccountUsers.SingleAsync();
         Assert.Null(membership.AccessRevokedOn);
+        Assert.Null(membership.AccessRevokedReason);
         Assert.Equal(cavePermissionId, (await context.CavePermissions.AsNoTracking().SingleAsync()).Id);
         Assert.Equal(userPermissionId, (await context.UserPermissions.AsNoTracking().SingleAsync()).Id);
 
@@ -230,12 +267,27 @@ public sealed class AccountAccessRevocationTests
         return new AccountUserManagerService(
             userRepository,
             requestUser,
-            null!,
+            CreateEmailService(context, requestUser),
             null!,
             new AccountRepository(context, requestUser),
             null!,
             userRepository,
             NullLogger<AccountUserManagerService>.Instance);
+    }
+
+    private static EmailService CreateEmailService(
+        PlanarianDbContext context,
+        RequestUser requestUser)
+    {
+        return new EmailService(
+            new MessageTypeRepository(context, requestUser, null!),
+            requestUser,
+            null!,
+            new ClientUrlBuilder(new StubClientRequestOrigin()),
+            new MessageLogRepository(context, requestUser),
+            new EmailOptions { Domain = "mg.example.test" },
+            null!,
+            NullLogger<EmailService>.Instance);
     }
 
     private static PlanarianDbContext CreateContext()
@@ -263,15 +315,18 @@ public sealed class AccountAccessRevocationTests
     private static async Task SeedUserAndMembership(
         PlanarianDbContext context,
         RequestUser requestUser,
-        DateTime? accessRevokedOn = null)
+        DateTime? accessRevokedOn = null,
+        string? accessRevokedReason = null)
     {
         context.Users.Add(CreateUser());
+        context.Accounts.Add(new Account { Id = AccountId, Name = "Test account" });
         context.AccountUsers.Add(new AccountUser
         {
             AccountId = AccountId,
             UserId = TargetUserId,
             InvitationAcceptedOn = DateTime.UtcNow,
-            AccessRevokedOn = accessRevokedOn
+            AccessRevokedOn = accessRevokedOn,
+            AccessRevokedReason = accessRevokedReason
         });
 
         await context.SaveChangesAsync();
@@ -290,6 +345,11 @@ public sealed class AccountAccessRevocationTests
     private sealed class StubApiRequestOrigin : IApiRequestOrigin
     {
         public string GetOrigin() => "https://api.example.test";
+    }
+
+    private sealed class StubClientRequestOrigin : IClientRequestOrigin
+    {
+        public string GetOrigin() => "https://planarian.example.test";
     }
 
     private sealed class TestPlanarianDbContext : PlanarianDbContext

@@ -66,18 +66,20 @@ public class AccountUserManagerController : PlanarianControllerBase<AccountUserM
 
     [HttpDelete("{userId:length(10)}")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> Revoke(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountAccessChangeResultVm>> Revoke(string userId,
+        [FromBody] RevokeAccountAccessRequest? request, CancellationToken cancellationToken)
     {
-        await Service.RevokeAccess(userId, cancellationToken);
-        return Ok();
+        var result = await Service.RevokeAccess(userId, request, cancellationToken);
+        return new JsonResult(result);
     }
 
     [HttpPost("{userId:length(10)}/restore-access")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult> RestoreAccess(string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountAccessChangeResultVm>> RestoreAccess(string userId,
+        CancellationToken cancellationToken)
     {
-        await Service.RestoreAccess(userId, cancellationToken);
-        return Ok();
+        var result = await Service.RestoreAccess(userId, cancellationToken);
+        return new JsonResult(result);
     }
 
     #endregion

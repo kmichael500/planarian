@@ -18,6 +18,7 @@ import {
 } from "../../Shared/Services/AppService";
 import { ApiErrorResponse } from "../../Shared/Models/ApiErrorResponse";
 import { SelectListItem } from "../../Shared/Models/SelectListItem";
+import { RevokedAccountVm } from "../../Shared/Models/RevokedAccountVm";
 import { hasPermission } from "../../Shared/Permissioning/PermissionHelpers";
 import { useLocation } from "react-router-dom";
 import { defaultAppContentStyle } from "../Layout/AppContentLayout";
@@ -33,7 +34,7 @@ interface AppContextProps {
   currentAccountName: string | null;
   userGroupPrefix: string | null;
   accountIds: SelectListItem<string>[];
-  revokedAccountIds: SelectListItem<string>[];
+  revokedAccountIds: RevokedAccountVm[];
   hasPermission: (permission: PermissionKey) => boolean;
   permissions: FeaturePermissions;
   setPermissions: (permissions: FeaturePermissions) => void;
@@ -119,7 +120,7 @@ export const AppProvider: React.FC<AppProviderProps> = (props) => {
     useState<AppInitializeCurrentUserVm | null>(null);
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [accountIds, setAccountIds] = useState<SelectListItem<string>[]>([]);
-  const [revokedAccountIds, setRevokedAccountIds] = useState<SelectListItem<string>[]>([]);
+  const [revokedAccountIds, setRevokedAccountIds] = useState<RevokedAccountVm[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initializedError, setInitializedError] =

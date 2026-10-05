@@ -9,7 +9,8 @@ public sealed class EmailDeliveryEnumContractTests
     public void MessagePurposeNamesAreStableStringValues()
     {
         AssertEnumNames<MessagePurpose>(
-            "Generic", "EmailConfirmation", "PasswordReset", "AccountInvitation", "PasswordChanged");
+            "Generic", "EmailConfirmation", "PasswordReset", "AccountInvitation", "PasswordChanged",
+            "AccountAccessRevoked", "AccountAccessRestored");
     }
 
     [Fact]

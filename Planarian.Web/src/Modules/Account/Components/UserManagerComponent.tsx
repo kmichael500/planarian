@@ -10,6 +10,7 @@ import {
   Typography,
 } from "antd";
 import {
+  DeleteOutlined,
   EditOutlined,
   MailOutlined,
   RedoOutlined,
@@ -71,6 +72,9 @@ const UserManagerComponent: React.FC = () => {
     InvitationEmailAttemptVm[]
   >([]);
   const [form] = Form.useForm();
+  const [revokeForm] = Form.useForm<{ reason: string }>();
+  const [revokeModalUser, setRevokeModalUser] =
+    useState<UserManagerGridVm | null>(null);
   const navigate = useNavigate();
   const { currentUser } = useContext(AppContext);
   const toolbarVisibility = useScrollRevealVisibility({
@@ -139,33 +143,74 @@ const UserManagerComponent: React.FC = () => {
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
-  const handleRevokeAccess = async (user: UserManagerGridVm) => {
+
+  const handleRemoveInvitation = async (userId: string) => {
     try {
       setIsRevoking(true);
-      await AccountUserManagerService.RevokeAccess(user.userId);
-      message.success(
-        user.hasActiveInvitation ? "Invitation removed." : "Access revoked."
-      );
+      await AccountUserManagerService.RevokeAccess(userId);
+      message.success("Invitation removed.");
       fetchUsers();
     } catch (err) {
       const error = err as PlanarianError;
       message.error(error.message);
+    } finally {
+      setIsRevoking(false);
     }
-    setIsRevoking(false);
+  };
+
+  const handleRevokeAccess = async (user: UserManagerGridVm, reason: string) => {
+    try {
+      setIsRevoking(true);
+      const result = await AccountUserManagerService.RevokeAccess(user.userId, {
+        reason: reason.trim(),
+      });
+      if (
+        result?.notificationEmailDeliveryStatus ===
+        MessageDeliveryStatus.SendFailed
+      ) {
+        message.warning(
+          "Access was revoked, but the notification email could not be sent."
+        );
+      } else if (result?.notificationEmailDeliveryStatus != null) {
+        message.success("Access revoked and the user was notified.");
+      } else {
+        message.success("Access revoked.");
+      }
+      setRevokeModalUser(null);
+      revokeForm.resetFields();
+      fetchUsers();
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+    } finally {
+      setIsRevoking(false);
+    }
   };
 
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
   const handleRestoreAccess = async (userId: string) => {
     try {
       setIsRestoring(true);
-      await AccountUserManagerService.RestoreAccess(userId);
-      message.success("Access restored.");
+      const result = await AccountUserManagerService.RestoreAccess(userId);
+      if (
+        result?.notificationEmailDeliveryStatus ===
+        MessageDeliveryStatus.SendFailed
+      ) {
+        message.warning(
+          "Access was restored, but the notification email could not be sent."
+        );
+      } else if (result?.notificationEmailDeliveryStatus != null) {
+        message.success("Access restored and the user was notified.");
+      } else {
+        message.success("Access restored.");
+      }
       fetchUsers();
     } catch (err) {
       const error = err as PlanarianError;
       message.error(error.message);
+    } finally {
+      setIsRestoring(false);
     }
-    setIsRestoring(false);
   };
 
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -281,27 +326,41 @@ const UserManagerComponent: React.FC = () => {
           </PlanarianButton>
         ),
       });
-    } else if (user.userId !== currentUser?.id) {
+    } else if (isPending && user.userId !== currentUser?.id) {
       actions.push({
         key: "remove",
-        label: isPending ? "Remove invitation" : "Revoke access",
+        label: "Remove invitation",
         render: (
           <DeleteButtonComponent
             alwaysShowChildren
             permissionKey={PermissionKey.Admin}
             loading={isRevoking}
             type="default"
-            title={
-              isPending
-                ? `Are you sure you want to remove the invitation for ${user.fullName}?`
-                : `Are you sure you want to revoke access for ${user.fullName}? Their existing permissions will be preserved and can be restored later.`
-            }
-            onConfirm={() => handleRevokeAccess(user)}
+            title={`Are you sure you want to remove the invitation for ${user.fullName}?`}
+            onConfirm={() => handleRemoveInvitation(user.userId)}
             okText="Yes"
             cancelText="No"
           >
-            {isPending ? "Remove invitation" : "Revoke access"}
+            Remove invitation
           </DeleteButtonComponent>
+        ),
+      });
+    } else if (user.userId !== currentUser?.id) {
+      actions.push({
+        key: "revoke",
+        label: "Revoke access",
+        render: (
+          <PlanarianButton
+            alwaysShowChildren
+            danger
+            icon={<DeleteOutlined />}
+            permissionKey={PermissionKey.Admin}
+            loading={isRevoking && revokeModalUser?.userId === user.userId}
+            type="default"
+            onClick={() => setRevokeModalUser(user)}
+          >
+            Revoke access
+          </PlanarianButton>
         ),
       });
     }
@@ -448,6 +507,59 @@ const UserManagerComponent: React.FC = () => {
         emptyText="No tracked invitation emails."
         onClose={() => setInvitationHistoryVisible(false)}
       />
+
+      <Modal
+        title={
+          revokeModalUser
+            ? `Revoke access for ${revokeModalUser.fullName}`
+            : "Revoke access"
+        }
+        open={revokeModalUser != null}
+        confirmLoading={isRevoking}
+        okText="Revoke access"
+        okButtonProps={{ danger: true }}
+        onCancel={() => {
+          setRevokeModalUser(null);
+          revokeForm.resetFields();
+        }}
+        onOk={() => {
+          if (!revokeModalUser) return;
+          revokeForm
+            .validateFields()
+            .then(({ reason }) => handleRevokeAccess(revokeModalUser, reason))
+            .catch(() => {});
+        }}
+      >
+        <Text>
+          Their existing permissions will be preserved so access can be restored
+          later. The reason below will be shown to the user in Planarian and
+          included in the notification email.
+        </Text>
+        <Form form={revokeForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            label="Reason for revocation"
+            name="reason"
+            rules={[
+              {
+                required: true,
+                whitespace: true,
+                message: "Please provide a reason for revoking access.",
+              },
+              {
+                max: 255,
+                message: "The reason cannot exceed 255 characters.",
+              },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              maxLength={255}
+              showCount
+              placeholder="Explain why this account access is being revoked"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Invite User"

@@ -14,7 +14,7 @@ public class AppInitializeVm
 
     public string SignalrBaseUrl { get; set; } 
     public IEnumerable<SelectListItem<string>> AccountIds { get; set; } = new HashSet<SelectListItem<string>>();
-    public IEnumerable<SelectListItem<string>> RevokedAccountIds { get; set; } = new HashSet<SelectListItem<string>>();
+    public IEnumerable<RevokedAccountVm> RevokedAccountIds { get; set; } = new HashSet<RevokedAccountVm>();
     public string ApiBaseUrl { get; set; }
     public IEnumerable<string> Permissions { get; set; } = Array.Empty<string>();
     public AppInitializeCurrentUserVm? CurrentUser { get; set; }

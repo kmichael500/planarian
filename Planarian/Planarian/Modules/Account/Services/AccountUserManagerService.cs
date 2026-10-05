@@ -142,7 +142,8 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
         };
     }
 
-    public async Task RevokeAccess(string userId, CancellationToken cancellationToken = default)
+    public async Task<AccountAccessChangeResultVm> RevokeAccess(string userId,
+        RevokeAccountAccessRequest? request = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -166,19 +167,55 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
             !string.IsNullOrWhiteSpace(accountUser.InvitationCode))
         {
             await DeletePendingInvitationAccess(userId, RequestUser.AccountId, cancellationToken);
-            return;
+            return new AccountAccessChangeResultVm();
         }
 
         if (accountUser.AccessRevokedOn.HasValue)
         {
-            return;
+            return new AccountAccessChangeResultVm();
+        }
+
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            // Keep older web clients compatible during a rolling deployment. The current UI
+            // requires a reason before it submits a revocation.
+            reason = "No reason was provided. Contact someone who manages access for details.";
+        }
+
+        if (reason.Length > PropertyLength.MediumText)
+        {
+            throw ApiExceptionDictionary.BadRequest(
+                $"The revocation reason cannot exceed {PropertyLength.MediumText} characters.");
+        }
+
+        var user = await _userRepository.Get(userId);
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
+        if (string.IsNullOrWhiteSpace(accountName))
+        {
+            throw ApiExceptionDictionary.NotFound("Account");
         }
 
         accountUser.AccessRevokedOn = DateTime.UtcNow;
+        accountUser.AccessRevokedReason = reason;
         await _accountRepository.SaveChangesAsync(cancellationToken);
+
+        var sendResult = await _emailService.SendAccountAccessRevokedEmail(
+            user, accountName, reason, CancellationToken.None);
+
+        return new AccountAccessChangeResultVm
+        {
+            NotificationEmailDeliveryStatus = sendResult.DeliveryStatus
+        };
     }
 
-    public async Task RestoreAccess(string userId, CancellationToken cancellationToken = default)
+    public async Task<AccountAccessChangeResultVm> RestoreAccess(string userId,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
@@ -193,11 +230,32 @@ public class AccountUserManagerService : ServiceBase<UserRepository>
 
         if (!accountUser.AccessRevokedOn.HasValue)
         {
-            return;
+            return new AccountAccessChangeResultVm();
+        }
+
+        var user = await _userRepository.Get(userId);
+        if (user == null)
+        {
+            throw ApiExceptionDictionary.NotFound("User");
+        }
+
+        var accountName = await _accountRepository.GetAccountName(RequestUser.AccountId);
+        if (string.IsNullOrWhiteSpace(accountName))
+        {
+            throw ApiExceptionDictionary.NotFound("Account");
         }
 
         accountUser.AccessRevokedOn = null;
+        accountUser.AccessRevokedReason = null;
         await _accountRepository.SaveChangesAsync(cancellationToken);
+
+        var sendResult = await _emailService.SendAccountAccessRestoredEmail(
+            user, accountName, CancellationToken.None);
+
+        return new AccountAccessChangeResultVm
+        {
+            NotificationEmailDeliveryStatus = sendResult.DeliveryStatus
+        };
     }
 
     private async Task DeletePendingInvitationAccess(string userId, string accountId,

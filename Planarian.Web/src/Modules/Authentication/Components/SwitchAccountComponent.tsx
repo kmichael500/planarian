@@ -25,7 +25,7 @@ const SwitchAccountComponent = ({
     () => [
       ...accountIds
         .filter((item) => item.value !== currentAccountId)
-        .map((item) => ({ ...item, isRevoked: false })),
+        .map((item) => ({ ...item, reason: null, isRevoked: false })),
       ...revokedAccountIds.map((item) => ({ ...item, isRevoked: true })),
     ],
     [accountIds, revokedAccountIds, currentAccountId]
@@ -80,10 +80,23 @@ const SwitchAccountComponent = ({
                     marginBottom: "10px",
                   }}
                 >
-                  <span>{item.display}</span>
-                  {isRevoked && (
-                    <Typography.Text type="danger">Access revoked</Typography.Text>
-                  )}
+                  <div className="planarian-account-option__content">
+                    <span>{item.display}</span>
+                    {isRevoked && (
+                      <>
+                        <Typography.Text type="danger">
+                          Access revoked
+                        </Typography.Text>
+                        <Typography.Text
+                          className="planarian-account-option__reason"
+                          type="secondary"
+                        >
+                          {item.reason ||
+                            "No reason is available. Contact someone who manages access for details."}
+                        </Typography.Text>
+                      </>
+                    )}
+                  </div>
                 </List.Item>
               );
             }}

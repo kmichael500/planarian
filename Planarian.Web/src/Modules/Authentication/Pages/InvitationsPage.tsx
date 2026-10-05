@@ -25,7 +25,6 @@ const InvitationsPage = () => {
   const invitationActionInFlightRef = useRef(false);
   const {
     revokedAccountIds,
-    currentAccountId,
     setHeaderTitle,
     setHeaderButtons,
     refreshPendingInvitations,
@@ -107,14 +106,28 @@ const InvitationsPage = () => {
 
   return (
     <div style={styles.container}>
-      {!currentAccountId && revokedAccountIds.length > 0 && (
+      {revokedAccountIds.length > 0 && (
         <Alert
           type="warning"
           showIcon
           message="Account access revoked"
-          description={`Your access to ${revokedAccountIds
-            .map((account) => account.display)
-            .join(", ")} has been revoked. Contact an account administrator if you think this is a mistake.`}
+          description={
+            <Space direction="vertical" size="small">
+              {revokedAccountIds.map((account) => (
+                <div key={account.value}>
+                  <Text strong>{account.display}</Text>
+                  <div>
+                    Reason:{" "}
+                    {account.reason ||
+                      "No reason is available. Contact someone who manages access for details."}
+                  </div>
+                </div>
+              ))}
+              <Text>
+                If you have questions about this change, contact someone who manages access.
+              </Text>
+            </Space>
+          }
           style={{ marginBottom: 16 }}
         />
       )}

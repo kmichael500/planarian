@@ -6,5 +6,7 @@ public enum MessagePurpose
     EmailConfirmation,
     PasswordReset,
     AccountInvitation,
-    PasswordChanged
+    PasswordChanged,
+    AccountAccessRevoked,
+    AccountAccessRestored
 }

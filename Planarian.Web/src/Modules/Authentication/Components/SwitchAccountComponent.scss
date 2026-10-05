@@ -16,3 +16,14 @@
 .planarian-account-option:not([aria-disabled="true"]):hover {
   background: var(--hover-surface-color) !important;
 }
+
+.planarian-account-option__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.planarian-account-option__reason {
+  white-space: normal;
+}

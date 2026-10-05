@@ -15,6 +15,9 @@ public class AccountUser : EntityBase
     public DateTime? InvitationSentOn { get; set; }
     public DateTime? AccessRevokedOn { get; set; }
 
+    [MaxLength(PropertyLength.MediumText)]
+    public string? AccessRevokedReason { get; set; }
+
     [MaxLength(PropertyLength.InvitationCode)]
     public string? InvitationCode { get; set; }
 

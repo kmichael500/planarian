@@ -52,6 +52,7 @@ it("shows revoked accounts but does not allow switching to them", () => {
             {
               display: "Revoked account",
               value: "revoked001",
+              reason: "Membership expired.",
             },
           ],
           switchAccount,
@@ -70,6 +71,7 @@ it("shows revoked accounts but does not allow switching to them", () => {
   const revokedAccount = screen.getByText("Revoked account").closest(".ant-list-item");
   expect(revokedAccount).toHaveAttribute("aria-disabled", "true");
   expect(screen.getByText("Access revoked")).toBeInTheDocument();
+  expect(screen.getByText("Membership expired.")).toBeInTheDocument();
 
   fireEvent.click(revokedAccount!);
   expect(switchAccount).not.toHaveBeenCalled();

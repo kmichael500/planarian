@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { message } from "antd";
 import React, { useContext } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -133,10 +133,10 @@ describe("UserManagerComponent", () => {
       .mockResolvedValue();
     revokeAccess = jest
       .spyOn(AccountUserManagerService, "RevokeAccess")
-      .mockResolvedValue();
+      .mockResolvedValue({});
     restoreAccess = jest
       .spyOn(AccountUserManagerService, "RestoreAccess")
-      .mockResolvedValue();
+      .mockResolvedValue({});
     warningSpy = jest
       .spyOn(message, "warning")
       .mockImplementation(() => undefined as never);
@@ -288,7 +288,7 @@ describe("UserManagerComponent", () => {
     ).toBeInTheDocument();
   });
 
-  it("revokes an accepted user's access and refreshes the authoritative list", async () => {
+  it("requires a reason when revoking accepted access and reports notification failure", async () => {
     getUsers.mockResolvedValue([
       {
         ...pendingUser,
@@ -296,14 +296,36 @@ describe("UserManagerComponent", () => {
         invitationAcceptedOn: "2026-08-14T14:00:00Z",
       },
     ]);
+    revokeAccess.mockResolvedValue({
+      notificationEmailDeliveryStatus: MessageDeliveryStatus.SendFailed,
+    });
 
     renderManager();
     await screen.findByText("Invited User");
 
-    fireEvent.click(screen.getByRole("button", { name: "Revoke access" }));
+    fireEvent.click(screen.getByRole("button", { name: /Revoke access/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText(/reason below will be shown to the user in Planarian and included in the notification email/i)
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Revoke access" }));
+    expect(revokeAccess).not.toHaveBeenCalled();
+
+    fireEvent.change(
+      within(dialog).getByRole("textbox", { name: "Reason for revocation" }),
+      { target: { value: "  Membership expired.  " } }
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Revoke access" }));
 
     await waitFor(() =>
-      expect(revokeAccess).toHaveBeenCalledWith("user123456")
+      expect(revokeAccess).toHaveBeenCalledWith("user123456", {
+        reason: "Membership expired.",
+      })
+    );
+    expect(warningSpy).toHaveBeenCalledWith(
+      "Access was revoked, but the notification email could not be sent."
     );
     await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });

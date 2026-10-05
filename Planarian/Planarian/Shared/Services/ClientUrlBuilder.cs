@@ -40,6 +40,11 @@ public class ClientUrlBuilder
         return BuildPath(ClientRoutes.Invitation.Get(invitationCode));
     }
 
+    public string BuildInvitationListUrl()
+    {
+        return BuildPath(ClientRoutes.InvitationList.Get());
+    }
+
     private string BuildPath(string path)
     {
         return UrlHelper.Build(GetOrigin(), path, null);

@@ -2,8 +2,10 @@ import { HttpClient } from "../../../Shared/Http/HttpClient";
 import { SelectListItemDescriptionData } from "../../../Shared/Models/SelectListItem";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
 import { PermissionType } from "../../Authentication/Models/PermissionType";
+import { AccountAccessChangeResultVm } from "../Models/AccountAccessChangeResultVm";
 import { InviteUserRequest } from "../Models/InviteUserRequest";
 import { InviteUserResultVm } from "../Models/InviteUserResultVm";
+import { RevokeAccountAccessRequest } from "../Models/RevokeAccountAccessRequest";
 import { InvitationEmailAttemptVm } from "../Models/InvitationEmailHistoryVm";
 import { PermissionSelectListData } from "../Models/PermissionSelectListData";
 import { UserPermissionVm } from "../Models/UserAccessPermissionVm";
@@ -28,11 +30,23 @@ const AccountUserManagerService = {
   async InviteUser(request: InviteUserRequest): Promise<InviteUserResultVm> {
     return (await HttpClient.post<InviteUserResultVm>(`${baseUrl}`, request)).data;
   },
-  async RevokeAccess(userId: string): Promise<void> {
-    await HttpClient.delete(`${baseUrl}/${userId}`);
+  async RevokeAccess(
+    userId: string,
+    request?: RevokeAccountAccessRequest
+  ): Promise<AccountAccessChangeResultVm> {
+    const response = await HttpClient.delete<AccountAccessChangeResultVm>(
+      `${baseUrl}/${userId}`,
+      request ? { data: request } : undefined
+    );
+    return response.data;
   },
-  async RestoreAccess(userId: string): Promise<void> {
-    await HttpClient.post(`${baseUrl}/${userId}/restore-access`, {});
+  async RestoreAccess(userId: string): Promise<AccountAccessChangeResultVm> {
+    return (
+      await HttpClient.post<AccountAccessChangeResultVm>(
+        `${baseUrl}/${userId}/restore-access`,
+        {}
+      )
+    ).data;
   },
   async ResendInvitation(userId: string): Promise<void> {
     await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {});

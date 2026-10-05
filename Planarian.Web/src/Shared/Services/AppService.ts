@@ -3,6 +3,7 @@ import { RequestRuntimeState } from "../Http/RequestRuntimeState";
 import { PermissionKey } from "../../Modules/Authentication/Models/PermissionKey";
 import { isNullOrWhiteSpace } from "../Helpers/StringHelpers";
 import { SelectListItem } from "../Models/SelectListItem";
+import { RevokedAccountVm } from "../Models/RevokedAccountVm";
 
 const baseUrl = "api/app";
 
@@ -72,7 +73,7 @@ export interface AppOptionsVm {
 
 export interface AppInitializeVm extends AppOptionsVm {
   accountIds: SelectListItem<string>[];
-  revokedAccountIds?: SelectListItem<string>[];
+  revokedAccountIds?: RevokedAccountVm[];
   permissions: PermissionKey[];
   currentUser: AppInitializeCurrentUserVm | null;
   antiforgeryRequestToken: string | null;

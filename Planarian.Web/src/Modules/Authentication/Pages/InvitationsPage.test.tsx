@@ -129,15 +129,16 @@ describe("InvitationsPage", () => {
     jest.restoreAllMocks();
   });
 
-  it("explains revoked access when the user has no active account", async () => {
+  it("explains revoked access and its reason even when another account is active", async () => {
     jest.spyOn(UserService, "GetPendingInvitations").mockResolvedValue([]);
 
     renderPage(false, {
-      currentAccountId: null,
+      currentAccountId: "active0001",
       revokedAccountIds: [
         {
-          display: "Tennessee Cave Survey",
+          display: "Example Survey",
           value: "tcsaccount",
+          reason: "Membership expired.",
         },
       ],
     });
@@ -146,9 +147,8 @@ describe("InvitationsPage", () => {
       "No pending invitations were found for your email."
     );
     expect(screen.getByText("Account access revoked")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Your access to Tennessee Cave Survey has been revoked/)
-    ).toBeInTheDocument();
+    expect(screen.getByText("Example Survey")).toBeInTheDocument();
+    expect(screen.getByText(/Reason: Membership expired/)).toBeInTheDocument();
   });
 
   it("ignores a stale StrictMode invitation list after the current request succeeds", async () => {

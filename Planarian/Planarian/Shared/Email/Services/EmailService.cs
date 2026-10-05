@@ -226,6 +226,44 @@ public class EmailService : ServiceBase<MessageTypeRepository>
             cancellationToken);
     }
 
+    public async Task<EmailSendResult> SendAccountAccessRevokedEmail(User user, string accountName, string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var paragraphs = new List<string>
+        {
+            $"Your access to {accountName} in Planarian has been revoked.",
+            $"Reason: {reason}",
+            "Your Planarian login is still active, and access to any other organizations in Planarian is unchanged.",
+            $"If you have questions about this change, contact someone who manages access to {accountName}."
+        };
+
+        return await SendCommittedOperationEmail(MessagePurpose.AccountAccessRevoked,
+            () => SendGenericEmail(MessagePurpose.AccountAccessRevoked, $"Access to {accountName} was revoked",
+                user.EmailAddress, user.FullName,
+                new GenericEmailSubstitutions(paragraphs, "Account access revoked",
+                    "View details", _clientUrlBuilder.BuildInvitationListUrl()),
+                cancellationToken: cancellationToken),
+            cancellationToken);
+    }
+
+    public async Task<EmailSendResult> SendAccountAccessRestoredEmail(User user, string accountName,
+        CancellationToken cancellationToken = default)
+    {
+        var paragraphs = new List<string>
+        {
+            $"Your access to {accountName} in Planarian has been restored.",
+            "You can open Planarian and access this organization again."
+        };
+
+        return await SendCommittedOperationEmail(MessagePurpose.AccountAccessRestored,
+            () => SendGenericEmail(MessagePurpose.AccountAccessRestored, $"Access to {accountName} was restored",
+                user.EmailAddress, user.FullName,
+                new GenericEmailSubstitutions(paragraphs, "Account access restored",
+                    "Open Planarian", _clientUrlBuilder.GetOrigin()),
+                cancellationToken: cancellationToken),
+            cancellationToken);
+    }
+
     private static string? TryGetProviderMessageId(string? providerResponse)
     {
         if (string.IsNullOrWhiteSpace(providerResponse)) return null;
