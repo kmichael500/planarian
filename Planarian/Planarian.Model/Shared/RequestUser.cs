@@ -37,7 +37,8 @@ public class RequestUser
                 e.LastName,
                 e.LastActiveOn,
                 e.SessionVersion,
-                IsValidAccountId = e.AccountUsers.Any(au => au.AccountId == accountId)
+                IsValidAccountId = e.AccountUsers.Any(au =>
+                    au.AccountId == accountId && au.AccessRevokedOn == null)
             })
             .FirstOrDefaultAsync();
 

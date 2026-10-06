@@ -10,8 +10,16 @@ import { AccountUserManagerService } from "../Services/UserManagerService";
 import { UserManagerComponent } from "./UserManagerComponent";
 
 jest.mock("../../../Shared/Components/Buttons/DeleteButtonComponent", () => ({
-  DeleteButtonComponent: ({ children }: { children: React.ReactNode }) => (
-    <button type="button">{children}</button>
+  DeleteButtonComponent: ({
+    children,
+    onConfirm,
+  }: {
+    children: React.ReactNode;
+    onConfirm?: () => void;
+  }) => (
+    <button type="button" onClick={onConfirm}>
+      {children}
+    </button>
   ),
 }));
 
@@ -73,6 +81,7 @@ const pendingUser: UserManagerGridVm = {
   invitationAcceptedOn: null,
   invitationSentOn: null,
   lastActiveOn: null,
+  accessRevokedOn: null,
   hasActiveInvitation: true,
   invitationEmailAttemptCount: 2,
 };
@@ -96,11 +105,13 @@ const renderManager = () =>
     </MemoryRouter>
   );
 
-describe("UserManagerComponent invitation delivery status", () => {
+describe("UserManagerComponent", () => {
   let getUsers: jest.SpyInstance;
   let getHistory: jest.SpyInstance;
   let inviteUser: jest.SpyInstance;
   let resendInvitation: jest.SpyInstance;
+  let revokeAccess: jest.SpyInstance;
+  let restoreAccess: jest.SpyInstance;
   let warningSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
 
@@ -119,6 +130,12 @@ describe("UserManagerComponent invitation delivery status", () => {
       });
     resendInvitation = jest
       .spyOn(AccountUserManagerService, "ResendInvitation")
+      .mockResolvedValue();
+    revokeAccess = jest
+      .spyOn(AccountUserManagerService, "RevokeAccess")
+      .mockResolvedValue();
+    restoreAccess = jest
+      .spyOn(AccountUserManagerService, "RestoreAccess")
       .mockResolvedValue();
     warningSpy = jest
       .spyOn(message, "warning")
@@ -269,5 +286,51 @@ describe("UserManagerComponent invitation delivery status", () => {
     expect(
       screen.getByRole("button", { name: /Email History$/ })
     ).toBeInTheDocument();
+  });
+
+  it("revokes an accepted user's access and refreshes the authoritative list", async () => {
+    getUsers.mockResolvedValue([
+      {
+        ...pendingUser,
+        hasActiveInvitation: false,
+        invitationAcceptedOn: "2026-08-14T14:00:00Z",
+      },
+    ]);
+
+    renderManager();
+    await screen.findByText("Invited User");
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke access" }));
+
+    await waitFor(() =>
+      expect(revokeAccess).toHaveBeenCalledWith("user123456")
+    );
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
+  });
+
+  it("restores a revoked user's access instead of offering another revoke", async () => {
+    getUsers.mockResolvedValue([
+      {
+        ...pendingUser,
+        hasActiveInvitation: false,
+        invitationAcceptedOn: "2026-08-14T14:00:00Z",
+        accessRevokedOn: "2026-09-28T18:00:00Z",
+      },
+    ]);
+
+    renderManager();
+    await screen.findByText("Invited User");
+
+    expect(screen.getByText("Access revoked")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Revoke access" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Restore access/ }));
+
+    await waitFor(() =>
+      expect(restoreAccess).toHaveBeenCalledWith("user123456")
+    );
+    await waitFor(() => expect(getUsers).toHaveBeenCalledTimes(2));
   });
 });

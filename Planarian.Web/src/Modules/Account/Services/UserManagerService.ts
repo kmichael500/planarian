@@ -31,6 +31,9 @@ const AccountUserManagerService = {
   async RevokeAccess(userId: string): Promise<void> {
     await HttpClient.delete(`${baseUrl}/${userId}`);
   },
+  async RestoreAccess(userId: string): Promise<void> {
+    await HttpClient.post(`${baseUrl}/${userId}/restore-access`, {});
+  },
   async ResendInvitation(userId: string): Promise<void> {
     await HttpClient.post(`${baseUrl}/${userId}/resend-invitation`, {});
   },

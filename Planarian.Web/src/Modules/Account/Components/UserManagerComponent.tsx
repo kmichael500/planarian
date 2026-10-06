@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   Modal,
   Form,
@@ -39,12 +39,13 @@ import { MessageDeliveryStatus } from "../../../Shared/Models/MessageDeliverySta
 import { SplitSortControl } from "../../Search/Components/SplitSortControl";
 import { ScrollCollapseSection } from "../../../Shared/Components/ScrollCollapseSection/ScrollCollapseSection";
 import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
+import { AppContext } from "../../../Configuration/Context/AppContext";
 import "./UserManagerComponent.scss";
 
 const { Text } = Typography;
 const USER_MANAGER_COLLAPSE_BREAKPOINT_PX = 760;
 
-type UserStatusFilter = "all" | "accepted" | "pending";
+type UserStatusFilter = "all" | "accepted" | "pending" | "revoked";
 type UserSortBy =
   | "fullName"
   | "emailAddress"
@@ -71,6 +72,7 @@ const UserManagerComponent: React.FC = () => {
   >([]);
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const { currentUser } = useContext(AppContext);
   const toolbarVisibility = useScrollRevealVisibility({
     breakpointPx: USER_MANAGER_COLLAPSE_BREAKPOINT_PX,
     mode: "direct",
@@ -137,17 +139,33 @@ const UserManagerComponent: React.FC = () => {
   };
 
   const [isRevoking, setIsRevoking] = useState<boolean>(false);
-  const handleRevokeAccess = async (userId: string) => {
+  const handleRevokeAccess = async (user: UserManagerGridVm) => {
     try {
       setIsRevoking(true);
-      await AccountUserManagerService.RevokeAccess(userId);
-      message.success("Access revoked.");
+      await AccountUserManagerService.RevokeAccess(user.userId);
+      message.success(
+        user.hasActiveInvitation ? "Invitation removed." : "Access revoked."
+      );
       fetchUsers();
     } catch (err) {
       const error = err as PlanarianError;
       message.error(error.message);
     }
     setIsRevoking(false);
+  };
+
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
+  const handleRestoreAccess = async (userId: string) => {
+    try {
+      setIsRestoring(true);
+      await AccountUserManagerService.RestoreAccess(userId);
+      message.success("Access restored.");
+      fetchUsers();
+    } catch (err) {
+      const error = err as PlanarianError;
+      message.error(error.message);
+    }
+    setIsRestoring(false);
   };
 
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -164,8 +182,10 @@ const UserManagerComponent: React.FC = () => {
     setIsResending(false);
   };
 
-  const getUserStatus = (user: UserManagerGridVm): UserStatusFilter =>
-    user.invitationAcceptedOn ? "accepted" : "pending";
+  const getUserStatus = (user: UserManagerGridVm): UserStatusFilter => {
+    if (user.accessRevokedOn) return "revoked";
+    return user.invitationAcceptedOn ? "accepted" : "pending";
+  };
 
   const sortOptions: SelectListItem<string>[] = [
     { display: "Invitation sent", value: "invitationSentOn" },
@@ -223,6 +243,7 @@ const UserManagerComponent: React.FC = () => {
 
   const renderUserCard = (user: UserManagerGridVm) => {
     const isPending = user.hasActiveInvitation;
+    const isRevoked = !!user.accessRevokedOn;
     const actions: GridCardAction[] = [
       {
         key: "edit",
@@ -243,24 +264,47 @@ const UserManagerComponent: React.FC = () => {
       });
     }
 
-    actions.push({
-      key: "remove",
-      label: "Remove",
-      render: (
-        <DeleteButtonComponent
-          alwaysShowChildren
-          permissionKey={PermissionKey.Admin}
-          loading={isRevoking}
-          type="default"
-          title={`Are you sure you want to revoke access for ${user.fullName}? You will need to re-invite them to grant access in the future.`}
-          onConfirm={() => handleRevokeAccess(user.userId)}
-          okText="Yes"
-          cancelText="No"
-        >
-          Remove
-        </DeleteButtonComponent>
-      ),
-    });
+    if (isRevoked) {
+      actions.push({
+        key: "restore",
+        label: "Restore access",
+        render: (
+          <PlanarianButton
+            alwaysShowChildren
+            icon={<RedoOutlined />}
+            permissionKey={PermissionKey.Admin}
+            loading={isRestoring}
+            type="default"
+            onClick={() => handleRestoreAccess(user.userId)}
+          >
+            Restore access
+          </PlanarianButton>
+        ),
+      });
+    } else if (user.userId !== currentUser?.id) {
+      actions.push({
+        key: "remove",
+        label: isPending ? "Remove invitation" : "Revoke access",
+        render: (
+          <DeleteButtonComponent
+            alwaysShowChildren
+            permissionKey={PermissionKey.Admin}
+            loading={isRevoking}
+            type="default"
+            title={
+              isPending
+                ? `Are you sure you want to remove the invitation for ${user.fullName}?`
+                : `Are you sure you want to revoke access for ${user.fullName}? Their existing permissions will be preserved and can be restored later.`
+            }
+            onConfirm={() => handleRevokeAccess(user)}
+            okText="Yes"
+            cancelText="No"
+          >
+            {isPending ? "Remove invitation" : "Revoke access"}
+          </DeleteButtonComponent>
+        ),
+      });
+    }
 
     return (
       <GridCard
@@ -279,7 +323,9 @@ const UserManagerComponent: React.FC = () => {
           </span>
         }
         headerExtra={
-          isPending ? (
+          isRevoked ? (
+            <span className="user-manager-grid-card__status">Access revoked</span>
+          ) : isPending ? (
             <span className="user-manager-grid-card__status">Pending</span>
           ) : null
         }
@@ -297,6 +343,12 @@ const UserManagerComponent: React.FC = () => {
             <Text type="secondary">Last Active</Text>
             <span>{renderDate(user.lastActiveOn)}</span>
           </div>
+          {user.accessRevokedOn ? (
+            <div className="user-manager-grid-card__detail">
+              <Text type="secondary">Access Revoked</Text>
+              <span>{renderDate(user.accessRevokedOn)}</span>
+            </div>
+          ) : null}
           {user.invitationEmailAttemptCount > 0 ? (
             <div className="user-manager-grid-card__history">
               <PlanarianButton
@@ -342,6 +394,7 @@ const UserManagerComponent: React.FC = () => {
                     { label: "All statuses", value: "all" },
                     { label: "Accepted", value: "accepted" },
                     { label: "Pending", value: "pending" },
+                    { label: "Access revoked", value: "revoked" },
                   ]}
                 />
                 <SplitSortControl

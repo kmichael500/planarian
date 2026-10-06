@@ -34,6 +34,7 @@ public class AppService : ServiceBase<AppRepository>
         if (string.IsNullOrWhiteSpace(RequestUser.Id)) return result; // if not authenticated
 
         var accountIds = await Repository.GetAccountIds();
+        var revokedAccountIds = await Repository.GetRevokedAccountIds();
 
         var defaultAccountId = accountIds.FirstOrDefault()?.Value;
         var currentAccountId = RequestUser.AccountId ?? defaultAccountId;
@@ -46,6 +47,7 @@ public class AppService : ServiceBase<AppRepository>
             RequestUser.FullName,
             currentAccountId);
         result.AccountIds = accountIds;
+        result.RevokedAccountIds = revokedAccountIds;
         result.Permissions = permissions;
         return result;
     }

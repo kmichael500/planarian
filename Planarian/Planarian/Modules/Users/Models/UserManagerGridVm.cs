@@ -8,6 +8,7 @@ public class UserManagerGridVm
     public DateTime? InvitationAcceptedOn { get; set; }
     public DateTime? InvitationSentOn { get; set; }
     public DateTime? LastActiveOn { get; set; }
+    public DateTime? AccessRevokedOn { get; set; }
     public bool HasActiveInvitation { get; set; }
     public int InvitationEmailAttemptCount { get; set; }
 }

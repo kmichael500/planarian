@@ -13,6 +13,6 @@
   transition: background-color 0.3s, border-color 0.3s;
 }
 
-.planarian-account-option:hover {
+.planarian-account-option:not([aria-disabled="true"]):hover {
   background: var(--hover-surface-color) !important;
 }
