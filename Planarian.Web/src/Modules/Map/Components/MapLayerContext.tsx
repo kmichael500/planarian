@@ -1,6 +1,24 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { MAP_LAYER_DEFINITIONS, getLayerDefinition } from "./MapLayerDefinitions";
+import {
+  MAP_LAYER_DEFINITIONS,
+  getLayerDefinition,
+} from "./MapLayerDefinitions";
+import {
+  DEFAULT_HILLSHADE_PREFERENCES,
+  HillshadePaletteColorKey,
+  HillshadePreferences,
+  MapTheme,
+  normalizeHillshadePreferences,
+} from "./HillshadeStyle";
 
 type LayerPreference = { visible: boolean; opacity: number };
 type LayerPreferences = Record<string, LayerPreference>;
@@ -14,16 +32,29 @@ interface MapLayerContextValue {
   terrainExaggeration: number;
   setTerrainEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setTerrainExaggeration: React.Dispatch<React.SetStateAction<number>>;
+  hillshadePreferences: HillshadePreferences;
+  setHillshadeExaggeration: (value: number) => void;
+  setHillshadeDirection: (value: number) => void;
+  setHillshadeContrast: (value: number) => void;
+  setHillshadePaletteColor: (
+    theme: MapTheme,
+    key: HillshadePaletteColorKey,
+    value: string
+  ) => void;
+  resetHillshadePalette: (theme: MapTheme) => void;
+  resetHillshadeSettings: () => void;
 }
 
 const MapLayerContext = createContext<MapLayerContextValue | null>(null);
 
 const defaultPreferences = (): LayerPreferences =>
   Object.fromEntries(
-    MAP_LAYER_DEFINITIONS.filter((layer) => layer.type !== "group").map((layer) => [
-      layer.id,
-      { visible: layer.defaultVisible, opacity: layer.defaultOpacity },
-    ])
+    MAP_LAYER_DEFINITIONS.filter((layer) => layer.type !== "group").map(
+      (layer) => [
+        layer.id,
+        { visible: layer.defaultVisible, opacity: layer.defaultOpacity },
+      ]
+    )
   );
 
 const loadPreferences = (accountId: string | null): LayerPreferences => {
@@ -34,7 +65,11 @@ const loadPreferences = (accountId: string | null): LayerPreferences => {
   if (!raw) return defaults;
 
   try {
-    const saved = JSON.parse(raw) as Array<{ id: string; isActive: boolean; opacity: number }>;
+    const saved = JSON.parse(raw) as Array<{
+      id: string;
+      isActive: boolean;
+      opacity: number;
+    }>;
     saved.forEach(({ id, isActive, opacity }) => {
       if (defaults[id]) defaults[id] = { visible: isActive, opacity };
     });
@@ -44,7 +79,9 @@ const loadPreferences = (accountId: string | null): LayerPreferences => {
   return defaults;
 };
 
-const loadPreviousGroupMembers = (accountId: string | null): Record<string, string[]> => {
+const loadPreviousGroupMembers = (
+  accountId: string | null
+): Record<string, string[]> => {
   if (!accountId) return {};
   const raw = localStorage.getItem(`planarianPrevGroupMembers-${accountId}`);
   if (!raw) return {};
@@ -56,23 +93,70 @@ const loadPreviousGroupMembers = (accountId: string | null): Record<string, stri
   }
 };
 
-const savePreviousGroupMembers = (accountId: string | null, value: Record<string, string[]>) => {
+const savePreviousGroupMembers = (
+  accountId: string | null,
+  value: Record<string, string[]>
+) => {
   if (!accountId) return;
-  localStorage.setItem(`planarianPrevGroupMembers-${accountId}`, JSON.stringify(value));
+  localStorage.setItem(
+    `planarianPrevGroupMembers-${accountId}`,
+    JSON.stringify(value)
+  );
 };
 
-export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const hillshadeStorageKey = (accountId: string) =>
+  `planarianHillshadeSettings-v1-${accountId}`;
+
+const loadHillshadePreferences = (
+  accountId: string | null
+): HillshadePreferences => {
+  if (!accountId)
+    return {
+      ...DEFAULT_HILLSHADE_PREFERENCES,
+      paletteOverrides: {},
+    };
+
+  const raw = localStorage.getItem(hillshadeStorageKey(accountId));
+  if (!raw)
+    return {
+      ...DEFAULT_HILLSHADE_PREFERENCES,
+      paletteOverrides: {},
+    };
+
+  try {
+    return normalizeHillshadePreferences(JSON.parse(raw));
+  } catch (error) {
+    console.error("Failed to parse saved hillshade settings", error);
+    return {
+      ...DEFAULT_HILLSHADE_PREFERENCES,
+      paletteOverrides: {},
+    };
+  }
+};
+
+export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { currentAccountId } = useContext(AppContext);
-  const [preferences, setPreferences] = useState<LayerPreferences>(() => loadPreferences(currentAccountId));
-  const previousGroupMembers = useRef<Record<string, string[]>>(loadPreviousGroupMembers(currentAccountId));
+  const [preferences, setPreferences] = useState<LayerPreferences>(() =>
+    loadPreferences(currentAccountId)
+  );
+  const previousGroupMembers = useRef<Record<string, string[]>>(
+    loadPreviousGroupMembers(currentAccountId)
+  );
   const [terrainEnabled, setTerrainEnabled] = useState(false);
   const [terrainExaggeration, setTerrainExaggeration] = useState(1);
+  const [hillshadePreferences, setHillshadePreferences] =
+    useState<HillshadePreferences>(() =>
+      loadHillshadePreferences(currentAccountId)
+    );
 
   useEffect(() => {
     setPreferences(loadPreferences(currentAccountId));
     previousGroupMembers.current = loadPreviousGroupMembers(currentAccountId);
     setTerrainEnabled(false);
     setTerrainExaggeration(1);
+    setHillshadePreferences(loadHillshadePreferences(currentAccountId));
   }, [currentAccountId]);
 
   useEffect(() => {
@@ -82,14 +166,27 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isActive: value.visible,
       opacity: value.opacity,
     }));
-    localStorage.setItem(`planarianMapLayerStates-${currentAccountId}`, JSON.stringify(serializable));
+    localStorage.setItem(
+      `planarianMapLayerStates-${currentAccountId}`,
+      JSON.stringify(serializable)
+    );
   }, [currentAccountId, preferences]);
+
+  useEffect(() => {
+    if (!currentAccountId) return;
+    localStorage.setItem(
+      hillshadeStorageKey(currentAccountId),
+      JSON.stringify(hillshadePreferences)
+    );
+  }, [currentAccountId, hillshadePreferences]);
 
   const isVisible = useCallback(
     (id: string) => {
       const definition = getLayerDefinition(id);
       if (definition?.type === "group") {
-        return definition.memberLayerIds.some((memberId) => preferences[memberId]?.visible);
+        return definition.memberLayerIds.some(
+          (memberId) => preferences[memberId]?.visible
+        );
       }
       return preferences[id]?.visible ?? false;
     },
@@ -108,72 +205,152 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [preferences]
   );
 
-  const toggleLayer = useCallback((id: string) => {
-    setPreferences((current) => {
-      const definition = getLayerDefinition(id);
-      if (!definition) return current;
+  const toggleLayer = useCallback(
+    (id: string) => {
+      setPreferences((current) => {
+        const definition = getLayerDefinition(id);
+        if (!definition) return current;
 
-      if (definition.type === "group") {
-        const activeMemberIds = definition.memberLayerIds.filter((memberId) => current[memberId]?.visible);
-        let membersToActivate: string[] = [];
-
-        if (activeMemberIds.length > 0) {
-          const nextRemembered = { ...previousGroupMembers.current, [id]: activeMemberIds };
-          previousGroupMembers.current = nextRemembered;
-          savePreviousGroupMembers(currentAccountId, nextRemembered);
-        } else {
-          const remembered = previousGroupMembers.current[id]?.filter((memberId) =>
-            definition.memberLayerIds.includes(memberId)
+        if (definition.type === "group") {
+          const activeMemberIds = definition.memberLayerIds.filter(
+            (memberId) => current[memberId]?.visible
           );
-          membersToActivate = remembered?.length ? remembered : definition.memberLayerIds;
+          let membersToActivate: string[] = [];
+
+          if (activeMemberIds.length > 0) {
+            const nextRemembered = {
+              ...previousGroupMembers.current,
+              [id]: activeMemberIds,
+            };
+            previousGroupMembers.current = nextRemembered;
+            savePreviousGroupMembers(currentAccountId, nextRemembered);
+          } else {
+            const remembered = previousGroupMembers.current[id]?.filter(
+              (memberId) => definition.memberLayerIds.includes(memberId)
+            );
+            membersToActivate = remembered?.length
+              ? remembered
+              : definition.memberLayerIds;
+          }
+
+          return Object.fromEntries(
+            Object.entries(current).map(([layerId, value]) => [
+              layerId,
+              definition.memberLayerIds.includes(layerId)
+                ? {
+                    ...value,
+                    visible: membersToActivate.includes(layerId),
+                  }
+                : value,
+            ])
+          );
         }
 
-        return Object.fromEntries(
+        const turnOn = !current[id]?.visible;
+        const next = Object.fromEntries(
           Object.entries(current).map(([layerId, value]) => [
             layerId,
-            definition.memberLayerIds.includes(layerId)
-              ? { ...value, visible: membersToActivate.includes(layerId) }
-              : value,
+            layerId === id ? { ...value, visible: turnOn } : value,
           ])
-        );
-      }
+        ) as LayerPreferences;
 
-      const turnOn = !current[id]?.visible;
-      const next = Object.fromEntries(
-        Object.entries(current).map(([layerId, value]) => [
-          layerId,
-          layerId === id ? { ...value, visible: turnOn } : value,
-        ])
-      ) as LayerPreferences;
-
-      if (definition.groupId) {
-        const parent = getLayerDefinition(definition.groupId);
-        if (
-          parent?.type === "group" &&
-          !parent.memberLayerIds.some((memberId) => next[memberId]?.visible)
-        ) {
-          const nextRemembered = { ...previousGroupMembers.current };
-          delete nextRemembered[parent.id];
-          previousGroupMembers.current = nextRemembered;
-          savePreviousGroupMembers(currentAccountId, nextRemembered);
+        if (definition.groupId) {
+          const parent = getLayerDefinition(definition.groupId);
+          if (
+            parent?.type === "group" &&
+            !parent.memberLayerIds.some((memberId) => next[memberId]?.visible)
+          ) {
+            const nextRemembered = { ...previousGroupMembers.current };
+            delete nextRemembered[parent.id];
+            previousGroupMembers.current = nextRemembered;
+            savePreviousGroupMembers(currentAccountId, nextRemembered);
+          }
         }
-      }
 
-      return next;
-    });
-  }, [currentAccountId]);
+        return next;
+      });
+    },
+    [currentAccountId]
+  );
 
   const setOpacity = useCallback((id: string, nextOpacity: number) => {
     setPreferences((current) => {
       const definition = getLayerDefinition(id);
       if (!definition) return current;
-      const ids = definition.type === "group" ? definition.memberLayerIds : [id];
+      const ids =
+        definition.type === "group" ? definition.memberLayerIds : [id];
       return Object.fromEntries(
         Object.entries(current).map(([layerId, value]) => [
           layerId,
           ids.includes(layerId) ? { ...value, opacity: nextOpacity } : value,
         ])
       );
+    });
+  }, []);
+
+  const updateHillshadePreferences = useCallback(
+    (update: (current: HillshadePreferences) => HillshadePreferences) => {
+      setHillshadePreferences((current) =>
+        normalizeHillshadePreferences(update(current))
+      );
+    },
+    []
+  );
+
+  const setHillshadeExaggeration = useCallback(
+    (value: number) =>
+      updateHillshadePreferences((current) => ({
+        ...current,
+        exaggeration: value,
+      })),
+    [updateHillshadePreferences]
+  );
+
+  const setHillshadeDirection = useCallback(
+    (value: number) =>
+      updateHillshadePreferences((current) => ({
+        ...current,
+        illuminationDirection: value,
+      })),
+    [updateHillshadePreferences]
+  );
+
+  const setHillshadeContrast = useCallback(
+    (value: number) =>
+      updateHillshadePreferences((current) => ({
+        ...current,
+        contrast: value,
+      })),
+    [updateHillshadePreferences]
+  );
+
+  const setHillshadePaletteColor = useCallback(
+    (theme: MapTheme, key: HillshadePaletteColorKey, value: string) =>
+      updateHillshadePreferences((current) => ({
+        ...current,
+        paletteOverrides: {
+          ...current.paletteOverrides,
+          [theme]: {
+            ...current.paletteOverrides[theme],
+            [key]: value,
+          },
+        },
+      })),
+    [updateHillshadePreferences]
+  );
+
+  const resetHillshadePalette = useCallback((theme: MapTheme) => {
+    setHillshadePreferences((current) => {
+      const paletteOverrides = { ...current.paletteOverrides };
+      delete paletteOverrides[theme];
+      return { ...current, paletteOverrides };
+    });
+  }, []);
+
+  const resetHillshadeSettings = useCallback(() => {
+    setHillshadePreferences({
+      ...DEFAULT_HILLSHADE_PREFERENCES,
+      paletteOverrides: {},
     });
   }, []);
 
@@ -187,15 +364,41 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       terrainExaggeration,
       setTerrainEnabled,
       setTerrainExaggeration,
+      hillshadePreferences,
+      setHillshadeExaggeration,
+      setHillshadeDirection,
+      setHillshadeContrast,
+      setHillshadePaletteColor,
+      resetHillshadePalette,
+      resetHillshadeSettings,
     }),
-    [isVisible, opacity, setOpacity, terrainEnabled, terrainExaggeration, toggleLayer]
+    [
+      hillshadePreferences,
+      isVisible,
+      opacity,
+      resetHillshadePalette,
+      resetHillshadeSettings,
+      setHillshadeContrast,
+      setHillshadeDirection,
+      setHillshadeExaggeration,
+      setHillshadePaletteColor,
+      setOpacity,
+      terrainEnabled,
+      terrainExaggeration,
+      toggleLayer,
+    ]
   );
 
-  return <MapLayerContext.Provider value={value}>{children}</MapLayerContext.Provider>;
+  return (
+    <MapLayerContext.Provider value={value}>
+      {children}
+    </MapLayerContext.Provider>
+  );
 };
 
 export const useMapLayers = () => {
   const context = useContext(MapLayerContext);
-  if (!context) throw new Error("useMapLayers must be used inside MapLayerProvider");
+  if (!context)
+    throw new Error("useMapLayers must be used inside MapLayerProvider");
   return context;
 };

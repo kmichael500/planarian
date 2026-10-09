@@ -1,14 +1,48 @@
 import { render, screen } from "@testing-library/react";
+import { getHillshadeStyle } from "./HillshadeStyle";
 import { MapLayers } from "./MapLayers";
 
 let mockMapCurrent: any;
+let mockTheme: "light" | "dark" = "light";
+const mockHillshadePreferences = {
+  exaggeration: 0.4,
+  illuminationDirection: 90,
+  contrast: 1.2,
+  paletteOverrides: {},
+};
+
+jest.mock("../../../ThemeProvider", () => ({
+  useTheme: () => ({ effectiveMode: mockTheme }),
+}));
+
+jest.mock("./HillshadeStyle", () => ({
+  getHillshadeStyle: jest.fn(),
+}));
+
+const mockGetHillshadeStyle = getHillshadeStyle as jest.MockedFunction<
+  typeof getHillshadeStyle
+>;
+
+beforeEach(() => {
+  mockGetHillshadeStyle.mockImplementation(
+    (theme, opacity) =>
+      ({
+        backgroundColor: `${theme}-background`,
+        paint: { "hillshade-exaggeration": opacity },
+      } as ReturnType<typeof getHillshadeStyle>)
+  );
+});
 
 jest.mock("react-map-gl/maplibre", () => ({
   Source: (props: any) => (
     <div
       data-testid={`source-${props.id}`}
-      data-has-minzoom={String(Object.prototype.hasOwnProperty.call(props, "minzoom"))}
-      data-has-maxzoom={String(Object.prototype.hasOwnProperty.call(props, "maxzoom"))}
+      data-has-minzoom={String(
+        Object.prototype.hasOwnProperty.call(props, "minzoom")
+      )}
+      data-has-maxzoom={String(
+        Object.prototype.hasOwnProperty.call(props, "maxzoom")
+      )}
       data-minzoom={props.minzoom}
       data-maxzoom={props.maxzoom}
     >
@@ -18,8 +52,12 @@ jest.mock("react-map-gl/maplibre", () => ({
   Layer: (props: any) => (
     <div
       data-testid={`layer-${props.id}`}
-      data-has-minzoom={String(Object.prototype.hasOwnProperty.call(props, "minzoom"))}
-      data-has-maxzoom={String(Object.prototype.hasOwnProperty.call(props, "maxzoom"))}
+      data-has-minzoom={String(
+        Object.prototype.hasOwnProperty.call(props, "minzoom")
+      )}
+      data-has-maxzoom={String(
+        Object.prototype.hasOwnProperty.call(props, "maxzoom")
+      )}
       data-minzoom={props.minzoom}
       data-maxzoom={props.maxzoom}
       data-before-id={props.beforeId}
@@ -32,9 +70,10 @@ jest.mock("react-map-gl/maplibre", () => ({
 jest.mock("./MapLayerContext", () => ({
   useMapLayers: () => ({
     isVisible: () => false,
-    opacity: (id: string) => id === "mapterhorn-hillshade" ? 0.4 : 1,
+    opacity: (id: string) => (id === "mapterhorn-hillshade" ? 0.4 : 1),
     terrainEnabled: false,
     terrainExaggeration: 1,
+    hillshadePreferences: mockHillshadePreferences,
   }),
 }));
 
@@ -42,37 +81,115 @@ describe("MapLayers optional zoom props", () => {
   test("omits undefined zoom props while preserving configured zoom limits", () => {
     render(<MapLayers includeDataOverlays={false} />);
 
-    expect(screen.getByTestId("source-osm-street")).toHaveAttribute("data-has-minzoom", "false");
-    expect(screen.getByTestId("source-osm-street")).toHaveAttribute("data-has-maxzoom", "false");
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute("data-has-minzoom", "false");
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute("data-has-maxzoom", "false");
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute("data-before-id", "planarian-overlay-anchor");
+    expect(screen.getByTestId("source-osm-street")).toHaveAttribute(
+      "data-has-minzoom",
+      "false"
+    );
+    expect(screen.getByTestId("source-osm-street")).toHaveAttribute(
+      "data-has-maxzoom",
+      "false"
+    );
+    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
+      "data-has-minzoom",
+      "false"
+    );
+    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
+      "data-has-maxzoom",
+      "false"
+    );
+    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
+      "data-before-id",
+      "planarian-overlay-anchor"
+    );
 
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute("data-has-minzoom", "true");
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute("data-has-maxzoom", "true");
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute("data-minzoom", "4");
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute("data-maxzoom", "12");
-    expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute("data-has-minzoom", "false");
-    expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute("data-has-maxzoom", "false");
+    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
+      "data-has-minzoom",
+      "true"
+    );
+    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
+      "data-has-maxzoom",
+      "true"
+    );
+    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
+      "data-minzoom",
+      "4"
+    );
+    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
+      "data-maxzoom",
+      "12"
+    );
+    expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute(
+      "data-has-minzoom",
+      "false"
+    );
+    expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute(
+      "data-has-maxzoom",
+      "false"
+    );
 
-    expect(screen.getByTestId("source-regrid-parcel-boundaries")).toHaveAttribute("data-has-minzoom", "false");
-    expect(screen.getByTestId("source-regrid-parcel-boundaries")).toHaveAttribute("data-has-maxzoom", "false");
-    expect(screen.getByTestId("layer-regrid-parcel-boundaries")).toHaveAttribute("data-has-minzoom", "true");
-    expect(screen.getByTestId("layer-regrid-parcel-boundaries")).toHaveAttribute("data-has-maxzoom", "true");
-    expect(screen.getByTestId("layer-regrid-parcel-boundaries")).toHaveAttribute("data-minzoom", "15");
-    expect(screen.getByTestId("layer-regrid-parcel-boundaries")).toHaveAttribute("data-maxzoom", "17");
-    expect(screen.getByTestId("layer-regrid-parcel-boundaries")).toHaveAttribute("data-before-id", "planarian-overlay-anchor");
-
-    expect(JSON.parse(screen.getByTestId("layer-mapterhorn-hillshade").getAttribute("data-paint") || "{}"))
-      .toEqual({
-        "hillshade-exaggeration": 1,
-        "hillshade-shadow-color": "rgba(0, 0, 0, 0.4)",
-        "hillshade-highlight-color": "rgba(255, 255, 255, 0.4)",
-        "hillshade-accent-color": "rgba(0, 0, 0, 0.4)",
-      });
+    expect(
+      screen.getByTestId("source-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-has-minzoom", "false");
+    expect(
+      screen.getByTestId("source-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-has-maxzoom", "false");
+    expect(
+      screen.getByTestId("layer-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-has-minzoom", "true");
+    expect(
+      screen.getByTestId("layer-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-has-maxzoom", "true");
+    expect(
+      screen.getByTestId("layer-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-minzoom", "15");
+    expect(
+      screen.getByTestId("layer-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-maxzoom", "17");
+    expect(
+      screen.getByTestId("layer-regrid-parcel-boundaries")
+    ).toHaveAttribute("data-before-id", "planarian-overlay-anchor");
   });
 });
 
+describe("MapLayers hillshade integration", () => {
+  afterEach(() => {
+    mockTheme = "light";
+  });
+
+  test("passes the effective theme and layer opacity to the hillshade style owner", () => {
+    render(<MapLayers includeDataOverlays={false} />);
+
+    expect(mockGetHillshadeStyle).toHaveBeenCalledWith("light", 0.4, mockHillshadePreferences);
+    expect(
+      JSON.parse(
+        screen
+          .getByTestId("layer-planarian-map-background")
+          .getAttribute("data-paint") || "{}"
+      )
+    ).toEqual({ "background-color": "light-background" });
+    expect(
+      JSON.parse(
+        screen
+          .getByTestId("layer-mapterhorn-hillshade")
+          .getAttribute("data-paint") || "{}"
+      )
+    ).toEqual({ "hillshade-exaggeration": 0.4 });
+  });
+
+  test("recomputes hillshade styling for dark mode", () => {
+    mockTheme = "dark";
+    render(<MapLayers includeDataOverlays={false} />);
+
+    expect(mockGetHillshadeStyle).toHaveBeenCalledWith("dark", 0.4, mockHillshadePreferences);
+    expect(
+      JSON.parse(
+        screen
+          .getByTestId("layer-planarian-map-background")
+          .getAttribute("data-paint") || "{}"
+      )
+    ).toEqual({ "background-color": "dark-background" });
+  });
+});
 
 describe("MapLayers terrain lifecycle", () => {
   afterEach(() => {

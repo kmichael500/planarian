@@ -1,11 +1,13 @@
 import React, { useEffect } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 import { AppOptions } from "../../../Shared/Services/AppService";
+import { useTheme } from "../../../ThemeProvider";
 import { MAP_LAYER_DEFINITIONS, MAPTERHORN_TILEJSON_URL } from "./MapLayerDefinitions";
 import { useMapLayers } from "./MapLayerContext";
 import { MapHydrologyOverlayLayer } from "./MapHydrologyOverlayLayer";
 import { MapStreamGageOverlayLayer } from "./MapStreamGageOverlayLayer";
 import { MAP_OVERLAY_ANCHOR_LAYER_ID } from "./PlanarianBaseMap";
+import { getHillshadeStyle } from "./HillshadeStyle";
 
 const resolveTiles = (tiles: string[] | undefined) =>
   tiles?.map((tile) => tile.startsWith("/api/") ? `${AppOptions.apiBaseUrl}${tile}` : tile);
@@ -50,10 +52,18 @@ interface MapLayersProps {
 }
 
 export const MapLayers: React.FC<MapLayersProps> = ({ includeDataOverlays = true }) => {
-  const { isVisible, opacity } = useMapLayers();
+  const { isVisible, opacity, hillshadePreferences } = useMapLayers();
+  const { effectiveMode } = useTheme();
+  const hillshadeStyle = getHillshadeStyle(effectiveMode, opacity("mapterhorn-hillshade"), hillshadePreferences);
 
   return (
     <>
+      <Layer
+        id="planarian-map-background"
+        type="background"
+        beforeId={MAP_OVERLAY_ANCHOR_LAYER_ID}
+        paint={{ "background-color": hillshadeStyle.backgroundColor }}
+      />
       <Source id="mapterhorn-terrain" type="raster-dem" url={MAPTERHORN_TILEJSON_URL} tileSize={512} encoding="terrarium" />
       <TerrainController />
       {MAP_LAYER_DEFINITIONS.map((definition) => {
@@ -101,12 +111,7 @@ export const MapLayers: React.FC<MapLayersProps> = ({ includeDataOverlays = true
                 id={definition.id}
                 type="hillshade"
                 beforeId={MAP_OVERLAY_ANCHOR_LAYER_ID}
-                paint={{
-                  "hillshade-exaggeration": 1,
-                  "hillshade-shadow-color": `rgba(0, 0, 0, ${layerOpacity})`,
-                  "hillshade-highlight-color": `rgba(255, 255, 255, ${layerOpacity})`,
-                  "hillshade-accent-color": `rgba(0, 0, 0, ${layerOpacity})`,
-                }}
+                paint={getHillshadeStyle(effectiveMode, layerOpacity, hillshadePreferences).paint}
                 layout={{ visibility: visible ? "visible" : "none" }}
               />
             </Source>

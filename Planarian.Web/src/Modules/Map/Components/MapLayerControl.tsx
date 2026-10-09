@@ -11,6 +11,7 @@ import {
   selectableMapLayers,
 } from "./MapLayerDefinitions";
 import { useMapLayers } from "./MapLayerContext";
+import { HillshadeSettingsControl } from "./HillshadeSettingsControl";
 
 interface MapLayerControlProps {
   position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
@@ -120,6 +121,7 @@ export const MapLayerControl: React.FC<MapLayerControlProps> = ({
                 value={opacity(layer.id)}
                 onChange={(value) => updateOpacity(layer.id, value, members.map((member) => member.id))}
               />
+              {layer.id === "mapterhorn-hillshade" && <HillshadeSettingsControl />}
               {layer.type === "group" && activeCount > 0 && (
                 <GroupMembers>
                   {members.map((member) => (
