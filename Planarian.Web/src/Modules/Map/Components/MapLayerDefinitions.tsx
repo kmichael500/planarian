@@ -1,6 +1,10 @@
 import type { DataDrivenPropertyValueSpecification } from "maplibre-gl";
 import { PublicAccessLegend } from "./PublicAccessLegend";
 import { PUBLIC_ACCESS_INFO } from "./PublicAccesDetails";
+import {
+  DEFAULT_USGS_HILLSHADE_VARIANT,
+  getUsgsHillshadeTileUrl,
+} from "./UsgsHillshade";
 
 export const MAPTERHORN_TILEJSON_URL = "https://tiles.mapterhorn.com/tilejson.json";
 
@@ -245,12 +249,37 @@ export const MAP_LAYER_DEFINITIONS: MapLayerDefinition[] = [
   },
   ...NGMDB_LAYER_SPECS.map(createNgmdbLayer),
   {
-    id: "mapterhorn-hillshade",
+    id: "hillshade-group",
     displayName: "Hillshade",
+    type: "group",
+    memberLayerIds: ["usgs-hillshade", "mapterhorn-hillshade"],
+    defaultVisible: true,
+    defaultOpacity: 1,
+    sectionId: "base-layers",
+  },
+  {
+    id: "usgs-hillshade",
+    displayName: "USGS",
+    type: "raster",
+    source: {
+      tiles: [getUsgsHillshadeTileUrl(DEFAULT_USGS_HILLSHADE_VARIANT)],
+      tileSize: 256,
+      maxzoom: 18,
+    },
+    defaultVisible: true,
+    defaultOpacity: 1,
+    groupId: "hillshade-group",
+    sectionId: "base-layers",
+    attribution: "USGS The National Map 3D Elevation Program (3DEP)",
+  },
+  {
+    id: "mapterhorn-hillshade",
+    displayName: "Mapterhorn",
     type: "hillshade",
     source: { url: MAPTERHORN_TILEJSON_URL, tileSize: 512, encoding: "terrarium" },
     defaultVisible: false,
     defaultOpacity: 1,
+    groupId: "hillshade-group",
     sectionId: "base-layers",
     attribution: '<a href="https://mapterhorn.com/attribution">© Mapterhorn</a>',
   },

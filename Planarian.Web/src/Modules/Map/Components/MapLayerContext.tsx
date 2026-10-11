@@ -19,6 +19,11 @@ import {
   MapTheme,
   normalizeHillshadePreferences,
 } from "./HillshadeStyle";
+import {
+  DEFAULT_USGS_HILLSHADE_VARIANT,
+  normalizeUsgsHillshadeVariant,
+  UsgsHillshadeVariant,
+} from "./UsgsHillshade";
 
 type LayerPreference = { visible: boolean; opacity: number };
 type LayerPreferences = Record<string, LayerPreference>;
@@ -43,6 +48,8 @@ interface MapLayerContextValue {
   ) => void;
   resetHillshadePalette: (theme: MapTheme) => void;
   resetHillshadeSettings: () => void;
+  usgsHillshadeVariant: UsgsHillshadeVariant;
+  setUsgsHillshadeVariant: (variant: UsgsHillshadeVariant) => void;
 }
 
 const MapLayerContext = createContext<MapLayerContextValue | null>(null);
@@ -134,6 +141,26 @@ const loadHillshadePreferences = (
   }
 };
 
+const usgsHillshadeStorageKey = (accountId: string) =>
+  "planarianUsgsHillshadeSettings-v2-" + accountId;
+
+const loadUsgsHillshadeVariant = (
+  accountId: string | null
+): UsgsHillshadeVariant => {
+  if (!accountId) return DEFAULT_USGS_HILLSHADE_VARIANT;
+
+  const raw = localStorage.getItem(usgsHillshadeStorageKey(accountId));
+  if (!raw) return DEFAULT_USGS_HILLSHADE_VARIANT;
+
+  try {
+    const parsed = JSON.parse(raw) as { variant?: unknown };
+    return normalizeUsgsHillshadeVariant(parsed.variant);
+  } catch (error) {
+    console.error("Failed to parse saved USGS hillshade settings", error);
+    return DEFAULT_USGS_HILLSHADE_VARIANT;
+  }
+};
+
 export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -150,6 +177,10 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<HillshadePreferences>(() =>
       loadHillshadePreferences(currentAccountId)
     );
+  const [usgsHillshadeVariant, setUsgsHillshadeVariantState] =
+    useState<UsgsHillshadeVariant>(() =>
+      loadUsgsHillshadeVariant(currentAccountId)
+    );
 
   useEffect(() => {
     setPreferences(loadPreferences(currentAccountId));
@@ -157,6 +188,7 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
     setTerrainEnabled(false);
     setTerrainExaggeration(1);
     setHillshadePreferences(loadHillshadePreferences(currentAccountId));
+    setUsgsHillshadeVariantState(loadUsgsHillshadeVariant(currentAccountId));
   }, [currentAccountId]);
 
   useEffect(() => {
@@ -179,6 +211,14 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
       JSON.stringify(hillshadePreferences)
     );
   }, [currentAccountId, hillshadePreferences]);
+
+  useEffect(() => {
+    if (!currentAccountId) return;
+    localStorage.setItem(
+      usgsHillshadeStorageKey(currentAccountId),
+      JSON.stringify({ variant: usgsHillshadeVariant })
+    );
+  }, [currentAccountId, usgsHillshadeVariant]);
 
   const isVisible = useCallback(
     (id: string) => {
@@ -228,8 +268,13 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
             const remembered = previousGroupMembers.current[id]?.filter(
               (memberId) => definition.memberLayerIds.includes(memberId)
             );
+            const defaultMembers = definition.memberLayerIds.filter(
+              (memberId) => getLayerDefinition(memberId)?.defaultVisible
+            );
             membersToActivate = remembered?.length
               ? remembered
+              : defaultMembers.length > 0
+              ? defaultMembers
               : definition.memberLayerIds;
           }
 
@@ -354,6 +399,12 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  const setUsgsHillshadeVariant = useCallback(
+    (variant: UsgsHillshadeVariant) =>
+      setUsgsHillshadeVariantState(normalizeUsgsHillshadeVariant(variant)),
+    []
+  );
+
   const value = useMemo<MapLayerContextValue>(
     () => ({
       isVisible,
@@ -371,6 +422,8 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
       setHillshadePaletteColor,
       resetHillshadePalette,
       resetHillshadeSettings,
+      usgsHillshadeVariant,
+      setUsgsHillshadeVariant,
     }),
     [
       hillshadePreferences,
@@ -378,6 +431,7 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
       opacity,
       resetHillshadePalette,
       resetHillshadeSettings,
+      setUsgsHillshadeVariant,
       setHillshadeContrast,
       setHillshadeDirection,
       setHillshadeExaggeration,
@@ -386,6 +440,7 @@ export const MapLayerProvider: React.FC<{ children: React.ReactNode }> = ({
       terrainEnabled,
       terrainExaggeration,
       toggleLayer,
+      usgsHillshadeVariant,
     ]
   );
 

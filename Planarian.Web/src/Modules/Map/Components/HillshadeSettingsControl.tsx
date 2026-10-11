@@ -1,5 +1,4 @@
-import { ColorPicker, InputNumber, Slider, Tabs, Tooltip } from "antd";
-import { InfoCircleOutlined } from "@ant-design/icons";
+import { ColorPicker, InputNumber, Slider, Tabs } from "antd";
 import React, { useState } from "react";
 import styled from "styled-components";
 import {
@@ -40,7 +39,6 @@ export const HillshadeSettingsControl: React.FC = () => {
     resetHillshadePalette,
     resetHillshadeSettings,
   } = useMapLayers();
-  const [expanded, setExpanded] = useState(false);
   const [showAdvancedColors, setShowAdvancedColors] = useState(false);
 
   const renderPalette = (theme: MapTheme) => {
@@ -68,138 +66,111 @@ export const HillshadeSettingsControl: React.FC = () => {
 
   return (
     <SettingsContainer>
-      <SettingsToggle
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <span>{expanded ? "▾" : "▸"} Hillshade settings</span>
-      </SettingsToggle>
+      <SettingsPanel>
+        <SettingLabel>
+          <span>Relief strength</span>
+          <Value>{hillshadePreferences.exaggeration.toFixed(2)}</Value>
+        </SettingLabel>
+        <Slider
+          aria-label="Hillshade relief strength"
+          min={0}
+          max={1}
+          step={0.05}
+          value={hillshadePreferences.exaggeration}
+          onChange={setHillshadeExaggeration}
+        />
 
-      {expanded && (
-        <SettingsPanel>
-          <SettingLabel>
-            <span>Relief strength</span>
-            <Value>{hillshadePreferences.exaggeration.toFixed(2)}</Value>
-          </SettingLabel>
-          <Slider
-            aria-label="Hillshade relief strength"
-            min={0}
-            max={1}
-            step={0.05}
-            value={hillshadePreferences.exaggeration}
-            onChange={setHillshadeExaggeration}
-          />
+        <SettingLabel>
+          <span>Contrast</span>
+          <Value>{hillshadePreferences.contrast.toFixed(2)}×</Value>
+        </SettingLabel>
+        <Slider
+          aria-label="Hillshade contrast"
+          min={0.5}
+          max={1.5}
+          step={0.05}
+          value={hillshadePreferences.contrast}
+          onChange={setHillshadeContrast}
+        />
 
-          <SettingLabel>
-            <span>Contrast</span>
-            <Value>{hillshadePreferences.contrast.toFixed(2)}×</Value>
-          </SettingLabel>
-          <Slider
-            aria-label="Hillshade contrast"
-            min={0.5}
-            max={1.5}
-            step={0.05}
-            value={hillshadePreferences.contrast}
-            onChange={setHillshadeContrast}
-          />
+        <SettingLabel>
+          <span>Light direction</span>
+          <Value>
+            {Math.round(hillshadePreferences.illuminationDirection)}°
+          </Value>
+        </SettingLabel>
 
-          <SettingLabel>
-            <span>
-              Light direction{" "}
-              <Tooltip title="Northwest lighting is the cartographic default. Changing illumination can affect whether ridges and depressions are perceived correctly.">
-                <InfoCircleOutlined />
-              </Tooltip>
-            </span>
-            <Value>
-              {Math.round(hillshadePreferences.illuminationDirection)}°
-            </Value>
-          </SettingLabel>
-
-          <DirectionControl aria-label="Hillshade light direction presets">
-            {DIRECTIONS.map((direction) => (
-              <DirectionButton
-                key={direction.label}
-                type="button"
-                $active={
-                  Math.round(hillshadePreferences.illuminationDirection) ===
-                  direction.value
-                }
-                style={{
-                  gridColumn: direction.column,
-                  gridRow: direction.row,
-                }}
-                onClick={() => setHillshadeDirection(direction.value)}
-                aria-label={`Light from ${direction.label}`}
-              >
-                {direction.label}
-              </DirectionButton>
-            ))}
-            <DirectionReadout>
-              <InputNumber
-                aria-label="Hillshade light direction degrees"
-                min={0}
-                max={359}
-                step={1}
-                value={Math.round(hillshadePreferences.illuminationDirection)}
-                onChange={(value) =>
-                  value !== null && setHillshadeDirection(value)
-                }
-                controls={false}
-              />
-              <span>°</span>
-            </DirectionReadout>
-          </DirectionControl>
-
-          <AdvancedToggle
-            type="button"
-            aria-expanded={showAdvancedColors}
-            onClick={() => setShowAdvancedColors((value) => !value)}
-          >
-            {showAdvancedColors ? "▾" : "▸"} Advanced colors
-          </AdvancedToggle>
-
-          {showAdvancedColors && (
-            <Tabs
-              size="small"
-              items={[
-                {
-                  key: "light",
-                  label: "Light",
-                  children: renderPalette("light"),
-                },
-                {
-                  key: "dark",
-                  label: "Dark",
-                  children: renderPalette("dark"),
-                },
-              ]}
+        <DirectionControl aria-label="Hillshade light direction presets">
+          {DIRECTIONS.map((direction) => (
+            <DirectionButton
+              key={direction.label}
+              type="button"
+              $active={
+                Math.round(hillshadePreferences.illuminationDirection) ===
+                direction.value
+              }
+              style={{
+                gridColumn: direction.column,
+                gridRow: direction.row,
+              }}
+              onClick={() => setHillshadeDirection(direction.value)}
+              aria-label={`Light from ${direction.label}`}
+            >
+              {direction.label}
+            </DirectionButton>
+          ))}
+          <DirectionReadout>
+            <InputNumber
+              aria-label="Hillshade light direction degrees"
+              min={0}
+              max={359}
+              step={1}
+              value={Math.round(hillshadePreferences.illuminationDirection)}
+              onChange={(value) =>
+                value !== null && setHillshadeDirection(value)
+              }
+              controls={false}
             />
-          )}
+            <span>°</span>
+          </DirectionReadout>
+        </DirectionControl>
 
-          <ResetButton type="button" onClick={resetHillshadeSettings}>
-            Reset hillshade defaults
-          </ResetButton>
-        </SettingsPanel>
-      )}
+        <AdvancedToggle
+          type="button"
+          aria-expanded={showAdvancedColors}
+          onClick={() => setShowAdvancedColors((value) => !value)}
+        >
+          {showAdvancedColors ? "▾" : "▸"} Advanced colors
+        </AdvancedToggle>
+
+        {showAdvancedColors && (
+          <Tabs
+            size="small"
+            items={[
+              {
+                key: "light",
+                label: "Light",
+                children: renderPalette("light"),
+              },
+              {
+                key: "dark",
+                label: "Dark",
+                children: renderPalette("dark"),
+              },
+            ]}
+          />
+        )}
+
+        <ResetButton type="button" onClick={resetHillshadeSettings}>
+          Reset hillshade defaults
+        </ResetButton>
+      </SettingsPanel>
     </SettingsContainer>
   );
 };
 
 const SettingsContainer = styled.div`
   margin-top: 6px;
-`;
-
-const SettingsToggle = styled.button`
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--text-color);
-  cursor: pointer;
-  padding: 2px 0;
-  text-align: left;
-  font: inherit;
-  font-weight: 600;
 `;
 
 const SettingsPanel = styled.div`

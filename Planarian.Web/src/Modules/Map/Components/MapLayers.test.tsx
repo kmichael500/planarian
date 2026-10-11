@@ -4,6 +4,8 @@ import { MapLayers } from "./MapLayers";
 
 let mockMapCurrent: any;
 let mockTheme: "light" | "dark" = "light";
+let mockUsgsHillshadeVariant: "gray" | "gray-stretch" | "multidirectional" =
+  "multidirectional";
 const mockHillshadePreferences = {
   exaggeration: 0.4,
   illuminationDirection: 90,
@@ -24,6 +26,9 @@ const mockGetHillshadeStyle = getHillshadeStyle as jest.MockedFunction<
 >;
 
 beforeEach(() => {
+  mockMapCurrent = undefined;
+  mockTheme = "light";
+  mockUsgsHillshadeVariant = "multidirectional";
   mockGetHillshadeStyle.mockImplementation(
     (theme, opacity) =>
       ({
@@ -74,6 +79,7 @@ jest.mock("./MapLayerContext", () => ({
     terrainEnabled: false,
     terrainExaggeration: 1,
     hillshadePreferences: mockHillshadePreferences,
+    usgsHillshadeVariant: mockUsgsHillshadeVariant,
   }),
 }));
 
@@ -151,6 +157,75 @@ describe("MapLayers optional zoom props", () => {
   });
 });
 
+describe("MapLayers USGS hillshade integration", () => {
+  test("applies the selected variant when the raster source becomes available", () => {
+    const setTiles = jest.fn();
+    let styleDataHandler: (() => void) | undefined;
+    let sourceReady = false;
+    const instance = {
+      isStyleLoaded: jest.fn(() => true),
+      once: jest.fn(),
+      on: jest.fn((event: string, handler: () => void) => {
+        if (event === "styledata") styleDataHandler = handler;
+      }),
+      off: jest.fn(),
+      getTerrain: jest.fn(() => null),
+      setTerrain: jest.fn(),
+      getSource: jest.fn((id: string) =>
+        id === "usgs-hillshade" && sourceReady ? { setTiles } : undefined
+      ),
+    };
+    mockMapCurrent = { getMap: () => instance };
+    mockUsgsHillshadeVariant = "gray-stretch";
+
+    render(<MapLayers includeDataOverlays={false} />);
+
+    expect(setTiles).not.toHaveBeenCalled();
+    expect(instance.on).toHaveBeenCalledWith("styledata", expect.any(Function));
+
+    sourceReady = true;
+    styleDataHandler?.();
+
+    expect(
+      decodeURIComponent(setTiles.mock.calls.at(-1)?.[0]?.[0] ?? "")
+    ).toContain('"rasterFunction":"Hillshade Gray-Stretch"');
+    expect(instance.off).toHaveBeenCalledWith(
+      "styledata",
+      expect.any(Function)
+    );
+  });
+
+  test("pushes variant changes into MapLibre's raster source", () => {
+    const setTiles = jest.fn();
+    const instance = {
+      isStyleLoaded: jest.fn(() => true),
+      once: jest.fn(),
+      off: jest.fn(),
+      getTerrain: jest.fn(() => null),
+      setTerrain: jest.fn(),
+      getSource: jest.fn((id: string) =>
+        id === "usgs-hillshade" ? { setTiles } : undefined
+      ),
+    };
+    mockMapCurrent = { getMap: () => instance };
+    mockUsgsHillshadeVariant = "gray";
+
+    const { rerender } = render(<MapLayers includeDataOverlays={false} />);
+
+    expect(setTiles).toHaveBeenCalled();
+    expect(
+      decodeURIComponent(setTiles.mock.calls.at(-1)?.[0]?.[0] ?? "")
+    ).toContain('"rasterFunction":"Hillshade Gray"');
+
+    mockUsgsHillshadeVariant = "gray-stretch";
+    rerender(<MapLayers includeDataOverlays={false} />);
+
+    expect(
+      decodeURIComponent(setTiles.mock.calls.at(-1)?.[0]?.[0] ?? "")
+    ).toContain('"rasterFunction":"Hillshade Gray-Stretch"');
+  });
+});
+
 describe("MapLayers hillshade integration", () => {
   afterEach(() => {
     mockTheme = "light";
@@ -159,7 +234,11 @@ describe("MapLayers hillshade integration", () => {
   test("passes the effective theme and layer opacity to the hillshade style owner", () => {
     render(<MapLayers includeDataOverlays={false} />);
 
-    expect(mockGetHillshadeStyle).toHaveBeenCalledWith("light", 0.4, mockHillshadePreferences);
+    expect(mockGetHillshadeStyle).toHaveBeenCalledWith(
+      "light",
+      0.4,
+      mockHillshadePreferences
+    );
     expect(
       JSON.parse(
         screen
@@ -180,7 +259,11 @@ describe("MapLayers hillshade integration", () => {
     mockTheme = "dark";
     render(<MapLayers includeDataOverlays={false} />);
 
-    expect(mockGetHillshadeStyle).toHaveBeenCalledWith("dark", 0.4, mockHillshadePreferences);
+    expect(mockGetHillshadeStyle).toHaveBeenCalledWith(
+      "dark",
+      0.4,
+      mockHillshadePreferences
+    );
     expect(
       JSON.parse(
         screen
@@ -202,6 +285,7 @@ describe("MapLayers terrain lifecycle", () => {
     const setTerrain = jest.fn();
     const instance = {
       isStyleLoaded: jest.fn(() => styleLoaded),
+      on: jest.fn(),
       once: jest.fn((event: string, handler: () => void) => {
         if (event === "load") loadHandler = handler;
       }),

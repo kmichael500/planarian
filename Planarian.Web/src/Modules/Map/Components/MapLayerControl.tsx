@@ -1,4 +1,4 @@
-import { Checkbox, InputNumber, Slider, Space, Tooltip } from "antd";
+import { Checkbox, InputNumber, Slider, Tooltip } from "antd";
 import React, { useContext, useState } from "react";
 import styled from "styled-components";
 import { BuildOutlined, DatabaseOutlined } from "@ant-design/icons";
@@ -12,6 +12,7 @@ import {
 } from "./MapLayerDefinitions";
 import { useMapLayers } from "./MapLayerContext";
 import { HillshadeSettingsControl } from "./HillshadeSettingsControl";
+import { UsgsHillshadeSettingsControl } from "./UsgsHillshadeSettingsControl";
 
 interface MapLayerControlProps {
   position?: Partial<Record<"top" | "right" | "left" | "bottom", string>>;
@@ -95,6 +96,7 @@ export const MapLayerControl: React.FC<MapLayerControlProps> = ({
             )
           : [];
         const activeCount = members.filter((member) => isVisible(member.id)).length;
+        const isHillshadeGroup = layer.id === "hillshade-group";
         const section = MAP_LAYER_SECTIONS.find((candidate) => candidate.id === layer.sectionId);
         const showSectionHeading = index === 0 || layers[index - 1].sectionId !== layer.sectionId;
         const hideFirstBaseLayerHeading = index === 0 && section?.id === "base-layers";
@@ -106,31 +108,65 @@ export const MapLayerControl: React.FC<MapLayerControlProps> = ({
             )}
             <LayerRow>
               <Checkbox
-                checked={layer.type === "group" ? activeCount === members.length && members.length > 0 : isVisible(layer.id)}
-                indeterminate={layer.type === "group" && activeCount > 0 && activeCount < members.length}
+                checked={
+                  layer.type === "group"
+                    ? isHillshadeGroup
+                      ? activeCount > 0
+                      : activeCount === members.length && members.length > 0
+                    : isVisible(layer.id)
+                }
+                indeterminate={
+                  layer.type === "group" &&
+                  !isHillshadeGroup &&
+                  activeCount > 0 &&
+                  activeCount < members.length
+                }
                 onChange={() => toggle(layer.id, members.map((member) => member.id))}
               >
                 {layer.description ? (
                   <Tooltip title={layer.description}><span>{layer.displayName}</span></Tooltip>
                 ) : layer.displayName}
               </Checkbox>
-              <Slider
-                min={0}
-                max={1}
-                step={0.1}
-                value={opacity(layer.id)}
-                onChange={(value) => updateOpacity(layer.id, value, members.map((member) => member.id))}
-              />
-              {layer.id === "mapterhorn-hillshade" && <HillshadeSettingsControl />}
+              {!isHillshadeGroup && (
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={opacity(layer.id)}
+                  onChange={(value) => updateOpacity(layer.id, value, members.map((member) => member.id))}
+                />
+              )}
               {layer.type === "group" && activeCount > 0 && (
                 <GroupMembers>
-                  {members.map((member) => (
-                    <Checkbox key={member.id} checked={isVisible(member.id)} onChange={() => toggle(member.id)}>
-                      {member.description ? (
-                        <Tooltip title={member.description}><span>{member.displayName}</span></Tooltip>
-                      ) : member.displayName}
-                    </Checkbox>
-                  ))}
+                  {members.map((member) =>
+                    isHillshadeGroup ? (
+                      <HillshadeMember key={member.id}>
+                        <Checkbox checked={isVisible(member.id)} onChange={() => toggle(member.id)}>
+                          {member.displayName}
+                        </Checkbox>
+                        {isVisible(member.id) && (
+                          <HillshadeMemberSettings>
+                            <Slider
+                              ariaLabelForHandle={`${member.displayName} hillshade opacity`}
+                              min={0}
+                              max={1}
+                              step={0.1}
+                              value={opacity(member.id)}
+                              onChange={(value) => updateOpacity(member.id, value)}
+                            />
+                            {member.id === "usgs-hillshade" && <UsgsHillshadeSettingsControl />}
+                            {member.id === "mapterhorn-hillshade" && <HillshadeSettingsControl />}
+                          </HillshadeMemberSettings>
+                        )}
+                      </HillshadeMember>
+                    ) : (
+                      <Checkbox key={member.id} checked={isVisible(member.id)} onChange={() => toggle(member.id)}>
+                        {member.description ? (
+                          <Tooltip title={member.description}><span>{member.displayName}</span></Tooltip>
+                        ) : member.displayName}
+                      </Checkbox>
+                    )
+                  )}
                 </GroupMembers>
               )}
             </LayerRow>
@@ -171,14 +207,42 @@ export const MapLayerControl: React.FC<MapLayerControlProps> = ({
           </HoverIcon>
           <ContentWrapper>
             {renderLayerList(layerControlLayers)}
-            <Space direction="vertical">
-              <PlanarianButton alwaysShowChildren onClick={() => setTerrainEnabled((enabled) => !enabled)} icon={<BuildOutlined />}>
+            <TerrainControls>
+              <PlanarianButton
+                block
+                alwaysShowChildren
+                onClick={() => setTerrainEnabled((enabled) => !enabled)}
+                icon={<BuildOutlined />}
+              >
                 {terrainEnabled ? "Disable 3D Terrain" : "Enable 3D Terrain"}
               </PlanarianButton>
               {terrainEnabled && (
-                <div>Exaggeration: <InputNumber min={0} max={10} step={0.1} value={terrainExaggeration} onChange={(value) => value !== null && setTerrainExaggeration(value)} /></div>
+                <TerrainScaleControl>
+                  <TerrainScaleHeader>
+                    <span>Vertical scale</span>
+                    <InputNumber
+                      aria-label="3D terrain vertical scale"
+                      min={0}
+                      max={3}
+                      step={0.1}
+                      precision={1}
+                      controls={false}
+                      addonAfter="×"
+                      value={terrainExaggeration}
+                      onChange={(value) => value !== null && setTerrainExaggeration(value)}
+                    />
+                  </TerrainScaleHeader>
+                  <Slider
+                    ariaLabelForHandle="3D terrain vertical scale slider"
+                    min={0}
+                    max={3}
+                    step={0.1}
+                    value={terrainExaggeration}
+                    onChange={setTerrainExaggeration}
+                  />
+                </TerrainScaleControl>
               )}
-            </Space>
+            </TerrainControls>
           </ContentWrapper>
         </ControlPanel>
 
@@ -245,4 +309,31 @@ const LayerList = styled.div`
   scrollbar-gutter: stable;
 `;
 const LayerRow = styled.div`margin-bottom: 15px;`;
-const GroupMembers = styled.div`margin-left: 20px; margin-top: 5px; display: flex; flex-direction: column; gap: 5px;`;
+const TerrainControls = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+const TerrainScaleControl = styled.div`
+  width: 100%;
+`;
+const TerrainScaleHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+
+  .ant-input-number-group-wrapper {
+    width: 92px;
+    flex: 0 0 92px;
+  }
+
+  .ant-input-number-input {
+    text-align: right;
+  }
+`;
+const GroupMembers = styled.div`margin-left: 20px; margin-top: 5px; display: flex; flex-direction: column; gap: 8px;`;
+const HillshadeMember = styled.div`display: flex; flex-direction: column;`;
+const HillshadeMemberSettings = styled.div`margin: 4px 0 6px 22px;`;

@@ -34,6 +34,8 @@ const createMapLayerContext = (): ReturnType<typeof useMapLayers> => ({
   setHillshadePaletteColor: jest.fn(),
   resetHillshadePalette,
   resetHillshadeSettings,
+  usgsHillshadeVariant: "gray",
+  setUsgsHillshadeVariant: jest.fn(),
 });
 
 beforeEach(() => {
@@ -42,25 +44,18 @@ beforeEach(() => {
 });
 
 describe("HillshadeSettingsControl", () => {
-  test("keeps advanced controls collapsed until requested", () => {
+  test("shows the active Mapterhorn controls while keeping advanced colors collapsed", () => {
     render(<HillshadeSettingsControl />);
-
-    expect(screen.queryByText("Relief strength")).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: /Hillshade settings/i })
-    );
 
     expect(screen.getByText("Relief strength")).toBeInTheDocument();
     expect(screen.getByText("Contrast")).toBeInTheDocument();
-    expect(screen.getByText(/Light direction/)).toBeInTheDocument();
+    expect(screen.getByText("Light direction")).toBeInTheDocument();
     expect(screen.queryByText("Background")).not.toBeInTheDocument();
   });
 
   test("maps compass choices to illumination directions", () => {
     render(<HillshadeSettingsControl />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /Hillshade settings/i })
-    );
+
     fireEvent.click(screen.getByRole("button", { name: "Light from E" }));
 
     expect(setHillshadeDirection).toHaveBeenCalledWith(90);
@@ -68,9 +63,7 @@ describe("HillshadeSettingsControl", () => {
 
   test("reveals theme-specific color controls and reset actions", () => {
     render(<HillshadeSettingsControl />);
-    fireEvent.click(
-      screen.getByRole("button", { name: /Hillshade settings/i })
-    );
+
     fireEvent.click(screen.getByRole("button", { name: /Advanced colors/i }));
 
     expect(screen.getByRole("tab", { name: "Light" })).toBeInTheDocument();

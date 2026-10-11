@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import type { RasterTileSource } from "maplibre-gl";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 import { AppOptions } from "../../../Shared/Services/AppService";
 import { useTheme } from "../../../ThemeProvider";
@@ -8,9 +9,42 @@ import { MapHydrologyOverlayLayer } from "./MapHydrologyOverlayLayer";
 import { MapStreamGageOverlayLayer } from "./MapStreamGageOverlayLayer";
 import { MAP_OVERLAY_ANCHOR_LAYER_ID } from "./PlanarianBaseMap";
 import { getHillshadeStyle } from "./HillshadeStyle";
+import { getUsgsHillshadeTileUrl, UsgsHillshadeVariant } from "./UsgsHillshade";
 
 const resolveTiles = (tiles: string[] | undefined) =>
   tiles?.map((tile) => tile.startsWith("/api/") ? `${AppOptions.apiBaseUrl}${tile}` : tile);
+
+const UsgsHillshadeSourceController: React.FC<{ variant: UsgsHillshadeVariant }> = ({ variant }) => {
+  const { current: map } = useMap();
+
+  useEffect(() => {
+    const instance = map?.getMap();
+    if (!instance) return;
+
+    // react-map-gl 7.1 does not propagate raster `tiles` changes to RasterTileSource,
+    // so update the public MapLibre source API directly.
+    const applyVariant = () => {
+      const source = instance.getSource("usgs-hillshade") as RasterTileSource | undefined;
+      if (!source) return false;
+
+      source.setTiles([getUsgsHillshadeTileUrl(variant)]);
+      return true;
+    };
+
+    if (applyVariant()) return;
+
+    const applyWhenSourceIsReady = () => {
+      if (applyVariant()) instance.off("styledata", applyWhenSourceIsReady);
+    };
+    instance.on("styledata", applyWhenSourceIsReady);
+
+    return () => {
+      instance.off("styledata", applyWhenSourceIsReady);
+    };
+  }, [map, variant]);
+
+  return null;
+};
 
 const TerrainController = () => {
   const { current: map } = useMap();
@@ -52,7 +86,7 @@ interface MapLayersProps {
 }
 
 export const MapLayers: React.FC<MapLayersProps> = ({ includeDataOverlays = true }) => {
-  const { isVisible, opacity, hillshadePreferences } = useMapLayers();
+  const { isVisible, opacity, hillshadePreferences, usgsHillshadeVariant } = useMapLayers();
   const { effectiveMode } = useTheme();
   const hillshadeStyle = getHillshadeStyle(effectiveMode, opacity("mapterhorn-hillshade"), hillshadePreferences);
 
@@ -66,6 +100,7 @@ export const MapLayers: React.FC<MapLayersProps> = ({ includeDataOverlays = true
       />
       <Source id="mapterhorn-terrain" type="raster-dem" url={MAPTERHORN_TILEJSON_URL} tileSize={512} encoding="terrarium" />
       <TerrainController />
+      <UsgsHillshadeSourceController variant={usgsHillshadeVariant} />
       {MAP_LAYER_DEFINITIONS.map((definition) => {
         if (definition.type === "group" || definition.type === "overlay") return null;
         const visible = isVisible(definition.id);
