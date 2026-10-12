@@ -32,12 +32,13 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     }
 
     private const double EarthRadiusMiles = 3958.756;
+    private const string RelevanceSortBy = "Relevance";
+    private const string SearchHeadlineOptions =
+        "StartSel=<mark>,StopSel=</mark>,MaxWords=24,MinWords=8,MaxFragments=3,FragmentDelimiter= ...<br>";
 
 
     public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
-        var query = GetCavesQuery(filterQuery, permissionKey);
-
         var userLatitude = filterQuery.Ulat;
         var userLongitude = filterQuery.Ulon;
         var hasLocationForDistance = userLatitude.HasValue && userLongitude.HasValue;
@@ -50,13 +51,29 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             cosUserLatitude = Math.Cos(userLatitudeRadians);
         }
 
+        var searchCondition = filterQuery.Conditions
+            .FirstOrDefault(c => c.Field == nameof(CaveSearchParamsVm.Search));
+        var searchText = searchCondition?.Value?.Trim() ?? string.Empty;
+        var isSearch = !string.IsNullOrWhiteSpace(searchText);
+        var useRelevanceSort = isSearch && filterQuery.SortBy == RelevanceSortBy;
+
+        var query = GetCavesQuery(filterQuery, permissionKey, skipUnifiedSearch: useRelevanceSort);
+
         var narrativeCondition = filterQuery.Conditions
             .FirstOrDefault(c => c.Field == nameof(CaveSearchParamsVm.Narrative));
 
         var isNarrativeSearch = narrativeCondition != null;
         var narrativeSearch = narrativeCondition?.Value ?? string.Empty;
 
-        var caveSearchQuery = query.Select(e => new CaveSearchVm
+        var relevanceTotalCount = useRelevanceSort
+            ? await ApplyUnifiedSearchFilter(query, searchText).CountAsync()
+            : (int?)null;
+
+        var projectionSource = useRelevanceSort
+            ? ApplyRelevanceOrdering(query, searchText, filterQuery.SortDescending)
+            : query;
+
+        var caveSearchQuery = projectionSource.Select(e => new CaveSearchVm
         {
             Id = e.Id,
             NarrativeSnippet = isNarrativeSearch
@@ -132,7 +149,9 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             OtherTags = e.CaveOtherTags.Select(ee => new SelectListItem<string>(ee.TagType!.Name, ee.TagTypeId)),
         });
 
-        var orderedQuery = filterQuery.SortBy switch
+        IQueryable<CaveSearchVm> orderedQuery = useRelevanceSort
+            ? caveSearchQuery
+            : filterQuery.SortBy switch
         {
             nameof(CaveSearchVm.Name) => ApplyStableOrdering(caveSearchQuery, e => e.Name, filterQuery.SortDescending),
             nameof(CaveSearchVm.ReportedOn) => ApplyStableOrdering(caveSearchQuery, e => e.ReportedOn,
@@ -158,7 +177,17 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             _ => ApplyStableOrdering(caveSearchQuery, e => e.LengthFeet, filterQuery.SortDescending)
         };
 
-        var result = await orderedQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize);
+        var result = useRelevanceSort
+            ? await orderedQuery.ApplyPagingWithTotalCountAsync(
+                filterQuery.PageNumber,
+                filterQuery.PageSize,
+                relevanceTotalCount!.Value)
+            : await orderedQuery.ApplyPagingAsync(filterQuery.PageNumber, filterQuery.PageSize);
+
+        if (isSearch && result.Results.Any())
+        {
+            await PopulateSearchSnippets(result, searchText);
+        }
 
         return result;
     }
@@ -171,6 +200,111 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return sortDescending
             ? query.OrderByDescendingNullLast(orderingExpression).ThenBy(e => e.Id)
             : query.OrderBy(orderingExpression).ThenBy(e => e.Id);
+    }
+
+    private IQueryable<CaveSearchDocument> GetMatchingSearchDocuments(
+        string searchText)
+    {
+        var containsPattern = CreateContainsLikePattern(searchText);
+
+        return DbContext.CaveSearchDocuments.Where(document =>
+            document.SearchVector.Matches(EF.Functions.PlainToTsQuery("simple", searchText))
+            || EF.Functions.ILike(document.DisplayId, containsPattern, "\\")
+            || EF.Functions.ILike(document.NameSearchText, containsPattern, "\\"));
+    }
+
+    private static string CreateContainsLikePattern(string searchText)
+    {
+        var escapedSearch = searchText.Trim()
+            .Replace("\\", "\\\\")
+            .Replace("%", "\\%")
+            .Replace("_", "\\_");
+
+        return $"%{escapedSearch}%";
+    }
+
+    private IQueryable<Cave> ApplyUnifiedSearchFilter(IQueryable<Cave> query, string searchText)
+    {
+        return query.Join(
+                GetMatchingSearchDocuments(searchText),
+                cave => cave.Id,
+                document => document.CaveId,
+                (cave, _) => cave);
+    }
+
+    private IQueryable<Cave> ApplyRelevanceOrdering(
+        IQueryable<Cave> query,
+        string searchText,
+        bool sortDescending)
+    {
+        var normalizedSearch = searchText.Trim().ToLowerInvariant();
+        var containsPattern = CreateContainsLikePattern(searchText);
+        var rankedQuery = query.Join(
+            GetMatchingSearchDocuments(searchText),
+            cave => cave.Id,
+            document => document.CaveId,
+            (cave, document) => new { Cave = cave, Document = document });
+
+        if (sortDescending)
+        {
+            return rankedQuery
+                .OrderByDescending(e => e.Document.DisplayId.ToLower() == normalizedSearch)
+                .ThenByDescending(e => e.Document.Name.ToLower() == normalizedSearch)
+                .ThenByDescending(e => EF.Functions.ILike(
+                    e.Document.NameSearchText,
+                    containsPattern,
+                    "\\"))
+                .ThenByDescending(e => e.Document.PhraseVector.Matches(
+                    EF.Functions.PhraseToTsQuery("simple", searchText)))
+                .ThenByDescending(e => e.Document.SearchVector.RankCoverDensity(
+                    EF.Functions.PlainToTsQuery("simple", searchText)))
+                .ThenBy(e => e.Cave.Id)
+                .Select(e => e.Cave);
+        }
+
+        return rankedQuery
+            .OrderBy(e => e.Document.DisplayId.ToLower() == normalizedSearch)
+            .ThenBy(e => e.Document.Name.ToLower() == normalizedSearch)
+            .ThenBy(e => EF.Functions.ILike(
+                e.Document.NameSearchText,
+                containsPattern,
+                "\\"))
+            .ThenBy(e => e.Document.PhraseVector.Matches(
+                EF.Functions.PhraseToTsQuery("simple", searchText)))
+            .ThenBy(e => e.Document.SearchVector.RankCoverDensity(
+                EF.Functions.PlainToTsQuery("simple", searchText)))
+            .ThenBy(e => e.Cave.Id)
+            .Select(e => e.Cave);
+    }
+
+    private async Task PopulateSearchSnippets(PagedResult<CaveSearchVm> result, string searchText)
+    {
+        var caveIds = result.Results.Select(e => e.Id).ToArray();
+        if (caveIds.Length == 0)
+        {
+            return;
+        }
+
+        var snippets = await DbContext.CaveSearchDocuments
+            .Where(e => caveIds.Contains(e.CaveId))
+            .Select(e => new
+            {
+                e.CaveId,
+                Snippet = e.SearchVector.Matches(
+                    EF.Functions.PlainToTsQuery("simple", searchText))
+                    ? EF.Functions.PlainToTsQuery("simple", searchText)
+                        .GetResultHeadline("simple", e.SnippetText, SearchHeadlineOptions)
+                    : null
+            })
+            .ToDictionaryAsync(e => e.CaveId, e => e.Snippet);
+
+        foreach (var cave in result.Results)
+        {
+            if (snippets.TryGetValue(cave.Id, out var snippet))
+            {
+                cave.SearchSnippet = snippet;
+            }
+        }
     }
 
     public async Task<List<CaveExportDto>> GetCavesForExport(FilterQuery filterQuery, string? permissionKey)
@@ -240,7 +374,10 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return exportData;
     }
 
-    private IQueryable<Cave> GetCavesQuery(FilterQuery filterQuery, string? permissionKey = null)
+    private IQueryable<Cave> GetCavesQuery(
+        FilterQuery filterQuery,
+        string? permissionKey = null,
+        bool skipUnifiedSearch = false)
     {
         var query = DbContext.Caves
             .IgnoreQueryFilters() // ignoring because it makes the query too slow, we are applying the same filter to it here so we can include a permission type
@@ -290,6 +427,25 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                             ),
                         _ => throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator))
                     };
+                    break;
+                case nameof(CaveSearchParamsVm.Search):
+                    var searchText = queryCondition.Value?.Trim();
+                    if (string.IsNullOrWhiteSpace(searchText))
+                    {
+                        break;
+                    }
+
+                    if (queryCondition.Operator != QueryOperator.FreeText)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(queryCondition.Operator));
+                    }
+
+                    if (skipUnifiedSearch)
+                    {
+                        break;
+                    }
+
+                    query = ApplyUnifiedSearchFilter(query, searchText);
                     break;
                 case nameof(CaveSearchParamsVm.Narrative):
                     query = queryCondition.Operator switch

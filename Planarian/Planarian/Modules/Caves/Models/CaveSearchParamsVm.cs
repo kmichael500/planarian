@@ -10,6 +10,7 @@ public class CaveSearchParamsVm
     public string Id { get; set; }
     
     public string IsFavorite { get; set; }
+    public string Search { get; set; }
     public string Name { get; set; }
     public string Narrative { get; set; }
     public string StateId { get; set; }

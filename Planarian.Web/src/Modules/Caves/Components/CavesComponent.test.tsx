@@ -70,7 +70,7 @@ jest.mock("../../../Shared/Scroll/useScrollRevealVisibility", () => ({
 
 const getCavesMock = CaveService.GetCaves as jest.Mock;
 
-const caveResult = (narrativeSnippet: string) => ({
+const caveResult = (narrativeSnippet: string, searchSnippet?: string) => ({
   pageNumber: 1,
   pageSize: 10,
   totalCount: 1,
@@ -79,6 +79,7 @@ const caveResult = (narrativeSnippet: string) => ({
     {
       id: "0123456789",
       name: "Security Test Cave",
+      searchSnippet,
       narrativeSnippet,
       reportedOn: null,
       isArchived: false,
@@ -115,6 +116,20 @@ beforeEach(() => {
 });
 
 describe("CavesComponent narrative HTML", () => {
+  it("sanitizes global-search match snippets while preserving highlighting", async () => {
+    const searchSnippet = [
+      'Geology: <mark onclick="window.__planarianXss=true">Bangor</mark> Limestone',
+      '<img data-xss-probe="search-image" src="x" onerror="window.__planarianXss=true">',
+    ].join("");
+    getCavesMock.mockResolvedValue(caveResult("", searchSnippet));
+
+    const { container } = render(<CavesComponent />);
+    const highlighted = await screen.findByText("Bangor");
+    expect(highlighted.tagName).toBe("MARK");
+    expect(highlighted.attributes).toHaveLength(0);
+    expect(container.querySelector('[data-xss-probe="search-image"]')).toBeNull();
+  });
+
   it("removes executable markup while preserving allowed highlighting", async () => {
     const narrative = [
       'Safe narrative with <mark data-xss-probe="mark" onclick="window.__planarianXss=true">matching phrase</mark>.',

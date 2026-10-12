@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Migrations.Design;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Planarian.Migrations.SqlScripts;
 using Planarian.Migrations.SqlViews;
 
 namespace Planarian.Migrations.DesignTime;
@@ -10,13 +11,13 @@ public class PlanarianDesignTimeServices : IDesignTimeServices
 {
     public void ConfigureDesignTimeServices(IServiceCollection services)
     {
-        services.Replace(ServiceDescriptor.Singleton<IMigrationsScaffolder, SqlViewMigrationsScaffolder>());
+        services.Replace(ServiceDescriptor.Singleton<IMigrationsScaffolder, PlanarianMigrationsScaffolder>());
     }
 }
 
-internal sealed class SqlViewMigrationsScaffolder : MigrationsScaffolder
+internal sealed class PlanarianMigrationsScaffolder : MigrationsScaffolder
 {
-    public SqlViewMigrationsScaffolder(MigrationsScaffolderDependencies dependencies) : base(dependencies)
+    public PlanarianMigrationsScaffolder(MigrationsScaffolderDependencies dependencies) : base(dependencies)
     {
     }
 
@@ -28,15 +29,25 @@ internal sealed class SqlViewMigrationsScaffolder : MigrationsScaffolder
     {
         var migration = base.ScaffoldMigration(migrationName, rootNamespace, subNamespace, language);
         var changedViews = SqlViewScriptGenerator.GetChangedViews();
-        if (changedViews.Count == 0)
+        var changedScripts = SqlMigrationScriptGenerator.GetChangedScripts();
+
+        if (changedViews.Count == 0 && changedScripts.Count == 0)
         {
             return migration;
         }
 
+        var upSql = string.Concat(
+            changedViews.Count > 0 ? SqlViewScriptGenerator.GenerateUpSql(changedViews) : string.Empty,
+            changedScripts.Count > 0 ? SqlMigrationScriptGenerator.GenerateUpSql(changedScripts) : string.Empty);
+
+        var downSql = string.Concat(
+            changedScripts.Count > 0 ? SqlMigrationScriptGenerator.GenerateDownSql(changedScripts) : string.Empty,
+            changedViews.Count > 0 ? SqlViewScriptGenerator.GenerateDownSql(changedViews) : string.Empty);
+
         return new ScaffoldedMigration(
             migration.FileExtension,
             migration.PreviousMigrationId,
-            InjectSqlViewScripts(migration.MigrationCode, changedViews),
+            InjectMigrationSql(migration.MigrationCode, upSql, downSql),
             migration.MigrationId,
             migration.MetadataCode,
             migration.MigrationSubNamespace,
@@ -45,16 +56,27 @@ internal sealed class SqlViewMigrationsScaffolder : MigrationsScaffolder
             migration.SnapshotSubnamespace);
     }
 
-    private static string InjectSqlViewScripts(string migrationCode, IReadOnlyList<SqlViewInfo> changedViews)
+    private static string InjectMigrationSql(string migrationCode, string upSql, string downSql)
     {
-        var upSql = Indent(SqlViewScriptGenerator.GenerateUpSql(changedViews), 12);
-        var downSql = Indent(SqlViewScriptGenerator.GenerateDownSql(changedViews), 12);
+        if (!string.IsNullOrWhiteSpace(upSql))
+        {
+            migrationCode = InjectIntoMethod(
+                migrationCode,
+                "Up",
+                Indent(upSql, 12),
+                insertAtStart: false);
+        }
 
-        return InjectIntoMethod(
-            InjectIntoMethod(migrationCode, "Up", upSql, insertAtStart: false),
-            "Down",
-            downSql,
-            insertAtStart: true);
+        if (!string.IsNullOrWhiteSpace(downSql))
+        {
+            migrationCode = InjectIntoMethod(
+                migrationCode,
+                "Down",
+                Indent(downSql, 12),
+                insertAtStart: true);
+        }
+
+        return migrationCode;
     }
 
     private static string InjectIntoMethod(string migrationCode, string methodName, string sql, bool insertAtStart)

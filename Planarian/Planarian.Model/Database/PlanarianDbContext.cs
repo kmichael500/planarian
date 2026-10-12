@@ -8,6 +8,7 @@ using Planarian.Model.Database.Entities.Trips;
 using Planarian.Model.Database.Extensions;
 using Planarian.Model.Interceptors;
 using Planarian.Model.Shared;
+using Planarian.Model.Shared.Base;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Model.Database;
@@ -66,6 +67,7 @@ public class PlanarianDbContextBase : DbContext
     public DbSet<BiologyTag> BiologyTags { get; set; } = null!;
     public DbSet<CartographerNameTag> CartographerNameTags { get; set; } = null!;
     public DbSet<Cave> Caves { get; set; } = null!;
+    public DbSet<CaveSearchDocument> CaveSearchDocuments { get; set; } = null!;
     public DbSet<CaveGeoJson> CaveGeoJsons { get; set; } = null!;
     public DbSet<CaveOtherTag> CaveOtherTags { get; set; } = null!;
     
@@ -94,6 +96,8 @@ public class PlanarianDbContextBase : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     { 
         modelBuilder.HasPostgresExtension("postgis");
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        SqlMigrationScriptRegistry.ApplyAnnotations(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlanarianDbContextBase).Assembly);
         
         var tsSimple = typeof(FullTextSearchExtensions).GetMethod(

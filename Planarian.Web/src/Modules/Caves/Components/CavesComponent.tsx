@@ -56,10 +56,22 @@ import {
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 import type { ScrollState } from "../../../Shared/Scroll/ScrollState";
 import { useScrollRevealVisibility } from "../../../Shared/Scroll/useScrollRevealVisibility";
+import { normalizeCaveMainSearch } from "../Helpers/CaveSearchQueryHelpers";
 import "./CavesComponent.scss";
 const query = window.location.search.substring(1);
-const queryBuilder = new QueryBuilder<CaveSearchParamsVm>(query);
+const queryBuilder = normalizeCaveMainSearch(
+  new QueryBuilder<CaveSearchParamsVm>(query),
+  query
+);
 const SEARCH_TOOLBAR_BREAKPOINT_PX = 720;
+
+const sanitizeSearchHtml = (value: string) =>
+  DOMPurify.sanitize(value, {
+    ALLOWED_TAGS: ["mark", "br"],
+    ALLOWED_ATTR: [],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+  });
 
 const CavesComponent: React.FC = () => {
   let [caves, setCaves] = useState<PagedResult<CaveSearchVm>>();
@@ -90,7 +102,13 @@ const CavesComponent: React.FC = () => {
   const featureStorageKey = accountId
     ? `${accountId}-selectedFeatures`
     : "selectedFeatures";
+  const hasGlobalSearch = Boolean(
+    (queryBuilder.getFieldValue("search") as string | undefined)?.trim()
+  );
   const sortOptions = [
+    ...(hasGlobalSearch
+      ? [{ display: "Relevance", value: CaveSearchSortByConstants.Relevance }]
+      : []),
     ...(locationPermissionGranted !== false ? [{ display: "Distance From Me", value: CaveSearchSortByConstants.DistanceMiles }] : []),
     { display: "Cave ID", value: CaveSearchSortByConstants.DisplayId },
     { display: "Length", value: CaveSearchSortByConstants.LengthFeet },
@@ -650,6 +668,22 @@ const CavesComponent: React.FC = () => {
                           {renderFeature(cave, featureKey)}
                         </div>
                       ))}
+                    {cave.searchSnippet && (
+                      <>
+                        <Typography.Text
+                          style={{ marginRight: "8px", fontWeight: "bold" }}
+                        >
+                          Match:
+                        </Typography.Text>
+                        <Typography.Paragraph style={{ marginBottom: 8 }}>
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeSearchHtml(cave.searchSnippet),
+                            }}
+                          />
+                        </Typography.Paragraph>
+                      </>
+                    )}
                     {cave.narrativeSnippet && (
                       <>
                         <Typography.Text
@@ -660,18 +694,12 @@ const CavesComponent: React.FC = () => {
                         <Typography.Paragraph style={{ marginBottom: 8 }}>
                           <span
                             dangerouslySetInnerHTML={{
-                              __html: DOMPurify.sanitize(
+                              __html: sanitizeSearchHtml(
                                 expandedNarratives[cave.id] ||
                                   cave.narrativeSnippet.length <= 400
                                   ? cave.narrativeSnippet
                                   : cave.narrativeSnippet.substring(0, 400) +
-                                  "…",
-                                {
-                                  ALLOWED_TAGS: ["mark", "br"],
-                                  ALLOWED_ATTR: [],
-                                  ALLOW_DATA_ATTR: false,
-                                  ALLOW_ARIA_ATTR: false,
-                                }
+                                  "…"
                               ),
                             }}
                           />

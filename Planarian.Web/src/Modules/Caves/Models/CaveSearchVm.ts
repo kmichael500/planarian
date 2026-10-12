@@ -7,6 +7,7 @@ import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 export interface CaveSearchVm {
   id: string;
   name: string;
+  searchSnippet?: string;
   narrativeSnippet?: string;
   reportedOn: string | null;
   isArchived: boolean;
@@ -35,6 +36,7 @@ export interface CaveSearchVm {
 }
 
 export class CaveSearchSortByConstants {
+  static readonly Relevance = "Relevance";
   static readonly DisplayId = capitalizeFirstLetter(
     nameof<CaveSearchVm>("displayId")
   );

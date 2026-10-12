@@ -33,6 +33,9 @@ export interface AdvancedSearchDrawerComponentProps<T extends object>
   children?: React.ReactNode;
   mainSearchField: NestedKeyOf<T>;
   mainSearchFieldLabel: string;
+  mainSearchOperator?: QueryOperator;
+  mainSearchSortBy?: string;
+  mainSearchEmptySortBy?: string;
   form?: FormInstance<T>;
   sortOptions?: SelectListItem<string>[];
   onExportGpx?: () => Promise<void>;
@@ -64,6 +67,9 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   children,
   mainSearchField,
   mainSearchFieldLabel,
+  mainSearchOperator = QueryOperator.Contains,
+  mainSearchSortBy,
+  mainSearchEmptySortBy,
   form,
   sortOptions,
   onExportGpx,
@@ -106,12 +112,23 @@ const AdvancedSearchDrawerComponent = <T extends object>({
   };
 
   const handleMainSearchChange = (value: string) => {
+    const hadSearchValue = Boolean(mainSearchValue.trim());
+    const hasSearchValue = Boolean(value.trim());
+
     setMainSearchValue(value);
-    queryBuilder.filterBy(
-      mainSearchField,
-      QueryOperator.Contains,
-      value as any
-    );
+    queryBuilder.filterBy(mainSearchField, mainSearchOperator, value as any);
+
+    if (mainSearchSortBy && hasSearchValue && !hadSearchValue) {
+      queryBuilder.setSort(mainSearchSortBy).setSortDescending(true);
+    } else if (
+      mainSearchSortBy &&
+      mainSearchEmptySortBy &&
+      hadSearchValue &&
+      !hasSearchValue &&
+      queryBuilder.getSortBy() === mainSearchSortBy
+    ) {
+      queryBuilder.setSort(mainSearchEmptySortBy).setSortDescending(true);
+    }
   };
 
   const handleSortOptionChange = async (value: string) => {
@@ -128,6 +145,14 @@ const AdvancedSearchDrawerComponent = <T extends object>({
     queryBuilder.setSortDescending(!queryBuilder.getSortDescending());
     await onSearch();
   };
+
+  const effectiveSortOptions =
+    mainSearchSortBy &&
+    mainSearchValue.trim() &&
+    sortOptions &&
+    !sortOptions.some((option) => option.value === mainSearchSortBy)
+      ? [{ display: mainSearchSortBy, value: mainSearchSortBy }, ...sortOptions]
+      : sortOptions;
 
   const shouldShowPersistentContent =
     !hidePersistentContentOnMobile || !isBelowToolbarBreakpoint;
@@ -198,13 +223,13 @@ const AdvancedSearchDrawerComponent = <T extends object>({
         </div>
       </div>
       <div className="planarian-search-toolbar__right">
-        {shouldShowPersistentContent && sortOptions?.length ? (
+        {shouldShowPersistentContent && effectiveSortOptions?.length ? (
           <SplitSortControl
             isDescending={queryBuilder.getSortDescending() ?? false}
             onSelect={handleSortOptionChange}
             onToggleDirection={handleSortDirectionToggle}
             selectedValue={queryBuilder.getSortBy()}
-            sortOptions={sortOptions}
+            sortOptions={effectiveSortOptions}
           />
         ) : null}
         {toolbarMetrics?.map((metric) => (

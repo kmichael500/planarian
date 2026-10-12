@@ -11,6 +11,7 @@ import {
   parseEntranceLocationFilter,
 } from "../../Search/Helpers/EntranceLocationFilterHelpers";
 import { QueryBuilder } from "../../Search/Services/QueryBuilder";
+import { normalizeCaveMainSearch } from "../../Caves/Helpers/CaveSearchQueryHelpers";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import type { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 
@@ -19,10 +20,13 @@ interface ExploreMapFiltersProps {
 }
 
 export const ExploreMapFilters: React.FC<ExploreMapFiltersProps> = ({ onQueryChange }) => {
-  const queryBuilder = useMemo(
-    () => new QueryBuilder<CaveSearchParamsVm>(window.location.search.substring(1), false),
-    []
-  );
+  const queryBuilder = useMemo(() => {
+    const query = window.location.search.substring(1);
+    return normalizeCaveMainSearch(
+      new QueryBuilder<CaveSearchParamsVm>(query, false),
+      query
+    );
+  }, []);
   const [form] = Form.useForm<CaveSearchParamsVm>();
   const [appliedQuery, setAppliedQuery] = useState(() =>
     queryBuilder.hasFilters() ? queryBuilder.buildAsQueryString() : ""

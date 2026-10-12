@@ -21,6 +21,8 @@
     <ItemGroup>
         <EmbeddedResource Include="Database\Views\*.sql"
                           LogicalName="Planarian.Model.Database.Views.%(Filename)%(Extension)" />
+        <EmbeddedResource Include="Database\MigrationScripts\*.sql"
+                          LogicalName="Planarian.Model.Database.MigrationScripts.%(Filename)%(Extension)" />
     </ItemGroup>
 
     <ItemGroup>

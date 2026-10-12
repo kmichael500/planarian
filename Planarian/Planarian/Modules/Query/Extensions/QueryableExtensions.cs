@@ -232,13 +232,6 @@ public static class  QueryableExtensions
     {
         if (query == null) throw new ArgumentNullException(nameof(query));
 
-        if (pageNumber < 1) pageNumber = 1;
-
-        if (pageSize < 1) pageSize = QueryConstants.DefaultPageSize;
-
-        if (pageSize > QueryConstants.MaxPageSize) pageSize = QueryConstants.MaxPageSize;
-
-
         if (orderingExpression != null)
         {
             query = sortDescending
@@ -247,6 +240,23 @@ public static class  QueryableExtensions
         }
 
         var totalCount = await query.CountAsync();
+        return await query.ApplyPagingWithTotalCountAsync(pageNumber, pageSize, totalCount);
+    }
+
+    public static async Task<PagedResult<T>> ApplyPagingWithTotalCountAsync<T>(
+        this IQueryable<T> query,
+        int pageNumber,
+        int pageSize,
+        int totalCount)
+    {
+        if (query == null) throw new ArgumentNullException(nameof(query));
+
+        if (pageNumber < 1) pageNumber = 1;
+
+        if (pageSize < 1) pageSize = QueryConstants.DefaultPageSize;
+
+        if (pageSize > QueryConstants.MaxPageSize) pageSize = QueryConstants.MaxPageSize;
+
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
         if (pageNumber > totalPages) pageNumber = totalPages;

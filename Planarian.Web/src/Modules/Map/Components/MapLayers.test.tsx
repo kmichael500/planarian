@@ -50,6 +50,7 @@ jest.mock("react-map-gl/maplibre", () => ({
       )}
       data-minzoom={props.minzoom}
       data-maxzoom={props.maxzoom}
+      data-tiles={props.tiles ? JSON.stringify(props.tiles) : undefined}
     >
       {props.children}
     </div>
@@ -83,39 +84,23 @@ jest.mock("./MapLayerContext", () => ({
   }),
 }));
 
-describe("MapLayers optional zoom props", () => {
-  test("omits undefined zoom props while preserving configured zoom limits", () => {
+describe("MapLayers raster overzooming", () => {
+  test("keeps native tile limits on sources instead of hiding layers above them", () => {
     render(<MapLayers includeDataOverlays={false} />);
 
     expect(screen.getByTestId("source-osm-street")).toHaveAttribute(
-      "data-has-minzoom",
-      "false"
+      "data-maxzoom",
+      "19"
     );
-    expect(screen.getByTestId("source-osm-street")).toHaveAttribute(
-      "data-has-maxzoom",
-      "false"
+    expect(screen.getByTestId("source-open-topo")).toHaveAttribute(
+      "data-maxzoom",
+      "17"
     );
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
-      "data-has-minzoom",
-      "false"
-    );
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
-      "data-has-maxzoom",
-      "false"
-    );
-    expect(screen.getByTestId("layer-osm-street")).toHaveAttribute(
-      "data-before-id",
-      "planarian-overlay-anchor"
+    expect(screen.getByTestId("source-macrostrat")).toHaveAttribute(
+      "data-maxzoom",
+      "17"
     );
 
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
-      "data-has-minzoom",
-      "true"
-    );
-    expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
-      "data-has-maxzoom",
-      "true"
-    );
     expect(screen.getByTestId("source-usgs-500k-geology")).toHaveAttribute(
       "data-minzoom",
       "4"
@@ -125,35 +110,32 @@ describe("MapLayers optional zoom props", () => {
       "12"
     );
     expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute(
-      "data-has-minzoom",
-      "false"
-    );
-    expect(screen.getByTestId("layer-usgs-500k-geology")).toHaveAttribute(
       "data-has-maxzoom",
       "false"
     );
 
     expect(
       screen.getByTestId("source-regrid-parcel-boundaries")
-    ).toHaveAttribute("data-has-minzoom", "false");
-    expect(
-      screen.getByTestId("source-regrid-parcel-boundaries")
-    ).toHaveAttribute("data-has-maxzoom", "false");
-    expect(
-      screen.getByTestId("layer-regrid-parcel-boundaries")
-    ).toHaveAttribute("data-has-minzoom", "true");
-    expect(
-      screen.getByTestId("layer-regrid-parcel-boundaries")
-    ).toHaveAttribute("data-has-maxzoom", "true");
+    ).toHaveAttribute("data-maxzoom", "17");
     expect(
       screen.getByTestId("layer-regrid-parcel-boundaries")
     ).toHaveAttribute("data-minzoom", "15");
     expect(
       screen.getByTestId("layer-regrid-parcel-boundaries")
-    ).toHaveAttribute("data-maxzoom", "17");
+    ).toHaveAttribute("data-has-maxzoom", "false");
     expect(
       screen.getByTestId("layer-regrid-parcel-boundaries")
     ).toHaveAttribute("data-before-id", "planarian-overlay-anchor");
+  });
+
+  test("asks Esri to return missing imagery as an error so MapLibre can fall back to a parent tile", () => {
+    render(<MapLayers includeDataOverlays={false} />);
+
+    const tiles = screen
+      .getByTestId("source-esri-satellite")
+      .getAttribute("data-tiles");
+
+    expect(tiles).toContain("blankTile=false");
   });
 });
 

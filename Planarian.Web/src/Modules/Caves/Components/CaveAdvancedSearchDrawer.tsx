@@ -20,6 +20,7 @@ import {
 import { ToolbarMetric } from "../../../Shared/Components/Toolbar/ResponsiveToolbar";
 import { QueryBuilder, QueryOperator } from "../../Search/Services/QueryBuilder";
 import { CaveSearchParamsVm } from "../Models/CaveSearchParamsVm";
+import { CaveSearchSortByConstants } from "../Models/CaveSearchVm";
 import { NestedKeyOf } from "../../../Shared/Helpers/StringHelpers";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { StateCountyFilterFormItem } from "../../Search/Components/StateFilterFormItem";
@@ -251,8 +252,11 @@ const CaveAdvancedSearchDrawer: React.FC<CaveAdvancedSearchDrawerProps> = ({
       <AdvancedSearchDrawerComponent
         queryBuilder={queryBuilder}
         onSearch={onSearch}
-        mainSearchField={"name" as NestedKeyOf<CaveSearchParamsVm>}
-        mainSearchFieldLabel={"Name or ID"}
+        mainSearchField={"search" as NestedKeyOf<CaveSearchParamsVm>}
+        mainSearchFieldLabel={"Search caves"}
+        mainSearchOperator={QueryOperator.FreeText}
+        mainSearchSortBy={CaveSearchSortByConstants.Relevance}
+        mainSearchEmptySortBy={CaveSearchSortByConstants.LengthFeet}
         form={form}
         sortOptions={sortOptions}
         onSortChange={onSortChange}

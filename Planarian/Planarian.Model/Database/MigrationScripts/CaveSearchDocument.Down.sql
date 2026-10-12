@@ -1,0 +1,27 @@
+DROP TRIGGER IF EXISTS "CaveSearch_Accounts" ON "Accounts";
+DROP TRIGGER IF EXISTS "CaveSearch_States" ON "States";
+DROP TRIGGER IF EXISTS "CaveSearch_Counties" ON "Counties";
+DROP TRIGGER IF EXISTS "CaveSearch_TagTypes" ON "TagTypes";
+DROP TRIGGER IF EXISTS "CaveSearch_Files" ON "Files";
+DROP TRIGGER IF EXISTS "CaveSearch_EntranceOtherTag" ON "EntranceOtherTag";
+DROP TRIGGER IF EXISTS "CaveSearch_EntranceReportedByNameTags" ON "EntranceReportedByNameTags";
+DROP TRIGGER IF EXISTS "CaveSearch_EntranceHydrologyTags" ON "EntranceHydrologyTags";
+DROP TRIGGER IF EXISTS "CaveSearch_FieldIndicationTags" ON "FieldIndicationTags";
+DROP TRIGGER IF EXISTS "CaveSearch_EntranceStatusTags" ON "EntranceStatusTags";
+DROP TRIGGER IF EXISTS "CaveSearch_Entrances" ON "Entrances";
+DROP TRIGGER IF EXISTS "CaveSearch_CaveOtherTags" ON "CaveOtherTags";
+DROP TRIGGER IF EXISTS "CaveSearch_CaveReportedByNameTags" ON "CaveReportedByNameTags";
+DROP TRIGGER IF EXISTS "CaveSearch_CartographerNameTags" ON "CartographerNameTags";
+DROP TRIGGER IF EXISTS "CaveSearch_MapStatusTags" ON "MapStatusTags";
+DROP TRIGGER IF EXISTS "CaveSearch_ArcheologyTags" ON "ArcheologyTags";
+DROP TRIGGER IF EXISTS "CaveSearch_BiologyTags" ON "BiologyTags";
+DROP TRIGGER IF EXISTS "CaveSearch_PhysiographicProvinceTags" ON "PhysiographicProvinceTags";
+DROP TRIGGER IF EXISTS "CaveSearch_GeologicAgeTags" ON "GeologicAgeTags";
+DROP TRIGGER IF EXISTS "CaveSearch_GeologyTags" ON "GeologyTags";
+DROP TRIGGER IF EXISTS "CaveSearch_Caves" ON "Caves";
+
+DROP FUNCTION IF EXISTS "RefreshCaveSearchDocumentsForTagTypeTrigger"();
+DROP FUNCTION IF EXISTS "RefreshCaveSearchDocumentsForOwnerTrigger"();
+DROP FUNCTION IF EXISTS "RefreshCaveSearchDocumentEntranceTagTrigger"();
+DROP FUNCTION IF EXISTS "RefreshCaveSearchDocumentDirectTrigger"();
+DROP FUNCTION IF EXISTS "RefreshCaveSearchDocument"(text);
