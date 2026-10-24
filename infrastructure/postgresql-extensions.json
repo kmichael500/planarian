@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "242023797972520136"
+    }
+  },
+  "parameters": {
+    "serverName": {
+      "type": "string",
+      "defaultValue": "db-planarian",
+      "metadata": {
+        "description": "Name of the existing Azure Database for PostgreSQL flexible server."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+      "apiVersion": "2022-12-01",
+      "name": "[format('{0}/{1}', parameters('serverName'), 'azure.extensions')]",
+      "properties": {
+        "source": "user-override",
+        "value": "POSTGIS,PG_TRGM"
+      }
+    }
+  ]
+}
