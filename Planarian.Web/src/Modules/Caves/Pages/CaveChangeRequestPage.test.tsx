@@ -238,8 +238,8 @@ it("keeps staged file and line-plot actions with the assets instead of a redunda
   expect(screen.getByRole("dialog", { name: "Line plot viewer Main survey" })).toBeInTheDocument();
 });
 
-it("keeps reviewer and revise actions explicitly named at the mobile breakpoint", async () => {
-  renderRequestPage(pageDetail());
+it("keeps manager review and revise actions available without submitter edit ownership at the mobile breakpoint", async () => {
+  renderRequestPage(pageDetail({ request: pageRequest({ canEdit: false, canReview: true }) }));
 
   const requestRegion = await screen.findByRole("region", { name: "Change request" });
   const actions = within(requestRegion).getByRole("region", { name: "Reviewer actions" });
