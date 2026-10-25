@@ -222,7 +222,7 @@ integration tests that prove a pristine database and the supported main baseline
 ```bash
 dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
   --configuration Release --no-restore \
-  --filter 'FullyQualifiedName~MigrationUpgradeIntegrationTests|FullyQualifiedName~PostgresFoundationIntegrationTests'
+  --filter 'FullyQualifiedName~Migration|FullyQualifiedName~PostgresFoundationIntegrationTests'
 ```
 
 If the migration adds no special data backfill, do not invent a historical-data migration test unrelated to its shape;
@@ -233,8 +233,10 @@ Keep historical compatibility coverage separate from the current-main-v32 upgrad
 Deployment-safety claims must come from the current-main regression, not from an older baseline fixture. For this migration,
 the downgrade target is the **v32 schema/data contract**, not reconstruction of deliberately removed unused
 `ReportedByUserId` values. Migration tests must verify that distinct legacy `FileName` values survive an untouched
-round trip, post-upgrade File renames are not overwritten by rollback compatibility data, the restored v32 `FileName`
-column has no default, and mismatched Cave/File tenant ownership fails closed before the completion migration commits.
+round trip, post-upgrade File Name/Extension edits and newly-created Files downgrade from current metadata, the normalized
+v32 PostgreSQL schema contract (column types/nullability/defaults, constraints, and indexes; excluding physical column
+order) round-trips unchanged, populated completion-owned tables can downgrade, mismatched Cave/File tenant ownership
+fails closed transactionally, and Entrance Other rollback removes only rows proven to have been inserted by its backfill.
 
 Then run the repository-required pending-model check:
 
