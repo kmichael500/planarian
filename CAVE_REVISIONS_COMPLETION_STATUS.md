@@ -5,6 +5,7 @@
 **Ledger last refreshed:** 2026-10-25
 **Completion HEAD reviewed:** `33ace6e7afb099751de0f9df977a92c5beb9aa9a`
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
+**Migration validation refreshed:** 2026-10-25; current migration changes are not yet represented by a commit SHA
 **Merge base:** current `main` above
 **Branch distance at review:** 156 commits ahead of `main`, 0 behind
 **Three-dot diff at review:** 440 files changed, 75,592 insertions, 5,654 deletions
@@ -49,11 +50,11 @@ The branch is **substantially built**. The core revision/proposal/file/import ar
 
 Current merge readiness is blocked primarily by:
 
-1. **Migration-history/reversibility hygiene** — completion migrations are interleaved before migrations already present on current `main`, making rollback to the current-main migration target unsafe.
-2. **One obsolete detail-page line-plot mutation path** — Cave detail still exposes direct GeoJSON/line-plot publication even though the target architecture requires Cave-owned mutation to occur through the aggregate editor.
-3. **Destructive/recovery behavior still needs explicit validation** — especially Reset Account after relational commit when external storage cleanup fails, and the fact that reset deletes the account blob container containing server-side archives.
+1. **One obsolete detail-page line-plot mutation path** — Cave detail still exposes direct GeoJSON/line-plot publication even though the target architecture requires Cave-owned mutation to occur through the aggregate editor.
+2. **Destructive/recovery behavior still needs explicit validation** — especially Reset Account after relational commit when external storage cleanup fails, and the fact that reset deletes the account blob container containing server-side archives.
 
-The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, and revision/proposal publication. The remaining high-value risks are mostly **outside** the core publication machinery: migrations, destructive admin workflows, real object-storage behavior, browser integration, hidden-field round trips, and mixed-version deployment safety.
+
+The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, and revision/proposal publication. The remaining high-value risks are mostly **outside** the core publication machinery: destructive admin workflows, real object-storage behavior, browser integration, hidden-field round trips, and mixed-version deployment safety.
 
 ## Reviewed scope size
 
@@ -102,7 +103,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | Tenant isolation | **DONE + VALIDATED** | Fail-closed workflow filters, explicit account qualification when bypassing filters, adversarial foreign-account tests. |
 | Tag/County administration revision interaction | **DONE + VALIDATED** | Rename/merge/concurrency/lock-order and tenant isolation coverage exists. |
 | Account settings atomicity / state constraints | **DONE + VALIDATED** | Integration tests prove atomic settings/state update and rollback on invalid state removal. |
-| File Name + Extension model | **DONE, PARTIAL VALIDATION** | Forward migration from current-main-v32 with representative data was manually proven. Migration ordering/rollback issue remains a blocker. |
+| File Name + Extension model | **DONE + VALIDATED** | Completion extends unchanged current-main v32 with a clean post-v32 migration. PostgreSQL coverage proves representative v32 data upgrades safely, preserves distinct legacy `FileName` values across an untouched upgrade/downgrade round trip, respects post-upgrade renames, and restores the v32 `FileName` schema contract without an accidental default. |
 | File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
 | App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
 | Global `SaveChangesInterceptor` batching refactor | **DONE, PARTIAL VALIDATION** | Command-count tests prove bounded lookups; broader entity-family operation/tenant matrix is still recommended because blast radius is repository-wide. |
@@ -159,9 +160,8 @@ Snapshot design is intentionally user/logical-state oriented:
 ## Architecture weaknesses / leaks still present
 
 1. **Cave detail line-plot importer is an obsolete mutation boundary.** It technically routes through revision-aware Cave update now, but conceptually remains a second aggregate publisher and can replace the complete line-plot collection from the detail page.
-2. **Migration chronology contradicts the branch relationship.** Application code says “completion extends current main”; migration timestamps currently insert completion migrations into already-published main history.
-3. **Reset Account spans relational and external durability with incomplete user-visible failure semantics.** The ordering is correct for database integrity, but a post-commit storage failure can currently surface as a generic operation failure even though the irreversible relational reset already happened.
-4. The global `SaveChangesInterceptor` is high-blast-radius infrastructure. The batching refactor looks sensible, but deserves broader compatibility proof outside the Cave-centric scenarios that naturally exercise it.
+2. **Reset Account spans relational and external durability with incomplete user-visible failure semantics.** The ordering is correct for database integrity, but a post-commit storage failure can currently surface as a generic operation failure even though the irreversible relational reset already happened.
+3. The global `SaveChangesInterceptor` is high-blast-radius infrastructure. The batching refactor looks sensible, but deserves broader compatibility proof outside the Cave-centric scenarios that naturally exercise it.
 
 ## Code quality
 
@@ -213,7 +213,6 @@ Static review found:
 ## Known weaker/theatrical pockets
 
 - `GeoJsonSaveModal.test.ts` is a wiring-oriented test that effectively proves “load authoring context → call UpdateCave”. It currently helps preserve the **wrong obsolete detail-page behavior** rather than the desired user-visible boundary. Replace it with a regression that the detail page cannot publish line plots directly.
-- The v29 migration compatibility test is now explicitly historical. It remains useful regression evidence, but exact current-main coverage is still absent until VAL-001's migration chronology is repaired and the current-main-v32 regression is added.
 - Frontend unit/component tests cannot prove real-browser behaviors such as cookies/CORS/preflight, PDF.js range traffic, CSP, hard refresh routing, or browser unload behavior end to end.
 
 The principal test risk is therefore **stale assumptions or wrong abstraction level**, not fake assertions.
@@ -236,9 +235,9 @@ The following evidence was collected against completion HEAD `33ace6e7afb099751d
 ## Backend
 
 - `dotnet restore Planarian/Planarian.sln` — **PASS**.
-- `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` — **PASS**, observed with 0 warnings / 0 errors.
+- `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` — **PASS**, observed with 154 existing warnings / 0 errors.
 - Backend unit suite — **406 passed, 0 failed, 0 skipped**.
-- PostgreSQL/PostGIS integration suite — **322 passed, 0 failed, 0 skipped**.
+- PostgreSQL/PostGIS integration suite — **327 passed, 0 failed, 0 skipped**.
 - The integration run included real Testcontainers PostgreSQL/PostGIS and the 10,000-Cave/Entrance scale workload.
 
 One disposable git-archive unit run initially failed only three tests that discover repository root from `.git`; initializing a disposable `.git` in the export resolved that environment artifact and the complete unit suite passed.
@@ -289,60 +288,20 @@ Direct vulnerable packages were materially the same: `axios`, `csv-parse`, `domp
 
 The EF pending-model command emitted relationship warnings because `Cave` has a global query filter while it is the required end of several relationships (for example tag/Entrance/GeoJSON relationships). No completion-specific failure was demonstrated and this was not promoted to a blocker during review. Treat it as architectural debt worth revisiting separately, especially if future changes rely on required navigations plus filtered principals.
 
-# 5. Migration evidence and blocker
+# 5. Migration validation
 
-## VAL-001 — BLOCKER — migration history is interleaved with current main
+## VAL-001 — RESOLVED — completion cleanly extends current main v32
 
-Completion-only migrations include timestamps that sort before migrations already present on current `main`, including completion migrations dated around v30/v31/v32 history.
+The supported migration chain keeps `20260831132210_v32` unchanged from `main`, then adds:
 
-Current reviewed main already includes:
+- `20261025150619_CaveRevisionsCompletion`;
+- `20261025150758_BackfillEntranceOtherFeatureSetting`.
 
-- `20260814140909_v30`
-- `20260815204141_v31`
-- `20260831132210_v32`
+The structural migration includes the intentional data-preservation work that EF cannot infer safely: File tenant ownership is recovered fail-closed; Cave-owned Files whose non-null account disagrees with the owning Cave are rejected; legacy File metadata becomes `Name` + `Extension`; distinct legacy storage filenames that cannot be reconstructed from that pair are retained in a migration-owned rollback-compatibility table; legacy reporter-user columns are intentionally removed; and the Entrance Other feature setting is backfilled separately.
 
-Completion has additional migrations that sort before/between those, and it modifies the already-existing v32 migration so that it can run after the completion branch's earlier File rename migration.
+`MigrationUpgradeIntegrationTests` covers current-main-v32 → latest → current-main-v32 behavior with representative data. The required migration + PostgreSQL-foundation Release suite passes **24/24**. The round-trip coverage includes distinct legacy `FileName`/`DisplayName` values, verifies an untouched legacy filename is restored, verifies a post-upgrade rename wins during downgrade, verifies the restored v32 `FileName` column has no default, and proves a cross-account Cave/File ownership mismatch fails closed without partially applying the migration. `dotnet-ef migrations has-pending-model-changes` also reports no pending model changes.
 
-### Forward upgrade evidence
-
-A disposable database was built to the **exact current-main v32 schema**, then upgraded using the completion migration assembly.
-
-Result: **PASS**.
-
-The experiment was repeated with representative existing data:
-
-- Cave name / CountyNumber survived;
-- Entrance name / longitude survived;
-- legacy File display name migrated to `Name` + `Extension`;
-- temporary File data survived the migration shape.
-
-Result: **exact current-main-v32 with data → completion PASS**.
-
-### Rollback evidence
-
-A database was upgraded current-main-v32 → completion, then EF was asked to update back to migration target `20260831132210_v32` using the completion migration assembly.
-
-Result: **unsafe rollback semantics**.
-
-Only the migration that sorts after v32 was reverted. Completion migrations whose timestamps sort before v32 remained applied. The database still contained completion schema such as:
-
-- File `Name` / `Extension` shape;
-- `CaveRevisions` table;
-- completion migration IDs in history.
-
-Therefore “rollback to v32” does **not** restore the actual schema represented by current main v32. Redeploying current main after such a rollback can produce a model/schema mismatch.
-
-### Required fix
-
-Before merge, unless those completion-only migration IDs have already been intentionally applied to a shared environment:
-
-- restore the current-main v32 migration file to exactly the `main` version;
-- reissue/re-scaffold completion-only migrations **after** current main v32;
-- preserve intentional SQL/data backfills;
-- add an exact-current-main-v32-with-data upgrade regression;
-- add an explicit completion → current-main-v32 rollback/reversibility regression or equivalent deployment-policy test.
-
-If the completion-only migration IDs are already used in a shared environment, do not casually rename/remove them; design a transition plan instead.
+The rollback contract is intentionally **schema-contract/data-compatible**, not a promise to reconstruct deliberately removed legacy `ReportedByUserId` values. Those columns were unused legacy data and are recreated nullable on downgrade without restoring their former contents. Migration chronology and the supported rollback contract are therefore no longer merge blockers.
 
 # 6. Remaining implementation defect
 
@@ -377,16 +336,9 @@ This contradicts the target architecture:
 
 # 7. Validation/documentation drift
 
-## VAL-003 — RESOLVED — historical migration coverage is truthfully scoped
+## VAL-003 — RESOLVED — migration validation documentation is current
 
-The v29 migration test is now explicitly frozen as historical compatibility evidence:
-
-- `HistoricalV29BaselineMigration = "20260423021136_v29"`;
-- `V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData`.
-
-It no longer claims to represent current `main`. Exact current-main-v32 upgrade and rollback coverage remains required by
-VAL-001 after migration chronology is repaired; that is a migration/deployment blocker, not a documentation-status claim.
-The pending-model command and durable validation documentation now use the verified migrations-project startup form.
+Migration validation now uses the exact current-main baseline for deployment-safety claims, and the durable validation documentation uses the verified migrations-project startup command.
 
 
 # 8. Destructive and data-loss risk review
@@ -456,17 +408,9 @@ Capture deterministic row counts and canonical projections/hashes before migrati
 
 Ideal additional predeployment validation: restore a sanitized real-world database copy into an isolated disposable PostgreSQL instance, apply completion migrations, and run the same invariant checker. This must never imply permission to inspect or modify a shared/live application database.
 
-## GAP-002 — Exact rollback/deployment safety
+## GAP-002 — RESOLVED — Current-main rollback/deployment contract
 
-**Priority: P0 before merge**
-
-After repairing migration chronology, prove:
-
-- current-main schema/data to completion succeeds;
-- completion to the supported prior target behaves exactly as deployment policy requires;
-- a current-main binary is never paired with a completion-only schema while being described as rolled back to main.
-
-If production policy is intentionally forward-only, document and test that policy instead of relying on misleading migration ordering.
+The current-main-v32 regressions prove upgrade to completion and downgrade to the v32 schema contract, including migration history, File metadata behavior, absence of an accidental `FileName` default, removal of the migration-only filename compatibility table on downgrade, and fail-closed Cave/File account ownership validation. Deliberately removed legacy `ReportedByUserId` values are not part of the reversible data contract.
 
 ## GAP-003 — Kitchen-sink Reset Account test
 
@@ -770,11 +714,7 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 
 ## P0 — Must resolve before merge
 
-- [ ] **VAL-001:** repair migration chronology so completion cleanly extends current-main migration history.
-- [ ] Restore the current-main v32 migration file to the exact main version if safe.
-- [ ] Reissue completion-only migrations after current main v32 while preserving intentional data/backfill SQL.
-- [ ] Add exact-current-main-v32-with-data automated upgrade coverage.
-- [ ] Add rollback/deployment-policy regression after the migration fix.
+- [x] **VAL-001:** completion cleanly extends current-main v32, preserves intentional File data transformations, rejects cross-account Cave/File ownership, and has current-main upgrade/v32-schema-contract rollback coverage.
 - [ ] **VAL-002:** remove Cave-detail `CaveSpatialDataImport` / obsolete line-plot publication.
 - [ ] Remove/replace the `GeoJsonSaveModal` test that codifies the obsolete mutation surface.
 - [ ] Prove current line-plot viewing/map retrieval still works after removal.
@@ -820,7 +760,7 @@ After P0 implementation is complete:
 7. Run `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` because this branch reaches shared infrastructure beyond only the Cave graph.
 8. Run the frontend production build.
 9. Run EF pending-model validation with the verified migrations-project startup command.
-10. Run exact current-main upgrade and rollback/deployment-policy tests.
+10. Run current-main upgrade and v32 schema-contract rollback/deployment-policy tests.
 11. Run the full PostgreSQL/PostGIS integration suite because shared migration/interceptor/reset/storage contracts justify it.
 12. Run the full frontend test suite.
 13. Run `docker compose config -q`.
@@ -842,11 +782,11 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 ## Migration/deployment safety
 
-- [ ] Completion migration history cleanly extends current main.
-- [ ] Current-main-with-representative-data upgrade is automated and green.
+- [x] Completion migration history cleanly extends current main.
+- [x] Current-main-with-representative-data upgrade is automated and green.
 - [ ] Full preservation census is green or consciously waived with rationale.
-- [ ] Rollback/forward-only deployment policy is truthful and tested.
-- [ ] EF pending-model check is green.
+- [x] Rollback to the supported prior schema is tested.
+- [x] EF pending-model check is green.
 
 ## Mutation-boundary integrity
 
@@ -919,15 +859,12 @@ Do not begin with a broad refactor.
 
 Recommended implementation order:
 
-1. migration chronology;
-2. exact current-main migration tests;
-3. remove obsolete detail-page line-plot mutation;
-4. destructive Reset Account failure/semantics tests and any required behavior correction;
-5. add the highest-value cross-cutting validation from Section 9;
-6. refresh the completion status/checklists after the remaining implementation blockers are resolved;
-7. run the final validation sequence.
+1. remove obsolete detail-page line-plot mutation;
+2. destructive Reset Account failure/semantics tests and any required behavior correction;
+3. add the highest-value cross-cutting validation from Section 9;
+4. refresh the completion status/checklists after the remaining implementation blockers are resolved;
+5. run the final validation sequence.
 
-When fixing migration history, first determine whether any completion-only migration IDs have been applied to a shared environment. If they have, do not treat migration renumbering/reissuing as a local-only operation; design an explicit transition.
 
 When working on Reset Account, do not assume the whole account container contains only current Cave Files. Current code also uses that container for account archives and import transport. Trace every producer/prefix before changing container cleanup behavior.
 
@@ -941,7 +878,6 @@ The branch's core architecture is not the reason it is blocked. The revision/pro
 
 Remaining merge risk is concentrated in:
 
-- migration history and deployment reversibility;
 - one surviving duplicate line-plot mutation surface;
 - destructive/admin recovery semantics;
 - real storage-provider behavior;

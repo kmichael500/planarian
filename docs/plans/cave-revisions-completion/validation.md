@@ -229,10 +229,12 @@ If the migration adds no special data backfill, do not invent a historical-data 
 the empty/latest and **exact current merge-target (`main`)** upgrade contracts plus focused retained-object schema tests are
 the relevant coverage. Add a dedicated migration test only if the migration itself contains data transformation logic.
 
-The v29 migration coverage is intentionally frozen and named as historical compatibility evidence
-(`HistoricalV29BaselineMigration` / `V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData`). It does **not**
-satisfy the exact-current-merge-target requirement. Current-main-v32 upgrade/rollback coverage remains part of the
-separate migration-chronology blocker; do not relabel the historical test as current-main evidence.
+Keep historical compatibility coverage separate from the current-main-v32 upgrade/rollback regression.
+Deployment-safety claims must come from the current-main regression, not from an older baseline fixture. For this migration,
+the downgrade target is the **v32 schema/data contract**, not reconstruction of deliberately removed unused
+`ReportedByUserId` values. Migration tests must verify that distinct legacy `FileName` values survive an untouched
+round trip, post-upgrade File renames are not overwritten by rollback compatibility data, the restored v32 `FileName`
+column has no default, and mismatched Cave/File tenant ownership fails closed before the completion migration commits.
 
 Then run the repository-required pending-model check:
 

@@ -14,8 +14,8 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20260821201900_CaveChangeRequestReviewEvents")]
-    partial class CaveChangeRequestReviewEvents
+    [Migration("20261025150619_CaveRevisionsCompletion")]
+    partial class CaveRevisionsCompletion
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

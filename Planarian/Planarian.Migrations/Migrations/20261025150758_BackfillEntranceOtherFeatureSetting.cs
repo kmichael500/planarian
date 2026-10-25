@@ -4,8 +4,10 @@
 
 namespace Planarian.Migrations.Migrations
 {
+    /// <inheritdoc />
     public partial class BackfillEntranceOtherFeatureSetting : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
@@ -20,6 +22,7 @@ namespace Planarian.Migrations.Migrations
                 """);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""

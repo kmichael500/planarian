@@ -432,15 +432,9 @@ The status ledger therefore recommends a broad entity/state compatibility matrix
 
 ## 17. Migration surface is large
 
-The branch adds migrations for revision/proposal/import/File lifecycle concepts and modifies schema across several stages.
+The branch adds revision/proposal/import/File-lifecycle schema after current-main v32. The published v32 migration remains unchanged and intentional data transformations are explicit. The completion migration fails closed when a Cave-owned File's account disagrees with its owning Cave, and it keeps a small migration-owned compatibility table only for legacy `FileName` values that cannot be reconstructed from `Name + Extension`. PostgreSQL integration tests cover current-main upgrade, untouched legacy filename restoration, post-upgrade rename behavior, and downgrade back to the v32 schema contract. Deliberately removed legacy reporter-user values are not treated as reversible data.
 
-The current status ledger identifies migration chronology as the largest merge blocker:
-
-- completion migrations are timestamp-interleaved with migrations that already exist on current `main`;
-- exact current-main-v32 → completion forward upgrade was manually proven;
-- rollback to the current-main-v32 migration target is not equivalent to restoring the actual main schema.
-
-See the migration section of the status ledger for current deployability. This change guide records the compared branch delta and intentionally does not own live finding status.
+See the migration section of the status ledger for current validation evidence. This change guide records the compared branch delta and intentionally does not own live finding status.
 
 ## 18. The test suite changed almost as much as the implementation
 
