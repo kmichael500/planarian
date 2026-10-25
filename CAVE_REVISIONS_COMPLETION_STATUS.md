@@ -5,8 +5,8 @@
 **Ledger last refreshed:** 2026-10-25
 **Completion HEAD reviewed:** `33ace6e7afb099751de0f9df977a92c5beb9aa9a`
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
-**Migration validation refreshed:** 2026-10-25; current migration changes are not yet represented by a commit SHA
-**Rollout-baseline validation refreshed:** 2026-10-25; uncommitted worktree validation completed after the eager-history-baseline changes
+**Migration validation refreshed:** 2026-10-25; migration repair/hardening is represented by completion commit `fa4582ac93ebd36f8c8bfbb891ec713ce380b09c` before rollout reconciliation
+**Rollout-baseline validation refreshed:** 2026-10-25; merge reconciliation validation is recorded below
 **Merge base:** current `main` above
 **Branch distance at review:** 156 commits ahead of `main`, 0 behind
 **Three-dot diff at review:** 440 files changed, 75,592 insertions, 5,654 deletions
@@ -220,7 +220,25 @@ The principal test risk is therefore **stale assumptions or wrong abstraction le
 
 # 4. Validation already completed
 
-Unless noted below, the following evidence was collected against completion HEAD `33ace6e7afb099751de0f9df977a92c5beb9aa9a` and current `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2`. The backend build/unit/integration results and frontend test/build results were rerun on 2026-10-25 against the uncommitted rollout-baseline worktree; those refreshed counts are recorded below.
+The following evidence was collected against completion HEAD `33ace6e7afb099751de0f9df977a92c5beb9aa9a` and current `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2`.
+
+## 2026-10-25 rollout merge-reconciliation refresh
+
+A second full validation pass was run against the resolved merge tree combining rollout commit `32c90ee43e0081f8105209d132cdcf20eef81679` with completion commit `fa4582ac93ebd36f8c8bfbb891ec713ce380b09c`, before creating the merge commit. Conflict resolution deliberately preserved the newer split migration-test suite, hardened FeatureSetting provenance migration, rollback-compatibility behavior, and migration documentation from the completion branch while layering the eager revision-history rollout on top.
+
+- Release solution build — **PASS, 0 warnings / 0 errors**.
+- Backend unit suite — **406 passed, 0 failed, 0 skipped**.
+- Migration + PostgreSQL-foundation focused suite — **32 passed, 0 failed, 0 skipped**.
+- Rollout/revision/import focused suite — **23 passed, 0 failed, 0 skipped**.
+- Full PostgreSQL/PostGIS integration suite — **341 passed, 0 failed, 0 skipped**, including both 10,000-record scale workloads.
+- Frontend suite — **71 suites / 328 tests passed, 0 snapshots**.
+- Client-route generator — **6/6 passed**; CSP configuration — **5/5 passed**; `.env.example` mapping validation — **PASS**.
+- Optimized frontend production build — **PASS**; only existing CRA/ESLint/bundle-size warnings were emitted.
+- EF pending-model check — **PASS: no pending model changes**.
+- Repository documentation validator — **PASS**; the validator still reports the intentionally historical `Completion HEAD reviewed` SHA above as older than the worktree HEAD.
+- Staged/unstaged diff checks and conflict-marker scan — **PASS**.
+
+This refresh supersedes the older test-count totals below for the reconciled rollout work. The older totals remain because they are SHA-pinned evidence from the earlier broad completion review.
 
 ## Git / static checks
 
@@ -238,7 +256,7 @@ Unless noted below, the following evidence was collected against completion HEAD
 - `dotnet restore Planarian/Planarian.sln` — **PASS**.
 - `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` — **PASS**, observed with 154 existing warnings / 0 errors.
 - Backend unit suite — **406 passed, 0 failed, 0 skipped**.
-- PostgreSQL/PostGIS integration suite — **333 passed, 0 failed, 0 skipped**.
+- PostgreSQL/PostGIS integration suite — **327 passed, 0 failed, 0 skipped**.
 - The integration run included real Testcontainers PostgreSQL/PostGIS and the 10,000-Cave/Entrance scale workload.
 
 One disposable git-archive unit run initially failed only three tests that discover repository root from `.git`; initializing a disposable `.git` in the export resolved that environment artifact and the complete unit suite passed.
@@ -246,7 +264,7 @@ One disposable git-archive unit run initially failed only three tests that disco
 ## Frontend
 
 - `npm ci` — **PASS**.
-- Frontend test suite — **71 suites passed, 328 tests passed, 0 snapshots**.
+- Frontend test suite — **71 suites passed, 326 tests passed, 0 snapshots**.
 - Client-route generator tests — **6/6 passed**.
 - CSP configuration tests — **5/5 passed**.
 - `npm run build` — **PASS** with existing lint warnings.
@@ -298,9 +316,11 @@ The supported migration chain keeps `20260831132210_v32` unchanged from `main`, 
 - `20261025150619_CaveRevisionsCompletion`;
 - `20261025150758_BackfillEntranceOtherFeatureSetting`.
 
-The structural migration includes the intentional data-preservation work that EF cannot infer safely: File tenant ownership is recovered fail-closed; Cave-owned Files whose non-null account disagrees with the owning Cave are rejected; legacy File metadata becomes `Name` + `Extension`; distinct legacy storage filenames that cannot be reconstructed from that pair are retained in a migration-owned rollback-compatibility table; legacy reporter-user columns are intentionally removed; and the Entrance Other feature setting is backfilled separately.
+The structural migration includes the intentional data-preservation work that EF cannot infer safely: File tenant ownership is recovered fail-closed; Cave-owned Files whose non-null account disagrees with the owning Cave are rejected; legacy File metadata becomes `Name` + `Extension`; distinct legacy storage filenames that cannot be reconstructed from that pair are retained in a migration-owned rollback-compatibility table; and legacy reporter-user columns are intentionally removed. The separate Entrance Other backfill records the exact FeatureSetting rows it inserts in a migration-owned marker table so rollback removes only migration-created rows, including when a preexisting setting happens to use the deterministic candidate ID.
 
-`MigrationUpgradeIntegrationTests` covers current-main-v32 → latest → current-main-v32 behavior with representative data. After the schema migration, a separate one-time application bootstrap creates the authoritative `SystemBaseline/Baseline` revision for every pre-existing Cave from the canonical snapshot projection and advances `CurrentRevisionId`; normal API startup refuses to serve while any live Cave remains uninitialized. The rollout is resumable, reuses one history-boundary timestamp across retries, has no user actor, and refuses to create a late baseline after ordinary revision publication begins. The migration round-trip coverage includes distinct legacy `FileName`/`DisplayName` values, verifies an untouched legacy filename is restored, verifies a post-upgrade rename wins during downgrade, verifies the restored v32 `FileName` column has no default, and proves a cross-account Cave/File ownership mismatch fails closed without partially applying the migration. `dotnet-ef migrations has-pending-model-changes` is part of the required final validation.
+The migration tests are split by behavior (`MigrationUpgrade`, File metadata, File ownership, FeatureSetting backfill, legacy reporter cleanup, and legacy revision initialization) rather than one monolithic class. The required migration + PostgreSQL-foundation Release suite passes **32/32**. Coverage includes a normalized PostgreSQL catalog comparison proving v32 columns/types/nullability/defaults/constraints/indexes round-trip unchanged (physical column order intentionally excluded), rollback after the new revision/proposal/import/retained-object tables contain valid data, distinct legacy `FileName` preservation, post-upgrade Name and Extension edits, Files created after upgrade, migration length/validation boundaries, the complete supported File ownership matrix with transactional rollback, and exact FeatureSetting backfill provenance. `dotnet-ef migrations has-pending-model-changes` also reports no pending model changes.
+
+After the schema migration, a separate one-time application bootstrap creates the authoritative `SystemBaseline/Baseline` revision for every pre-existing Cave from the canonical snapshot projection and advances `CurrentRevisionId`. Normal API startup refuses to serve while any live Cave remains uninitialized. The rollout is resumable, reuses one history-boundary timestamp across retries, has no user actor, refuses to create a late baseline after ordinary revision publication begins, and has supported-scale coverage for 10,000 Caves.
 
 The rollback contract is intentionally **schema-contract/data-compatible**, not a promise to reconstruct deliberately removed legacy `ReportedByUserId` values. Those columns were unused legacy data and are recreated nullable on downgrade without restoring their former contents. Migration chronology and the supported rollback contract are therefore no longer merge blockers.
 
@@ -534,7 +554,7 @@ Keep this invariant so a future compatibility change cannot silently restore las
 
 **Priority: P1**
 
-Rollout baseline creation is now deployment-only. Ordinary reads and authoring-context reads must remain read-only; a missing `CurrentRevisionId` on an existing Cave is an integrity error, not permission to manufacture history during a request.
+Rollout baseline creation is deployment-only. Ordinary reads and authoring-context reads must remain read-only; a missing `CurrentRevisionId` on an existing Cave is an integrity error, not permission to manufacture history during a request.
 
 Create a read-only contract test that fingerprints relevant database state, performs representative reads, and compares afterward:
 
