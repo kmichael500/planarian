@@ -1,8 +1,9 @@
 # Cave revision and proposal architecture
 
 > [!IMPORTANT]
-> `docs/plans/cave-revisions-completion/README.md` records the implementation plan and validation gates used to complete
-> this pre-release architecture. This document describes the durable implemented behavior.
+> `docs/plans/cave-revisions-completion/README.md` records the target-state implementation plan and validation gates for
+> this pre-release architecture. This document is the durable architecture contract. Temporary pre-merge implementation
+> gaps do not weaken its invariants; the SHA-pinned live status is tracked in [`../CAVE_REVISIONS_COMPLETION_STATUS.md`](../CAVE_REVISIONS_COMPLETION_STATUS.md).
 
 ## Published state
 
@@ -24,7 +25,9 @@ identity and does not fan out Cave revisions.
 Bulk Cave import first key-share-locks existing planned target Counties and validates their account, State, display
 code, and name while those locks are held. It then key-share-locks existing planned target TagTypes and locks affected
 Cave rows `FOR UPDATE`. Entrance import starts at the TagType step because it operates against stable Cave IDs and does
-not mutate Cave County membership. Both imports validate expected Cave and revision state before replacing aggregate
+not mutate Cave County membership. Bulk and interactive publication use the same canonical published snapshot and
+semantic-diff rules; bulk differs in how it plans, locks, and applies many relational writes, not in what counts as a
+published Cave change. Both imports validate expected Cave and revision state before replacing aggregate
 child/reference state. They do not pessimistically lock every old reference absent from the target plan: the owning
 Cave lock and expected-revision validation serialize that wholesale replacement. Hard Cave deletion similarly locks
 the Cave `FOR UPDATE`, checks for pending proposals, and deletes the aggregate without first locking every referenced

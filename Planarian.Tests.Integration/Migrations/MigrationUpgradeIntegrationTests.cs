@@ -17,7 +17,7 @@ namespace Planarian.Tests;
 [Collection(MigrationIntegrationCollection.Name)]
 public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
-    private const string MainBaselineMigration = "20260423021136_v29";
+    private const string HistoricalV29BaselineMigration = "20260423021136_v29";
     [Fact]
     public async Task EmptyDatabaseMigratesToLatest()
     {
@@ -227,17 +227,17 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData()
+    public async Task V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData()
     {
-        // Arrange the exact pre-foundation production schema and representative data.
+        // Arrange the frozen historical v29 schema and representative data.
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(ExactMainSchemaUpgradesWithoutCorruptingExistingTenantData));
+            nameof(V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData));
         var migrations = database.GetMigrationNames().ToList();
         var baseline = migrations.FindIndex(migration =>
-            migration.EndsWith(MainBaselineMigration, StringComparison.Ordinal));
+            migration.EndsWith(HistoricalV29BaselineMigration, StringComparison.Ordinal));
         var foundation = migrations.FindIndex(migration =>
             migration.EndsWith("_CaveRevisionImportFoundation", StringComparison.Ordinal));
-        Assert.True(baseline >= 0, $"Expected main baseline migration {MainBaselineMigration} was not found.");
+        Assert.True(baseline >= 0, $"Expected historical v29 baseline migration {HistoricalV29BaselineMigration} was not found.");
         Assert.Equal(baseline + 1, foundation);
         await database.MigrateAsync(migrations[baseline]);
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
@@ -304,7 +304,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             nameof(MigratedLegacyCaveInitializesOneBaselineForProposalAuthoringAndCanBeSubmitted));
         var migrations = database.GetMigrationNames().ToList();
         var baseline = migrations.FindIndex(migration =>
-            migration.EndsWith(MainBaselineMigration, StringComparison.Ordinal));
+            migration.EndsWith(HistoricalV29BaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(migrations[baseline]);
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
         await database.MigrateAsync(null);
@@ -724,7 +724,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     private async Task<PostgresTestDatabase> CreateV29DatabaseAsync(string name)
     {
         var database = await fixture.CreateUnmigratedDatabaseAsync(name);
-        var migration = database.GetMigrationNames().Single(x => x.EndsWith(MainBaselineMigration, StringComparison.Ordinal));
+        var migration = database.GetMigrationNames().Single(x => x.EndsWith(HistoricalV29BaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(migration);
         return database;
     }

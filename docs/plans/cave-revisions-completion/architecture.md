@@ -534,11 +534,13 @@ this plan.
 
 ## 22. Durable-document transition
 
-The current `docs/cave-revisions.md` still describes branch mechanics that this plan intentionally replaces, including
-approval-attempt blob copying and historical File binaries being disposable after removal.
+When this plan was authored, `docs/cave-revisions.md` still described branch mechanics that the target architecture
+replaced, including approval-attempt blob copying and disposable historical File bytes. That was a baseline observation,
+not a permanent statement about the durable document.
 
-During implementation, do not partially rewrite that durable document after every phase. Once the target behavior is
-actually implemented and validated, update it coherently to describe the final truth:
+The current completion branch has already updated `docs/cave-revisions.md` to describe the target File lifecycle, direct
+edit concurrency, and line-plot revision/proposal semantics. Keep that durable contract aligned with the final validated
+implementation rather than reintroducing baseline mechanics. In particular it must continue to state that:
 
 - aggregate editor/publication includes Files and line plots;
 - stale direct edits require the client-loaded revision;
@@ -547,4 +549,5 @@ actually implemented and validated, update it coherently to describe the final t
 - line-plot snapshot/diff/proposal semantics are explicit;
 - current line-plot payload storage remains `CaveGeoJson` `jsonb` pending a later redesign.
 
-Then remove the temporary active-plan warning/routing if the implementation plan is no longer needed for future agents.
+Once all completion gates are satisfied, remove the temporary active-plan routing or mark this plan completed/historical so
+future agents do not treat an implementation sequence as live current-state documentation.

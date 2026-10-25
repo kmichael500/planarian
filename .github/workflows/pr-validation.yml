@@ -16,7 +16,7 @@ on:
       - "compose.yaml"
       - "dev"
       - "package.json"
-      - "AGENTS.md"
+      - "*.md"
       - "scripts/**"
       - ".github/workflows/pr-validation.yml"
 
@@ -25,6 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate repository documentation
+        env:
+          PLANARIAN_DOC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/validate-repository-docs.py --base-sha "$PLANARIAN_DOC_BASE_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: ">=22.13.0 <23"

@@ -67,7 +67,7 @@ dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
   --filter FullyQualifiedName~RelevantTestOrNamespace
 ```
 
-The normal comprehensive PR/release validation is:
+The normal comprehensive **backend** validation sequence is:
 
 ```bash
 dotnet restore Planarian/Planarian.sln
@@ -83,3 +83,7 @@ dotnet tool run dotnet-ef migrations has-pending-model-changes \
 Migration/model changes require the Migration category and pending-model check; golden-compatibility changes require
 Golden; batching or supported-workload changes require Scale. A full integration invocation already includes ordinary
 PostgreSQL, Migration, Golden, and Scale tests, so do not redundantly append their filtered invocations after it.
+
+The complete cross-stack pull-request workflow also installs/builds/tests the web client, validates generated client routes,
+and validates the frontend environment example. Treat [`.github/workflows/pr-validation.yml`](../.github/workflows/pr-validation.yml)
+as the canonical CI sequence instead of duplicating every frontend step here.

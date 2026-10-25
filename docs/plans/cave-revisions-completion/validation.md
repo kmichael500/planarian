@@ -1,8 +1,12 @@
 # Focused testing and completion validation
 
-This task is broad in behavior but should not trigger indiscriminate repository validation. Follow `docs/testing.md` and
-run the narrowest tests that prove the changed contracts. Expand only when an actual dependency or shared contract makes
-it necessary.
+This document defines the validation contract, not the live pass/fail ledger. Current SHA-pinned results and known gaps are
+tracked in [`../../../CAVE_REVISIONS_COMPLETION_STATUS.md`](../../../CAVE_REVISIONS_COMPLETION_STATUS.md).
+
+This task is broad in behavior but should not trigger indiscriminate repository validation while developing. Follow
+`docs/testing.md` and run the narrowest tests that prove the changed contracts. Expand when an actual dependency or shared
+contract makes it necessary; the final branch currently touches shared migration/storage/revision infrastructure, so the
+live status ledger may legitimately require broader completion validation than an individual development step.
 
 ## 1. Test placement rules
 
@@ -222,8 +226,13 @@ dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
 ```
 
 If the migration adds no special data backfill, do not invent a historical-data migration test unrelated to its shape;
-the existing empty/latest and exact-main upgrade contracts plus focused retained-object schema tests are the relevant
-coverage. Add a dedicated migration test only if the migration itself contains data transformation logic.
+the empty/latest and **exact current merge-target (`main`)** upgrade contracts plus focused retained-object schema tests are
+the relevant coverage. Add a dedicated migration test only if the migration itself contains data transformation logic.
+
+The v29 migration coverage is intentionally frozen and named as historical compatibility evidence
+(`HistoricalV29BaselineMigration` / `V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData`). It does **not**
+satisfy the exact-current-merge-target requirement. Current-main-v32 upgrade/rollback coverage remains part of the
+separate migration-chronology blocker; do not relabel the historical test as current-main evidence.
 
 Then run the repository-required pending-model check:
 
@@ -249,8 +258,8 @@ At the end of implementation, perform validation in this order:
 6. run the required migration tests and pending-model check;
 7. run conditional import/archive/deletion checks only if their contracts changed beyond the focused retention cases;
 8. run `git diff --check`;
-9. inspect the final diff against `feature/cave-revisions` for the bypass/concurrency/tenant issues listed in
-   `implementation.md` Phase 10;
+9. inspect the final diff against the actual merge target (currently `main`) for the bypass/concurrency/tenant issues
+   listed in `implementation.md` Phase 10; use `feature/cave-revisions` only as an additional historical delta if useful;
 10. search for obsolete direct File/GeoJSON publication and staged blob-copy call sites;
 11. confirm durable docs match implemented behavior.
 
@@ -259,6 +268,7 @@ specific reason.
 
 ## 14. Final acceptance checklist
 
+These checkboxes are acceptance criteria, not a live status board. Use the SHA-pinned status ledger for current evidence.
 Do not mark the task complete until every applicable item is true:
 
 ### Concurrency and aggregate publication

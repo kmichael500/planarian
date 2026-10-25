@@ -9,12 +9,14 @@ namespace Planarian.Modules.Caves.Revisions;
 
 /// <summary>
 /// Publishes a bounded set of Cave revisions inside the caller's existing transaction.
-/// Existing Caves without history receive a baseline only when state actually changes.
+/// Uses the same canonical snapshot and semantic-diff contract as interactive publication while keeping
+/// the persistence path set-oriented. Existing Caves without history receive a baseline only when state changes.
 /// </summary>
 public sealed class CaveBulkRevisionRepository
 {
     private const int BatchSize = 1000;
     private readonly PlanarianDbContext _db;
+    private readonly CaveRevisionDiffService _diff = new();
     private readonly AccountExecutionScope _scope;
 
     public CaveBulkRevisionRepository(PlanarianDbContext db, RequestUser requestUser)
@@ -41,6 +43,22 @@ public sealed class CaveBulkRevisionRepository
             throw new ArgumentException("Only import revisions may identify an import batch.", nameof(importBatchId));
 
         var mutationIds = operations.Keys.Order(StringComparer.Ordinal).ToList();
+        var expectedRevisionIds = mutationIds
+            .Where(after.ContainsKey)
+            .Select(caveId => expectedCurrentRevisionIds.GetValueOrDefault(caveId))
+            .Where(revisionId => revisionId is not null)
+            .Select(revisionId => revisionId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var expectedRevisions = expectedRevisionIds.Count == 0
+            ? new Dictionary<string, ExpectedRevisionSnapshot>(StringComparer.Ordinal)
+            : await _db.CaveRevisions.AsNoTracking()
+                .Where(revision => revision.AccountId == _scope.AccountId &&
+                                   expectedRevisionIds.Contains(revision.Id))
+                .Select(revision => new ExpectedRevisionSnapshot(revision.Id, revision.CaveId,
+                    revision.SnapshotSchemaVersion, revision.SnapshotJson))
+                .ToDictionaryAsync(revision => revision.Id, StringComparer.Ordinal, cancellationToken);
+
         foreach (var chunk in mutationIds.Chunk(BatchSize))
         {
             var liveIds = chunk.Where(after.ContainsKey).ToList();
@@ -57,8 +75,28 @@ public sealed class CaveBulkRevisionRepository
                 var operation = operations[caveId];
                 var expectedCurrent = expectedCurrentRevisionIds.GetValueOrDefault(caveId);
 
-                if (previousSnapshot is not null && currentSnapshot is not null &&
-                    CaveSnapshotJson.Serialize(previousSnapshot) == CaveSnapshotJson.Serialize(currentSnapshot))
+                // Match interactive publication semantics: once a Cave has revision history, compare the
+                // resulting state with its last published snapshot rather than with the current live rows.
+                // Shared reference labels can drift without revision fan-out and must become visible on the
+                // next legitimate publication. Legacy Caves with no revision still compare live-before/after
+                // so a baseline is created only when the bulk operation actually changes them.
+                var semanticPrevious = previousSnapshot;
+                if (expectedCurrent is not null && currentSnapshot is not null)
+                {
+                    if (!liveCaves.TryGetValue(caveId, out var liveCave))
+                        throw new CaveRevisionConflictException(caveId, expectedCurrent, null);
+                    if (liveCave.CurrentRevisionId != expectedCurrent)
+                        throw new CaveRevisionConflictException(caveId, expectedCurrent, liveCave.CurrentRevisionId);
+                    if (!expectedRevisions.TryGetValue(expectedCurrent, out var expectedRevision) ||
+                        expectedRevision.CaveId != caveId)
+                        throw new InvalidOperationException(
+                            $"Expected current revision '{expectedCurrent}' for Cave '{caveId}' was not found.");
+                    semanticPrevious = CaveSnapshotJson.Deserialize(expectedRevision.SnapshotJson,
+                        expectedRevision.SnapshotSchemaVersion);
+                }
+
+                if (semanticPrevious is not null && currentSnapshot is not null &&
+                    _diff.IsSemanticEqual(semanticPrevious, currentSnapshot))
                     continue;
 
                 string? previousRevisionId = expectedCurrent;
@@ -98,4 +136,7 @@ public sealed class CaveBulkRevisionRepository
             _db.ChangeTracker.Clear();
         }
     }
+
+    private sealed record ExpectedRevisionSnapshot(string Id, string CaveId, int SnapshotSchemaVersion,
+        string SnapshotJson);
 }

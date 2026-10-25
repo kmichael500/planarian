@@ -1,8 +1,13 @@
 # Ordered implementation plan
 
-Follow these phases in order. A later phase may modify files introduced earlier, but do not skip the earlier contract and
-validation work. The file lists below are concrete starting points from the inspected branch, not permission to ignore
-adjacent code reached by compilation or tests.
+This is the target implementation sequence and remains useful as rationale/acceptance guidance; it is not a live progress
+ledger. Do not redo a phase merely because it appears below. Re-check current source and use
+[`../../../CAVE_REVISIONS_COMPLETION_STATUS.md`](../../../CAVE_REVISIONS_COMPLETION_STATUS.md) for SHA-pinned completion
+status.
+
+Follow these phases in order when implementing remaining work. A later phase may modify files introduced earlier, but do
+not skip the earlier contract and validation work. The file lists below are concrete starting points from the inspected
+baseline, not permission to ignore adjacent code reached by compilation or tests.
 
 ## Phase 0 — Re-establish the live baseline
 
@@ -10,7 +15,8 @@ Before editing:
 
 1. confirm the current branch is still `feature/cave-revisions-completion`;
 2. run `git status --short --branch` and preserve unrelated local work;
-3. inspect the diff against `feature/cave-revisions` so new upstream/local changes are understood;
+3. inspect the diff against the actual merge target (currently `main`); use `feature/cave-revisions` only when it is
+   still useful for understanding the historical completion-plan delta;
 4. reread `AGENTS.md`, `Planarian/AGENTS.md`, and this plan;
 5. locate any changes to the named files since baseline `565ba738` and adapt paths without changing the target design.
 
@@ -611,9 +617,9 @@ change and the shared contract has targeted coverage elsewhere, do not manufactu
 ## Phase 10 — Durable docs and final bypass review
 ### 10.1 Update durable architecture
 
-After behavior is implemented and focused tests pass, rewrite the affected sections of `docs/cave-revisions.md` to match
-the final implemented truth. In particular remove the obsolete approval-candidate blob-copy model and obsolete claim
-that ordinary removed published File bytes may disappear.
+After behavior is implemented and focused tests pass, verify `docs/cave-revisions.md` matches the final implemented and
+normative truth. The current completion branch has already removed the old approval-candidate blob-copy/disposable-history
+model, so do not reapply that historical transition mechanically; update only facts that actually changed.
 
 Update `docs/data-access-architecture.md` only if the new provider-neutral external-storage boundary adds a durable rule
 worth stating there. Do not copy the whole active plan into permanent architecture docs.
@@ -638,7 +644,9 @@ implementations.
 
 ### 10.3 Fresh adversarial pass
 
-Before declaring completion, inspect the final branch diff against `feature/cave-revisions` and specifically look for:
+Before declaring completion, inspect the final branch diff against the actual merge target (currently `main`). If
+`feature/cave-revisions` is still useful as a historical parent for isolating this completion work, inspect that delta too.
+Specifically look for:
 
 - a mutation route that still bypasses Cave revision publication;
 - a stale-client path that still substitutes current server revision state;

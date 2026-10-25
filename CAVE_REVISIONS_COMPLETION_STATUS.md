@@ -1,0 +1,953 @@
+# Cave Revisions Completion Status and Validation Ledger
+
+**Branch:** `feature/cave-revisions-completion`
+**Status:** **ACTIVE PRE-MERGE — CHANGES REQUIRED**
+**Ledger last refreshed:** 2026-10-25
+**Completion HEAD reviewed:** `33ace6e7afb099751de0f9df977a92c5beb9aa9a`
+**Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
+**Merge base:** current `main` above
+**Branch distance at review:** 156 commits ahead of `main`, 0 behind
+**Three-dot diff at review:** 440 files changed, 75,592 insertions, 5,654 deletions
+
+## Purpose
+
+This is the durable handoff/status ledger for the Cave revisions completion branch. It records what is implemented, what has actually been validated, what remains only partially validated, concrete defects found during adversarial review, and high-value validation still needed before merge.
+
+This file is intentionally broader than the implementation plan. It includes findings from the post-implementation architecture/code-quality/test-quality review and the later destructive/data-loss risk review. Another agent should be able to resume from this file without depending on chat history.
+
+Do not treat an item as validated merely because the implementation exists or because a related test is green. The status below distinguishes implementation from evidence.
+
+## Authority and related documents
+
+Follow the repository workflow router and project rules first:
+
+- `PROJECT_PROTOCOLS.md`
+- `AGENTS.md`
+- `Planarian/AGENTS.md` for backend/persistence changes
+- `docs/data-access-architecture.md`
+- `docs/testing.md`
+- `docs/cave-revisions.md`
+- `docs/plans/cave-revisions-completion/README.md`
+- `docs/plans/cave-revisions-completion/architecture.md`
+- `docs/plans/cave-revisions-completion/implementation.md`
+- `docs/plans/cave-revisions-completion/validation.md`
+
+The completion-plan README is still marked **active pre-merge implementation plan**, so its target-state requirements still apply.
+
+## Status legend
+
+- **DONE + VALIDATED** — implemented and supported by direct review/test evidence.
+- **DONE, PARTIAL VALIDATION** — implementation appears complete, but one or more important scenarios remain unproven.
+- **MOSTLY DONE** — implementation is substantially present but a known path still contradicts the target state.
+- **BLOCKER** — should be fixed before merge.
+- **VALIDATION GAP** — no known implementation defect yet, but risk is material enough to require explicit proof before merge.
+- **FOLLOW-UP** — useful hardening that may be post-merge only if the merge gate explicitly accepts the risk.
+
+# Executive assessment
+
+The branch is **substantially built**. The core revision/proposal/file/import architecture is coherent and considerably stronger than the size of the diff suggests. This is not a branch that needs a broad redesign.
+
+Current merge readiness is blocked primarily by:
+
+1. **Migration-history/reversibility hygiene** — completion migrations are interleaved before migrations already present on current `main`, making rollback to the current-main migration target unsafe.
+2. **One obsolete detail-page line-plot mutation path** — Cave detail still exposes direct GeoJSON/line-plot publication even though the target architecture requires Cave-owned mutation to occur through the aggregate editor.
+3. **Destructive/recovery behavior still needs explicit validation** — especially Reset Account after relational commit when external storage cleanup fails, and the fact that reset deletes the account blob container containing server-side archives.
+
+The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, and revision/proposal publication. The remaining high-value risks are mostly **outside** the core publication machinery: migrations, destructive admin workflows, real object-storage behavior, browser integration, hidden-field round trips, and mixed-version deployment safety.
+
+## Reviewed scope size
+
+The reviewed three-dot diff contained approximately:
+
+- 82 Cave production files;
+- 22 import files;
+- 17 File-domain files;
+- 23 account-domain files;
+- 23 migration-related files;
+- 117 frontend files;
+- 25 development/tooling files;
+- 9 documentation files.
+
+Changed test areas included approximately:
+
+- 41 Cave revision/proposal files;
+- 25 import files;
+- 34 integration-test infrastructure files;
+- 38 frontend test files;
+- 11 account/admin test files;
+- 2 migration-test files.
+
+These counts explain why the review treated this as a shared-system change rather than only a Cave UI feature.
+
+# 1. Feature implementation status
+
+| Area | Status | Evidence / remaining work |
+| --- | --- | --- |
+| Cave revision entity/model and legacy baseline creation | **DONE + VALIDATED** | Real PostgreSQL integration coverage; baseline creation and revision query paths reviewed. |
+| Direct manager edit optimistic concurrency | **DONE + VALIDATED** | Existing Cave edits require client-loaded `ExpectedRevisionId`; stale edits conflict instead of silently overwriting. Add explicit missing-ID regression if not already present as noted below. |
+| Semantic no-op suppression | **DONE + VALIDATED** | Snapshot comparison avoids published revisions/proposal versions for semantically unchanged aggregate state. |
+| Revision history query + diff UI | **DONE + VALIDATED** | Unit/frontend coverage exists for nested diffs, line-plot presentation, historical labels, false/zero preservation, etc. |
+| Suggest Cave Changes flow | **DONE + VALIDATED** | Immutable proposal-version architecture and authoring flow have broad integration/frontend coverage. |
+| Review / approve / reject / request-changes / resubmit | **DONE + VALIDATED** | Includes stale base/proposal concurrency, review-event history, rejection/no-publication behavior, and `xmin` race coverage. |
+| Proposal version immutability | **DONE + VALIDATED** | Proposal versions freeze exact proposed state including assets; later mutable state does not redefine older proposal meaning. |
+| File authoring in aggregate Cave editor | **DONE + VALIDATED** | Stage/add/edit/remove flows and unsaved-change behavior have frontend/integration coverage. |
+| Upload-once staged File lifecycle | **DONE + VALIDATED** | New content is written once; publication associates the existing object rather than copying to a new published key. |
+| Historical removed-file retention | **DONE + VALIDATED** | `RetainedCaveFileObject` preserves private object locator while live `File` row can be removed. |
+| Provider-neutral object storage abstraction | **DONE, PARTIAL VALIDATION** | Application logic uses `IObjectStorage` for the affected lifecycle. Service behavior is heavily tested with a fake. The production `AzureBlobObjectStorage` adapter itself does not yet have a real Azurite contract test. |
+| Line-plot aggregate authoring | **MOSTLY DONE** | New `CaveLinePlotAuthoringEditor` has the correct stable-ID model. Obsolete Cave-detail `CaveSpatialDataImport` / `GeoJsonSaveModal` direct mutation remains and must be removed. |
+| Line plots in revision/proposal semantics | **DONE + VALIDATED** | Stable IDs, normalized content hash, metadata diffs, proposal exact GeoJSON payloads, deterministic snapshot behavior covered. |
+| Cave hard deletion / proposal blocking / retained-object cleanup | **DONE + VALIDATED** | Core Cave deletion and staged/retained asset behavior has dedicated integration coverage. |
+| Bulk Cave/Entrance import rewrite | **DONE + VALIDATED** | Immutable plan/execute flow, preview/commit equivalence, dry run, rollback, tenant adversarial behavior, golden compatibility, and supported-scale test passed. |
+| Import performance architecture | **DONE + VALIDATED** | 10,000-Cave/Entrance workload passed; set-oriented/bounded architecture reviewed. |
+| Tenant isolation | **DONE + VALIDATED** | Fail-closed workflow filters, explicit account qualification when bypassing filters, adversarial foreign-account tests. |
+| Tag/County administration revision interaction | **DONE + VALIDATED** | Rename/merge/concurrency/lock-order and tenant isolation coverage exists. |
+| Account settings atomicity / state constraints | **DONE + VALIDATED** | Integration tests prove atomic settings/state update and rollback on invalid state removal. |
+| File Name + Extension model | **DONE, PARTIAL VALIDATION** | Forward migration from current-main-v32 with representative data was manually proven. Migration ordering/rollback issue remains a blocker. |
+| File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
+| App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
+| Global `SaveChangesInterceptor` batching refactor | **DONE, PARTIAL VALIDATION** | Command-count tests prove bounded lookups; broader entity-family operation/tenant matrix is still recommended because blast radius is repository-wide. |
+| Account Reset rewrite | **DONE, PARTIAL VALIDATION** | Relational purge-before-external-delete ordering is tested. Failure after relational commit and whole-container deletion semantics still need explicit validation/product decision. |
+| Account archive projection compatibility | **DONE, PARTIAL VALIDATION** | Focused projection tests exist. Full `.tar.gz` generation/content/cancellation/pruning/restore semantics are under-tested. |
+| Unsaved-change guard | **DONE + VALIDATED** | Edit/Suggest/Revise tests cover blocked navigation, keep-editing, discard, asset-only dirty state, and `beforeunload`. |
+| Detail-page read-only Cave-owned state | **NOT COMPLETE** | File direct mutation removed, but GeoJSON/line-plot publication path remains on detail page. |
+| Durable completion docs / final acceptance checklist | **NOT COMPLETE** | README still says active pre-merge; validation checklist remains largely unchecked; durable docs should be refreshed after fixes. |
+
+# 2. Architecture and code-quality assessment
+
+## Architecture strengths
+
+The strongest architectural result is the central **published Cave aggregate mutation boundary**.
+
+`CaveMutationRepository` / `CaveMutationCoordinator` now provide a coherent model:
+
+- outer workflow owns or joins a relational transaction deliberately;
+- existing Cave mutation captures the expected revision and live-before state;
+- concurrent/stale current-revision changes are detected;
+- the resulting aggregate snapshot is built after mutation;
+- semantic no-ops do not create history noise;
+- publication writes the revision and advances the current pointer atomically;
+- delete publication uses a tombstone snapshot captured before removal;
+- tenant scope remains explicit even on deliberate `IgnoreQueryFilters()` paths.
+
+The split between interactive publication and `CaveBulkRevisionRepository` is appropriate rather than accidental duplication. Interactive workflows need per-aggregate concurrency semantics; imports need set-oriented/batched behavior at supported scale.
+
+The proposal architecture is also strong:
+
+- proposal versions are immutable;
+- each version is authored against an exact base revision;
+- exact File intent and line-plot GeoJSON are frozen in the proposal version;
+- approval reconstructs/publishes that immutable version;
+- stale published-base and stale active-proposal conflicts are explicit;
+- review events preserve workflow history;
+- new logical line-plot IDs are allocated at a stable point in the proposal lifecycle.
+
+File architecture is similarly coherent:
+
+- provider-neutral object-storage boundary;
+- upload once for authoring content;
+- relational publication associates the existing File/object;
+- ordinary historical removal retains private object coordinates separately from the live File row;
+- external delete occurs after relational durability where atomic cross-system transactions are impossible.
+
+Snapshot design is intentionally user/logical-state oriented:
+
+- public revision snapshots do not expose storage partition/key;
+- line plots store stable ID/name/content fingerprint rather than raw GeoJSON;
+- shared reference metadata is not used as a revision fan-out trigger;
+- batch snapshot projection remains bounded rather than N+1.
+
+## Architecture weaknesses / leaks still present
+
+1. **Cave detail line-plot importer is an obsolete mutation boundary.** It technically routes through revision-aware Cave update now, but conceptually remains a second aggregate publisher and can replace the complete line-plot collection from the detail page.
+2. **Migration chronology contradicts the branch relationship.** Application code says “completion extends current main”; migration timestamps currently insert completion migrations into already-published main history.
+3. **Reset Account spans relational and external durability with incomplete user-visible failure semantics.** The ordering is correct for database integrity, but a post-commit storage failure can currently surface as a generic operation failure even though the irreversible relational reset already happened.
+4. The global `SaveChangesInterceptor` is high-blast-radius infrastructure. The batching refactor looks sensible, but deserves broader compatibility proof outside the Cave-centric scenarios that naturally exercise it.
+
+## Code quality
+
+Backend code quality is generally **high**:
+
+- persistence ownership is mostly kept in repositories;
+- coordinator/services remain relatively thin around persistence boundaries;
+- immutable records are used for plans/snapshots/proposals;
+- concurrency and transaction ownership are explicit;
+- bulk work is batched;
+- cancellation is propagated through serious database work;
+- unusual behavior is generally commented with intent;
+- no broad generic CRUD/unit-of-work abstraction was introduced.
+
+Frontend code quality is **good new code inside an older/noisier frontend**:
+
+- authoring components are reasonably decomposed;
+- mapping/diff helpers are separated;
+- revision/proposal pages are not a single monolith;
+- production build succeeds;
+- there is still inherited lint/hook/API debt and a few changed-file warnings, but no systemic new frontend architecture problem was found.
+
+A large service such as `CaveChangeRequestService` may eventually benefit from workflow-oriented splitting, but a pre-merge broad refactor would add more risk than value. Treat that as post-merge maintainability work unless a concrete bug requires it.
+
+# 3. Test-quality / test-theatre assessment
+
+Overall test theatre is **low**.
+
+The strongest tests use real PostgreSQL/PostGIS and assert durable postconditions rather than merely mocked call order. The suite exercises:
+
+- real EF migrations and constraints;
+- transaction rollback after late injected failure;
+- multiple `DbContext` instances for concurrency;
+- `xmin`/revision races;
+- tenant boundary attacks;
+- immutable proposal publication;
+- file retention/deletion semantics;
+- dry-run persistence guarantees;
+- preview/commit equivalence;
+- large set-oriented imports.
+
+Static review found:
+
+- no changed tests intentionally skipped;
+- no `.only`/equivalent focus left behind;
+- no changed test files that contain tests but no obvious assertions;
+- no conflict markers or material TODO/FIXME/HACK residue in changed human-authored files.
+
+## Known weaker/theatrical pockets
+
+- `GeoJsonSaveModal.test.ts` is a wiring-oriented test that effectively proves “load authoring context → call UpdateCave”. It currently helps preserve the **wrong obsolete detail-page behavior** rather than the desired user-visible boundary. Replace it with a regression that the detail page cannot publish line plots directly.
+- The v29 migration compatibility test is now explicitly historical. It remains useful regression evidence, but exact current-main coverage is still absent until VAL-001's migration chronology is repaired and the current-main-v32 regression is added.
+- Frontend unit/component tests cannot prove real-browser behaviors such as cookies/CORS/preflight, PDF.js range traffic, CSP, hard refresh routing, or browser unload behavior end to end.
+
+The principal test risk is therefore **stale assumptions or wrong abstraction level**, not fake assertions.
+
+# 4. Validation already completed
+
+The following evidence was collected against completion HEAD `33ace6e7afb099751de0f9df977a92c5beb9aa9a` and current `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2`.
+
+## Git / static checks
+
+- `git diff --check main...feature/cave-revisions-completion` — **PASS**.
+- Merge base equals current reviewed `main`.
+- Branch was 156 commits ahead / 0 behind current reviewed `main`.
+- Local completion branch was also **21 commits ahead of `origin/feature/cave-revisions-completion`** at final ledger verification; the remote branch was stale relative to this worktree.
+- Human-authored changed-file review found no conflict markers.
+- No changed test skips/focus markers found.
+- Static scan found no material TODO/FIXME/HACK/NotImplemented residue requiring a finding.
+- Completion branch working tree was clean immediately before this ledger was added.
+
+## Backend
+
+- `dotnet restore Planarian/Planarian.sln` — **PASS**.
+- `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` — **PASS**, observed with 0 warnings / 0 errors.
+- Backend unit suite — **406 passed, 0 failed, 0 skipped**.
+- PostgreSQL/PostGIS integration suite — **322 passed, 0 failed, 0 skipped**.
+- The integration run included real Testcontainers PostgreSQL/PostGIS and the 10,000-Cave/Entrance scale workload.
+
+One disposable git-archive unit run initially failed only three tests that discover repository root from `.git`; initializing a disposable `.git` in the export resolved that environment artifact and the complete unit suite passed.
+
+## Frontend
+
+- `npm ci` — **PASS**.
+- Frontend test suite — **71 suites passed, 326 tests passed, 0 snapshots**.
+- Client-route generator tests — **6/6 passed**.
+- CSP configuration tests — **5/5 passed**.
+- `npm run build` — **PASS** with existing lint warnings.
+- Changed Cave files still have some lint warnings such as missing hook dependencies / older equality style; none was demonstrated as a completion regression during review.
+
+## EF/model
+
+Using the migrations project as both target and startup project:
+
+```bash
+dotnet tool run dotnet-ef migrations has-pending-model-changes \
+  --project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+  --startup-project Planarian/Planarian.Migrations/Planarian.Migrations.csproj \
+  --context PlanarianDbContext \
+  --configuration Release
+```
+
+Result: **No changes have been made to the model since the last migration.**
+
+The application project as startup project did not load `Microsoft.EntityFrameworkCore.Design`; the command above is the verified form and should be the documented command.
+
+## Development infrastructure
+
+- `docker compose config -q` — **PASS**.
+- Shell syntax validation on the reviewed dev/scripts — **PASS**.
+- Docker/Azurite/Postgres configuration reviewed; committed storage/database credentials are local emulator/development defaults, not production secrets.
+
+## Dependency audit observation
+
+A production dependency audit did not show the completion branch making the inherited advisory picture worse overall. This was informational, not treated as a feature acceptance gate.
+
+Reviewed totals:
+
+- current reviewed `main`: 96 advisories — 13 low, 40 moderate, 37 high, 6 critical;
+- completion: 94 advisories — 12 low, 42 moderate, 34 high, 6 critical.
+
+Direct vulnerable packages were materially the same: `axios`, `csv-parse`, `dompurify`, `maplibre-gl`, `react-router-dom`, `react-scripts`, and `uuid`; completion's upgraded `react-router-dom` reduced that direct advisory from high to moderate. The six critical advisories were inherited rather than introduced by this branch.
+
+## Informational EF model warning to keep on the radar
+
+The EF pending-model command emitted relationship warnings because `Cave` has a global query filter while it is the required end of several relationships (for example tag/Entrance/GeoJSON relationships). No completion-specific failure was demonstrated and this was not promoted to a blocker during review. Treat it as architectural debt worth revisiting separately, especially if future changes rely on required navigations plus filtered principals.
+
+# 5. Migration evidence and blocker
+
+## VAL-001 — BLOCKER — migration history is interleaved with current main
+
+Completion-only migrations include timestamps that sort before migrations already present on current `main`, including completion migrations dated around v30/v31/v32 history.
+
+Current reviewed main already includes:
+
+- `20260814140909_v30`
+- `20260815204141_v31`
+- `20260831132210_v32`
+
+Completion has additional migrations that sort before/between those, and it modifies the already-existing v32 migration so that it can run after the completion branch's earlier File rename migration.
+
+### Forward upgrade evidence
+
+A disposable database was built to the **exact current-main v32 schema**, then upgraded using the completion migration assembly.
+
+Result: **PASS**.
+
+The experiment was repeated with representative existing data:
+
+- Cave name / CountyNumber survived;
+- Entrance name / longitude survived;
+- legacy File display name migrated to `Name` + `Extension`;
+- temporary File data survived the migration shape.
+
+Result: **exact current-main-v32 with data → completion PASS**.
+
+### Rollback evidence
+
+A database was upgraded current-main-v32 → completion, then EF was asked to update back to migration target `20260831132210_v32` using the completion migration assembly.
+
+Result: **unsafe rollback semantics**.
+
+Only the migration that sorts after v32 was reverted. Completion migrations whose timestamps sort before v32 remained applied. The database still contained completion schema such as:
+
+- File `Name` / `Extension` shape;
+- `CaveRevisions` table;
+- completion migration IDs in history.
+
+Therefore “rollback to v32” does **not** restore the actual schema represented by current main v32. Redeploying current main after such a rollback can produce a model/schema mismatch.
+
+### Required fix
+
+Before merge, unless those completion-only migration IDs have already been intentionally applied to a shared environment:
+
+- restore the current-main v32 migration file to exactly the `main` version;
+- reissue/re-scaffold completion-only migrations **after** current main v32;
+- preserve intentional SQL/data backfills;
+- add an exact-current-main-v32-with-data upgrade regression;
+- add an explicit completion → current-main-v32 rollback/reversibility regression or equivalent deployment-policy test.
+
+If the completion-only migration IDs are already used in a shared environment, do not casually rename/remove them; design a transition plan instead.
+
+# 6. Remaining implementation defect
+
+## VAL-002 — BLOCKER — Cave detail still publishes line plots
+
+`CaveComponent.tsx` still renders `CaveSpatialDataImport` for users with edit permission.
+
+That flow:
+
+- accepts a ZIP/shapefile;
+- parses it client-side;
+- opens `GeoJsonSaveModal`;
+- loads edit authoring context;
+- maps a Cave form containing the imported line plots;
+- calls `CaveService.UpdateCave`.
+
+The modal explicitly describes replacement behavior, and imported line plots do not carry existing stable logical IDs. The path can therefore replace the aggregate line-plot collection from the Cave detail page.
+
+This contradicts the target architecture:
+
+- Cave detail should be read-only for Cave-owned mutable state;
+- line-plot mutation should occur through `CaveLinePlotAuthoringEditor`;
+- there should be one supported aggregate mutation surface.
+
+### Required fix
+
+- remove `CaveSpatialDataImport` from the Cave detail page;
+- remove the obsolete `GeoJsonSaveModal` publication path if no longer used;
+- remove/replace the wiring test that codifies this obsolete behavior;
+- add a user-visible regression that Cave detail exposes no direct line-plot publication control;
+- keep current line-plot viewing/rendering intact.
+
+# 7. Validation/documentation drift
+
+## VAL-003 — RESOLVED — historical migration coverage is truthfully scoped
+
+The v29 migration test is now explicitly frozen as historical compatibility evidence:
+
+- `HistoricalV29BaselineMigration = "20260423021136_v29"`;
+- `V29HistoricalBaselineUpgradesWithoutCorruptingExistingTenantData`.
+
+It no longer claims to represent current `main`. Exact current-main-v32 upgrade and rollback coverage remains required by
+VAL-001 after migration chronology is repaired; that is a migration/deployment blocker, not a documentation-status claim.
+The pending-model command and durable validation documentation now use the verified migrations-project startup form.
+
+
+# 8. Destructive and data-loss risk review
+
+The core publication tests are strong. Remaining safety work should focus on operations where failure may leave a durable result that differs from what the user thinks happened.
+
+## RISK-004 — Reset Account can complete relationally and then report a storage failure
+
+Completion correctly changes Reset Account so the PostgreSQL purge commits before external storage cleanup.
+
+Current sequence:
+
+1. `Repository.ExecuteResetAsync()` performs and commits the relational reset.
+2. provider-neutral File objects are cleaned up best-effort.
+3. the legacy account storage container is removed.
+
+This ordering protects database integrity, but it creates an important partial-success state: if the final storage operation fails after step 1, the API can fail even though the irreversible relational reset has already succeeded.
+
+The integration fake already exposes a container-cleanup failure switch, but the existing reset test does not exercise this state.
+
+Required validation:
+
+- inject the storage failure after relational commit;
+- prove the relational reset is committed exactly once;
+- prove retry is safe;
+- prove another account is untouched;
+- define truthful API/user-visible semantics for “reset completed, external cleanup incomplete”.
+
+## RISK-005 — Reset also removes server-side account archives
+
+`ArchiveJobCoordinator` writes account archives into `RequestUser.AccountContainerName` under `archives/...`.
+
+`ResetAccount()` removes that account container. A previously generated Recent Archive therefore disappears during reset.
+
+This whole-container behavior also exists on reviewed `main`; completion did not introduce the underlying behavior. Because completion substantially rewrites reset/storage lifecycle logic, this is the right point to make the contract explicit.
+
+Required decision:
+
+- if archives are intentionally part of reset, make that explicit in UX/docs and test it;
+- if archives are intended as recovery artifacts, move them to a separate retention boundary or stop removing the entire container.
+
+Trip-photo storage was traced separately. Trip photos use `BlobService` and paths such as `projects/{projectId}/trips/{tripId}/photos/{photoId}` in its configured container. No evidence was found that the Reset Account container operation targets that BlobService container. Do not claim Trip photos are affected without new evidence.
+
+# 9. High-value validation still missing
+
+These items focus on unexpected data loss, unrelated regressions, recovery, and production/browser behavior rather than adding redundant Cave-publication tests.
+
+## GAP-001 — Full current-main database preservation census
+
+**Priority: P0 before merge**
+
+Build the exact current-main schema and seed representative data across unrelated subsystems, including where practical:
+
+- users/authentication state;
+- account membership and permissions;
+- account settings and states;
+- counties and TagTypes;
+- favorites;
+- Caves and Entrances;
+- Cave/Entrance tag relationships;
+- Files and line plots;
+- Projects / Trips / Photo metadata;
+- message/email metadata;
+- other durable current-main tables not intentionally transformed.
+
+Capture deterministic row counts and canonical projections/hashes before migration. Upgrade to completion and assert that intentional transformations match their contract while unrelated durable data is unchanged.
+
+Ideal additional predeployment validation: restore a sanitized real-world database copy into an isolated disposable PostgreSQL instance, apply completion migrations, and run the same invariant checker. This must never imply permission to inspect or modify a shared/live application database.
+
+## GAP-002 — Exact rollback/deployment safety
+
+**Priority: P0 before merge**
+
+After repairing migration chronology, prove:
+
+- current-main schema/data to completion succeeds;
+- completion to the supported prior target behaves exactly as deployment policy requires;
+- a current-main binary is never paired with a completion-only schema while being described as rolled back to main.
+
+If production policy is intentionally forward-only, document and test that policy instead of relying on misleading migration ordering.
+
+## GAP-003 — Kitchen-sink Reset Account test
+
+**Priority: P0 before merge**
+
+Create a realistic account containing as many dependent types as practical: Caves, Entrances, tag relationships, Files, retained historical objects, line plots, Favorites, permissions, revisions, change requests, proposal versions, review events, staged Files, Counties, custom TagTypes, AccountStates, temporary Files, and archives according to the chosen product contract.
+
+Create a second account with equivalent “must remain untouched” data.
+
+Run Reset and prove both directions:
+
+- everything that should be removed is gone;
+- everything that should survive is unchanged;
+- the second account is equivalent before and after;
+- no dependent/orphaned rows remain;
+- invoking Reset again on the already-reset state is safe.
+
+Make this a reusable destructive-operation fixture so new tables cannot silently fall outside the reset graph.
+
+## GAP-004 — External-cleanup fault injection
+
+**Priority: P0/P1**
+
+For workflows that intentionally commit PostgreSQL before external cleanup, inject provider failures and define the durable result:
+
+- Reset Account;
+- hard Cave removal;
+- historical/retained File cleanup;
+- expired staged-file cleanup;
+- proposal cleanup where applicable;
+- archive pruning/partial archive cleanup.
+
+Tests should prove relational truth is not falsified by a later storage failure and that cleanup debt is safe/retryable.
+
+## GAP-005 — Production AzureBlobObjectStorage contract against Azurite
+
+**Priority: P1**
+
+Business-level File tests appropriately use `TestFileBlobStore : IObjectStorage`, but no direct production-adapter tests were found.
+
+The repository Docker environment already includes Azurite. Add a storage contract suite against real `AzureBlobObjectStorage` + Azurite covering:
+
+- Put then OpenRead returns identical bytes;
+- content type survives;
+- ETag / last-modified are populated consistently;
+- missing object returns the expected null/not-found semantics;
+- remove existing object;
+- remove missing object;
+- concurrent first-use container creation;
+- normalized partition/container behavior;
+- object disappears between property lookup and stream opening;
+- cancellation behavior where meaningful.
+
+Also make the intended immutable-address assumption explicit. Either prove the application never reuses an immutable object key or make provider behavior reject accidental overwrite. Do not rely only on generated-ID improbability as protection against silent replacement.
+
+## GAP-006 — Global SaveChangesInterceptor compatibility matrix
+
+**Priority: P1**
+
+The interceptor/batch ownership loader is repository-wide infrastructure. Existing command-count tests prove important performance properties but not the complete behavioral matrix.
+
+Add parameterized/integration coverage across each entity family the interceptor explicitly validates:
+
+- Added in same account → allowed;
+- Modified in same account → allowed;
+- Removed in same account → allowed;
+- foreign-account Added/Modified/Removed → forbidden;
+- failed attempt leaves both tenants unchanged;
+- global/default entities retain intended special rules;
+- registration/password-reset/invitation-cleanup exceptions remain narrow and intentional.
+
+Particularly cover Cave/Entrance association entities whose ownership is now populated by reflection and batched FK lookup.
+
+## GAP-007 — Small real-browser smoke suite
+
+**Priority: P1**
+
+No Playwright/Cypress-style browser suite was found in the reviewed completion branch.
+
+Do not create hundreds of browser tests. Add a small set of high-value scenarios, ideally Chromium plus WebKit for the most important paths:
+
+- authenticated bootstrap using real cookie behavior;
+- frontend/API CORS and preflight;
+- account switching;
+- hard refresh on nested routes;
+- browser back/forward around editor/proposal routes;
+- unsaved-change browser navigation/unload behavior;
+- authenticated File view/download;
+- object-URL/download behavior where relevant;
+- CSP does not block required application workers/assets;
+- stale direct-edit conflict UX.
+
+### PDF smoke scenario
+
+The branch changed PDF streaming so PDF.js sends `X-Planarian-File-Stream-Session` rather than a query parameter.
+
+Prove end to end:
+
+**PDF.js → real browser → custom header → preflight/CORS if applicable → authenticated API → HTTP Range requests → PDF renders successfully.**
+
+Unit tests already prove frontend request-option construction and backend throttling separately. This browser test proves their integration.
+
+## GAP-008 — Mixed-version / stale-SPA deployment safety
+
+**Priority: P1**
+
+A user can keep an older SPA tab open while a new backend deploys.
+
+The backend currently appears to do the safe thing for existing Cave edits: missing `ExpectedRevisionId` is rejected.
+
+Add an explicit regression:
+
+- send an old-client-shaped existing-Cave update without `ExpectedRevisionId`;
+- expect controlled 400;
+- assert Cave state, current revision, Files, line plots, and revision count remain unchanged.
+
+Keep this invariant so a future compatibility change cannot silently restore last-write-wins behavior.
+
+## GAP-009 — Ordinary read paths have no unintended writes
+
+**Priority: P1**
+
+Authoring context intentionally may materialize a baseline for a legacy Cave. Ordinary reads should not.
+
+Create a read-only contract test that fingerprints relevant database state, performs representative reads, and compares afterward:
+
+- Cave detail;
+- Cave list/search/advanced search;
+- map/current line-plot retrieval;
+- File view/download metadata path;
+- revision/history read;
+- other major ordinary GET flows touched by this branch.
+
+Assert no timestamps, revision pointers, workflow rows, File rows, tag rows, or other durable state change.
+
+Separately prove authoring-context baseline behavior:
+
+- visibility/permission boundary is checked before baseline creation;
+- exactly one baseline is created when needed;
+- repeated authoring-context reads are idempotent;
+- guessed/inaccessible Cave IDs cannot create baseline side effects.
+
+## GAP-010 — Full archive generation/content validation
+
+**Priority: P1**
+
+Current archive tests mostly validate projections rather than a complete generated archive.
+
+Add a test that calls `ExportService.WriteArchive()`, opens the resulting `.tar.gz`, and validates actual contents using difficult data:
+
+- Unicode Cave/file names;
+- filenames with multiple dots;
+- path/name collision candidates;
+- multiple Caves;
+- line plots;
+- zero-byte file;
+- missing blob;
+- ordinary binary/text/PDF files;
+- enough Entrances/tags to exercise projections.
+
+Validate:
+
+- `caves.csv` and `entrances.csv` parse and match expected current state;
+- expected file entries are byte-identical;
+- missing-file manifest is correct;
+- current line plots are represented as intended;
+- staged/historical payload is not exported unless explicitly part of the contract;
+- archive paths cannot escape the archive root.
+
+Also test `ArchiveJobCoordinator`:
+
+- cancellation cleans temporary archive;
+- failure leaves no published corrupt archive;
+- pruning retains the correct five;
+- current/newest archive cannot be pruned accidentally;
+- Account A cannot list/remove/download Account B archives;
+- interrupted/stale temporary archive behavior is defined.
+
+## GAP-011 — Define archive vs backup semantics
+
+**Priority: P1 product/architecture decision**
+
+The account Archive appears to represent current Cave state rather than the complete revision/proposal/audit universe.
+
+Decide and document:
+
+- Is Archive a **current-state export**?
+- Or is it intended as a **complete disaster-recovery backup**?
+
+If it is a current-state export, tests should explicitly prevent accidental inclusion of internal/staged/historical payloads.
+
+If it is a backup, the implementation/spec is incomplete because revision/proposal/history/retained-object semantics need inclusion and a restore contract.
+
+Do not let user-facing language imply “backup” if the artifact cannot reconstruct all data reasonably expected from a backup.
+
+## GAP-012 — Hidden/disabled feature fields preserve existing data
+
+**Priority: P1**
+
+Revisioning does not prevent this class of silent loss: the UI can submit an aggregate that accidentally blanked data it did not display.
+
+Scenario:
+
+1. Cave contains a value in feature-controlled field X.
+2. Account disables X so the editor hides it.
+3. Manager changes unrelated visible field Y.
+4. Save.
+5. X must remain unchanged.
+
+Add round-trip tests across relevant feature-controlled Cave and Entrance fields/collections. Test direct edit and proposal authoring if their mapping paths differ.
+
+## GAP-013 — Account switching and frontend cache isolation
+
+**Priority: P1/P2**
+
+Server-side tenant isolation is strong, but client caches can still show or submit stale account-specific reference/settings data.
+
+Feature settings are keyed by account in the reviewed `AccountService`, which is good. Extend validation to the complete switch workflow:
+
+- start in Account A;
+- load feature settings/tags/counties/Cave authoring data;
+- switch to Account B without a full reload;
+- ensure Account A options/IDs are not actionable in Account B;
+- switch back and verify correct reuse/invalidation;
+- submissions after the switch always carry the current account context.
+
+A real-browser test is preferable because context/provider/cache lifetime matters.
+
+## GAP-014 — Abandoned authoring/staging lifecycle
+
+**Priority: P1/P2**
+
+Unpublished authoring Files expire after 10 days and cleanup currently runs opportunistically during later staging/temp uploads. Proposal-linked staged Files are deliberately protected from ordinary expiration cleanup.
+
+Add lifecycle tests for:
+
+- upload → close tab / never submit → eventually expires and is cleaned up;
+- DB row cleanup followed by storage-provider failure leaves safe/retryable cleanup debt;
+- proposal-linked staged File is not prematurely collected;
+- rejected/resolved request cleanup follows the chosen retention policy;
+- a published File has `ExpiresOn = null` and cannot be collected by staging cleanup;
+- stale authoring rows are eventually collected even if that same user never uploads again, or explicitly document that cleanup is only opportunistic.
+
+The final point may require an operations/product decision: opportunistic cleanup alone can leave stale storage indefinitely for inactive accounts.
+
+## GAP-015 — File/object retry and race semantics
+
+**Priority: P2 unless strict object immutability is chosen**
+
+Make cross-system retry assumptions explicit for:
+
+- repeated finalize/publish;
+- simultaneous remove and publish;
+- two requests attempting to attach the same staged File;
+- retry after client timeout;
+- duplicate HTTP submissions.
+
+Existing proposal/File concurrency coverage is strong, but object-store idempotency assumptions deserve an explicit contract.
+
+## GAP-016 — Map/detail read compatibility after old GeoJSON mutation is removed
+
+**Priority: P0 with VAL-002**
+
+When removing the old detail-page importer, prove that only mutation disappears:
+
+- existing line plots still display on Cave detail/map;
+- map retrieval still returns current `CaveGeoJson`;
+- view/download behavior remains available;
+- aggregate editor can still import/add/rename/replace/remove line plots.
+
+# 10. Existing coverage that should not be duplicated unnecessarily
+
+Do not spend pre-merge time multiplying variations of scenarios that already have strong evidence unless a fix changes their contract:
+
+- stale direct revision conflicts;
+- proposal base/proposal-version conflicts;
+- proposal approval concurrency;
+- semantic no-op revision suppression;
+- immutable proposal versions;
+- exact proposal File/line-plot intent;
+- File-only/line-plot-only proposal validity;
+- rejection creates no revision;
+- tenant filters on revision/proposal workflow tables;
+- cross-account staged File rejection;
+- import dry-run persistence;
+- import preview/commit equivalence;
+- late import rollback;
+- 10k import scale;
+- retained historical File semantics;
+- File publication clearing expiration;
+- staged File object availability checks;
+- change-request review history;
+- unsaved-change page navigation behaviors;
+- PlanarianAdmin/account-admin permission separation and default-account capability resolution.
+
+The branch already has meaningful evidence in these areas. Prefer tests that expand the risk surface instead of inflating counts.
+
+The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTests.cs` file is removed on completion, but equivalent/newer PDF throttling coverage exists in `Planarian.Tests.Unit/Authentication/RequestThrottleServiceTests.cs`, `FileResponseSecurityTests.cs`, and `FileResultResponseTests.cs`. The removal was therefore not treated as lost coverage.
+
+# 11. Required pre-merge work order
+
+## P0 — Must resolve before merge
+
+- [ ] **VAL-001:** repair migration chronology so completion cleanly extends current-main migration history.
+- [ ] Restore the current-main v32 migration file to the exact main version if safe.
+- [ ] Reissue completion-only migrations after current main v32 while preserving intentional data/backfill SQL.
+- [ ] Add exact-current-main-v32-with-data automated upgrade coverage.
+- [ ] Add rollback/deployment-policy regression after the migration fix.
+- [ ] **VAL-002:** remove Cave-detail `CaveSpatialDataImport` / obsolete line-plot publication.
+- [ ] Remove/replace the `GeoJsonSaveModal` test that codifies the obsolete mutation surface.
+- [ ] Prove current line-plot viewing/map retrieval still works after removal.
+- [ ] Add kitchen-sink destructive Reset Account test.
+- [ ] Add Reset Account post-commit external-storage failure test.
+- [ ] Decide, document, and test whether reset intentionally removes stored account archives.
+- [x] Freeze/rename the v29 migration test so it is explicitly historical rather than “exact main”.
+- [ ] Update durable completion docs/checklists after implementation truth is final.
+
+## P1 — Strongly recommended before merge because failures can be silent or cross-cutting
+
+- [ ] Full current-main database preservation census.
+- [ ] Azurite contract tests for production `AzureBlobObjectStorage`.
+- [ ] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
+- [ ] Small real-browser smoke suite, including WebKit for critical workflows.
+- [ ] Real-browser PDF.js custom-header/range/authentication test.
+- [ ] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
+- [ ] Read-only GET/no-side-effect contract plus intentional authoring-baseline idempotency.
+- [ ] End-to-end archive `.tar.gz` generation/content validation.
+- [ ] Archive cancellation/failure/pruning/account-isolation tests.
+- [ ] Explicit archive-vs-backup product contract.
+- [ ] Hidden/disabled feature-field preservation tests.
+- [ ] Account-switch/client-cache isolation validation.
+
+## P2 — Hardening that can be consciously deferred if documented
+
+- [ ] Abandoned staging cleanup lifecycle / inactive-account orphan strategy.
+- [ ] Object-store retry/race/idempotency hardening.
+- [ ] Clean changed-file frontend lint warnings where low risk.
+- [ ] Consider post-merge workflow-oriented split of very large services only if it materially improves maintenance.
+- [ ] Broader browser coverage after the small critical smoke suite is established.
+
+# 12. Recommended final validation sequence after fixes
+
+After P0 implementation is complete:
+
+1. Run narrow tests for each changed blocker/fix while developing.
+2. Run all changed Cave revision unit tests.
+3. Run all changed direct-edit/File/line-plot/proposal integration tests.
+4. Run new destructive/reset/storage/migration-preservation tests.
+5. Run changed frontend tests.
+6. Run real-browser smoke tests if added.
+7. Run `dotnet build Planarian/Planarian.sln --configuration Release --no-restore` because this branch reaches shared infrastructure beyond only the Cave graph.
+8. Run the frontend production build.
+9. Run EF pending-model validation with the verified migrations-project startup command.
+10. Run exact current-main upgrade and rollback/deployment-policy tests.
+11. Run the full PostgreSQL/PostGIS integration suite because shared migration/interceptor/reset/storage contracts justify it.
+12. Run the full frontend test suite.
+13. Run `docker compose config -q`.
+14. Run relevant shell/config validation.
+15. Run `git diff --check`.
+16. Perform a fresh adversarial review against `main` for:
+    - obsolete mutation bypasses;
+    - tenant-filter bypasses;
+    - direct `DbContext` ownership in services/workflow coordinators;
+    - stale-write paths;
+    - destructive/data-loss side effects;
+    - migration history;
+    - storage cleanup ordering;
+    - documentation that claims validation not actually performed.
+
+# 13. Final merge acceptance conditions
+
+Do not mark this branch merge-ready until every applicable item below is true or an explicit documented decision accepts the residual risk.
+
+## Migration/deployment safety
+
+- [ ] Completion migration history cleanly extends current main.
+- [ ] Current-main-with-representative-data upgrade is automated and green.
+- [ ] Full preservation census is green or consciously waived with rationale.
+- [ ] Rollback/forward-only deployment policy is truthful and tested.
+- [ ] EF pending-model check is green.
+
+## Mutation-boundary integrity
+
+- [ ] Cave detail cannot mutate Files or line plots.
+- [ ] Aggregate editor is the only normal interactive Cave-owned asset mutation surface.
+- [ ] Existing-Cave edit without expected revision fails safely.
+- [ ] Stale edits cannot silently overwrite.
+- [ ] No obsolete standalone GeoJSON publication endpoint/control remains.
+
+## Destructive-operation safety
+
+- [ ] Reset behavior is tested against a dense dependency graph.
+- [ ] Reset cannot affect another tenant.
+- [ ] Post-commit storage failure has truthful user/API semantics.
+- [ ] Fate of stored archives during reset is intentional and documented.
+- [ ] Hard-delete/external-cleanup failure semantics are safe/retryable.
+
+## Storage/File safety
+
+- [ ] Fake-storage business tests remain green.
+- [ ] Production object-storage adapter has at least one real Azurite contract suite.
+- [ ] Immutable object identity cannot be silently overwritten by a normal retry/path bug.
+- [ ] Staged/published/retained/expired File lifecycle remains mutually exclusive and proven.
+
+## Cross-cutting compatibility
+
+- [ ] Global save-interceptor matrix is green or equivalent evidence exists.
+- [ ] Hidden feature fields survive unrelated edits.
+- [ ] Account switching cannot reuse actionable foreign-account UI data.
+- [ ] Ordinary reads do not unexpectedly mutate durable state.
+- [ ] Archive current-state/backup semantics are explicit and tested.
+
+## Browser/runtime
+
+- [ ] Critical authenticated browser smoke test passes.
+- [ ] PDF viewer works through the real custom-header/range-request path.
+- [ ] Nested-route hard refresh works.
+- [ ] Stale-edit conflict UX works.
+- [ ] Unsaved-change browser behavior works.
+- [ ] Critical WebKit/Safari-equivalent smoke path passes if the browser harness supports it.
+
+## Documentation/reporting
+
+- [ ] `docs/cave-revisions.md` describes implemented truth.
+- [ ] completion plan README/checklist no longer claims an active incomplete state once actually complete.
+- [ ] this ledger is refreshed with final evidence.
+- [ ] exact test/build commands and results are recorded.
+- [ ] no validation is claimed merely because a related test exists.
+
+# 14. Important review limitations and boundaries
+
+The completed adversarial review was extensive but was not equivalent to manually clicking every UI screen.
+
+Specifically:
+
+- no live production/staging/development application database was inspected or modified;
+- disposable repository-owned PostgreSQL/PostGIS databases were used for integration/migration experiments;
+- no Azure production resources were modified;
+- real Azure Blob Storage behavior was not exercised; service tests used a fake object-storage boundary;
+- no real-browser end-to-end suite was run;
+- no full real account archive round-trip/restore was proven;
+- the migration preservation experiment used representative data rather than every current-main table;
+- dependency-audit results were informational and inherited vulnerabilities remain a separate security-maintenance concern.
+
+# 15. Notes for the next agent
+
+Start by reading this ledger and the authoritative completion-plan documents. Re-check branch HEAD and `main` before trusting the SHAs/counts recorded above.
+
+Do not begin with a broad refactor.
+
+Recommended implementation order:
+
+1. migration chronology;
+2. exact current-main migration tests;
+3. remove obsolete detail-page line-plot mutation;
+4. destructive Reset Account failure/semantics tests and any required behavior correction;
+5. add the highest-value cross-cutting validation from Section 9;
+6. refresh the completion status/checklists after the remaining implementation blockers are resolved;
+7. run the final validation sequence.
+
+When fixing migration history, first determine whether any completion-only migration IDs have been applied to a shared environment. If they have, do not treat migration renumbering/reissuing as a local-only operation; design an explicit transition.
+
+When working on Reset Account, do not assume the whole account container contains only current Cave Files. Current code also uses that container for account archives and import transport. Trace every producer/prefix before changing container cleanup behavior.
+
+When adding tests, prefer **state/invariant assertions** over mock-call assertions. A passing test should answer “what durable/user-visible safety property is guaranteed?” rather than only “which method was called?”
+
+# 16. Current overall verdict
+
+**CHANGES REQUIRED, but close.**
+
+The branch's core architecture is not the reason it is blocked. The revision/proposal/import/File-publication model is generally strong, and the existing integration suite contains unusually meaningful coverage.
+
+Remaining merge risk is concentrated in:
+
+- migration history and deployment reversibility;
+- one surviving duplicate line-plot mutation surface;
+- destructive/admin recovery semantics;
+- real storage-provider behavior;
+- broad shared-interceptor compatibility;
+- real-browser integration;
+- archive/backup expectations;
+- silent UI round-trip risks such as hidden fields and account switching.
+
+Resolve the P0 items, add the most important P1 safety tests, and then perform one fresh adversarial pass rather than assuming the previous green suite proves the corrected branch.

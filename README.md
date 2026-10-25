@@ -93,13 +93,13 @@ That gives them a useful starting point for finding caves that might have leads 
 - View cave entrances and line plots on the map
 - Use map layers like street, topo, satellite, lidar, public land, parcel boundaries, Macrostrat geology, NGMDB geology, hydrology, and watershed boundaries
 - Click anywhere on the map to get information about that point, including coordinates, elevation, geology, and nearby stream gages
-- The map stays fast even with tens of thousands of entrance points
+- Entrance points are delivered as viewport-scoped vector tiles rather than loading the full account dataset into the browser at once.
 
 ## Admin
 
 - Import cave and entrance CSVs with a dry run before changes are applied, then review inserts, updates, and deletes before processing
 - Manage county codes, tags, and other account-level settings
-- Create downloadable account archives and manage recent backups
+- Create downloadable account archives and manage recent archives
 
 ## Permissions
 
@@ -111,7 +111,7 @@ Planarian supports multiple survey accounts with separate permissions and settin
 
 - Admin: full access to the account and settings
 - Manager: can edit and manage the caves they control and review submitted changes
-- Viewer: can view data and suggest updates
+- View: can view data and suggest updates
 
 ### Permission Scope
 
@@ -128,12 +128,27 @@ Users can be invited by managers or admins through the app, accept or decline pe
 
 ## Developer Setup
 
+### Documentation map
+
+Use the focused document that owns the fact instead of copying volatile rules between guides:
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — start here for the system map, workflow diagrams, component catalog, and guided code tours.
+- [`docs/authorization.md`](docs/authorization.md) — platform, account, and Cave authorization boundaries.
+- [`docs/data-access-architecture.md`](docs/data-access-architecture.md) — durable backend dependency and persistence rules.
+- [`docs/cave-revisions.md`](docs/cave-revisions.md) — durable Cave revision/proposal architecture contract.
+- [`docs/import-compatibility.md`](docs/import-compatibility.md) — import compatibility invariants and approved differences.
+- [`docs/testing.md`](docs/testing.md) — backend test architecture and validation commands.
+- [`Contracts/README.md`](Contracts/README.md) — shared browser-route contract and generation workflow.
+- [`AGENTS.md`](AGENTS.md) — concise routing for coding agents; specialized command-like workflows are registered in [`PROJECT_PROTOCOLS.md`](PROJECT_PROTOCOLS.md).
+
+The Cave-revisions completion material under `docs/plans/` is an active target-state implementation plan, not the canonical source for unrelated repository behavior.
+
 - Frontend: React + TypeScript
 - Backend: C#
 - Database: PostgreSQL/PostGIS
 - File storage: Azure Blob Storage or a local storage emulator
 
-Planarian is not heavily dependent on Azure specifically. Most of the application can run anywhere that supports the backend, frontend, and PostgreSQL. The main Azure-specific piece right now is file storage, since files such as maps, articles, trip reports, and survey data are stored in blob storage. For local development, you can use a real Azure Blob Storage account or a local emulator like Azurite.
+The core application architecture is not tied to Azure hosting, but the current hosted configuration has Azure-specific dependencies: Azure Blob Storage is the production object-storage adapter, Azure App Configuration is required outside the Development environment, and the checked-in deployment workflows target Azure services. Local development can use Azurite for blob storage and local configuration instead of Azure App Configuration.
 
 ### Docker development
 

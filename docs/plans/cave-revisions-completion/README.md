@@ -1,8 +1,14 @@
 # Cave revisions completion implementation plan
 
-Status: **active pre-merge implementation plan** for `feature/cave-revisions-completion`.
+Status: **active pre-merge target-state plan** for `feature/cave-revisions-completion`.
 
-Baseline inspected while writing this plan: `565ba7383b954ce2c7797346000ed10f9e374e6a`.
+This directory is normative for the completion target and validation gates; it is **not** a live progress tracker.
+Current SHA-pinned implementation/validation status is recorded in
+[`../../../CAVE_REVISIONS_COMPLETION_STATUS.md`](../../../CAVE_REVISIONS_COMPLETION_STATUS.md). The status ledger may report
+implementation gaps, but it does not override this plan or the durable architecture contracts.
+
+Baseline inspected while writing this plan: `565ba7383b954ce2c7797346000ed10f9e374e6a`. Baseline observations below are
+historical evidence about why the plan exists, not claims about the current branch.
 Re-check the current branch and diff before implementing; do not assume this SHA remains HEAD.
 
 ## Purpose
@@ -81,24 +87,25 @@ Do **not** implement any of the following as part of this plan:
 - a broad redesign of import/archive behavior unrelated to the changed snapshot fields;
 - whole-solution test runs merely for reassurance during implementation.
 
-## Confirmed branch gaps this plan closes
+## Baseline gaps that motivated this plan (historical)
 
-The current branch was inspected before this plan was written. These are concrete gaps, not hypothetical cleanup:
+At baseline `565ba738`, inspection found these concrete gaps. Some are now implemented; use the SHA-pinned status ledger
+and current source to determine remaining work rather than treating this list as present tense:
 
-- `CaveVm` exposes `CurrentRevisionId`, while both backend and frontend `AddCaveVm` currently omit an expected-revision
-  field; direct edit therefore loses the browser's base revision before publication.
-- `CaveService` currently falls back to the freshly loaded entity's `CurrentRevisionId` when no expected revision is
-  supplied, which cannot detect a stale browser form.
-- `CaveComponent.tsx` currently owns direct published File upload through `UploadComponent`/`AddCaveFile`.
-- `CaveComponent.tsx` currently owns direct GeoJSON persistence through `GeoJsonSaveModal`.
-- `AddCaveComponent.tsx` can edit/remove existing File metadata but does not provide the complete add-file authoring flow.
-- `CavePublishedSnapshotV1` contains Cave fields, tags, Entrances, and File metadata but no line-plot state.
-- `CaveService.UploadCaveGeoJson` currently replaces persisted line plots outside Cave revision publication.
-- current GeoJSON replacement removes all existing rows and recreates them instead of preserving unchanged logical IDs.
-- proposal File intent is in `CaveProposalSnapshotV1`, but staged File ownership is currently request-level through
-  `CaveChangeRequestStagedFile`, which prevents clean pre-request editor staging and requires careful version semantics.
-- current staged File publication copies blobs and changes `BlobKey`/`BlobContainer`; the target design uploads new
-  Cave/staged File content once and changes relational lifecycle instead.
+- `CaveVm` exposed `CurrentRevisionId`, while both backend and frontend `AddCaveVm` omitted an expected-revision field;
+  direct edit therefore lost the browser's base revision before publication.
+- `CaveService` fell back to the freshly loaded entity's `CurrentRevisionId` when no expected revision was supplied, which
+  could not detect a stale browser form.
+- `CaveComponent.tsx` owned direct published File upload through `UploadComponent`/`AddCaveFile`.
+- `CaveComponent.tsx` owned direct GeoJSON persistence through `GeoJsonSaveModal`.
+- `AddCaveComponent.tsx` could edit/remove existing File metadata but did not provide the complete add-file authoring flow.
+- `CavePublishedSnapshotV1` contained Cave fields, tags, Entrances, and File metadata but no line-plot state.
+- `CaveService.UploadCaveGeoJson` replaced persisted line plots outside Cave revision publication.
+- GeoJSON replacement removed all existing rows and recreated them instead of preserving unchanged logical IDs.
+- proposal File intent lived in `CaveProposalSnapshotV1`, but staged File ownership was request-level through
+  `CaveChangeRequestStagedFile`, preventing clean pre-request editor staging and requiring careful version semantics.
+- staged File publication copied blobs and changed `BlobKey`/`BlobContainer`; the target design uploads new Cave/staged
+  File content once and changes relational lifecycle instead.
 
 ## Plan files
 
