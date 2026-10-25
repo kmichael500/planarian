@@ -6,7 +6,7 @@ export interface CaveRevisionListItemVm {
   actorUserId?: string;
   actorName?: string;
   source: "SystemBaseline" | "ManagerEdit" | "UserSubmission" | "Import" | "System";
-  operation: "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
+  operation: "Baseline" | "Create" | "Update" | "Archive" | "Unarchive" | "Delete";
   changeRequestId?: string;
   importBatchId?: string;
   changeRequestSubmitterUserId?: string;

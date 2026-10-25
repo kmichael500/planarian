@@ -43,8 +43,9 @@ Commit execution:
 - performs destructive external object cleanup after commit.
 
 Interactive and bulk publication share snapshot construction and semantic comparison (`CavePublishedSnapshotV1` +
-`CaveRevisionDiffService`) but not one per-Cave execution loop. Existing versioned Caves compare the resulting state to
-the stored current published revision; legacy Caves without history use their live before-state as the baseline seed.
+`CaveRevisionDiffService`) but not one per-Cave execution loop. Existing Caves compare the resulting state to the
+stored current published revision. Pre-existing Caves are initialized during the controlled revision-history rollout;
+bulk publication fails closed if an existing target lacks that current revision instead of creating a late baseline.
 
 ## Consequences
 

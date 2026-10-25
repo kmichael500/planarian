@@ -31,9 +31,14 @@ public sealed class CaveRevisionQueryRepository
             .Select(cave => cave.CurrentRevisionId)
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (currentRevisionId is null && !await _db.Caves.AnyAsync(
-                cave => cave.AccountId == _scope.AccountId && cave.Id == caveId, cancellationToken))
-            return null;
+        if (currentRevisionId is null)
+        {
+            if (!await _db.Caves.AnyAsync(
+                    cave => cave.AccountId == _scope.AccountId && cave.Id == caveId, cancellationToken))
+                return null;
+            throw new InvalidOperationException(
+                $"Cave '{caveId}' has no current revision. Revision history rollout must complete before history is served.");
+        }
 
         var rows = await (from revision in _db.CaveRevisions.AsNoTracking()
                           join user in _db.Users.AsNoTracking() on revision.CreatedByUserId equals user.Id into actors

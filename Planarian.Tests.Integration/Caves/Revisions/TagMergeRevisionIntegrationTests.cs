@@ -290,9 +290,10 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task LegacyCaveMergeCreatesBaselineThenManagerEdit()
+    public async Task UninitializedCaveMergeFailsClosedInsteadOfCreatingALateBaseline()
     {
-        await using var database = await fixture.CreateDatabaseAsync(nameof(LegacyCaveMergeCreatesBaselineThenManagerEdit));
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(UninitializedCaveMergeFailsClosedInsteadOfCreatingALateBaseline));
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var source = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
             TagTypeKeyConstant.Biology, "Legacy Source", "biology00a");
@@ -307,18 +308,19 @@ public sealed class TagMergeRevisionIntegrationTests(PostgresTestServer fixture)
         }
 
         await using (var db = database.CreateDbContext("manager", cave.AccountId))
-            await Repository(db).MergeAsync([source.Id], destination.Id);
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                Repository(db).MergeAsync([source.Id], destination.Id));
+            Assert.Contains("Revision history rollout must complete", error.Message, StringComparison.Ordinal);
+        }
 
         await using var verify = database.CreateDbContext("verify", cave.AccountId);
-        var pointer = await verify.Caves.IgnoreQueryFilters().Where(row => row.Id == cave.CaveId)
-            .Select(row => row.CurrentRevisionId).SingleAsync();
-        var managerEdit = await verify.CaveRevisions.SingleAsync(revision => revision.Id == pointer);
-        var baseline = await verify.CaveRevisions.SingleAsync(revision => revision.Id == managerEdit.PreviousRevisionId);
-        Assert.Equal(CaveRevisionSource.SystemBaseline, baseline.Source);
-        Assert.Contains(CaveSnapshotJson.Deserialize(baseline.SnapshotJson, 1).Tags,
+        Assert.Null(await verify.Caves.IgnoreQueryFilters().Where(row => row.Id == cave.CaveId)
+            .Select(row => row.CurrentRevisionId).SingleAsync());
+        Assert.Single(await verify.CaveRevisions.Where(revision => revision.CaveId == cave.CaveId).ToListAsync());
+        Assert.Contains(await verify.BiologyTags.Where(tag => tag.CaveId == cave.CaveId).ToListAsync(),
             tag => tag.TagTypeId == source.Id);
-        Assert.Equal(CaveRevisionSource.ManagerEdit, managerEdit.Source);
-        Assert.Contains(CaveSnapshotJson.Deserialize(managerEdit.SnapshotJson, 1).Tags,
+        Assert.DoesNotContain(await verify.BiologyTags.Where(tag => tag.CaveId == cave.CaveId).ToListAsync(),
             tag => tag.TagTypeId == destination.Id);
     }
 

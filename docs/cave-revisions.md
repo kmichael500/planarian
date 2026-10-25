@@ -153,8 +153,10 @@ ordinary `CaveVm` reads or the revision API.
   free-form creation intents when the referenced TagType is missing or no longer eligible.
 - “Reported By” Cave and Entrance data is represented by People tags. Planarian-user attribution comes from revision
   actors, change-request submitters, proposal-version authors, and reviewers. Cave and Entrance do not store a separate
-  reporter-user identity. A legacy Cave's first system baseline records who initialized revision tracking, which may not
-  identify the actor who originally entered the Cave.
+  reporter-user identity. A Cave that predates revision history receives a system-generated `Baseline` revision with no
+  user actor during rollout. That entry means “revision history starts here”: it records the Cave's state when revision
+  history was enabled and does not imply the Cave was created then or that no earlier changes occurred. Recovered older
+  history may later be presented before this boundary, but it is separate from the authoritative revision chain.
 - File history preserves attachment identity, editable filename stem (`Name`), immutable uploaded-file `Extension`, and
   captured file-type metadata without exposing
   object-storage locators in revision JSON. Bytes from Files that were successfully published are retained across ordinary

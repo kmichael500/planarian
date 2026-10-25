@@ -66,6 +66,26 @@ public sealed class CaveRevisionQueryRepositoryIntegrationTests(PostgresTestServ
         Assert.Null(await repository.GetAsync(tenant.CaveId, other.RevisionId, default));
     }
 
+
+    [Fact]
+    public async Task ListRejectsAnExistingCaveWithoutARolloutRevision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ListRejectsAnExistingCaveWithoutARolloutRevision));
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await CavePermissions.GrantViewAsync(database, tenant, "user-a");
+        await using (var seed = database.CreateDbContext("seed", tenant.AccountId))
+        {
+            await seed.Caves.IgnoreQueryFilters().Where(cave => cave.Id == tenant.CaveId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(cave => cave.CurrentRevisionId, (string?)null));
+        }
+
+        await using var db = database.CreateDbContext("user-a", tenant.AccountId);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new CaveRevisionQueryRepository(db, db.RequestUser).ListAsync(tenant.CaveId, default));
+        Assert.Contains("Revision history rollout must complete", error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ListRejectsACyclicRevisionChain()
     {

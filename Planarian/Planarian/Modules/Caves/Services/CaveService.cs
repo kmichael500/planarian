@@ -71,10 +71,11 @@ public class CaveService : ServiceBase<CaveRepository>
     {
         var visible = await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, visible.CountyId, visible.StateId);
-        await _caveMutationCoordinator.EnsureBaselineAsync(caveId, cancellationToken);
-        var cave = await Repository.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
+        if (visible.CurrentRevisionId is null)
+            throw new InvalidOperationException(
+                "Revision history rollout is incomplete for this Cave. The deployment bootstrap must finish before authoring.");
         var linePlots = await Repository.GetCaveLinePlotsAsync(caveId, cancellationToken);
-        return new CaveEditAuthoringContextVm(cave, linePlots);
+        return new CaveEditAuthoringContextVm(visible, linePlots);
     }
 
     public async Task<int> GetNextCountyNumber(string countyId, bool useFirstAvailableCountyNumber = false)

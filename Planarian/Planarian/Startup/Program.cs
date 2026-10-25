@@ -67,7 +67,11 @@ using Southport.Messaging.Email.Core;
 using Southport.Messaging.Email.MailGun;
 using FileOptions = Planarian.Shared.Options.FileOptions;
 
-var builder = WebApplication.CreateBuilder(args);
+var initializeCaveRevisionHistory = args.Contains(
+    CaveRevisionRolloutRepository.CommandLineSwitch, StringComparer.Ordinal);
+var applicationArgs = args.Where(arg =>
+    !string.Equals(arg, CaveRevisionRolloutRepository.CommandLineSwitch, StringComparison.Ordinal)).ToArray();
+var builder = WebApplication.CreateBuilder(applicationArgs);
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -264,6 +268,7 @@ builder.Services.AddScoped<CaveRevisionQueryRepository>();
 builder.Services.AddScoped<CaveChangeRequestRepository>();
 builder.Services.AddScoped<CaveMutationCoordinator>();
 builder.Services.AddScoped<CaveMutationRepository>();
+builder.Services.AddScoped<CaveRevisionRolloutRepository>();
 builder.Services.AddScoped<TagReferenceLockRepository>();
 builder.Services.AddSingleton<IObjectStorage, AzureBlobObjectStorage>();
 builder.Services.AddScoped<FileService>();
@@ -493,6 +498,21 @@ builder.Services.Configure<GzipCompressionProviderOptions>(o =>
 
 var app = builder.Build();
 
+await using (var rolloutScope = app.Services.CreateAsyncScope())
+{
+    var rollout = rolloutScope.ServiceProvider.GetRequiredService<CaveRevisionRolloutRepository>();
+    if (initializeCaveRevisionHistory)
+    {
+        var result = await rollout.InitializeAsync();
+        Console.WriteLine(result.AlreadyComplete
+            ? $"Cave revision history is already initialized. Boundary: {result.RevisionHistoryStartedOn:O}"
+            : $"Initialized revision history for {result.InitializedCaveCount} Cave(s). Boundary: {result.RevisionHistoryStartedOn:O}");
+        return;
+    }
+
+    await rollout.EnsureCompleteAsync();
+}
+
 if (isAzureAppService)
     app.UseForwardedHeaders();
 
@@ -536,4 +556,4 @@ app.MapHub<NotificationHub>("/api/notificationHub", options => { });
 
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();

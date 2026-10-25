@@ -150,9 +150,7 @@ This is a responsibility map, not a complete dependency graph. Small support rep
 
 ### Ordinary reads
 
-Ordinary Cave detail/search/map/history reads should be read-only.
-
-An important exception is **authoring context for a legacy Cave**: the revision system may establish the Cave's first baseline revision before authoring proceeds. That is an intentional write boundary and is separately permission checked.
+Ordinary Cave detail/search/map/history reads and authoring-context reads are read-only. Existing Caves receive their first revision during the controlled revision-history rollout before the API serves requests; request handling never creates a late rollout baseline.
 
 ### Interactive writes
 

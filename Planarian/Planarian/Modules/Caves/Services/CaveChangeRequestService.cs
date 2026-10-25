@@ -43,15 +43,11 @@ public sealed class CaveChangeRequestService
     public async Task<CaveProposalAuthoringContextVm> GetAuthoringContextAsync(string caveId,
         CancellationToken cancellationToken)
     {
-        // Visibility is the hard boundary: an inaccessible Cave must not even have a baseline
-        // initialized as a side effect of a guessed authoring-context request.
-        _ = await _caves.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
-        await _mutations.EnsureBaselineAsync(caveId, cancellationToken);
         var cave = await _caves.GetCave(caveId) ?? throw ApiExceptionDictionary.NotFound("Cave");
+        var currentRevisionId = cave.CurrentRevisionId ?? throw new InvalidOperationException(
+            "Revision history rollout is incomplete for this Cave. The deployment bootstrap must finish before authoring.");
         var linePlots = await _caves.GetCaveLinePlotsAsync(caveId, cancellationToken);
-        return new CaveProposalAuthoringContextVm(cave,
-            cave.CurrentRevisionId ?? throw new InvalidOperationException("Revision baseline initialization failed."),
-            linePlots);
+        return new CaveProposalAuthoringContextVm(cave, currentRevisionId, linePlots);
     }
 
     public async Task<CaveChangePreviewVm> PreviewAsync(string caveId, AddCaveVm values,

@@ -10,7 +10,7 @@ namespace Planarian.Modules.Caves.Revisions;
 /// <summary>
 /// Publishes a bounded set of Cave revisions inside the caller's existing transaction.
 /// Uses the same canonical snapshot and semantic-diff contract as interactive publication while keeping
-/// the persistence path set-oriented. Existing Caves without history receive a baseline only when state changes.
+/// the persistence path set-oriented. Existing Caves must already have rollout revision history initialized.
 /// </summary>
 public sealed class CaveBulkRevisionRepository
 {
@@ -75,11 +75,13 @@ public sealed class CaveBulkRevisionRepository
                 var operation = operations[caveId];
                 var expectedCurrent = expectedCurrentRevisionIds.GetValueOrDefault(caveId);
 
-                // Match interactive publication semantics: once a Cave has revision history, compare the
-                // resulting state with its last published snapshot rather than with the current live rows.
-                // Shared reference labels can drift without revision fan-out and must become visible on the
-                // next legitimate publication. Legacy Caves with no revision still compare live-before/after
-                // so a baseline is created only when the bulk operation actually changes them.
+                if (previousSnapshot is not null && expectedCurrent is null)
+                    throw new InvalidOperationException(
+                        $"Cave '{caveId}' has no current revision. Revision history rollout must complete before bulk mutations are served.");
+
+                // Match interactive publication semantics: compare the resulting state with the stored current
+                // published revision rather than merely with the current live rows. Shared reference labels can
+                // drift without revision fan-out and must become visible on the next legitimate publication.
                 var semanticPrevious = previousSnapshot;
                 if (expectedCurrent is not null && currentSnapshot is not null)
                 {
@@ -99,18 +101,7 @@ public sealed class CaveBulkRevisionRepository
                     _diff.IsSemanticEqual(semanticPrevious, currentSnapshot))
                     continue;
 
-                string? previousRevisionId = expectedCurrent;
-                if (previousSnapshot is not null && expectedCurrent is null)
-                {
-                    var baseline = new CaveRevision
-                    {
-                        Id = IdGenerator.Generate(), AccountId = _scope.AccountId, CaveId = caveId,
-                        Source = CaveRevisionSource.SystemBaseline, Operation = CaveRevisionOperation.Create,
-                        SnapshotSchemaVersion = 1, SnapshotJson = CaveSnapshotJson.Serialize(previousSnapshot)
-                    };
-                    _db.CaveRevisions.Add(baseline);
-                    previousRevisionId = baseline.Id;
-                }
+                var previousRevisionId = expectedCurrent;
 
                 var acceptedSnapshot = operation == CaveRevisionOperation.Delete
                     ? previousSnapshot ?? throw new InvalidOperationException($"Deleted Cave '{caveId}' has no before snapshot.")

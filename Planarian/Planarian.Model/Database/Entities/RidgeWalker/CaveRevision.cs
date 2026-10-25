@@ -21,7 +21,8 @@ public enum CaveRevisionOperation
     Update,
     Archive,
     Unarchive,
-    Delete
+    Delete,
+    Baseline
 }
 
 public enum CaveImportKind

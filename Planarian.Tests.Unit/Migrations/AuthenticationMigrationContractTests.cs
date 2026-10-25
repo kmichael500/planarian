@@ -38,7 +38,8 @@ public sealed class AuthenticationMigrationContractTests
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory != null; directory = directory.Parent)
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))) return directory.FullName;
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) ||
+                File.Exists(Path.Combine(directory.FullName, ".git"))) return directory.FullName;
         throw new InvalidOperationException("Could not locate the repository root.");
     }
 }

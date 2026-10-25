@@ -57,8 +57,9 @@ public sealed class ImportAtomicityIntegrationTests(PostgresTestServer fixture) 
         await using var database = await fixture.CreateDatabaseAsync(
             nameof(EntranceSecondRecordLateFailureRollsBackCompleteState));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        await CaveTestDataFactory.AddCaveAsync(database, tenant, caveId: "secondcav0", countyNumber: 2,
-            name: "Second");
+        var secondCave = await CaveTestDataFactory.AddCaveAsync(
+            database, tenant, caveId: "secondcav0", countyNumber: 2, name: "Second");
+        await CaveTestDataFactory.PublishBaselineRevisionAsync(database, secondCave, "revision2a");
         await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade");
 

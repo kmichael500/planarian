@@ -105,3 +105,51 @@ it("shows approved-request attribution and links authorized reviewers back to th
   fireEvent.click(screen.getByText("Changes approved"));
   expect(await screen.findByRole("link", { name: "Review" })).toHaveAttribute("href", "/caves/requests/request001");
 });
+
+
+it("presents the rollout baseline as the start of revision history, not Cave creation", async () => {
+  const baseline: CaveRevisionHistoryVm = {
+    caveId: "legacy-cave", currentRevisionId: "baseline001",
+    revisions: [{
+      id: "baseline001", caveId: "legacy-cave", sequence: 1, publishedOn: "2026-10-25T17:00:00Z",
+      actorName: "Deployment Admin", source: "SystemBaseline", operation: "Baseline", isCurrent: true,
+    }],
+  };
+  jest.spyOn(CaveService, "GetRevisionHistory").mockResolvedValue(baseline);
+  jest.spyOn(CaveService, "GetRevision").mockResolvedValue({
+    revision: baseline.revisions[0], current: {} as any, diff: undefined,
+  } as any);
+
+  render(<MemoryRouter><CaveHistoryModal caveId="legacy-cave" /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: /history/i }));
+
+  expect(await screen.findByText("Revision history starts here")).toBeInTheDocument();
+  expect(screen.getByText(/History started/)).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent("Deployment Admin");
+  expect(document.body).not.toHaveTextContent("Created");
+
+  fireEvent.click(screen.getByText("Revision history starts here"));
+  expect(await screen.findByText(
+    "This is the Cave as it existed when revision history was enabled. Earlier changes may not be shown.",
+  )).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent("Initial publication");
+});
+
+it("still presents a genuinely new post-rollout Cave as created", async () => {
+  const created: CaveRevisionHistoryVm = {
+    caveId: "new-cave", currentRevisionId: "revision01",
+    revisions: [{
+      id: "revision01", caveId: "new-cave", sequence: 1, publishedOn: "2026-10-26T17:00:00Z",
+      actorName: "Casey Creator", source: "ManagerEdit", operation: "Create", isCurrent: true,
+    }],
+  };
+  jest.spyOn(CaveService, "GetRevisionHistory").mockResolvedValue(created);
+
+  render(<MemoryRouter><CaveHistoryModal caveId="new-cave" /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: /history/i }));
+
+  expect(await screen.findByText("Created")).toBeInTheDocument();
+  expect(screen.getByText(/Revision 1/)).toBeInTheDocument();
+  expect(screen.getByText(/Casey Creator/)).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent("Revision history starts here");
+});

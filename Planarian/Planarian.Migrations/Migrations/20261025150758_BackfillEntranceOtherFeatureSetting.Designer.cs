@@ -14,15 +14,15 @@ using Planarian.Model.Database;
 namespace Planarian.Migrations.Migrations
 {
     [DbContext(typeof(PlanarianDbContext))]
-    [Migration("20260816013327_RetainedCaveFileObjects")]
-    partial class RetainedCaveFileObjects
+    [Migration("20261025150758_BackfillEntranceOtherFeatureSetting")]
+    partial class BackfillEntranceOtherFeatureSetting
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.6")
+                .HasAnnotation("ProductVersion", "8.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
@@ -169,6 +169,14 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("AccountInvitationAccountId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AccountInvitationUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("CreatedByUserId")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -176,15 +184,21 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DeliveryStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DeliveryStatusMessage")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeliveryStatusOn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FromEmailAddress")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("FromName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("MessageKey")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -199,6 +213,25 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderCorrelationId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ProviderDomain")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("Subject")
                         .IsRequired()
                         .HasColumnType("text");
@@ -206,6 +239,11 @@ namespace Planarian.Migrations.Migrations
                     b.Property<string>("Substitutions")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("TemplateKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("MessageKey");
 
                     b.Property<string>("ToEmailAddress")
                         .IsRequired()
@@ -221,7 +259,113 @@ namespace Planarian.Migrations.Migrations
 
                     b.HasIndex("ModifiedByUserId");
 
+                    b.HasIndex("ProviderCorrelationId")
+                        .IsUnique()
+                        .HasFilter("\"ProviderCorrelationId\" IS NOT NULL");
+
+                    b.HasIndex("AccountInvitationAccountId", "AccountInvitationUserId");
+
                     b.ToTable("MessageLogs");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLogEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int?>("AttemptNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Bot")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DeliveryMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EnhancedDeliveryCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool?>("IsDelayedBounce")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MessageLogId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("OccurredOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderDomain")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateOnly>("ProviderEventDay")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ProviderEventId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProviderEventType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Severity")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WebhookToken")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("MessageLogId");
+
+                    b.HasIndex("ModifiedByUserId");
+
+                    b.HasIndex("WebhookToken")
+                        .IsUnique()
+                        .HasFilter("\"WebhookToken\" IS NOT NULL");
+
+                    b.HasIndex("Provider", "ProviderDomain", "ProviderEventDay", "ProviderEventId")
+                        .IsUnique();
+
+                    b.ToTable("MessageLogEvents");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.MessageType", b =>
@@ -826,6 +970,65 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("AccountId", "Status", "CreatedOn");
 
                     b.ToTable("CaveChangeRequests");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestReviewEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("ChangeRequestId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProposalVersionId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("AccountId", "ChangeRequestId", "CreatedOn");
+
+                    b.HasIndex("AccountId", "ChangeRequestId", "ProposalVersionId");
+
+                    b.ToTable("CaveChangeRequestReviewEvents");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestStagedFile", b =>
@@ -1715,14 +1918,10 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime>("CreatedOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<DateTime?>("ExpiresOn")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FileName")
+                    b.Property<string>("Extension")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1739,13 +1938,21 @@ namespace Planarian.Migrations.Migrations
                     b.Property<DateTime?>("ModifiedOn")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CaveId");
 
                     b.HasIndex("FileTypeTagId");
 
-                    b.ToTable("Files");
+                    b.ToTable("Files", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Files_ValidNameAndExtension", "length(\"Name\") + length(\"Extension\") <= 1000 AND btrim(\"Name\", ' ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13) || chr(133) || chr(160) || chr(5760) || chr(8192) || chr(8193) || chr(8194) || chr(8195) || chr(8196) || chr(8197) || chr(8198) || chr(8199) || chr(8200) || chr(8201) || chr(8202) || chr(8232) || chr(8233) || chr(8239) || chr(8287) || chr(12288)) <> '' AND \"Name\" NOT IN ('.', '..') AND \"Name\" NOT LIKE '%/%' AND \"Name\" NOT LIKE '%\\\\%' AND \"Name\" !~ '[[:cntrl:]]' AND (\"Extension\" = '' OR (length(\"Extension\") > 1 AND left(\"Extension\", 1) = '.' AND \"Extension\" NOT LIKE '%/%' AND \"Extension\" NOT LIKE '%\\\\%' AND \"Extension\" !~ '[[:cntrl:]]'))");
+                        });
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.GeologicAgeTag", b =>
@@ -2396,6 +2603,10 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("EmailConfirmationMessageLogId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<DateTime?>("EmailConfirmedOn")
                         .HasColumnType("timestamp with time zone");
 
@@ -2427,11 +2638,15 @@ namespace Planarian.Migrations.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordResetCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("PasswordResetCodeExpiration")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PendingEmailAddress")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(20)
@@ -2441,11 +2656,16 @@ namespace Planarian.Migrations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmailAddress")
                         .IsUnique()
                         .HasFilter("\"IsTemporary\" = false");
+
+                    b.HasIndex("EmailConfirmationMessageLogId");
 
                     b.ToTable("Users");
                 });
@@ -2539,7 +2759,37 @@ namespace Planarian.Migrations.Migrations
                         .WithMany()
                         .HasForeignKey("ModifiedByUserId");
 
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.AccountUser", "AccountInvitation")
+                        .WithMany("InvitationMessageLogs")
+                        .HasForeignKey("AccountInvitationAccountId", "AccountInvitationUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AccountInvitation");
+
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("ModifiedByUser");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLogEvent", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("Planarian.Model.Database.Entities.MessageLog", "MessageLog")
+                        .WithMany("Events")
+                        .HasForeignKey("MessageLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", "ModifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("ModifiedByUserId");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("MessageLog");
 
                     b.Navigation("ModifiedByUser");
                 });
@@ -2796,6 +3046,35 @@ namespace Planarian.Migrations.Migrations
                         .HasForeignKey("AccountId", "Id", "CurrentProposalVersionId")
                         .HasPrincipalKey("AccountId", "ChangeRequestId", "Id")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestReviewEvent", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequest", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "ChangeRequestId")
+                        .HasPrincipalKey("AccountId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Planarian.Model.Database.Entities.RidgeWalker.CaveProposalVersion", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId", "ChangeRequestId", "ProposalVersionId")
+                        .HasPrincipalKey("AccountId", "ChangeRequestId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.CaveChangeRequestStagedFile", b =>
@@ -3600,9 +3879,24 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.User", b =>
+                {
+                    b.HasOne("Planarian.Model.Database.Entities.MessageLog", "EmailConfirmationMessageLog")
+                        .WithMany()
+                        .HasForeignKey("EmailConfirmationMessageLogId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("EmailConfirmationMessageLog");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.Leads.Lead", b =>
                 {
                     b.Navigation("LeadTags");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.MessageLog", b =>
+                {
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.Projects.Project", b =>
@@ -3633,6 +3927,11 @@ namespace Planarian.Migrations.Migrations
                     b.Navigation("Tags");
 
                     b.Navigation("UserPermissions");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountUser", b =>
+                {
+                    b.Navigation("InvitationMessageLogs");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.Cave", b =>

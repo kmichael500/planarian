@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Planarian.Model.Database.Entities;
 using Planarian.Model.Database.Entities.RidgeWalker;
+using Planarian.Model.Database.Revisions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Caves.Models;
 using Planarian.Modules.Caves.Repositories;
@@ -18,6 +19,8 @@ namespace Planarian.Tests;
 public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture) : IClassFixture<PostgresTestServer>
 {
     private const string HistoricalV29BaselineMigration = "20260423021136_v29";
+    private const string CurrentMainBaselineMigration = "20260831132210_v32";
+    private const string CaveRevisionsCompletionMigrationSuffix = "_CaveRevisionsCompletion";
     [Fact]
     public async Task EmptyDatabaseMigratesToLatest()
     {
@@ -48,48 +51,263 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task ProposalVersionBaseMigrationBackfillsExistingVersionFromItsRequest()
+    public async Task CurrentMainV32UpgradesToLatestAndRollsBackToTheV32SchemaContract()
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(ProposalVersionBaseMigrationBackfillsExistingVersionFromItsRequest));
-        var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_StagedFileTenantForeignKey", StringComparison.Ordinal));
-        await database.MigrateAsync(previousMigration);
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+            nameof(CurrentMainV32UpgradesToLatestAndRollsBackToTheV32SchemaContract));
+        var migrations = database.GetMigrationNames().ToList();
+        var baseline = migrations.FindIndex(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        var completion = migrations.FindIndex(migration =>
+            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
+        var backfill = migrations.FindIndex(migration =>
+            migration.EndsWith("_BackfillEntranceOtherFeatureSetting", StringComparison.Ordinal));
 
-        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        Assert.True(baseline >= 0, $"Expected current main baseline migration {CurrentMainBaselineMigration} was not found.");
+        Assert.Equal(baseline + 1, completion);
+        Assert.Equal(completion + 1, backfill);
+
+        await database.MigrateAsync(migrations[baseline]);
+        await SeedCurrentMainV32RepresentativeDataAsync(database);
+
+        await database.MigrateAsync(null);
+
+        CaveRevisionRolloutResult rolloutResult;
+        await using (var rolloutContext = database.CreateDbContext("revision-rollout", "mainacct01"))
         {
-            await connection.OpenAsync();
-            await using var seed = new NpgsqlCommand("""
-                insert into "CaveChangeRequests"
-                    ("Id", "AccountId", "CaveId", "BaseRevisionId", "Status", "CreatedOn")
-                values ('oldreq0001', @account, @cave, @revision, 'Pending', now());
+            var rollout = new CaveRevisionRolloutRepository(rolloutContext);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => rollout.EnsureCompleteAsync());
+            rolloutResult = await rollout.InitializeAsync();
+            Assert.False(rolloutResult.AlreadyComplete);
+            Assert.Equal(1, rolloutResult.InitializedCaveCount);
+            await rollout.EnsureCompleteAsync();
+        }
 
-                insert into "CaveProposalVersions"
-                    ("Id", "AccountId", "ChangeRequestId", "SchemaVersion", "ProposalJson", "CreatedOn")
-                values ('oldver0001', @account, 'oldreq0001', 1, '{}'::jsonb, now());
+        await using (var current = database.CreateDbContext("current-main-upgrade", "mainacct01"))
+        {
+            var cave = await current.Caves.IgnoreQueryFilters().SingleAsync(row => row.Id == "maincave01");
+            Assert.NotNull(cave.CurrentRevisionId);
 
-                update "CaveChangeRequests" set "CurrentProposalVersionId" = 'oldver0001'
-                where "Id" = 'oldreq0001';
-                """, connection);
-            seed.Parameters.AddWithValue("account", tenant.AccountId);
-            seed.Parameters.AddWithValue("cave", tenant.CaveId);
-            seed.Parameters.AddWithValue("revision", tenant.RevisionId);
-            await seed.ExecuteNonQueryAsync();
+            var revision = await current.CaveRevisions.IgnoreQueryFilters()
+                .SingleAsync(row => row.Id == cave.CurrentRevisionId);
+            Assert.Equal(CaveRevisionSource.SystemBaseline, revision.Source);
+            Assert.Equal(CaveRevisionOperation.Baseline, revision.Operation);
+            Assert.Null(revision.PreviousRevisionId);
+            Assert.Null(revision.CreatedByUserId);
+            Assert.Equal(rolloutResult.RevisionHistoryStartedOn, revision.CreatedOn);
+            var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
+            Assert.Equal("Existing Main Cave", snapshot.Name);
+            var snapshotFile = Assert.Single(snapshot.Files);
+            Assert.Equal("existing-cave", snapshotFile.Name);
+            Assert.Equal(".pdf", snapshotFile.Extension);
+
+            var file = await current.Files.SingleAsync(row => row.Id == "mainfiler1");
+            Assert.Equal("existing-cave", file.Name);
+            Assert.Equal(".pdf", file.Extension);
+
+            var generatedSetting = await current.FeatureSettings.SingleAsync(setting =>
+                setting.AccountId == "mainacct01" &&
+                setting.Key == FeatureKey.EnabledFieldEntranceOtherTags);
+            Assert.True(generatedSetting.IsEnabled);
+            Assert.False(generatedSetting.IsDefault);
+        }
+
+        await using (var rerunContext = database.CreateDbContext("revision-rollout-rerun", "mainacct01"))
+        {
+            var rerun = await new CaveRevisionRolloutRepository(rerunContext).InitializeAsync();
+            Assert.True(rerun.AlreadyComplete);
+            Assert.Equal(0, rerun.InitializedCaveCount);
+            Assert.Equal(rolloutResult.RevisionHistoryStartedOn, rerun.RevisionHistoryStartedOn);
+            Assert.Single(await rerunContext.CaveRevisions.IgnoreQueryFilters().ToListAsync());
+        }
+
+        await database.MigrateAsync(migrations[baseline]);
+
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using (var verify = new NpgsqlCommand("""
+            select f."DisplayName", f."FileName",
+                   to_regclass('public."CaveRevisions"') is null,
+                   not exists(select 1 from information_schema.columns where table_name='Caves' and column_name='CurrentRevisionId'),
+                   exists(select 1 from information_schema.columns where table_name='Caves' and column_name='ReportedByUserId'),
+                   not exists(select 1 from "FeatureSettings" where "AccountId"='mainacct01' and "Key"='EnabledFieldEntranceOtherTags'),
+                   (select column_default is null from information_schema.columns where table_name='Files' and column_name='FileName'),
+                   to_regclass('public."__CaveRevisionsCompletionLegacyFileNames"') is null
+            from "Files" f where f."Id"='mainfiler1'
+            """, connection))
+        await using (var reader = await verify.ExecuteReaderAsync())
+        {
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("existing-cave", reader.GetString(0));
+            Assert.Equal("existing-cave.pdf", reader.GetString(1));
+            Assert.True(reader.GetBoolean(2));
+            Assert.True(reader.GetBoolean(3));
+            Assert.True(reader.GetBoolean(4));
+            Assert.True(reader.GetBoolean(5));
+            Assert.True(reader.GetBoolean(6));
+            Assert.True(reader.GetBoolean(7));
+        }
+
+        await using var history = new NpgsqlCommand(
+            "select \"MigrationId\" from \"__EFMigrationsHistory\" order by \"MigrationId\" desc limit 1", connection);
+        Assert.Equal(CurrentMainBaselineMigration, (string?)await history.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task CurrentMainV32RoundTripPreservesDistinctLegacyFileName()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(CurrentMainV32RoundTripPreservesDistinctLegacyFileName));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await SeedCurrentMainV32RepresentativeDataAsync(database);
+
+        await using (var seed = new NpgsqlConnection(database.ConnectionString))
+        {
+            await seed.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                update "Files"
+                set "FileName" = 'legacy-original.pdf', "DisplayName" = 'Friendly Label'
+                where "Id" = 'mainfiler1'
+                """, seed);
+            await command.ExecuteNonQueryAsync();
         }
 
         await database.MigrateAsync(null);
 
-        await using var verifyConnection = new NpgsqlConnection(database.ConnectionString);
-        await verifyConnection.OpenAsync();
-        await using var verify = new NpgsqlCommand("""
-            select "CaveId", "BaseRevisionId"
-            from "CaveProposalVersions" where "Id" = 'oldver0001'
-            """, verifyConnection);
-        await using var reader = await verify.ExecuteReaderAsync();
+        await using (var upgraded = new NpgsqlConnection(database.ConnectionString))
+        {
+            await upgraded.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                select f."Name", f."Extension", legacy."OriginalFileName",
+                       legacy."MigratedName", legacy."MigratedExtension"
+                from "Files" f
+                join "__CaveRevisionsCompletionLegacyFileNames" legacy on legacy."FileId" = f."Id"
+                where f."Id" = 'mainfiler1'
+                """, upgraded);
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("Friendly Label", reader.GetString(0));
+            Assert.Equal(".pdf", reader.GetString(1));
+            Assert.Equal("legacy-original.pdf", reader.GetString(2));
+            Assert.Equal("Friendly Label", reader.GetString(3));
+            Assert.Equal(".pdf", reader.GetString(4));
+        }
+
+        await database.MigrateAsync(baseline);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var verifyCommand = new NpgsqlCommand("""
+            select f."DisplayName", f."FileName",
+                   (select column_default is null
+                    from information_schema.columns
+                    where table_name='Files' and column_name='FileName'),
+                   to_regclass('public."__CaveRevisionsCompletionLegacyFileNames"') is null
+            from "Files" f
+            where f."Id" = 'mainfiler1'
+            """, verify);
+        await using var verifyReader = await verifyCommand.ExecuteReaderAsync();
+        Assert.True(await verifyReader.ReadAsync());
+        Assert.Equal("Friendly Label", verifyReader.GetString(0));
+        Assert.Equal("legacy-original.pdf", verifyReader.GetString(1));
+        Assert.True(verifyReader.GetBoolean(2));
+        Assert.True(verifyReader.GetBoolean(3));
+    }
+
+    [Fact]
+    public async Task CurrentMainV32RollbackUsesCurrentNameWhenFileMetadataChangedAfterUpgrade()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(CurrentMainV32RollbackUsesCurrentNameWhenFileMetadataChangedAfterUpgrade));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await SeedCurrentMainV32RepresentativeDataAsync(database);
+
+        await using (var seed = new NpgsqlConnection(database.ConnectionString))
+        {
+            await seed.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                update "Files"
+                set "FileName" = 'legacy-original.pdf', "DisplayName" = 'Friendly Label'
+                where "Id" = 'mainfiler1'
+                """, seed);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using (var edit = new NpgsqlConnection(database.ConnectionString))
+        {
+            await edit.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                update "Files"
+                set "Name" = 'Renamed After Upgrade'
+                where "Id" = 'mainfiler1'
+                """, edit);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(baseline);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var verifyCommand = new NpgsqlCommand("""
+            select "DisplayName", "FileName"
+            from "Files"
+            where "Id" = 'mainfiler1'
+            """, verify);
+        await using var reader = await verifyCommand.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(tenant.CaveId, reader.GetString(0));
-        Assert.Equal(tenant.RevisionId, reader.GetString(1));
+        Assert.Equal("Renamed After Upgrade", reader.GetString(0));
+        Assert.Equal("Renamed After Upgrade.pdf", reader.GetString(1));
+    }
+
+    [Fact]
+    public async Task CurrentMainV32MigrationRejectsCaveFileOwnedByDifferentAccount()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(CurrentMainV32MigrationRejectsCaveFileOwnedByDifferentAccount));
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await SeedCurrentMainV32RepresentativeDataAsync(database);
+
+        await using (var seed = new NpgsqlConnection(database.ConnectionString))
+        {
+            await seed.OpenAsync();
+            await using var command = new NpgsqlCommand("""
+                insert into "Accounts"("Id","Name","CountyIdDelimiter","DefaultViewAccessAllCaves","ExportEnabled","CreatedOn")
+                values('otheracct1','Other Account','-',false,true,now());
+
+                update "Files"
+                set "AccountId" = 'otheracct1'
+                where "Id" = 'mainfiler1';
+                """, seed);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(null));
+        Assert.Contains("does not match its owning Cave account", error.MessageText, StringComparison.Ordinal);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using var verifyCommand = new NpgsqlCommand("""
+            select f."AccountId",
+                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='DisplayName'),
+                   not exists(select 1 from information_schema.columns where table_name='Files' and column_name='Name'),
+                   (select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" desc limit 1)
+            from "Files" f
+            where f."Id" = 'mainfiler1'
+            """, verify);
+        await using var reader = await verifyCommand.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("otheracct1", reader.GetString(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.True(reader.GetBoolean(2));
+        Assert.Equal(CurrentMainBaselineMigration, reader.GetString(3));
     }
 
     [Fact]
@@ -97,69 +315,60 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
             nameof(LegacyReporterUserColumnsAreDroppedWhileExistingCaveEntranceAndPeopleTagDataSurvives));
-        var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_CaveProposalVersionBaseRevision", StringComparison.Ordinal));
-        await database.MigrateAsync(previousMigration);
-        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
-        var caveReporter = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.People, "Cave Reporter", "caverep00a");
-        var entranceReporter = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.People, "Entrance Reporter", "entrep000a");
-        var location = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
-            TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
-        const string entranceId = "legacyent1";
-        string reporterUserId;
+        var baseline = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(baseline);
+        await SeedCurrentMainV32RepresentativeDataAsync(database);
 
-        await using (var seed = database.CreateDbContext("legacy-reporter-seed", tenant.AccountId))
-        {
-            reporterUserId = await seed.Users.Select(user => user.Id).FirstAsync();
-            seed.Entrances.Add(new Entrance
-            {
-                Id = entranceId,
-                CaveId = tenant.CaveId,
-                Name = "Legacy entrance",
-                IsPrimary = true,
-                Description = "Preserve me",
-                LocationQualityTagId = location.Id,
-                Location = new NetTopologySuite.Geometries.Point(-86.25, 35.15, 612) { SRID = 4326 }
-            });
-            seed.CaveReportedByNameTags.Add(new CaveReportedByNameTag
-                { CaveId = tenant.CaveId, TagTypeId = caveReporter.Id });
-            seed.EntranceReportedByNameTags.Add(new EntranceReportedByNameTag
-                { EntranceId = entranceId, TagTypeId = entranceReporter.Id });
-            await seed.SaveChangesAsync();
-        }
+        const string reporterUserId = "reportusr1";
+        const string caveReporterId = "caverep00a";
+        const string entranceReporterId = "entrep000a";
+        const string entranceId = "legacyent1";
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync();
-            await using var setLegacyReporter = new NpgsqlCommand("""
-                update "Caves" set "ReportedByUserId" = @user where "Id" = @cave;
-                update "Entrances" set "ReportedByUserId" = @user where "Id" = @entrance;
+            await using var seed = new NpgsqlCommand("""
+                insert into "Users"("Id","EmailAddress","FirstName","LastName","IsTemporary","SessionVersion","CreatedOn")
+                values ('reportusr1','reporter@example.test','Legacy','Reporter',false,0,now());
+
+                insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn") values
+                  ('caverep00a','mainacct01','People','Cave Reporter',false,now()),
+                  ('entrep000a','mainacct01','People','Entrance Reporter',false,now()),
+                  ('locqual00a','mainacct01','LocationQuality','Survey Grade',false,now());
+
+                insert into "Entrances"("Id","CaveId","LocationQualityTagId","Name","IsPrimary","Description","Location","CreatedOn")
+                values ('legacyent1','maincave01','locqual00a','Legacy entrance',true,'Preserve me',
+                        ST_SetSRID(ST_MakePoint(-86.25,35.15,612),4326),now());
+
+                insert into "CaveReportedByNameTags"("Id","TagTypeId","CaveId","CreatedOn")
+                values ('caverept01','caverep00a','maincave01',now());
+                insert into "EntranceReportedByNameTags"("Id","TagTypeId","EntranceId","CreatedOn")
+                values ('entrept001','entrep000a','legacyent1',now());
+
+                update "Caves" set "ReportedByUserId" = 'reportusr1' where "Id" = 'maincave01';
+                update "Entrances" set "ReportedByUserId" = 'reportusr1' where "Id" = 'legacyent1';
                 """, connection);
-            setLegacyReporter.Parameters.AddWithValue("user", reporterUserId);
-            setLegacyReporter.Parameters.AddWithValue("cave", tenant.CaveId);
-            setLegacyReporter.Parameters.AddWithValue("entrance", entranceId);
-            await setLegacyReporter.ExecuteNonQueryAsync();
+            await seed.ExecuteNonQueryAsync();
         }
 
         await database.MigrateAsync(null);
 
-        await using (var verify = database.CreateDbContext("verify", tenant.AccountId))
+        await using (var verify = database.CreateDbContext("verify", "mainacct01"))
         {
-            Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == tenant.CaveId));
+            Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == "maincave01"));
             var entrance = await verify.Entrances.IgnoreQueryFilters().SingleAsync(row => row.Id == entranceId);
             Assert.Equal("Preserve me", entrance.Description);
             Assert.Equal(-86.25, entrance.Location.X, 6);
             Assert.Equal(35.15, entrance.Location.Y, 6);
             Assert.Equal(612, entrance.Location.Z, 6);
             Assert.True(await verify.CaveReportedByNameTags.AnyAsync(tag =>
-                tag.CaveId == tenant.CaveId && tag.TagTypeId == caveReporter.Id));
+                tag.CaveId == "maincave01" && tag.TagTypeId == caveReporterId));
             Assert.True(await verify.EntranceReportedByNameTags.AnyAsync(tag =>
-                tag.EntranceId == entranceId && tag.TagTypeId == entranceReporter.Id));
+                tag.EntranceId == entranceId && tag.TagTypeId == entranceReporterId));
             Assert.True(await verify.Users.AnyAsync(user => user.Id == reporterUserId));
-            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == caveReporter.Id));
-            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == entranceReporter.Id));
+            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == caveReporterId));
+            Assert.True(await verify.TagTypes.AnyAsync(tag => tag.Id == entranceReporterId));
         }
 
         await using var catalog = new NpgsqlConnection(database.ConnectionString);
@@ -186,7 +395,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             nameof(EntranceOtherBackfillRollbackPreservesPreexistingAccountOverride));
         var migrations = database.GetMigrationNames().ToList();
         var previous = migrations.FindIndex(migration =>
-            migration.EndsWith("_CaveChangeRequestReviewEvents", StringComparison.Ordinal));
+            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
         Assert.True(previous >= 0);
         await database.MigrateAsync(migrations[previous]);
         var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
@@ -235,10 +444,13 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         var migrations = database.GetMigrationNames().ToList();
         var baseline = migrations.FindIndex(migration =>
             migration.EndsWith(HistoricalV29BaselineMigration, StringComparison.Ordinal));
-        var foundation = migrations.FindIndex(migration =>
-            migration.EndsWith("_CaveRevisionImportFoundation", StringComparison.Ordinal));
+        var currentMain = migrations.FindIndex(migration =>
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        var completion = migrations.FindIndex(migration =>
+            migration.EndsWith(CaveRevisionsCompletionMigrationSuffix, StringComparison.Ordinal));
         Assert.True(baseline >= 0, $"Expected historical v29 baseline migration {HistoricalV29BaselineMigration} was not found.");
-        Assert.Equal(baseline + 1, foundation);
+        Assert.True(currentMain > baseline);
+        Assert.Equal(currentMain + 1, completion);
         await database.MigrateAsync(migrations[baseline]);
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
 
@@ -298,10 +510,10 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task MigratedLegacyCaveInitializesOneBaselineForProposalAuthoringAndCanBeSubmitted()
+    public async Task MigratedLegacyCaveUsesRolloutBaselineForProposalAuthoringAndCanBeSubmitted()
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(MigratedLegacyCaveInitializesOneBaselineForProposalAuthoringAndCanBeSubmitted));
+            nameof(MigratedLegacyCaveUsesRolloutBaselineForProposalAuthoringAndCanBeSubmitted));
         var migrations = database.GetMigrationNames().ToList();
         var baseline = migrations.FindIndex(migration =>
             migration.EndsWith(HistoricalV29BaselineMigration, StringComparison.Ordinal));
@@ -310,6 +522,13 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         await database.MigrateAsync(null);
 
         const string accountId = "mainacct01";
+        await using (var rollout = database.CreateDbContext("revision-rollout", accountId))
+        {
+            var result = await new CaveRevisionRolloutRepository(rollout).InitializeAsync();
+            Assert.Equal(1, result.InitializedCaveCount);
+        }
+
+
         const string caveId = "maincave01";
         const string contributorId = "contrib001";
         await using (var permissions = database.CreateDbContext(contributorId, accountId))
@@ -363,7 +582,8 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         var revisions = await verify.CaveRevisions.Where(revision => revision.CaveId == caveId).ToListAsync();
         Assert.Single(revisions);
         Assert.Equal(CaveRevisionSource.SystemBaseline, revisions[0].Source);
-        Assert.Equal(CaveRevisionOperation.Create, revisions[0].Operation);
+        Assert.Equal(CaveRevisionOperation.Baseline, revisions[0].Operation);
+        Assert.Null(revisions[0].CreatedByUserId);
         var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
         Assert.Equal(CaveChangeRequestStatus.Pending, request.Status);
         Assert.NotNull(request.CurrentProposalVersionId);
@@ -376,7 +596,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             nameof(FileNameMigrationPreservesLegacyDisplayNameAndBackfillsNameAndExtensionEdgeCases));
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
         var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(previousMigration);
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
@@ -439,7 +659,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             nameof(FileNameMigrationFailsRatherThanTruncatingLegacyFileMetadata));
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
         var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(previousMigration);
         var displayName = new string('n', 100);
         var fileName = "x." + new string('e', 998);
@@ -486,7 +706,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             $"{nameof(FileNameMigrationFailsWhenLegacyDisplayNameViolatesTheNewNamePolicy)}_{databaseSuffix}");
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
         var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(previousMigration);
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
@@ -541,7 +761,7 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         }
 
         var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
         await database.MigrateAsync(previousMigration);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
@@ -563,13 +783,13 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task FileNameMigrationDownFailsRatherThanTruncatingLegacyDisplayName()
+    public async Task FileNameMigrationDownPreservesTheV32DisplayNameWidth()
     {
         await using var database = await CreateV29DatabaseAsync(
-            nameof(FileNameMigrationDownFailsRatherThanTruncatingLegacyDisplayName));
+            nameof(FileNameMigrationDownPreservesTheV32DisplayNameWidth));
         await V29DatabaseSeeder.SeedRepresentativeTenantAsync(database);
         await database.MigrateAsync(null);
-        var name = new string('n', 101);
+        var name = new string('n', 996);
         const string extension = ".pdf";
 
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
@@ -586,24 +806,23 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         }
 
         var previousMigration = database.GetMigrationNames().Single(migration =>
-            migration.EndsWith("_RetainedCaveFileObjects", StringComparison.Ordinal));
-        var error = await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(previousMigration));
-        Assert.Contains("cannot fit the legacy DisplayName column", error.MessageText, StringComparison.Ordinal);
+            migration.EndsWith(CurrentMainBaselineMigration, StringComparison.Ordinal));
+        await database.MigrateAsync(previousMigration);
 
         await using var verify = new NpgsqlConnection(database.ConnectionString);
         await verify.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            select "Name", "Extension",
-                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='FileName'),
-                   exists(select 1 from information_schema.columns where table_name='Files' and column_name='DisplayName')
-            from "Files" where "Id"='mainfiler1'
+            select "DisplayName", "FileName",
+                   character_maximum_length
+            from "Files"
+            join information_schema.columns on table_name='Files' and column_name='DisplayName'
+            where "Id"='mainfiler1'
             """, verify);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal(name, reader.GetString(0));
-        Assert.Equal(extension, reader.GetString(1));
-        Assert.False(reader.GetBoolean(2));
-        Assert.False(reader.GetBoolean(3));
+        Assert.Equal(name + extension, reader.GetString(1));
+        Assert.Equal(1000, reader.GetInt32(2));
     }
 
     [Fact]
@@ -657,9 +876,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
     }
 
     [Fact]
-    public async Task V29UnassignableNullOwnerFileFailsClosedAndLeavesV29Schema()
+    public async Task V29UnassignableNullOwnerFileFailsClosedAndLeavesCurrentMainSchema()
     {
-        await using var database = await CreateV29DatabaseAsync(nameof(V29UnassignableNullOwnerFileFailsClosedAndLeavesV29Schema));
+        await using var database = await CreateV29DatabaseAsync(nameof(V29UnassignableNullOwnerFileFailsClosedAndLeavesCurrentMainSchema));
         await V29DatabaseSeeder.SeedFileOwnershipScenarioAsync(database, "orphanfile", null, null,
             "orphan.pdf", "orphan/orphanfile.pdf");
 
@@ -668,11 +887,18 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
 
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("select \"AccountId\" is null, is_nullable from \"Files\" join information_schema.columns on table_name='Files' and column_name='AccountId' where \"Id\"='orphanfile'", connection);
+        await using var command = new NpgsqlCommand("""
+            select "AccountId" is null, is_nullable,
+                   (select "MigrationId" from "__EFMigrationsHistory" order by "MigrationId" desc limit 1)
+            from "Files"
+            join information_schema.columns on table_name='Files' and column_name='AccountId'
+            where "Id"='orphanfile'
+            """, connection);
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.True(reader.GetBoolean(0));
         Assert.Equal("YES", reader.GetString(1));
+        Assert.Equal(CurrentMainBaselineMigration, reader.GetString(2));
     }
 
     private static AddCaveVm LegacyValues(CaveVm cave) => new()
@@ -720,6 +946,34 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             ReportedByNameTagIds = entrance.ReportedByNameTagIds
         }).ToList()
     };
+
+    private static async Task SeedCurrentMainV32RepresentativeDataAsync(PostgresTestDatabase database)
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            insert into "States"("Id","Name","Abbreviation","CreatedOn")
+            values('mainstate1','Tennessee','TN',now());
+
+            insert into "Accounts"("Id","Name","CountyIdDelimiter","DefaultViewAccessAllCaves","ExportEnabled","CreatedOn")
+            values('mainacct01','Existing Main Account','-',false,true,now());
+
+            insert into "Counties"("Id","AccountId","StateId","DisplayId","Name","CreatedOn")
+            values('maincnty01','mainacct01','mainstate1','MAIN','Existing County',now());
+
+            insert into "Caves"("Id","AccountId","StateId","CountyId","Name","AlternateNames","CountyNumber","IsArchived","CreatedOn")
+            values('maincave01','mainacct01','mainstate1','maincnty01','Existing Main Cave','[]',42,false,now());
+
+            insert into "TagTypes"("Id","AccountId","Key","Name","IsDefault","CreatedOn")
+            values('mainfile01','mainacct01','File','Existing file',false,now());
+
+            insert into "Files"("Id","AccountId","CaveId","FileTypeTagId","FileName","DisplayName","BlobKey","BlobContainer","CreatedOn")
+            values('mainfiler1','mainacct01','maincave01','mainfile01','existing-cave.pdf','existing-cave',
+                   'caves/maincave01/files/mainfiler1.pdf','main',now());
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
 
     private async Task<PostgresTestDatabase> CreateV29DatabaseAsync(string name)
     {

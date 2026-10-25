@@ -79,35 +79,6 @@ public sealed class CaveMutationRepository
     }
 
     /// <summary>
-    /// Initializes revision tracking for an existing Cave without otherwise mutating it.
-    /// The Cave row lock makes concurrent authoring-context requests converge on one baseline.
-    /// </summary>
-    public async Task<string> EnsureBaselineAsync(string caveId, CancellationToken cancellationToken = default)
-    {
-        for (var attempt = 0; ; attempt++)
-        {
-            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                var cave = await GetLockedOwnedCaveAsync(caveId, cancellationToken);
-                var baseline = await EstablishBaselineIfNeededAsync(cave, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                return baseline.Revision.Id;
-            }
-            catch (DbUpdateConcurrencyException) when (attempt < 2)
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                _db.ChangeTracker.Clear();
-            }
-            catch
-            {
-                await transaction.RollbackAsync(CancellationToken.None);
-                throw;
-            }
-        }
-    }
-
-    /// <summary>
     /// Convenience path for a small synchronous Cave mutation. The coordinator
     /// owns the transaction and delegates revision publication to the same
     /// prepare/publish primitives used by larger service transactions.
@@ -185,7 +156,7 @@ public sealed class CaveMutationRepository
         if (expectedRevisionId is not null && cave.CurrentRevisionId != expectedRevisionId)
             throw new CaveRevisionConflictException(caveId, expectedRevisionId, cave.CurrentRevisionId);
 
-        var previous = await EstablishBaselineIfNeededAsync(cave, cancellationToken);
+        var previous = await GetCurrentRevisionAsync(cave, cancellationToken);
         var live = await _snapshots.BuildAsync(caveId, cancellationToken);
         return new CaveMutationPreparation(caveId, previous.Revision, previous.Snapshot, live);
     }
@@ -271,31 +242,16 @@ public sealed class CaveMutationRepository
             .SingleOrDefaultAsync(c => c.Id == caveId && c.AccountId == _scope.AccountId, cancellationToken)
         ?? throw new InvalidOperationException("Cave is not owned by the current account.");
 
-    private async Task<Cave> GetLockedOwnedCaveAsync(string caveId, CancellationToken cancellationToken) =>
-        await _db.Caves.FromSqlInterpolated(
-                $"SELECT *, xmin FROM \"Caves\" WHERE \"AccountId\" = {_scope.AccountId} AND \"Id\" = {caveId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken)
-        ?? throw ApiExceptionDictionary.NotFound("Cave");
-
-    private async Task<(CaveRevision Revision, CavePublishedSnapshotV1 Snapshot)> EstablishBaselineIfNeededAsync(
+    private async Task<(CaveRevision Revision, CavePublishedSnapshotV1 Snapshot)> GetCurrentRevisionAsync(
         Cave cave, CancellationToken cancellationToken)
     {
-        if (cave.CurrentRevisionId is not null)
-        {
-            var existing = await _db.CaveRevisions
-                .SingleAsync(r => r.Id == cave.CurrentRevisionId && r.AccountId == _scope.AccountId,
-                    cancellationToken);
-            return (existing, CaveSnapshotJson.Deserialize(existing.SnapshotJson, existing.SnapshotSchemaVersion));
-        }
+        if (cave.CurrentRevisionId is null)
+            throw new InvalidOperationException(
+                $"Cave '{cave.Id}' has no current revision. Revision history rollout must complete before Cave mutations are served.");
 
-        var snapshot = await _snapshots.BuildAsync(cave.Id, cancellationToken);
-        var baseline = NewRevision(cave.AccountId, cave.Id, null, snapshot, CaveRevisionSource.SystemBaseline,
-            CaveRevisionOperation.Create, null, null);
-        _db.CaveRevisions.Add(baseline);
-        await _db.SaveChangesAsync(cancellationToken);
-        cave.CurrentRevisionId = baseline.Id;
-        await _db.SaveChangesAsync(cancellationToken);
-        return (baseline, snapshot);
+        var revision = await _db.CaveRevisions
+            .SingleAsync(r => r.Id == cave.CurrentRevisionId && r.AccountId == _scope.AccountId, cancellationToken);
+        return (revision, CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion));
     }
 
     private void RequireCallerTransaction()

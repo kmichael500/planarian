@@ -109,7 +109,8 @@ public sealed class CsvExportSecurityTests
              directory != null;
              directory = directory.Parent)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
+            var gitPath = Path.Combine(directory.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
                 return directory.FullName;
         }
 

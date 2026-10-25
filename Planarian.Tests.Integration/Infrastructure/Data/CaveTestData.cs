@@ -72,8 +72,8 @@ internal static class CaveTestDataFactory
             AccountId = cave.AccountId,
             CaveId = cave.CaveId,
             Source = CaveRevisionSource.SystemBaseline,
-            Operation = CaveRevisionOperation.Create,
-            SnapshotSchemaVersion = 1,
+            Operation = CaveRevisionOperation.Baseline,
+            SnapshotSchemaVersion = snapshot.SchemaVersion,
             SnapshotJson = CaveSnapshotJson.Serialize(snapshot)
         });
         await db.SaveChangesAsync();

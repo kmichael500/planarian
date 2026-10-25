@@ -122,8 +122,9 @@ have different revision semantics. Both paths build `CavePublishedSnapshotV1` th
 `CavePublishedSnapshotRepository` and use `CaveRevisionDiffService` for semantic change detection. For a Cave that
 already has revision history, bulk publication compares the resulting snapshot with the stored current published
 revision, not merely with the live rows captured immediately before the bulk write. This preserves the same behavior for
-reference-label drift and semantic no-ops as interactive publication. A legacy Cave with no revision still compares its
-live before/after snapshots so a `SystemBaseline` is created only when the operation actually changes it.
+reference-label drift and semantic no-ops as interactive publication. Every pre-existing Cave must already have its
+rollout revision before import execution is available; a missing current revision on an existing Cave is an integrity
+error rather than a reason to manufacture a late baseline.
 
 It receives:
 
@@ -137,7 +138,7 @@ It receives:
 It then:
 
 - ignores semantic no-change rows;
-- creates a SystemBaseline for an existing Cave only when needed;
+- fails closed if an existing Cave lacks its rollout/current revision;
 - creates one Import revision for each real mutation;
 - advances CurrentRevisionId for non-deleted Caves;
 - writes in bounded batches.

@@ -37,8 +37,9 @@ CaveChangeRequestService is a workflow coordinator. It does not define a third r
 | --- | --- | --- | --- |
 | CaveService | Interactive Cave aggregate authoring, validation, authorization, File/line-plot/Entrance/tag desired state | Orchestrates through repositories and CaveMutationCoordinator; does not own raw DbContext | **Major change** |
 | CaveMutationCoordinator | Thin application boundary for Cave publication primitives | Delegates transaction/publish mechanics to CaveMutationRepository | **New** |
-| CaveMutationRepository | Single-Cave publication: baseline, conflict checks, prepare/publish/delete, revision pointer advancement | Owns transactional publication algorithm used by CaveService/FileService workflows | **New** |
+| CaveMutationRepository | Single-Cave publication: conflict checks, prepare/publish/delete, revision pointer advancement | Owns transactional publication algorithm used by CaveService/FileService workflows; existing Caves must already have rollout history | **New** |
 | CavePublishedSnapshotRepository | Build canonical semantic Cave snapshots using bounded projections | Reads PostgreSQL directly in repository layer | **New** |
+| CaveRevisionRolloutRepository | One-time initialization of revision history for Caves that predate the feature | Deployment-only, bounded/set-oriented, resumable; normal startup verifies completion | **New** |
 | CaveRevisionService | Permission-aware revision/history use cases | Read orchestration only | **New** |
 | CaveRevisionQueryRepository | Revision history and comparison persistence queries | Repository-level read model | **New** |
 | CaveBulkRevisionRepository | Publish many Cave revisions for import/admin workflows | Joins caller-owned transaction; batched/set-oriented | **New** |
@@ -168,6 +169,7 @@ The catalog above is responsibility-oriented, so it intentionally groups partial
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveMutationValidation.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveMutationValidation.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveMutationWorkflow.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveMutationWorkflow.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CavePublishedSnapshotRepository.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CavePublishedSnapshotRepository.cs) |
+| Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionRolloutRepository.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionRolloutRepository.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionQueryRepository.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionQueryRepository.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveTagReferencePolicy.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveTagReferencePolicy.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/StagedCaveFilePublication.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/StagedCaveFilePublication.cs) |

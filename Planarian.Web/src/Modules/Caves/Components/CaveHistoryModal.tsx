@@ -14,7 +14,7 @@ import { AppContext } from "../../../Configuration/Context/AppContext";
 const sourceLabel = (revision: CaveRevisionListItemVm) => {
   if (revision.changeRequestId) return "Changes approved";
   if (revision.source === "Import") return "Imported";
-  if (revision.source === "SystemBaseline") return "Revision tracking initialized";
+  if (revision.source === "SystemBaseline" && revision.operation === "Baseline") return "Revision history starts here";
   if (revision.operation === "Create") return "Created";
   if (revision.operation === "Archive") return "Archived";
   if (revision.operation === "Unarchive") return "Restored";
@@ -72,18 +72,19 @@ export const CaveHistoryModal = ({ caveId, canReviewChangeRequests = false }: { 
       <PlanarianModal header="Cave History" open={open} onClose={() => setOpen(false)} width={900}>
         <Spin spinning={loading}>
           {historyError && <Alert type="error" showIcon message={historyError} style={{ marginBottom: 16 }} />}
-          {!loading && history?.revisions.length === 0 && <Typography.Text type="secondary">Revision tracking has not started yet.</Typography.Text>}
           <Timeline
             items={history?.revisions.map((revision) => ({
               color: revision.isCurrent ? "green" : "blue",
               children: (
                 <Collapse onChange={loadRevision} ghost items={[{
                   key: revision.id,
-                  label: <div><strong>{sourceLabel(revision)}</strong>{revision.isCurrent && <Tag color="success" style={{ marginLeft: 8 }}>Current</Tag>}<div><Typography.Text type="secondary">Revision {revision.sequence} · {formatDateTime(revision.publishedOn)}{!revision.changeRequestId && revision.actorName ? ` · ${revision.actorName}` : ""}</Typography.Text></div>{revision.changeRequestId && <div><Typography.Text type="secondary">Submitted by {revision.changeRequestSubmitterName || "Unknown"} · Approved by {revision.changeRequestReviewerName || revision.actorName || "Unknown"}</Typography.Text></div>}</div>,
+                  label: <div><strong>{sourceLabel(revision)}</strong>{revision.isCurrent && <Tag color="success" style={{ marginLeft: 8 }}>Current</Tag>}<div><Typography.Text type="secondary">{revision.source === "SystemBaseline" && revision.operation === "Baseline" ? `History started · ${formatDateTime(revision.publishedOn)}` : `Revision ${revision.sequence} · ${formatDateTime(revision.publishedOn)}${!revision.changeRequestId && revision.actorName ? ` · ${revision.actorName}` : ""}`}</Typography.Text></div>{revision.changeRequestId && <div><Typography.Text type="secondary">Submitted by {revision.changeRequestSubmitterName || "Unknown"} · Approved by {revision.changeRequestReviewerName || revision.actorName || "Unknown"}</Typography.Text></div>}</div>,
                   children: <Space direction="vertical" size={8} style={{ width: "100%" }}>
                     {revision.changeRequestId && (canReviewChangeRequests || currentUser?.id === revision.changeRequestSubmitterUserId) && <Link to={ClientRoutes.caveChangeRequest.get(revision.changeRequestId)}>Review</Link>}
                     {comparisons[revision.id]
-                      ? <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} />
+                      ? revision.source === "SystemBaseline" && revision.operation === "Baseline"
+                        ? <Typography.Text type="secondary">This is the Cave as it existed when revision history was enabled. Earlier changes may not be shown.</Typography.Text>
+                        : <CaveRevisionDiff diff={comparisons[revision.id].diff} previous={comparisons[revision.id].previous} current={comparisons[revision.id].current} />
                       : revisionErrors[revision.id]
                         ? <Alert type="error" showIcon message={revisionErrors[revision.id]} />
                         : <Spin size="small" />}

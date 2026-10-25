@@ -54,7 +54,7 @@ sequenceDiagram
     Mutation->>DB: Begin transaction if none exists
     Service->>Coord: PrepareExisting(R10)
     Coord->>Mutation: PrepareExisting(R10)
-    Mutation->>DB: Verify current revision / establish baseline if needed
+    Mutation->>DB: Verify required current revision
     Mutation->>Snapshot: Build live snapshot before mutation
     Service->>Current: Apply and save Cave aggregate
     Current->>DB: Persist Cave/tags/Entrances/Files/line plots
@@ -97,13 +97,35 @@ sequenceDiagram
     API-->>B: Conflict; no mutation and no R12
 ~~~
 
-## Baselines
+## Revision-history rollout boundary
 
-Legacy Caves may have current relational state but no CurrentRevisionId.
+Every Cave that already exists when revision history is enabled receives exactly one system-generated rollout revision before the new API serves requests. That revision uses `Source = SystemBaseline` and `Operation = Baseline`; its canonical snapshot records the Cave exactly as it existed at the rollout boundary. It does **not** mean the Cave was created at that time or that no earlier changes occurred.
 
-Authoring context may call EnsureBaselineAsync after visibility/permission checks. CaveMutationRepository locks the Cave and creates a SystemBaseline revision exactly when needed.
+The rollout is a deliberate deployment step after the schema migrations. It is account-aware, bounded, resumable, idempotent, and uses the same `CavePublishedSnapshotRepository` projection as normal publication. All rollout revisions share one history-boundary timestamp and have no user actor. Normal API startup fails closed while any live Cave has `CurrentRevisionId = null`.
 
-A baseline is not supposed to be manufactured by ordinary detail/search/history reads merely because someone viewed a Cave.
+After rollout, an existing Cave without `CurrentRevisionId` is an integrity/deployment error. Ordinary reads, authoring-context reads, interactive writes, and bulk writes never manufacture a late baseline. A Cave created after rollout instead receives its ordinary `Create` revision atomically with creation.
+
+Recovered pre-revision history may later be reconstructed from older durable sources and presented before this boundary. Such recovered history is distinct from the authoritative `CaveRevision` chain and must not rewrite the rollout revision's predecessor pointer.
+
+### Rollout deployment sequence
+
+The rollout boundary assumes Cave-owned writes are quiesced while initialization runs. The supported deployment order is:
+
+1. stop or otherwise quiesce the old API's Cave/Entrance/File/line-plot/import/admin writes;
+2. apply the Cave-revisions EF migrations;
+3. run the new API artifact once with `--initialize-cave-revision-history`;
+4. verify the command completes successfully;
+5. start the new API normally. Its startup guard independently verifies that no live Cave still has a null `CurrentRevisionId`.
+
+The published API artifact runs the bootstrap with:
+
+```bash
+dotnet Planarian.dll --initialize-cave-revision-history
+```
+
+The command exits after initialization; it does not start the HTTP server. A successful rerun is a no-op and reports the existing history boundary.
+
+Do not let the old writer remain active during step 3. The rollout intentionally commits bounded batches for resumability rather than holding one database-wide transaction, so quiescing writers is what makes the shared timestamp represent one authoritative rollout state. Concurrent rollout commands themselves are serialized with a PostgreSQL advisory lock.
 
 ## Snapshot semantics
 
