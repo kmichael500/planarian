@@ -556,6 +556,54 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Accounts");
                 });
 
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountResetCleanupTarget", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsContainer")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StoragePartition")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("AccountId", "StoragePartition", "StorageKey", "IsContainer")
+                        .IsUnique();
+
+                    b.ToTable("AccountResetCleanupTargets");
+                });
+
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountState", b =>
                 {
                     b.Property<string>("AccountId")

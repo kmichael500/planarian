@@ -30,11 +30,21 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
     // dangerous
     [HttpDelete("reset")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public async Task<ActionResult<string>> RestAccount(CancellationToken cancellationToken)
+    public async Task<ActionResult<AccountResetResult>> RestAccount(CancellationToken cancellationToken)
     {
-        await Service.ResetAccount(cancellationToken);
-        return Ok("Account reset finished.");
+        var result = await Service.ResetAccount(cancellationToken);
+        return Ok(result);
     }
+
+    [HttpGet("reset/cleanup")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<bool>> HasPendingResetCleanup(CancellationToken cancellationToken)
+        => Ok(await Service.HasPendingResetCleanupAsync(cancellationToken));
+
+    [HttpPost("reset/cleanup")]
+    [Authorize(Policy = PermissionPolicyKey.Admin)]
+    public async Task<ActionResult<AccountResetResult>> RetryResetCleanup(CancellationToken cancellationToken)
+        => Ok(await Service.RetryResetCleanupAsync(cancellationToken));
 
     #region Misc Settings
 

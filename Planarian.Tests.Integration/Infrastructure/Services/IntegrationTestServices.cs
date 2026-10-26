@@ -35,10 +35,18 @@ internal sealed class IntegrationTestServices
     private readonly CavePublishedSnapshotRepository _snapshots;
     private readonly TagReferenceLockRepository _tagLocks;
     private AccountService? _account;
+    private readonly ArchiveJobCoordinator _archiveCoordinator;
+    private readonly AccountMaintenanceLockRepository _maintenance;
 
-    private IntegrationTestServices(PlanarianDbContext db, TestFileBlobStore blobs)
+    private IntegrationTestServices(PlanarianDbContext db, TestFileBlobStore blobs,
+        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null)
     {
         _db = db;
+        _maintenance = new AccountMaintenanceLockRepository(new ServerOptions
+        { SqlConnectionString = maintenanceConnectionString ?? db.Database.GetDbConnection().ConnectionString });
+        _archiveCoordinator = archiveCoordinator ??
+            new ArchiveJobCoordinator(new ServiceCollection().BuildServiceProvider()
+                .GetRequiredService<IServiceScopeFactory>(), _maintenance);
         var user = db.RequestUser;
         var caves = new CaveRepository(db, user);
         var tags = new TagRepository(db, user);
@@ -64,8 +72,9 @@ internal sealed class IntegrationTestServices
     public CaveService Caves { get; }
     public FileService Files { get; }
 
-    public static IntegrationTestServices For(PlanarianDbContext db, TestFileBlobStore? blobs = null) =>
-        new(db, blobs ?? new TestFileBlobStore());
+    public static IntegrationTestServices For(PlanarianDbContext db, TestFileBlobStore? blobs = null,
+        ArchiveJobCoordinator? archiveCoordinator = null, string? maintenanceConnectionString = null) =>
+        new(db, blobs ?? new TestFileBlobStore(), archiveCoordinator, maintenanceConnectionString);
 
     public async Task<FileVm> StageRequestFileForTestAsync(string requestId, Stream stream, string fileName,
         string? uuid, CancellationToken cancellationToken)
@@ -87,14 +96,14 @@ internal sealed class IntegrationTestServices
     private AccountService CreateAccountService()
     {
         var user = _db.RequestUser;
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
         return new AccountService(new AccountRepository(_db, user), user, Files,
             new NotificationService(new NoOpNotificationHubContext()), new FeatureSettingRepository(_db, user),
-            new ArchiveJobCoordinator(serviceProvider.GetRequiredService<IServiceScopeFactory>()), CreateThrottle(_db),
+            _archiveCoordinator, CreateThrottle(_db),
             new TagTypeAdministrationRepository(_db, user, _tagLocks, _snapshots,
                 new CaveBulkRevisionRepository(_db, user)),
             new CountyAdministrationRepository(_db, user, new CountyReferenceLockRepository(_db, user), _snapshots,
-                new CaveBulkRevisionRepository(_db, user)));
+                new CaveBulkRevisionRepository(_db, user)),
+            NullLogger<AccountService>.Instance, _maintenance);
     }
 
     private static RequestThrottleService CreateThrottle(PlanarianDbContext db)
@@ -257,6 +266,8 @@ internal sealed class TestFileBlobStore : IObjectStorage
             _ => Task.FromResult(OpenRead(address.Partition, address.Key)),
             "application/octet-stream", null, null));
     }
+
+    public void InvalidateContainer(string partition) { }
 
     public Task<bool> DeleteIfExistsAsync(StorageObjectAddress address, CancellationToken cancellationToken)
     {

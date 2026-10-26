@@ -344,6 +344,21 @@ public class FileService : ServiceBase<FileRepository>
 
     public Task DeleteObjectBestEffortAsync(StorageObjectAddress address) => BestEffortDeleteObjectAsync(address);
 
+    // Reset Account needs to report post-commit storage failures truthfully.
+    // Ordinary File cleanup retains its best-effort, non-signaling contract.
+    public async Task<bool> TryDeleteObjectAsync(StorageObjectAddress address)
+    {
+        try
+        {
+            await _objectStorage.DeleteIfExistsAsync(address, CancellationToken.None);
+            return true; // An already-missing immutable object is safely cleaned up.
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task RequireAuthoringStagedObjectsAvailableAsync(IEnumerable<string> fileIds,
         CancellationToken cancellationToken)
     {
@@ -470,18 +485,29 @@ public class FileService : ServiceBase<FileRepository>
     private static async Task EnsureContainerExists(BlobContainerClient containerClient)
     {
         var containerName = containerClient.Name;
-        var initializationTask = ContainerInitializationTasks.GetOrAdd(
-            containerName,
-            _ => containerClient.CreateIfNotExistsAsync());
-
-        try
+        // Azure may still be deleting the previous container immediately after
+        // Reset Account. This legacy BlobService path needs the same recreation
+        // retry as the provider-neutral upload path.
+        for (var attempt = 0; ; attempt++)
         {
-            await initializationTask;
-        }
-        catch
-        {
-            ContainerInitializationTasks.TryRemove(containerName, out _);
-            throw;
+            var initializationTask = ContainerInitializationTasks.GetOrAdd(
+                containerName, _ => containerClient.CreateIfNotExistsAsync());
+            try
+            {
+                await initializationTask;
+                return;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 409 &&
+                ex.ErrorCode == "ContainerBeingDeleted" && attempt < 9)
+            {
+                ContainerInitializationTasks.TryRemove(containerName, out _);
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * (attempt + 1), 8)));
+            }
+            catch
+            {
+                ContainerInitializationTasks.TryRemove(containerName, out _);
+                throw;
+            }
         }
     }
 
@@ -628,6 +654,7 @@ public class FileService : ServiceBase<FileRepository>
             // A successful initialization is cached to avoid repeated container-existence checks.
             // Invalidate it even when deletion fails so a later upload can re-establish the container safely.
             ContainerInitializationTasks.TryRemove(containerClient.Name, out _);
+            _objectStorage.InvalidateContainer(containerClient.Name);
         }
     }
 

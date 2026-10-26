@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Azure;
 using Planarian.Library.Exceptions;
 using Planarian.Model.Database.Entities;
@@ -29,11 +30,14 @@ public class AccountService : ServiceBase<AccountRepository>
     private readonly RequestThrottleService _requestThrottleService;
     private readonly TagTypeAdministrationRepository _tagTypes;
     private readonly CountyAdministrationRepository _counties;
+    private readonly ILogger<AccountService> _logger;
+    private readonly AccountMaintenanceLockRepository _maintenance;
 
     public AccountService(AccountRepository repository, RequestUser requestUser, FileService fileService,
         NotificationService notificationService, FeatureSettingRepository featureSettingRepository,
         ArchiveJobCoordinator archiveJobCoordinator, RequestThrottleService requestThrottleService,
-        TagTypeAdministrationRepository tagTypes, CountyAdministrationRepository counties) : base(repository, requestUser)
+        TagTypeAdministrationRepository tagTypes, CountyAdministrationRepository counties,
+        ILogger<AccountService> logger, AccountMaintenanceLockRepository maintenance) : base(repository, requestUser)
     {
         _fileService = fileService;
         _notificationService = notificationService;
@@ -42,23 +46,155 @@ public class AccountService : ServiceBase<AccountRepository>
         _requestThrottleService = requestThrottleService;
         _tagTypes = tagTypes;
         _counties = counties;
+        _logger = logger;
+        _maintenance = maintenance;
     }
-    public async Task ResetAccount(CancellationToken cancellationToken)
+
+    public async Task<AccountResetResult> ResetAccount(CancellationToken cancellationToken)
     {
-        var group = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
-        await _notificationService.SendNotificationToGroupAsync(group, "Resetting cave and account data.");
-        var fileObjects = await Repository.ExecuteResetAsync(cancellationToken);
-        await _notificationService.SendNotificationToGroupAsync(group, "Finished resetting cave and account data.");
+        var accountId = RequestUser.AccountId ?? throw ApiExceptionDictionary.NoAccount;
+        if (!_archiveJobCoordinator.TryBeginAccountReset(accountId))
+            throw ApiExceptionDictionary.Conflict("An archive or account reset is already running.");
 
-        await _notificationService.SendNotificationToGroupAsync(group, "Deleting associated files.");
-        foreach (var fileObject in fileObjects)
-            await _fileService.DeleteObjectBestEffortAsync(
-                new StorageObjectAddress(fileObject.Partition, fileObject.Key));
+        try
+        {
+            await using var lease = await _maintenance.TryAcquireAsync(accountId, exclusive: true, cancellationToken)
+                ?? throw ApiExceptionDictionary.Conflict("An account write or archive is still running.");
 
-        // Legacy account-owned assets (archives/photos/import transport) still share the
-        // Azure account container. Keep that cleanup after the relational reset commits.
-        await _fileService.DeleteContainer(RequestUser.AccountContainerName);
-        await _notificationService.SendNotificationToGroupAsync(group, "Done deleting associated files.");
+            var group = $"{RequestUser.UserGroupPrefix}-DeleteAllCaves";
+            await NotifyResetProgressBestEffortAsync(group, "Resetting cave and account data.");
+            await Repository.ExecuteResetAsync(cancellationToken);
+            // This transition is irreversible. Ignore request disconnects during cleanup.
+            try
+            {
+                return await CleanupStorageAsync(group);
+            }
+            catch (Exception ex)
+            {
+                // The purge has already committed. Never report this as rollback.
+                _logger.LogError(ex, "Account {AccountId} reset committed, but cleanup processing failed",
+                    accountId);
+                await NotifyResetProgressBestEffortAsync(group,
+                    "Account data was reset, but stored-file cleanup needs a retry.");
+                return new AccountResetResult(true, false);
+            }
+        }
+        finally
+        {
+            _archiveJobCoordinator.CompleteAccountReset(accountId);
+        }
+    }
+
+    public Task<bool> HasPendingResetCleanupAsync(CancellationToken cancellationToken)
+        => Repository.HasPendingCleanupAsync(cancellationToken);
+
+    public async Task<AccountResetResult> RetryResetCleanupAsync(CancellationToken cancellationToken)
+    {
+        var accountId = RequestUser.AccountId ?? throw ApiExceptionDictionary.NoAccount;
+        if (!_archiveJobCoordinator.TryBeginAccountReset(accountId))
+            throw ApiExceptionDictionary.Conflict("An archive or account reset is already running.");
+
+        try
+        {
+            await using var lease = await _maintenance.TryAcquireAsync(accountId, exclusive: true, cancellationToken)
+                ?? throw ApiExceptionDictionary.Conflict("An account write or archive is still running.");
+            if (!await Repository.HasPendingCleanupAsync(cancellationToken))
+                throw ApiExceptionDictionary.BadRequest("No account reset cleanup is pending.");
+            try
+            {
+                return await CleanupStorageAsync($"{RequestUser.UserGroupPrefix}-DeleteAllCaves");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Account {AccountId} cleanup retry failed", accountId);
+                return new AccountResetResult(true, false);
+            }
+        }
+        finally
+        {
+            _archiveJobCoordinator.CompleteAccountReset(accountId);
+        }
+    }
+
+    private async Task<AccountResetResult> CleanupStorageAsync(string group)
+    {
+        // Pending targets were written in the same transaction as the reset.
+        // Only confirmed deletions remove outbox rows; process crashes leave retryable debt.
+        await NotifyResetProgressBestEffortAsync(group, "Deleting associated files.");
+        var completedIds = new List<string>(500);
+        var failed = 0;
+        var pending = await Repository.GetCleanupTargetsAsync(CancellationToken.None);
+        var conflicts = await Repository.GetConflictedCleanupTargetIdsAsync(pending, CancellationToken.None);
+        foreach (var target in pending)
+        {
+            var successful = false;
+            try
+            {
+                if (target.IsContainer)
+                {
+                    if (await Repository.IsContainerReferencedByAnotherAccountAsync(
+                            target.StoragePartition, CancellationToken.None))
+                    {
+                        _logger.LogWarning("Account {AccountId} container has foreign references; cleanup deferred",
+                            RequestUser.AccountId);
+                    }
+                    else
+                    {
+                        await _fileService.DeleteContainer(target.StoragePartition);
+                        successful = true;
+                    }
+                }
+                else if (conflicts.Contains(target.Id))
+                {
+                    _logger.LogWarning("Cleanup target {Id} is now referenced by another account", target.Id);
+                }
+                else
+                {
+                    successful = await _fileService.TryDeleteObjectAsync(
+                        new StorageObjectAddress(target.StoragePartition, target.StorageKey));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reset cleanup failed for account {AccountId}, target {Id}",
+                    RequestUser.AccountId, target.Id);
+            }
+
+            if (successful) completedIds.Add(target.Id);
+            else
+            {
+                failed++;
+                _logger.LogWarning("Account reset cleanup target {TargetId} remains pending", target.Id);
+            }
+            if (completedIds.Count == 500)
+            {
+                await Repository.CompleteCleanupTargetsAsync(completedIds, CancellationToken.None);
+                completedIds.Clear();
+            }
+        }
+
+        if (completedIds.Count > 0)
+            await Repository.CompleteCleanupTargetsAsync(completedIds, CancellationToken.None);
+
+        var complete = failed == 0 &&
+            !await Repository.HasPendingCleanupAsync(CancellationToken.None);
+        await NotifyResetProgressBestEffortAsync(group, complete
+            ? "Finished resetting cave/account data and deleting stored files."
+            : "Cave/account data was reset, but some stored files could not be cleaned up.");
+        return new AccountResetResult(RelationalResetCompleted: true, StorageCleanupCompleted: complete);
+    }
+
+    private async Task NotifyResetProgressBestEffortAsync(string group, string message)
+    {
+        try
+        {
+            await _notificationService.SendNotificationToGroupAsync(group, message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reset notification delivery failed for account {AccountId}",
+                RequestUser.AccountId);
+        }
     }
 
     #region Tags
@@ -243,14 +379,15 @@ public class AccountService : ServiceBase<AccountRepository>
 
     #region Archive
 
-    public void StartArchive()
+    public async Task StartArchiveAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
         {
             throw ApiExceptionDictionary.NoAccount;
         }
 
-        var started = _archiveJobCoordinator.StartArchiveJob(RequestUser.AccountId, RequestUser.AccountContainerName);
+        var started = await _archiveJobCoordinator.StartArchiveJobAsync(
+            RequestUser.AccountId, RequestUser.AccountContainerName, cancellationToken);
         if (!started)
         {
             throw ApiExceptionDictionary.BadRequest("An archive is already running for this account.");

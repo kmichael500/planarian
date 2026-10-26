@@ -25,8 +25,23 @@ import {
 
 const baseUrl = "api/account";
 const AccountService = {
-  async ResetAccount() {
-    await HttpClient.delete(`${baseUrl}/reset`);
+  async ResetAccount(): Promise<{ relationalResetCompleted: boolean; storageCleanupCompleted: boolean }> {
+    const response = await HttpClient.delete<{ relationalResetCompleted: boolean; storageCleanupCompleted: boolean }>(
+      `${baseUrl}/reset`
+    );
+    return response.data;
+  },
+
+  async HasPendingResetCleanup(): Promise<boolean> {
+    const response = await HttpClient.get<boolean>(`${baseUrl}/reset/cleanup`);
+    return response.data;
+  },
+
+  async RetryResetCleanup(): Promise<{ relationalResetCompleted: boolean; storageCleanupCompleted: boolean }> {
+    const response = await HttpClient.post<{ relationalResetCompleted: boolean; storageCleanupCompleted: boolean }>(
+      `${baseUrl}/reset/cleanup`, {}
+    );
+    return response.data;
   },
 
   //#region Settings

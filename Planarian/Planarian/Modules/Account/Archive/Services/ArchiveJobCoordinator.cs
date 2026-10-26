@@ -17,28 +17,68 @@ public class ArchiveJobCoordinator
     public const string TempArchivePrefix = "archives/temp/";
 
     private readonly ConcurrentDictionary<string, ArchiveJobHandle> _jobs = new();
+    private readonly HashSet<string> _resettingAccounts = new(StringComparer.Ordinal);
+    private readonly object _accountMaintenanceGate = new();
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly AccountMaintenanceLockRepository _maintenance;
 
-    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory)
+    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory, AccountMaintenanceLockRepository maintenance)
     {
         _scopeFactory = scopeFactory;
+        _maintenance = maintenance;
     }
 
     public static string GetGroupName(string accountId) => $"archive-{accountId}";
 
-    public bool StartArchiveJob(string accountId, string accountContainerName)
+    // Guard reset/archive admission as one atomic operation on this application instance.
+    // A running archive must not repopulate an account container during reset.
+    public bool TryBeginAccountReset(string accountId)
     {
+        lock (_accountMaintenanceGate)
+        {
+            if (_resettingAccounts.Contains(accountId) || _jobs.ContainsKey(accountId))
+                return false;
+            return _resettingAccounts.Add(accountId);
+        }
+    }
+
+    public void CompleteAccountReset(string accountId)
+    {
+        lock (_accountMaintenanceGate)
+            _resettingAccounts.Remove(accountId);
+    }
+
+    public async Task<bool> StartArchiveJobAsync(string accountId, string accountContainerName,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = await _maintenance.TryAcquireAsync(accountId, exclusive: false, cancellationToken);
+        if (lease is null) return false;
+
         var jobHandle = new ArchiveJobHandle(accountId, accountContainerName, new CancellationTokenSource())
         {
             StatusMessage = "Preparing archive..."
         };
-
-        if (!_jobs.TryAdd(accountId, jobHandle))
+        lock (_accountMaintenanceGate)
         {
+            if (_resettingAccounts.Contains(accountId) || !_jobs.TryAdd(accountId, jobHandle))
+            {
+                jobHandle.CancellationTokenSource.Dispose();
+                // Cannot await under the in-process gate; release just below.
+                jobHandle = null!;
+            }
+        }
+
+        if (jobHandle is null)
+        {
+            await lease.DisposeAsync();
             return false;
         }
 
-        _ = Task.Run(() => RunArchiveJob(jobHandle), CancellationToken.None);
+        _ = Task.Run(async () =>
+        {
+            try { await RunArchiveJob(jobHandle); }
+            finally { await lease.DisposeAsync(); }
+        }, CancellationToken.None);
         return true;
     }
 

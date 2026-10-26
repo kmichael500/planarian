@@ -89,6 +89,7 @@ public partial class PlanarianDbContextBase : DbContext
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
     public DbSet<RetainedCaveFileObject> RetainedCaveFileObjects { get; set; } = null!;
+    public DbSet<AccountResetCleanupTarget> AccountResetCleanupTargets { get; set; } = null!;
     public DbSet<GeologicAgeTag> GeologicAgeTags { get; set; } = null!;
     public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<MapStatusTag> MapStatusTags { get; set; } = null!;

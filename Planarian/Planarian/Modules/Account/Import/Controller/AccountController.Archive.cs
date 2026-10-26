@@ -13,9 +13,9 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
 {
     [HttpPost("archive")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]
-    public IActionResult StartArchive()
+    public async Task<IActionResult> StartArchive(CancellationToken cancellationToken)
     {
-        Service.StartArchive();
+        await Service.StartArchiveAsync(cancellationToken);
         return Ok();
     }
 

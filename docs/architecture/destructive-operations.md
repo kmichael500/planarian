@@ -82,27 +82,78 @@ sequenceDiagram
     Admin->>Service: Reset Account
     Service->>Repo: ExecuteResetAsync
     Repo->>DB: Begin transaction
-    Repo->>DB: Capture live + retained object addresses
-    Repo->>DB: Delete revision/workflow/Cave/reference/account state graph
+    Service->>DB: Acquire exclusive account maintenance lease
+    Repo->>DB: Capture File + retained storage locators
+    Repo->>DB: Persist cleanup targets; purge Cave/account graph
     Repo->>DB: Commit
-    Repo-->>Service: Object addresses
-    loop captured objects
-        Service->>Storage: Best-effort delete object
+    loop persisted cleanup targets
+        Service->>Storage: Delete object or account container
+        Service->>DB: Remove successfully cleaned target
     end
-    Service->>Storage: Delete legacy account container
+    Service-->>Admin: Relational reset complete; storage cleanup status
 ~~~
 
 The relational reset is committed **before** external cleanup.
 
+Before the commit, the repository rejects File/retained-object locators that refer
+to another account's storage container or to bytes also referenced by another
+tenant's relational File/retention rows. This preflight fails closed, leaving
+both tenants' relational data and storage untouched rather than deleting a
+foreign tenant's bytes. It operates in bounded key batches to avoid one query
+per stored object.
+
 That ordering is intentional.
 
-## Important Reset Account caveat
+## Reset Account partial-success contract and recovery
 
-The final whole-container delete is not currently best-effort in the same way as individual object deletion.
+The API distinguishes `relationalResetCompleted` from `storageCleanupCompleted`.
+Provider-neutral object locators and the account-container deletion target are
+written to `AccountResetCleanupTargets` in the **same PostgreSQL transaction**
+as the relational purge. Storage deletion starts only after commit. Deletion
+targets are removed in bounded batches after successful storage operations;
+crashes and failures leave durable targets for the administrator's
+`POST /api/account/reset/cleanup` retry, exposed in Account Settings. The
+`GET /api/account/reset/cleanup` status survives page refresh.
 
-If container deletion fails after the PostgreSQL reset committed, the API can report failure even though the relational reset already happened.
+Until all targets are cleared, the account's mutating HTTP requests are
+rejected. This matters: a retry must not erase new files uploaded into a
+previously deleted container or reuse an object key. Reads remain available.
+The account's identity, users and feature settings remain intact.
 
-Because this is a legitimate partial-success state, its current test coverage and user-visible behavior decision are tracked in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md) rather than duplicated here.
+Reset and account archive creation use PostgreSQL **session-level advisory
+locks**. Ordinary account-scoped mutating HTTP requests and full background
+archive jobs hold a shared per-account lease. Reset and cleanup retry need an
+exclusive lease, which fails closed if another request/archive is active.
+A database-session failure automatically releases its lease. Coordination
+uses a separate bounded Npgsql connection pool so holding these long-lived
+leases does not starve ordinary EF database connections. The middleware
+enforces this after authentication/authorization, on all mutating HTTP verbs,
+including bulk import endpoints. The reset/cleanup endpoints use the exclusive
+lease themselves instead.
+
+Pre-commit address checks reject foreign-account containers, shared
+provider-neutral objects, and **any foreign File/retention reference to the
+entire account container**, even if the key does not appear in this account's
+own File table. Cleanup retries re-check foreign references before deleting.
+The preflight and cleanup reference queries are bounded in key batches.
+
+Account container deletion intentionally removes stored archives, temporary
+archives and import transport files. Azure acknowledges the container-delete
+request before all physical cleanup necessarily finishes; a successful API result
+means the storage provider accepted the deletion, not that every byte is already
+gone or that any configured soft-delete retention has expired. `FileService` invalidates both its own
+and the provider-neutral Azure storage initialization caches. Uploads handle
+Azure's transient `ContainerBeingDeleted` response with bounded retries
+to accommodate asynchronous container deletion.
+
+**Boundaries:** the shared lease covers HTTP requests entering this app and
+ArchiveJobCoordinator, not arbitrary direct database writers, external
+processes bypassing the app, or hypothetical future background jobs that do
+not take the lease. Cross-tenant reference checks cannot prevent an unrelated
+non-cooperating writer from adding a foreign reference *after* a check.
+Storage operations and Postgres commits are not a distributed transaction;
+unavailability can leave recorded cleanup debt. Do not claim stronger
+guarantees without a deployment-level audit of every writer.
 
 ## Account container also contains archives
 
@@ -112,12 +163,11 @@ ResetAccount removes the whole account container after relational reset.
 
 Therefore stored server-side account archives are currently removed by Reset Account as part of that container deletion.
 
-This behavior needs an explicit product contract:
-
-- either archives are intentionally reset data and the UX should say so;
-- or archives are recovery artifacts and need a separate retention boundary.
-
-The current validation/product-decision status for this behavior is kept in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md).
+**Decision:** archives are intentionally deleted during Reset Account. They are
+current-state exports, not a protected recovery/backup channel. The UI explicitly
+warns that stored archives are deleted, and the integration tests assert that
+Account A's archive objects disappear while Account B's remain. Previously
+downloaded archive copies outside Planarian are unaffected.
 
 ## Archive jobs
 
