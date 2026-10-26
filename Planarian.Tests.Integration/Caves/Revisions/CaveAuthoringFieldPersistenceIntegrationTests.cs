@@ -16,7 +16,7 @@ using static Planarian.Tests.Integration.Caves.Revisions.CaveChangeRequestTestSu
 
 namespace Planarian.Tests.Integration.Caves.Revisions;
 
-public sealed class CaveChangeRequestFieldPersistenceIntegrationTests(PostgresTestServer fixture)
+public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestServer fixture)
     : IClassFixture<PostgresTestServer>
 {
     private const string FullGeoJson =
@@ -578,6 +578,217 @@ public sealed class CaveChangeRequestFieldPersistenceIntegrationTests(PostgresTe
                 .BuildAsync(tenant.CaveId);
             Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
         }
+    }
+
+    [Fact]
+    public async Task NewCaveCreationPersistsEveryAuthorableFieldAndCreatesOneCompleteRevision()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(NewCaveCreationPersistsEveryAuthorableFieldAndCreatesOneCompleteRevision));
+        var account = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        var shell = new PublishedCaveTestData(
+            account.AccountId, account.StateId, account.StateName, account.StateAbbreviation,
+            account.CountyId, account.CountyName, account.CountyDisplayId,
+            string.Empty, string.Empty, 1, string.Empty);
+        var references = await CreateReferenceCatalogAsync(database, shell);
+        await GrantScopedManagerAsync(database, account.AccountId, references.TargetCountyId, "manager");
+        var blobs = new TestFileBlobStore();
+
+        string stagedFileId;
+        string createdCaveId;
+        await using (var manager = await CaveTestActor.CreateAsync(database, account.AccountId, "manager", blobs))
+        {
+            await using var content = new MemoryStream(Encoding.UTF8.GetBytes("new Cave field contract bytes"));
+            var staged = await manager.Services.Files.StageAuthoringFile(content, "source.pdf", default);
+            stagedFileId = staged.Id;
+
+            var values = FullValues(shell, references, stagedFileId);
+            values.Id = null;
+            values.ExpectedRevisionId = null;
+
+            createdCaveId = await manager.Services.Caves.AddCave(values, default);
+            Assert.False(string.IsNullOrWhiteSpace(createdCaveId));
+        }
+
+        await using var verify = await CaveTestActor.CreateAsync(database, account.AccountId, "manager", blobs);
+        verify.Db.ChangeTracker.Clear();
+        var live = await new CaveRepository(verify.Db, verify.Db.RequestUser).GetCave(createdCaveId);
+        Assert.NotNull(live);
+        Assert.Equal("Fully Populated Cave", live!.Name);
+        Assert.Equal(["Alpha Alias", "Zulu Alias"], live.AlternateNames);
+        Assert.Equal(references.TargetStateId, live.StateId);
+        Assert.Equal(references.TargetCountyId, live.CountyId);
+        Assert.Equal(42, live.CountyNumber);
+        Assert.Equal(123.5, live.LengthFeet);
+        Assert.Equal(54.25, live.DepthFeet);
+        Assert.Equal(31.75, live.MaxPitDepthFeet);
+        Assert.Equal(4, live.NumberOfPits);
+        Assert.Equal("Full narrative", live.Narrative);
+        Assert.Equal(CaveReportedOn, live.ReportedOn);
+        Assert.Equal([references.Geology.Id], live.GeologyTagIds);
+        Assert.Equal([references.GeologicAge.Id], live.GeologicAgeTagIds);
+        Assert.Equal([references.MapStatus.Id], live.MapStatusTagIds);
+        Assert.Equal([references.PhysiographicProvince.Id], live.PhysiographicProvinceTagIds);
+        Assert.Equal([references.Archeology.Id], live.ArcheologyTagIds);
+        Assert.Equal([references.Biology.Id], live.BiologyTagIds);
+        Assert.Equal([references.CaveOther.Id], live.OtherTagIds);
+        Assert.Equal([references.Cartographer.Id], live.CartographerNameTagIds);
+        Assert.Equal([references.CaveReporter.Id], live.ReportedByNameTagIds);
+
+        var primary = Assert.Single(live.Entrances.Where(entrance => entrance.IsPrimary));
+        var secondary = Assert.Single(live.Entrances.Where(entrance => !entrance.IsPrimary));
+        Assert.Equal("Main Entrance", primary.Name);
+        Assert.Equal("Detailed entrance description", primary.Description);
+        Assert.Equal(references.LocationQuality.Id, primary.LocationQualityTagId);
+        Assert.Equal([references.EntranceStatus.Id], primary.EntranceStatusTagIds);
+        Assert.Equal([references.EntranceHydrology.Id], primary.EntranceHydrologyTagIds);
+        Assert.Equal([references.FieldIndication.Id], primary.FieldIndicationTagIds);
+        Assert.Equal([references.EntranceReporter.Id], primary.ReportedByNameTagIds);
+        Assert.Equal([references.EntranceOther.Id], primary.EntranceOtherTagIds);
+
+        var file = Assert.Single(await verify.Db.Files.AsNoTracking()
+            .Where(row => row.CaveId == createdCaveId).ToListAsync());
+        Assert.Equal(stagedFileId, file.Id);
+        Assert.Equal(references.SurveyFile.Id, file.FileTypeTagId);
+        Assert.Equal("Field evidence", file.Name);
+        Assert.Null(file.ExpiresOn);
+
+        var linePlot = Assert.Single(await verify.Db.CaveGeoJsons.AsNoTracking()
+            .Where(row => row.CaveId == createdCaveId).ToListAsync());
+        Assert.Equal("Main Traverse", linePlot.Name);
+
+        var revisions = await verify.Db.CaveRevisions.Where(row => row.CaveId == createdCaveId).ToListAsync();
+        var revision = Assert.Single(revisions);
+        Assert.Equal(CaveRevisionSource.ManagerEdit, revision.Source);
+        Assert.Equal(CaveRevisionOperation.Create, revision.Operation);
+        Assert.Null(revision.PreviousRevisionId);
+        Assert.Equal(revision.Id, live.CurrentRevisionId);
+
+        var snapshot = CaveSnapshotJson.Deserialize(revision.SnapshotJson, revision.SnapshotSchemaVersion);
+        AssertFullPublishedSnapshot(snapshot, references, stagedFileId, primary.Id, secondary.Id, linePlot.Id);
+        var rebuilt = await new CavePublishedSnapshotRepository(verify.Db, verify.Db.RequestUser)
+            .BuildAsync(createdCaveId);
+        Assert.Equal(CaveSnapshotJson.Serialize(rebuilt), CaveSnapshotJson.Serialize(snapshot));
+    }
+
+    [Fact]
+    public async Task DirectEditAndProposalApprovalProduceIdenticalPublishedStateForTheSameIntent()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(DirectEditAndProposalApprovalProduceIdenticalPublishedStateForTheSameIntent));
+        var (tenant, locationQualityId) =
+            await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        var biology = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.Biology, "Parity Bat", "parbio0001");
+        var hydrology = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
+            TagTypeKeyConstant.EntranceHydrology, "Parity Wet", "parhyd0001");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+
+        AddCaveVm baselineValues;
+        CavePublishedSnapshotV1 directSnapshot;
+        string directRevisionId;
+
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager"))
+        {
+            var baselineContext = await manager.Services.Caves.GetEditAuthoringContextAsync(tenant.CaveId, default);
+            baselineValues = ValuesFromCave(baselineContext.Cave);
+
+            var directTarget = ValuesFromCave(baselineContext.Cave);
+            ApplyParityTarget(directTarget, biology.Id, hydrology.Id);
+            await manager.Services.Caves.AddCave(directTarget, default);
+            manager.Db.ChangeTracker.Clear();
+
+            var directLive = await new CaveRepository(manager.Db, manager.Db.RequestUser).GetCave(tenant.CaveId);
+            directRevisionId = directLive!.CurrentRevisionId!;
+            var directRevision = await manager.Db.CaveRevisions.SingleAsync(row => row.Id == directRevisionId);
+            directSnapshot = CaveSnapshotJson.Deserialize(
+                directRevision.SnapshotJson, directRevision.SnapshotSchemaVersion);
+
+            baselineValues.ExpectedRevisionId = directRevisionId;
+            await manager.Services.Caves.AddCave(baselineValues, default);
+        }
+
+        string requestId;
+        string proposalVersionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor"))
+        {
+            var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+            var proposalTarget = ValuesFromCave(context.Cave);
+            ApplyParityTarget(proposalTarget, biology.Id, hydrology.Id);
+            requestId = await contributor.ChangeRequests.CreateAsync(
+                tenant.CaveId, proposalTarget, context.ExpectedBaseRevisionId, default);
+            proposalVersionId = await CurrentVersionAsync(contributor.Db, requestId);
+        }
+
+        string approvedRevisionId;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer"))
+        {
+            approvedRevisionId = (await reviewer.ChangeRequests.ApproveAsync(
+                requestId, proposalVersionId, "Parity approval", default)).PublishedRevisionId!;
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        var approvedRevision = await verify.CaveRevisions.SingleAsync(row => row.Id == approvedRevisionId);
+        var approvedSnapshot = CaveSnapshotJson.Deserialize(
+            approvedRevision.SnapshotJson, approvedRevision.SnapshotSchemaVersion);
+
+        Assert.True(new CaveRevisionDiffService().IsSemanticEqual(directSnapshot, approvedSnapshot));
+        Assert.Equal(CaveSnapshotJson.Serialize(directSnapshot), CaveSnapshotJson.Serialize(approvedSnapshot));
+        Assert.NotEqual(directRevisionId, approvedRevisionId);
+    }
+
+    private static void ApplyParityTarget(AddCaveVm values, string biologyTagId, string hydrologyTagId)
+    {
+        values.Name = "Path Parity Cave";
+        values.AlternateNames = ["Parity Alpha", "Parity Zulu"];
+        values.LengthFeet = 234.5;
+        values.DepthFeet = 67.25;
+        values.MaxPitDepthFeet = 23.75;
+        values.NumberOfPits = 5;
+        values.Narrative = "Identical desired state";
+        values.ReportedOn = CaveReportedOn;
+        values.BiologyTagIds = [biologyTagId];
+
+        var entrance = values.Entrances.Single();
+        entrance.Name = "Parity Entrance";
+        entrance.Description = "Identical entrance state";
+        entrance.Latitude = 35.75;
+        entrance.Longitude = -86.25;
+        entrance.ElevationFeet = 345.5;
+        entrance.ReportedOn = EntranceReportedOn;
+        entrance.PitFeet = 21.5;
+        entrance.EntranceHydrologyTagIds = [hydrologyTagId];
+    }
+
+    private static async Task GrantScopedManagerAsync(
+        PostgresTestDatabase database, string accountId, string countyId, string userId)
+    {
+        await using var db = database.CreateDbContext(userId, accountId);
+        await CavePermissions.EnsureAccountUserAsync(db, accountId);
+        const string permissionId = "mAnageR000";
+        if (!await db.Permissions.AnyAsync(row => row.Id == permissionId))
+        {
+            db.Permissions.Add(new Permission
+            {
+                Id = permissionId,
+                Key = "Manager",
+                Name = "Manager",
+                Description = "Manage Caves",
+                PermissionType = "Cave"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        db.CavePermissions.Add(new CavePermission
+        {
+            UserId = db.RequestUser.Id,
+            AccountId = accountId,
+            CountyId = countyId,
+            PermissionId = permissionId
+        });
+        await db.SaveChangesAsync();
     }
 
     private static readonly DateTime CaveReportedOn =

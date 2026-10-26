@@ -17,6 +17,7 @@ import { getFileType } from "../../Files/Services/FileHelpers";
 import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 import { FileService } from "../../Files/Services/FileService";
 import { caveToForm } from "../Helpers/CaveFormMapper";
+import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm } from "../Models/CaveChangeRequestVm";
 import { CaveVm } from "../Models/CaveVm";
@@ -76,7 +77,8 @@ export const SuggestCaveChangesPage = () => {
 
   if (!caveId) return null;
 
-  const preview = async (values: AddCaveVm) => {
+  const preview = async (_validatedValues: AddCaveVm) => {
+    const values = getCaveAuthoringSubmissionValues(form);
     setLoading(true);
     try {
       setDraft(values);

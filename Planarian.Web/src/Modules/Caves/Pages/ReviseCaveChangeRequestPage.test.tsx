@@ -34,8 +34,17 @@ jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
 }));
 
 jest.mock("../Helpers/CaveFormMapper", () => ({
-  caveToForm: (cave: any) => ({ id: cave?.id ?? "cave000001", name: cave?.name ?? "Proposed name" }),
-  snapshotToForm: () => ({ id: "cave000001", name: "Proposed name" }),
+  caveToForm: (cave: any) => ({
+    id: cave?.id ?? "cave000001", expectedRevisionId: "revision01", name: cave?.name ?? "Proposed name",
+    depthFeet: null, biologyTagIds: ["biology-hidden"],
+    files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
+    linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
+  }),
+  snapshotToForm: () => ({
+    id: "cave000001", name: "Proposed name", depthFeet: null, biologyTagIds: ["biology-hidden"],
+    files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
+    linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
+  }),
 }));
 
 beforeAll(() => {
@@ -253,4 +262,37 @@ it("saves reviewer-requested edits as a draft without implicitly resubmitting", 
   fireEvent.click(await screen.findByRole("button", { name: "Save draft version" }));
   await waitFor(() => expect(revise).toHaveBeenCalledTimes(1));
   expect(resubmit).not.toHaveBeenCalled();
+});
+
+
+it("previews and saves a revision with the same complete draft including unmounted values", async () => {
+  mockPendingRequest();
+  const preview = jest.spyOn(CaveService, "PreviewRevisedChanges").mockResolvedValue({
+    base: {} as any, proposed: {} as any, diff: {} as any,
+    countyNumberIntent: "Manual", linePlots: [], hasMeaningfulChanges: true,
+  });
+  const revise = jest.spyOn(CaveService, "ReviseChanges").mockResolvedValue("proposal02");
+  renderPage();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Review changes" }));
+
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+  const expectedDraft = expect.objectContaining({
+    id: "cave000001",
+    name: "Proposed name",
+    depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
+    files: [expect.objectContaining({ id: "file-hidden", name: "Existing map" })],
+    linePlots: [expect.objectContaining({ id: "line-hidden", name: "Existing traverse" })],
+  });
+  expect(preview).toHaveBeenCalledWith(
+    "request0001", expectedDraft, false, "revision01", "proposal01"
+  );
+
+  fireEvent.click(await screen.findByRole("button", { name: "Save proposal version" }));
+
+  await waitFor(() => expect(revise).toHaveBeenCalledTimes(1));
+  expect(revise).toHaveBeenCalledWith(
+    "request0001", expectedDraft, false, "revision01", "proposal01"
+  );
 });

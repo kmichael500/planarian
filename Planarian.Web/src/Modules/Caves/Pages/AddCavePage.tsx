@@ -7,6 +7,7 @@ import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveService } from "../Service/CaveService";
 import { useNavigate } from "react-router-dom";
 import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
+import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 
 const AddCavesPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
@@ -60,7 +61,8 @@ const AddCavesPage: React.FC = () => {
     otherTagIds: [],
   };
 
-  const handleFormSubmit = async (values: AddCaveVm) => {
+  const handleFormSubmit = async (_validatedValues: AddCaveVm) => {
+    const values = getCaveAuthoringSubmissionValues(form);
     try {
       await CaveService.AddCave(values);
       message.success(`'${values.name}' added successfully`);
