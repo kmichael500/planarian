@@ -3,14 +3,14 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-26
-**Completion HEAD reviewed:** `3319128817570b49b739fdab807dae42744b6280`
-**Package refresh:** 2026-10-26; GAP-001 preservation-census tests and this ledger refresh are validated on top of the committed line-plot cleanup baseline.
+**Completion HEAD reviewed:** `08955058c85456b0bd5bf50eb339aeb2b87db91a`
+**Package refresh:** 2026-10-26; this ledger-only refresh records the validated GAP-001 preservation-census commit `08955058c85456b0bd5bf50eb339aeb2b87db91a`.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 169 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 478 files changed, 66,945 insertions, 5,989 deletions
+**Branch distance at baseline review:** 170 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 481 files changed, 67,926 insertions, 5,989 deletions
 
 ## Purpose
 
@@ -219,11 +219,11 @@ The principal remaining test risk is therefore **runtime integration coverage**,
 
 # 4. Validation already completed
 
-The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The reviewed committed completion baseline is `3319128817570b49b739fdab807dae42744b6280`; this package adds the GAP-001 preservation-census tests and ledger refresh on top of that baseline.
+The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The reviewed completion HEAD is `08955058c85456b0bd5bf50eb339aeb2b87db91a`, which contains the GAP-001 preservation-census tests; this ledger-only follow-up records that reviewed state.
 
 ## 2026-10-26 focused completion refresh
 
-- Committed baseline `33191288` includes the merged Cave-authoring field-persistence package, Reset Account destructive-safety hardening, and the Cave-detail line-plot publication cleanup.
+- Earlier committed baseline `33191288` includes the merged Cave-authoring field-persistence package, Reset Account destructive-safety hardening, and the Cave-detail line-plot publication cleanup; GAP-001 was then committed as `08955058`.
 - GAP-001 focused preservation validation passed **2/2** on disposable PostgreSQL/PostGIS: one test covers the complete 41-table current-main v32 migration boundary and one covers the separate revision-rollout boundary plus an idempotent no-op rerun.
 - Adversarial test-quality review corrected the preservation class name so the repository's documented `FullyQualifiedName~Migration` filter discovers **both** GAP-001 tests; the temporary implementation-coupled rollout batch-count assertions were removed and FeatureSetting backfill provenance was strengthened for both generated rows.
 - The final migration + PostgreSQL-foundation focused suite passed **34/34** with the complete census fixture and corrected test discovery.
