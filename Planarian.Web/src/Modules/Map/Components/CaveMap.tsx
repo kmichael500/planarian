@@ -20,10 +20,9 @@ import { MapLayers } from "./MapLayers";
 
 interface CaveMapProps {
   cave: CaveVm;
-  lineworkRefreshToken?: number;
 }
 
-export const CaveMap: React.FC<CaveMapProps> = ({ cave, lineworkRefreshToken = 0 }) => {
+export const CaveMap: React.FC<CaveMapProps> = ({ cave }) => {
   const { currentAccountName } = useContext(AppContext);
   const navigate = useNavigate();
   const mapRef = useRef<MapRef>(null);
@@ -94,7 +93,6 @@ export const CaveMap: React.FC<CaveMapProps> = ({ cave, lineworkRefreshToken = 0
         <MapLayers />
         <MapEntranceTileLayer />
         <MapLinePlotLayer
-          key={`${cave.id}-${lineworkRefreshToken}`}
           viewportRevision={viewportRevision}
           attribution={currentAccountName ? `© ${currentAccountName}` : undefined}
         />

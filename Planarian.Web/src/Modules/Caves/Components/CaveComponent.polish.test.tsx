@@ -43,9 +43,6 @@ jest.mock("../../../Shared/Components/Display/DistanceFromMeComponent", () => ({
 jest.mock("../../../Shared/Components/Display/PlanarianTag", () => ({
   PlanarianTag: ({ children }: any) => <span>{children}</span>,
 }));
-jest.mock("./CaveSpatialDataImport", () => ({
-  CaveSpatialDataImport: () => null,
-}));
 
 const cave = {
   id: "cave000001",

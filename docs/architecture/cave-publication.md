@@ -196,11 +196,9 @@ The aggregate editor is the supported normal interactive authoring surface, but 
 
 That specialized File-import path is not the same as the Cave/Entrance CSV bulk-import architecture.
 
-## Supported boundary and pre-merge deviations
+## Supported interactive boundary
 
-The supported architecture requires the Cave detail page to be read-only for Cave-owned Files and line plots. Branch-specific deviations from that target are intentionally tracked only in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md), so this evergreen page does not become stale as review fixes land.
-
-If a pre-merge source path still mutates Cave-owned state outside the aggregate editor, do not infer from its temporary existence that it is a second supported architecture.
+The Cave detail page is read-only for Cave-owned Files and line plots. Normal interactive mutation of those assets occurs through the aggregate Cave editor; the detail page continues to provide read/view behavior only.
 
 ## Read the code in this order
 

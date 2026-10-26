@@ -36,7 +36,6 @@ import { StreamGages } from "../../Map/Components/StreamGages";
 import { CountyTagComponent } from "../../../Shared/Components/Display/CountyTagComponent";
 import { StateTagComponent } from "../../../Shared/Components/Display/StateTagComponent";
 import { PublicAccessDetails } from "../../Map/Components/PublicAccesDetails";
-import { CaveSpatialDataImport } from "./CaveSpatialDataImport";
 import { DistanceFromMeComponent } from "../../../Shared/Components/Display/DistanceFromMeComponent";
 
 const { Panel } = Collapse;
@@ -82,7 +81,6 @@ export interface CaveComponentProps {
   isLoading: boolean;
   options?: CaveComponentOptions;
   hasEditPermission?: boolean;
-  updateCave?: () => void;
 }
 
 // Common function to generate tags
@@ -110,7 +108,6 @@ const CaveComponent = ({
   cave,
   isLoading,
   options = {}, // Default to empty object
-  updateCave,
   hasEditPermission,
 }: CaveComponentProps) => {
   // Set default for inCardContainer within options
@@ -126,8 +123,6 @@ const CaveComponent = ({
 
   const [showGeology, setShowGeology] = useState(false);
   const [showStreamGages, setShowStreamGages] = useState(false);
-
-  const [lineworkRefreshToken, setLineworkRefreshToken] = useState(0);
 
   const descriptionItemCandidates: (PlanarianDescriptionItem | false)[] = [
     isFeatureEnabled(FeatureKey.EnabledFieldCaveId) && {
@@ -512,24 +507,10 @@ const CaveComponent = ({
 
       {showMap && options && options.showMap == true && (
         <>
-          <PlanarianDividerComponent
-            title="Map"
-            element={
-              cave ? (
-                <CaveSpatialDataImport
-                  caveId={cave.id}
-                  disabled={!hasEditPermission}
-                  onSaved={() => {
-                    setLineworkRefreshToken((value) => value + 1);
-                    updateCave?.();
-                  }}
-                />
-              ) : undefined
-            }
-          />
+          <PlanarianDividerComponent title="Map" />
           {cave?.primaryEntrance && (
             <div style={{ height: "590px" }}>
-              <CaveMap key={cave.id} cave={cave} lineworkRefreshToken={lineworkRefreshToken} />
+              <CaveMap key={cave.id} cave={cave} />
             </div>
           )}
         </>

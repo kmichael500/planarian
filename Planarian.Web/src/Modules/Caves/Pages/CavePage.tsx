@@ -116,12 +116,6 @@ const CavePageContent = ({ caveId }: CavePageContentProps) => {
       isLoading={isLoading}
       hasEditPermission={hasEditPermission}
       options={{ showMap: true }}
-      updateCave={async () => {
-        setIsLoading(true);
-        const updatedCave = await CaveService.GetCave(caveId);
-        setCave(updatedCave);
-        setIsLoading(false);
-      }}
     />
   );
 };
