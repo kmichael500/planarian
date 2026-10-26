@@ -255,6 +255,7 @@ builder.Services.AddScoped<CountyReferenceLockRepository>();
 builder.Services.AddScoped<CountyAdministrationRepository>();
 builder.Services.AddScoped<PlanarianSettingsService>();
 builder.Services.AddScoped<ExportService>();
+builder.Services.AddSingleton<Planarian.Modules.Account.Repositories.AccountMaintenanceLockRepository>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
 builder.Services.AddScoped<TagService>();
@@ -549,6 +550,7 @@ app.UseAuthentication();
 app.UseMiddleware<RequestUserMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
+app.UseMiddleware<Planarian.Modules.Account.Services.AccountMaintenanceMiddleware>();
 
 
 app.MapHub<NotificationHub>("/api/notificationHub", options => { });

@@ -16,15 +16,37 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
 
     public AzureBlobObjectStorage(FileOptions options) => _options = options;
 
+    public void InvalidateContainer(string partition)
+        => ContainerInitializationTasks.TryRemove(partition.ToLowerInvariant(), out _);
+
     public async Task PutAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken)
     {
-        var container = await GetContainerAsync(address.Partition, createIfNotExists: true);
-        var client = container.GetBlobClient(address.Key);
         var uploadOptions = new BlobUploadOptions();
         if (!string.IsNullOrWhiteSpace(contentType))
             uploadOptions.HttpHeaders = new BlobHttpHeaders { ContentType = contentType };
-        await client.UploadAsync(content, uploadOptions, cancellationToken);
+
+        // Azure can return ContainerBeingDeleted after a successful account reset.
+        // Rewind only seekable streams; non-seekable streams are not safe to replay.
+        var initialPosition = content.CanSeek ? content.Position : 0;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var container = await GetContainerAsync(address.Partition, createIfNotExists: true);
+                await container.GetBlobClient(address.Key).UploadAsync(content, uploadOptions, cancellationToken);
+                return;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 409 &&
+                ex.ErrorCode == "ContainerBeingDeleted" && attempt < 9)
+            {
+                InvalidateContainer(address.Partition);
+                if (!content.CanSeek)
+                    throw;
+                if (content.CanSeek) content.Position = initialPosition;
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * (attempt + 1), 8)), cancellationToken);
+            }
+        }
     }
 
     public async Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,

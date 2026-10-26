@@ -16,6 +16,9 @@ public interface IObjectStorage
     Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,
         CancellationToken cancellationToken);
 
+    // Reset may remove legacy account containers; discard cached create results.
+    void InvalidateContainer(string partition);
+
     Task<bool> DeleteIfExistsAsync(StorageObjectAddress address,
         CancellationToken cancellationToken);
 }

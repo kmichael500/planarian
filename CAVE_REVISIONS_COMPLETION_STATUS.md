@@ -108,7 +108,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
 | App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
 | Global `SaveChangesInterceptor` batching refactor | **DONE, PARTIAL VALIDATION** | Command-count tests prove bounded lookups; broader entity-family operation/tenant matrix is still recommended because blast radius is repository-wide. |
-| Account Reset rewrite | **DONE, PARTIAL VALIDATION** | Relational purge-before-external-delete ordering is tested. Failure after relational commit and whole-container deletion semantics still need explicit validation/product decision. |
+| Account Reset rewrite | **DONE, PARTIAL VALIDATION** | Reset graph, two-tenant noninterference, archive container removal, post-commit storage failures, immediate retry, and same-instance reset/archive admission are now tested in the focused destructive-safety worktree. A transactional cleanup outbox, explicit retry endpoint/UI and PostgreSQL shared/exclusive account-maintenance leases now cover API writes and background archives. Independent non-cooperating writers and live Azure smoke tests remain deployment validation boundaries. |
 | Account archive projection compatibility | **DONE, PARTIAL VALIDATION** | Focused projection tests exist. Full `.tar.gz` generation/content/cancellation/pruning/restore semantics are under-tested. |
 | Unsaved-change guard | **DONE + VALIDATED** | Edit/Suggest/Revise tests cover blocked navigation, keep-editing, discard, asset-only dirty state, and `beforeunload`. |
 | Detail-page read-only Cave-owned state | **NOT COMPLETE** | File direct mutation removed, but GeoJSON/line-plot publication path remains on detail page. |
@@ -366,7 +366,7 @@ Migration validation now uses the exact current-main baseline for deployment-saf
 
 The core publication tests are strong. Remaining safety work should focus on operations where failure may leave a durable result that differs from what the user thinks happened.
 
-## RISK-004 — Reset Account can complete relationally and then report a storage failure
+## RISK-004 — PARTIALLY RESOLVED — Reset Account post-commit cleanup debt
 
 Completion correctly changes Reset Account so the PostgreSQL purge commits before external storage cleanup.
 
@@ -376,17 +376,26 @@ Current sequence:
 2. provider-neutral File objects are cleaned up best-effort.
 3. the legacy account storage container is removed.
 
-This ordering protects database integrity, but it creates an important partial-success state: if the final storage operation fails after step 1, the API can fail even though the irreversible relational reset has already succeeded.
+The focused destructive-safety worktree adds a typed API result distinguishing committed
+relational deletion from best-effort external cleanup. A pre-commit storage locator
+preflight also rejects direct foreign-account containers and shared cross-tenant
+objects before relational deletion, without touching either tenant. It tests container-delete failure
+*after* commit, a safe immediate retry, provider-neutral object failure reporting and
+two-tenant isolation. A failed delete is no longer reported as if the PostgreSQL
+transaction had rolled back. The UI and SignalR progress surface the partial result.
 
-The integration fake already exposes a container-cleanup failure switch, but the existing reset test does not exercise this state.
+The follow-up destructive-safety worktree persists cleanup objects and the account
+container target transactionally, supports an idempotent admin retry endpoint and
+UI, and blocks account mutations until cleanup is complete. PostgreSQL
+cross-instance advisory shared/exclusive leases cover ordinary mutating HTTP
+requests, reset and background archive jobs. An additional preflight rejects
+foreign references to any bytes in the account container.
 
-Required validation:
-
-- inject the storage failure after relational commit;
-- prove the relational reset is committed exactly once;
-- prove retry is safe;
-- prove another account is untouched;
-- define truthful API/user-visible semantics for “reset completed, external cleanup incomplete”.
+**Deployment validation still needed:** no live Azure/Azurite lifecycle smoke
+test yet; independent actors that bypass HTTP and the archive coordinator are
+not automatically fenced; an unrelated other-tenant writer could create an
+unsafe foreign reference after the last pre-delete check. Do not represent a
+passing disposable-Postgres/fake-object-storage suite as exhaustive proof.
 
 ## RISK-005 — Reset also removes server-side account archives
 
@@ -396,10 +405,10 @@ Required validation:
 
 This whole-container behavior also exists on reviewed `main`; completion did not introduce the underlying behavior. Because completion substantially rewrites reset/storage lifecycle logic, this is the right point to make the contract explicit.
 
-Required decision:
-
-- if archives are intentionally part of reset, make that explicit in UX/docs and test it;
-- if archives are intended as recovery artifacts, move them to a separate retention boundary or stop removing the entire container.
+**Resolved product decision:** Reset intentionally removes stored account archives,
+including temporary archives. The UI warns to download copies first. Tests verify
+Account A archives disappear and Account B's remain. Archives are not complete
+revision/proposal disaster-recovery backups.
 
 Trip-photo storage was traced separately. Trip photos use `BlobService` and paths such as `projects/{projectId}/trips/{tripId}/photos/{photoId}` in its configured container. No evidence was found that the Reset Account container operation targets that BlobService container. Do not claim Trip photos are affected without new evidence.
 
@@ -433,9 +442,18 @@ Ideal additional predeployment validation: restore a sanitized real-world databa
 
 The current-main-v32 regressions prove upgrade to completion and downgrade to the v32 schema contract, including migration history, File metadata behavior, absence of an accidental `FileName` default, removal of the migration-only filename compatibility table on downgrade, and fail-closed Cave/File account ownership validation. Deliberately removed legacy `ReportedByUserId` values are not part of the reversible data contract.
 
-## GAP-003 — Kitchen-sink Reset Account test
+## GAP-003 — PARTIALLY RESOLVED — Kitchen-sink Reset Account test
 
-**Priority: P0 before merge**
+**Priority: P0 before merge**. The focused destructive-safety worktree adds a
+two-tenant integration scenario covering all 14 Cave/Entrance tag relationships,
+Files (staged, temporary, published and retained), line plots, Favorites,
+revisions, proposal versions, review events, Counties, custom TagTypes,
+AccountStates, permissions and stored archives. Successful Reset removes the
+intended account graph and leaves the other tenant's graph and blobs intact.
+Account identity, members, and feature settings are intentionally retained.
+The tests should remain part of the branch acceptance suite. The broader
+cross-replica/write-concurrency and durable external cleanup questions remain
+tracked under RISK-004.
 
 Create a realistic account containing as many dependent types as practical: Caves, Entrances, tag relationships, Files, retained historical objects, line plots, Favorites, permissions, revisions, change requests, proposal versions, review events, staged Files, Counties, custom TagTypes, AccountStates, temporary Files, and archives according to the chosen product contract.
 
@@ -732,9 +750,11 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 - [ ] **VAL-002:** remove Cave-detail `CaveSpatialDataImport` / obsolete line-plot publication.
 - [ ] Remove/replace the `GeoJsonSaveModal` test that codifies the obsolete mutation surface.
 - [ ] Prove current line-plot viewing/map retrieval still works after removal.
-- [ ] Add kitchen-sink destructive Reset Account test.
-- [ ] Add Reset Account post-commit external-storage failure test.
-- [ ] Decide, document, and test whether reset intentionally removes stored account archives.
+- [x] Add kitchen-sink destructive Reset Account test (focused destructive-safety worktree).
+- [x] Add Reset Account post-commit external-storage failure test (focused destructive-safety worktree).
+- [x] Decide, document, and test that reset intentionally removes stored account archives (focused destructive-safety worktree).
+- [x] Persist failed provider-neutral storage cleanup targets for safe later retry (transactional outbox + endpoint/UI).
+- [x] Add cross-replica account API mutation and archive coordination with PostgreSQL advisory leases (independent writers still need deployment audit).
 - [x] Freeze/rename the v29 migration test so it is explicitly historical rather than “exact main”.
 - [ ] Update durable completion docs/checklists after implementation truth is final.
 
@@ -812,10 +832,11 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 ## Destructive-operation safety
 
-- [ ] Reset behavior is tested against a dense dependency graph.
-- [ ] Reset cannot affect another tenant.
-- [ ] Post-commit storage failure has truthful user/API semantics.
-- [ ] Fate of stored archives during reset is intentional and documented.
+- [x] Reset behavior is tested against a dense dependency graph (focused worktree).
+- [x] Reset does not affect the second tenant in the tested relational/blob graph (focused worktree).
+- [x] Post-commit storage failure has truthful user/API semantics (focused worktree).
+- [x] Fate of stored archives during reset is intentional and documented (focused worktree).
+- [x] Durable cleanup retry and cross-replica API/archive admission tested; independent write paths still need deployment audit.
 - [ ] Hard-delete/external-cleanup failure semantics are safe/retryable.
 
 ## Storage/File safety

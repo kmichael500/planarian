@@ -20,20 +20,47 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
     }
 
-    public async Task<IReadOnlyList<AccountFileObjectAddress>> ExecuteResetAsync(
-        CancellationToken cancellationToken)
+    public async Task ExecuteResetAsync(CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         try
         {
             var fileObjects = await GetFileObjectAddressesForResetAsync(cancellationToken);
+            var existing = await DbContext.AccountResetCleanupTargets.AsNoTracking()
+                .Where(row => row.AccountId == RequestUser.AccountId)
+                .Select(row => new { row.StoragePartition, row.StorageKey, row.IsContainer })
+                .ToListAsync(cancellationToken);
+            var known = existing.Select(row => (row.StoragePartition, row.StorageKey, row.IsContainer))
+                .ToHashSet();
+            foreach (var item in fileObjects)
+            {
+                // Account-container bytes are removed together in one container operation.
+                if (string.Equals(item.Partition, RequestUser.AccountContainerName,
+                        StringComparison.OrdinalIgnoreCase)) continue;
+                if (known.Add((item.Partition, item.Key, false)))
+                    DbContext.AccountResetCleanupTargets.Add(new AccountResetCleanupTarget
+                    {
+                        AccountId = RequestUser.AccountId!,
+                        StoragePartition = item.Partition, StorageKey = item.Key
+                    });
+            }
+
+            var container = RequestUser.AccountContainerName;
+            if (known.Add((container, string.Empty, true)))
+                DbContext.AccountResetCleanupTargets.Add(new AccountResetCleanupTarget
+                {
+                    AccountId = RequestUser.AccountId!, StoragePartition = container,
+                    StorageKey = string.Empty, IsContainer = true
+                });
+
+            // Cleanup addresses are committed atomically with the relational purge.
+            await DbContext.SaveChangesAsync(cancellationToken);
             await DeleteAllCavePermissions(cancellationToken);
             await DeleteCaveWithRelatedData(cancellationToken);
             await DeleteAllTagTypes(cancellationToken);
             await DeleteAllCounties(cancellationToken);
             await DeleteAllAccountStates(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return fileObjects;
         }
         catch
         {
@@ -41,6 +68,64 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             throw;
         }
     }
+
+    public Task<List<AccountResetCleanupTarget>> GetCleanupTargetsAsync(CancellationToken cancellationToken)
+        => DbContext.AccountResetCleanupTargets.AsNoTracking()
+            .Where(row => row.AccountId == RequestUser.AccountId)
+            .OrderBy(row => row.IsContainer).ThenBy(row => row.Id)
+            .ToListAsync(cancellationToken);
+
+    public Task<bool> HasPendingCleanupAsync(CancellationToken cancellationToken)
+        => DbContext.AccountResetCleanupTargets.AsNoTracking()
+            .AnyAsync(row => row.AccountId == RequestUser.AccountId, cancellationToken);
+
+    public Task<int> CompleteCleanupTargetsAsync(IEnumerable<string> ids, CancellationToken cancellationToken)
+    {
+        var targetIds = ids.ToArray();
+        return DbContext.AccountResetCleanupTargets
+            .Where(row => row.AccountId == RequestUser.AccountId && targetIds.Contains(row.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    /// <summary>Two bounded reference queries per key chunk, rather than two per stored object.</summary>
+    public async Task<HashSet<string>> GetConflictedCleanupTargetIdsAsync(
+        IReadOnlyList<AccountResetCleanupTarget> targets, CancellationToken cancellationToken)
+    {
+        var conflicts = new HashSet<string>();
+        foreach (var partition in targets.Where(t => !t.IsContainer)
+                     .GroupBy(t => t.StoragePartition, StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var chunk in partition.Chunk(500))
+            {
+                var keys = chunk.Select(t => t.StorageKey).Distinct().ToArray();
+                var foreignFiles = await DbContext.Files.IgnoreQueryFilters()
+                    .Where(row => row.AccountId != RequestUser.AccountId &&
+                                  row.BlobContainer != null && row.BlobContainer.ToLower() == partition.Key.ToLower() && row.BlobKey != null &&
+                                  keys.Contains(row.BlobKey))
+                    .Select(row => row.BlobKey!)
+                    .ToListAsync(cancellationToken);
+                var foreignRetained = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
+                    .Where(row => row.AccountId != RequestUser.AccountId &&
+                                  row.StoragePartition.ToLower() == partition.Key.ToLower() && keys.Contains(row.StorageKey))
+                    .Select(row => row.StorageKey)
+                    .ToListAsync(cancellationToken);
+                var referenced = foreignFiles.Concat(foreignRetained).ToHashSet();
+                foreach (var target in chunk)
+                    if (referenced.Contains(target.StorageKey)) conflicts.Add(target.Id);
+            }
+        }
+
+        return conflicts;
+    }
+
+    public async Task<bool> IsContainerReferencedByAnotherAccountAsync(
+        string container, CancellationToken cancellationToken)
+        => await DbContext.Files.IgnoreQueryFilters()
+               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                                row.BlobContainer != null && row.BlobContainer.ToLower() == container.ToLower(), cancellationToken)
+           || await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
+               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                                row.StoragePartition.ToLower() == container.ToLower(), cancellationToken);
 
     private async Task<IReadOnlyList<AccountFileObjectAddress>> GetFileObjectAddressesForResetAsync(
         CancellationToken cancellationToken)
@@ -57,7 +142,47 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .Select(row => new AccountFileObjectAddress(row.StoragePartition, row.StorageKey))
             .ToListAsync(cancellationToken);
 
-        return live.Concat(retained).Distinct().ToList();
+        var addresses = live.Concat(retained).Distinct().ToList();
+
+        // The whole account container includes untracked archives/imports. Even a
+        // foreign reference to a key absent from our File table makes deleting
+        // that container unsafe.
+        if (await IsContainerReferencedByAnotherAccountAsync(RequestUser.AccountContainerName, cancellationToken))
+            throw ApiExceptionDictionary.Conflict(
+                "Cannot safely reset an account whose storage container is referenced by another account.");
+
+        // Legacy File rows can contain storage locators that are not tied to the
+        // account's container. Never delete another tenant's account container
+        // or an object still referenced by another account.
+        var ownContainer = RequestUser.AccountContainerName;
+        foreach (var address in addresses)
+        {
+            if (address.Partition.StartsWith("account-", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(address.Partition, ownContainer, StringComparison.OrdinalIgnoreCase))
+                throw ApiExceptionDictionary.Conflict(
+                    "Cannot safely reset an account with a File in another account's storage container.");
+        }
+
+        foreach (var partition in addresses.GroupBy(address => address.Partition, StringComparer.OrdinalIgnoreCase))
+        {
+            foreach (var chunk in partition.Select(address => address.Key).Distinct().Chunk(500))
+            {
+                var keys = chunk;
+                var referencedByAnotherFile = await DbContext.Files.IgnoreQueryFilters()
+                    .AnyAsync(file => file.AccountId != RequestUser.AccountId &&
+                                      file.BlobContainer != null && file.BlobContainer.ToLower() == partition.Key.ToLower() && file.BlobKey != null &&
+                                      keys.Contains(file.BlobKey), cancellationToken);
+                var referencedByAnotherRetention = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
+                    .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                                     row.StoragePartition.ToLower() == partition.Key.ToLower() &&
+                                     keys.Contains(row.StorageKey), cancellationToken);
+                if (referencedByAnotherFile || referencedByAnotherRetention)
+                    throw ApiExceptionDictionary.Conflict(
+                        "Cannot safely reset an account while its stored Files are also referenced by another account.");
+            }
+        }
+
+        return addresses;
     }
 
     private async Task DeleteCaveWithRelatedData(CancellationToken cancellationToken)
@@ -231,6 +356,26 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 .Where(tag => tag.Cave.AccountId == RequestUser.AccountId)
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
+        } while (deletedCount == batchSize);
+
+        // Favorites and line plots have NO ACTION foreign keys to Cave. They must
+        // be removed before their owning Cave, including in a reset with no other tags.
+        do
+        {
+            deletedCount = await DeleteBatchAsync(DbContext.Favorites
+                // Legacy rows may have a null AccountId despite their Cave FK.
+                // Do not delete an explicitly other-tenant-owned Favorite.
+                .Where(favorite => favorite.AccountId == RequestUser.AccountId ||
+                                   (favorite.AccountId == null &&
+                                    favorite.Cave.AccountId == RequestUser.AccountId))
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
+        } while (deletedCount == batchSize);
+
+        do
+        {
+            deletedCount = await DeleteBatchAsync(DbContext.CaveGeoJsons
+                .Where(plot => plot.Cave.AccountId == RequestUser.AccountId)
+                .IgnoreQueryFilters(), batchSize, cancellationToken);
         } while (deletedCount == batchSize);
 
         // Step 4: Delete the cave
