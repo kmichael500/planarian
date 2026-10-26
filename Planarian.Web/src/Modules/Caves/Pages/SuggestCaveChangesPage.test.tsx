@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -68,7 +68,12 @@ jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
 }));
 
 jest.mock("../Helpers/CaveFormMapper", () => ({
-  caveToForm: () => ({ id: "cave000001", name: "Published cave" }),
+  caveToForm: () => ({
+    id: "cave000001", expectedRevisionId: "revision01", name: "Published cave", depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
+    files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
+    linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
+  }),
 }));
 
 beforeAll(() => {
@@ -282,4 +287,30 @@ it("keeps removed published files and line plots reviewable in preview", async (
   const diff = await screen.findByTestId("revision-diff");
   expect(diff).toHaveAttribute("data-file-actions", "removed-file");
   expect(diff).toHaveAttribute("data-line-plot-actions", "removed-line");
+});
+
+it("previews and submits the same complete draft including unmounted authoring values", async () => {
+  mockAuthoringContext();
+  const preview = jest.spyOn(CaveService, "PreviewChanges").mockResolvedValue(previewResult(true));
+  const submit = jest.spyOn(CaveService, "SubmitChanges").mockResolvedValue("request0001");
+  renderWithDataRouter();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Review changes" }));
+
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
+  const expectedDraft = expect.objectContaining({
+    id: "cave000001",
+    expectedRevisionId: "revision01",
+    name: "Published cave",
+    depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
+    files: [expect.objectContaining({ id: "file-hidden", name: "Existing map" })],
+    linePlots: [expect.objectContaining({ id: "line-hidden", name: "Existing traverse" })],
+  });
+  expect(preview).toHaveBeenCalledWith("cave000001", expectedDraft, "revision01");
+
+  fireEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
+
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  expect(submit).toHaveBeenCalledWith("cave000001", expectedDraft, "revision01");
 });

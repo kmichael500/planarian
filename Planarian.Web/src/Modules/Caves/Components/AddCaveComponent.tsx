@@ -62,8 +62,12 @@ const AddCaveComponent = ({
 }: AddCaveComponentProps) => {
   const { isFeatureEnabled } = useFeatureEnabled();
   const editingCave = isEditing ? (cave as CaveVm | undefined) : undefined;
-  const [selectedStateId, setSelectedStateId] = useState<string>();
-  const [selectedCountyId, setSelectedCountyId] = useState<string>();
+  const [selectedStateId, setSelectedStateId] = useState<string | undefined>(
+    () => form.getFieldValue("stateId") ?? cave?.stateId ?? undefined
+  );
+  const [selectedCountyId, setSelectedCountyId] = useState<string | undefined>(
+    () => form.getFieldValue("countyId") ?? cave?.countyId ?? undefined
+  );
   const [countyDisplayId, setCountyDisplayId] = useState<string>();
   const [countyIdDelimiter, setCountyIdDelimiter] = useState<string>();
   const [isCountyMetadataLoading, setIsCountyMetadataLoading] =

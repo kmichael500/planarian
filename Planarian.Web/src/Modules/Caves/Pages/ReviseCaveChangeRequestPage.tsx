@@ -16,6 +16,7 @@ import { FileService } from "../../Files/Services/FileService";
 import { getFileType } from "../../Files/Services/FileHelpers";
 import { downloadFile } from "../../../Shared/Helpers/FileHelpers";
 import { caveToForm, snapshotToForm } from "../Helpers/CaveFormMapper";
+import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 import { AddCaveVm } from "../Models/AddCaveVm";
 import { CaveChangePreviewVm, CaveChangeRequestDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveService } from "../Service/CaveService";
@@ -141,7 +142,8 @@ export const ReviseCaveChangeRequestPage = () => {
     }])),
   };
 
-  const previewChanges = async (values: AddCaveVm) => {
+  const previewChanges = async (_validatedValues: AddCaveVm) => {
+    const values = getCaveAuthoringSubmissionValues(form);
     setLoading(true);
     try {
       setDraft(values);

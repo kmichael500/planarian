@@ -46,7 +46,12 @@ jest.mock("../../../Shared/Components/Buttons/PlanarianModal", () => ({
 }));
 
 jest.mock("../Helpers/CaveFormMapper", () => ({
-  caveToForm: () => ({ id: "cave000001", expectedRevisionId: "revision01", name: "Published cave" }),
+  caveToForm: () => ({
+    id: "cave000001", expectedRevisionId: "revision01", name: "Published cave", depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
+    files: [{ id: "file-hidden", name: "Existing map", extension: ".pdf", fileTypeTagId: "file-type", fileTypeKey: "Map" }],
+    linePlots: [{ id: "line-hidden", name: "Existing traverse", geoJson: "{\"type\":\"FeatureCollection\",\"features\":[]}" }],
+  }),
 }));
 
 const cave = {
@@ -109,4 +114,46 @@ it("clears the shared guard before navigating after a successful direct save", a
   await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
   expect(await screen.findByText("Cave detail")).toBeInTheDocument();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+
+it("submits preserved unmounted authoring values instead of only the currently rendered fields", async () => {
+  const update = jest.spyOn(CaveService, "UpdateCave").mockResolvedValue();
+  renderPage();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Save cave" }));
+
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    id: "cave000001",
+    expectedRevisionId: "revision01",
+    name: "Published cave",
+    depthFeet: null,
+    biologyTagIds: ["biology-hidden"],
+    files: [expect.objectContaining({ id: "file-hidden", name: "Existing map", fileTypeTagId: "file-type" })],
+    linePlots: [expect.objectContaining({ id: "line-hidden", name: "Existing traverse" })],
+  }));
+});
+
+it("keeps the complete dirty draft after a stale direct-save conflict", async () => {
+  const update = jest.spyOn(CaveService, "UpdateCave").mockRejectedValue({
+    statusCode: 409,
+    conflictKind: "PublishedCaveChanged",
+    message: "The Cave changed.",
+  });
+  renderPage();
+  const name = await screen.findByRole("textbox", { name: "Name" });
+  fireEvent.change(name, { target: { value: "My conflicted draft" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "Save cave" }));
+
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(update).toHaveBeenCalledWith(expect.objectContaining({
+    name: "My conflicted draft",
+    biologyTagIds: ["biology-hidden"],
+    files: [expect.objectContaining({ id: "file-hidden" })],
+    linePlots: [expect.objectContaining({ id: "line-hidden" })],
+  }));
+  expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("My conflicted draft");
+  expect(screen.queryByText("Cave detail")).not.toBeInTheDocument();
 });

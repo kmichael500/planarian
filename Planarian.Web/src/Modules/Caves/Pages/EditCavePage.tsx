@@ -12,6 +12,7 @@ import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/Delete
 import { caveToForm } from "../Helpers/CaveFormMapper";
 import { UnsavedChangesModal } from "../../../Shared/Components/UnsavedChangesModal";
 import { useUnsavedChangesGuard } from "../../../Shared/Hooks/useUnsavedChangesGuard";
+import { getCaveAuthoringSubmissionValues } from "../Helpers/CaveAuthoringFormValues";
 
 const EditCavePage: React.FC = () => {
   const { caveId } = useParams();
@@ -63,7 +64,8 @@ const EditCavePage: React.FC = () => {
     getCave();
   }, []);
 
-  const handleFormSubmit = async (values: AddCaveVm) => {
+  const handleFormSubmit = async (_validatedValues: AddCaveVm) => {
+    const values = getCaveAuthoringSubmissionValues(form);
     try {
       setIsLoading(true);
       await CaveService.UpdateCave(values);

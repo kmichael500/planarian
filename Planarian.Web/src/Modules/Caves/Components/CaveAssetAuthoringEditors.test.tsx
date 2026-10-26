@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form } from 'antd';
 import { CaveFileAuthoringEditor } from './CaveFileAuthoringEditor';
@@ -10,6 +10,12 @@ jest.mock("./CaveLinePlotViewer", () => ({
 }));
 import { CaveService } from '../Service/CaveService';
 import { FileService } from '../../Files/Services/FileService';
+import { parseCaveLinePlotFile } from '../../Map/Helpers/LinePlotFileParser';
+import { AddCaveVm } from '../Models/AddCaveVm';
+
+jest.mock('../../Map/Helpers/LinePlotFileParser', () => ({
+  parseCaveLinePlotFile: jest.fn(),
+}));
 
 jest.mock('../../Tag/Components/TagSelectComponent', () => ({
   TagSelectComponent: () => <div>File type</div>,
@@ -39,7 +45,7 @@ const FileHarness = ({ onFinish, onAuthoringChange, onValuesChange, stagedFileRe
   stagedFileRequestId?: string;
   existingRequestStagedFileIds?: readonly string[];
 }) => {
-  const [form] = Form.useForm<any>();
+  const [form] = Form.useForm<AddCaveVm>();
   return <Form form={form} onValuesChange={onValuesChange} initialValues={{ files: [{ id: 'file-existing', name: 'IRT',
     extension: '.DAT', fileTypeTagId: 'type-file', fileTypeKey: 'Data' }] }}>
     <CaveFileAuthoringEditor form={form} onAuthoringChange={onAuthoringChange}
@@ -53,7 +59,7 @@ const LinePlotHarness = ({ onFinish, onAuthoringChange, onValuesChange }: {
   onAuthoringChange?: jest.Mock;
   onValuesChange?: jest.Mock;
 }) => {
-  const [form] = Form.useForm<any>();
+  const [form] = Form.useForm<AddCaveVm>();
   return <Form form={form} onValuesChange={onValuesChange} initialValues={{ linePlots: [{ id: 'line-existing',
     name: 'Main line', geoJson: '{"type":"FeatureCollection","features":[]}' }] }}>
     <CaveLinePlotAuthoringEditor form={form} onAuthoringChange={onAuthoringChange} />
@@ -143,4 +149,80 @@ it('keeps existing request-staged files on request-scoped view and download acce
   await userEvent.click(screen.getByRole('button', { name: 'Viewer download' }));
   expect(stagedDownload).toHaveBeenCalledTimes(2);
   expect(publishedDownload).not.toHaveBeenCalled();
+});
+
+
+it('preserves the stable File ID when metadata is edited', async () => {
+  const onFinish = jest.fn();
+  render(<FileHarness onFinish={onFinish} />);
+
+  const name = screen.getByRole('textbox', { name: 'Name' });
+  await userEvent.clear(name);
+  await userEvent.type(name, 'Renamed IRT');
+  await userEvent.click(screen.getByRole('button', { name: 'Read files' }));
+
+  expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({
+    files: [expect.objectContaining({ id: 'file-existing', name: 'Renamed IRT' })],
+  }));
+});
+
+it('preserves the stable line-plot ID when metadata is edited', async () => {
+  const onFinish = jest.fn();
+  render(<LinePlotHarness onFinish={onFinish} />);
+
+  const name = screen.getByRole('textbox', { name: 'Name' });
+  await userEvent.clear(name);
+  await userEvent.type(name, 'Renamed main line');
+  await userEvent.click(screen.getByRole('button', { name: 'Read line plots' }));
+
+  expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({
+    linePlots: [expect.objectContaining({ id: 'line-existing', name: 'Renamed main line' })],
+  }));
+});
+
+it('removes a newly staged File from desired state and cleans up the unpublished staging object', async () => {
+  const onFinish = jest.fn();
+  const stage = jest.spyOn(CaveService, 'StageAuthoringFile').mockResolvedValue({
+    id: 'file-new', name: 'New map', extension: '.pdf', fileTypeTagId: 'type-file', fileTypeKey: 'Map',
+  } as any);
+  const removeStaged = jest.spyOn(CaveService, 'DeleteAuthoringStagedFile').mockResolvedValue();
+  const { container } = render(<FileHarness onFinish={onFinish} />);
+  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+  await userEvent.upload(input, new File(['bytes'], 'new-map.pdf', { type: 'application/pdf' }));
+
+  await waitFor(() => expect(stage).toHaveBeenCalledTimes(1));
+  await screen.findByRole('group', { name: 'New map file editor' });
+  await userEvent.click(screen.getByRole('button', { name: 'Remove New map' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Read files' }));
+
+  await waitFor(() => expect(removeStaged).toHaveBeenCalledWith('file-new'));
+  expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({
+    files: [expect.objectContaining({ id: 'file-existing' })],
+  }));
+  expect(onFinish.mock.calls[0][0].files.some((file: any) => file.id === 'file-new')).toBe(false);
+});
+
+it('does not submit a phantom line plot when one is added and removed before save', async () => {
+  const onFinish = jest.fn();
+  (parseCaveLinePlotFile as jest.MockedFunction<typeof parseCaveLinePlotFile>).mockResolvedValue(
+    [{ type: 'FeatureCollection', features: [] }] as any
+  );
+  const { container } = render(<LinePlotHarness onFinish={onFinish} />);
+  const input = container.querySelectorAll('input[type="file"]')[0] as HTMLInputElement;
+
+  await userEvent.upload(input, new File(
+    ['{"type":"FeatureCollection","features":[]}'],
+    'new-line.geojson',
+    { type: 'application/geo+json' }
+  ));
+
+  await screen.findByRole('group', { name: 'new-line line plot editor' });
+  await userEvent.click(screen.getByRole('button', { name: 'Remove new-line' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Read line plots' }));
+
+  expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({
+    linePlots: [expect.objectContaining({ id: 'line-existing' })],
+  }));
+  expect(onFinish.mock.calls[0][0].linePlots).toHaveLength(1);
 });
