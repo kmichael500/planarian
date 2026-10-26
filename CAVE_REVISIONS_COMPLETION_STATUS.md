@@ -3,14 +3,14 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-26
-**Completion HEAD reviewed:** `b2990484e62a5b1255fa498834ccced79ac29eaf`
-**Working-tree refresh:** 2026-10-26; the line-plot detail cleanup and this ledger refresh are uncommitted on top of that baseline.
+**Completion HEAD reviewed:** `3319128817570b49b739fdab807dae42744b6280`
+**Package refresh:** 2026-10-26; GAP-001 preservation-census tests and this ledger refresh are validated on top of the committed line-plot cleanup baseline.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
-**Migration validation refreshed:** 2026-10-25; migration repair/hardening is represented by completion commit `fa4582ac93ebd36f8c8bfbb891ec713ce380b09c` before rollout reconciliation
-**Rollout-baseline validation refreshed:** 2026-10-25; merge reconciliation validation is recorded below
+**Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
+**Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
 **Merge base:** current `main` above
-**Branch distance at baseline review:** 168 commits ahead of `main`, 0 behind
-**Three-dot diff at baseline review:** 477 files changed, 67,088 insertions, 5,794 deletions
+**Branch distance at baseline review:** 169 commits ahead of `main`, 0 behind
+**Three-dot diff at baseline review:** 478 files changed, 66,945 insertions, 5,989 deletions
 
 ## Purpose
 
@@ -52,9 +52,9 @@ The branch is **substantially built**. The core revision/proposal/file/import ar
 
 No known Cave-revision implementation blocker remains in the current working tree. The former Cave-detail line-plot mutation surface has been removed, and the Reset Account destructive-safety package is merged into the completion branch.
 
-The remaining **P0 merge gate is validation rather than a known implementation defect**: run the full current-main database preservation census so unrelated durable data is proven unchanged across the completion migration/rollout boundary.
+The **P0 implementation/validation checklist is now complete in this package**. GAP-001 adds a strict current-main v32 database preservation census plus a separate revision-rollout preservation boundary; the package still needs to be included in the branch's final adversarial validation pass.
 
-The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, and authoring-field preservation. The remaining high-value risks are mostly outside the core publication machinery: production object-storage behavior, shared-interceptor compatibility, real-browser integration, archive generation/runtime behavior, account-switch cache isolation, and mixed-version deployment safety.
+The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, and current-main migration/rollout preservation. The remaining high-value risks are P1/P2 work outside the core publication machinery: production object-storage behavior, shared-interceptor compatibility, real-browser integration, archive generation/runtime behavior, account-switch cache isolation, and mixed-version deployment safety.
 
 ## Reviewed scope size
 
@@ -219,11 +219,17 @@ The principal remaining test risk is therefore **runtime integration coverage**,
 
 # 4. Validation already completed
 
-The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The current completion baseline is `b2990484e62a5b1255fa498834ccced79ac29eaf`; the line-plot detail cleanup and ledger refresh are uncommitted on top of that baseline until this focused package is finalized.
+The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The reviewed committed completion baseline is `3319128817570b49b739fdab807dae42744b6280`; this package adds the GAP-001 preservation-census tests and ledger refresh on top of that baseline.
 
 ## 2026-10-26 focused completion refresh
 
-- Baseline `b2990484` includes the merged Cave-authoring field-persistence package and Reset Account destructive-safety hardening.
+- Committed baseline `33191288` includes the merged Cave-authoring field-persistence package, Reset Account destructive-safety hardening, and the Cave-detail line-plot publication cleanup.
+- GAP-001 focused preservation validation passed **2/2** on disposable PostgreSQL/PostGIS: one test covers the complete 41-table current-main v32 migration boundary and one covers the separate revision-rollout boundary plus an idempotent no-op rerun.
+- Adversarial test-quality review corrected the preservation class name so the repository's documented `FullyQualifiedName~Migration` filter discovers **both** GAP-001 tests; the temporary implementation-coupled rollout batch-count assertions were removed and FeatureSetting backfill provenance was strengthened for both generated rows.
+- The final migration + PostgreSQL-foundation focused suite passed **34/34** with the complete census fixture and corrected test discovery.
+- Release solution build passed **0 warnings / 0 errors** and the backend unit suite passed **415/415** during this review.
+- The full PostgreSQL/PostGIS integration suite passed **368/368** before the final assertion-only strengthening that checks no extra `FeatureSettings` rows were inserted; the exact final source was then rebuilt and the affected preservation tests (**2/2**) plus the full migration/foundation group (**34/34**) were rerun green.
+- EF pending-model validation reports **no changes since the last migration**; the command emits the repository's existing global-query-filter relationship warnings.
 - The obsolete Cave-detail line-plot publication surface was removed without changing the aggregate editor or map read path.
 - After removing the temporary negative regression, focused frontend validation passed **4 suites / 20 tests, 0 snapshots** across Cave detail, aggregate File/line-plot authoring, CaveMap, and `MapLinePlotLayer`.
 - The prior full frontend run passed **75 suites / 356 tests, 0 snapshots** before that one temporary test was removed. Its preflight passed client-route generator **6/6** and CSP configuration **5/5**; the focused post-removal run revalidated the affected suites.
@@ -411,27 +417,19 @@ Trip-photo storage was traced separately. Trip photos use `BlobService` and path
 
 These items focus on unexpected data loss, unrelated regressions, recovery, and production/browser behavior rather than adding redundant Cave-publication tests.
 
-## GAP-001 — Full current-main database preservation census
+## GAP-001 — RESOLVED — Full current-main database preservation census
 
-**Priority: P0 before merge**
+The current working tree now contains a strict two-phase PostgreSQL/PostGIS preservation gate rather than another representative single-Cave migration test.
 
-Build the exact current-main schema and seed representative data across unrelated subsystems, including where practical:
+`CurrentMainV32CompletionMigrationPreservesCompleteDurableDatabase` builds the exact current-main v32 schema, asserts that its public durable-table manifest is exactly **41 tables**, seeds **every one of those 41 tables**, and fails if any table remains empty. The fixture includes three account shapes; normal, temporary/invited, confirmed and cross-account users; account/global permissions; all CavePermission scopes; default/non-default account and project TagTypes; rich/minimal/archived Caves; 3D and zero-valued Entrances; every Cave/Entrance tag relationship; Cave-owned/null-owner/account-only/expiring Files; line plots; Favorites; Project/Trip/Member/Photo/Lead data; message/email history; throttle logs; and fixed audit metadata.
 
-- users/authentication state;
-- account membership and permissions;
-- account settings and states;
-- counties and TagTypes;
-- favorites;
-- Caves and Entrances;
-- Cave/Entrance tag relationships;
-- Files and line plots;
-- Projects / Trips / Photo metadata;
-- message/email metadata;
-- other durable current-main tables not intentionally transformed.
+Before and after migration, all **37 v32 tables that are not intentionally transformed** are compared as canonical whole-row JSON including PostgreSQL `xmin`, so an invisible rewrite is observable rather than reduced to a row-count check. `Caves`, `Entrances`, `Files`, and `FeatureSettings` use explicit transformation-aware projections. The test separately proves the expected File owner/name/extension conversions, FeatureSetting backfill/provenance, migration-owned filename compatibility rows, intentional reporter-column removal without deleting users/People tags, preservation of the `UserCavePermissions` view result, empty completion-owned revision/proposal tables before rollout, and correct migration history.
 
-Capture deterministic row counts and canonical projections/hashes before migration. Upgrade to completion and assert that intentional transformations match their contract while unrelated durable data is unchanged.
+`RevisionRolloutOnlyCreatesBaselineHistoryAndAdvancesCavePointers` then treats rollout as a separate deployment boundary. Every non-`Caves`/non-`CaveRevisions` table is captured including `xmin` and must remain exactly unchanged. Cave user/audit state must remain unchanged apart from the deliberate `CurrentRevisionId`/row-version advance. The three generated `SystemBaseline/Baseline` revisions are compared against explicit full expected snapshots covering scalar state, references, every tag family, Entrances, Files and line-plot content hashes. A second rollout is required to be a complete database no-op, including `xmin`.
 
-Ideal additional predeployment validation: restore a sanitized real-world database copy into an isolated disposable PostgreSQL instance, apply completion migrations, and run the same invariant checker. This must never imply permission to inspect or modify a shared/live application database.
+Validation on 2026-10-26: the two new focused tests passed **2/2** on disposable repository-owned PostgreSQL/PostGIS; after correcting documented migration-filter discovery, the migration + PostgreSQL-foundation suite passed **34/34** on the final fixture; and EF reported **“No changes have been made to the model since the last migration.”** No existing development/staging/production database was inspected or modified.
+
+An optional higher-confidence predeployment extension remains: restore a sanitized real-world database copy into an isolated disposable PostgreSQL instance and run the same invariant approach. That is additional deployment evidence, not a remaining GAP-001 requirement, and does not authorize access to a shared/live database.
 
 ## GAP-002 — RESOLVED — Current-main rollback/deployment contract
 
@@ -696,7 +694,7 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 - [x] Add cross-replica account API mutation and archive coordination with PostgreSQL advisory leases (independent writers still need deployment audit).
 - [x] Freeze/rename the v29 migration test so it is explicitly historical rather than “exact main”.
 - [x] Refresh durable completion docs/checklists to current implementation truth. Keep the plan active until remaining validation gates are complete.
-- [ ] **GAP-001:** full current-main database preservation census.
+- [x] **GAP-001:** full current-main database preservation census, including a strict 41-table v32 migration boundary and separate rollout preservation boundary.
 
 ## P1 — Strongly recommended before merge because failures can be silent or cross-cutting
 
@@ -758,7 +756,7 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 - [x] Completion migration history cleanly extends current main.
 - [x] Current-main-with-representative-data upgrade is automated and green.
-- [ ] Full preservation census is green or consciously waived with rationale.
+- [x] Full preservation census is green: every current-main v32 durable model table is explicitly classified, seeded, and checked across migration; rollout is validated as a separate preservation boundary.
 - [x] Rollback to the supported prior schema is tested.
 - [x] EF pending-model check is green.
 
@@ -772,10 +770,10 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 ## Destructive-operation safety
 
-- [x] Reset behavior is tested against a dense dependency graph (focused worktree).
-- [x] Reset does not affect the second tenant in the tested relational/blob graph (focused worktree).
-- [x] Post-commit storage failure has truthful user/API semantics (focused worktree).
-- [x] Fate of stored archives during reset is intentional and documented (focused worktree).
+- [x] Reset behavior is tested against a dense dependency graph (merged destructive-safety package).
+- [x] Reset does not affect the second tenant in the tested relational/blob graph (merged destructive-safety package).
+- [x] Post-commit storage failure has truthful user/API semantics (merged destructive-safety package).
+- [x] Fate of stored archives during reset is intentional and documented (merged destructive-safety package).
 - [x] Durable cleanup retry and cross-replica API/archive admission tested; independent write paths still need deployment audit.
 - [ ] Hard-delete/external-cleanup failure semantics are safe/retryable.
 
@@ -807,7 +805,7 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 - [x] `docs/cave-revisions.md` describes implemented truth.
 - [ ] completion plan README/checklist no longer claims an active incomplete state once actually complete.
-- [x] this ledger is refreshed through the current working-tree line-plot remediation; refresh again after final validation/commit.
+- [x] this ledger is refreshed through the GAP-001 preservation-census package; refresh again after the branch's final adversarial validation.
 - [ ] exact final test/build commands and results are recorded.
 - [ ] no validation is claimed merely because a related test exists.
 
@@ -823,7 +821,7 @@ Specifically:
 - real Azure Blob Storage behavior was not exercised; service tests used a fake object-storage boundary;
 - no real-browser end-to-end suite was run;
 - no full real account archive round-trip/restore was proven;
-- the migration preservation experiment used representative data rather than every current-main table;
+- the synthetic migration preservation census now explicitly seeds and checks every current-main v32 model table; it is still synthetic data rather than a sanitized restored real-world database;
 - dependency-audit results were informational and inherited vulnerabilities remain a separate security-maintenance concern.
 
 # 15. Notes for the next agent
@@ -834,9 +832,9 @@ Do not begin with a broad refactor.
 
 Recommended next work order:
 
-1. run GAP-001, the full current-main database preservation census;
-2. add the production `AzureBlobObjectStorage` + Azurite contract suite;
-3. add the global `SaveChangesInterceptor` operation/tenant compatibility matrix;
+1. add the production `AzureBlobObjectStorage` + Azurite contract suite;
+2. add the global `SaveChangesInterceptor` operation/tenant compatibility matrix;
+3. finish remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows;
 4. add the small critical browser/PDF smoke suite;
 5. finish archive runtime validation and account-switch/cache isolation;
 6. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
@@ -854,7 +852,6 @@ The branch's core architecture is not the reason it is blocked. The revision/pro
 
 Remaining merge risk is concentrated in:
 
-- the full current-main preservation census;
 - real storage-provider behavior;
 - broad shared-interceptor compatibility;
 - real-browser integration;
@@ -862,4 +859,4 @@ Remaining merge risk is concentrated in:
 - account-switch/client-cache isolation;
 - independent-writer/live-provider deployment boundaries around destructive cleanup.
 
-Complete the remaining P0 preservation census, add the highest-value P1 safety tests, and then perform one fresh adversarial pass rather than assuming the previous green suite proves the corrected branch.
+The P0 checklist is complete through the GAP-001 preservation-census package. Add the highest-value P1 safety tests and then perform one fresh adversarial pass rather than assuming the previous green suite proves the corrected branch.
