@@ -17,8 +17,10 @@ appropriate completion suite before finishing.
   `SaveChanges`, batching, and tracked-entry structure rather than flaky wall-clock thresholds.
 
 Use small, scenario-specific typed factories for test data rather than a universal seed. Account, Cave, reference,
-file, change-request, and import setup live in focused helpers under `Infrastructure/Data`. `GlobalStateTestData` is the
-narrow global-reference bypass; dedicated high-volume setup belongs in `ImportScaleSeeder`.
+file, change-request, and import setup live in focused helpers under `Infrastructure/Data`. `GlobalStateTestData` remains
+the narrow raw-SQL global-reference bypass. Protected global system prerequisites such as Permission definitions, default TagTypes, global FeatureSettings, and platform
+permission assignments use the typed, interceptor-free `GlobalSystemTestData` seed context, mirroring `DataGenerator`;
+do not use that bypass for tenant-owned setup. Dedicated high-volume setup belongs in `ImportScaleSeeder`.
 
 Raw SQL in tests is reserved for provider contracts and observations (catalogs, constraints, PostGIS, locks, `xmin`,
 or exact no-write checks), historical migration setup, and dedicated scale seeding. Routine domain arrangement uses

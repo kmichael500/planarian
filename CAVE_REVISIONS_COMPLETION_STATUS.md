@@ -2,9 +2,9 @@
 
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
-**Ledger last refreshed:** 2026-10-26
-**Completion HEAD reviewed:** `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`
-**Package refresh:** 2026-10-26; latest reviewed code package is shared-reference revision administration `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`; earlier dead-code, preservation, and asset-lifecycle evidence remains SHA-pinned below.
+**Ledger last refreshed:** 2026-10-27
+**Completion HEAD reviewed:** `f9ef92a337805a351a96a236b4ae6caa35e3cf7a`
+**Package refresh:** 2026-10-27; the `SaveChanges` tenant/ownership hardening package was validated as an uncommitted working tree on top of `f9ef92a337805a351a96a236b4ae6caa35e3cf7a`. Its exact pre-commit validation evidence is intentionally recorded below as working-tree evidence; earlier package evidence remains SHA-pinned below.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
@@ -106,7 +106,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | File Name + Extension model | **DONE + VALIDATED** | Completion extends unchanged current-main v32 with a clean post-v32 migration. PostgreSQL coverage proves representative v32 data upgrades safely, preserves distinct legacy `FileName` values across an untouched upgrade/downgrade round trip, respects post-upgrade renames, and restores the v32 `FileName` schema contract without an accidental default. |
 | File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
 | App/global permission semantics | **DONE + VALIDATED** | Platform-admin/account-admin/default-account/export capability integration coverage exists. |
-| Global `SaveChangesInterceptor` batching refactor | **DONE, PARTIAL VALIDATION** | Command-count tests prove bounded lookups; broader entity-family operation/tenant matrix is still recommended because blast radius is repository-wide. |
+| Global `SaveChangesInterceptor` batching refactor | **DONE + VALIDATED** | Mechanical EntityBase coverage contract plus real-PostgreSQL matrix cover side-effect-free current/original AccountId and Cave/County/Entrance ownership, staged Files, foreign-tenant Added/Modified/Deleted states, mixed-batch atomicity, laundering/smuggling attempts, narrow AccountUser/User invitation exceptions including the unique null-`InvitationSentOn` recovery case, protected global/default writes, and bounded lookup counts. Unchanged Cave→County relationships avoid a redundant ownership SELECT while actual County moves remain validated. |
 | Account Reset rewrite | **DONE, PARTIAL VALIDATION** | The merged destructive-safety package tests the Reset graph, two-tenant noninterference, archive container removal, post-commit storage failures, immediate retry, and reset/archive admission. A transactional cleanup outbox, explicit retry endpoint/UI and PostgreSQL shared/exclusive account-maintenance leases cover API writes and background archives. Independent non-cooperating writers and live Azure smoke tests remain deployment validation boundaries. |
 | Account archive projection compatibility | **DONE, PARTIAL VALIDATION** | Focused projection tests exist. Full `.tar.gz` generation/content/cancellation/pruning/restore semantics are under-tested. |
 | Unsaved-change guard | **DONE + VALIDATED** | Edit/Suggest/Revise tests cover blocked navigation, keep-editing, discard, asset-only dirty state, and `beforeunload`. |
@@ -159,7 +159,7 @@ Snapshot design is intentionally user/logical-state oriented:
 
 ## Architecture weaknesses / validation boundaries still present
 
-1. The global `SaveChangesInterceptor` is high-blast-radius infrastructure. The batching refactor looks sensible, but deserves broader compatibility proof outside the Cave-centric scenarios that naturally exercise it.
+1. The global `SaveChangesInterceptor` remains high-blast-radius infrastructure, but its Cave/account-domain switch coverage is now mechanically classified and the ownership mechanisms have a real-PostgreSQL compatibility/tenant-isolation matrix. Legacy Trip/Lead/Project entities and explicitly global/system records remain deliberately outside the Cave-completion ownership contract.
 2. The production `AzureBlobObjectStorage` adapter has a passing manual local Azurite smoke for create-only collision handling, idempotent delete, and snapshot-aware deletion, but still lacks a committed automated Azurite contract suite; broader provider-level race/cancellation/content-metadata semantics remain a validation boundary.
 3. Browser/runtime and full archive-generation behavior are still under-tested end to end. Reset Account now has durable cleanup debt/retry semantics, but independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
 
@@ -219,7 +219,25 @@ The principal remaining test risk is therefore **runtime integration coverage**,
 
 # 4. Validation already completed
 
-The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The latest reviewed completion code HEAD is `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`; the earlier dead-code and GAP-001 evidence remains pinned to the SHAs recorded in their respective refresh sections.
+The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The `SaveChanges` hardening package was validated on reviewed HEAD `f9ef92a337805a351a96a236b4ae6caa35e3cf7a` before commit and is recorded first as explicitly pre-commit working-tree evidence; older committed-package, dead-code, and GAP-001 evidence remains pinned to the SHAs recorded in the corresponding refresh sections.
+
+## 2026-10-27 SaveChanges ownership hardening working-tree refresh
+
+The package validated on reviewed HEAD `f9ef92a337805a351a96a236b4ae6caa35e3cf7a` completes the shared `SaveChangesInterceptor` ownership audit: side-effect-free batched current/original Cave/County/Entrance validation, missing current-domain entity coverage, narrowed AccountUser/invitation and authenticated-User exceptions, explicit PlanarianAdmin boundaries for Permission definitions and global UserPermission/FeatureSetting/default-TagType writes, an explicit synchronous-`SaveChanges` rejection so async authorization cannot be bypassed, and a reflection-based EntityBase coverage contract.
+
+Final validation of the production/test source before this ledger-only evidence update:
+
+- Release solution restore/build — **PASS, 0 warnings / 0 errors** in the final run. An earlier fresh rebuild emitted **152 pre-existing nullable/compiler warnings in unchanged files; 0 warnings referenced changed C# files**.
+- backend unit/architecture suite — **417/417 passed**;
+- full disposable PostgreSQL/PostGIS integration suite — **494/494 passed**, including migration, Golden, Scale, tenant-isolation, invitation, permission, synchronous-SaveChanges rejection, and destructive-operation coverage;
+- focused affected ownership/permission/migration matrix — **64/64 passed**;
+- focused global-system + FeatureSetting compatibility package after fixture migration — **21/21 passed**;
+- EF pending-model validation — **PASS, no pending model changes**; the command still emits the repository's existing required-navigation/global-query-filter warnings;
+- repository documentation validator against current literal `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2` — **PASS**;
+- focused dead-code analyzer set (`IDE0051`, `IDE0052`, `IDE0059`, `IDE0060`, `CA1811`, `CA1812`, `CA1823`) — **PASS, zero findings**;
+- changed-C# whitespace and unused-using formatting checks, staged/unstaged `git diff --check`, conflict-marker/skip scans, and debug/TODO residue scan — **PASS**.
+
+The full-suite pass caught only stale test setup caused by the newly enforced global-system boundary: global Permission/UserPermission and FeatureSetting prerequisites had to move to the narrow typed `GlobalSystemTestData` bootstrap path. After that migration and additional adversarial Permission/FeatureSetting mutation coverage, the exact runtime source is green. No additional production defect was found in the final pass.
 
 ## 2026-10-26 shared-reference revision administration refresh
 
@@ -523,23 +541,31 @@ The repository Docker environment already includes Azurite. Add an automated sto
 
 Also make the intended immutable-address assumption explicit. Either prove the application never reuses an immutable object key or make provider behavior reject accidental overwrite. Do not rely only on generated-ID improbability as protection against silent replacement.
 
-## GAP-006 — Global SaveChangesInterceptor compatibility matrix
+## GAP-006 — RESOLVED — Global SaveChangesInterceptor compatibility matrix
 
-**Priority: P1**
+The repository-wide ownership interceptor now has both a mechanical coverage contract and real PostgreSQL behavioral coverage. The audit found five concrete tenant-safety/ownership gaps:
 
-The interceptor/batch ownership loader is repository-wide infrastructure. Existing command-count tests prove important performance properties but not the complete behavioral matrix.
+- `CaveChangeRequestReviewEvent`, `CaveGeoJson`, `CavePermission`, `Favorite`, and `UserPermission` were current Cave/account-domain `EntityBase` types with no interceptor switch case;
+- Added `AccountUser` rows bypassed Account validation entirely, allowing a selected Account A context to construct membership for Account B;
+- Cave/permission rows could carry a current-account `AccountId` with a foreign County ID because the ownership loader batch-resolved Cave/Entrance parents but not County parents;
+- modified rows could hide their pre-save owner by changing a direct `AccountId` or mutable parent FK before `SaveChanges`; deleted/severed aggregate children also demonstrated that authorization cannot safely depend on mutating navigations back into place;
+- global/system writes needed an explicit authority boundary: ordinary account contexts could construct global `UserPermission`, global `FeatureSetting`, or global/default `TagType` rows because `AccountId = null` had no tenant to compare against, and Permission definitions were previously accepted outside the switch; authenticated no-Account contexts also had overly broad `User` mutation authority.
 
-Add parameterized/integration coverage across each entity family the interceptor explicitly validates:
+A final commit-readiness pass also caught a compatibility regression in the first hardening draft: invitation claims required a non-null `InvitationSentOn`, even though invitation creation deliberately keeps a successfully submitted invitation usable when persisting that convenience timestamp fails. The corrected matcher preserves the stronger identity proof without turning that documented resilience path into an unusable invitation.
 
-- Added in same account → allowed;
-- Modified in same account → allowed;
-- Removed in same account → allowed;
-- foreign-account Added/Modified/Removed → forbidden;
-- failed attempt leaves both tenants unchanged;
-- global/default entities retain intended special rules;
-- registration/password-reset/invitation-cleanup exceptions remain narrow and intentional.
+The implementation now batch-validates current and original Cave, County, and Entrance parent IDs in bounded 500-ID chunks without mutating EF navigations when those relationships are introduced, changed, or independently carry ownership. A modified Cave with an unchanged `CountyId` relies on the separately validated current/original Cave `AccountId`, avoiding the redundant County query seen in bulk revision publication; actual County moves still validate both current and original County IDs. It also preserves the staged-File ownership check, validates the missing current-domain entity families, and narrows the `AccountUser` exception to same-selected-account writes, verified invitation claims, platform-admin creation of a brand-new Account, or deletion-only invitation cleanup. Verified invitation claims are matched to a pending temporary invite by Account, normalized email, and the copied invitation-sent timestamp. If Mailgun accepted the invitation but the optional `InvitationSentOn` persistence failed, a null timestamp still matches only a pending invite whose timestamp is also null, and only when that Account/email/null-timestamp set resolves to exactly one temporary invitee; ambiguity fails closed. Cave/User permission transfer must originate from that exact temporary invitee. Permission definitions, global `UserPermission` and `FeatureSetting` rows, and global/default `TagType` writes require PlanarianAdmin. Authenticated `User` writes require self, same-selected-Account membership, or the verified temporary-invitation transition rather than treating a missing selected Account as blanket permission. The intentionally unauthenticated User registration/email-confirmation/password-reset paths remain explicit exceptions.
 
-Particularly cover Cave/Entrance association entities whose ownership is now populated by reflection and batched FK lookup.
+Validation includes:
+
+- foreign-account Added/Modified/Deleted checks across every directly validated Account entity family and every Cave/Entrance association family;
+- pre-populated foreign navigations as well as missing-navigation FK resolution, so validation cannot be bypassed by controlling tracking/navigation state;
+- Account-A rows carrying Account-B Cave/County IDs, foreign rows attempting to relabel `AccountId` to Account A, and mutable child relationships attempting to move from an Account-B parent to Account A before save;
+- atomic mixed owned + foreign batches;
+- current-tenant success for direct AccountId, Cave, Entrance, File, and staged-File ownership mechanisms;
+- platform-admin account creation, global/account permission behavior, rejection of arbitrary cross-account membership, verified invitation acceptance even while a different Account is selected, transfer only of the temporary invitee’s Cave/User permissions, successful acceptance with either a persisted or legitimately missing invitation-sent timestamp, fail-closed rejection when a missing timestamp would match multiple temporary invitees, rejection of unrelated permission theft, deletion-only invitation cleanup, rejection of no-account invitation modification, and focused registration/email-confirmation/password-reset/arbitrary-edit lifecycle cases;
+- ordinary-account rejection for Permission-definition mutation plus global `UserPermission`, global `FeatureSetting`, and global/default `TagType` creation, global-to-tenant laundering, tenant-to-global promotion, and deletion, with direct platform-admin compatibility retained; authenticated no-Account User edits are also proven self-only rather than cross-user;
+- bounded ownership-query tests for 600 Cave associations, 120 Entrance associations, and 600 County associations;
+- an architecture contract that fails when a current Cave/account `EntityBase` family disappears from the interceptor switch or a newly added entity is not explicitly classified.
 
 ## GAP-007 — Small real-browser smoke suite
 
@@ -749,7 +775,7 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 
 - [ ] Remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows (GAP-004).
 - [ ] Azurite contract tests for production `AzureBlobObjectStorage`.
-- [ ] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
+- [x] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
 - [ ] Small real-browser smoke suite, including WebKit for critical workflows.
 - [ ] Real-browser PDF.js custom-header/range/authentication test.
 - [ ] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
@@ -882,11 +908,10 @@ Do not begin with a broad refactor.
 Recommended next work order:
 
 1. add the production `AzureBlobObjectStorage` + Azurite contract suite;
-2. add the global `SaveChangesInterceptor` operation/tenant compatibility matrix;
-3. finish remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows;
-4. add the small critical browser/PDF smoke suite;
-5. finish archive runtime validation and account-switch/cache isolation;
-6. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
+2. finish remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows;
+3. add the small critical browser/PDF smoke suite;
+4. finish archive runtime validation and account-switch/cache isolation;
+5. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
 
 
 When working on Reset Account, do not assume the whole account container contains only current Cave Files. Current code also uses that container for account archives and import transport. Trace every producer/prefix before changing container cleanup behavior.

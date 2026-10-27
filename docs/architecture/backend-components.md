@@ -118,7 +118,7 @@ The Cave/Entrance CSV dry-run path ends after planning; it is not “execute and
 
 | Component | Responsibility | Branch change |
 | --- | --- | --- |
-| SaveChangesInterceptor + ownership batch loader | Enforce tenant/ownership constraints across EF writes | **Major shared-infrastructure refactor** |
+| SaveChangesInterceptor + ownership batch loader | Enforce tenant/ownership constraints across EF writes; async-only SaveChanges enforcement because ownership validation performs database I/O; side-effect-free batch validation of current/original Cave/County/Entrance parent ownership when relationships are introduced/changed, without re-querying an unchanged Cave County relationship; staged-File ownership; fail-closed invitation claim correlation (including the unique null-`InvitationSentOn` recovery case); PlanarianAdmin-only Permission/global UserPermission/FeatureSetting/default-TagType writes; scoped authenticated User mutation; mechanically classify current EntityBase coverage | **Major shared-infrastructure refactor** |
 | RequestThrottleService / ThrottleEventLogRepository | Request/file-stream throttling and event logging | **Changed / repository split** |
 | FileResponsePolicy | Authenticated file response/range/security decisions | **Changed** |
 | UserRepository, PermissionRepository, AppService | Permission/default-account/platform-admin behavior | **Changed** |

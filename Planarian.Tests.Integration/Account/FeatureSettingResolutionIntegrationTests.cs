@@ -21,8 +21,11 @@ public sealed class FeatureSettingResolutionIntegrationTests(PostgresTestServer 
         await using var db = database.CreateDbContext("account-admin", account.AccountId);
         db.FeatureSettings.Add(new FeatureSetting
         {
-            Id = "override01", AccountId = account.AccountId, Key = FeatureKey.EnabledFieldCaveId,
-            IsEnabled = false, IsDefault = false
+            Id = "override01",
+            AccountId = account.AccountId,
+            Key = FeatureKey.EnabledFieldCaveId,
+            IsEnabled = false,
+            IsDefault = false
         });
         await db.SaveChangesAsync();
 
@@ -65,15 +68,12 @@ public sealed class FeatureSettingResolutionIntegrationTests(PostgresTestServer 
     private static async Task AddGlobalDefaultAsync(PostgresTestDatabase database, FeatureKey key, string id,
         bool isEnabled)
     {
-        await using var seed = database.CreateDbContext("featseed", accountId: null);
-        seed.Users.Add(new User("Feature", "Seeder", "feature-seeder@integration.test") { Id = "featseed" });
-        seed.FeatureSettings.Add(new FeatureSetting
+        await GlobalSystemTestData.AddFeatureSettingAsync(database, new FeatureSetting
         {
             Id = id,
             Key = key,
             IsEnabled = isEnabled,
             IsDefault = true
         });
-        await seed.SaveChangesAsync();
     }
 }

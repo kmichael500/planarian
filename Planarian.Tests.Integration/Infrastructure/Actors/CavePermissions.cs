@@ -49,16 +49,13 @@ internal static class CavePermissions
     private static async Task GrantAsync(PostgresTestDatabase database, PublishedCaveTestData cave, string userId,
         string permissionId, string key, string description)
     {
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId, Key = key, Name = key, Description = description, PermissionType = "Cave"
+        });
+
         await using var db = database.CreateDbContext(userId, cave.AccountId);
         await EnsureAccountUserAsync(db, cave.AccountId);
-        if (!await db.Permissions.AnyAsync(row => row.Id == permissionId))
-        {
-            db.Permissions.Add(new Permission
-            {
-                Id = permissionId, Key = key, Name = key, Description = description, PermissionType = "Cave"
-            });
-            await db.SaveChangesAsync();
-        }
         db.CavePermissions.Add(new CavePermission
         {
             UserId = db.RequestUser.Id,

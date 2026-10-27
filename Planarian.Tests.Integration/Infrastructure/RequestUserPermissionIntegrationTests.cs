@@ -25,22 +25,18 @@ public sealed class RequestUserPermissionIntegrationTests(PostgresTestServer fix
         await using (var seed = database.CreateDbContext(userId, null))
         {
             seed.Users.Add(new User("Planarian", "Admin", "planarian-admin@integration.test") { Id = userId });
-            seed.Permissions.Add(new Permission
-            {
-                Id = permissionId,
-                Key = PermissionKey.PlanarianAdmin,
-                Name = "Planarian Admin",
-                Description = "Global Planarian administration",
-                PermissionType = PermissionType.User
-            });
-            seed.UserPermissions.Add(new UserPermission
-            {
-                UserId = userId,
-                PermissionId = permissionId,
-                AccountId = null
-            });
             await seed.SaveChangesAsync();
         }
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = permissionId,
+            Key = PermissionKey.PlanarianAdmin,
+            Name = "Planarian Admin",
+            Description = "Global Planarian administration",
+            PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.AddUserPermissionAsync(
+            database, "plnadmup01", userId, permissionId);
 
         await using var db = database.CreateDbContext(userId, null);
         await db.RequestUser.Initialize(null, userId);
@@ -177,37 +173,40 @@ public sealed class RequestUserPermissionIntegrationTests(PostgresTestServer fix
 
     private static async Task AddGlobalPlanarianAdminAsync(PostgresTestDatabase database, string userId)
     {
-        await using var seed = database.CreateDbContext(userId, null);
-        seed.Users.Add(new User("Planarian", "Admin", $"{userId}@integration.test") { Id = userId });
-        seed.Permissions.Add(new Permission
+        await using (var seed = database.CreateDbContext(userId, null))
+        {
+            seed.Users.Add(new User("Planarian", "Admin", $"{userId}@integration.test") { Id = userId });
+            await seed.SaveChangesAsync();
+        }
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
         {
             Id = "plnadmperm", Key = PermissionKey.PlanarianAdmin, Name = "Planarian Admin",
             Description = "Global Planarian administration", PermissionType = PermissionType.User
         });
-        seed.UserPermissions.Add(new UserPermission { UserId = userId, PermissionId = "plnadmperm", AccountId = null });
-        await seed.SaveChangesAsync();
+        await GlobalSystemTestData.AddUserPermissionAsync(
+            database, "plnadmup01", userId, "plnadmperm");
     }
 
     private static async Task AddAccountAdminAsync(PostgresTestDatabase database, string accountId, string userId)
     {
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "acctadmprm", Key = PermissionKey.Admin, Name = "Admin",
+            Description = "Account administration", PermissionType = PermissionType.User
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "cavemgrprm", Key = PermissionKey.Manager, Name = "Manager",
+            Description = "Cave management", PermissionType = PermissionType.Cave
+        });
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "caveviewpm", Key = PermissionKey.View, Name = "View",
+            Description = "Cave viewing", PermissionType = PermissionType.Cave
+        });
+
         await using var seed = database.CreateDbContext(userId, accountId);
         seed.AccountUsers.Add(new AccountUser { AccountId = accountId, UserId = userId });
-        seed.Permissions.AddRange(
-            new Permission
-            {
-                Id = "acctadmprm", Key = PermissionKey.Admin, Name = "Admin",
-                Description = "Account administration", PermissionType = PermissionType.User
-            },
-            new Permission
-            {
-                Id = "cavemgrprm", Key = PermissionKey.Manager, Name = "Manager",
-                Description = "Cave management", PermissionType = PermissionType.Cave
-            },
-            new Permission
-            {
-                Id = "caveviewpm", Key = PermissionKey.View, Name = "View",
-                Description = "Cave viewing", PermissionType = PermissionType.Cave
-            });
         seed.UserPermissions.Add(new UserPermission { UserId = userId, PermissionId = "acctadmprm", AccountId = accountId });
         var account = await seed.Accounts.SingleAsync(row => row.Id == accountId);
         account.ExportEnabled = false;

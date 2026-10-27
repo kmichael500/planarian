@@ -34,6 +34,12 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
             Assert.Equal(1, result.InitializedCaveCount);
         }
 
+        await GlobalSystemTestData.EnsurePermissionAsync(database, new Permission
+        {
+            Id = "legacyview", Key = "View", Name = "View", Description = "View Caves",
+            PermissionType = "Cave"
+        });
+
         await using (var permissions = database.CreateDbContext(contributorId, accountId))
         {
             permissions.AccountUsers.Add(new AccountUser
@@ -41,11 +47,6 @@ public sealed class LegacyRevisionMigrationIntegrationTests(PostgresTestServer f
                 AccountId = accountId,
                 UserId = permissions.RequestUser.Id,
                 InvitationAcceptedOn = DateTime.UtcNow
-            });
-            permissions.Permissions.Add(new Permission
-            {
-                Id = "legacyview", Key = "View", Name = "View", Description = "View Caves",
-                PermissionType = "Cave"
             });
             permissions.CavePermissions.Add(new CavePermission
             {
