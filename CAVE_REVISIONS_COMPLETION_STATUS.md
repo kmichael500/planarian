@@ -235,7 +235,7 @@ Adversarial validation for this package included:
 - broad merge/concurrency/tenant/proposal matrix during adversarial review — **85/85 passed**;
 - complete PostgreSQL/PostGIS integration suite on the exact final implementation tree — **438/438 passed**;
 - unit/architecture suite — **415/415 passed**;
-- Release solution build — **PASS, 0 warnings / 0 errors**;
+- Release solution build — **PASS, 0 errors**; a fresh post-merge target-worktree rebuild emitted **175 pre-existing nullable warnings** in unchanged code paths (the earlier incremental build emitted none);
 - EF pending-model check — **PASS, no pending model changes**;
 - repository documentation validator against current literal `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2` — **PASS**;
 - `git diff --check`, staged-diff check, source-to-test Tag merge branch census, and stale shared-reference documentation scan — **PASS**.
