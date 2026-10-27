@@ -23,7 +23,6 @@ jest.mock("../Sidebar/SidebarComponent", () => ({
 
 jest.mock("antd", () => {
   const actual = jest.requireActual<typeof import("antd")>("antd");
-  const React = jest.requireActual<typeof import("react")>("react");
   const { useLocation } =
     jest.requireActual<typeof import("react-router-dom")>("react-router-dom");
 

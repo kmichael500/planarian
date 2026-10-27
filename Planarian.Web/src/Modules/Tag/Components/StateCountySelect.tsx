@@ -274,7 +274,7 @@ export const StateCountySelect: React.FC<StateCountySelectProps> = ({
                     .includes(input.toLowerCase())
                 }
                 tagRender={(props) => {
-                  const { label, value, closable, onClose } = props;
+                  const { value, closable, onClose } = props;
                   const isPermitted = permittedCounties.some(
                     (cty) => cty.value === value
                   );

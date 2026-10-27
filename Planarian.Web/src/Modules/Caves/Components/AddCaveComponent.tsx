@@ -83,14 +83,6 @@ const AddCaveComponent = ({
     form
   );
 
-  const [caveState, setCaveState] = useState<AddCaveVm | CaveVm>(
-    cave ?? ({} as AddCaveVm)
-  );
-
-  useEffect(() => {
-    setCaveState(cave ?? ({} as AddCaveVm));
-  }, [cave]);
-
   const handlePrimaryEntranceChange = (index: number) => {
     form.setFieldsValue({
       entrances: form
@@ -190,7 +182,7 @@ const AddCaveComponent = ({
   ]);
 
   const validateEntrances = async (
-    rule: RuleObject,
+    _rule: RuleObject,
     entrances: AddEntranceVm[]
   ) => {
     if (!entrances || entrances.length === 0) {
@@ -204,26 +196,22 @@ const AddCaveComponent = ({
     }
   };
 
-  const [autoCountyNumber, setAutoCountyNumber] = useState<number>();
   const [isCountyNumberLoading, setIsCountyNumberLoading] =
     useState<boolean>(false);
 
   useEffect(() => {
     if (isNullOrWhiteSpace(selectedCountyId)) {
-      setAutoCountyNumber(undefined);
       setIsCountyNumberLoading(false);
       form.setFieldsValue({ countyNumber: undefined });
       return;
     }
 
     if (isCountyNumberManuallySet) {
-      setAutoCountyNumber(undefined);
       setIsCountyNumberLoading(false);
       return;
     }
 
     if (isEditing && cave?.countyId === selectedCountyId && cave?.countyNumber) {
-      setAutoCountyNumber(cave.countyNumber);
       setIsCountyNumberLoading(false);
       form.setFieldsValue({ countyNumber: cave.countyNumber });
       return;
@@ -239,13 +227,11 @@ const AddCaveComponent = ({
       .then((nextCountyNumber) => {
         if (!isCurrent) return;
 
-        setAutoCountyNumber(nextCountyNumber);
         form.setFieldsValue({ countyNumber: nextCountyNumber });
       })
       .catch(() => {
         if (!isCurrent) return;
 
-        setAutoCountyNumber(undefined);
         form.setFieldsValue({ countyNumber: undefined });
       })
       .finally(() => {

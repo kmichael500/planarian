@@ -54,7 +54,7 @@ const LeadTableComponent: React.FC<LeadTableProps> = (
     },
     {
       title: "Actions",
-      render: (text: string, record: LeadVm) => (
+      render: (_text: string, record: LeadVm) => (
         <span>
           <DeleteButtonComponent
             title="Are you sure you want to delete this lead?"

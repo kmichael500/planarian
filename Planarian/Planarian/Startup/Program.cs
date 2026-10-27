@@ -52,7 +52,6 @@ using Planarian.Modules.Projects.Services;
 using Planarian.Modules.Settings.Repositories;
 using Planarian.Modules.Settings.Services;
 using Planarian.Modules.Tags.Repositories;
-using Planarian.Modules.Tags.Services;
 using Planarian.Modules.Trips.Repositories;
 using Planarian.Modules.Trips.Services;
 using Planarian.Modules.Users.Repositories;
@@ -116,7 +115,6 @@ builder.Configuration.AddCommandLine(args);
 builder.WebHost.UseSetting("AllowedHosts",
     builder.Configuration["AllowedHosts"] ?? "localhost");
 #endif
-
 
 builder.Services.AddControllers(options =>
     {
@@ -258,7 +256,6 @@ builder.Services.AddScoped<ExportService>();
 builder.Services.AddSingleton<Planarian.Modules.Account.Repositories.AccountMaintenanceLockRepository>();
 builder.Services.AddSingleton<ArchiveJobCoordinator>();
 builder.Services.AddScoped<AccountUserManagerService>();
-builder.Services.AddScoped<TagService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<MailgunWebhookService>();
 builder.Services.AddScoped<CaveService>();
@@ -320,7 +317,6 @@ builder.Services.AddScoped<FeatureSettingRepository>();
 builder.Services.AddScoped<CaveImportPlanningRepository>();
 builder.Services.AddScoped<EntranceImportPlanningRepository>();
 
-
 #endregion
 
 #region Http Clients
@@ -378,17 +374,6 @@ builder.Services.AddDbContext<PlanarianDbContextBase>(options =>
     });
 });
 
-//
-// // Convert NetTopologySuite Point to SqlGeometry
-// MappingSchema.Default.SetConverter<Point, SqlGeometry>(p =>
-// {
-//     var sqlGeometry = SqlGeometry.Point(p.X, p.Y, 4326); // Example SRID
-//     return sqlGeometry;
-// });
-//
-// // Convert SqlGeometry to NetTopologySuite Point
-// MappingSchema.Default.SetConverter<SqlGeometry, Point>(sqlGeometry => new Point(sqlGeometry.STX.Value, sqlGeometry.STY.Value));
-
 #endregion
 
 #region Authentication
@@ -433,8 +418,6 @@ builder.Services.AddSession();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
 builder.Services.AddAuthorization(PermissionPolicyConfiguration.Configure);
-
-
 
 #endregion
 
@@ -494,7 +477,6 @@ builder.Services.Configure<BrotliCompressionProviderOptions>(o =>
 builder.Services.Configure<GzipCompressionProviderOptions>(o =>
     o.Level = CompressionLevel.Optimal);
 
-
 #endregion
 
 var app = builder.Build();
@@ -527,7 +509,6 @@ app.UseSession();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-
 app.UseHttpsRedirection();
 // correct order https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware/?view=aspnetcore-3.1#middleware-order
 app.UseRouting();
@@ -552,9 +533,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<Planarian.Modules.Account.Services.AccountMaintenanceMiddleware>();
 
-
 app.MapHub<NotificationHub>("/api/notificationHub", options => { });
-
 
 app.MapControllers();
 

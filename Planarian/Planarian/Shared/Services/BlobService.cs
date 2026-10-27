@@ -19,26 +19,6 @@ public class BlobService
         _containerClient = new BlobContainerClient(blobOptions.ConnectionString, blobOptions.ContainerName);
     }
 
-    #region Users
-
-    public async Task<string> AddUsersProfilePicture(string userId, Stream stream, string? contentType = null)
-    {
-        var blobKey = $"{userId}/profilePicture";
-
-        var blobClient = _containerClient.GetBlobClient(blobKey);
-        await blobClient.UploadAsync(stream, new BlobUploadOptions
-        {
-            HttpHeaders = new BlobHttpHeaders
-            {
-                ContentType = string.IsNullOrWhiteSpace(contentType) ? null : contentType
-            }
-        });
-
-        return blobKey;
-    }
-
-    #endregion
-
     #region Trip Photos
 
     public async Task<string> AddTripPhoto(string projectId, string tripId,

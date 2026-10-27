@@ -1,4 +1,4 @@
-import { Checkbox, Form, Input, Select } from "antd";
+import { Checkbox, Form } from "antd";
 import { QueryOperator } from "../Services/QueryBuilder";
 import { FilterFormItemProps } from "../Models/NumberComparisonFormItemProps";
 import { useState } from "react";

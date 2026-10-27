@@ -10,10 +10,6 @@ public sealed class CaveMutationCoordinator
 
     public CaveMutationCoordinator(CaveMutationRepository repository) => _repository = repository;
 
-    public Task ExecuteTransactionAsync(Func<CancellationToken, Task> work,
-        CancellationToken cancellationToken = default) =>
-        _repository.ExecuteTransactionAsync(work, cancellationToken);
-
     public Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default) =>
         _repository.ExecuteTransactionAsync(work, cancellationToken);
@@ -31,11 +27,6 @@ public sealed class CaveMutationCoordinator
         string? changeRequestId = null, string? importBatchId = null, CancellationToken cancellationToken = default) =>
         _repository.PublishExistingAsync(caveId, expectedRevisionId, source, operation, write, changeRequestId,
             importBatchId, cancellationToken);
-
-    public Task<CaveMutationResult> PublishNewAsync(Cave cave, CaveRevisionSource source,
-        CaveRevisionOperation operation = CaveRevisionOperation.Create, string? changeRequestId = null,
-        string? importBatchId = null, CancellationToken cancellationToken = default) =>
-        _repository.PublishNewAsync(cave, source, operation, changeRequestId, importBatchId, cancellationToken);
 
     public Task<CaveMutationPreparation> PrepareExistingAsync(string caveId, string? expectedRevisionId = null,
         CancellationToken cancellationToken = default) =>

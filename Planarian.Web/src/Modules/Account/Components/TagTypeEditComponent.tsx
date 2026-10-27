@@ -289,7 +289,7 @@ const TagTypeEditComponent: React.FC<TagTypeEditComponentProps> = ({
     {
       title: "Action",
       key: "action",
-      render: (text: string, record: TagTypeTableVm) => (
+      render: (_text: string, record: TagTypeTableVm) => (
         <span>
           <Space>
             {editedTagType && editedTagType.tagTypeId === record.tagTypeId ? (

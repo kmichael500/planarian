@@ -4,7 +4,6 @@ import {
 } from "./types";
 
 export const VIRTUAL_LIST_OVERSCAN = 6;
-export const VIRTUAL_QUEUE_ROW_HEIGHT = 132;
 export const VIRTUAL_UPLOAD_QUEUE_ROW_HEIGHT = 104;
 
 export const createQueueItemId = () => {
@@ -150,14 +149,11 @@ export const sortQueueItemsByAddedOrder = <TResult,>(
       left.id.localeCompare(right.id)
   );
 
-export const canStartUpload = <TResult,>(
-  item: QueuedFileUploadItem<TResult>,
-  now: number
-) => item.status === "queued" && !!item.file;
+export const canStartUpload = <TResult,>(item: QueuedFileUploadItem<TResult>) =>
+  item.status === "queued" && !!item.file;
 
 export const deriveOrderedQueueView = <TResult,>(
   items: QueuedFileUploadItem<TResult>[],
-  now: number,
   maxConcurrentUploads: number
 ) => {
   const orderedItems = sortQueueItemsByAddedOrder(items);
@@ -175,7 +171,7 @@ export const deriveOrderedQueueView = <TResult,>(
   }
 
   for (const item of runnableCandidates) {
-    if (!canStartUpload(item, now)) {
+    if (!canStartUpload(item)) {
       continue;
     }
 

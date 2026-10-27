@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Select, Spin } from "antd";
 import { SelectProps } from "antd/lib/select";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";

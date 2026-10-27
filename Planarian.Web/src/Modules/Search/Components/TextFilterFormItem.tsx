@@ -3,7 +3,6 @@ import { InfoCircleOutlined } from "@ant-design/icons";
 import { QueryOperator } from "../Services/QueryBuilder";
 import {
   FilterFormItemProps,
-  FilterFormProps,
 } from "../Models/NumberComparisonFormItemProps";
 
 export interface TextFilterFormItemProps<T extends object>

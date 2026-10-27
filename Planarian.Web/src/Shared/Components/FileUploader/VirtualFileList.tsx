@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { VIRTUAL_LIST_OVERSCAN } from "./fileUploaderHelpers";
 
 interface VirtualFileListProps<T extends { id: string }> {

@@ -3,7 +3,7 @@
 import React from "react";
 import { DatePicker, Grid } from "antd";
 import type { RangePickerProps } from "antd/lib/date-picker";
-import dayjs, { Dayjs } from "dayjs";
+import { Dayjs } from "dayjs";
 
 const { RangePicker } = DatePicker;
 

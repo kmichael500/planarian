@@ -397,7 +397,6 @@ Primary files:
 - `Planarian.Web/src/Modules/Caves/Models/CaveRevisionVm.ts`
 - `Planarian.Web/src/Modules/Caves/Components/CaveRevisionDiff.tsx`
 - `Planarian.Web/src/Modules/Caves/Components/CaveRevisionDiffPresentation.ts`
-- `Planarian.Web/src/Modules/Caves/Helpers/CaveRevisionDiffHelpers.ts`
 - V1 JSON fixtures and contract/diff tests under `Planarian.Tests.Unit/Caves/Revisions/`.
 
 ### 6.1 Keep File snapshot provider-neutral and public-safe

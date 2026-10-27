@@ -40,7 +40,7 @@ import { ApiErrorResponse } from "../../../Shared/Models/ApiErrorResponse";
 import { PlanarianModal } from "../../../Shared/Components/Buttons/PlanarianModal";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface UserPermissionManagementProps {
   userId: string;
@@ -142,14 +142,6 @@ export const UserPermissionManagement: React.FC<
     nameof<CavePermissionManagementVm>("hasAllLocations"),
     form
   );
-  const caveIds: SelectListItemWithData<
-    string,
-    CavePermissionManagementData
-  >[] =
-    Form.useWatch(
-      nameof<CavePermissionManagementVm>("cavePermissions"),
-      form
-    ) || [];
 
   const handleSearchCaves = async (pageNumber: number = 1) => {
     setSearching(true);

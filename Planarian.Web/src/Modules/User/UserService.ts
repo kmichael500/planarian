@@ -26,13 +26,13 @@ const UserService = {
     await HttpClient.put(`${baseUrl}/current/password`, request);
   },
   async SendPasswordResetEmail(email: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/reset-password/email/${encodeURIComponent(email)}`,
       {}
     );
   },
   async ResetPassword(code: string, password: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/reset-password?code=${code}`,
       password,
       {
@@ -66,13 +66,13 @@ const UserService = {
   },
 
   async AcceptInvitation(invitationCode: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/invitations/${invitationCode}/accept`,
       {}
     );
   },
   async DeclineInvitation(invitationCode: string): Promise<void> {
-    const response = await HttpClient.post(
+    await HttpClient.post(
       `${baseUrl}/invitations/${invitationCode}/decline`,
       {}
     );

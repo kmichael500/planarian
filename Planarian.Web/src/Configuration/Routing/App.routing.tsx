@@ -120,7 +120,3 @@ export const AppRouting: React.FC = () => {
     </Routes>
   );
 };
-
-export interface HasRoute {
-  route: string;
-}

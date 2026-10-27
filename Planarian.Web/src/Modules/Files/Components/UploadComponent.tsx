@@ -146,7 +146,7 @@ const UploadComponent = ({
     accept: allowedFileTypes?.join(","),
     beforeUpload,
     showUploadList: singleFile ? false : true,
-    itemRender: (originNode, file, currFileList) => {
+    itemRender: (originNode, file) => {
       return file.status !== "done" ? originNode : null;
     },
     async customRequest(options) {
@@ -255,10 +255,10 @@ const UploadComponent = ({
             }}
           >
             <Form.List name="files">
-              {(fields, { add, remove }, { errors }) => (
+              {(fields) => (
                 <>
                   <Row gutter={16}>
-                    {fields.map((field, index) => (
+                    {fields.map((field) => (
                       <Col>
                         <Card bordered style={{ height: "100%" }}>
                           <Form.Item

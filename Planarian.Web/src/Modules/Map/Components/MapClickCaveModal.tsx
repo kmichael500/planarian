@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { Spin } from "antd";
-import { CloseOutlined, EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined } from "@ant-design/icons";
 import { CaveVm } from "../../Caves/Models/CaveVm";
 import { CaveComponent } from "../../Caves/Components/CaveComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";

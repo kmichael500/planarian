@@ -15,18 +15,6 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     {
     }
 
-    public async Task<File?> GetCaveFileByBlobKey(string blobKey)
-    {
-        return await DbContext.Files.Where(e => e.BlobKey == blobKey && e.Cave!.AccountId == RequestUser.AccountId)
-            .FirstOrDefaultAsync();
-    }
-
-    public async Task<File?> GetFileById(string id)
-    {
-        return await DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId)
-            .FirstOrDefaultAsync();
-    }
-
     public async Task<File?> GetDeletableUnpublishedFileByIdAsync(string id,
         CancellationToken cancellationToken)
     {
@@ -36,43 +24,6 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
                 !DbContext.CaveChangeRequestStagedFiles.Any(staged =>
                     staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id))
             .SingleOrDefaultAsync(cancellationToken);
-    }
-
-    public sealed record FileMetadataMutationContextResult(
-        string Id,
-        string FileTypeTagId,
-        string? CaveId,
-        string Name,
-        string Extension,
-        bool IsChangeRequestStaged,
-        string? CountyId,
-        string? StateId);
-
-    public async Task<FileMetadataMutationContextResult?> GetFileMetadataMutationContextAsync(
-        string id, CancellationToken cancellationToken)
-    {
-        return await DbContext.Files.AsNoTracking()
-            .Where(file => file.Id == id && file.AccountId == RequestUser.AccountId)
-            .Select(file => new FileMetadataMutationContextResult(
-                file.Id,
-                file.FileTypeTagId,
-                file.CaveId,
-                file.Name,
-                file.Extension,
-                DbContext.CaveChangeRequestStagedFiles.Any(staged =>
-                    staged.AccountId == RequestUser.AccountId && staged.FileId == file.Id),
-                file.Cave != null ? file.Cave.CountyId : null,
-                file.Cave != null ? file.Cave.StateId : null))
-            .SingleOrDefaultAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<File>> GetTrackedFilesByIdsAsync(IEnumerable<string> fileIds,
-        CancellationToken cancellationToken)
-    {
-        var ids = fileIds.Distinct(StringComparer.Ordinal).ToList();
-        return await DbContext.Files
-            .Where(file => ids.Contains(file.Id) && file.AccountId == RequestUser.AccountId)
-            .ToListAsync(cancellationToken);
     }
 
     public async Task<FileAccessInfoResult?> GetAuthoringStagedFileAccessInfoAsync(string id,
@@ -156,13 +107,6 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             .Select(e => new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).FirstOrDefaultAsync();
     }
 
-    public async Task<IEnumerable<GetFileBlobPropertiesResult>> GetAllCavesBlobProperties()
-    {
-        return await DbContext.Files
-            .Where(e => e.AccountId == RequestUser.AccountId && !string.IsNullOrWhiteSpace(e.CaveId))
-            .Select(e => new GetFileBlobPropertiesResult(e.BlobKey, e.BlobContainer)).ToListAsync();
-    }
-
     public async Task<FileVm?> GetFileVm(string id)
     {
         return await ToFileVm(DbContext.Files.Where(e => e.Id == id && e.AccountId == RequestUser.AccountId))
@@ -179,12 +123,6 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             FileTypeKey = e.FileTypeTag.Key,
             FileTypeTagId = e.FileTypeTagId
         });
-    }
-
-    public async Task<IEnumerable<string>> GetAllExistingFileIdsByCaveId(string entityId)
-    {
-        return await DbContext.Files.Where(e => e.CaveId == entityId && e.AccountId == RequestUser.AccountId)
-            .Select(e => e.Id).ToListAsync();
     }
 
     public async Task<IEnumerable<File>> GetExpiredFiles()

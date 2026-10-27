@@ -59,7 +59,6 @@ export const downloadFile = (filename: string, content: string) => {
       break;
     default:
       throw new Error("File type not supported");
-      break;
   }
 
   const url = URL.createObjectURL(blob);

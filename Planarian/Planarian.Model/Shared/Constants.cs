@@ -56,11 +56,6 @@ public static class TagTypeKeyConstant
         File, People, Biology, Archeology, MapStatus, CaveOther, GeologicAge, PhysiographicProvince,
     };
 
-    public static bool IsValidTagKey(string tagKey)
-    {
-        return All.Any(e => e == tagKey);
-    }
-
     public static bool IsValidAccountTagKey(string tagKey)
     {
         return AllAccountTags.Any(e => e == tagKey);

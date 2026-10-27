@@ -1,4 +1,3 @@
-import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GageList, downsampleStreamGagePoints } from "./GaugeList";
 import { MapService, NearbyStreamGage, StreamGagePoint } from "../Services/MapService";

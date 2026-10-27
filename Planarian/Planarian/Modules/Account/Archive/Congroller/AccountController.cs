@@ -64,16 +64,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         return Ok(result);
     }
 
-    // [HttpPost("settings")]
-    // public async Task<ActionResult<MiscAccountSettingsVm>> CreateSettings([FromBody] MiscAccountSettingsVm settings,
-    //     CancellationToken cancellationToken)
-    // {
-    //     var result = await Service.CreateOrUpdateMiscAccountSettingsVm(settings, cancellationToken);
-    //     return Ok(result);
-    // }
-
-
-
     #endregion
 
     #region Tags
@@ -118,7 +108,6 @@ public partial class AccountController : PlanarianControllerBase<AccountService>
         var result = await Service.GetAllStates(cancellationToken);
         return Ok(result);
     }
-
 
     [HttpPost("states/{stateId:length(10)}/counties")]
     [Authorize(Policy = PermissionPolicyKey.Admin)]

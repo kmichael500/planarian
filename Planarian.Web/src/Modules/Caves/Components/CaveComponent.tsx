@@ -397,7 +397,6 @@ const CaveComponent = ({
       <PlanarianDividerComponent title="Files" />
       <FileListComponent
         files={cave?.files}
-        isUploading={false}
         customOrder={["Map"]}
         hasEditPermission={hasEditPermission}
         allowUpload={false}

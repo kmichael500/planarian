@@ -1,5 +1,4 @@
-import { Result, Button } from "antd";
-import { PlanarianButton } from "../Components/Buttons/PlanarianButtton";
+import { Result } from "antd";
 import { BackButtonComponent } from "../Components/Buttons/BackButtonComponent";
 import { useContext, useEffect } from "react";
 import { AppContext } from "../../Configuration/Context/AppContext";

@@ -82,7 +82,6 @@ class QueryBuilder<T extends object> {
 
   public setUserLocation(latitude?: number, longitude?: number) {
 
-
     this.userLatitude = latitude;
     this.userLongitude = longitude;
     return this;
@@ -134,18 +133,6 @@ class QueryBuilder<T extends object> {
     defaultValue: QueryOperator
   ): QueryOperator {
     return this.conditions.find((x) => x.key === key)?.operator ?? defaultValue;
-  }
-
-  equal(
-    field: NestedKeyOf<T>,
-    value: T[keyof T],
-    keepDuplicates = false,
-    key?: string
-  ) {
-    this.addToDictionary(
-      new QueryCondition(field, key, QueryOperator.Equal, value)
-    );
-    return this;
   }
 
   filterBy(

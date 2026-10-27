@@ -7,7 +7,6 @@ import {
 import { QueryBuilder, QueryOperator } from "../Services/QueryBuilder";
 import { Form } from "antd";
 import {
-  CountyDropdownProps,
   CountyDropdown,
 } from "../../Caves/Components/CountyDropdown";
 import { PermissionKey } from "../../Authentication/Models/PermissionKey";
@@ -31,9 +30,6 @@ const StateCountyFilterFormItem = <T extends object>({
   onChange,
   ...rest
 }: StateCountyFilterFormItem<T>) => {
-  const [selectedCountyId, setSelectedCountyId] = useState<
-    string | undefined
-  >();
   const [selectedState, setSelectedState] = useState<string | undefined>();
 
   const stateDropDownProps = {
@@ -43,7 +39,6 @@ const StateCountyFilterFormItem = <T extends object>({
     onClear: () => {
       queryBuilder.removeFromDictionary(stateField);
       setSelectedState(undefined);
-      setSelectedCountyId(undefined);
     },
     onChange: (value) => {
       if (value !== undefined) {
@@ -51,7 +46,6 @@ const StateCountyFilterFormItem = <T extends object>({
         setSelectedState(value);
       } else {
         setSelectedState(undefined);
-        setSelectedCountyId(undefined);
         queryBuilder.removeFromDictionary(stateField);
         queryBuilder.removeFromDictionary(countyField);
       }
@@ -65,7 +59,6 @@ const StateCountyFilterFormItem = <T extends object>({
     if (stateValue === undefined) return;
     setSelectedState(stateValue as string);
     if (countyValue === undefined) return;
-    setSelectedCountyId(countyValue as string);
   }, []);
 
   return (

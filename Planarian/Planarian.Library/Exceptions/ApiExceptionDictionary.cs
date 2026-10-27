@@ -31,11 +31,6 @@ public static class ApiExceptionDictionary
         return new ApiException(StatusCodes.Status409Conflict, ApiExceptionType.Conflict, message);
     }
 
-    public static ApiException FromErrorCode(string? errorCode, string message)
-    {
-        return FromErrorCode(errorCode, message, null);
-    }
-
     public static ApiException FromErrorCode(string? errorCode, string message, object? data)
     {
         if (!Enum.TryParse<ApiExceptionType>(errorCode, out var apiExceptionType))

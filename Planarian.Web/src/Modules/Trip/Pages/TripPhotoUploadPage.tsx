@@ -35,52 +35,13 @@ import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/Delete
 
 const { TextArea } = Input;
 
-interface TripPhotoUploadComponentProps {}
-
-const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
-  props: TripPhotoUploadComponentProps
-) => {
+const TripPhotoUploadPage: React.FC = () => {
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
   useEffect(() => {
     setHeaderButtons([<BackButtonComponent to={"./.."} />]);
     setHeaderTitle(["Upload Photos"]);
   }, []);
-
-  //#region Main Modal
-
-  const [open, setOpen] = useState(false);
-  const [confirmLoading, setConfirmLoading] = useState(false);
-
-  const [form] = Form.useForm();
-
-  const showModal = (): void => {
-    setOpen(true);
-  };
-
-  const handleUploadModalCancel = (): void => {
-    form.resetFields();
-    setOpen(false);
-  };
-
-  const onSubmit = async (values: TripPhotoUpload[]): Promise<void> => {
-    try {
-      setConfirmLoading(true);
-      const newTripid = await TripService.UploadPhotos(
-        values,
-        tripId as string
-      );
-      setOpen(false);
-      navigate("../");
-    } catch (e) {
-      const error = e as ApiErrorResponse;
-      message.error(error.message);
-    }
-
-    setConfirmLoading(false);
-  };
-
-  //#endregion
 
   //#region Upload Modal
   const [filesMetaData, setFilesMetaData] = useState<PhotoMetaData[]>([]);
@@ -151,7 +112,7 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
     setFileList(newFileList);
   };
 
-  const beforeUpload = (file: RcFile, FileList: RcFile[]) => {
+  const beforeUpload = (file: RcFile) => {
     setFileList([...fileList, file]);
 
     return false;
@@ -267,7 +228,7 @@ const TripPhotoUploadPage: React.FC<TripPhotoUploadComponentProps> = (
             onPreview={handlePreview}
             onChange={handleChange}
             beforeUpload={beforeUpload}
-            itemRender={(node, file, fileList) => {
+            itemRender={(_node, file) => {
               return (
                 <>
                   <Image

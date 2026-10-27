@@ -13,7 +13,6 @@ let AppOptions: AppOptionsVm = {
   supportEmail: "",
 };
 
-
 const AppService = {
   async InitializeApp(
     selectedAccountId?: string | null
@@ -33,9 +32,6 @@ const AppService = {
     RequestRuntimeState.setAntiforgeryRequestToken(response.data.antiforgeryRequestToken);
 
     return response.data;
-  },
-  GetAntiforgeryRequestToken(): string | null {
-    return RequestRuntimeState.getAntiforgeryRequestToken();
   },
   async HasCavePermission(
     permissionKey: PermissionKey,

@@ -58,7 +58,3 @@ export class CaveSearchSortByConstants {
     nameof<CaveSearchVm>("distanceMiles")
   );
 }
-
-export const CaveSortMetadataKeys = Object.freeze({
-  distanceLocation: "distanceSortLocation",
-});

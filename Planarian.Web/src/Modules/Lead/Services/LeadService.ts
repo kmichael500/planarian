@@ -5,7 +5,7 @@ const LeadService = {
   //#region Leads
 
   async DeleteLead(leadId: string): Promise<void> {
-    const response = await HttpClient.delete<void>(`${baseUrl}/${leadId}`);
+    await HttpClient.delete<void>(`${baseUrl}/${leadId}`);
   },
 
   //#endregion

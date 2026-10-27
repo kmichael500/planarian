@@ -77,16 +77,6 @@ const ProjectService = {
     );
     return response.data;
   },
-
-  async AddProjectMember(
-    userId: string,
-    projectId: string
-  ): Promise<SelectListItem<string>[]> {
-    const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${projectId}/members/${userId}`
-    );
-    return response.data;
-  },
   async AddProjectMembers(
     userIds: string[],
     projectId: string

@@ -1,6 +1,5 @@
 import { Col, Form, Input, message, Modal, Row, Select } from "antd";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { MemberGridType } from "./MemberGridComponent";
 import { MailOutlined } from "@ant-design/icons";
 import { SelectListItem } from "../../Models/SelectListItem";
@@ -32,8 +31,6 @@ const MemberGridAddMemberComponent: React.FC<
 
   const [selectExistingForm] = Form.useForm();
   const [addNewMemberForm] = Form.useForm();
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (members === undefined) {
@@ -178,7 +175,7 @@ const MemberGridAddMemberComponent: React.FC<
                 mode="multiple"
                 notFoundContent={
                   <InviteButtonComponent
-                    onClick={(e) => {
+                    onClick={() => {
                       inviteMember();
                     }}
                   />

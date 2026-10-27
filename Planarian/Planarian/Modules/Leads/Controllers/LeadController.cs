@@ -29,12 +29,8 @@ public class LeadController : PlanarianControllerBase<LeadService>
     public async Task<ActionResult<IEnumerable<LeadVm>>> GetLeads(
         [FromQuery] IEnumerable<QueryCondition> queryCondition)
     {
-        // var leads = await Service.GetLeads(queryCondition);
-
-
         return new JsonResult(queryCondition);
     }
-
 
     [HttpDelete("{leadId:length(10)}")]
     public async Task<ActionResult> DeleteLead(string leadId)

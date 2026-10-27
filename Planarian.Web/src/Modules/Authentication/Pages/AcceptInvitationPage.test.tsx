@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { message } from "antd";
-import React, { StrictMode } from "react";
+import { StrictMode } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { AcceptInvitationVm } from "../../User/Models/AcceptInvitationVm";
 import { UserService } from "../../User/UserService";

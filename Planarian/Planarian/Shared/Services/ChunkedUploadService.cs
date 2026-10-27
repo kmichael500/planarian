@@ -331,15 +331,6 @@ public class ChunkedUploadService : ServiceBase
         await _fileService.DeleteFile(session.BlobKey, session.ContainerName);
     }
 
-    public void RemoveSession(string sessionId)
-    {
-        if (Sessions.TryRemove(sessionId, out var session))
-        {
-            session.Status = ChunkedUploadSessionStatus.Canceled;
-            ReleaseProcessingSlot(sessionId);
-        }
-    }
-
     public ChunkedUploadSessionState GetRequiredSession(string sessionId)
     {
         if (RequestUser.AccountId == null) throw ApiExceptionDictionary.NoAccount;

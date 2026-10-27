@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Card, Form, Input, message } from "antd";
-import { UserVm } from "../../User/Models/UserVm";
 import {
   isNullOrWhiteSpace,
   nameof,
@@ -20,8 +19,6 @@ const ResetPasswordPage: React.FC = () => {
   const [passwordForm] = Form.useForm();
   const [emailForm] = Form.useForm();
 
-  const [user, setUser] = useState<UserVm | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
 
   const { setHeaderTitle, setHeaderButtons } = useContext(AppContext);
 
@@ -32,7 +29,6 @@ const ResetPasswordPage: React.FC = () => {
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [, setIsChangingPassword] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -50,13 +46,11 @@ const ResetPasswordPage: React.FC = () => {
       }
       await UserService.ResetPassword(code, values.password);
       message.success("Updated successfully");
-      setIsChangingPassword(false);
       passwordForm.resetFields();
       navigate("/login");
     } catch (error: any) {
       message.error(error.message);
     }
-    setIsLoading(false);
     setIsSubmitting(false);
   };
 
@@ -65,7 +59,6 @@ const ResetPasswordPage: React.FC = () => {
     try {
       await UserService.SendPasswordResetEmail(values.email);
       message.success("You should receive an email shortly");
-      setIsChangingPassword(false);
       emailForm.resetFields();
       navigate("/login");
     } catch (e) {
@@ -73,7 +66,6 @@ const ResetPasswordPage: React.FC = () => {
 
       message.error(error.message);
     }
-    setIsLoading(false);
     setIsSubmitting(false);
   };
 
@@ -81,13 +73,12 @@ const ResetPasswordPage: React.FC = () => {
     <>
       {isChangingPassword && (
         <Card
-          loading={isLoading}
           title="Reset Password"
           actions={[
             <SaveButtonComponent
               loading={isSubmitting}
               type="primary"
-              onClick={(e) => passwordForm.submit()}
+              onClick={() => passwordForm.submit()}
             />,
             <Link to={"/"}>
               <CancelButtonComponent />
@@ -95,7 +86,6 @@ const ResetPasswordPage: React.FC = () => {
           ]}
         >
           <Form
-            initialValues={user}
             layout="vertical"
             form={passwordForm}
             onFinish={onChangePassword}
@@ -154,13 +144,12 @@ const ResetPasswordPage: React.FC = () => {
       )}
       {!isChangingPassword && (
         <Card
-          loading={isLoading}
           title="Reset Password"
           actions={[
             <SubmitButtonComponent
               loading={isSubmitting}
               type="primary"
-              onClick={(e) => emailForm.submit()}
+              onClick={() => emailForm.submit()}
             />,
             <Link to={"/"}>
               <CancelButtonComponent />

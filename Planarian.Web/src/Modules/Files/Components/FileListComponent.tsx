@@ -14,7 +14,6 @@ const { Panel } = Collapse;
 export interface FileListComponentProps {
   files?: FileVm[];
   customOrder?: string[];
-  isUploading: boolean;
   setIsUploading?: (value: boolean) => void;
   hasEditPermission?: boolean;
   allowUpload?: boolean;
@@ -22,7 +21,6 @@ export interface FileListComponentProps {
 
 export const FileListComponent = ({
   files,
-  isUploading,
   setIsUploading,
   customOrder,
   hasEditPermission = true,
@@ -166,10 +164,10 @@ export const FileListComponent = ({
               Upload
             </PlanarianButton>
           ) : undefined}
-          renderItem={function (item: object): ReactNode {
+          renderItem={function (): ReactNode {
             return null;
           }}
-          itemKey={function (item: object): string {
+          itemKey={function (): string {
             return "";
           }}
         ></CardGridComponent>

@@ -142,9 +142,3 @@ export interface CaveChangePreviewVm {
   removedLinePlots?: GeoJsonUploadVm[];
   hasMeaningfulChanges: boolean;
 }
-
-export interface CaveProposalAuthoringConflictVm {
-  conflictKind: "PublishedCaveChanged" | "ActiveProposalVersionChanged";
-  expectedId: string;
-  actualId?: string;
-}

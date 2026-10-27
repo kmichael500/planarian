@@ -92,7 +92,7 @@ const AccountSettingsComponent = () => {
     setStates(cavesResponse);
   };
 
-  const onStatesChange = (value: string[]) => {
+  const onStatesChange = () => {
     getStates();
   };
 

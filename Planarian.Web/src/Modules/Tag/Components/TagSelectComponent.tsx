@@ -1,4 +1,4 @@
-import { Form, Select, SelectProps, Spin } from "antd";
+import { Select, SelectProps, Spin } from "antd";
 import { useEffect, useState } from "react";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
 import { ProjectService } from "../../Project/Services/ProjectService";
@@ -39,7 +39,6 @@ const TagSelectComponent: React.FC<TagSelectComponentProps> = ({
   const resolvedMode = resolveTagSelectMode(tagType, allowCustomTags, mode);
   const [tags, setTags] = useState<SelectListItem<string>[]>();
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState<string>("");
 
   useEffect(() => {
     const getTags = async () => {

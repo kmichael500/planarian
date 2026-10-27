@@ -1188,7 +1188,6 @@ public class CaveService : ServiceBase<CaveRepository>
 
         await RequestUser.HasCavePermission(PermissionPolicyKey.Manager, caveId, entity.CountyId, entity.StateId);
 
-
         await _caveMutationCoordinator.PublishExistingAsync(
             caveId, entity.CurrentRevisionId, CaveRevisionSource.ManagerEdit, CaveRevisionOperation.Archive,
             cave => cave.IsArchived = true);
@@ -1208,14 +1207,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
     #endregion
 
-
     #region Favorite Cave
-
-    public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
-    {
-        var caves = await Repository.GetFavoriteCaves(query);
-        return caves;
-    }
 
     public async Task FavoriteCave(string caveId)
     {

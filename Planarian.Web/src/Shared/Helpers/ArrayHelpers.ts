@@ -1,9 +1,5 @@
 import { SelectListItem } from "../Models/SelectListItem";
 
-export function distinct(array: string[]): string[] {
-  return [...new Set(array)];
-}
-
 export const sortSelectListItems = <T>(
   SelectListItems: SelectListItem<T>[]
 ) => {

@@ -11,13 +11,7 @@ import { PermissionType } from "../../Authentication/Models/PermissionType";
 
 const { Text } = Typography;
 
-interface PermissionManagementListProps {
-  userId: string;
-}
-
-export const CavePermissionManagementList: React.FC<
-  PermissionManagementListProps
-> = ({ userId }) => {
+export const CavePermissionManagementList: React.FC = () => {
   const [permissions, setPermissions] = useState<
     SelectListItemDescriptionData<string, PermissionSelectListData>[]
   >([]);

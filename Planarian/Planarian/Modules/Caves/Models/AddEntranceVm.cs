@@ -18,7 +18,6 @@ public class AddEntranceVm
         EntranceHydrologyTagIds = entranceHydrologyTagIds;
     }
 
-
     public AddEntranceVm(string name, string description, double latitude, double longitude,
         double elevationFeet,
         double? pitFeet, string locationQualityTagId,
@@ -56,8 +55,4 @@ public class AddEntranceVm
     public IEnumerable<string> EntranceHydrologyTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> ReportedByNameTagIds { get; set; } = new HashSet<string>();
     public IEnumerable<string> EntranceOtherTagIds { get; set; } = new HashSet<string>();
-}
-
-public class EditEntranceVm : AddEntranceVm
-{
 }

@@ -9,7 +9,7 @@ import { PhotoService } from "../../Photo/Services/PhotoService";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
 import { DeleteButtonComponent } from "../../../Shared/Components/Buttons/DeleteButtonComponent";
 
-const { Title, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface TripDetailPhotoComponentProps {
   tripId: string;
@@ -18,7 +18,6 @@ interface TripDetailPhotoComponentProps {
 const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
   props
 ) => {
-  let [isLoading, setIsLoading] = useState(false);
   let [photos, setPhotos] = useState<PhotoVm[]>();
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -34,7 +33,6 @@ const TripDetailPhotoComponent: React.FC<TripDetailPhotoComponentProps> = (
           props.tripId as string
         );
         setPhotos(photosResponse);
-        setIsLoading(false);
       };
       getTripPhotos();
     }
