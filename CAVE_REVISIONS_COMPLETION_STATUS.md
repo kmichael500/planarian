@@ -3,8 +3,8 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-26
-**Completion HEAD reviewed:** `08955058c85456b0bd5bf50eb339aeb2b87db91a`
-**Package refresh:** 2026-10-26; this ledger-only refresh records the validated GAP-001 preservation-census commit `08955058c85456b0bd5bf50eb339aeb2b87db91a`.
+**Completion HEAD reviewed:** `12a7794ee92f526f7194a7e9c16927d84f569e34`
+**Package refresh:** 2026-10-26; latest reviewed code package is dead-code audit merge `12a7794ee92f526f7194a7e9c16927d84f569e34`; earlier preservation and asset-lifecycle evidence remains SHA-pinned below.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
@@ -219,7 +219,20 @@ The principal remaining test risk is therefore **runtime integration coverage**,
 
 # 4. Validation already completed
 
-The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The reviewed completion HEAD is `08955058c85456b0bd5bf50eb339aeb2b87db91a`, which contains the GAP-001 preservation-census tests; this ledger-only follow-up records that reviewed state.
+The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The latest reviewed completion code HEAD is `12a7794ee92f526f7194a7e9c16927d84f569e34`; the earlier GAP-001 preservation evidence remains pinned to `08955058c85456b0bd5bf50eb339aeb2b87db91a`.
+
+## 2026-10-26 dead-code audit merge refresh
+
+- Dead-code audit commit `c1e271a9` was merged into the current completion branch as `12a7794e`, on top of Cave asset-lifecycle commit `c5f4b9f3`.
+- The only merge conflict was in `FileService.cs`; resolution preserved the newer `CleanupAssetRemovalTargetsAsync` lifecycle and removed only the audit-confirmed unused `DeleteBlobBestEffortAsync` and `EnsureFileManagerAccess` helpers.
+- Release solution build — **PASS, 0 errors**; the repository's existing nullable/static-analysis warnings remain.
+- Full backend unit suite — **415/415 passed**.
+- Merge-conflict-sensitive Cave aggregate asset integration suite — **19/19 passed** on disposable PostgreSQL/PostGIS.
+- Full frontend suite — **73 suites / 353 tests passed, 0 snapshots**; preflight client-route generator **6/6** and CSP configuration **5/5** also passed.
+- EF pending-model validation — **PASS: no changes since the last migration**; the command still emits the repository's existing global-query-filter relationship warnings.
+- Focused .NET dead-code analyzer set (`IDE0051`, `IDE0052`, `IDE0059`, `IDE0060`, `CA1811`, `CA1812`, `CA1823`) — **PASS, zero findings**.
+- `git diff --check`, deleted-symbol reference scans, and the merged documentation diff — **PASS**.
+- The full PostgreSQL/PostGIS suite was **not rerun specifically for this dead-code merge**. The prior **381/381** full-suite evidence remains pinned to the Cave asset lifecycle refresh below; the merge-specific backend conflict surface was rerun directly via the **19/19** asset suite above.
 
 ## 2026-10-26 focused completion refresh
 
