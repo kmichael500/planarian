@@ -3,8 +3,8 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-26
-**Completion HEAD reviewed:** `12a7794ee92f526f7194a7e9c16927d84f569e34`
-**Package refresh:** 2026-10-26; latest reviewed code package is dead-code audit merge `12a7794ee92f526f7194a7e9c16927d84f569e34`; earlier preservation and asset-lifecycle evidence remains SHA-pinned below.
+**Completion HEAD reviewed:** `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`
+**Package refresh:** 2026-10-26; latest reviewed code package is shared-reference revision administration `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`; earlier dead-code, preservation, and asset-lifecycle evidence remains SHA-pinned below.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
@@ -101,7 +101,7 @@ These counts explain why the review treated this as a shared-system change rathe
 | Bulk Cave/Entrance import rewrite | **DONE + VALIDATED** | Immutable plan/execute flow, preview/commit equivalence, dry run, rollback, tenant adversarial behavior, golden compatibility, and supported-scale test passed. |
 | Import performance architecture | **DONE + VALIDATED** | 10,000-Cave/Entrance workload passed; set-oriented/bounded architecture reviewed. |
 | Tenant isolation | **DONE + VALIDATED** | Fail-closed workflow filters, explicit account qualification when bypassing filters, adversarial foreign-account tests. |
-| Tag/County administration revision interaction | **DONE + VALIDATED** | Rename/merge/concurrency/lock-order and tenant isolation coverage exists. |
+| Tag/County administration revision interaction | **DONE + VALIDATED** | Rename/merge behavior has direct rollback, tenant-isolation, proposal-staleness, no-op, lock-order/writer-interleaving, 13-family/16-path Tag coverage, historical duplicate-preservation regression coverage, late multi-batch rollback, and 10,000-Cave rename + Tag/County merge scale coverage. |
 | Account settings atomicity / state constraints | **DONE + VALIDATED** | Integration tests prove atomic settings/state update and rollback on invalid state removal. |
 | File Name + Extension model | **DONE + VALIDATED** | Completion extends unchanged current-main v32 with a clean post-v32 migration. PostgreSQL coverage proves representative v32 data upgrades safely, preserves distinct legacy `FileName` values across an untouched upgrade/downgrade round trip, respects post-upgrade renames, and restores the v32 `FileName` schema contract without an accidental default. |
 | File/PDF/vector read behavior | **DONE, PARTIAL VALIDATION** | Strong unit/component coverage exists. No real-browser PDF.js → custom header → CORS → Range → authenticated API smoke test yet. |
@@ -154,8 +154,8 @@ Snapshot design is intentionally user/logical-state oriented:
 
 - public revision snapshots do not expose storage partition/key;
 - line plots store stable ID/name/content fingerprint rather than raw GeoJSON;
-- shared reference metadata is not used as a revision fan-out trigger;
-- batch snapshot projection remains bounded rather than N+1.
+- TagType and County label administration publishes bounded `ManagerEdit` revision fan-out for affected Caves while preserving stable reference IDs and historical labels;
+- batch snapshot projection remains bounded rather than N+1, including 10,000-Cave shared-reference rename, Tag merge, and County merge paths.
 
 ## Architecture weaknesses / validation boundaries still present
 
@@ -219,7 +219,28 @@ The principal remaining test risk is therefore **runtime integration coverage**,
 
 # 4. Validation already completed
 
-The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The latest reviewed completion code HEAD is `12a7794ee92f526f7194a7e9c16927d84f569e34`; the earlier GAP-001 preservation evidence remains pinned to `08955058c85456b0bd5bf50eb339aeb2b87db91a`.
+The broad validation evidence below is preserved at the SHAs where it was actually collected rather than being silently relabeled as current. The latest reviewed completion code HEAD is `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298`; the earlier dead-code and GAP-001 evidence remains pinned to the SHAs recorded in their respective refresh sections.
+
+## 2026-10-26 shared-reference revision administration refresh
+
+Implementation commit `8a2c92ab7d6fde4f8a7fd4b784273daae63eb298` changes shared County/Tag administration so an administrative label change that changes a serialized published Cave snapshot publishes one normal `ManagerEdit` revision per affected Cave in the same transaction. Stable County/Tag IDs remain unchanged; immutable prior revisions and proposal versions retain their historical labels. County/Tag merge semantics remain source-preserving, with explicit deletion still separate.
+
+Adversarial validation for this package included:
+
+- exact historical Tag-merge duplicate-preservation regression coverage across all 14 collection-backed relationship paths plus the scalar File Type and Location Quality paths;
+- multi-source Tag and County merges, destination-preexisting relationships/Caves, source normalization/no-op behavior, foreign-account rejection, default/global Tag tenant isolation, proposal staleness, incomplete-rollout fail-closed behavior, and both writer-first/administration-first concurrency interleavings;
+- deterministic failure on the second 1,000-revision publication chunk across 1,200 Caves, proving complete transaction rollback including exact pre-merge `CurrentRevisionId` restoration;
+- 10,000-Cave County rename, Tag merge, and County merge scale tests with bounded command/tracking behavior and exactly one revision per affected Cave;
+- focused final shared-reference merge safety package — **33/33 passed**;
+- broad merge/concurrency/tenant/proposal matrix during adversarial review — **85/85 passed**;
+- complete PostgreSQL/PostGIS integration suite on the exact final implementation tree — **438/438 passed**;
+- unit/architecture suite — **415/415 passed**;
+- Release solution build — **PASS, 0 warnings / 0 errors**;
+- EF pending-model check — **PASS, no pending model changes**;
+- repository documentation validator against current literal `main` `e342691c82f1bb6549be903d3a8f94a5d2560ac2` — **PASS**;
+- `git diff --check`, staged-diff check, source-to-test Tag merge branch census, and stale shared-reference documentation scan — **PASS**.
+
+The final review found no production data-loss defect. It did strengthen test assertions around same-parent multi-source collapse, scalar default-Tag tenant isolation, County incomplete-rollout failure, and exact multi-batch revision-pointer rollback. No frontend source changed in this package, so the previously recorded frontend validation remains the applicable frontend evidence.
 
 ## 2026-10-26 dead-code audit merge refresh
 
@@ -283,7 +304,7 @@ A second full validation pass was run against the resolved merge tree combining 
 - Client-route generator — **6/6 passed**; CSP configuration — **5/5 passed**; `.env.example` mapping validation — **PASS**.
 - Optimized frontend production build — **PASS**; only existing CRA/ESLint/bundle-size warnings were emitted.
 - EF pending-model check — **PASS: no pending model changes**.
-- Repository documentation validator — **PASS**; the validator still reports the intentionally historical `Completion HEAD reviewed` SHA above as older than the worktree HEAD.
+- Repository documentation validator — **PASS**; at that historical review point it warned that the then-recorded `Completion HEAD reviewed` SHA was older than the worktree HEAD.
 - Staged/unstaged diff checks and conflict-marker scan — **PASS**.
 
 This refresh supersedes the older test-count totals below for the reconciled rollout work. The older totals remain because they are SHA-pinned evidence from the earlier broad completion review.
