@@ -150,7 +150,7 @@ CavePublishedSnapshotRepository builds snapshots using bounded projection groups
 
 Direct authoring may stage a File before Save. Before opening the Cave publication transaction the service verifies the required external object exists. Inside the relational transaction it revalidates/locks ownership and associates the staged File with the Cave.
 
-Removing a previously published File records a RetainedCaveFileObject locator before deleting the live File row. The underlying object is not physically deleted by ordinary revisioned removal.
+Removing a previously published File queues its exact object address as a `StorageCleanupTarget` with purpose `CaveAssetRemoval` before deleting the live File row. The Cave revision and cleanup target commit atomically; physical object deletion is attempted only after that transaction commits. A failed external delete leaves durable cleanup debt rather than retaining the File payload as historical content.
 
 See [Files and storage](files-and-storage.md).
 

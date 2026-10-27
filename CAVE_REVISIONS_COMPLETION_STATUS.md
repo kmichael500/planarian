@@ -93,11 +93,11 @@ These counts explain why the review treated this as a shared-system change rathe
 | Proposal version immutability | **DONE + VALIDATED** | Proposal versions freeze exact proposed state including assets; later mutable state does not redefine older proposal meaning. |
 | File authoring in aggregate Cave editor | **DONE + VALIDATED** | Stage/add/edit/remove flows and unsaved-change behavior have frontend/integration coverage. |
 | Upload-once staged File lifecycle | **DONE + VALIDATED** | New content is written once; publication associates the existing object rather than copying to a new published key. |
-| Historical removed-file retention | **DONE + VALIDATED** | `RetainedCaveFileObject` preserves private object locator while live `File` row can be removed. |
-| Provider-neutral object storage abstraction | **DONE, PARTIAL VALIDATION** | Application logic uses `IObjectStorage` for the affected lifecycle. Service behavior is heavily tested with a fake. The production `AzureBlobObjectStorage` adapter itself does not yet have a real Azurite contract test. |
+| Published Cave asset removal/history | **DONE + VALIDATED** | Files and line plots now share the same semantic contract: revision history retains lightweight identity/metadata while removed payloads are not deliberately retained as historical Cave content. File bytes use durable post-commit `CaveAssetRemoval` cleanup; `CaveGeoJson` deletion is transactional. |
+| Provider-neutral object storage abstraction | **DONE, PARTIAL VALIDATION** | Application logic uses `IObjectStorage` for the affected lifecycle. Service behavior is heavily tested with a fake, and a manual local Azurite smoke validated create-only collision handling plus snapshot-aware deletion. A committed automated Azurite contract suite is still missing. |
 | Line-plot aggregate authoring | **DONE + VALIDATED** | `CaveLinePlotAuthoringEditor` is the normal interactive authoring surface. The obsolete Cave-detail `CaveSpatialDataImport` / `GeoJsonSaveModal` path is removed; focused frontend coverage proves aggregate authoring and map rendering still work. |
 | Line plots in revision/proposal semantics | **DONE + VALIDATED** | Stable IDs, normalized content hash, metadata diffs, proposal exact GeoJSON payloads, deterministic snapshot behavior covered. |
-| Cave hard deletion / proposal blocking / retained-object cleanup | **DONE + VALIDATED** | Core Cave deletion and staged/retained asset behavior has dedicated integration coverage. |
+| Cave hard deletion / proposal blocking | **DONE + VALIDATED** | Core Cave deletion and unresolved-proposal blocking have dedicated integration coverage; hard-delete provider-failure retry remains tracked separately below. |
 | Bulk Cave/Entrance import rewrite | **DONE + VALIDATED** | Immutable plan/execute flow, preview/commit equivalence, dry run, rollback, tenant adversarial behavior, golden compatibility, and supported-scale test passed. |
 | Import performance architecture | **DONE + VALIDATED** | 10,000-Cave/Entrance workload passed; set-oriented/bounded architecture reviewed. |
 | Tenant isolation | **DONE + VALIDATED** | Fail-closed workflow filters, explicit account qualification when bypassing filters, adversarial foreign-account tests. |
@@ -160,7 +160,7 @@ Snapshot design is intentionally user/logical-state oriented:
 ## Architecture weaknesses / validation boundaries still present
 
 1. The global `SaveChangesInterceptor` is high-blast-radius infrastructure. The batching refactor looks sensible, but deserves broader compatibility proof outside the Cave-centric scenarios that naturally exercise it.
-2. The production `AzureBlobObjectStorage` adapter still lacks a real Azurite contract suite, so provider-level immutability/race semantics remain a validation boundary.
+2. The production `AzureBlobObjectStorage` adapter has a passing manual local Azurite smoke for create-only collision handling, idempotent delete, and snapshot-aware deletion, but still lacks a committed automated Azurite contract suite; broader provider-level race/cancellation/content-metadata semantics remain a validation boundary.
 3. Browser/runtime and full archive-generation behavior are still under-tested end to end. Reset Account now has durable cleanup debt/retry semantics, but independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
 
 ## Code quality
@@ -235,6 +235,23 @@ The broad validation evidence below is preserved at the SHAs where it was actual
 - The prior full frontend run passed **75 suites / 356 tests, 0 snapshots** before that one temporary test was removed. Its preflight passed client-route generator **6/6** and CSP configuration **5/5**; the focused post-removal run revalidated the affected suites.
 - The optimized production frontend build passed with the repository's existing CRA/ESLint/bundle-size warnings; its prebuild again passed client-route generator **6/6** and CSP configuration **5/5**.
 - `python3 scripts/validate-repository-docs.py --base-sha e342691c82f1bb6549be903d3a8f94a5d2560ac2` passed after preserving the validator's machine-readable ledger SHA labels.
+
+## 2026-10-26 Cave asset lifecycle alignment refresh
+
+After the product decision changed from permanent removed-File byte retention to metadata-only historical evidence, the implementation and validation plan were updated before release so Files and line plots share the same published-history/removal semantics.
+
+- Focused Cave/File/line-plot/proposal/tenant-safety integration matrix — **44/44 passed** on the final test source, including direct and proposal removals, approval rollback protection, mixed cleanup success/already-missing/failure handling, post-delete acknowledgement failure + idempotent retry, failed external cleanup/retry, stale cleanup protection for same-tenant and foreign-tenant live Files, failed-create compensation safety, and direct-save transaction ownership.
+- Reset Account/import/maintenance integration suite — **24/24 passed**, including external cleanup failure/retry, cross-tenant safety, kitchen-sink reset, and proof that `CaveAssetRemoval` debt does not block unrelated writes.
+- Cave revision/line-plot diff contract unit suite — **16/16 passed**.
+- Full Release migration + PostgreSQL-foundation focused suite — **36/36 passed**, including conversion of pre-release retained File locators into `CaveAssetRemoval` cleanup debt, an intentional old-row-ID collision, and fail-closed downgrade with pending asset cleanup.
+- Full backend unit suite — **415/415 passed**.
+- Full Release PostgreSQL/PostGIS integration suite — **381/381 passed**.
+- Live Azurite object-storage contract check — **PASS**: create-only upload rejects an existing immutable address without changing bytes, normal delete is idempotent, and base-blob cleanup succeeds with snapshots via `IncludeSnapshots`.
+- EF pending-model check — **PASS: no pending model changes**.
+- Release backend + integration-test build — **PASS, 0 errors**; a fresh rebuild still emits the repository's existing nullable/static-analysis warning set (154 warnings in the latest integration-project build).
+- Optimized frontend production build — **PASS**; its prebuild passed client-route generator **6/6** and CSP configuration **5/5**, with the repository's existing CRA/ESLint/bundle-size warnings.
+- `git diff --check` — **PASS**.
+- Repository documentation validator — **PASS** for this refresh.
 
 ## Historical broad validation at `33ace6e7`
 
@@ -336,7 +353,7 @@ The supported migration chain keeps `20260831132210_v32` unchanged from `main`, 
 
 The structural migration includes the intentional data-preservation work that EF cannot infer safely: File tenant ownership is recovered fail-closed; Cave-owned Files whose non-null account disagrees with the owning Cave are rejected; legacy File metadata becomes `Name` + `Extension`; distinct legacy storage filenames that cannot be reconstructed from that pair are retained in a migration-owned rollback-compatibility table; and legacy reporter-user columns are intentionally removed. The separate Entrance Other backfill records the exact FeatureSetting rows it inserts in a migration-owned marker table so rollback removes only migration-created rows, including when a preexisting setting happens to use the deterministic candidate ID.
 
-The migration tests are split by behavior (`MigrationUpgrade`, File metadata, File ownership, FeatureSetting backfill, legacy reporter cleanup, and legacy revision initialization) rather than one monolithic class. The required migration + PostgreSQL-foundation Release suite passes **32/32**. Coverage includes a normalized PostgreSQL catalog comparison proving v32 columns/types/nullability/defaults/constraints/indexes round-trip unchanged (physical column order intentionally excluded), rollback after the new revision/proposal/import/retained-object tables contain valid data, distinct legacy `FileName` preservation, post-upgrade Name and Extension edits, Files created after upgrade, migration length/validation boundaries, the complete supported File ownership matrix with transactional rollback, and exact FeatureSetting backfill provenance. `dotnet-ef migrations has-pending-model-changes` also reports no pending model changes.
+The migration tests are split by behavior (`MigrationUpgrade`, File metadata, File ownership, FeatureSetting backfill, legacy reporter cleanup, and legacy revision initialization) rather than one monolithic class. The required migration + PostgreSQL-foundation Release suite passes **32/32**. Coverage includes a normalized PostgreSQL catalog comparison proving v32 columns/types/nullability/defaults/constraints/indexes round-trip unchanged (physical column order intentionally excluded), rollback after the new revision/proposal/import tables contain valid data, distinct legacy `FileName` preservation, post-upgrade Name and Extension edits, Files created after upgrade, migration length/validation boundaries, the complete supported File ownership matrix with transactional rollback, and exact FeatureSetting backfill provenance. `dotnet-ef migrations has-pending-model-changes` also reports no pending model changes.
 
 After the schema migration, a separate one-time application bootstrap creates the authoritative `SystemBaseline/Baseline` revision for every pre-existing Cave from the canonical snapshot projection and advances `CurrentRevisionId`. Normal API startup refuses to serve while any live Cave remains uninitialized. The rollout is resumable, reuses one history-boundary timestamp across retries, has no user actor, refuses to create a late baseline after ordinary revision publication begins, and has supported-scale coverage for 10,000 Caves.
 
@@ -392,8 +409,7 @@ cross-instance advisory shared/exclusive leases cover ordinary mutating HTTP
 requests, reset and background archive jobs. An additional preflight rejects
 foreign references to any bytes in the account container.
 
-**Deployment validation still needed:** no live Azure/Azurite lifecycle smoke
-test yet; independent actors that bypass HTTP and the archive coordinator are
+**Deployment validation still needed:** no live Azure lifecycle smoke and no committed automated Azurite contract suite yet; the manual local Azurite smoke covers only the affected immutable-create/delete semantics. Independent actors that bypass HTTP and the archive coordinator are
 not automatically fenced; an unrelated other-tenant writer could create an
 unsafe foreign reference after the last pre-delete check. Do not represent a
 passing disposable-Postgres/fake-object-storage suite as exhaustive proof.
@@ -437,29 +453,28 @@ The current-main-v32 regressions prove upgrade to completion and downgrade to th
 
 ## GAP-003 — RESOLVED — Kitchen-sink Reset Account test
 
-The merged destructive-safety package includes a two-tenant integration scenario covering all 14 Cave/Entrance tag relationships, Files (staged, temporary, published and retained), line plots, Favorites, revisions, proposal versions, review events, Counties, custom TagTypes, AccountStates, permissions, and stored archives. Successful Reset removes the intended Account A graph, preserves the intentionally retained account identity/members/feature settings, leaves Account B's graph and blobs unchanged, and is safe to retry. Broader independent-writer/live-provider boundaries remain tracked under RISK-004 rather than weakening this graph test.
+The merged destructive-safety package includes a two-tenant integration scenario covering all 14 Cave/Entrance tag relationships, Files (staged, temporary, published and pending asset-cleanup debt), line plots, Favorites, revisions, proposal versions, review events, Counties, custom TagTypes, AccountStates, permissions, and stored archives. Successful Reset removes the intended Account A graph, preserves the intentionally retained account identity/members/feature settings, leaves Account B's graph and blobs unchanged, and is safe to retry. Broader independent-writer/live-provider boundaries remain tracked under RISK-004 rather than weakening this graph test.
 
 ## GAP-004 — PARTIALLY RESOLVED — External-cleanup fault injection
 
 **Priority: P1 for the remaining workflows**
 
-Reset Account now has direct post-commit provider-failure coverage, truthful partial-success semantics, persisted cleanup debt, and retry behavior. Equivalent failure-injection evidence is still needed where applicable for:
+Reset Account now has direct post-commit provider-failure coverage, truthful partial-success semantics, persisted cleanup debt, and retry behavior. Ordinary published File removal now also has direct provider-failure coverage proving the Cave revision/File-row mutation commits first, `CaveAssetRemoval` debt survives failure, unrelated writes are not blocked, and retry deletes the object/target. Equivalent failure-injection evidence is still needed where applicable for:
 
 - hard Cave removal;
-- historical/retained File cleanup;
 - expired staged-file cleanup;
 - proposal cleanup;
 - archive pruning/partial archive cleanup.
 
 Those remaining tests should prove relational truth is not falsified by a later storage failure and that cleanup debt is safe/retryable.
 
-## GAP-005 — Production AzureBlobObjectStorage contract against Azurite
+## GAP-005 — Automated AzureBlobObjectStorage contract suite against Azurite
 
 **Priority: P1**
 
-Business-level File tests appropriately use `TestFileBlobStore : IObjectStorage`, but no direct production-adapter tests were found.
+Business-level File tests appropriately use `TestFileBlobStore : IObjectStorage`. A manual local Azurite smoke now validates the production adapter's create-only collision behavior, idempotent deletion, and deletion of a base blob with snapshots, but there is still no committed automated adapter contract suite.
 
-The repository Docker environment already includes Azurite. Add a storage contract suite against real `AzureBlobObjectStorage` + Azurite covering:
+The repository Docker environment already includes Azurite. Add an automated storage contract suite against real `AzureBlobObjectStorage` + Azurite covering:
 
 - Put then OpenRead returns identical bytes;
 - content type survives;
@@ -592,7 +607,7 @@ Also test `ArchiveJobCoordinator`:
 
 ## GAP-011 — RESOLVED — Archive is a current-state export, not a disaster-recovery backup
 
-The product/architecture decision is now explicit in `docs/architecture/destructive-operations.md`: the account Archive exports current Cave/Entrance state, current live Cave Files, current line plots, and the missing-file manifest where needed. It does not promise revision/proposal/review/retained-object recovery, and no restore workflow is defined. Full generated-archive content/cancellation/pruning validation remains under GAP-010.
+The product/architecture decision is now explicit in `docs/architecture/destructive-operations.md`: the account Archive exports current Cave/Entrance state, current live Cave Files, current line plots, and the missing-file manifest where needed. It does not promise revision/proposal/review history or storage-cleanup-debt recovery, and no restore workflow is defined. Full generated-archive content/cancellation/pruning validation remains under GAP-010.
 
 ## GAP-012 — RESOLVED — Hidden/disabled feature fields preserve existing data
 
@@ -668,7 +683,7 @@ Do not spend pre-merge time multiplying variations of scenarios that already hav
 - import preview/commit equivalence;
 - late import rollback;
 - 10k import scale;
-- retained historical File semantics;
+- removed File historical-metadata and post-commit cleanup semantics;
 - File publication clearing expiration;
 - staged File object availability checks;
 - change-request review history;
@@ -781,8 +796,8 @@ Do not mark this branch merge-ready until every applicable item below is true or
 
 - [ ] Fake-storage business tests remain green.
 - [ ] Production object-storage adapter has at least one real Azurite contract suite.
-- [ ] Immutable object identity cannot be silently overwritten by a normal retry/path bug.
-- [ ] Staged/published/retained/expired File lifecycle remains mutually exclusive and proven.
+- [x] Immutable Cave/File object creation is provider-enforced create-only; a retry/path bug cannot silently overwrite an existing object address, and failed create does not compensate-delete pre-existing bytes.
+- [ ] Staged/published/removed-history/expired File lifecycle remains mutually exclusive and proven.
 
 ## Cross-cutting compatibility
 

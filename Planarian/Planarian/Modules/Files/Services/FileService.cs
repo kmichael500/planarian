@@ -25,6 +25,8 @@ namespace Planarian.Modules.Files.Services;
 
 public class FileService : ServiceBase<FileRepository>
 {
+    private const int OpportunisticCleanupBatchSize = 16;
+
     private static readonly ConcurrentDictionary<string, Task> ContainerInitializationTasks =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -50,11 +52,12 @@ public class FileService : ServiceBase<FileRepository>
     private readonly CaveMutationCoordinator _caveMutationCoordinator;
     private readonly TagReferenceLockRepository _tagReferenceLocks;
     private readonly IObjectStorage _objectStorage;
+    private readonly ILogger<FileService> _logger;
 
     public FileService(FileRepository repository, RequestUser requestUser, TagRepository tagRepository,
         FileOptions fileOptions, SettingsRepository settingsRepository, CaveRepository caveRepository,
         RequestThrottleService requestThrottleService, CaveMutationCoordinator caveMutationCoordinator,
-        TagReferenceLockRepository tagReferenceLocks, IObjectStorage objectStorage) : base(
+        TagReferenceLockRepository tagReferenceLocks, IObjectStorage objectStorage, ILogger<FileService> logger) : base(
         repository, requestUser)
     {
         _tagRepository = tagRepository;
@@ -65,6 +68,7 @@ public class FileService : ServiceBase<FileRepository>
         _caveMutationCoordinator = caveMutationCoordinator;
         _tagReferenceLocks = tagReferenceLocks;
         _objectStorage = objectStorage;
+        _logger = logger;
     }
 
     public async Task<FileVm> UploadCaveFile(Stream stream, string caveId, string fileName,
@@ -95,12 +99,14 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = tagTypeId
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
+        var objectCreated = false;
 
         try
         {
             if (stream.CanSeek) stream.Position = 0;
-            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
+            await _objectStorage.CreateAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
+            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -118,9 +124,9 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            // The object address is unique to this File. If relational publication fails,
-            // compensate the already-written object without falsifying the database outcome.
-            await BestEffortDeleteObjectAsync(address);
+            // Compensate only if this request completed object creation. A create-only collision
+            // belongs to another File and must never cause deletion of the pre-existing bytes.
+            if (objectCreated) await BestEffortDeleteObjectAsync(address);
             throw;
         }
 
@@ -162,6 +168,7 @@ public class FileService : ServiceBase<FileRepository>
             FileTypeTagId = tagTypeId
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
+        var objectCreated = false;
 
         try
         {
@@ -170,8 +177,9 @@ public class FileService : ServiceBase<FileRepository>
             var sourceContainer = await GetBlobContainerClient(RequestUser.AccountContainerName,
                 createIfNotExists: false);
             await using var source = await OpenBlobReadStream(sourceContainer, sourceBlobKey, cancellationToken);
-            await _objectStorage.PutAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
+            await _objectStorage.CreateAsync(address, source, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
+            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -189,7 +197,7 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            await BestEffortDeleteObjectAsync(address);
+            if (objectCreated) await BestEffortDeleteObjectAsync(address);
             throw;
         }
 
@@ -269,6 +277,7 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken, string? uuid = null)
     {
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
+        await CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         var parsedFileName = FileNamePolicy.Parse(fileName);
         fileName = parsedFileName.CompleteName;
 
@@ -295,12 +304,14 @@ public class FileService : ServiceBase<FileRepository>
             ExpiresOn = DateTime.UtcNow.AddDays(10)
         };
         var address = new StorageObjectAddress(RequestUser.AccountContainerName, $"objects/files/{entity.Id}");
+        var objectCreated = false;
 
         try
         {
             if (stream.CanSeek) stream.Position = 0;
-            await _objectStorage.PutAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
+            await _objectStorage.CreateAsync(address, stream, MimeTypes.GetMimeType(parsedFileName.Extension),
                 cancellationToken);
+            objectCreated = true;
             entity.BlobKey = address.Key;
             entity.BlobContainer = address.Partition;
 
@@ -312,7 +323,7 @@ public class FileService : ServiceBase<FileRepository>
         }
         catch
         {
-            await BestEffortDeleteObjectAsync(address);
+            if (objectCreated) await BestEffortDeleteObjectAsync(address);
             throw;
         }
 
@@ -337,6 +348,84 @@ public class FileService : ServiceBase<FileRepository>
         await Repository.SaveChangesAsync(cancellationToken);
         if (!string.IsNullOrWhiteSpace(blobKey) && !string.IsNullOrWhiteSpace(blobContainer))
             await BestEffortDeleteObjectAsync(new StorageObjectAddress(blobContainer, blobKey));
+    }
+
+
+    public async Task CleanupAssetRemovalTargetsAsync(IEnumerable<string>? targetIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var requestedIds = targetIds?.Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal).ToArray();
+        var maxCount = requestedIds is null ? OpportunisticCleanupBatchSize : 500;
+
+        List<StorageCleanupTarget> pending;
+        try
+        {
+            pending = await Repository.GetStorageCleanupTargetsAsync(
+                StorageCleanupPurpose.CaveAssetRemoval, requestedIds, maxCount, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // The relational mutation has already committed. Cleanup discovery must not
+            // replace that durable outcome with a misleading request failure.
+            _logger.LogWarning(exception,
+                "Unable to load Cave asset cleanup debt for account {AccountId}; cleanup will retry later",
+                RequestUser.AccountId);
+            return;
+        }
+
+        var completed = new List<string>(pending.Count);
+        foreach (var target in pending)
+        {
+            try
+            {
+                var address = new StorageObjectAddress(target.StoragePartition, target.StorageKey);
+                if (await Repository.IsStorageObjectReferencedByLiveFileAsync(address, cancellationToken))
+                {
+                    // The bytes are live again (or shared by legacy data), so this removal no longer owns deletion.
+                    // A later removal of the live File will create its own cleanup target if needed.
+                    _logger.LogWarning(
+                        "Cave asset cleanup target {TargetId} for account {AccountId} is referenced by a live File; " +
+                        "clearing the stale cleanup target without deleting the object",
+                        target.Id, RequestUser.AccountId);
+                    completed.Add(target.Id);
+                    continue;
+                }
+
+                if (await TryDeleteObjectAsync(address))
+                {
+                    completed.Add(target.Id);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Cave asset cleanup target {TargetId} for account {AccountId} remains pending after object deletion failed",
+                        target.Id, RequestUser.AccountId);
+                }
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception,
+                    "Cave asset cleanup target {TargetId} for account {AccountId} could not be processed and remains pending",
+                    target.Id, RequestUser.AccountId);
+            }
+        }
+
+        if (completed.Count == 0) return;
+        try
+        {
+            await Repository.CompleteStorageCleanupTargetsAsync(
+                StorageCleanupPurpose.CaveAssetRemoval, completed, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            // A successful external delete with a failed acknowledgement is safe to retry:
+            // DeleteIfExists is idempotent and an already-missing object counts as cleaned.
+            _logger.LogWarning(exception,
+                "Unable to acknowledge {CleanupCount} completed Cave asset cleanup targets for account {AccountId}; " +
+                "idempotent cleanup will retry later",
+                completed.Count, RequestUser.AccountId);
+        }
     }
 
     public Task DeleteBlobBestEffortAsync(string blobKey, string blobContainer) =>

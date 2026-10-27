@@ -73,7 +73,7 @@ flowchart LR
 | Published history | Immutable semantic record of accepted state | CaveRevision + CavePublishedSnapshotV1 |
 | Proposed future state | Immutable version of a suggestion awaiting workflow action | CaveProposalVersion + CaveProposalSnapshotV1 |
 | Proposal workflow | Mutable status/pointer around immutable proposal versions | CaveChangeRequest + review events |
-| Historical removed File bytes | Retained private locator plus object content | RetainedCaveFileObject + object storage |
+| Removed Cave asset history | Lightweight semantic revision metadata; removed File bytes are post-commit cleanup | CaveRevision snapshots + StorageCleanupTarget for transient external cleanup debt |
 
 ## Architecture rules worth remembering
 
@@ -183,7 +183,7 @@ Read [Proposals](docs/architecture/proposals.md).
 4. [IObjectStorage.cs](Planarian/Planarian/Shared/Services/IObjectStorage.cs)
 5. [AzureBlobObjectStorage.cs](Planarian/Planarian/Shared/Services/AzureBlobObjectStorage.cs)
 6. [File.cs](Planarian/Planarian.Model/Database/Entities/RidgeWalker/File.cs)
-7. [RetainedCaveFileObject.cs](Planarian/Planarian.Model/Database/Entities/RidgeWalker/RetainedCaveFileObject.cs)
+7. [StorageCleanupTarget.cs](Planarian/Planarian.Model/Database/Entities/RidgeWalker/StorageCleanupTarget.cs)
 8. the File portion of CaveService.SaveCaveAsync.
 
 Then, if you need to understand account File import, inspect `FileService.UploadCaveFile` / `PublishStagedCaveFile`; those are specialized one-Cave publication paths rather than the aggregate editor.
@@ -247,8 +247,9 @@ The decision records capture major choices that would otherwise be easy to redis
 - [ADR 0002 — Aggregate Cave publication](docs/architecture/decisions/0002-aggregate-cave-publication.md)
 - [ADR 0003 — Immutable proposal versions](docs/architecture/decisions/0003-immutable-proposal-versions.md)
 - [ADR 0004 — Upload-once File storage](docs/architecture/decisions/0004-upload-once-file-storage.md)
-- [ADR 0005 — Retained File objects](docs/architecture/decisions/0005-retained-file-objects.md)
+- [ADR 0005 — Retained File objects (superseded)](docs/architecture/decisions/0005-retained-file-objects.md)
 - [ADR 0006 — Bulk import publication](docs/architecture/decisions/0006-bulk-import-publication.md)
+- [ADR 0007 — Cave asset removal cleanup](docs/architecture/decisions/0007-cave-asset-removal-cleanup.md)
 
 ADRs describe why a decision was made. If a decision changes later, preserve the old record and supersede it rather than rewriting history.
 

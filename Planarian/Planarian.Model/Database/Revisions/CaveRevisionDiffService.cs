@@ -81,34 +81,30 @@ public sealed class CaveRevisionDiffService
                 entranceChanges.Add(change);
         }
 
-        var oldFiles = previous.Files.ToDictionary(e => e.Id);
-        var newFiles = current.Files.ToDictionary(e => e.Id);
+        var files = IndexAssets(previous.Files, current.Files, file => file.Id);
         var fileChanges = new List<CaveFileChange>();
-        foreach (var id in oldFiles.Keys.Intersect(newFiles.Keys).Order(StringComparer.Ordinal))
+        foreach (var id in files.RetainedIds)
         {
             var metadataBefore = metadata.Count;
-            var change = CompareFile(oldFiles[id], newFiles[id], id);
+            var change = CompareFile(files.PreviousById[id], files.CurrentById[id], id);
             if (change.Scalars.Count != 0 || metadata.Count != metadataBefore)
                 fileChanges.Add(change);
         }
 
-        var oldLinePlots = previous.LinePlots.ToDictionary(linePlot => linePlot.Id);
-        var newLinePlots = current.LinePlots.ToDictionary(linePlot => linePlot.Id);
+        var linePlots = IndexAssets(previous.LinePlots, current.LinePlots, linePlot => linePlot.Id);
         var linePlotChanges = new List<CaveLinePlotChange>();
-        foreach (var id in oldLinePlots.Keys.Intersect(newLinePlots.Keys).Order(StringComparer.Ordinal))
+        foreach (var id in linePlots.RetainedIds)
         {
-            var change = CompareLinePlot(oldLinePlots[id], newLinePlots[id], id);
+            var change = CompareLinePlot(linePlots.PreviousById[id], linePlots.CurrentById[id], id);
             if (change.Scalars.Count != 0) linePlotChanges.Add(change);
         }
 
         return new CaveRevisionDiff(scalars, addedTags, removedTags,
             newEntrances.Keys.Except(oldEntrances.Keys).Order().ToList(),
             oldEntrances.Keys.Except(newEntrances.Keys).Order().ToList(), entranceChanges.Select(change => change.EntranceId).ToList(),
-            newFiles.Keys.Except(oldFiles.Keys).Order(StringComparer.Ordinal).ToList(),
-            oldFiles.Keys.Except(newFiles.Keys).Order(StringComparer.Ordinal).ToList(),
+            files.AddedIds, files.RemovedIds,
             fileChanges.Select(change => change.FileId).ToList(),
-            newLinePlots.Keys.Except(oldLinePlots.Keys).Order(StringComparer.Ordinal).ToList(),
-            oldLinePlots.Keys.Except(newLinePlots.Keys).Order(StringComparer.Ordinal).ToList(),
+            linePlots.AddedIds, linePlots.RemovedIds,
             linePlotChanges.Select(change => change.LinePlotId).ToList(),
             entranceChanges, fileChanges, linePlotChanges,
             metadata.OrderBy(change => change.Path).ThenBy(change => change.Property).ToList());
@@ -220,6 +216,26 @@ public sealed class CaveRevisionDiffService
                 ? oldStrings.SequenceEqual(newStrings, StringComparer.Ordinal)
                 : Equals(oldValue, newValue);
     }
+
+    private static StableAssetIndex<T> IndexAssets<T>(IEnumerable<T> previous, IEnumerable<T> current,
+        Func<T, string> getId)
+    {
+        var previousById = previous.ToDictionary(getId, StringComparer.Ordinal);
+        var currentById = current.ToDictionary(getId, StringComparer.Ordinal);
+        return new StableAssetIndex<T>(
+            previousById,
+            currentById,
+            currentById.Keys.Except(previousById.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+            previousById.Keys.Except(currentById.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList(),
+            previousById.Keys.Intersect(currentById.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList());
+    }
+
+    private sealed record StableAssetIndex<T>(
+        IReadOnlyDictionary<string, T> PreviousById,
+        IReadOnlyDictionary<string, T> CurrentById,
+        IReadOnlyList<string> AddedIds,
+        IReadOnlyList<string> RemovedIds,
+        IReadOnlyList<string> RetainedIds);
 
     public bool IsSemanticEqual(CavePublishedSnapshotV1 previous, CavePublishedSnapshotV1 current)
     {

@@ -30,13 +30,12 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         var live = await db.Files.SingleAsync(row => row.Id == file.FileId);
         live.BlobContainer = portablePartition;
         live.BlobKey = liveKey;
-        db.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
+        db.StorageCleanupTargets.Add(new StorageCleanupTarget
         {
             AccountId = tenant.AccountId,
-            CaveId = tenant.CaveId,
-            FileId = "oldreset01",
             StoragePartition = portablePartition,
-            StorageKey = retainedKey
+            StorageKey = retainedKey,
+            Purpose = StorageCleanupPurpose.CaveAssetRemoval
         });
         await db.SaveChangesAsync();
 
@@ -358,8 +357,9 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         await using (var observer = database.CreateDbContext("a", account.AccountId))
         {
             Assert.False(await observer.Caves.IgnoreQueryFilters().AnyAsync(row => row.Id == account.CaveId));
-            var debt = await observer.AccountResetCleanupTargets
-                .Where(row => row.AccountId == account.AccountId).ToListAsync();
+            var debt = await observer.StorageCleanupTargets
+                .Where(row => row.AccountId == account.AccountId &&
+                              row.Purpose == StorageCleanupPurpose.AccountReset).ToListAsync();
             Assert.Single(debt);
             Assert.Equal(key, debt[0].StorageKey);
         }
@@ -374,7 +374,8 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         }
         await using (var verify = database.CreateDbContext("a", account.AccountId))
         {
-            Assert.False(await verify.AccountResetCleanupTargets.AnyAsync(row => row.AccountId == account.AccountId));
+            Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+                row.AccountId == account.AccountId && row.Purpose == StorageCleanupPurpose.AccountReset));
             Assert.False(await verify.Caves.IgnoreQueryFilters().AnyAsync(row => row.Id == account.CaveId));
         }
         Assert.False(blobs.Contains(partition, key));
@@ -441,7 +442,8 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
 
         await using var verify = database.CreateDbContext("a", account.AccountId);
         Assert.False(await verify.Files.IgnoreQueryFilters().AnyAsync(row => row.AccountId == account.AccountId));
-        Assert.False(await verify.AccountResetCleanupTargets.AnyAsync(row => row.AccountId == account.AccountId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+                row.AccountId == account.AccountId && row.Purpose == StorageCleanupPurpose.AccountReset));
     }
 
 
@@ -476,7 +478,8 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         await using var verify = database.CreateDbContext("observer", accountA.AccountId);
         Assert.True(await verify.Caves.IgnoreQueryFilters().AnyAsync(row => row.Id == accountA.CaveId));
         Assert.True(await verify.Files.IgnoreQueryFilters().AnyAsync(row => row.Id == fileB.FileId));
-        Assert.False(await verify.AccountResetCleanupTargets.AnyAsync(row => row.AccountId == accountA.AccountId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+            row.AccountId == accountA.AccountId && row.Purpose == StorageCleanupPurpose.AccountReset));
     }
 
 }

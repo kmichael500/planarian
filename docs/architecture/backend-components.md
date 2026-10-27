@@ -75,9 +75,9 @@ Approval intentionally calls the same Cave publication semantics used by direct 
 | --- | --- | --- | --- |
 | FileService | Stage authoring Files, stream/view Files, verify object availability, cleanup external objects, and publish specialized account File imports | Coordinates FileRepository/object storage and uses the single-Cave publisher when a direct File import changes a Cave | **Major change** |
 | FileRepository | File metadata, staged ownership, lookup/mutation persistence | Repository layer | **Major change** |
-| IObjectStorage | Provider-neutral object Put/Open/Delete interface | Infrastructure boundary | **New** |
+| IObjectStorage | Provider-neutral immutable Create/Open/Delete interface | Infrastructure boundary | **New** |
 | AzureBlobObjectStorage | Azure Blob implementation of IObjectStorage | Infrastructure adapter | **New** |
-| RetainedCaveFileObject | Private locator for bytes of once-published Files after live File removal | Persistence entity deliberately without live Cave/File/Tag FK | **New** |
+| StorageCleanupTarget | Durable post-commit external-storage cleanup debt, purpose-scoped for Cave asset removal and Account Reset | Persistence entity deliberately independent of live Cave/File FKs | **New** |
 | StagedCaveFilePublication | Validated publication intent for a staged File during proposal approval | Small immutable workflow value | **New** |
 
 Important boundary: older archive/photo/trip/storage code may still use Azure SDK types. Do not infer that IObjectStorage currently fronts all storage in the repository.

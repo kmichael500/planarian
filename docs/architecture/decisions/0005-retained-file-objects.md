@@ -1,7 +1,9 @@
 # ADR 0005 — Retain published File bytes outside the live File row after removal
 
-**Status:** Accepted for the pre-release Cave-revisions target
+**Status:** Superseded by [ADR 0007](0007-cave-asset-removal-cleanup.md) before release
 **Scope:** Historical published File content
+
+This decision was implemented temporarily on the completion branch, then superseded before release when the product policy changed: published history should preserve semantic metadata, not every removed File payload indefinitely.
 
 ## Context
 

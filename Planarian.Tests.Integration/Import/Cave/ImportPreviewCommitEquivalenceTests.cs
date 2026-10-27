@@ -84,32 +84,28 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
     }
 
     [Fact]
-    public async Task CaveSyncDeletionPurgesRetainedFileObjectsAndDefersPhysicalDelete()
+    public async Task CaveSyncDeletionDefersPublishedFilePhysicalDeleteUntilAfterRelationalCommit()
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(CaveSyncDeletionPurgesRetainedFileObjectsAndDefersPhysicalDelete));
+            nameof(CaveSyncDeletionDefersPublishedFilePhysicalDeleteUntilAfterRelationalCommit));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var file = await FileTestDataFactory.AddFileAsync(database, tenant, associateWithCave: true,
+            fileId: "syncfile01");
         await using var db = database.CreateDbContext("a", tenant.AccountId);
-        db.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
-        {
-            AccountId = tenant.AccountId,
-            CaveId = tenant.CaveId,
-            FileId = "oldfile001",
-            StoragePartition = "test",
-            StorageKey = "objects/files/oldfile001"
-        });
+        var live = await db.Files.SingleAsync(row => row.Id == file.FileId);
+        live.BlobContainer = "test";
+        live.BlobKey = "objects/files/syncfile01";
         await db.SaveChangesAsync();
         var import = new CaveImportTestHarness(db, db.RequestUser);
         var csv = ImportDryRunIntegrationTests.CaveHeader +
             "\nReplacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,Replacement\n";
 
         var plan = await import.PlanCsvAsync(csv, syncExisting: true);
-        var result = await import.ExecuteAsync(plan, "delete-retained.csv");
+        var result = await import.ExecuteAsync(plan, "delete-file.csv");
 
-        Assert.False(await db.RetainedCaveFileObjects.IgnoreQueryFilters().AnyAsync(row =>
-            row.AccountId == tenant.AccountId && row.CaveId == tenant.CaveId));
+        Assert.False(await db.Files.IgnoreQueryFilters().AnyAsync(row => row.Id == file.FileId));
         Assert.Contains(result.BlobDeletes, target =>
-            target.BlobContainer == "test" && target.BlobKey == "objects/files/oldfile001");
+            target.BlobContainer == "test" && target.BlobKey == "objects/files/syncfile01");
     }
 
     [Fact]

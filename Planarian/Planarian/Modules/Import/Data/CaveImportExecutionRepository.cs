@@ -346,14 +346,6 @@ public sealed class CaveImportExecutionRepository
             var files = await _db.Files.IgnoreQueryFilters().Where(f => f.CaveId != null && scopedIds.Contains(f.CaveId) && f.Cave != null && f.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(f => new { f.Id, f.BlobKey, f.BlobContainer }).ToListAsync(cancellationToken);
             foreach (var file in files) deferredBlobDeletes.Add(new DeferredImportBlobDelete(file.BlobKey, file.BlobContainer));
-            var retainedObjects = await _db.RetainedCaveFileObjects.IgnoreQueryFilters()
-                .Where(row => row.AccountId == _scope.AccountId && scopedIds.Contains(row.CaveId))
-                .AsNoTracking().Select(row => new { row.StorageKey, row.StoragePartition }).ToListAsync(cancellationToken);
-            foreach (var retained in retainedObjects)
-                deferredBlobDeletes.Add(new DeferredImportBlobDelete(retained.StorageKey, retained.StoragePartition));
-            await _db.RetainedCaveFileObjects.IgnoreQueryFilters()
-                .Where(row => row.AccountId == _scope.AccountId && scopedIds.Contains(row.CaveId))
-                .ExecuteDeleteAsync(cancellationToken);
             var entranceIds = await _db.Entrances.IgnoreQueryFilters().Where(e => scopedIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))

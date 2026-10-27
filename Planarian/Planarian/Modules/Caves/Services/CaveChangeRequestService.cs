@@ -284,9 +284,12 @@ public sealed class CaveChangeRequestService
         await _files.RequireStoredObjectsAvailableAsync(publications.Select(publication =>
             new StorageObjectAddress(publication.StoragePartition, publication.StorageKey)), cancellationToken);
         var baseSnapshot = Deserialize(row.ProposalBaseRevision);
+        // Process only debt from earlier committed publications. New cleanup targets created by
+        // this approval are handled after the outer approval transaction commits below.
+        await _files.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         var approval = await _mutations.ExecuteOwnedTransactionAsync(async token =>
         {
-            var mutation = await _caveService.ApproveChangeRequestAsync(values,
+            var saveResult = await _caveService.ApproveChangeRequestAsync(values,
                 row.ProposalVersion.BaseRevisionId, requestId, publications,
                 proposal.Entrances.Select(entrance => entrance.EntranceId)
                     .Except(baseSnapshot.Entrances.Select(entrance => entrance.Id))
@@ -296,10 +299,13 @@ public sealed class CaveChangeRequestService
                     .ToHashSet(StringComparer.Ordinal),
                 ToPeoplePublicationContext(proposal), token);
             var discardedObjects = await _requests.MarkApprovedAsync(requestId,
-                expectedProposalVersionId, mutation, notes, token);
-            return (Mutation: mutation, DiscardedObjects: discardedObjects);
+                expectedProposalVersionId, saveResult.Mutation, notes, token);
+            return (SaveResult: saveResult, DiscardedObjects: discardedObjects);
         }, cancellationToken);
-        var publishedRevisionId = approval.Mutation.RevisionId;
+        var publishedRevisionId = approval.SaveResult.Mutation.RevisionId;
+
+        await _files.CleanupAssetRemovalTargetsAsync(
+            approval.SaveResult.StorageCleanupTargetIds, CancellationToken.None);
 
         foreach (var objectAddress in approval.DiscardedObjects)
             await _files.DeleteObjectBestEffortAsync(

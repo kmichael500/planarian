@@ -68,7 +68,7 @@ When complete, all of the following are true:
 - Files and line plots participate in revision snapshots, diffs, proposal semantics, approval, and no-op detection;
 - proposal versions remain immutable descriptions of exactly what was proposed, including assets;
 - new Cave/staged File content is uploaded once and publication does not require copying bytes to a new key;
-- ordinary removal of a previously published File moves only its private object locator into a tenant-owned retention record and does not destroy its immutable bytes;
+- ordinary removal of a previously published File preserves revision metadata but queues its object for durable post-commit deletion, matching line-plot history semantics without treating deleted payloads as permanent Cave history;
 - Cave/file application logic uses a provider-neutral object-storage boundary rather than Azure SDK types;
 - the current `CaveGeoJson` `jsonb` storage and current line-plot rendering path remain in place for this task;
 - imports retain their specialized set-oriented mechanics while sharing the published snapshot/revision invariants;
@@ -118,7 +118,7 @@ If an implementation detail is unclear, resolve it from `architecture.md` first 
 
 1. Fix direct-editor expected-revision propagation and stale conflict behavior.
 2. Introduce the provider-neutral object-storage boundary for the affected File workflows.
-3. Convert new Cave/staged Files to upload-once lifecycle semantics and add the narrow retained-object persistence used on ordinary removal.
+3. Convert new Cave/staged Files to upload-once lifecycle semantics and add durable purpose-scoped post-commit storage cleanup for removed File payloads.
 4. Complete File authoring in the aggregate Cave editor and remove detail-page File mutation.
 5. Add line plots to the aggregate editor while retaining the current `CaveGeoJson` storage model.
 6. Add line-plot metadata/fingerprints to published revision semantics and diffs while keeping File storage locators private.

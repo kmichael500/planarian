@@ -12,14 +12,19 @@ This avoids the worst failure mode: deleting bytes first and then rolling back t
 
 The tradeoff is that post-commit external cleanup can fail and leave cleanup debt. Such failures must be safe, observable enough to understand, and retryable where appropriate.
 
-## Ordinary published File removal is not destruction
+## Ordinary published File removal
 
 Removing a File from current Cave state:
 
-- records RetainedCaveFileObject;
+- queues `StorageCleanupTarget` with purpose `CaveAssetRemoval` in the relational publication transaction;
 - removes the live File row;
 - publishes the new Cave revision;
-- keeps the bytes.
+- after commit, deletes the external bytes and clears the target;
+- if external deletion fails, logs the failure and keeps durable cleanup debt for retry without rolling back the already-published revision.
+
+The owning request tries the new cleanup target immediately after commit. Later Cave/File authoring activity processes a bounded batch of older `CaveAssetRemoval` targets. There is no dedicated background relay for this purpose today, so “retryable” does not mean “guaranteed to clear while an account is inactive.” Reset Account explicitly absorbs pending asset-removal addresses into its stronger cleanup workflow.
+
+This matches line-plot semantics at the revision level: removed payload is not part of historical state. The storage mechanics differ because `CaveGeoJson` can be deleted transactionally in PostgreSQL while File bytes cannot.
 
 See [Files and storage](files-and-storage.md).
 
@@ -42,7 +47,7 @@ sequenceDiagram
     Cave->>Mutation: Publish Delete revision
     Mutation->>DB: Persist tombstone history
     DB-->>Cave: Commit
-    loop each current/retained object
+    loop each current object
         Cave->>Storage: Best-effort delete
     end
 ~~~
@@ -59,7 +64,7 @@ The execution repository performs equivalent safety checks in a set-oriented way
 
 - verify current account;
 - reject open proposal conflicts;
-- collect current and retained object addresses;
+- collect current live File object addresses;
 - remove relational data;
 - publish bulk delete revisions;
 - commit;
@@ -83,7 +88,7 @@ sequenceDiagram
     Service->>Repo: ExecuteResetAsync
     Repo->>DB: Begin transaction
     Service->>DB: Acquire exclusive account maintenance lease
-    Repo->>DB: Capture File + retained storage locators
+    Repo->>DB: Capture live File + pending asset-cleanup addresses
     Repo->>DB: Persist cleanup targets; purge Cave/account graph
     Repo->>DB: Commit
     loop persisted cleanup targets
@@ -95,9 +100,9 @@ sequenceDiagram
 
 The relational reset is committed **before** external cleanup.
 
-Before the commit, the repository rejects File/retained-object locators that refer
-to another account's storage container or to bytes also referenced by another
-tenant's relational File/retention rows. This preflight fails closed, leaving
+Before the commit, the repository rejects cleanup addresses that would delete bytes also referenced by another
+tenant's live relational File. Pending ordinary asset-cleanup addresses are folded into Reset Account cleanup
+responsibility before their original targets are purged. This preflight fails closed, leaving
 both tenants' relational data and storage untouched rather than deleting a
 foreign tenant's bytes. It operates in bounded key batches to avoid one query
 per stored object.
@@ -108,7 +113,7 @@ That ordering is intentional.
 
 The API distinguishes `relationalResetCompleted` from `storageCleanupCompleted`.
 Provider-neutral object locators and the account-container deletion target are
-written to `AccountResetCleanupTargets` in the **same PostgreSQL transaction**
+written to `StorageCleanupTargets` with purpose `AccountReset` in the **same PostgreSQL transaction**
 as the relational purge. Storage deletion starts only after commit. Deletion
 targets are removed in bounded batches after successful storage operations;
 crashes and failures leave durable targets for the administrator's
@@ -132,9 +137,9 @@ including bulk import endpoints. The reset/cleanup endpoints use the exclusive
 lease themselves instead.
 
 Pre-commit address checks reject foreign-account containers, shared
-provider-neutral objects, and **any foreign File/retention reference to the
-entire account container**, even if the key does not appear in this account's
-own File table. Cleanup retries re-check foreign references before deleting.
+provider-neutral objects, and **any foreign live File reference to the entire
+account container**, even if the key does not appear in this account's own File
+table. Cleanup retries re-check foreign live-File references before deleting.
 The preflight and cleanup reference queries are bounded in key batches.
 
 Account container deletion intentionally removes stored archives, temporary
@@ -184,7 +189,7 @@ It:
 
 This path still uses Azure-specific Blob APIs and is **not** part of the provider-neutral IObjectStorage Cave/File boundary.
 
-The current implementation is a **current-state export**: `ExportService` writes `caves.csv`, `entrances.csv`, current live Cave Files, current CaveGeoJson line plots, and `missing-files.csv` when needed. It does not export CaveRevision history, proposal/review history, or RetainedCaveFileObject records, and no restore workflow is defined. It should therefore not be described to users as a complete disaster-recovery backup unless that contract is expanded.
+The current implementation is a **current-state export**: `ExportService` writes `caves.csv`, `entrances.csv`, current live Cave Files, current CaveGeoJson line plots, and `missing-files.csv` when needed. It does not export CaveRevision history, proposal/review history, or `StorageCleanupTarget` operational debt, and no restore workflow is defined. It should therefore not be described to users as a complete disaster-recovery backup unless that contract is expanded.
 
 ## External cleanup failure model
 

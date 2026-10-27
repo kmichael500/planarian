@@ -75,5 +75,5 @@ Rejected for new Cave/File publication behavior because it leaks provider-specif
 ## Related documentation
 
 - [Files and storage](../files-and-storage.md)
-- [Retained File object ADR](0005-retained-file-objects.md)
+- [Cave asset removal cleanup ADR](0007-cave-asset-removal-cleanup.md)
 - [Data-access architecture](../../data-access-architecture.md)

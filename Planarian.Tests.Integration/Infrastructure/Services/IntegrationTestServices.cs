@@ -184,6 +184,7 @@ internal sealed class TestFileBlobStore : IObjectStorage
 
     public bool FailWrites { get; set; }
     public bool FailDeletes { get; set; }
+    public int DeleteIfExistsAttempts { get; private set; }
     public bool FailContainerDeletes { get; set; }
     public Func<string, Task>? BeforeContainerDeleteAsync { get; set; }
     public IReadOnlyCollection<(string Container, string Key)> Keys
@@ -253,9 +254,19 @@ internal sealed class TestFileBlobStore : IObjectStorage
         }
     }
 
-    public async Task PutAsync(StorageObjectAddress address, Stream content, string? contentType,
-        CancellationToken cancellationToken) =>
-        await WriteAsync(content, address.Partition, address.Key, cancellationToken);
+    public async Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
+        CancellationToken cancellationToken)
+    {
+        if (FailWrites) throw new IOException("The test blob boundary rejected the write.");
+        using var copy = new MemoryStream();
+        await content.CopyToAsync(copy, cancellationToken);
+        lock (_gate)
+        {
+            if (_content.ContainsKey((address.Partition, address.Key)))
+                throw new IOException("The test object address already exists.");
+            _content[(address.Partition, address.Key)] = copy.ToArray();
+        }
+    }
 
     public Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,
         CancellationToken cancellationToken)
@@ -271,6 +282,7 @@ internal sealed class TestFileBlobStore : IObjectStorage
 
     public Task<bool> DeleteIfExistsAsync(StorageObjectAddress address, CancellationToken cancellationToken)
     {
+        lock (_gate) DeleteIfExistsAttempts++;
         var existed = Contains(address.Partition, address.Key);
         Delete(address.Partition, address.Key);
         return Task.FromResult(existed);

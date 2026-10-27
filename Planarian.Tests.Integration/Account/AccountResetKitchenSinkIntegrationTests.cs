@@ -72,7 +72,7 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
         // A fixed whitelist: the SQL here is a test observation, not domain setup.
         string[] tables =
         [
-            "Caves", "Files", "RetainedCaveFileObjects", "CaveRevisions",
+            "Caves", "Files", "StorageCleanupTargets", "CaveRevisions",
             "CaveChangeRequests", "CaveProposalVersions", "CaveChangeRequestReviewEvents",
             "CaveImportBatches", "Favorites", "Counties", "TagTypes",
             "AccountStates", "AccountUsers", "FeatureSettings", "CavePermission"
@@ -171,10 +171,11 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
             Extension = ".pdf", BlobContainer = "account-" + cave.AccountId, BlobKey = "objects/temporary-" + actor,
             ExpiresOn = DateTime.UtcNow.AddMinutes(30)
         });
-        db.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
+        db.StorageCleanupTargets.Add(new StorageCleanupTarget
         {
-            AccountId = cave.AccountId, CaveId = cave.CaveId, FileId = "retained-" + actor,
-            StoragePartition = "portable-account-objects", StorageKey = "portable/retained-" + actor
+            AccountId = cave.AccountId,
+            StoragePartition = "portable-account-objects", StorageKey = "portable/retained-" + actor,
+            Purpose = StorageCleanupPurpose.CaveAssetRemoval
         });
         await db.SaveChangesAsync();
 
@@ -201,7 +202,8 @@ public sealed class AccountResetKitchenSinkIntegrationTests(PostgresTestServer f
             ["Caves"] = await db.Caves.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Entrances"] = await db.Entrances.IgnoreQueryFilters().Where(x => x.Cave!.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Files"] = await db.Files.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
-            ["Retained"] = await db.RetainedCaveFileObjects.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
+            ["CleanupTargets"] = await db.StorageCleanupTargets.IgnoreQueryFilters()
+                .Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Revisions"] = await db.CaveRevisions.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Requests"] = await db.CaveChangeRequests.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),
             ["Versions"] = await db.CaveProposalVersions.IgnoreQueryFilters().Where(x => x.AccountId == accountId).Select(x => x.Id).OrderBy(x => x).ToArrayAsync(),

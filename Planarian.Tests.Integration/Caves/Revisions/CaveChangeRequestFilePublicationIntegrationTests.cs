@@ -66,6 +66,161 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             file => file.Id == fileId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProposalPublishedFileRemovalCommitsBeforeBlobCleanup(bool failBlobDelete)
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ProposalPublishedFileRemovalCommitsBeforeBlobCleanup) +
+            (failBlobDelete ? "_delete_failure" : "_delete_success"));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+        var blobs = new TestFileBlobStore();
+
+        string fileId;
+        string blobKey;
+        string blobContainer;
+        string revisionWithFileId;
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager", blobs))
+        {
+            await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("proposal removal bytes"));
+            fileId = (await manager.Services.Files.UploadCaveFile(content, tenant.CaveId, "remove-me.pdf", default)).Id;
+            var file = await manager.Db.Files.SingleAsync(row => row.Id == fileId);
+            blobKey = file.BlobKey!;
+            blobContainer = file.BlobContainer!;
+            revisionWithFileId = (await manager.Db.Caves.IgnoreQueryFilters()
+                .SingleAsync(row => row.Id == tenant.CaveId)).CurrentRevisionId!;
+        }
+
+        string requestId;
+        string proposalVersionId;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs))
+        {
+            var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+            Assert.Equal(revisionWithFileId, context.ExpectedBaseRevisionId);
+            var values = ValuesFromCave(context.Cave);
+            values.Files = [];
+            requestId = await contributor.ChangeRequests.CreateAsync(
+                tenant.CaveId, values, revisionWithFileId, default);
+            proposalVersionId = await CurrentVersionAsync(contributor.Db, requestId);
+            var version = await contributor.ChangeRequests.GetVersionAsync(requestId, proposalVersionId, default);
+            Assert.Equal([fileId], version.DiffFromBase.RemovedFiles);
+        }
+
+        if (failBlobDelete) blobs.FailDelete(blobContainer, blobKey);
+
+        CaveChangeRequestDecisionVm decision;
+        await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer", blobs))
+            decision = await reviewer.ChangeRequests.ApproveAsync(requestId, proposalVersionId, null, default);
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.False(await verify.Files.AnyAsync(row => row.Id == fileId));
+        var request = await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId);
+        Assert.Equal(CaveChangeRequestStatus.Approved, request.Status);
+        Assert.Equal(decision.PublishedRevisionId, request.ApprovedRevisionId);
+        var accepted = await verify.CaveRevisions.SingleAsync(row => row.Id == decision.PublishedRevisionId);
+        Assert.DoesNotContain(CaveSnapshotJson.Deserialize(accepted.SnapshotJson, accepted.SnapshotSchemaVersion).Files,
+            file => file.Id == fileId);
+
+        var pendingCleanup = await verify.StorageCleanupTargets.AsNoTracking()
+            .Where(row => row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                          row.StoragePartition == blobContainer && row.StorageKey == blobKey)
+            .ToListAsync();
+        if (failBlobDelete)
+        {
+            Assert.True(blobs.Contains(blobContainer, blobKey));
+            Assert.Single(pendingCleanup);
+        }
+        else
+        {
+            Assert.False(blobs.Contains(blobContainer, blobKey));
+            Assert.Empty(pendingCleanup);
+        }
+    }
+
+    [Fact]
+    public async Task PublishedFileRemovalInsideApprovalTransactionDoesNotDeleteBeforeOuterCommit()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(PublishedFileRemovalInsideApprovalTransactionDoesNotDeleteBeforeOuterCommit));
+        var (tenant, _) = await CreateMeasuredPublishedCaveAsync(database, 'a', null, null, null, null);
+        await ReferenceTestData.AddTagAsync(database, tenant.AccountId, TagTypeKeyConstant.File,
+            "Other", "other0000a");
+        await CavePermissions.GrantManagerAsync(database, tenant, "manager");
+        await CavePermissions.GrantViewAsync(database, tenant, "contributor");
+        await CavePermissions.GrantManagerAsync(database, tenant, "reviewer");
+        var blobs = new TestFileBlobStore();
+
+        string fileId;
+        string blobKey;
+        string blobContainer;
+        string revisionWithFileId;
+        int revisionCountBeforeRollback;
+        await using (var manager = await CaveTestActor.CreateAsync(database, tenant.AccountId, "manager", blobs))
+        {
+            await using var content = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("rollback removal bytes"));
+            fileId = (await manager.Services.Files.UploadCaveFile(content, tenant.CaveId, "rollback-remove.pdf",
+                default)).Id;
+            var file = await manager.Db.Files.SingleAsync(row => row.Id == fileId);
+            blobKey = file.BlobKey!;
+            blobContainer = file.BlobContainer!;
+            revisionWithFileId = (await manager.Db.Caves.IgnoreQueryFilters()
+                .SingleAsync(row => row.Id == tenant.CaveId)).CurrentRevisionId!;
+            revisionCountBeforeRollback = await manager.Db.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId);
+        }
+
+        string requestId;
+        AddCaveVm removalValues;
+        await using (var contributor = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs))
+        {
+            var context = await contributor.ChangeRequests.GetAuthoringContextAsync(tenant.CaveId, default);
+            removalValues = ValuesFromCave(context.Cave);
+            removalValues.Files = [];
+            requestId = await contributor.ChangeRequests.CreateAsync(
+                tenant.CaveId, removalValues, revisionWithFileId, default);
+        }
+
+        await using (var reviewer = database.CreateDbContext("reviewer", tenant.AccountId))
+        {
+            await CavePermissions.AuthenticateAsync(reviewer, tenant.AccountId);
+            var services = IntegrationTestServices.For(reviewer, blobs);
+            var mutations = new CaveMutationCoordinator(new CaveMutationRepository(reviewer, reviewer.RequestUser,
+                new CavePublishedSnapshotRepository(reviewer, reviewer.RequestUser)));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => mutations.ExecuteOwnedTransactionAsync(async token =>
+            {
+                await services.Caves.ApproveChangeRequestAsync(
+                    removalValues, revisionWithFileId, requestId, [], token);
+
+                Assert.False(await reviewer.Files.AnyAsync(row => row.Id == fileId));
+                Assert.Single(await reviewer.StorageCleanupTargets.AsNoTracking().Where(row =>
+                    row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                    row.StoragePartition == blobContainer && row.StorageKey == blobKey).ToListAsync());
+                Assert.True(blobs.Contains(blobContainer, blobKey));
+
+                throw new InvalidOperationException("Simulated approval failure after Cave publication work");
+            }, default));
+        }
+
+        await using var verify = database.CreateDbContext("verify", tenant.AccountId);
+        Assert.True(await verify.Files.AnyAsync(row => row.Id == fileId && row.CaveId == tenant.CaveId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+            row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+            row.StoragePartition == blobContainer && row.StorageKey == blobKey));
+        Assert.Equal(revisionWithFileId, (await verify.Caves.IgnoreQueryFilters()
+            .SingleAsync(row => row.Id == tenant.CaveId)).CurrentRevisionId);
+        Assert.Equal(revisionCountBeforeRollback,
+            await verify.CaveRevisions.CountAsync(row => row.CaveId == tenant.CaveId));
+        Assert.Equal(CaveChangeRequestStatus.Pending,
+            (await verify.CaveChangeRequests.SingleAsync(row => row.Id == requestId)).Status);
+        Assert.True(blobs.Contains(blobContainer, blobKey));
+    }
+
     [Fact]
     public async Task FileOnlyProposalVersionCanBeApprovedEndToEnd()
     {

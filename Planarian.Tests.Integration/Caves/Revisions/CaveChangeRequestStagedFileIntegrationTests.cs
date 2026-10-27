@@ -114,6 +114,7 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
             contributor.Services.StageRequestFileForTestAsync(requestId, content, "notes.txt", null, default));
 
         Assert.Empty(blobs.Keys);
+        Assert.Equal(0, blobs.DeleteIfExistsAttempts);
         Assert.False(await contributor.Db.Files.AnyAsync(file => file.CaveId == null));
         Assert.False(await contributor.Db.CaveChangeRequestStagedFiles.AnyAsync());
     }

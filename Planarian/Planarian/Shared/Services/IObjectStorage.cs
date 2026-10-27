@@ -10,7 +10,11 @@ public sealed record StoredObjectReadResult(
 
 public interface IObjectStorage
 {
-    Task PutAsync(StorageObjectAddress address, Stream content, string? contentType,
+    /// <summary>
+    /// Creates content at an application-allocated immutable address. Implementations must fail
+    /// if that address already exists; they must never overwrite existing content.
+    /// </summary>
+    Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken);
 
     Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,

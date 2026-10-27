@@ -61,9 +61,9 @@ The most important change is therefore not one new screen or table. It is a new 
 | Mutation boundary | Cave fields, Files, and GeoJSON had separate mutation paths | Supported target is one desired-state Cave aggregate | One save maps to at most one revision |
 | Suggestions | No complete immutable multi-version proposal architecture | `CaveChangeRequest` + immutable `CaveProposalVersion` + review events | Reviewer can know exactly what was proposed |
 | Proposal approval | N/A as current architecture | Approval publishes exact selected proposal through Cave aggregate publication | Avoids a second Cave-writing implementation |
-| Files | `FileName` / optional `DisplayName`; storage lifecycle tied more directly to blob mechanics | `Name` + immutable `Extension`; staged authoring; upload-once publication; retained historical object locator | Separates user metadata, current relationship, and byte lifetime |
+| Files | `FileName` / optional `DisplayName`; storage lifecycle tied more directly to blob mechanics | `Name` + immutable `Extension`; staged authoring; upload-once publication; durable post-commit removal cleanup | Separates user metadata, current relationship, and byte lifetime |
 | Object storage | Cave/File code more Azure-shaped | Cave/File publication uses `IObjectStorage` with `AzureBlobObjectStorage` adapter | Reduces provider leakage in new lifecycle |
-| Removed published Files | Removing current File could leave no narrow provider-neutral historical locator | `RetainedCaveFileObject` preserves exact published byte address | History can retain byte identity without keeping live File relationships |
+| Removed published Files | Payload cleanup was not part of unified Cave revision semantics | Revision keeps File metadata; `StorageCleanupTarget(CaveAssetRemoval)` safely deletes bytes after commit | Files now match line plots: history records what existed without treating deleted payloads as permanent historical content |
 | Line plots | `CaveGeoJson` current state; standalone replacement path | Still `CaveGeoJson` JSONB, but stable logical IDs participate in aggregate revisions/proposals | Adds history without forcing a GIS storage redesign |
 | Line-plot history | No revision representation | Published revision stores ID/name/content hash; proposal stores exact GeoJSON | History stays bounded while proposal remains reproducible |
 | Cave imports | One large service mixed parsing, planning, mutation, dry-run transaction behavior | Parser + planning repository + pure immutable planner + execution repository | Separates read-only preview from committed write path |
@@ -73,7 +73,7 @@ The most important change is therefore not one new screen or table. It is a new 
 | Tag/County administration | Mostly reference administration | Dedicated administration/lock repositories publish revisions where remaps change Cave semantics | Shared references cannot silently bypass history |
 | Tenant safety | Existing account/query-filter model | Revision/proposal/import paths add fail-closed tenant filters and explicit account qualification | New history/workflow data stays account-scoped |
 | Cave hard delete | Deleted current aggregate | Blocks unresolved proposals, writes Delete revision/tombstone, cleans external objects after commit | Preserves final history and safer cross-system ordering |
-| Account reset | Relational + storage deletion existed | Large explicit reset graph includes revision/proposal/retained data; relational commit precedes external cleanup | New history/storage tables are included in purge semantics |
+| Account reset | Relational + storage deletion existed | Large explicit reset graph includes revision/proposal/cleanup data; relational commit precedes external cleanup | New history/storage tables are included in purge semantics |
 | Revision UI | No full revision/change-request UI | History, diff presentation, mine/review queues, suggest/revise/review pages | Makes architecture visible to users |
 | Unsaved Cave authoring | Less complete protection around new asset-heavy forms | Shared unsaved-change protection for direct/proposal authoring | Staged asset changes are treated as real form state |
 | PDF/file streaming | Existing viewer/download behavior | Request/throttle/file response work includes custom PDF stream session header and stronger response policy | Shared File serving behavior changed outside revision core |
@@ -212,7 +212,7 @@ upload
   → Save/approval associates same File/object with Cave
 ~~~
 
-A File removed from current Cave state no longer needs to remain as a live File row solely to preserve historical bytes. `RetainedCaveFileObject` keeps the private historical object locator instead.
+A File removed from current Cave state is no longer retained as historical payload. The revision preserves its ID/name/type metadata; the removal transaction queues its object address as `StorageCleanupTarget(CaveAssetRemoval)`, and physical deletion runs only after commit. A failed delete leaves retryable cleanup debt.
 
 See [Files and storage](docs/architecture/files-and-storage.md).
 
@@ -359,7 +359,7 @@ A Cave hard delete now:
 5. deletes current aggregate state;
 6. writes a Delete revision;
 7. commits PostgreSQL;
-8. deletes current/retained external objects after commit.
+8. deletes current external objects after commit.
 
 Sync-import deletion follows equivalent principles in a bulk executor.
 
@@ -374,7 +374,7 @@ The completion branch adds durable data that Reset Account must remove:
 - proposal versions;
 - review events;
 - request staged-file associations;
-- retained File-object locators;
+- storage-cleanup debt;
 - import revision provenance.
 
 `AccountRepository.ExecuteResetAsync` now explicitly removes that graph inside the relational reset transaction.
@@ -503,7 +503,7 @@ If you see these names, they are central to the branch rather than incidental he
 
 - IObjectStorage
 - AzureBlobObjectStorage
-- RetainedCaveFileObject
+- StorageCleanupTarget
 - StagedCaveFilePublication
 
 ### Imports
@@ -567,7 +567,7 @@ Read:
 2. FileService.StageAuthoringFile
 3. IObjectStorage / AzureBlobObjectStorage
 4. File entity
-5. RetainedCaveFileObject
+5. StorageCleanupTarget
 6. File portion of CaveService.SaveCaveAsync
 
 ### Slice D — Line plots
@@ -617,7 +617,8 @@ Use the ADRs:
 - [Why one aggregate Cave save?](docs/architecture/decisions/0002-aggregate-cave-publication.md)
 - [Why immutable proposal versions?](docs/architecture/decisions/0003-immutable-proposal-versions.md)
 - [Why upload Files once?](docs/architecture/decisions/0004-upload-once-file-storage.md)
-- [Why keep removed File bytes without keeping the File row?](docs/architecture/decisions/0005-retained-file-objects.md)
+- [Why was retained-File storage superseded?](docs/architecture/decisions/0005-retained-file-objects.md)
+- [Why remove Cave asset payloads after publication?](docs/architecture/decisions/0007-cave-asset-removal-cleanup.md)
 - [Why do imports have a separate publisher?](docs/architecture/decisions/0006-bulk-import-publication.md)
 
 ## What remains unfinished or not fully validated

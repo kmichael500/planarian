@@ -165,9 +165,6 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
                     ("Id","AccountId","CaveId","PreviousRevisionId","Source","Operation","SnapshotSchemaVersion","SnapshotJson","ImportBatchId","CreatedOn")
                 values ('revimport1','mainacct01','maincave01','revbase001','Import','Update',1,'{}'::jsonb,'import0001',now());
 
-                insert into "RetainedCaveFileObjects"
-                    ("Id","AccountId","CaveId","FileId","StoragePartition","StorageKey","CreatedOn")
-                values ('retain0001','mainacct01','maincave01','removed001','main','retained/removed001.pdf',now());
                 """, connection);
             await seedCommand.ExecuteNonQueryAsync();
         }
@@ -192,6 +189,82 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         Assert.True(await reader.ReadAsync());
         for (var index = 0; index < 9; index++)
             Assert.True(reader.GetBoolean(index));
+    }
+
+
+    [Fact]
+    public async Task StorageCleanupMigrationPreservesResetDebtAndConvertsRetainedFilesToAssetCleanupDebt()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(StorageCleanupMigrationPreservesResetDebtAndConvertsRetainedFilesToAssetCleanupDebt));
+        var previous = database.GetMigrationNames().Single(migration =>
+            migration.EndsWith("_AccountResetCleanupOutbox", StringComparison.Ordinal));
+        await database.MigrateAsync(previous);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "AccountResetCleanupTargets"
+                    ("Id","AccountId","StoragePartition","StorageKey","IsContainer","CreatedOn")
+                values ('sameid0001','mainacct01','portable-store','reset/pending',false,now());
+
+                insert into "RetainedCaveFileObjects"
+                    ("Id","AccountId","CaveId","FileId","StoragePartition","StorageKey","CreatedOn")
+                values ('sameid0001','mainacct01','maincave01','removed001','portable-store','files/removed.pdf',now());
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await database.MigrateAsync(null);
+
+        await using var verify = new NpgsqlConnection(database.ConnectionString);
+        await verify.OpenAsync();
+        await using (var rows = new NpgsqlCommand("""
+            select "Purpose", "StoragePartition", "StorageKey"
+            from "StorageCleanupTargets"
+            where "AccountId"='mainacct01'
+            order by "Purpose" collate "C", "StorageKey" collate "C"
+            """, verify))
+        await using (var reader = await rows.ExecuteReaderAsync())
+        {
+            var actual = new List<(string Purpose, string Partition, string Key)>();
+            while (await reader.ReadAsync())
+                actual.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            Assert.Equal(
+            [
+                ("AccountReset", "portable-store", "reset/pending"),
+                ("CaveAssetRemoval", "portable-store", "files/removed.pdf")
+            ], actual);
+        }
+
+        await using var removed = new NpgsqlCommand(
+            "select to_regclass('public.\"RetainedCaveFileObjects\"') is null", verify);
+        Assert.True((bool)(await removed.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task StorageCleanupMigrationRefusesDowngradeWhileAssetCleanupDebtExists()
+    {
+        await using var database = await fixture.CreateUnmigratedDatabaseAsync(
+            nameof(StorageCleanupMigrationRefusesDowngradeWhileAssetCleanupDebtExists));
+        var migrations = database.GetMigrationNames().ToList();
+        var previous = migrations.Single(migration =>
+            migration.EndsWith("_AccountResetCleanupOutbox", StringComparison.Ordinal));
+        await database.MigrateAsync(null);
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var seed = new NpgsqlCommand("""
+                insert into "StorageCleanupTargets"
+                    ("Id","AccountId","StoragePartition","StorageKey","IsContainer","Purpose","CreatedOn")
+                values ('cleanup001','mainacct01','portable-store','files/pending.pdf',false,'CaveAssetRemoval',now());
+                """, connection);
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await Assert.ThrowsAsync<PostgresException>(() => database.MigrateAsync(previous));
     }
 
 

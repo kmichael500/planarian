@@ -31,6 +31,9 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Caves.Services;
 
+internal sealed record CaveSaveResult(
+    CaveMutationResult Mutation, IReadOnlyList<string> StorageCleanupTargetIds);
+
 public class CaveService : ServiceBase<CaveRepository>
 {
     private readonly FileService _fileService;
@@ -493,31 +496,43 @@ public class CaveService : ServiceBase<CaveRepository>
         return memoryStream.ToArray();
     }
 
-    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken) =>
-        (await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId, null, null, null,
-            null, cancellationToken)).CaveId;
+    public async Task<string> AddCave(AddCaveVm values, CancellationToken cancellationToken)
+    {
+        // Retry cleanup debt from already-committed removals before opening this publication transaction.
+        await _fileService.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        var result = await SaveCaveAsync(values, CaveRevisionSource.ManagerEdit, null, values.ExpectedRevisionId,
+            null, null, null, null, requireOwnedTransaction: true, cancellationToken);
+        await _fileService.CleanupAssetRemovalTargetsAsync(result.StorageCleanupTargetIds, CancellationToken.None);
+        return result.Mutation.CaveId;
+    }
 
-    internal Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
+    internal Task<CaveSaveResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
         string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
         IReadOnlySet<string> authorizedNewEntranceIds, IReadOnlySet<string> authorizedNewLinePlotIds,
         CavePeoplePublicationContext peoplePublicationContext, CancellationToken cancellationToken) =>
         SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, authorizedNewEntranceIds, authorizedNewLinePlotIds, peoplePublicationContext,
-            cancellationToken);
+            requireOwnedTransaction: false, cancellationToken);
 
-    public Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
+    // Transaction-joining overload used by the approval workflow and integration rollback coverage.
+    // It is intentionally not part of CaveService's public application API.
+    internal async Task<CaveMutationResult> ApproveChangeRequestAsync(AddCaveVm values, string baseRevisionId,
         string changeRequestId, IReadOnlyList<StagedCaveFilePublication> stagedFilePublications,
-        CancellationToken cancellationToken) =>
-        SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
+        CancellationToken cancellationToken)
+    {
+        var result = await SaveCaveAsync(values, CaveRevisionSource.UserSubmission, changeRequestId, baseRevisionId,
             stagedFilePublications, new HashSet<string>(StringComparer.Ordinal),
-            new HashSet<string>(StringComparer.Ordinal), null, cancellationToken);
+            new HashSet<string>(StringComparer.Ordinal), null, requireOwnedTransaction: false, cancellationToken);
+        return result.Mutation;
+    }
 
-    private async Task<CaveMutationResult> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
+    private async Task<CaveSaveResult> SaveCaveAsync(AddCaveVm values, CaveRevisionSource revisionSource,
         string? changeRequestId, string? expectedRevisionId,
         IReadOnlyList<StagedCaveFilePublication>? stagedFilePublications,
         IReadOnlySet<string>? authorizedNewEntranceIds,
         IReadOnlySet<string>? authorizedNewLinePlotIds,
-        CavePeoplePublicationContext? peoplePublicationContext, CancellationToken cancellationToken)
+        CavePeoplePublicationContext? peoplePublicationContext, bool requireOwnedTransaction,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
@@ -552,7 +567,8 @@ public class CaveService : ServiceBase<CaveRepository>
             }
         }
 
-        return await _caveMutationCoordinator.ExecuteTransactionAsync(async _ =>
+        var cleanupTargets = new List<StorageCleanupTarget>();
+        async Task<CaveMutationResult> PublishAsync(CancellationToken _)
         {
             var entity = isNew ? new Cave { Id = IdGenerator.Generate() } : await Repository.GetAsync(values.Id);
 
@@ -899,7 +915,9 @@ public class CaveService : ServiceBase<CaveRepository>
 
             foreach (var fileEntity in entity.Files.Where(file => !desiredFileIds.Contains(file.Id)).ToList())
             {
-                await Repository.RetainPublishedFileObjectAsync(fileEntity, entity.Id, cancellationToken);
+                var cleanupTarget = await Repository.QueuePublishedFileObjectCleanupAsync(
+                    fileEntity, entity.Id, cancellationToken);
+                if (cleanupTarget is not null) cleanupTargets.Add(cleanupTarget);
                 entity.Files.Remove(fileEntity);
                 Repository.Delete(fileEntity);
             }
@@ -926,7 +944,16 @@ public class CaveService : ServiceBase<CaveRepository>
             }
 
             return mutationResult;
-        }, cancellationToken);
+        }
+
+        // Direct manager edits must own the transaction so post-save object cleanup is truly post-commit.
+        // Proposal approval deliberately joins the outer approval transaction; its caller runs cleanup only after commit.
+        var mutation = requireOwnedTransaction
+            ? await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(PublishAsync, cancellationToken)
+            : await _caveMutationCoordinator.ExecuteTransactionAsync(PublishAsync, cancellationToken);
+
+        return new CaveSaveResult(mutation, cleanupTargets
+            .Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList());
     }
 
     private sealed record PeopleTagBinding(string Id, TagType? NewTag);

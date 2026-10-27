@@ -61,11 +61,12 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         await using var database = await fixture.CreateDatabaseAsync(nameof(PendingCleanupPermitsReadsButRejectsMutatingRequests));
         var account = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var context = database.CreateDbContext("a", account.AccountId);
-        context.AccountResetCleanupTargets.Add(new Planarian.Model.Database.Entities.RidgeWalker.AccountResetCleanupTarget
+        context.StorageCleanupTargets.Add(new Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupTarget
         {
             AccountId = account.AccountId,
             StoragePartition = "portable-account-objects",
-            StorageKey = "objects/pending-reset"
+            StorageKey = "objects/pending-reset",
+            Purpose = Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose.AccountReset
         });
         await context.SaveChangesAsync();
 
@@ -92,5 +93,42 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         await middleware.InvokeAsync(http, context.RequestUser, maintenance, repo);
         Assert.True(executed);
     }
+
+    [Fact]
+    public async Task PendingCaveAssetCleanupDoesNotBlockUnrelatedAccountWrites()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(PendingCaveAssetCleanupDoesNotBlockUnrelatedAccountWrites));
+        var account = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        await using var context = database.CreateDbContext("a", account.AccountId);
+        context.StorageCleanupTargets.Add(new Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupTarget
+        {
+            AccountId = account.AccountId,
+            StoragePartition = "portable-account-objects",
+            StorageKey = "objects/pending-asset-delete",
+            Purpose = Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose.CaveAssetRemoval
+        });
+        await context.SaveChangesAsync();
+
+        var maintenance = new AccountMaintenanceLockRepository(new ServerOptions
+        {
+            SqlConnectionString = database.ConnectionString
+        });
+        var executed = false;
+        var middleware = new AccountMaintenanceMiddleware(_ =>
+        {
+            executed = true;
+            return Task.CompletedTask;
+        });
+        var http = new DefaultHttpContext();
+        http.Request.Path = "/api/caves";
+        http.Request.Method = "POST";
+
+        await middleware.InvokeAsync(http, context.RequestUser, maintenance,
+            new AccountRepository(context, context.RequestUser));
+
+        Assert.True(executed);
+    }
+
 
 }

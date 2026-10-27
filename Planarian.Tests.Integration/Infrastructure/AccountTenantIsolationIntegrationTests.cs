@@ -57,6 +57,33 @@ public sealed class AccountTenantIsolationIntegrationTests(PostgresTestServer fi
     }
 
     [Fact]
+    public async Task StorageCleanupTargetCannotBeWrittenForAnotherAccount()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(StorageCleanupTargetCannotBeWrittenForAnotherAccount));
+        var accountA = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'a');
+        var accountB = await AccountTestDataFactory.CreateAccountWithCountyAsync(database, 'b');
+
+        await using (var db = database.CreateDbContext("account-a-admin", accountA.AccountId))
+        {
+            db.StorageCleanupTargets.Add(new StorageCleanupTarget
+            {
+                AccountId = accountB.AccountId,
+                StoragePartition = "foreign-storage",
+                StorageKey = "objects/files/foreign",
+                Purpose = StorageCleanupPurpose.CaveAssetRemoval
+            });
+
+            var exception = await Assert.ThrowsAsync<ApiException>(() => db.SaveChangesAsync());
+            Assert.Equal(403, exception.StatusCode);
+        }
+
+        await using var verify = database.CreateDbContext("verify", accountB.AccountId);
+        Assert.False(await verify.StorageCleanupTargets.IgnoreQueryFilters().AnyAsync(row =>
+            row.AccountId == accountB.AccountId && row.StorageKey == "objects/files/foreign"));
+    }
+
+    [Fact]
     public async Task AccountACannotUpdateAccountBCountyById()
     {
         await using var database = await fixture.CreateDatabaseAsync(nameof(AccountACannotUpdateAccountBCountyById));

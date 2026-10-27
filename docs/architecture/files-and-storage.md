@@ -1,6 +1,6 @@
 # Files and storage
 
-This page explains why File metadata lives in PostgreSQL while File bytes live in object storage, and how the completion branch changed the File lifecycle.
+This page explains why File metadata lives in PostgreSQL while File bytes live in object storage, and how Cave-owned Files participate in the same revision semantics as line plots without forcing both payload types into the same storage model.
 
 ## Two durability systems
 
@@ -9,13 +9,11 @@ A Cave File spans:
 - **PostgreSQL** — identity, account ownership, Cave association, filename metadata, File type, staging expiration;
 - **object storage** — byte content that the Cave/File lifecycle treats as immutable once written to its allocated address.
 
-Those systems cannot participate in one atomic transaction.
-
-The design therefore chooses an ordering where relational truth remains authoritative and destructive external cleanup happens after relational commit.
+Those systems cannot participate in one atomic transaction. Relational Cave state and its revision therefore commit first; destructive external cleanup happens only afterward.
 
 ## Storage boundary
 
-For the affected Cave/File publication lifecycle:
+For the affected Cave/File lifecycle:
 
 ~~~mermaid
 flowchart LR
@@ -24,139 +22,167 @@ flowchart LR
     Azure["AzureBlobObjectStorage"]
     Blob["Azure Blob Storage"]
 
-    FileService -->|"Put / Open / DeleteIfExists"| Boundary
+    FileService -->|"Create / Open / DeleteIfExists"| Boundary
     Boundary -->|"adapter implementation"| Azure
     Azure -->|"Azure SDK"| Blob
 ~~~
 
-StorageObjectAddress contains:
+`StorageObjectAddress` contains:
 
-- Partition — logical namespace; Azure maps it to a container;
-- Key — object key within that partition.
+- `Partition` — logical namespace; Azure maps it to a container;
+- `Key` — object key within that partition.
 
-The current Azure adapter lowercases the partition before constructing the Blob container client.
+The current Azure adapter lowercases the partition before constructing the Blob container client. This abstraction is intentionally scoped; older archive/photo/trip/storage paths may still use Azure-specific APIs directly.
 
-This abstraction is intentionally scoped. Some older archive/photo/trip/storage paths still use BlobService or Azure SDK types directly.
+The application uses Azure's delete-if-exists operation for object cleanup. Planarian does not create Blob snapshots in this lifecycle, but provider policies can still affect physical deletion. For example, Azure requires snapshots to be deleted with the base blob when snapshots exist, and immutability/retention features can reject or defer deletion. Such provider failures leave the durable cleanup target pending rather than falsifying relational Cave state. Application history policy therefore means “do not deliberately retain removed payloads as Cave history,” not “bypass storage-provider retention guarantees.”
 
-## New authoring File lifecycle
+## Cave asset semantics
 
-StageAuthoringFile allocates the File ID before upload and uses a stable application-assigned object key independent of staging/published state:
+Files and line plots are different storage implementations of the same **Cave-owned asset lifecycle**:
+
+- stable identity while current;
+- user-facing name/metadata;
+- add/change/remove through aggregate Cave publication;
+- revision history records the semantic change;
+- successful removal does not preserve the old payload indefinitely.
+
+The implementation deliberately does **not** introduce a generic `CaveAsset` persistence hierarchy. File bytes live in object storage; line-plot GeoJSON currently lives in `CaveGeoJson` JSONB. Shared code is limited to behavior that is truly common, such as stable-ID revision diffing and post-commit external-storage cleanup.
+
+Published history is lightweight:
+
+- File revisions preserve stable File ID, historical `Name`, `Extension`, and File-type metadata;
+- line-plot revisions preserve stable ID, historical name, and deterministic content hash;
+- neither published-history shape contains the removed payload or a private storage locator.
+
+Immutable proposal versions still retain the payload necessary to review exactly what was proposed. File proposals reference staged File objects; line-plot proposals currently embed exact GeoJSON. That storage-specific difference is intentional until line plots are actually migrated into the File model.
+
+## Authoring File lifecycle
+
+`StageAuthoringFile` allocates the File ID before upload and uses a stable application-assigned object key independent of staging/published state:
 
 ~~~text
 objects/files/{fileId}
 ~~~
 
-The uploaded extension is metadata, not part of object identity. The application allocates a unique address and treats it as immutable for the File lifecycle. `AzureBlobObjectStorage.PutAsync` does not itself expose a separate write-if-absent contract, which is why provider-level immutability/retry behavior remains an explicit Azurite validation gap.
+The uploaded extension is metadata, not part of object identity. The application allocates a unique address and treats it as immutable for the File lifecycle.
+
+`IObjectStorage.CreateAsync` is intentionally **create-only**. The Azure adapter supplies an `If-None-Match: *` condition so a generated-ID collision or future retry/path bug cannot overwrite bytes already stored at that address. If object creation itself fails, relational persistence does not proceed. Compensation deletes run only after this request has positively completed object creation; a create collision never deletes the pre-existing object.
 
 ~~~mermaid
 stateDiagram-v2
     [*] --> Staged: upload once (CaveId null, ExpiresOn set)
     Staged --> Published: Save / proposal approval (same File ID and object address)
     Staged --> Deleted: expires / abandoned before publication
-    Published --> RetainedLocator: ordinary revisioned removal; bytes stay
-    Published --> Deleted: explicit hard purge
-    RetainedLocator --> Deleted: explicit hard purge
+    Published --> CleanupQueued: ordinary revisioned removal
+    CleanupQueued --> Deleted: post-commit object cleanup succeeds
+    CleanupQueued --> CleanupQueued: external delete fails; durable retry remains
 ~~~
 
 ### Staged
 
 Relational shape:
 
-- AccountId = current account;
-- CaveId = null;
-- ExpiresOn = roughly 10-day cleanup deadline;
-- BlobContainer/BlobKey store the provider address;
+- `AccountId` = current account;
+- `CaveId` = null;
+- `ExpiresOn` = roughly 10-day cleanup deadline;
+- `BlobContainer`/`BlobKey` store the provider address;
 - object already exists.
 
-The upload happens **before** the short relational insert transaction so a large external write does not hold a database transaction open.
-
-If the relational insert fails, the service best-effort deletes the newly written object.
+The upload happens **before** the short relational insert transaction so a large external write does not hold a database transaction open. If the relational insert fails, the service best-effort deletes the newly written object.
 
 ### Published
 
-Publication changes relational lifecycle:
+Publication changes relational lifecycle only:
 
 - same File ID;
 - same storage address;
-- CaveId = target Cave;
-- ExpiresOn = null.
+- `CaveId` = target Cave;
+- `ExpiresOn` = null.
 
-There is no staging-to-published copy/rename/re-upload for the new authoring flow.
+There is no staging-to-published copy/rename/re-upload for the aggregate authoring flow.
 
 ### Removed from current Cave state
 
-Ordinary revisioned removal is not physical destruction.
+Ordinary revisioned removal is payload-destructive, but the order is fail-safe:
 
-Before deleting the live File row, CaveRepository records:
+1. validate the current File belongs to the current account/Cave;
+2. inside the same relational transaction, create a `StorageCleanupTarget` with purpose `CaveAssetRemoval` for the exact object address;
+3. delete the live File row/current Cave membership;
+4. publish the Cave revision without that File;
+5. commit PostgreSQL;
+6. only after commit, attempt `DeleteIfExists` on the object;
+7. remove the cleanup target only after deletion succeeds, the object is already absent, or the address is proven to belong to a live File and therefore must not be deleted.
 
-- AccountId;
-- CaveId;
-- historical FileId;
-- StoragePartition;
-- StorageKey.
+If external deletion fails, the File is still correctly removed from current Cave state and revision history remains correct. The durable cleanup target stays for retry and the failure is logged as a structured warning. Ordinary `CaveAssetRemoval` debt does **not** trigger the account-wide write block used for failed Reset Account cleanup.
 
-in RetainedCaveFileObject.
+Cleanup is attempted immediately after the owning publication commits. Older pending asset-removal debt is also retried in a **bounded** batch when later Cave/File authoring activity occurs. There is currently no dedicated background relay for ordinary asset-removal debt, so an inactive account can retain failed cleanup debt until later activity or another explicit destructive workflow (such as Reset Account) assumes responsibility. This is durable/retryable cleanup, not a guarantee of time-bounded physical deletion.
 
-The File row is then removed so current-domain FileTypeTag/Cave relationships no longer remain alive.
+The historical revision still knows that the File existed and retains its historical filename/type metadata. It does not promise that the old bytes remain downloadable.
 
-The object bytes remain.
+## StorageCleanupTarget
 
-### Hard purge
+`StorageCleanupTarget` is an outbox for **post-commit external cleanup**, not historical content storage.
 
-Explicit irreversible Cave hard purge removes both current and retained relational locators, commits that relational result, and only then best-effort deletes the de-duplicated object addresses. Account Reset follows the same commit-before-cleanup principle for captured File objects, but then also deletes the whole account container; that final container delete can currently throw after the relational reset has committed.
+Relevant fields:
 
-## Why RetainedCaveFileObject is not a File version
+- `AccountId`;
+- `StoragePartition`;
+- `StorageKey`;
+- `IsContainer`;
+- `Purpose`.
 
-It deliberately has no live-domain foreign key to File, Cave, or TagType.
+Current purposes:
 
-Its job is narrow: preserve a private provider-neutral locator from a historical stable File ID to the exact published bytes after the current File row no longer exists.
+- `CaveAssetRemoval` — ordinary removed File payload cleanup;
+- `AccountReset` — stronger Reset Account cleanup debt.
 
-Historical user-facing metadata belongs in CavePublishedSnapshotV1.
+The purpose distinction matters. Reset Account cleanup can block subsequent account writes until the reset's external cleanup is resolved. Ordinary asset-removal debt is retryable but does not freeze unrelated writes.
 
-The retained locator is not exposed in revision JSON.
+Reset Account also captures pending `CaveAssetRemoval` addresses before its relational purge and converts responsibility for them into its own reset cleanup targets. That prevents unresolved ordinary cleanup from being orphaned by account reset.
+
+## Line-plot payload deletion
+
+Line plots do not need the external cleanup outbox because `CaveGeoJson` lives in the same PostgreSQL transaction as Cave publication. Removing a line plot deletes its current `CaveGeoJson` row and publishes the revision atomically.
+
+This is a storage-level difference, not a user-facing lifecycle difference: both Files and line plots disappear from current state after publication while historical revisions retain only lightweight semantic metadata.
 
 ## File metadata
 
-File now separates:
+File separates:
 
-- Name — editable filename stem;
-- Extension — uploaded-file extension;
-- FileTypeTagId — current type reference.
+- `Name` — editable filename stem;
+- `Extension` — uploaded-file extension;
+- `FileTypeTagId` — current type reference.
 
 The persistence model enforces filename/extension constraints so malformed names cannot be persisted only because they bypassed one UI path.
 
 ## Proposal Files
 
-A proposal version records exact File intent.
+A proposal version records exact File intent. For `PublishStaged` Files:
 
-For PublishStaged Files:
-
-1. staged File is already uploaded;
-2. proposal version records stable File ID and metadata intent;
+1. the staged File is already uploaded;
+2. the proposal version records stable File ID and metadata intent;
 3. approval verifies the external object exists;
 4. approval relationally associates that File with the Cave;
 5. no copy occurs;
 6. unused/discarded staged objects may be cleaned after commit.
 
-## Cleanup behavior
+If approval removes a currently published File, its `CaveAssetRemoval` cleanup target is created inside the approval transaction but object deletion does not run until the **outer approval transaction has committed**.
 
-Expired never-published staged Files can be physically deleted because no published revision ever depended on them.
+## Other destructive paths
 
-Published File bytes are retained across ordinary removal.
+Explicit Cave hard deletion, bulk-import deletion, account reset, abandoned staging, and archive cleanup have their own orchestration rules. They must all preserve the same fundamental ordering: do not destroy external bytes before the relational mutation that makes them unreachable has committed.
 
-External deletion is generally best-effort where relational state has already committed, because PostgreSQL cannot roll back Blob Storage.
-
-## Validation ownership
-
-Provider-contract tests, retry/immutability behavior, and the operational policy for abandoned staging are validation/operations concerns rather than additional architecture rules. Their current status belongs in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md) so this lifecycle description stays stable as tests are added.
+Account Reset uses durable `StorageCleanupTarget` rows with purpose `AccountReset`. Some older specialized deletion paths still use post-commit best-effort external cleanup; their validation status is tracked in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md).
 
 ## Read the code in this order
 
-1. Planarian/Planarian/Modules/Files/Controllers/FileController.cs
-2. Planarian/Planarian/Modules/Files/Services/FileService.cs
-3. Planarian/Planarian/Shared/Services/IObjectStorage.cs
-4. Planarian/Planarian/Shared/Services/AzureBlobObjectStorage.cs
-5. Planarian/Planarian.Model/Database/Entities/RidgeWalker/File.cs
-6. Planarian/Planarian.Model/Database/Entities/RidgeWalker/RetainedCaveFileObject.cs
-7. Planarian/Planarian/Modules/Caves/Repositories/CaveRepository.cs
-8. File handling inside CaveService.SaveCaveAsync
+1. `Planarian/Planarian/Modules/Files/Controllers/FileController.cs`
+2. `Planarian/Planarian/Modules/Files/Services/FileService.cs`
+3. `Planarian/Planarian/Shared/Services/IObjectStorage.cs`
+4. `Planarian/Planarian/Shared/Services/AzureBlobObjectStorage.cs`
+5. `Planarian/Planarian.Model/Database/Entities/RidgeWalker/File.cs`
+6. `Planarian/Planarian.Model/Database/Entities/RidgeWalker/StorageCleanupTarget.cs`
+7. `Planarian/Planarian/Modules/Caves/Repositories/CaveRepository.cs`
+8. File handling inside `CaveService.SaveCaveAsync`
+9. [ADR 0007 — Cave asset removal cleanup](decisions/0007-cave-asset-removal-cleanup.md)

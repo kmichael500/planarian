@@ -556,54 +556,6 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("Accounts");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountResetCleanupTarget", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("AccountId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsContainer")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StorageKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("StoragePartition")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("AccountId", "StoragePartition", "StorageKey", "IsContainer")
-                        .IsUnique();
-
-                    b.ToTable("AccountResetCleanupTargets");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.AccountState", b =>
                 {
                     b.Property<string>("AccountId")
@@ -2215,61 +2167,6 @@ namespace Planarian.Migrations.Migrations
                     b.ToTable("PhysiographicProvinceTags");
                 });
 
-            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.RetainedCaveFileObject", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("AccountId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CaveId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime>("CreatedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FileId")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<DateTime?>("ModifiedOn")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StorageKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("StoragePartition")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId", "CaveId");
-
-                    b.HasIndex("AccountId", "FileId")
-                        .IsUnique();
-
-                    b.ToTable("RetainedCaveFileObjects");
-                });
-
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.State", b =>
                 {
                     b.Property<string>("Id")
@@ -2306,6 +2203,59 @@ namespace Planarian.Migrations.Migrations
                     b.HasIndex("ModifiedByUserId");
 
                     b.ToTable("States");
+                });
+
+            modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupTarget", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsContainer")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("ModifiedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StoragePartition")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId", "Purpose");
+
+                    b.HasIndex("AccountId", "StoragePartition", "StorageKey", "IsContainer", "Purpose")
+                        .IsUnique();
+
+                    b.ToTable("StorageCleanupTargets");
                 });
 
             modelBuilder.Entity("Planarian.Model.Database.Entities.RidgeWalker.UserPermission", b =>

@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Planarian.Model.Database;
+using Planarian.Model.Database.Entities.RidgeWalker;
 using Planarian.Model.Shared;
 using Planarian.Modules.Files.Services;
 using Planarian.Shared.Base;
+using Planarian.Shared.Services;
 using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Files.Repositories;
@@ -199,6 +201,44 @@ public class FileRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return await DbContext.Files.AnyAsync(e =>
             e.CaveId == caveId && e.Name == name && e.Extension == extension &&
             e.AccountId == RequestUser.AccountId);
+    }
+
+    public Task<List<StorageCleanupTarget>> GetStorageCleanupTargetsAsync(
+        StorageCleanupPurpose purpose, IEnumerable<string>? targetIds, int maxCount,
+        CancellationToken cancellationToken)
+    {
+        var ids = targetIds?.Distinct(StringComparer.Ordinal).ToArray();
+        if (ids is { Length: 0 }) return Task.FromResult(new List<StorageCleanupTarget>());
+        var query = DbContext.StorageCleanupTargets.AsNoTracking()
+            .Where(row => row.AccountId == RequestUser.AccountId && row.Purpose == purpose);
+        if (ids is not null) query = query.Where(row => ids.Contains(row.Id));
+        return query.OrderBy(row => row.CreatedOn).ThenBy(row => row.Id)
+            .Take(maxCount).ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CompleteStorageCleanupTargetsAsync(StorageCleanupPurpose purpose,
+        IEnumerable<string> targetIds, CancellationToken cancellationToken)
+    {
+        var ids = targetIds.Distinct(StringComparer.Ordinal).ToArray();
+        if (ids.Length == 0) return Task.FromResult(0);
+        return DbContext.StorageCleanupTargets
+            .Where(row => row.AccountId == RequestUser.AccountId && row.Purpose == purpose && ids.Contains(row.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsStorageObjectReferencedByLiveFileAsync(StorageObjectAddress address,
+        CancellationToken cancellationToken)
+    {
+        var ownReference = await DbContext.Files.AnyAsync(file =>
+            file.AccountId == RequestUser.AccountId && file.BlobContainer != null && file.BlobKey != null &&
+            file.BlobContainer.ToLower() == address.Partition.ToLower() && file.BlobKey == address.Key,
+            cancellationToken);
+        if (ownReference) return true;
+
+        return await DbContext.Files.IgnoreQueryFilters().AnyAsync(file =>
+            file.AccountId != RequestUser.AccountId && file.BlobContainer != null && file.BlobKey != null &&
+            file.BlobContainer.ToLower() == address.Partition.ToLower() && file.BlobKey == address.Key,
+            cancellationToken);
     }
 }
 

@@ -151,7 +151,7 @@ Sync import can plan Cave deletion.
 
 Before delete execution, open change requests block hard deletion.
 
-The executor gathers current and retained File object addresses, removes the relational graph inside the import transaction, publishes delete revisions, commits, and lets ImportService perform best-effort external object cleanup afterward.
+The executor gathers current live File object addresses, removes the relational graph inside the import transaction, publishes delete revisions, commits, and lets ImportService perform best-effort external object cleanup afterward. Pending ordinary asset-cleanup debt is independent operational state rather than historical Cave content.
 
 ## Lock ordering
 

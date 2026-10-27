@@ -59,14 +59,13 @@ internal static class CurrentMainV32DatabaseCensus
 
     internal static readonly string[] CompletionOwnedTables =
     [
-        "AccountResetCleanupTargets",
+        "StorageCleanupTargets",
         "CaveChangeRequestReviewEvents",
         "CaveChangeRequestStagedFiles",
         "CaveChangeRequests",
         "CaveImportBatches",
         "CaveProposalVersions",
-        "CaveRevisions",
-        "RetainedCaveFileObjects"
+        "CaveRevisions"
     ];
 
     internal static readonly string[] MigrationOwnedTables =

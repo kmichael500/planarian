@@ -26,8 +26,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         try
         {
             var fileObjects = await GetFileObjectAddressesForResetAsync(cancellationToken);
-            var existing = await DbContext.AccountResetCleanupTargets.AsNoTracking()
-                .Where(row => row.AccountId == RequestUser.AccountId)
+            var existing = await DbContext.StorageCleanupTargets.AsNoTracking()
+                .Where(row => row.AccountId == RequestUser.AccountId &&
+                              row.Purpose == StorageCleanupPurpose.AccountReset)
                 .Select(row => new { row.StoragePartition, row.StorageKey, row.IsContainer })
                 .ToListAsync(cancellationToken);
             var known = existing.Select(row => (row.StoragePartition, row.StorageKey, row.IsContainer))
@@ -38,19 +39,20 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                 if (string.Equals(item.Partition, RequestUser.AccountContainerName,
                         StringComparison.OrdinalIgnoreCase)) continue;
                 if (known.Add((item.Partition, item.Key, false)))
-                    DbContext.AccountResetCleanupTargets.Add(new AccountResetCleanupTarget
+                    DbContext.StorageCleanupTargets.Add(new StorageCleanupTarget
                     {
                         AccountId = RequestUser.AccountId!,
-                        StoragePartition = item.Partition, StorageKey = item.Key
+                        StoragePartition = item.Partition, StorageKey = item.Key,
+                        Purpose = StorageCleanupPurpose.AccountReset
                     });
             }
 
             var container = RequestUser.AccountContainerName;
             if (known.Add((container, string.Empty, true)))
-                DbContext.AccountResetCleanupTargets.Add(new AccountResetCleanupTarget
+                DbContext.StorageCleanupTargets.Add(new StorageCleanupTarget
                 {
                     AccountId = RequestUser.AccountId!, StoragePartition = container,
-                    StorageKey = string.Empty, IsContainer = true
+                    StorageKey = string.Empty, IsContainer = true, Purpose = StorageCleanupPurpose.AccountReset
                 });
 
             // Cleanup addresses are committed atomically with the relational purge.
@@ -69,27 +71,30 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         }
     }
 
-    public Task<List<AccountResetCleanupTarget>> GetCleanupTargetsAsync(CancellationToken cancellationToken)
-        => DbContext.AccountResetCleanupTargets.AsNoTracking()
-            .Where(row => row.AccountId == RequestUser.AccountId)
+    public Task<List<StorageCleanupTarget>> GetCleanupTargetsAsync(CancellationToken cancellationToken)
+        => DbContext.StorageCleanupTargets.AsNoTracking()
+            .Where(row => row.AccountId == RequestUser.AccountId &&
+                          row.Purpose == StorageCleanupPurpose.AccountReset)
             .OrderBy(row => row.IsContainer).ThenBy(row => row.Id)
             .ToListAsync(cancellationToken);
 
     public Task<bool> HasPendingCleanupAsync(CancellationToken cancellationToken)
-        => DbContext.AccountResetCleanupTargets.AsNoTracking()
-            .AnyAsync(row => row.AccountId == RequestUser.AccountId, cancellationToken);
+        => DbContext.StorageCleanupTargets.AsNoTracking()
+            .AnyAsync(row => row.AccountId == RequestUser.AccountId &&
+                             row.Purpose == StorageCleanupPurpose.AccountReset, cancellationToken);
 
     public Task<int> CompleteCleanupTargetsAsync(IEnumerable<string> ids, CancellationToken cancellationToken)
     {
         var targetIds = ids.ToArray();
-        return DbContext.AccountResetCleanupTargets
-            .Where(row => row.AccountId == RequestUser.AccountId && targetIds.Contains(row.Id))
+        return DbContext.StorageCleanupTargets
+            .Where(row => row.AccountId == RequestUser.AccountId &&
+                          row.Purpose == StorageCleanupPurpose.AccountReset && targetIds.Contains(row.Id))
             .ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <summary>Two bounded reference queries per key chunk, rather than two per stored object.</summary>
     public async Task<HashSet<string>> GetConflictedCleanupTargetIdsAsync(
-        IReadOnlyList<AccountResetCleanupTarget> targets, CancellationToken cancellationToken)
+        IReadOnlyList<StorageCleanupTarget> targets, CancellationToken cancellationToken)
     {
         var conflicts = new HashSet<string>();
         foreach (var partition in targets.Where(t => !t.IsContainer)
@@ -104,12 +109,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                                   keys.Contains(row.BlobKey))
                     .Select(row => row.BlobKey!)
                     .ToListAsync(cancellationToken);
-                var foreignRetained = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
-                    .Where(row => row.AccountId != RequestUser.AccountId &&
-                                  row.StoragePartition.ToLower() == partition.Key.ToLower() && keys.Contains(row.StorageKey))
-                    .Select(row => row.StorageKey)
-                    .ToListAsync(cancellationToken);
-                var referenced = foreignFiles.Concat(foreignRetained).ToHashSet();
+                var referenced = foreignFiles.ToHashSet();
                 foreach (var target in chunk)
                     if (referenced.Contains(target.StorageKey)) conflicts.Add(target.Id);
             }
@@ -121,11 +121,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     public async Task<bool> IsContainerReferencedByAnotherAccountAsync(
         string container, CancellationToken cancellationToken)
         => await DbContext.Files.IgnoreQueryFilters()
-               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
-                                row.BlobContainer != null && row.BlobContainer.ToLower() == container.ToLower(), cancellationToken)
-           || await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
-               .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
-                                row.StoragePartition.ToLower() == container.ToLower(), cancellationToken);
+            .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
+                             row.BlobContainer != null && row.BlobContainer.ToLower() == container.ToLower(),
+                cancellationToken);
 
     private async Task<IReadOnlyList<AccountFileObjectAddress>> GetFileObjectAddressesForResetAsync(
         CancellationToken cancellationToken)
@@ -137,12 +135,13 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                            file.BlobContainer != null && file.BlobKey != null)
             .Select(file => new AccountFileObjectAddress(file.BlobContainer!, file.BlobKey!))
             .ToListAsync(cancellationToken);
-        var retained = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters().AsNoTracking()
-            .Where(row => row.AccountId == RequestUser.AccountId)
+        var pendingAssetCleanup = await DbContext.StorageCleanupTargets.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.AccountId == RequestUser.AccountId &&
+                          row.Purpose == StorageCleanupPurpose.CaveAssetRemoval && !row.IsContainer)
             .Select(row => new AccountFileObjectAddress(row.StoragePartition, row.StorageKey))
             .ToListAsync(cancellationToken);
 
-        var addresses = live.Concat(retained).Distinct().ToList();
+        var addresses = live.Concat(pendingAssetCleanup).Distinct().ToList();
 
         // The whole account container includes untracked archives/imports. Even a
         // foreign reference to a key absent from our File table makes deleting
@@ -172,11 +171,7 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
                     .AnyAsync(file => file.AccountId != RequestUser.AccountId &&
                                       file.BlobContainer != null && file.BlobContainer.ToLower() == partition.Key.ToLower() && file.BlobKey != null &&
                                       keys.Contains(file.BlobKey), cancellationToken);
-                var referencedByAnotherRetention = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
-                    .AnyAsync(row => row.AccountId != RequestUser.AccountId &&
-                                     row.StoragePartition.ToLower() == partition.Key.ToLower() &&
-                                     keys.Contains(row.StorageKey), cancellationToken);
-                if (referencedByAnotherFile || referencedByAnotherRetention)
+                if (referencedByAnotherFile)
                     throw ApiExceptionDictionary.Conflict(
                         "Cannot safely reset an account while its stored Files are also referenced by another account.");
             }
@@ -270,8 +265,9 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
 
         do
         {
-            deletedCount = await DeleteBatchAsync(DbContext.RetainedCaveFileObjects
-                .Where(row => row.AccountId == RequestUser.AccountId)
+            deletedCount = await DeleteBatchAsync(DbContext.StorageCleanupTargets
+                .Where(row => row.AccountId == RequestUser.AccountId &&
+                              row.Purpose == StorageCleanupPurpose.CaveAssetRemoval)
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
         } while (deletedCount == batchSize);

@@ -105,7 +105,8 @@ Affected Cave/File application logic depends on a provider-neutral interface suc
 ```csharp
 public interface IObjectStorage
 {
-    Task PutAsync(StorageObjectAddress address, Stream content, string? contentType,
+    // Create-only: fail if the immutable address already exists.
+    Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken);
     Task<StoredObjectReadResult?> OpenReadAsync(StorageObjectAddress address,
         CancellationToken cancellationToken);
@@ -118,6 +119,8 @@ Use a provider-neutral address such as:
 ```csharp
 public sealed record StorageObjectAddress(string Partition, string Key);
 ```
+
+The create operation must be conditional/non-overwriting at the provider boundary. A File ID collision or retry bug must fail closed rather than replace bytes belonging to an existing File, and compensation must never delete a pre-existing address when create itself failed.
 
 `Partition` is a logical namespace. The Azure adapter may map it to a container; an S3/MinIO adapter may map it to a
 bucket; a filesystem adapter may map it under a configured root. Application logic must not depend on that mapping.
@@ -179,69 +182,53 @@ File ID is never proof of ownership.
 
 Existing legacy object keys remain valid. Do not migrate all previously stored bytes merely to adopt the new key scheme.
 
-## 6. Published File retention and removal
+## 6. Published Cave asset removal and historical payload policy
 
-A File that has been successfully published in a Cave revision has historical byte content worth retaining, but the
-live `File` row is the wrong place to keep that historical content locator after removal. `File` carries current-domain
-relationships such as `FileTypeTagId`; retaining a detached `File` row would keep foreign-key dependencies alive and can
-block later TagType administration even though the File is no longer current.
+Files and line plots are both Cave-owned assets and should expose the same revision semantics even though their physical
+storage differs. A published revision preserves the semantic evidence needed to explain what existed and what changed; it
+is not a permanent archive of removed payloads.
 
-Use one narrow internal entity for removed published content, named `RetainedCaveFileObject` unless current naming
-conventions strongly favor an equivalent. It contains only durable content-location identity:
+For Files, the live `File` row remains the source of current metadata and object address. Ordinary removal must not keep a
+detached live File row or a historical byte locator indefinitely. Instead, queue the exact object address in the shared
+`StorageCleanupTarget` outbox with purpose `CaveAssetRemoval` inside the same relational transaction that deletes the live
+File row and publishes the Cave revision. After commit, attempt object deletion and clear the target only when cleanup is
+safe. External failure leaves durable retryable cleanup debt and emits structured diagnostics. New targets are attempted immediately after commit; later Cave/File authoring processes older debt in bounded batches. No dedicated ordinary-asset background relay is required by this pre-release plan, so inactive-account debt may remain pending.
 
-```text
-Id                     // ordinary entity/audit identity
-AccountId              // required tenant owner
-CaveId                 // Cave that owned the published File; scalar for lookup/purge, no Cave FK
-FileId                 // stable historical File ID from Cave snapshots
-StoragePartition       // provider-neutral internal object namespace
-StorageKey             // provider-neutral internal object key
-```
+For line plots, `CaveGeoJson` is already PostgreSQL current-state payload storage, so removal deletes the row atomically in
+the Cave publication transaction. Published history retains stable line-plot ID, historical name, and content hash, not
+the removed GeoJSON body.
 
-Required relational rules:
-
-- unique `(AccountId, FileId)`;
-- index `(AccountId, CaveId)` for Cave/account hard-purge lookup;
-- no FK to `File`, `Cave`, or `TagType`; those live-domain rows may legitimately be deleted later;
-- an Account relationship may follow the repository's normal tenant-owned-entity convention, but hard account cleanup
-  must explicitly remove these rows and their objects;
-- this table is internal persistence and is never serialized into `CavePublishedSnapshotV1`.
-
-Ordinary removal of a current published File happens in the same relational transaction as Cave publication:
+The shared semantic contract is therefore:
 
 ```text
-current File exists
+published Cave asset exists
     ↓
-capture/verify RetainedCaveFileObject(AccountId, CaveId, FileId, storage address)
+publish desired Cave state without that asset
     ↓
-delete/detach the live File row and current Cave membership
+revision retains lightweight historical identity/metadata
     ↓
-publish the new Cave snapshot/revision without that File
-    ↓
-commit
-    ↓
-do NOT delete the underlying object
+current payload is removed
 ```
 
-If a retention row for the same `(AccountId, FileId)` already exists (for example after a future restore/re-remove), its
-Cave and object address must agree. Treat a mismatch as an invariant violation; never silently repoint historical File
-identity to different bytes.
+The physical implementation differs only at the storage boundary:
 
-The historical snapshot continues to contain only stable File ID and historical user-facing metadata. Revision and
-proposal APIs currently expose `CavePublishedSnapshotV1`, so storage locators must not become V1 wire data. A future
-restore/download operation can authorize the Cave/revision, then resolve its File ID to either a current File or the
-internal retained-object record server-side. No historical-download or rollback endpoint is added in this task.
+```text
+File        → queue StorageCleanupTarget in transaction → commit → delete object externally
+CaveGeoJson → delete row in the same PostgreSQL transaction
+```
 
-Physical object deletion remains correct for:
+Do not add storage partition/key to `CavePublishedSnapshotV1`. File history remains stable File ID + historical
+name/extension/type metadata. Do not add raw GeoJSON to published line-plot snapshots. The revision actor and timestamp
+provide the audit context for statements such as “user X removed asset Y.”
 
-- never-published staged Files after expiration;
-- failed/orphaned uploads that never became valid persisted assets;
-- explicit irreversible Cave/account hard purge, which must also delete matching retained-object rows and de-duplicate
-  object addresses before external deletion.
+Proposal versions are allowed to retain payload required to reproduce/review the proposal. File proposals reference exact
+staged File IDs; line-plot proposals retain exact proposed GeoJSON. Do not build a generic proposal-asset storage layer
+until a future line-plot-as-File migration actually needs it.
 
-This small retention table is intentionally **not** a generic blob archive, File versioning system, or GeoJSON recovery
-system. It exists only because File bytes live outside PostgreSQL and a historical stable File ID otherwise has nowhere
-provider-neutral and private to resolve after the current `File` row is deleted.
+`StorageCleanupTarget` is shared post-commit cleanup infrastructure, not a historical File table. Distinguish
+`CaveAssetRemoval` from `AccountReset`: failed Reset Account cleanup may block subsequent writes; failed ordinary asset
+cleanup must remain retryable without freezing unrelated account activity. Reset Account captures pending asset-removal
+addresses before purging their targets so cleanup responsibility is not lost.
 
 ## 7. File editor semantics
 
@@ -502,12 +489,11 @@ High-volume import remains set-oriented/bounded and must not be routed through t
 
 If shared snapshot construction changes from five bounded projection groups per chunk to include line plots, preserve
 the bounded projection design and supported 10,000-Cave/~15,000-Entrance workload. Add only the necessary projection;
-do not materialize tracked aggregate graphs for snapshot generation. Retained File object locators are not snapshot
-input and must not add another per-chunk projection.
+do not materialize tracked aggregate graphs for snapshot generation. Storage cleanup targets are operational debt, not snapshot input, and must not add another per-chunk projection.
 
 Archive export continues to represent **current** Cave state and current published assets. It must not suddenly include:
 
-- every retained historical File object;
+- removed historical File payloads or storage-cleanup debt;
 - expired/abandoned staging;
 - rejected proposal assets;
 - every historical proposal line-plot body.
@@ -515,22 +501,15 @@ Archive export continues to represent **current** Cave state and current publish
 Archive import should produce current state compatible with the new published snapshot fields. Change archive format
 only if the new authoritative current-state contract truly requires it.
 
-## 21. Hard deletion versus revisioned removal
-Keep these concepts separate:
+## 21. Hard deletion versus revisioned asset removal
 
-```text
-revisioned remove File from current Cave
-    ≠
-explicit hard purge of historical data
-```
+Keep these concepts separate. Ordinary File/line-plot removal is an aggregate Cave publication that removes the current
+payload and preserves lightweight revision metadata. Hard Cave/account deletion removes the owning current domain as well.
+Both must obey commit-before-external-delete ordering for File bytes, but hard deletion may use specialized orchestration
+for all objects owned by the deleted scope.
 
-Ordinary removal retains published immutable bytes through `RetainedCaveFileObject`. Never-published expired staging is
-physically deleted. The existing explicit Cave/account hard-purge/reset path must be extended to remove matching retained
-locator rows and delete their object addresses after the relational purge commits; de-duplicate addresses before external
-delete so a current and retained reference cannot cause duplicate destructive calls. Do not invent any other purge mode.
-
-For current `CaveGeoJson`, retain existing hard-delete behavior. There is no new historical GeoJSON backup system in
-this plan.
+Never-published expired staging is physically deleted because no published revision depends on it. Current `CaveGeoJson`
+rows remain transactional PostgreSQL data; there is no historical GeoJSON backup system in this plan.
 
 ## 22. Durable-document transition
 

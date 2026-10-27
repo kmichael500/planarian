@@ -99,11 +99,13 @@ object merely because it changed from staged to published. Generic staged lookup
 uploader-qualified, while request-bound staged downloads additionally require current request visibility.
 
 When a published File is removed from current Cave state, its live `File` row is deleted so obsolete Cave/TagType
-relationships cannot survive indefinitely. Before that deletion commits, Planarian records only the internal
-provider-neutral `(AccountId, CaveId, FileId, StoragePartition, StorageKey)` locator in `RetainedCaveFileObject`. The
-underlying object is retained so a future authorized restore can resolve historical revision metadata back to the exact
-bytes. Explicit Cave/account hard purge removes retained locators and then best-effort deletes de-duplicated objects after
-the relational commit. Never-published abandoned/rejected staged Files remain eligible for normal expiration cleanup.
+relationships do not survive. The same relational transaction queues the exact object address as a
+`StorageCleanupTarget` with purpose `CaveAssetRemoval` and publishes the Cave revision without the File. Only after that
+transaction commits does Planarian attempt external deletion. Successful cleanup removes the target; an external failure
+leaves durable retryable cleanup debt without making the already-committed Cave publication false. Cleanup failures are
+logged; later Cave/File authoring retries older debt in bounded batches. There is no dedicated ordinary-asset background
+relay, so debt can remain while an account is inactive. Revision history keeps the File's stable ID and historical
+user-facing metadata, not its storage locator or removed bytes.
 
 Browser downloads for proposal Files use the same API-origin-aware, account-qualified URL construction as published
 File downloads. Request, version, revision, and staged-File access remains permission-filtered and tenant-qualified,
@@ -116,6 +118,11 @@ Current line-plot payload storage remains `CaveGeoJson` `jsonb`; this feature de
 Line plots nevertheless participate in the same aggregate Cave mutation as fields, tags, Entrances, and Files. A stable
 line-plot ID survives rename/content edits, omitted IDs are additions, omitted existing IDs are removals, and one aggregate
 save produces at most one Cave revision. Direct standalone GeoJSON publication is not an interactive mutation path.
+
+Files and line plots intentionally share the same published-history/removal semantics: current payload disappears after
+the removal publishes, while the previous revision retains enough lightweight metadata to explain what existed and what
+changed. Their physical deletion mechanics differ only because `CaveGeoJson` participates in the PostgreSQL transaction
+while File bytes live in external object storage.
 
 Published revision V1 stores only each line plot's stable ID, historical name, and deterministic SHA-256 content
 fingerprint. Canonicalization sorts JSON object properties while preserving array/feature ordering, so formatting/property
@@ -158,10 +165,9 @@ ordinary `CaveVm` reads or the revision API.
   history was enabled and does not imply the Cave was created then or that no earlier changes occurred. Recovered older
   history may later be presented before this boundary, but it is separate from the authoritative revision chain.
 - File history preserves attachment identity, editable filename stem (`Name`), immutable uploaded-file `Extension`, and
-  captured file-type metadata without exposing
-  object-storage locators in revision JSON. Bytes from Files that were successfully published are retained across ordinary
-  later removal through the internal retained-object locator until explicit hard purge; never-published staged bytes may
-  expire or be discarded. No historical-download or rollback API is implied by retention alone.
+  captured file-type metadata without exposing object-storage locators in revision JSON. Ordinary published removal queues
+  post-commit physical deletion; after successful cleanup the old bytes are not recoverable through Planarian.
+  Never-published staged bytes may expire or be discarded.
 - Line-plot history preserves stable identity, historical name, and a deterministic content fingerprint, not the full
   GeoJSON payload. Immutable proposal versions retain exact proposed line-plot GeoJSON separately from published history.
 - A semantic no-op creates neither a published revision nor a proposal version.

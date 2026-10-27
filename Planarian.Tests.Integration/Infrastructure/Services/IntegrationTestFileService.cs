@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Authentication.Services;
 using Planarian.Modules.Caves.Repositories;
@@ -25,7 +26,7 @@ internal sealed class IntegrationTestFileService(
     TagReferenceLockRepository tagReferenceLocks,
     TestFileBlobStore blobs)
     : FileService(repository, requestUser, tagRepository, fileOptions, settingsRepository, caveRepository,
-        requestThrottleService, caveMutationCoordinator, tagReferenceLocks, blobs)
+        requestThrottleService, caveMutationCoordinator, tagReferenceLocks, blobs, NullLogger<FileService>.Instance)
 {
     protected override Task AddToBlobStorage(Stream stream, string key, string containerName,
         CancellationToken cancellationToken) => blobs.WriteAsync(stream, containerName, key, cancellationToken);

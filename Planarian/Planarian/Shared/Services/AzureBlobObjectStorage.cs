@@ -19,10 +19,15 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
     public void InvalidateContainer(string partition)
         => ContainerInitializationTasks.TryRemove(partition.ToLowerInvariant(), out _);
 
-    public async Task PutAsync(StorageObjectAddress address, Stream content, string? contentType,
+    public async Task CreateAsync(StorageObjectAddress address, Stream content, string? contentType,
         CancellationToken cancellationToken)
     {
-        var uploadOptions = new BlobUploadOptions();
+        var uploadOptions = new BlobUploadOptions
+        {
+            // Object addresses are immutable. The BlobUploadOptions overload otherwise overwrites
+            // existing block blobs, so require nonexistence at the provider boundary.
+            Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All }
+        };
         if (!string.IsNullOrWhiteSpace(contentType))
             uploadOptions.HttpHeaders = new BlobHttpHeaders { ContentType = contentType };
 
@@ -88,7 +93,7 @@ public sealed class AzureBlobObjectStorage : IObjectStorage
         {
             var container = await GetContainerAsync(address.Partition, createIfNotExists: false);
             return (await container.GetBlobClient(address.Key)
-                .DeleteIfExistsAsync(cancellationToken: cancellationToken)).Value;
+                .DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, conditions: null, cancellationToken)).Value;
         }
         catch (RequestFailedException exception) when (exception.Status == 404)
         {

@@ -4,7 +4,7 @@ This is a conceptual map of the revision/proposal/File model introduced or subst
 
 It is not a complete ERD of Planarian.
 
-The diagram is conceptual, but relationship labels explicitly mark the important **logical-only** links. In particular, `CaveRevision.CaveId`, `CaveChangeRequest.CaveId`, and `RetainedCaveFileObject` ownership are not live-domain foreign keys. That is deliberate so history/retention can survive removal of current Cave/File relationships.
+The diagram is conceptual, but relationship labels explicitly mark the important **logical-only** links. In particular, `CaveRevision.CaveId`, `CaveChangeRequest.CaveId`, and `StorageCleanupTarget.AccountId` are not live-domain foreign keys. History and cleanup debt therefore survive removal of current Cave/File relationships without keeping those live relationships artificially alive.
 
 ## Core relationships
 
@@ -28,7 +28,7 @@ erDiagram
     CAVE_CHANGE_REQUEST ||--o{ CAVE_CHANGE_REQUEST_STAGED_FILE : claims
     FILE ||--o{ CAVE_CHANGE_REQUEST_STAGED_FILE : staged_reference
 
-    ACCOUNT ||--o{ RETAINED_CAVE_FILE_OBJECT : "logical AccountId ownership (no FK)"
+    ACCOUNT ||--o{ STORAGE_CLEANUP_TARGET : "logical AccountId cleanup ownership (no FK)"
     CAVE_REVISION }o--o| CAVE_IMPORT_BATCH : import_source
 ~~~
 
@@ -189,7 +189,7 @@ Typical lifecycle:
 
 - staged: CaveId null, ExpiresOn set;
 - published: CaveId set, ExpiresOn null;
-- removed from current state: live File row deleted after RetainedCaveFileObject is recorded.
+- removed from current state: live File row deleted in the publication transaction after a `CaveAssetRemoval` storage-cleanup target is queued; bytes are deleted only after commit.
 
 ## CaveChangeRequestStagedFile
 
@@ -199,24 +199,23 @@ It is tenant-qualified and prevents request workflow from treating a random clie
 
 Proposal versions still carry the exact File semantic intent; this table is workflow ownership/lifecycle support.
 
-## RetainedCaveFileObject
+## StorageCleanupTarget
 
-This internal table is intentionally disconnected from live-domain foreign keys.
+This internal table is durable **external-cleanup debt**, not historical File storage. It is intentionally independent of live File/Cave foreign keys so a relational deletion can commit before object-storage cleanup is attempted.
 
 Fields:
 
 - AccountId;
-- CaveId;
-- FileId;
 - StoragePartition;
-- StorageKey.
+- StorageKey;
+- IsContainer;
+- Purpose (`CaveAssetRemoval` or `AccountReset`).
 
-Constraints/indexes:
+Constraints/indexes distinguish purpose so the same address can safely move from ordinary asset cleanup responsibility into Reset Account cleanup responsibility inside one reset transaction.
 
-- unique AccountId + FileId;
-- indexed AccountId + CaveId.
+For ordinary File removal, a `CaveAssetRemoval` target is inserted in the same transaction that deletes the File and publishes the Cave revision. It is removed after post-commit deletion succeeds or the address is proven to belong to a live File and therefore must not be deleted. Failed deletion leaves the target for retry.
 
-Its purpose is to locate historical bytes after the current File row is gone.
+`AccountReset` targets use the same persistence mechanism but have stronger operational semantics: pending Reset Account cleanup can block account writes until resolved. Ordinary asset cleanup does not.
 
 ## CaveGeoJson
 
@@ -254,5 +253,5 @@ A useful distinction:
 | Proposed future state | CaveProposalVersion + CaveProposalSnapshotV1 |
 | Proposal workflow status | CaveChangeRequest |
 | Review audit | CaveChangeRequestReviewEvent |
-| Historical removed File bytes | RetainedCaveFileObject + object storage |
+| Post-commit external cleanup debt | StorageCleanupTarget |
 | Import provenance | CaveImportBatch |

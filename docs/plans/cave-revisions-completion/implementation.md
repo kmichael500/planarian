@@ -129,7 +129,7 @@ Primary files:
 - `Planarian/Planarian/Modules/Files/Services/FileService.cs`
 - `Planarian/Planarian/Modules/Files/Repositories/FileRepository.cs`
 - `Planarian/Planarian.Model/Database/Entities/RidgeWalker/File.cs`
-- a new `RetainedCaveFileObject` entity/configuration under the RidgeWalker model
+- a shared `StorageCleanupTarget` entity/configuration under the RidgeWalker model
 - `Planarian/Planarian.Model/Database/PlanarianDbContext.cs`
 - `Planarian/Planarian.Migrations/Migrations/` for the required schema migration
 - `Planarian/Planarian/Modules/Caves/Revisions/StagedCaveFilePublication.cs`
@@ -170,42 +170,40 @@ a newly created permanent-copy candidate because no candidate copy should exist.
 If the initial upload itself fails before a valid staged row/object pair exists, compensate only the object/row created by
 that failed attempt according to existing reliability conventions.
 
-### 3.4 Retain removed published content without retaining live domain dependencies
+### 3.4 Remove published File payloads safely after commit
 
-Add the narrow internal `RetainedCaveFileObject` persistence model from `architecture.md`. Use provider-neutral
-`StoragePartition`/`StorageKey` fields in this **new internal table** even if the legacy live `File` entity still calls
-them `BlobContainer`/`BlobKey`.
-
-For ordinary removal of a once-published File, inside the same Cave relational transaction:
+Use the shared provider-neutral `StorageCleanupTarget` persistence model with a purpose discriminator. For ordinary removal
+of a once-published File, inside the same Cave relational transaction:
 
 1. validate the current File belongs to the current account/Cave;
-2. create or verify the unique retained locator `(AccountId, FileId)` with the Cave ID and exact storage address;
-3. delete the live `File` row so its `FileTypeTagId` and other current-domain FKs no longer remain in use;
+2. queue its exact `StoragePartition`/`StorageKey` as purpose `CaveAssetRemoval`;
+3. delete the live `File` row so current-domain FKs no longer remain in use;
 4. publish the new Cave revision without that File;
-5. commit;
-6. do **not** delete the object after commit.
+5. commit.
 
-Do not add a File/TagType/Cave FK from the retention row. Historical user-facing File metadata already lives in Cave
-snapshots; duplicating those domain dependencies would recreate the deletion problem this table is meant to avoid.
+Only after commit may the application delete the object. Successful/already-absent cleanup removes the target. External
+failure leaves durable debt for retry and must emit structured diagnostics. If the address is now referenced by a live File, do not delete it; clear the stale
+cleanup request instead. Ordinary asset cleanup must not use Reset Account's account-wide write block. Immediate cleanup handles targets created by the current commit; later normal Cave/File authoring may retry only a bounded batch of older debt so cleanup cannot turn an interactive request into an unbounded storage sweep. A dedicated background relay is deferred unless operational evidence shows it is needed.
 
-If a retained row already exists for the File ID, verify its Cave and storage address match instead of overwriting it.
+The target is operational cleanup state, not historical File identity. Historical user-facing metadata already lives in
+Cave snapshots; storage addresses remain private and never become revision wire data.
 
-### 3.5 Cleanup and hard purge
+### 3.5 Cleanup, Reset Account, and hard purge
 
-Expired **never-published** staged Files are eligible for physical object deletion through `IObjectStorage`, then
-relational cleanup according to the existing cleanup convention. They do not create retained-object rows.
+Expired **never-published** staged Files remain eligible for physical object deletion. Account Reset uses the same
+`StorageCleanupTarget` table with purpose `AccountReset` and retains its stronger retry/write-block semantics. During
+reset, pending `CaveAssetRemoval` addresses must be captured into Reset cleanup responsibility before those ordinary
+target rows are purged.
 
-Explicit irreversible Cave/account purge must include retained-object rows: collect their object addresses, de-duplicate
-addresses shared with any current/live row, commit the relational purge, then perform external deletion using the
-existing post-commit/best-effort policy. Normal revisioned File removal is not this path.
-
-Archive export does not discover retained-object rows as current Files.
+Explicit hard Cave deletion and specialized import deletion still obey commit-before-external-delete ordering. Do not
+turn ordinary asset removal into a hard-history purge because published history already contains only metadata, not payload.
 
 ### 3.6 Migration
 
-Create the normal EF migration for the new table/indexes. Because the feature is pre-release, do not add compatibility
-shims for a historical schema that never shipped; still follow the repository's migration conventions and update the
-model snapshot normally.
+Create the normal EF migration for the shared cleanup table/purpose. Because the superseded retention design existed on
+the pre-release completion branch, the forward migration must convert existing `RetainedCaveFileObject` addresses into
+`CaveAssetRemoval` cleanup debt rather than dropping them. Preserve existing Reset Account cleanup debt. Migration ID
+collisions must not lose cleanup addresses, and downgrade must fail closed while asset cleanup debt is still pending.
 
 ### 3.7 Phase exit gate
 
@@ -215,12 +213,14 @@ Prove with focused tests:
 - successful publication performs no second put/copy;
 - File ID/storage address are unchanged by publication;
 - publication failure leaves the File staged and the Cave unchanged;
-- expired never-published staging is physically deleted and creates no retention row;
-- ordinary removal creates/verifies one tenant-qualified retained locator, deletes the live File row, and does not
-  physically delete the object;
-- a removed File no longer blocks deletion/merge semantics through a live `FileTypeTagId` relationship;
-- retained object locators are not exposed by the ordinary File/revision APIs;
-- cross-account staged File publication and retained-object lookup are rejected.
+- expired never-published staging is physically deleted;
+- ordinary published removal deletes the live File row, publishes one revision, and deletes bytes only after commit;
+- a failed external delete leaves one tenant-qualified `CaveAssetRemoval` target that can be retried;
+- historical revision metadata still identifies the removed File after bytes are deleted;
+- ordinary asset-cleanup debt does not block unrelated account writes;
+- Reset Account absorbs pending ordinary asset-cleanup addresses;
+- storage cleanup targets are not exposed through ordinary File/revision APIs;
+- cross-account staged File publication and storage cleanup remain tenant-safe.
 
 ## Phase 4 — Complete File authoring in the aggregate Cave editor
 
@@ -403,16 +403,13 @@ Primary files:
 ### 6.1 Keep File snapshot provider-neutral and public-safe
 
 Do **not** add storage partition/key fields to `CaveFileSnapshotV1`. Its stable File ID plus historical `Name`, immutable
-`Extension`, and File-type metadata remain the persisted revision contract. The internal `RetainedCaveFileObject` row
-is the server-side content locator after an ordinary published File removal.
+`Extension`, and File-type metadata remain the persisted revision contract. After ordinary published removal, the old
+object is cleanup work rather than historical revision content; successful cleanup makes those bytes unavailable.
 
-This matters because Cave revision comparison currently returns `CavePublishedSnapshotV1` through the API. Never expose
-internal object-storage addresses merely to make future recovery convenient. A future restore/download path must
-authorize the Cave/revision, then resolve the snapshot File ID server-side against current File state or the retained
-object table.
+This matters because Cave revision comparison returns `CavePublishedSnapshotV1` through the API. Never expose internal
+object-storage addresses to make cleanup or hypothetical recovery convenient. File and line-plot history should both
+preserve lightweight semantic evidence while omitting removed payloads.
 
-Ordinary removal deletes the live `File` row after atomically retaining its object locator; do not leave a detached live
-File row with current-domain foreign keys merely to preserve bytes.
 ### 6.2 Add line-plot snapshot
 
 Add `CaveLinePlotSnapshotV1` with stable ID, historical name, and deterministic content hash. Add the collection to
@@ -562,8 +559,7 @@ proposal JSON.
 ### 8.3 File publication during approval
 
 For `PublishStaged` File intents, associate the exact staged File/object and clear expiration. Do not copy it to another
-object key. Retained published Files keep their identity. Removed published Files leave current membership but retain
-historical bytes.
+object key. Retained published Files keep their identity. Removed published Files leave current membership; their object address is queued transactionally and physical deletion runs only after approval commits.
 
 ### 8.4 Line plots during approval
 
@@ -594,7 +590,7 @@ semantics actually touch import behavior.
 ### 9.2 Archive
 
 Verify current account archive export/import still handles current published Files and current `CaveGeoJson` data.
-Historical retained File bytes, staging, and proposal payload history are not automatically added to archive output.
+Removed historical File payloads, storage-cleanup debt, staging, and proposal payload history are not automatically added to archive output.
 
 ### 9.3 Hard Cave/account deletion
 

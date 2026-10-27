@@ -60,17 +60,16 @@ Use a deterministic fake `IObjectStorage` that records puts/reads/deletes. Do no
 14. Successful publication performs no second write/copy and retains the same File ID/address.
 15. Publication clears staging expiration and associates the File with the target Cave.
 16. Failed relational publication leaves the File staged/expiring and the Cave unchanged.
-17. Removing a previously published File creates exactly one tenant-qualified `RetainedCaveFileObject` and does not call
-    physical object delete.
-18. That ordinary removal deletes the live `File` row, so its current `FileTypeTagId` relationship no longer blocks later
-    TagType deletion/merge semantics; historical snapshot metadata remains readable.
-19. A repeated retention attempt for the same `(AccountId, FileId)` accepts only the same Cave/object address and rejects
-    an inconsistent repoint.
-20. Retained-object rows are not returned by ordinary current-File or Cave-revision APIs and cannot be guessed across
-    accounts.
-21. Expired never-published staged File cleanup deletes exactly that object and creates no retention row.
-22. Cross-account staged File cannot be attached/published.
-23. Unbound staged File read/delete is limited to its staging actor/account policy; guessed foreign IDs do not leak data.
+17. Removing a previously published File queues exactly one tenant-qualified `StorageCleanupTarget` with purpose
+    `CaveAssetRemoval` inside the publication transaction and does not delete bytes before commit.
+18. Successful post-commit cleanup deletes the object and clears the target while the historical snapshot remains readable.
+19. Failed external deletion leaves durable cleanup debt that can be retried idempotently.
+    - A mixed cleanup batch handles success, already-missing objects, and provider failure independently so only failed debt remains.
+    - If object deletion succeeds but cleanup-target acknowledgement fails, the target remains and a later retry safely clears it after observing the object is already absent.
+20. Ordinary `CaveAssetRemoval` debt does not trigger the Reset Account write block.
+21. Reset Account absorbs pending asset-removal addresses without losing cleanup responsibility.
+22. Expired never-published staged File cleanup deletes exactly that object and creates no historical retention record.
+23. Cross-account staged File cannot be attached/published; cleanup never deletes an address referenced by a live File.
 24. Published File download still reads through the provider-neutral storage boundary.
 ## 5. Required line-plot tests
 
@@ -96,8 +95,8 @@ Update the pre-release V1 fixtures and contract tests to prove:
 
 38. `CaveFileSnapshotV1` remains limited to stable File ID plus historical user-facing metadata; it does not expose
     storage partition/key through the revision API.
-39. A removed published File keeps its stable snapshot File ID while its private object address lives only in the
-    tenant-qualified `RetainedCaveFileObject` table; the live `File` row is gone.
+39. A removed published File keeps its stable snapshot File ID/metadata while the live `File` row is gone; revision JSON
+    contains neither a storage locator nor the removed bytes.
 40. `CaveLinePlotSnapshotV1` serializes ID/name/content hash but never raw GeoJSON.
 41. V1 enum tokens remain strings and numeric enum tokens remain invalid.
 42. Round-trip serialization/deserialization preserves the corrected pre-release V1 shape.
@@ -216,8 +215,9 @@ the directly impacted graph or repository policy is intentionally broadened.
 
 ### Required EF/migration validation
 
-This plan intentionally adds `RetainedCaveFileObject`, so a model/schema migration is required. Run the migration-focused
-integration tests that prove a pristine database and the supported main baseline upgrade to the latest schema:
+This plan intentionally generalizes the reset cleanup outbox into `StorageCleanupTarget`, adds a purpose discriminator,
+and removes the superseded `RetainedCaveFileObject` table, so a model/schema migration is required. Run the
+migration-focused integration tests that prove a pristine database and the supported main baseline upgrade to latest:
 
 ```bash
 dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
@@ -225,9 +225,10 @@ dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
   --filter 'FullyQualifiedName~Migration|FullyQualifiedName~PostgresFoundationIntegrationTests'
 ```
 
-If the migration adds no special data backfill, do not invent a historical-data migration test unrelated to its shape;
-the empty/latest and **exact current merge-target (`main`)** upgrade contracts plus focused retained-object schema tests are
-the relevant coverage. Add a dedicated migration test only if the migration itself contains data transformation logic.
+The cleanup migration **does** transform pre-release branch data: existing Reset Account debt must remain `AccountReset`
+and existing retained File locators must become `CaveAssetRemoval` cleanup debt. Dedicated migration tests therefore must
+prove that conversion, including an old-row-ID collision, and prove downgrade fails closed while asset cleanup debt exists.
+Keep the empty/latest and **exact current merge-target (`main`)** upgrade contracts as the broader schema coverage.
 
 Keep historical compatibility coverage separate from the current-main-v32 upgrade/rollback regression.
 Deployment-safety claims must come from the current-main regression, not from an older baseline fixture. For this migration,
@@ -254,8 +255,8 @@ dotnet tool run dotnet-ef migrations has-pending-model-changes \
   --context PlanarianDbContext --configuration Release --no-build
 ```
 
-Do not create an additional migration merely for legacy `BlobKey`/`BlobContainer` naming; the required migration is for
-the new retained-object table/indexes.
+Do not create an additional migration merely for legacy `BlobKey`/`BlobContainer` naming; the required migration is the
+shared storage-cleanup outbox/purpose conversion and removal of the superseded retained-object table.
 
 ## 13. Focused completion sequence
 
@@ -298,13 +299,15 @@ Do not mark the task complete until every applicable item is true:
 - [ ] A new staged Cave File is uploaded once to one immutable object identity.
 - [ ] Publication associates the same File/object; no staging→published byte copy remains.
 - [ ] Failed publication leaves the staged File recoverable/expiring and Cave unchanged.
-- [ ] Ordinary removal of a once-published File creates/verifies `RetainedCaveFileObject`, deletes the live `File` row,
-      and does not physically delete its object.
-- [ ] `RetainedCaveFileObject` has no File/Cave/TagType FK and is unique by tenant + historical File ID.
-- [ ] Removed historical File content therefore does not keep a live FileTypeTag relationship in use.
-- [ ] Expired never-published staging is physically cleaned up without creating retention rows.
+- [ ] Ordinary removal of a once-published File queues `CaveAssetRemoval` cleanup, deletes the live `File` row, publishes
+      history metadata, and physically deletes bytes only after commit.
+- [ ] Failed object deletion leaves durable retryable cleanup debt without blocking unrelated account writes.
+- [x] Mixed cleanup batches independently acknowledge successful/already-missing objects while retaining only failed debt.
+- [x] A post-delete cleanup-target acknowledgement failure is idempotently recoverable on a later retry.
+- [ ] Removed historical File content does not keep a live FileTypeTag relationship in use.
+- [ ] Expired never-published staging is physically cleaned up without creating historical retention state.
 - [ ] Affected application logic depends on provider-neutral storage types, not Azure SDK types.
-- [ ] Published File snapshot does not expose object-storage locators; stable File ID resolves retained content server-side.
+- [ ] Published File snapshot does not expose object-storage locators or promise historical payload recovery.
 - [ ] Cross-account/unowned staged File attachment is rejected.
 
 ### Line plots
@@ -339,8 +342,8 @@ Do not mark the task complete until every applicable item is true:
 - [ ] Snapshot query growth remains bounded for supported import scale.
 - [ ] Archive still represents current state without unexpectedly exporting historical/staged payloads.
 - [ ] Hard deletion remains blocked for unresolved proposals.
-- [ ] Explicit Cave/account hard purge removes retained-object rows and physically deletes their de-duplicated objects;
-      ordinary revisioned removal does not.
+- [ ] Ordinary File removal and explicit hard deletion both preserve commit-before-external-delete ordering; ordinary
+      File removal uses durable `CaveAssetRemoval` debt and line-plot removal deletes `CaveGeoJson` transactionally.
 - [ ] No PostGIS/MVT line-plot redesign leaked into this task.
 - [ ] Durable docs describe the implemented truth and no longer contradict the new File lifecycle.
 
@@ -363,6 +366,6 @@ The implementing agent's final response must list:
 - exact files/major areas changed;
 - exact test/build commands run and whether each passed;
 - any planned command not run and the concrete reason;
-- confirmation that the required retained-object migration tests and pending-model check ran;
+- confirmation that the required storage-cleanup migration/data-conversion tests and pending-model check ran;
 - any known remaining limitation, especially the intentionally deferred line-plot storage/versioning redesign;
 - confirmation that no unrelated full-suite validation was claimed or silently substituted.

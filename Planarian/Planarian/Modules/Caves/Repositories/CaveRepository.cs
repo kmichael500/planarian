@@ -1249,37 +1249,35 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return files;
     }
 
-    public async Task RetainPublishedFileObjectAsync(
+    public async Task<StorageCleanupTarget?> QueuePublishedFileObjectCleanupAsync(
         Planarian.Model.Database.Entities.RidgeWalker.File file, string caveId,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId) || file.AccountId != RequestUser.AccountId ||
             file.CaveId != caveId)
             throw new InvalidOperationException("The File is not a current File for this account/Cave.");
-        if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) return;
+        if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) return null;
         if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
             throw new InvalidOperationException("The File has an incomplete object-storage address.");
 
-        var existing = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
-            .SingleOrDefaultAsync(row => row.AccountId == RequestUser.AccountId && row.FileId == file.Id,
+        var existing = DbContext.StorageCleanupTargets.Local.FirstOrDefault(row =>
+            row.AccountId == RequestUser.AccountId && row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+            !row.IsContainer && row.StoragePartition == file.BlobContainer && row.StorageKey == file.BlobKey)
+            ?? await DbContext.StorageCleanupTargets.SingleOrDefaultAsync(row =>
+                row.AccountId == RequestUser.AccountId && row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                !row.IsContainer && row.StoragePartition == file.BlobContainer && row.StorageKey == file.BlobKey,
                 cancellationToken);
-        if (existing is null)
-        {
-            DbContext.RetainedCaveFileObjects.Add(new RetainedCaveFileObject
-            {
-                AccountId = RequestUser.AccountId,
-                CaveId = caveId,
-                FileId = file.Id,
-                StoragePartition = file.BlobContainer,
-                StorageKey = file.BlobKey
-            });
-            return;
-        }
+        if (existing is not null) return existing;
 
-        if (existing.CaveId != caveId ||
-            !string.Equals(existing.StoragePartition, file.BlobContainer, StringComparison.Ordinal) ||
-            !string.Equals(existing.StorageKey, file.BlobKey, StringComparison.Ordinal))
-            throw new InvalidOperationException("Historical File identity cannot be repointed to different content.");
+        var target = new StorageCleanupTarget
+        {
+            AccountId = RequestUser.AccountId,
+            StoragePartition = file.BlobContainer,
+            StorageKey = file.BlobKey,
+            Purpose = StorageCleanupPurpose.CaveAssetRemoval
+        };
+        DbContext.StorageCleanupTargets.Add(target);
+        return target;
     }
 
     public async Task<IReadOnlyList<StorageObjectAddress>> DeleteAggregateForHardDeleteAsync(
@@ -1316,7 +1314,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         await DeleteHardDeleteCaveAssociationsAsync(entity, cancellationToken);
 
         var files = entity.Files.ToList();
-        var retainedObjects = await RemoveRetainedFileObjectsForHardDeleteAsync(entity.Id, cancellationToken);
         DbContext.RemoveRange(entity.CavePermissions);
         await DeleteStagedFileReferencesAsync(files.Select(file => file.Id), cancellationToken);
         DbContext.RemoveRange(files);
@@ -1328,7 +1325,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         return files
             .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) && !string.IsNullOrWhiteSpace(file.BlobContainer))
             .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
-            .Concat(retainedObjects).Distinct().ToList();
+            .Distinct().ToList();
     }
 
     private async Task DeleteHardDeleteCaveAssociationsAsync(Cave entity, CancellationToken cancellationToken)
@@ -1353,19 +1350,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         await DeleteAndSaveAsync(entity.CaveReportedByNameTags);
         await DeleteAndSaveAsync(entity.CaveOtherTags);
         await DeleteAndSaveAsync(entity.Favorites);
-    }
-
-    public async Task<IReadOnlyList<StorageObjectAddress>> RemoveRetainedFileObjectsForHardDeleteAsync(
-        string caveId, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
-            throw new InvalidOperationException("An active account is required to delete retained File objects.");
-        var rows = await DbContext.RetainedCaveFileObjects.IgnoreQueryFilters()
-            .Where(row => row.AccountId == RequestUser.AccountId && row.CaveId == caveId)
-            .ToListAsync(cancellationToken);
-        DbContext.RetainedCaveFileObjects.RemoveRange(rows);
-        return rows.Select(row => new StorageObjectAddress(row.StoragePartition, row.StorageKey))
-            .Distinct().ToList();
     }
 
     public async Task DeleteStagedFileReferencesAsync(IEnumerable<string> fileIds,

@@ -355,12 +355,9 @@ public sealed class CaveAuthoringFieldPersistenceIntegrationTests(PostgresTestSe
             Assert.False(await verify.Db.Entrances.AsNoTracking()
                 .AnyAsync(row => row.Id == secondaryEntranceId));
             Assert.False(await verify.Db.Files.AsNoTracking().AnyAsync(row => row.Id == stagedFileId));
-            var retainedFile = Assert.Single(await verify.Db.RetainedCaveFileObjects.AsNoTracking()
-                .Where(row => row.FileId == stagedFileId).ToListAsync());
-            Assert.Equal(tenant.AccountId, retainedFile.AccountId);
-            Assert.Equal(tenant.CaveId, retainedFile.CaveId);
-            Assert.Equal(stagedAddress, (retainedFile.StoragePartition, retainedFile.StorageKey));
-            Assert.True(blobs.Contains(stagedAddress.Partition, stagedAddress.Key));
+            Assert.False(await verify.Db.StorageCleanupTargets.AsNoTracking().AnyAsync(row =>
+                row.Purpose == StorageCleanupPurpose.CaveAssetRemoval));
+            Assert.False(blobs.Contains(stagedAddress.Partition, stagedAddress.Key));
             Assert.False(await verify.Db.CaveGeoJsons.AsNoTracking().AnyAsync(row => row.Id == linePlotId));
 
             var revision = await verify.Db.CaveRevisions.SingleAsync(row => row.Id == secondRevisionId);

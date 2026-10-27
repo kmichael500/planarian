@@ -227,6 +227,9 @@ public class SaveChangesInterceptor : ISaveChangesInterceptor
             case nameof(CaveChangeRequestStagedFile):
                 ValidateAccount(((CaveChangeRequestStagedFile)entity.Entity).AccountId, requestUserAccountId);
                 break;
+            case nameof(StorageCleanupTarget):
+                ValidateAccount(((StorageCleanupTarget)entity.Entity).AccountId, requestUserAccountId);
+                break;
 
             case nameof(County):
                 ValidateAccount(((County)entity.Entity).AccountId, requestUserAccountId);

@@ -88,8 +88,7 @@ public partial class PlanarianDbContextBase : DbContext
     public DbSet<FeatureSetting> FeatureSettings { get; set; } = null!;
     public DbSet<FieldIndicationTag> FieldIndicationTags { get; set; } = null!;
     public DbSet<File> Files { get; set; } = null!;
-    public DbSet<RetainedCaveFileObject> RetainedCaveFileObjects { get; set; } = null!;
-    public DbSet<AccountResetCleanupTarget> AccountResetCleanupTargets { get; set; } = null!;
+    public DbSet<StorageCleanupTarget> StorageCleanupTargets { get; set; } = null!;
     public DbSet<GeologicAgeTag> GeologicAgeTags { get; set; } = null!;
     public DbSet<GeologyTag> GeologyTags { get; set; } = null!;
     public DbSet<MapStatusTag> MapStatusTags { get; set; } = null!;
@@ -188,7 +187,7 @@ public class PlanarianDbContext : PlanarianDbContextBase
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
         modelBuilder.Entity<CaveChangeRequestStagedFile>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
-        modelBuilder.Entity<RetainedCaveFileObject>().HasQueryFilter(row =>
+        modelBuilder.Entity<StorageCleanupTarget>().HasQueryFilter(row =>
             CurrentAccountId != null && row.AccountId == CurrentAccountId);
     }
 }
