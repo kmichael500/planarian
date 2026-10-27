@@ -99,9 +99,9 @@ The Cave/Entrance CSV dry-run path ends after planning; it is not “execute and
 
 | Component | Responsibility | Why it matters to revisions | Branch impact |
 | --- | --- | --- | --- |
-| TagTypeAdministrationRepository | Rename/merge/delete TagTypes with correct locks and affected-Cave behavior | Merge/remap can semantically change many Caves and therefore publish revisions | **New** |
+| TagTypeAdministrationRepository | Rename/merge/delete TagTypes with correct locks and affected-Cave behavior | Rename/merge can semantically change many Caves and therefore publish revisions | **New** |
 | TagReferenceLockRepository | Stable ordered locks for existing TagType references | Prevents reference changes racing Cave publication | **New** |
-| CountyAdministrationRepository | County merge/delete/update behavior | County moves can affect published Cave snapshots | **New** |
+| CountyAdministrationRepository | County merge/delete/update behavior | County rename/merge can affect many published Cave snapshots | **New** |
 | CountyReferenceLockRepository | Stable County reference/mutation locks | Enforces lock hierarchy shared with Cave writes/imports | **New** |
 | EligiblePeopleTagLookup | Resolve People tag identity under the shared comparison policy | Keeps direct/proposal/import identity semantics aligned | **New** |
 

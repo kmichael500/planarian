@@ -13,9 +13,9 @@ public sealed record CaveMutationResult(string CaveId, string? RevisionId, bool 
 /// Captures the revision pointer/history state and the live published snapshot
 /// before a caller-owned transaction mutates a Cave aggregate. The previous
 /// revision snapshot is intentionally kept separate from the live snapshot:
-/// shared reference metadata may have changed since the prior Cave revision,
-/// and the next legitimate Cave publication must make those effective changes
-/// observable without synthesizing revision fan-out at taxonomy-edit time.
+/// publication compares against immutable accepted history rather than assuming
+/// the current relational projection still matches the prior revision. Dedicated
+/// TagType/County label administration publishes its own affected-Cave revisions.
 /// </summary>
 public sealed record CaveMutationPreparation(
     string CaveId,

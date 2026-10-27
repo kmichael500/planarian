@@ -210,39 +210,37 @@ public class AccountService : ServiceBase<AccountRepository>
     {
         if (string.IsNullOrWhiteSpace(tag.Name)) throw ApiExceptionDictionary.BadRequest("Name cannot be empty.");
 
-        var isNewTagType = string.IsNullOrWhiteSpace(tagTypeId);
-        var entity = !isNewTagType
-            ? await _tagTypes.GetAccountAdministrativeTagAsync(tagTypeId, cancellationToken)
-            : new TagType();
-
-        if (entity == null) throw ApiExceptionDictionary.NotFound("Tag Type Id");
-
-        if (entity.IsDefault) throw ApiExceptionDictionary.Forbidden("Cannot modify default tag types.");
-
-
-        entity.Name = tag.Name;
-
-        if (isNewTagType)
+        if (!string.IsNullOrWhiteSpace(tagTypeId))
         {
-            if (!TagTypeKeyConstant.IsValidAccountTagKey(tag.Key))
-                throw ApiExceptionDictionary.BadRequest("Invalid tag key.");
-
-            entity.Key = tag.Key;
-            entity.AccountId = RequestUser.AccountId;
-            _tagTypes.Add(entity);
+            var renamed = await _tagTypes.RenameAsync(tagTypeId, tag.Name, cancellationToken);
+            return new TagTypeTableVm
+            {
+                TagTypeId = renamed.Id,
+                Name = renamed.Name,
+                IsUserModifiable = !string.IsNullOrWhiteSpace(renamed.AccountId),
+                Occurrences = await _tagTypes.GetNumberOfOccurrences(renamed.Id, cancellationToken)
+            };
         }
 
+        if (!TagTypeKeyConstant.IsValidAccountTagKey(tag.Key))
+            throw ApiExceptionDictionary.BadRequest("Invalid tag key.");
+
+        var entity = new TagType
+        {
+            Name = tag.Name,
+            Key = tag.Key,
+            AccountId = RequestUser.AccountId
+        };
+        _tagTypes.Add(entity);
         await _tagTypes.SaveChangesAsync(cancellationToken);
 
-        var result = new TagTypeTableVm
+        return new TagTypeTableVm
         {
             TagTypeId = entity.Id,
             Name = entity.Name,
             IsUserModifiable = !string.IsNullOrWhiteSpace(entity.AccountId),
-            Occurrences = await _tagTypes.GetNumberOfOccurrences(entity.Id, cancellationToken)
+            Occurrences = 0
         };
-
-        return result;
     }
 
     public async Task<int> DeleteTagTypes(IEnumerable<string> tagTypeIds)

@@ -19,8 +19,8 @@ concurrency/locking requirements, and relational/revision atomicity.
 Interactive Cave and File reference mutations hold PostgreSQL key-share locks on the union of current existing stable
 IDs and target existing stable IDs until the relational mutation and Cave revision publication commit. These paths can
 replace or detach individual relationships as part of an aggregate mutation. Newly created People identities have no
-existing row to lock. A label rename remains compatible with these key-share locks because it preserves the stable
-identity and does not fan out Cave revisions.
+existing row to lock. TagType and County label administration takes the corresponding conflicting update lock before
+locking affected Caves, so a rename cannot race a publication that is capturing that reference's current metadata.
 
 Bulk Cave import first key-share-locks existing planned target Counties and validates their account, State, display
 code, and name while those locks are held. It then key-share-locks existing planned target TagTypes and locks affected
@@ -44,11 +44,18 @@ and merges use that same conflicting County mutation lock, while Cave import use
 metadata stable through relational writes and revision commit. Ordinary Entrance import, File mutation, and Tag Merge
 do not acquire County locks because they do not mutate Cave County membership.
 
-Destructive or remapping TagType operations, including merges and deletion, acquire update locks on their TagType rows
-in that same ordering; ordinary published reference writers use key-share locks. TagType merges then discover and lock
-affected Caves, rewrite relationships set-wise, and publish the corresponding revisions in the same transaction. A
-merge replaces one stable identity with another, so every semantically affected Cave advances `CurrentRevisionId` with
-a published revision.
+Destructive, remapping, or label-changing TagType operations acquire update locks on their TagType rows in that same
+ordering; ordinary published reference writers use key-share locks. TagType renames discover and lock every Cave whose
+published snapshot contains that stable reference, update the shared label, and publish one `ManagerEdit` revision per
+affected Cave in the same transaction. TagType merges use the same affected-Cave boundary while also rewriting
+relationships set-wise. Both operations advance `CurrentRevisionId` only for Caves whose serialized published state
+actually changes.
+
+County name or display-code changes follow the same rule: an in-use County rename locks the County and its affected
+Caves, preserves the stable County ID and each Cave's County Number, and publishes one `ManagerEdit` revision per
+affected Cave. Updating an unused County creates no Cave revision because no published Cave snapshot changes. As with
+any other published revision, a rename makes an affected pending proposal based on the prior revision stale without
+rewriting that proposal version's captured labels or base revision.
 
 County merge is likewise a published bulk Cave mutation. It is restricted to source and destination Counties in the
 current account and selected State, locks those County rows before affected Cave rows, preserves every Cave's existing

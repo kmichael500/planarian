@@ -17,6 +17,8 @@ using File = Planarian.Model.Database.Entities.RidgeWalker.File;
 
 namespace Planarian.Modules.Account.Repositories;
 
+public sealed record TagTypeMutationResult(string Id, string Name, string? AccountId);
+
 public sealed class TagTypeAdministrationRepository : RepositoryBase
 {
     private const int BatchSize = 500;
@@ -34,6 +36,75 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
         _tagLocks = tagLocks;
         _snapshots = snapshots;
         _revisions = revisions;
+    }
+
+    public async Task<TagTypeMutationResult> RenameAsync(string tagTypeId, string name,
+        CancellationToken cancellationToken = default)
+    {
+        tagTypeId = tagTypeId.Trim();
+
+        await using var transaction = await BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var locked = await _tagLocks.LockForDestructiveMutationAsync([tagTypeId], cancellationToken);
+            if (locked.Count != 1) throw ApiExceptionDictionary.NotFound("Tag Type Id");
+
+            var lockedTag = locked.Single();
+            if (lockedTag.IsDefault)
+                throw ApiExceptionDictionary.Forbidden("Cannot modify default tag types.");
+            if (lockedTag.AccountId != _scope.AccountId)
+                throw ApiExceptionDictionary.NotFound("Tag Type Id");
+
+            var tag = await DbContext.TagTypes.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(row => row.AccountId == _scope.AccountId && row.Id == tagTypeId,
+                    cancellationToken)
+                ?? throw ApiExceptionDictionary.NotFound("Tag Type Id");
+
+            if (string.Equals(tag.Name, name, StringComparison.Ordinal))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return Result(tag);
+            }
+
+            var affectedIds = await DiscoverAffectedCaveIdsAsync(tag.Key, [tag.Id], cancellationToken);
+            await LockCavesAsync(affectedIds, cancellationToken);
+            var expected = affectedIds.Count == 0
+                ? new Dictionary<string, string?>(StringComparer.Ordinal)
+                : await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
+                    .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id))
+                    .ToDictionaryAsync(cave => cave.Id, cave => cave.CurrentRevisionId,
+                        StringComparer.Ordinal, cancellationToken);
+            var before = affectedIds.Count == 0
+                ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
+                : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                    .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
+
+            tag.Name = name;
+            await SaveChangesAsync(cancellationToken);
+
+            if (affectedIds.Count > 0)
+            {
+                var after = (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                    .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
+                var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
+                    StringComparer.Ordinal);
+                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.ManagerEdit,
+                    cancellationToken: cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return Result(tag);
+        }
+        catch (CaveRevisionConflictException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw TagAdministrationConcurrencyConflict();
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task MergeAsync(IEnumerable<string> sourceTagTypeIds, string destinationTagTypeId,
@@ -79,7 +150,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
                     .ToDictionaryAsync(cave => cave.Id, cave => cave.CurrentRevisionId,
                         StringComparer.Ordinal, cancellationToken);
             if (expected.Count != affectedIds.Count)
-                throw TagMergeConcurrencyConflict();
+                throw TagAdministrationConcurrencyConflict();
             var before = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
                 : (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
@@ -102,7 +173,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
         catch (CaveRevisionConflictException)
         {
             await transaction.RollbackAsync(CancellationToken.None);
-            throw TagMergeConcurrencyConflict();
+            throw TagAdministrationConcurrencyConflict();
         }
         catch
         {
@@ -176,11 +247,6 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
         return result;
     }
 
-    public async Task<TagType?> GetAccountAdministrativeTagAsync(string tagTypeId,
-        CancellationToken cancellationToken = default) =>
-        await DbContext.TagTypes.FirstOrDefaultAsync(tag => tag.Id == tagTypeId &&
-            (tag.AccountId == RequestUser.AccountId || tag.IsDefault), cancellationToken);
-
     public async Task<int> DeleteAsync(IEnumerable<string> tagTypeIds,
         CancellationToken cancellationToken = default)
     {
@@ -224,8 +290,11 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
         }
     }
 
-    private static ApiException TagMergeConcurrencyConflict() => ApiExceptionDictionary.Conflict(
-        "One or more affected Caves changed or disappeared during tag merge. Retry with current data.");
+    private static ApiException TagAdministrationConcurrencyConflict() => ApiExceptionDictionary.Conflict(
+        "One or more affected Caves changed or disappeared during tag administration. Retry with current data.");
+
+    private static TagTypeMutationResult Result(TagType tag) =>
+        new(tag.Id, tag.Name, tag.AccountId);
 
     private async Task<List<string>> DiscoverAffectedCaveIdsAsync(string key, IReadOnlyList<string> sourceIds,
         CancellationToken cancellationToken)
@@ -295,7 +364,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
         var connection = (NpgsqlConnection)DbContext.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(cancellationToken);
         var transaction = DbContext.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
-            ?? throw new InvalidOperationException("Tag merge transaction is not active.");
+            ?? throw new InvalidOperationException("Tag administration transaction is not active.");
         foreach (var chunk in caveIds.Order(StringComparer.Ordinal).Chunk(BatchSize))
         {
             await using var command = connection.CreateCommand();
@@ -311,7 +380,7 @@ public sealed class TagTypeAdministrationRepository : RepositoryBase
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken)) count++;
             if (count != chunk.Length)
-                throw TagMergeConcurrencyConflict();
+                throw TagAdministrationConcurrencyConflict();
         }
     }
 

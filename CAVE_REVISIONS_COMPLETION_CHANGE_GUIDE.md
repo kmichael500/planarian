@@ -329,9 +329,9 @@ New dedicated repositories include:
 
 Why these exist:
 
-A TagType or County operation can race with a Cave publication or remap many Cave references. The branch makes those operations participate in a deterministic lock hierarchy and publish revisions when a stable reference identity actually changes Cave semantics.
+A TagType or County operation can race with a Cave publication or change shared reference metadata used by many Caves. The branch makes those operations participate in a deterministic lock hierarchy and publish revisions whenever the serialized published state of affected Caves changes.
 
-Simple shared-label rename does **not** fan out synthetic Cave revisions; the next legitimate Cave publication captures current effective labels.
+Shared TagType and County label changes publish normal `ManagerEdit` revisions for every affected Cave in the same transaction; stable reference IDs remain unchanged, and older revisions retain their historical labels.
 
 ## 11. Tenant and authorization behavior was hardened around the new workflow
 

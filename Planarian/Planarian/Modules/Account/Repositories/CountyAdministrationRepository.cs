@@ -114,7 +114,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                     .ToListAsync(cancellationToken);
             if (affected.Count != affectedIds.Count ||
                 affected.Any(cave => !sourceIds.Contains(cave.CountyId) || cave.StateId != stateId))
-                throw CountyMergeConcurrencyConflict();
+                throw CountyAdministrationConcurrencyConflict();
 
             var destinationNumbers = (await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
                     .Where(cave => cave.AccountId == _scope.AccountId && cave.CountyId == destinationCountyId)
@@ -139,7 +139,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                     .SetProperty(cave => cave.CountyId, destinationCountyId)
                     .SetProperty(cave => cave.ModifiedOn, mutationTimestamp)
                     .SetProperty(cave => cave.ModifiedByUserId, actorUserId), cancellationToken);
-            if (updated != affectedIds.Count) throw CountyMergeConcurrencyConflict();
+            if (updated != affectedIds.Count) throw CountyAdministrationConcurrencyConflict();
 
             var after = affectedIds.Count == 0
                 ? new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal)
@@ -155,7 +155,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
         catch (CaveRevisionConflictException)
         {
             await transaction.RollbackAsync(CancellationToken.None);
-            throw CountyMergeConcurrencyConflict();
+            throw CountyAdministrationConcurrencyConflict();
         }
         catch
         {
@@ -220,18 +220,54 @@ public sealed class CountyAdministrationRepository : RepositoryBase
                 ?? throw ApiExceptionDictionary.NotFound("County Id");
 
             await ValidateTargetAsync(stateId, displayId, county.Id, cancellationToken);
-            if (county.StateId != stateId && await DbContext.Caves.IgnoreQueryFilters()
-                    .AnyAsync(cave => cave.AccountId == _scope.AccountId && cave.CountyId == county.Id,
-                        cancellationToken))
+
+            var stateChanged = county.StateId != stateId;
+            var labelChanged = !string.Equals(county.Name, name, StringComparison.Ordinal) ||
+                               !string.Equals(county.DisplayId, displayId, StringComparison.Ordinal);
+            var affectedIds = stateChanged || labelChanged
+                ? await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
+                    .Where(cave => cave.AccountId == _scope.AccountId && cave.CountyId == county.Id)
+                    .OrderBy(cave => cave.Id).Select(cave => cave.Id).ToListAsync(cancellationToken)
+                : [];
+
+            if (stateChanged && affectedIds.Count > 0)
                 throw ApiExceptionDictionary.BadRequest(
                     "Cannot move county to another state because it is in use.");
+
+            if (labelChanged) await LockCavesAsync(affectedIds, cancellationToken);
+            var expected = labelChanged && affectedIds.Count > 0
+                ? await DbContext.Caves.IgnoreQueryFilters().AsNoTracking()
+                    .Where(cave => cave.AccountId == _scope.AccountId && affectedIds.Contains(cave.Id))
+                    .ToDictionaryAsync(cave => cave.Id, cave => cave.CurrentRevisionId,
+                        StringComparer.Ordinal, cancellationToken)
+                : new Dictionary<string, string?>(StringComparer.Ordinal);
+            var before = labelChanged && affectedIds.Count > 0
+                ? (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                    .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal)
+                : new Dictionary<string, CavePublishedSnapshotV1>(StringComparer.Ordinal);
 
             county.Name = name;
             county.DisplayId = displayId;
             county.StateId = stateId;
             await SaveWithDuplicateTranslationAsync(displayId, cancellationToken);
+
+            if (labelChanged && affectedIds.Count > 0)
+            {
+                var after = (await _snapshots.BuildManyAsync(affectedIds, cancellationToken))
+                    .ToDictionary(snapshot => snapshot.CaveId, StringComparer.Ordinal);
+                var operations = affectedIds.ToDictionary(id => id, _ => CaveRevisionOperation.Update,
+                    StringComparer.Ordinal);
+                await _revisions.PublishAsync(before, after, expected, operations, CaveRevisionSource.ManagerEdit,
+                    cancellationToken: cancellationToken);
+            }
+
             await transaction.CommitAsync(cancellationToken);
             return Result(county);
+        }
+        catch (CaveRevisionConflictException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw CountyAdministrationConcurrencyConflict();
         }
         catch
         {
@@ -313,7 +349,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
         var connection = (NpgsqlConnection)DbContext.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(cancellationToken);
         var dbTransaction = DbContext.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
-            ?? throw new InvalidOperationException("County merge transaction is not active.");
+            ?? throw new InvalidOperationException("County administration transaction is not active.");
 
         foreach (var chunk in caveIds.Order(StringComparer.Ordinal).Chunk(BatchSize))
         {
@@ -329,7 +365,7 @@ public sealed class CountyAdministrationRepository : RepositoryBase
             var count = 0;
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken)) count++;
-            if (count != chunk.Length) throw CountyMergeConcurrencyConflict();
+            if (count != chunk.Length) throw CountyAdministrationConcurrencyConflict();
         }
     }
 
@@ -337,9 +373,9 @@ public sealed class CountyAdministrationRepository : RepositoryBase
         ApiExceptionDictionary.BadRequest(
             $"Cannot merge Counties because County Number {countyNumber} would be duplicated in the destination County.");
 
-    private static ApiException CountyMergeConcurrencyConflict() =>
+    private static ApiException CountyAdministrationConcurrencyConflict() =>
         ApiExceptionDictionary.Conflict(
-            "One or more affected Caves changed during County merge. Retry with current data.");
+            "One or more affected Caves changed during County administration. Retry with current data.");
 
     private sealed record CountyMergeCave(
         string Id, string CountyId, string StateId, int CountyNumber, string? CurrentRevisionId);

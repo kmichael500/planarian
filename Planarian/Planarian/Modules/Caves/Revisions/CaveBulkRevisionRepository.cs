@@ -80,8 +80,8 @@ public sealed class CaveBulkRevisionRepository
                         $"Cave '{caveId}' has no current revision. Revision history rollout must complete before bulk mutations are served.");
 
                 // Match interactive publication semantics: compare the resulting state with the stored current
-                // published revision rather than merely with the current live rows. Shared reference labels can
-                // drift without revision fan-out and must become visible on the next legitimate publication.
+                // published revision rather than merely with the current live rows. This also captures any
+                // reference metadata drift that predates the current publication boundary.
                 var semanticPrevious = previousSnapshot;
                 if (expectedCurrent is not null && currentSnapshot is not null)
                 {
