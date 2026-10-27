@@ -85,9 +85,6 @@ const AuthenticationService = {
       unregisterHttpHandler();
     };
   },
-  HandleUnauthorized(): void {
-    invokeUnauthorizedHandler();
-  },
   ResetUnauthorizedHandling(): void {
     isHandlingUnauthorized = false;
   },

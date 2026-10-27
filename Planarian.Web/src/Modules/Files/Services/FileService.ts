@@ -20,15 +20,3 @@ const FileService = {
   },
 };
 export { FileService };
-
-export interface UploadedFileResponse {
-  id: string;
-  fileUrl: string;
-}
-
-export interface FileInformation {
-  FileTypeKey: string;
-  CaveId?: string;
-  Name?: string;
-  Extension?: string;
-}

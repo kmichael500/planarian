@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { message } from "antd";
-import React from "react";
 import {
   MemoryRouter,
   Route,

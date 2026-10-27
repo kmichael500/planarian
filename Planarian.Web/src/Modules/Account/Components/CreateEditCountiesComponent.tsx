@@ -21,7 +21,6 @@ import {
 import { SearchOutlined } from "@ant-design/icons";
 import { ConfirmationModalComponent } from "../../../Shared/Components/Validation/ConfirmationModalComponent";
 import { PlanarianButton } from "../../../Shared/Components/Buttons/PlanarianButtton";
-import { SettingsService } from "../../Setting/Services/SettingsService";
 import { AccountService } from "../Services/AccountService";
 import {
   isNullOrWhiteSpace,
@@ -355,7 +354,7 @@ const CreateEditCountiesComponent = (
     {
       title: "Action",
       key: "action",
-      render: (text: string, record: TagTypeTableCountyVm) => (
+      render: (_text: string, record: TagTypeTableCountyVm) => (
         <span>
           <Space>
             {editedCounty && editedCounty.tagTypeId === record.tagTypeId ? (

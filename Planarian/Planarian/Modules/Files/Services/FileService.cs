@@ -223,7 +223,6 @@ public class FileService : ServiceBase<FileRepository>
         if (tagTypeId == null)
             throw ApiExceptionDictionary.NotFound("File type");
 
-
         var entity = new File()
         {
             Name = parsedFileName.Name,
@@ -338,9 +337,6 @@ public class FileService : ServiceBase<FileRepository>
         if (!string.IsNullOrWhiteSpace(blobKey) && !string.IsNullOrWhiteSpace(blobContainer))
             await BestEffortDeleteObjectAsync(new StorageObjectAddress(blobContainer, blobKey));
     }
-
-    public Task DeleteBlobBestEffortAsync(string blobKey, string blobContainer) =>
-        BestEffortDeleteObjectAsync(new StorageObjectAddress(blobContainer, blobKey));
 
     public Task DeleteObjectBestEffortAsync(StorageObjectAddress address) => BestEffortDeleteObjectAsync(address);
 
@@ -598,18 +594,6 @@ public class FileService : ServiceBase<FileRepository>
             MimeTypes.GetMimeType(Path.GetExtension(fileName)));
     }
 
-    private async Task EnsureFileManagerAccess(FileRepository.FileMetadataMutationContextResult fileContext)
-    {
-        if (!string.IsNullOrWhiteSpace(fileContext.CaveId) || !string.IsNullOrWhiteSpace(fileContext.CountyId))
-        {
-            await RequestUser.HasCavePermission(PermissionKey.Manager, fileContext.CaveId,
-                fileContext.CountyId, fileContext.StateId);
-            return;
-        }
-
-        await RequestUser.HasCavePermission(PermissionKey.Manager);
-    }
-
     private async Task EnsureFileViewAccess(string fileId, string? caveId, string? countyId, string? stateId)
     {
         if (!string.IsNullOrWhiteSpace(caveId) || !string.IsNullOrWhiteSpace(countyId))
@@ -657,7 +641,6 @@ public class FileService : ServiceBase<FileRepository>
             _objectStorage.InvalidateContainer(containerClient.Name);
         }
     }
-
 
     public async Task<Stream> GetFileStream(string fileId)
     {

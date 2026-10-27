@@ -84,7 +84,7 @@ const LoginPage: React.FC = () => {
         <PlanarianButton
           loading={isLoggingIn}
           type="primary"
-          onClick={(e) => form.submit()}
+          onClick={() => form.submit()}
           icon={<LoginOutlined />}
           alwaysShowChildren
         >

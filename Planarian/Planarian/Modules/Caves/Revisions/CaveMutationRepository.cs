@@ -42,9 +42,6 @@ public sealed class CaveMutationRepository
     /// The outermost repository call owns begin/commit/rollback; nested workflow composition
     /// (for example approval publishing Cave state plus request state) joins that transaction.
     /// </summary>
-    public Task ExecuteTransactionAsync(Func<CancellationToken, Task> work,
-        CancellationToken cancellationToken = default) =>
-        ExecuteTransactionAsync(async token => { await work(token); return true; }, cancellationToken);
 
     public async Task<T> ExecuteTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
@@ -95,33 +92,6 @@ public sealed class CaveMutationRepository
             write(cave);
             await _db.SaveChangesAsync(cancellationToken);
             var result = await PublishPreparedAsync(preparation, source, operation, changeRequestId, importBatchId,
-                cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Creates a new Cave and its first accepted revision atomically.
-    /// </summary>
-    public async Task<CaveMutationResult> PublishNewAsync(Cave cave, CaveRevisionSource source,
-        CaveRevisionOperation operation = CaveRevisionOperation.Create, string? changeRequestId = null,
-        string? importBatchId = null, CancellationToken cancellationToken = default)
-    {
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(cave.AccountId) && cave.AccountId != _scope.AccountId)
-                throw new InvalidOperationException("Cave account does not match the current account.");
-            cave.AccountId = _scope.AccountId;
-            _db.Caves.Add(cave);
-            await _db.SaveChangesAsync(cancellationToken);
-            var result = await PublishPersistedNewAsync(cave.Id, source, operation, changeRequestId, importBatchId,
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return result;

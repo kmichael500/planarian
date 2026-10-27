@@ -70,9 +70,9 @@ const TripService = {
   async UploadPhotos(values: TripPhotoUpload[], tripId: string): Promise<void> {
     const formData = new FormData();
 
-    values.forEach((e, i) => {
-      const title = values[i].title;
-      const description = values[i].description;
+    values.forEach((value, i) => {
+      const title = value.title;
+      const description = value.description;
       formData.append(
         `formData[${i}].title`,
         isNullOrWhiteSpace(title) ? "" : (title as string)
@@ -81,8 +81,8 @@ const TripService = {
         `formData[${i}].description`,
         isNullOrWhiteSpace(description) ? "" : (description as string)
       );
-      formData.append(`formData[${i}].file`, values[i].file as RcFile);
-      formData.append(`formData[${i}].uid`, values[i].uid as string);
+      formData.append(`formData[${i}].file`, value.file as RcFile);
+      formData.append(`formData[${i}].uid`, value.uid as string);
     });
 
     const response = await HttpClient.post<void>(
@@ -106,16 +106,6 @@ const TripService = {
   async GetTripMembers(tripId: string): Promise<SelectListItem<string>[]> {
     const response = await HttpClient.get<SelectListItem<string>[]>(
       `${baseUrl}/${tripId}/members`
-    );
-    return response.data;
-  },
-  async AddTripMember(
-    userId: string,
-    tripId: string
-  ): Promise<SelectListItem<string>[]> {
-    const response = await HttpClient.post<SelectListItem<string>[]>(
-      `${baseUrl}/${tripId}/members/${userId}`,
-      {}
     );
     return response.data;
   },

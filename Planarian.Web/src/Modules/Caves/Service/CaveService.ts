@@ -248,10 +248,6 @@ const CaveService = {
     const response = await HttpClient.delete<void>(`${baseUrl}/${id}`);
     return response.data;
   },
-  async DeleteAllCaves(): Promise<void> {
-    const response = await HttpClient.delete<void>(`${baseUrl}/import`);
-    return response.data;
-  },
   async SearchCavesPaged(
     name: string,
     pageNumber: number = 1,

@@ -439,12 +439,10 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-
     private async Task DeleteAllTagTypes(CancellationToken cancellationToken)
     {
         const int batchSize = 500; // Adjust based on your needs
         int deletedCount;
-
 
         do
         {
@@ -479,11 +477,6 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId)
             .ExecuteDeleteAsync(cancellationToken);
-    }
-
-    public async Task<IEnumerable<AccountState>> GetAllAccountStates()
-    {
-        return await DbContext.AccountStates.Where(c => c.AccountId == RequestUser.AccountId).ToListAsync();
     }
 
     public async Task<IEnumerable<SelectListItem<string>>> GetAllStates(CancellationToken cancellationToken)
@@ -529,28 +522,11 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
             .CountAsync(cancellationToken);
     }
 
-
     public async Task<AccountState?> GetAccountState(string accountId, string deletedStateId)
     {
         return await DbContext.AccountStates
             .Where(e => e.AccountId == accountId && e.StateId == deletedStateId)
             .FirstOrDefaultAsync();
-    }
-
-    public async Task<IEnumerable<string>> GetCavesBatch(int cavesBatchSize, CancellationToken cancellationToken)
-    {
-        return await DbContext.Caves
-            .Where(e => e.AccountId == RequestUser.AccountId)
-            .Take(cavesBatchSize)
-            .Select(e => e.Id)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<int> GetCavesCount(CancellationToken cancellationToken)
-    {
-        return await DbContext.Caves
-            .Where(e => e.AccountId == RequestUser.AccountId)
-            .CountAsync(cancellationToken);
     }
 
     public async Task<string?> GetAccountName(string accountId)

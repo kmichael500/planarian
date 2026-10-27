@@ -149,69 +149,6 @@ export const QueuedFileStorage = {
     });
   },
 
-  async deleteQueueState(queueKey: string): Promise<void> {
-    const database = await openDatabase();
-
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(QUEUE_STATE_STORE, "readwrite");
-      const store = transaction.objectStore(QUEUE_STATE_STORE);
-      const request = store.delete(queueKey);
-
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () =>
-        reject(transaction.error ?? new Error("Failed to delete upload queue state."));
-      transaction.onabort = () =>
-        reject(transaction.error ?? new Error("Failed to delete upload queue state."));
-      request.onerror = () => abortTransaction(transaction);
-    });
-  },
-
-  async putFilesAndQueueState<TState>(
-    queueKey: string,
-    files: QueueFileToStore[],
-    state: TState,
-    onProgress?: (completedCount: number) => void
-  ): Promise<void> {
-    const database = await openDatabase();
-
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(
-        [FILE_STORE, QUEUE_STATE_STORE],
-        "readwrite"
-      );
-      const fileStore = transaction.objectStore(FILE_STORE);
-      const queueStateStore = transaction.objectStore(QUEUE_STATE_STORE);
-      let completedCount = 0;
-
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () =>
-        reject(transaction.error ?? new Error("Failed to persist upload queue."));
-      transaction.onabort = () =>
-        reject(transaction.error ?? new Error("Failed to persist upload queue."));
-
-      files.forEach(({ itemId, file }) => {
-        const request = fileStore.put({
-          id: buildStorageId(queueKey, itemId),
-          queueKey,
-          itemId,
-          file,
-        } as StoredQueueFile);
-
-        request.onsuccess = () => {
-          completedCount += 1;
-          onProgress?.(completedCount);
-        };
-        request.onerror = () => abortTransaction(transaction);
-      });
-
-      const queueStateRequest = queueStateStore.put({
-        queueKey,
-        state,
-      } as StoredQueueState<TState>);
-      queueStateRequest.onerror = () => abortTransaction(transaction);
-    });
-  },
-
   async putFiles(
     queueKey: string,
     files: QueueFileToStore[],
@@ -265,19 +202,6 @@ export const QueuedFileStorage = {
           abortTransaction(transaction);
         };
       });
-    });
-  },
-
-  async putFile(queueKey: string, itemId: string, file: File): Promise<void> {
-    await runTransaction("readwrite", (store, transaction) => {
-      const request = store.put({
-        id: buildStorageId(queueKey, itemId),
-        queueKey,
-        itemId,
-        file,
-      } as StoredQueueFile);
-
-      request.onerror = () => abortTransaction(transaction);
     });
   },
 

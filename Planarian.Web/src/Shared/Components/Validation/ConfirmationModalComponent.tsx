@@ -1,14 +1,13 @@
-import React, { ReactNode, useState } from "react";
-import { Modal, Input, message, Typography } from "antd";
+import { ReactNode, useState } from "react";
+import { Modal, Input, Typography } from "antd";
 import {
   DeleteOutlined,
   CheckCircleOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
 import { PlanarianButton } from "../Buttons/PlanarianButtton";
-import { DeleteButtonComponent } from "../Buttons/DeleteButtonComponent";
 
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface ConfirmationModalComponentProps {
   onConfirm?: () => Promise<void> | void;
@@ -135,7 +134,7 @@ const ConfirmationModalComponent = ({
             style={{ fontSize: "20px" }}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onPressEnter={(e) => {
+            onPressEnter={() => {
               if (isConfirmed) {
                 handleOk();
               }

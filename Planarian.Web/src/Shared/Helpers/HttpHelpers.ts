@@ -1,12 +1,7 @@
-import { serialize } from "object-to-formdata";
 import { getApiBaseUrl } from "../Http/HttpClient";
 import { AuthenticationService } from "../../Modules/Authentication/Services/AuthenticationService";
 
 export const HttpHelpers = {
-  ToFormData(data: any): FormData {
-    var formData = serialize(data);
-    return formData;
-  },
 
   GetLocalRedirectUrl(redirectUrl: string | null): string {
     if (!redirectUrl?.trim()) return "/";

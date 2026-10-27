@@ -55,7 +55,7 @@ const FavoriteCave: React.FC<FavoriteCaveProps> = ({
     }
   }, [caveId]);
 
-  const handleFavoriteToggle = async (e: React.MouseEvent) => {
+  const handleFavoriteToggle = async () => {
     if (disabled || !caveId) {
       return;
     }

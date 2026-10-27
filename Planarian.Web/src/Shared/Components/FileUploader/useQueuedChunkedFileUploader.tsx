@@ -939,7 +939,6 @@ export const useQueuedChunkedFileUploader = <TResult,>({
     const now = Date.now();
     const { runnableItems } = deriveOrderedQueueView(
       queueItems,
-      now,
       uploaderConfig.maxConcurrentUploads
     );
     const waitForDispatch = nextDispatchAllowedAtRef.current - now;

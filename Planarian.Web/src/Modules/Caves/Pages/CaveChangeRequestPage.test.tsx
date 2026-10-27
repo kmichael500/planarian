@@ -3,8 +3,7 @@ import { useContext } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
 import { AppContext } from "../../../Configuration/Context/AppContext";
-import { CaveAvailability, CaveChangeRequestPage, ProposalVersionComparison,
-  UnavailableProposalFilesAlert } from "./CaveChangeRequestPage";
+import { CaveAvailability, CaveChangeRequestPage, ProposalVersionComparison } from "./CaveChangeRequestPage";
 import { CaveChangeRequestDetailVm, CaveChangeRequestSummaryVm, CaveProposalVersionDetailVm } from "../Models/CaveChangeRequestVm";
 import { CaveRevisionDiffVm, CaveSnapshotVm } from "../Models/CaveRevisionVm";
 import { CaveService } from "../Service/CaveService";

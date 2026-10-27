@@ -1,8 +1,6 @@
-import { Avatar, Typography } from "antd";
+import { Avatar } from "antd";
 import { UserAvatarComponent } from "./UserAvatarComponent";
 import { AvatarSize } from "antd/lib/avatar/AvatarContext";
-
-const { Text } = Typography;
 
 export interface UserAvatarComponentProps {
   userIds: string[];

@@ -13,23 +13,7 @@ export class CacheService {
     return this.cache.get(key);
   }
 
-  static has(key: string): boolean {
-    return this.cache.has(key);
-  }
-
   static delete(key: string): void {
     this.cache.delete(key);
-  }
-
-  static clear(): void {
-    this.cache.clear();
-  }
-
-  static size(): number {
-    return this.cache.size;
-  }
-
-  static setDefaultTTL(defaultTTL: number): void {
-    this.defaultTTL = defaultTTL;
   }
 }

@@ -203,7 +203,6 @@ public class UserRepository : RepositoryBase
 
     #region Manage Permissions
 
-
     public async Task<CavePermissionManagementVm> GetCavePermissionsVm(string userId, string accountId,
         string permissionKey)
     {
@@ -423,14 +422,6 @@ public class UserRepository : RepositoryBase
             .ExecuteDeleteAsync(cancellationToken);
 
         return deletedAccountUsers > 0;
-    }
-
-    public async Task<DateTime?> GetLastActiveOn(string userId)
-    {
-        return await DbContext.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.LastActiveOn)
-            .FirstOrDefaultAsync();
     }
 
  }

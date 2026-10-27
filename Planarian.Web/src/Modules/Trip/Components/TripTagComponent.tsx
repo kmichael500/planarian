@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Select, Spin, Tooltip } from "antd";
 import { TripService } from "../Services/TripService";
 import { SelectListItem } from "../../../Shared/Models/SelectListItem";
@@ -17,7 +17,6 @@ const TripTagComponent = (props: TripTagComponentProps) => {
     undefined
   );
 
-  const [inputVisible, setInputVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -51,10 +50,6 @@ const TripTagComponent = (props: TripTagComponentProps) => {
     }
   };
 
-  const showInput = () => {
-    setInputVisible(true);
-  };
-
   const handleSelectChange = async (value: string) => {
     var tagAlreadyAdded = tags.find((tag) => tag.value === value);
     if (value && tagAlreadyAdded === undefined) {
@@ -71,7 +66,6 @@ const TripTagComponent = (props: TripTagComponentProps) => {
         setSelected("Yooo");
         setSelected(null);
 
-        setInputVisible(false);
       } catch (error) {
         console.error(error);
       }
@@ -79,7 +73,7 @@ const TripTagComponent = (props: TripTagComponentProps) => {
   };
   return (
     <Spin spinning={isLoading}>
-      {tags.map((tag, index) => {
+      {tags.map((tag) => {
         const isLongTag = tag.display.length > 20;
         const tagElem = (
           <PlanarianTag key={tag.value} closable={true} onClose={() => handleClose(tag)}>

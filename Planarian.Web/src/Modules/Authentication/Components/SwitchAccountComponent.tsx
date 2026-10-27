@@ -1,5 +1,5 @@
 import { Form, List, Modal } from "antd";
-import React, { useContext, useMemo } from "react";
+import { useContext, useMemo } from "react";
 import { AppContext } from "../../../Configuration/Context/AppContext";
 import { CancelButtonComponent } from "../../../Shared/Components/Buttons/CancelButtonComponent";
 import "./SwitchAccountComponent.scss";

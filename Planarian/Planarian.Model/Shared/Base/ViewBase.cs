@@ -41,20 +41,10 @@ public abstract class ViewBase
         }
     }
 
-    public static string GetSqlResourceName<TView>() where TView : ViewBase
-    {
-        return GetSqlResourceName(typeof(TView));
-    }
-
     public static string GetSqlResourceName(Type viewType)
     {
         var viewName = GetViewName(viewType);
         return $"{SqlResourceRoot}.{viewName}.sql";
-    }
-
-    public static string GetDropViewSql<TView>() where TView : ViewBase
-    {
-        return $@"DROP VIEW IF EXISTS ""{GetViewName<TView>()}"";";
     }
 
     public static string ReadSqlResource<TView>() where TView : ViewBase

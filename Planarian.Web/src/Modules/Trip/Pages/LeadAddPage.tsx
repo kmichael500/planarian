@@ -66,7 +66,7 @@ const LeadAddPage: React.FC = () => {
     setLeads(updatedLeads);
   };
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async () => {
     let hasErrors = false;
     let errorMessage = "";
     leads.forEach((lead) => {

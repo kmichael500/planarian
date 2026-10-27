@@ -1,11 +1,9 @@
-import { Avatar, Spin, Tooltip, Typography } from "antd";
+import { Avatar, Spin, Tooltip } from "antd";
 import { useEffect, useState } from "react";
 import { StringHelpers } from "../../../Shared/Helpers/StringHelpers";
 import { NameProfilePhotoVm } from "../Models/NameProfilePhotoVm";
 import { AvatarSize } from "antd/lib/avatar/AvatarContext";
 import { UserService } from "../UserService";
-
-const { Text } = Typography;
 
 export interface UserAvatarComponentProps {
   userId: string;

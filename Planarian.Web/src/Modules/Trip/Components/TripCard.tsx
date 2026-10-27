@@ -31,7 +31,7 @@ const TripCardComponent: React.FC<TripCardProps> = ({ trip }) => {
     >
       <>
         <Row>
-          {trip.tripTagTypeIds.map((tagId, index) => (
+          {trip.tripTagTypeIds.map((tagId) => (
             <Col key={tagId}>
               <TagComponent tagId={tagId} />
             </Col>

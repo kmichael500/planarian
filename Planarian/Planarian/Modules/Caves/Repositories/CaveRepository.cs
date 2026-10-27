@@ -37,7 +37,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
 
     private const double EarthRadiusMiles = 3958.756;
 
-
     public async Task<PagedResult<CaveSearchVm>> GetCaves(FilterQuery filterQuery, string? permissionKey = null)
     {
         var query = GetCavesQuery(filterQuery, permissionKey);
@@ -983,15 +982,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         CancellationToken cancellationToken) =>
         EligiblePeopleTagLookup.GetEligibleAsync(DbContext, RequestUser.AccountId!, cancellationToken);
 
-    public async Task<IReadOnlyList<Planarian.Model.Database.Entities.TagType>> GetTrackedTagTypesAsync(
-        IEnumerable<string> ids, CancellationToken cancellationToken)
-    {
-        var distinct = ids.Distinct(StringComparer.Ordinal).ToList();
-        return await DbContext.TagTypes.Where(tag => distinct.Contains(tag.Id) &&
-                (tag.AccountId == RequestUser.AccountId || tag.IsDefault))
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task ValidateStateCountyPairAsync(string stateId, string countyId,
         CancellationToken cancellationToken)
     {
@@ -1458,57 +1448,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
             }).ToListAsync(cancellationToken);
     }
 
-    public async Task<Cave?> GetCaveWithLinePlots(string caveId)
-    {
-        return await DbContext.Caves.Where(e => e.Id == caveId && e.AccountId == RequestUser.AccountId)
-            .Include(e => e.GeoJsons)
-            .FirstOrDefaultAsync();
-    }
-
-    public async Task<HashSet<UsedCountyNumber>> GetUsedCountyNumbers()
-    {
-        var usedCountyNumbers = await DbContext.Caves
-            .Where(e => e.AccountId == RequestUser.AccountId)
-            .Select(e => new UsedCountyNumber(e.CountyId, e.CountyNumber))
-            .ToListAsync();
-
-        return usedCountyNumbers.ToHashSet();
-    }
-
-    public async Task<List<ImportSyncCaveLookup>> GetImportSyncCaves()
-    {
-        return await DbContext.Caves
-            .IgnoreQueryFilters()
-            .Where(e => e.AccountId == RequestUser.AccountId)
-            .Select(e => new ImportSyncCaveLookup(
-                e.Id,
-                e.StateId,
-                e.State.Abbreviation,
-                e.CountyId,
-                e.County.Name,
-                e.County.DisplayId,
-                e.CountyNumber,
-                e.Name,
-                e.AlternateNames,
-                e.LengthFeet,
-                e.DepthFeet,
-                e.MaxPitDepthFeet,
-                e.NumberOfPits,
-                e.Narrative,
-                e.ReportedOn,
-                e.IsArchived,
-                e.GeologyTags.Select(tag => tag.TagTypeId),
-                e.GeologicAgeTags.Select(tag => tag.TagTypeId),
-                e.MapStatusTags.Select(tag => tag.TagTypeId),
-                e.PhysiographicProvinceTags.Select(tag => tag.TagTypeId),
-                e.ArcheologyTags.Select(tag => tag.TagTypeId),
-                e.BiologyTags.Select(tag => tag.TagTypeId),
-                e.CaveOtherTags.Select(tag => tag.TagTypeId),
-                e.CartographerNameTags.Select(tag => tag.TagTypeId),
-                e.CaveReportedByNameTags.Select(tag => tag.TagTypeId)))
-            .ToListAsync();
-    }
-
     public record GetCaveForFileImportByCountyCodeNumberResult(string CaveId, string CaveName);
 
     public async Task<GetCaveForFileImportByCountyCodeNumberResult?> GetCaveForFileImportByCountyCodeNumber(
@@ -1533,20 +1472,6 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
     }
 
     #region Favorites
-
-    public async Task<PagedResult<FavoriteVm>> GetFavoriteCaves(FilterQuery query)
-    {
-        var favoriteCaves = await DbContext.Favorites
-            .Where(e => e.AccountId == RequestUser.AccountId && e.UserId == RequestUser.Id)
-            .OrderByDescending(e => e.CreatedOn)
-            .Select(e => new FavoriteVm
-            {
-                CaveId = e.CaveId,
-            })
-            .ApplyPagingAsync(query.PageNumber, query.PageSize);
-
-        return favoriteCaves;
-    }
 
     public async Task<Favorite?> GetFavoriteCave(string caveId)
     {
@@ -1597,31 +1522,3 @@ public class CaveRepository : CaveRepository<PlanarianDbContext>
     {
     }
 }
-
-public record UsedCountyNumber(string CountyId, int CountyNumber);
-public record ImportSyncCaveLookup(
-    string Id,
-    string StateId,
-    string StateAbbreviation,
-    string CountyId,
-    string CountyName,
-    string CountyDisplayId,
-    int CountyNumber,
-    string Name,
-    string? AlternateNames,
-    double? LengthFeet,
-    double? DepthFeet,
-    double? MaxPitDepthFeet,
-    int? NumberOfPits,
-    string? Narrative,
-    DateTime? ReportedOn,
-    bool IsArchived,
-    IEnumerable<string> GeologyTagIds,
-    IEnumerable<string> GeologicAgeTagIds,
-    IEnumerable<string> MapStatusTagIds,
-    IEnumerable<string> PhysiographicProvinceTagIds,
-    IEnumerable<string> ArcheologyTagIds,
-    IEnumerable<string> BiologyTagIds,
-    IEnumerable<string> OtherTagIds,
-    IEnumerable<string> CartographerNameTagIds,
-    IEnumerable<string> ReportedByNameTagIds);

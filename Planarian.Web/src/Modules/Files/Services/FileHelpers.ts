@@ -24,18 +24,6 @@ export const isGpxFileType = (fileType: string | null | undefined) => {
   return fileType ? fileType.toLowerCase() === "gpx" : false;
 };
 
-export const isGeoJsonFileType = (fileType: string | null | undefined) => {
-  return fileType ? fileType.toLowerCase() === "geojson" : false;
-};
-
-export const isKmlFileType = (fileType: string | null | undefined) => {
-  return fileType ? fileType.toLowerCase() === "kml" : false;
-};
-
-export const isZipFileType = (fileType: string | null | undefined) => {
-  return fileType ? fileType.toLowerCase() === "zip" : false;
-};
-
 export const isVectorDatasetFileType = (
   fileType: string | null | undefined
 ) => {

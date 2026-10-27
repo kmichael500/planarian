@@ -78,7 +78,7 @@ const MemberGridComponent: React.FC<MemberGridComponentProps> = (props) => {
     },
     {
       title: "Action",
-      render: (text: string, record: any) => (
+      render: (_text: string, record: any) => (
         <Space size="middle">
           <DeleteButtonComponent
             title={`Are you sure you want to delete this ${props.type.toLowerCase()} member?`}

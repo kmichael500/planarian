@@ -109,20 +109,6 @@ const PlanarianMenuComponent = (props: MenuComponentProps) => {
     if (selectedItem?.key && typeof selectedItem.key === "string") {
       setSelectedKey(selectedItem.key);
 
-      // Not sure if this is needed. It's purpose was to open the children of the selected item when refreshing the page
-      // However, it causes a bug that always opens the children of the selected item before clicking the menu open/closed
-
-      // const openKeys: string[] = [];
-      // let parent = (items as PlanarianMenuItem[]).find((item) =>
-      //   item.children?.includes(selectedItem)
-      // );
-      // while (parent && typeof parent.key === "string") {
-      //   openKeys.push(parent.key);
-      //   parent = (items as PlanarianMenuItem[]).find((item) =>
-      //     item.children?.includes(parent!)
-      //   );
-      // }
-      // setOpenedKeys(openKeys);
     }
   }, [location.pathname, props.menuItems]);
 

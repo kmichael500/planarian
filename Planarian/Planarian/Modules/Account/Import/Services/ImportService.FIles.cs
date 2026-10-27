@@ -139,26 +139,6 @@ public partial class ImportService
         await _chunkedUploadService.CancelActiveSessionsForCurrentUser(cancellationToken);
     }
 
-    private async Task<FileImportResult> ProcessFileImport(Stream stream, string fileName, string idRegex,
-        string delimiterRegex, bool ignoreDuplicates, string? requestId, CancellationToken cancellationToken)
-    {
-        var validation = await ValidateFileImport(
-            fileName,
-            idRegex,
-            delimiterRegex,
-            ignoreDuplicates,
-            requestId,
-            cancellationToken);
-        if (!validation.Result.IsSuccessful || string.IsNullOrWhiteSpace(validation.CaveId))
-        {
-            return validation.Result;
-        }
-
-        await _fileService.UploadCaveFile(stream, validation.CaveId, fileName, cancellationToken, requestId);
-
-        return validation.Result;
-    }
-
     private async Task<FileImportResult> ProcessStagedFileImport(string stagedBlobKey, string fileName, string idRegex,
         string delimiterRegex, bool ignoreDuplicates, string? requestId, CancellationToken cancellationToken)
     {

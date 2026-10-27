@@ -191,25 +191,6 @@ public class UserService : ServiceBase<UserRepository>
             ConfirmationEmailDeliveryStatus = sendResult.DeliveryStatus
         };
     }
-    
-    
-    public async Task ClaimInvitation(string invitationCode, string userEmail, CancellationToken cancellationToken)
-    {
-        var user = await Repository.GetUserByEmail(userEmail);
-        if (user == null) throw ApiExceptionDictionary.NotFound("User");
-
-        var dbTransaction = await Repository.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await ClaimInvitation(user, invitationCode, cancellationToken);
-            await dbTransaction.CommitAsync(cancellationToken);
-        }
-        catch (Exception)
-        {
-            await dbTransaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
 
     private async Task ClaimInvitation(User existingUser, string? invitationCode, CancellationToken cancellationToken)
     {

@@ -117,21 +117,6 @@ public class SettingsRepository<TDbContext> : RepositoryBase<TDbContext> where T
         return await DbContext.States.Where(e => e.Id == stateId).Select(e => e.Name).FirstOrDefaultAsync();
     }
 
-    public async Task<State?> GetStateByNameOrAbbreviation(string caveRecordState)
-    {
-        var state = await DbContext.States.Where(e => e.Name == caveRecordState || e.Abbreviation == caveRecordState)
-            .FirstOrDefaultAsync();
-
-        return state;
-    }
-
-    public async Task<County?> GetCountyByDisplayId(string displayId, string stateId)
-    {
-        var county = await DbContext.Counties
-            .Where(e => e.DisplayId == displayId && e.StateId == stateId).FirstOrDefaultAsync();
-
-        return county;
-    }
 }
 
 public class SettingsRepository : SettingsRepository<PlanarianDbContext>
