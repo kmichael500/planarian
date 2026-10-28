@@ -33,6 +33,7 @@ public sealed record CaveChangeRequestReviewEventReadRow(CaveChangeRequestReview
 
 public sealed class CaveChangeRequestRepository
 {
+    private const int CleanupLookupBatchSize = 500;
     private readonly PlanarianDbContext _db;
     private readonly RequestUser _user;
     private readonly AccountExecutionScope _scope;
@@ -422,7 +423,7 @@ public sealed class CaveChangeRequestRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> RejectAsync(string requestId,
+    public async Task<IReadOnlyList<string>> RejectAsync(string requestId,
         string expectedProposalVersionId, string? notes,
         CancellationToken cancellationToken)
     {
@@ -437,13 +438,15 @@ public sealed class CaveChangeRequestRepository
         request.ReviewerNotes = notes.Trim();
         request.ReviewedOn = DateTime.UtcNow;
         AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.Rejected, request.ReviewerNotes);
-        var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
+        var cleanupTargets = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+        var cleanupTargetIds = cleanupTargets.Select(target => target.Id)
+            .Distinct(StringComparer.Ordinal).ToList();
         await transaction.CommitAsync(cancellationToken);
-        return blobs;
+        return cleanupTargetIds;
     }
 
-    public async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> MarkApprovedAsync(string requestId,
+    public async Task<IReadOnlyList<string>> MarkApprovedAsync(string requestId,
         string expectedProposalVersionId,
         CaveMutationResult mutation, string? notes, CancellationToken cancellationToken)
     {
@@ -458,12 +461,12 @@ public sealed class CaveChangeRequestRepository
         request.ReviewerNotes = notes?.Trim();
         request.ReviewedOn = DateTime.UtcNow;
         AddReviewEvent(request, expectedProposalVersionId, CaveChangeRequestReviewAction.Approved, request.ReviewerNotes);
-        var blobs = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
+        var cleanupTargets = await RemoveRemainingStagedFilesAsync(requestId, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
-        return blobs;
+        return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
     }
 
-    private async Task<IReadOnlyList<StagedFileObjectDeleteTarget>> RemoveRemainingStagedFilesAsync(
+    private async Task<IReadOnlyList<StorageCleanupTarget>> RemoveRemainingStagedFilesAsync(
         string requestId, CancellationToken cancellationToken)
     {
         var stagedFileIds = await _db.CaveChangeRequestStagedFiles
@@ -482,13 +485,76 @@ public sealed class CaveChangeRequestRepository
                            !_db.CaveChangeRequestStagedFiles.Any(staged =>
                                staged.AccountId == _scope.AccountId && staged.FileId == file.Id))
             .ToListAsync(cancellationToken);
-        var blobs = filesToDelete
-            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) &&
-                           !string.IsNullOrWhiteSpace(file.BlobContainer))
-            .Select(file => new StagedFileObjectDeleteTarget(file.BlobKey!, file.BlobContainer!))
-            .ToList();
+
+        var cleanupTargets = await QueueUnpublishedFileObjectCleanupAsync(
+            filesToDelete, cancellationToken);
+
         _db.Files.RemoveRange(filesToDelete);
-        return blobs;
+        return cleanupTargets;
+    }
+
+    private async Task<IReadOnlyList<StorageCleanupTarget>> QueueUnpublishedFileObjectCleanupAsync(
+        IEnumerable<Planarian.Model.Database.Entities.RidgeWalker.File> files,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new List<(string Partition, string Key)>();
+        foreach (var file in files)
+        {
+            if (file.AccountId != _scope.AccountId || file.CaveId is not null)
+                throw new InvalidOperationException("The staged File is not an unpublished File for this account.");
+            if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) continue;
+            if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
+                throw new InvalidOperationException("A staged File has an incomplete object-storage address.");
+            candidates.Add((file.BlobContainer, file.BlobKey));
+        }
+
+        var addresses = candidates.Distinct().ToList();
+        if (addresses.Count == 0) return [];
+
+        var existingByAddress = _db.StorageCleanupTargets.Local
+            .Where(row => row.AccountId == _scope.AccountId &&
+                          row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval && !row.IsContainer)
+            .ToDictionary(row => (row.StoragePartition, row.StorageKey));
+
+        foreach (var partition in addresses.GroupBy(address => address.Partition))
+        {
+            foreach (var keyChunk in partition.Select(address => address.Key)
+                         .Distinct().Chunk(CleanupLookupBatchSize))
+            {
+                var keys = keyChunk.ToArray();
+                var existing = await _db.StorageCleanupTargets
+                    .Where(row => row.AccountId == _scope.AccountId &&
+                                  row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval &&
+                                  !row.IsContainer && row.StoragePartition == partition.Key &&
+                                  keys.Contains(row.StorageKey))
+                    .ToListAsync(cancellationToken);
+                foreach (var target in existing)
+                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
+            }
+        }
+
+        var targets = new List<StorageCleanupTarget>(addresses.Count);
+        foreach (var address in addresses)
+        {
+            if (existingByAddress.TryGetValue(address, out var existing))
+            {
+                targets.Add(existing);
+                continue;
+            }
+
+            var target = new StorageCleanupTarget
+            {
+                AccountId = _scope.AccountId,
+                StoragePartition = address.Partition,
+                StorageKey = address.Key,
+                Purpose = StorageCleanupPurpose.UnpublishedFileRemoval
+            };
+            _db.StorageCleanupTargets.Add(target);
+            existingByAddress.Add(address, target);
+            targets.Add(target);
+        }
+
+        return targets;
     }
 
     private async Task ClaimAuthoringStagedFilesAsync(CaveChangeRequest request, IEnumerable<string> fileIds,

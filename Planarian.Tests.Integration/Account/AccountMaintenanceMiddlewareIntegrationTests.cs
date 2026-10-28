@@ -94,19 +94,22 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
         Assert.True(executed);
     }
 
-    [Fact]
-    public async Task PendingCaveAssetCleanupDoesNotBlockUnrelatedAccountWrites()
+    [Theory]
+    [InlineData(Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose.CaveAssetRemoval)]
+    [InlineData(Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose.UnpublishedFileRemoval)]
+    public async Task PendingOrdinaryFileCleanupDoesNotBlockUnrelatedAccountWrites(
+        Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose purpose)
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(PendingCaveAssetCleanupDoesNotBlockUnrelatedAccountWrites));
+            $"{nameof(PendingOrdinaryFileCleanupDoesNotBlockUnrelatedAccountWrites)}_{purpose}");
         var account = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         await using var context = database.CreateDbContext("a", account.AccountId);
         context.StorageCleanupTargets.Add(new Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupTarget
         {
             AccountId = account.AccountId,
             StoragePartition = "portable-account-objects",
-            StorageKey = "objects/pending-asset-delete",
-            Purpose = Planarian.Model.Database.Entities.RidgeWalker.StorageCleanupPurpose.CaveAssetRemoval
+            StorageKey = $"objects/pending-{purpose}",
+            Purpose = purpose
         });
         await context.SaveChangesAsync();
 
@@ -128,6 +131,71 @@ public sealed class AccountMaintenanceMiddlewareIntegrationTests(PostgresTestSer
             new AccountRepository(context, context.RequestUser));
 
         Assert.True(executed);
+    }
+
+    [Fact]
+    public async Task ArchiveJobLeaseSerializesOneAccountAcrossReplicasWithoutBlockingMaintenanceSharedLease()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ArchiveJobLeaseSerializesOneAccountAcrossReplicasWithoutBlockingMaintenanceSharedLease));
+        var accountA = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var accountB = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'b');
+        var firstLocks = new AccountMaintenanceLockRepository(new ServerOptions
+        {
+            SqlConnectionString = database.ConnectionString
+        });
+        var secondLocks = new AccountMaintenanceLockRepository(new ServerOptions
+        {
+            SqlConnectionString = database.ConnectionString
+        });
+
+        await using (var firstArchive = await firstLocks.TryAcquireArchiveAsync(accountA.AccountId))
+        {
+            Assert.NotNull(firstArchive);
+            Assert.Null(await secondLocks.TryAcquireArchiveAsync(accountA.AccountId));
+
+            await using var ordinaryWrite = await secondLocks.TryAcquireAsync(
+                accountA.AccountId, exclusive: false);
+            Assert.NotNull(ordinaryWrite);
+            Assert.Null(await secondLocks.TryAcquireAsync(accountA.AccountId, exclusive: true));
+
+            await using var otherAccountArchive = await secondLocks.TryAcquireArchiveAsync(accountB.AccountId);
+            Assert.NotNull(otherAccountArchive);
+        }
+
+        await using var afterRelease = await secondLocks.TryAcquireArchiveAsync(accountA.AccountId);
+        Assert.NotNull(afterRelease);
+    }
+
+    [Fact]
+    public async Task ArchiveLeasesFitTheBoundedMaintenancePoolOneConnectionPerAccount()
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            nameof(ArchiveLeasesFitTheBoundedMaintenancePoolOneConnectionPerAccount));
+        var locks = new AccountMaintenanceLockRepository(new ServerOptions
+        {
+            SqlConnectionString = database.ConnectionString
+        });
+        var leases = new List<AccountMaintenanceLockRepository.Lease>();
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            for (var index = 0; index < 24; index++)
+            {
+                var lease = await locks.TryAcquireArchiveAsync(
+                    $"archive-pool-{index:D2}", timeout.Token);
+                Assert.NotNull(lease);
+                leases.Add(lease!);
+            }
+
+            Assert.Equal(24, leases.Count);
+        }
+        finally
+        {
+            for (var index = leases.Count - 1; index >= 0; index--)
+                await leases[index].DisposeAsync();
+        }
     }
 
 

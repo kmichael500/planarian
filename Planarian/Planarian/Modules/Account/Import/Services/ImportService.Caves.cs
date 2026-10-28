@@ -1,6 +1,5 @@
 using Planarian.Library.Exceptions;
 using Planarian.Modules.Account.Import.Models;
-using Planarian.Shared.Services;
 
 namespace Planarian.Modules.Account.Import.Services;
 
@@ -34,15 +33,10 @@ public partial class ImportService
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Applying cave import");
         var result = await _caveExecutor.ExecuteAsync(plan, temporaryFileId, cancellationToken);
 
-        // Relational state and revision history commit atomically inside the
-        // executor. Blob deletion is intentionally deferred until after commit.
-        foreach (var blob in result.BlobDeletes)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!string.IsNullOrWhiteSpace(blob.BlobKey) && !string.IsNullOrWhiteSpace(blob.BlobContainer))
-                await _fileService.DeleteObjectBestEffortAsync(
-                    new StorageObjectAddress(blob.BlobContainer, blob.BlobKey));
-        }
+        // Relational state, revision history, and cleanup responsibility commit atomically
+        // inside the executor. External deletion is attempted only after that commit.
+        await _fileService.CleanupAssetRemovalTargetsAsync(
+            result.StorageCleanupTargetIds, CancellationToken.None);
 
         await _notificationService.SendNotificationToGroupAsync(signalRGroup, "Finished cave import");
         return preview;

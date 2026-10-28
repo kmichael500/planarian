@@ -26,6 +26,13 @@ namespace Planarian.Modules.Files.Services;
 public class FileService : ServiceBase<FileRepository>
 {
     private const int OpportunisticCleanupBatchSize = 16;
+    private const int ExplicitCleanupBatchSize = 500;
+    private static readonly StorageCleanupPurpose[] AssetRemovalCleanupPurposes =
+        [StorageCleanupPurpose.CaveAssetRemoval];
+    private static readonly StorageCleanupPurpose[] UnpublishedFileCleanupPurposes =
+        [StorageCleanupPurpose.UnpublishedFileRemoval];
+    private static readonly StorageCleanupPurpose[] OrdinaryFileCleanupPurposes =
+        [StorageCleanupPurpose.CaveAssetRemoval, StorageCleanupPurpose.UnpublishedFileRemoval];
 
     private static readonly ConcurrentDictionary<string, Task> ContainerInitializationTasks =
         new(StringComparer.OrdinalIgnoreCase);
@@ -219,9 +226,9 @@ public class FileService : ServiceBase<FileRepository>
         fileName = parsedFileName.CompleteName;
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
 
-        var expiredObjects = await RemoveExpiredFiles(cancellationToken);
-        foreach (var expiredObject in expiredObjects)
-            await BestEffortDeleteObjectAsync(expiredObject);
+        await CleanupUnpublishedFileRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        var expiredCleanupTargetIds = await RemoveExpiredFiles(cancellationToken);
+        await CleanupUnpublishedFileRemovalTargetsAsync(expiredCleanupTargetIds, CancellationToken.None);
 
         var tempCaveImportTagType =
             await _tagRepository.GetFileTypeTagByName(fileTypeTagName, RequestUser.AccountId);
@@ -276,13 +283,12 @@ public class FileService : ServiceBase<FileRepository>
         CancellationToken cancellationToken, string? uuid = null)
     {
         if (RequestUser.AccountId == null) throw new BadHttpRequestException("Account Id is null");
-        await CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        await CleanupOrdinaryFileRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         var parsedFileName = FileNamePolicy.Parse(fileName);
         fileName = parsedFileName.CompleteName;
 
-        var expiredObjects = await RemoveExpiredFiles(cancellationToken);
-        foreach (var expiredObject in expiredObjects)
-            await BestEffortDeleteObjectAsync(expiredObject);
+        var expiredCleanupTargetIds = await RemoveExpiredFiles(cancellationToken);
+        await CleanupUnpublishedFileRemovalTargetsAsync(expiredCleanupTargetIds, CancellationToken.None);
 
         var allFileTypes = await _settingsRepository.GetTags(TagTypeKeyConstant.File);
         var autoTagType = allFileTypes.FirstOrDefault(tag =>
@@ -341,35 +347,79 @@ public class FileService : ServiceBase<FileRepository>
     {
         var entity = await Repository.GetDeletableUnpublishedFileByIdAsync(fileId, cancellationToken);
         if (entity is null) return;
-        var blobKey = entity.BlobKey;
-        var blobContainer = entity.BlobContainer;
+
+        var cleanupTargets = await Repository.QueueUnpublishedFileObjectCleanupAsync([entity], cancellationToken);
         Repository.Delete(entity);
         await Repository.SaveChangesAsync(cancellationToken);
-        if (!string.IsNullOrWhiteSpace(blobKey) && !string.IsNullOrWhiteSpace(blobContainer))
-            await BestEffortDeleteObjectAsync(new StorageObjectAddress(blobContainer, blobKey));
+        await CleanupUnpublishedFileRemovalTargetsAsync(
+            cleanupTargets.Select(target => target.Id), CancellationToken.None);
     }
 
+    public Task CleanupAssetRemovalTargetsAsync(IEnumerable<string>? targetIds = null,
+        CancellationToken cancellationToken = default) =>
+        CleanupStorageTargetsAsync(AssetRemovalCleanupPurposes, targetIds, cancellationToken);
 
-    public async Task CleanupAssetRemovalTargetsAsync(IEnumerable<string>? targetIds = null,
-        CancellationToken cancellationToken = default)
+    public Task CleanupUnpublishedFileRemovalTargetsAsync(IEnumerable<string>? targetIds = null,
+        CancellationToken cancellationToken = default) =>
+        CleanupStorageTargetsAsync(UnpublishedFileCleanupPurposes, targetIds, cancellationToken);
+
+    public Task CleanupOrdinaryFileRemovalTargetsAsync(IEnumerable<string>? targetIds = null,
+        CancellationToken cancellationToken = default) =>
+        CleanupStorageTargetsAsync(OrdinaryFileCleanupPurposes, targetIds, cancellationToken);
+
+    private async Task CleanupStorageTargetsAsync(IReadOnlyCollection<StorageCleanupPurpose> purposes,
+        IEnumerable<string>? targetIds, CancellationToken cancellationToken)
     {
         var requestedIds = targetIds?.Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal).ToArray();
-        var maxCount = requestedIds is null ? OpportunisticCleanupBatchSize : 500;
 
+        if (requestedIds is null)
+        {
+            await CleanupStorageTargetBatchAsync(
+                purposes, null, OpportunisticCleanupBatchSize, cancellationToken);
+            return;
+        }
+
+        foreach (var idChunk in requestedIds.Chunk(ExplicitCleanupBatchSize))
+            await CleanupStorageTargetBatchAsync(
+                purposes, idChunk, idChunk.Length, cancellationToken);
+    }
+
+    private async Task CleanupStorageTargetBatchAsync(
+        IReadOnlyCollection<StorageCleanupPurpose> purposes,
+        IReadOnlyCollection<string>? targetIds,
+        int maxCount,
+        CancellationToken cancellationToken)
+    {
         List<StorageCleanupTarget> pending;
         try
         {
             pending = await Repository.GetStorageCleanupTargetsAsync(
-                StorageCleanupPurpose.CaveAssetRemoval, requestedIds, maxCount, cancellationToken);
+                purposes, targetIds, maxCount, cancellationToken);
         }
         catch (Exception exception)
         {
             // The relational mutation has already committed. Cleanup discovery must not
             // replace that durable outcome with a misleading request failure.
             _logger.LogWarning(exception,
-                "Unable to load Cave asset cleanup debt for account {AccountId}; cleanup will retry later",
+                "Unable to load File object cleanup debt for account {AccountId}; cleanup will retry later",
                 RequestUser.AccountId);
+            return;
+        }
+
+        HashSet<string> referencedTargetIds;
+        try
+        {
+            referencedTargetIds = await Repository.GetCleanupTargetIdsReferencedByLiveFilesAsync(
+                pending, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // A failed safety check means this batch must remain pending; never guess that
+            // an address is unreferenced merely because PostgreSQL could not prove it.
+            _logger.LogWarning(exception,
+                "Unable to validate live File references for {CleanupCount} storage cleanup targets in account {AccountId}; cleanup will retry later",
+                pending.Count, RequestUser.AccountId);
             return;
         }
 
@@ -379,14 +429,14 @@ public class FileService : ServiceBase<FileRepository>
             try
             {
                 var address = new StorageObjectAddress(target.StoragePartition, target.StorageKey);
-                if (await Repository.IsStorageObjectReferencedByLiveFileAsync(address, cancellationToken))
+                if (referencedTargetIds.Contains(target.Id))
                 {
                     // The bytes are live again (or shared by legacy data), so this removal no longer owns deletion.
                     // A later removal of the live File will create its own cleanup target if needed.
                     _logger.LogWarning(
-                        "Cave asset cleanup target {TargetId} for account {AccountId} is referenced by a live File; " +
+                        "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} is referenced by a live File; " +
                         "clearing the stale cleanup target without deleting the object",
-                        target.Id, RequestUser.AccountId);
+                        target.Id, target.Purpose, RequestUser.AccountId);
                     completed.Add(target.Id);
                     continue;
                 }
@@ -398,15 +448,15 @@ public class FileService : ServiceBase<FileRepository>
                 else
                 {
                     _logger.LogWarning(
-                        "Cave asset cleanup target {TargetId} for account {AccountId} remains pending after object deletion failed",
-                        target.Id, RequestUser.AccountId);
+                        "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} remains pending after object deletion failed",
+                        target.Id, target.Purpose, RequestUser.AccountId);
                 }
             }
             catch (Exception exception)
             {
                 _logger.LogWarning(exception,
-                    "Cave asset cleanup target {TargetId} for account {AccountId} could not be processed and remains pending",
-                    target.Id, RequestUser.AccountId);
+                    "Storage cleanup target {TargetId} ({Purpose}) for account {AccountId} could not be processed and remains pending",
+                    target.Id, target.Purpose, RequestUser.AccountId);
             }
         }
 
@@ -414,20 +464,18 @@ public class FileService : ServiceBase<FileRepository>
         try
         {
             await Repository.CompleteStorageCleanupTargetsAsync(
-                StorageCleanupPurpose.CaveAssetRemoval, completed, CancellationToken.None);
+                purposes, completed, CancellationToken.None);
         }
         catch (Exception exception)
         {
             // A successful external delete with a failed acknowledgement is safe to retry:
             // DeleteIfExists is idempotent and an already-missing object counts as cleaned.
             _logger.LogWarning(exception,
-                "Unable to acknowledge {CleanupCount} completed Cave asset cleanup targets for account {AccountId}; " +
+                "Unable to acknowledge {CleanupCount} completed File object cleanup targets for account {AccountId}; " +
                 "idempotent cleanup will retry later",
                 completed.Count, RequestUser.AccountId);
         }
     }
-
-    public Task DeleteObjectBestEffortAsync(StorageObjectAddress address) => BestEffortDeleteObjectAsync(address);
 
     // Reset Account needs to report post-commit storage failures truthfully.
     // Ordinary File cleanup retains its best-effort, non-signaling contract.
@@ -515,20 +563,17 @@ public class FileService : ServiceBase<FileRepository>
         }
     }
 
-    private async Task<List<StorageObjectAddress>> RemoveExpiredFiles(CancellationToken cancellationToken)
+    private async Task<List<string>> RemoveExpiredFiles(CancellationToken cancellationToken)
     {
-        var expiredFiles = await Repository.GetExpiredFiles();
-        var objects = expiredFiles
-            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) && !string.IsNullOrWhiteSpace(file.BlobContainer))
-            .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
-            .Distinct()
-            .ToList();
+        var expiredFiles = (await Repository.GetExpiredFiles()).ToList();
+        var cleanupTargets = await Repository.QueueUnpublishedFileObjectCleanupAsync(
+            expiredFiles, cancellationToken);
 
         foreach (var expiredFile in expiredFiles)
             Repository.Delete(expiredFile);
 
         await Repository.SaveChangesAsync(cancellationToken);
-        return objects;
+        return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
     }
 
     private async Task BestEffortDeleteObjectAsync(StorageObjectAddress address)

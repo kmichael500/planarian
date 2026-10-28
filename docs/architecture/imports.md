@@ -111,7 +111,7 @@ For Cave import they:
 10. create the CaveImportBatch;
 11. call CaveBulkRevisionRepository;
 12. commit;
-13. return external File-object addresses that may be deleted after commit.
+13. return durable File-cleanup target IDs for bounded post-commit processing.
 
 If any relational step fails, the transaction rolls back.
 
@@ -151,7 +151,7 @@ Sync import can plan Cave deletion.
 
 Before delete execution, open change requests block hard deletion.
 
-The executor gathers current live File object addresses, removes the relational graph inside the import transaction, publishes delete revisions, commits, and lets ImportService perform best-effort external object cleanup afterward. Pending ordinary asset-cleanup debt is independent operational state rather than historical Cave content.
+The executor gathers current live File object addresses, queues tenant-qualified `CaveAssetRemoval` cleanup targets in the same import transaction that removes the relational graph and publishes delete revisions, then commits. A File with only one half of its object-storage address fails the import closed rather than committing a deletion that cannot carry cleanup responsibility. After commit, ImportService processes every cleanup target created by that import in bounded target/reference-query batches; provider failures leave durable debt for later retry. Pending ordinary asset-cleanup debt is independent operational state rather than historical Cave content.
 
 ## Lock ordering
 

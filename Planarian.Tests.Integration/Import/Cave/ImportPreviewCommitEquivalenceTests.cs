@@ -104,8 +104,12 @@ public sealed class ImportPreviewCommitEquivalenceTests(PostgresTestServer fixtu
         var result = await import.ExecuteAsync(plan, "delete-file.csv");
 
         Assert.False(await db.Files.IgnoreQueryFilters().AnyAsync(row => row.Id == file.FileId));
-        Assert.Contains(result.BlobDeletes, target =>
-            target.BlobContainer == "test" && target.BlobKey == "objects/files/syncfile01");
+        var cleanup = Assert.Single(await db.StorageCleanupTargets.AsNoTracking()
+            .Where(row => row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                          row.StoragePartition == "test" &&
+                          row.StorageKey == "objects/files/syncfile01")
+            .ToListAsync());
+        Assert.Contains(cleanup.Id, result.StorageCleanupTargetIds);
     }
 
     [Fact]

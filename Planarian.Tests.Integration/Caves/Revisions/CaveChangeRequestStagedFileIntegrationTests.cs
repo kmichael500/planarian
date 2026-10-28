@@ -122,10 +122,10 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task RejectionCommitsRelationalCleanupBeforeBestEffortBlobDeletion(bool failBlobDelete)
+    public async Task RejectionCommitsRelationalCleanupWithDurableObjectCleanupDebt(bool failBlobDelete)
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            $"{nameof(RejectionCommitsRelationalCleanupBeforeBestEffortBlobDeletion)}_{failBlobDelete}");
+            $"{nameof(RejectionCommitsRelationalCleanupWithDurableObjectCleanupDebt)}_{failBlobDelete}");
         var cave = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var location = await ReferenceTestData.AddTagAsync(database, cave.AccountId,
             TagTypeKeyConstant.LocationQuality, "Survey Grade", "locqual00a");
@@ -162,12 +162,39 @@ public sealed class CaveChangeRequestStagedFileIntegrationTests(PostgresTestServ
             Assert.DoesNotContain(detail.ActiveStagedFiles, file => file.Id == stagedFileId);
         }
 
-        await using var verify = database.CreateDbContext("verify", cave.AccountId);
-        Assert.Equal(CaveChangeRequestStatus.Rejected,
-            (await verify.CaveChangeRequests.SingleAsync(request => request.Id == requestId)).Status);
-        Assert.False(await verify.CaveChangeRequestStagedFiles.AnyAsync(link => link.FileId == stagedFileId));
-        Assert.False(await verify.Files.AnyAsync(file => file.Id == stagedFileId));
-        Assert.Equal(failBlobDelete ? 1 : 0, blobs.Keys.Count);
+        string? cleanupId = null;
+        await using (var verify = database.CreateDbContext("verify", cave.AccountId))
+        {
+            Assert.Equal(CaveChangeRequestStatus.Rejected,
+                (await verify.CaveChangeRequests.SingleAsync(request => request.Id == requestId)).Status);
+            Assert.False(await verify.CaveChangeRequestStagedFiles.AnyAsync(link => link.FileId == stagedFileId));
+            Assert.False(await verify.Files.AnyAsync(file => file.Id == stagedFileId));
+            var cleanup = await verify.StorageCleanupTargets.AsNoTracking()
+                .Where(row => row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval)
+                .ToListAsync();
+            if (failBlobDelete)
+            {
+                cleanupId = Assert.Single(cleanup).Id;
+                Assert.Single(blobs.Keys);
+            }
+            else
+            {
+                Assert.Empty(cleanup);
+                Assert.Empty(blobs.Keys);
+            }
+        }
+
+        if (cleanupId is not null)
+        {
+            blobs.FailDeletes = false;
+            await using (var retry = await CaveTestActor.CreateAsync(
+                             database, cave.AccountId, "reviewer", blobs))
+                await retry.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([cleanupId], default);
+
+            await using var cleaned = database.CreateDbContext("verify-cleaned", cave.AccountId);
+            Assert.False(await cleaned.StorageCleanupTargets.AnyAsync(row => row.Id == cleanupId));
+            Assert.Empty(blobs.Keys);
+        }
     }
 
     [Fact]

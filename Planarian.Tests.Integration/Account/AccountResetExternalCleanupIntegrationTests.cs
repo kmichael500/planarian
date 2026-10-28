@@ -26,17 +26,26 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         const string portablePartition = "portable-store";
         const string liveKey = "objects/files/resetfilea";
         const string retainedKey = "objects/files/oldreset01";
+        const string unpublishedKey = "objects/files/abandonedreset01";
         await using var db = database.CreateDbContext("a", tenant.AccountId);
         var live = await db.Files.SingleAsync(row => row.Id == file.FileId);
         live.BlobContainer = portablePartition;
         live.BlobKey = liveKey;
-        db.StorageCleanupTargets.Add(new StorageCleanupTarget
-        {
-            AccountId = tenant.AccountId,
-            StoragePartition = portablePartition,
-            StorageKey = retainedKey,
-            Purpose = StorageCleanupPurpose.CaveAssetRemoval
-        });
+        db.StorageCleanupTargets.AddRange(
+            new StorageCleanupTarget
+            {
+                AccountId = tenant.AccountId,
+                StoragePartition = portablePartition,
+                StorageKey = retainedKey,
+                Purpose = StorageCleanupPurpose.CaveAssetRemoval
+            },
+            new StorageCleanupTarget
+            {
+                AccountId = tenant.AccountId,
+                StoragePartition = portablePartition,
+                StorageKey = unpublishedKey,
+                Purpose = StorageCleanupPurpose.UnpublishedFileRemoval
+            });
         await db.SaveChangesAsync();
 
         var requests = new CaveChangeRequestRepository(db, db.RequestUser);
@@ -49,6 +58,7 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         var blobs = new TestFileBlobStore();
         blobs.Seed(portablePartition, liveKey, [1]);
         blobs.Seed(portablePartition, retainedKey, [2]);
+        blobs.Seed(portablePartition, unpublishedKey, [3]);
         var observedCommittedPurge = false;
         var observedProviderNeutralCleanupBeforeLegacyContainerDelete = false;
         blobs.BeforeContainerDeleteAsync = async _ =>
@@ -58,7 +68,8 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
                 .AnyAsync(cave => cave.AccountId == tenant.AccountId && cave.Id == tenant.CaveId);
             observedProviderNeutralCleanupBeforeLegacyContainerDelete =
                 !blobs.Contains(portablePartition, liveKey) &&
-                !blobs.Contains(portablePartition, retainedKey);
+                !blobs.Contains(portablePartition, retainedKey) &&
+                !blobs.Contains(portablePartition, unpublishedKey);
         };
 
         await IntegrationTestServices.For(db, blobs, maintenanceConnectionString: database.ConnectionString).Account.ResetAccount(default);
@@ -67,6 +78,7 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
         Assert.True(observedProviderNeutralCleanupBeforeLegacyContainerDelete);
         Assert.False(blobs.Contains(portablePartition, liveKey));
         Assert.False(blobs.Contains(portablePartition, retainedKey));
+        Assert.False(blobs.Contains(portablePartition, unpublishedKey));
     }
 
     [Fact]
@@ -199,6 +211,46 @@ public sealed class AccountResetExternalCleanupIntegrationTests(PostgresTestServ
             .AnyAsync(f => f.AccountId == account.AccountId));
     }
 
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ResetWithIncompleteFileStorageAddressFailsClosedBeforeRelationalDeletion(
+        bool hasStorageKey, bool hasStoragePartition)
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            $"{nameof(ResetWithIncompleteFileStorageAddressFailsClosedBeforeRelationalDeletion)}_" +
+            $"{hasStorageKey}_{hasStoragePartition}");
+        var account = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var file = await FileTestDataFactory.AddFileAsync(
+            database, account, associateWithCave: true, fileId: "partial001");
+
+        await using (var seed = database.CreateDbContext("a", account.AccountId))
+        {
+            var live = await seed.Files.SingleAsync(row => row.Id == file.FileId);
+            live.BlobKey = hasStorageKey ? "objects/partial" : null;
+            live.BlobContainer = hasStoragePartition ? "portable-store" : null;
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var reset = database.CreateDbContext("a", account.AccountId))
+        {
+            var failure = await Assert.ThrowsAsync<ApiException>(() =>
+                IntegrationTestServices.For(
+                        reset, maintenanceConnectionString: database.ConnectionString)
+                    .Account.ResetAccount(default));
+            Assert.Equal(409, failure.StatusCode);
+            Assert.Contains("incomplete object-storage address", failure.Message, StringComparison.Ordinal);
+        }
+
+        await using var verify = database.CreateDbContext("verify", account.AccountId);
+        Assert.True(await verify.Caves.IgnoreQueryFilters()
+            .AnyAsync(cave => cave.Id == account.CaveId && cave.AccountId == account.AccountId));
+        Assert.True(await verify.Files.IgnoreQueryFilters()
+            .AnyAsync(row => row.Id == file.FileId && row.CaveId == account.CaveId));
+        Assert.False(await verify.StorageCleanupTargets.AnyAsync(row =>
+            row.AccountId == account.AccountId && row.Purpose == StorageCleanupPurpose.AccountReset));
+    }
 
     [Fact]
     public async Task ConcurrentResetAndNewArchiveAreBlockedUntilExistingResetCompletes()

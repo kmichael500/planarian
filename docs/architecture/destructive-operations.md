@@ -22,7 +22,9 @@ Removing a File from current Cave state:
 - after commit, deletes the external bytes and clears the target;
 - if external deletion fails, logs the failure and keeps durable cleanup debt for retry without rolling back the already-published revision.
 
-The owning request tries the new cleanup target immediately after commit. Later Cave/File authoring activity processes a bounded batch of older `CaveAssetRemoval` targets. There is no dedicated background relay for this purpose today, so “retryable” does not mean “guaranteed to clear while an account is inactive.” Reset Account explicitly absorbs pending asset-removal addresses into its stronger cleanup workflow.
+The owning request tries the new cleanup target immediately after commit. Later Cave/File authoring activity processes a bounded batch of older ordinary File cleanup targets. Published/hard-delete payloads use `CaveAssetRemoval`; never-published staged payloads use `UnpublishedFileRemoval`. There is no dedicated background relay for these purposes today, so “retryable” does not mean “guaranteed to clear while an account is inactive.” Reset Account explicitly absorbs both ordinary File-cleanup purposes into its stronger cleanup workflow.
+
+Never-published Files follow the same ordering: explicit discard, expiration, proposal rejection, and proposal-approval cleanup commit the File-row removal plus `UnpublishedFileRemoval` target before attempting object deletion. A provider failure therefore leaves durable retryable debt instead of an untracked orphan.
 
 This matches line-plot semantics at the revision level: removed payload is not part of historical state. The storage mechanics differ because `CaveGeoJson` can be deleted transactionally in PostgreSQL while File bytes cannot.
 
@@ -43,12 +45,17 @@ sequenceDiagram
     Cave->>Repo: Lock Cave for hard delete
     Cave->>Repo: Verify no open change requests
     Cave->>Mutation: Prepare current revision/live snapshot
-    Cave->>Repo: Remove aggregate and collect object addresses
+    Cave->>Repo: Remove aggregate and queue CaveAssetRemoval targets
     Cave->>Mutation: Publish Delete revision
-    Mutation->>DB: Persist tombstone history
+    Mutation->>DB: Persist tombstone history + cleanup debt
     DB-->>Cave: Commit
-    loop each current object
-        Cave->>Storage: Best-effort delete
+    loop each committed cleanup target
+        Cave->>Storage: Delete object
+        alt delete succeeds or object already absent
+            Cave->>DB: Clear cleanup target
+        else provider failure
+            Note over DB,Storage: Keep durable target for retry
+        end
     end
 ~~~
 
@@ -64,11 +71,11 @@ The execution repository performs equivalent safety checks in a set-oriented way
 
 - verify current account;
 - reject open proposal conflicts;
-- collect current live File object addresses;
+- collect current live File object addresses and queue `CaveAssetRemoval` targets;
 - remove relational data;
 - publish bulk delete revisions;
-- commit;
-- let ImportService perform external object deletion after commit.
+- commit cleanup responsibility with the import;
+- let ImportService process those exact cleanup-target IDs after commit; provider failures leave the targets for retry.
 
 ## Account reset
 
@@ -101,11 +108,12 @@ sequenceDiagram
 The relational reset is committed **before** external cleanup.
 
 Before the commit, the repository rejects cleanup addresses that would delete bytes also referenced by another
-tenant's live relational File. Pending ordinary asset-cleanup addresses are folded into Reset Account cleanup
-responsibility before their original targets are purged. This preflight fails closed, leaving
-both tenants' relational data and storage untouched rather than deleting a
-foreign tenant's bytes. It operates in bounded key batches to avoid one query
-per stored object.
+tenant's live relational File. It also fails closed if a live File has only one half of its object-storage address,
+because purging that row would otherwise lose the information needed to prove cleanup responsibility. Pending ordinary
+File-cleanup addresses—both `CaveAssetRemoval` and `UnpublishedFileRemoval`—are folded into Reset Account cleanup
+responsibility before their original targets are purged. This preflight fails closed, leaving relational data and
+storage untouched rather than committing an unsafe or unrecoverable purge. Cross-tenant reference checks operate in
+bounded key batches to avoid one query per stored object.
 
 That ordering is intentional.
 
@@ -127,8 +135,9 @@ The account's identity, users and feature settings remain intact.
 
 Reset and account archive creation use PostgreSQL **session-level advisory
 locks**. Ordinary account-scoped mutating HTTP requests and full background
-archive jobs hold a shared per-account lease. Reset and cleanup retry need an
-exclusive lease, which fails closed if another request/archive is active.
+archive jobs hold a shared per-account maintenance lease. Reset and cleanup retry need an
+exclusive maintenance lease, which fails closed if another request/archive is active.
+Archive jobs acquire the shared maintenance lock and a separate exclusive per-account archive-job lock on the **same PostgreSQL session/lease**, so replicas running this archive-lock contract cannot generate/clean the same account's archive namespace concurrently without consuming a second long-lived lock-pool connection. Mixed-version rollout is handled separately by the stale-age guard on abandoned temp cleanup.
 A database-session failure automatically releases its lease. Coordination
 uses a separate bounded Npgsql connection pool so holding these long-lived
 leases does not starve ordinary EF database connections. The middleware
@@ -186,6 +195,8 @@ It:
 - keeps a bounded recent set;
 - deletes old archives;
 - handles cancellation/cleanup.
+
+The final archive becomes authoritative when the temporary-to-final copy completes. Failure to delete the promoted temporary object or prune an older archive does **not** retroactively report that completed export as failed; the extra object is safe storage debt and a later archive job retries cleanup. In addition to the shared maintenance lease, archive generation takes a separate exclusive per-account archive-job advisory lease, so new-version application replicas serialize archive jobs for that account. Abandoned `archives/temp/` cleanup also requires the temp object to be at least seven days old before another job may delete it. That grace period is intentionally conservative: during a rolling deployment an older replica does not yet take the new archive-job lock, so a fresh temp object cannot safely be assumed abandoned merely because the new replica does not own it. Cancellation/failure cleanup of the current job's own temp key remains best-effort; an undeleted partial temporary archive is retried by a later job after it becomes stale.
 
 This path still uses Azure-specific Blob APIs and is **not** part of the provider-neutral IObjectStorage Cave/File boundary.
 

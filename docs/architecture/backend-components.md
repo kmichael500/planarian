@@ -77,7 +77,7 @@ Approval intentionally calls the same Cave publication semantics used by direct 
 | FileRepository | File metadata, staged ownership, lookup/mutation persistence | Repository layer | **Major change** |
 | IObjectStorage | Provider-neutral immutable Create/Open/Delete interface | Infrastructure boundary | **New** |
 | AzureBlobObjectStorage | Azure Blob implementation of IObjectStorage | Infrastructure adapter | **New** |
-| StorageCleanupTarget | Durable post-commit external-storage cleanup debt, purpose-scoped for Cave asset removal and Account Reset | Persistence entity deliberately independent of live Cave/File FKs | **New** |
+| StorageCleanupTarget | Durable post-commit external-storage cleanup debt, purpose-scoped for published Cave asset removal, unpublished staged-File removal, and Account Reset | Persistence entity deliberately independent of live Cave/File FKs | **New** |
 | StagedCaveFilePublication | Validated publication intent for a staged File during proposal approval | Small immutable workflow value | **New** |
 
 Important boundary: older archive/photo/trip/storage code may still use Azure SDK types. Do not infer that IObjectStorage currently fronts all storage in the repository.
@@ -173,7 +173,7 @@ The catalog above is responsibility-oriented, so it intentionally groups partial
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionQueryRepository.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveRevisionQueryRepository.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/CaveTagReferencePolicy.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/CaveTagReferencePolicy.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Revisions/StagedCaveFilePublication.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/StagedCaveFilePublication.cs) |
-| Added | [`Planarian/Planarian/Modules/Caves/Revisions/StagedFileObjectDeleteTarget.cs`](../../Planarian/Planarian/Modules/Caves/Revisions/StagedFileObjectDeleteTarget.cs) |
+| Removed | `Planarian/Planarian/Modules/Caves/Revisions/StagedFileObjectDeleteTarget.cs` (superseded by durable `StorageCleanupTarget` IDs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Services/CaveChangeRequestService.cs`](../../Planarian/Planarian/Modules/Caves/Services/CaveChangeRequestService.cs) |
 | Added | [`Planarian/Planarian/Modules/Caves/Services/CaveRevisionService.cs`](../../Planarian/Planarian/Modules/Caves/Services/CaveRevisionService.cs) |
 | Modified | [`Planarian/Planarian/Modules/Caves/Services/CaveService.cs`](../../Planarian/Planarian/Modules/Caves/Services/CaveService.cs) |

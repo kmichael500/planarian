@@ -243,11 +243,13 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
         Assert.True((bool)(await removed.ExecuteScalarAsync())!);
     }
 
-    [Fact]
-    public async Task StorageCleanupMigrationRefusesDowngradeWhileAssetCleanupDebtExists()
+    [Theory]
+    [InlineData("CaveAssetRemoval")]
+    [InlineData("UnpublishedFileRemoval")]
+    public async Task StorageCleanupMigrationRefusesDowngradeWhileOrdinaryFileCleanupDebtExists(string purpose)
     {
         await using var database = await fixture.CreateUnmigratedDatabaseAsync(
-            nameof(StorageCleanupMigrationRefusesDowngradeWhileAssetCleanupDebtExists));
+            $"{nameof(StorageCleanupMigrationRefusesDowngradeWhileOrdinaryFileCleanupDebtExists)}_{purpose}");
         var migrations = database.GetMigrationNames().ToList();
         var previous = migrations.Single(migration =>
             migration.EndsWith("_AccountResetCleanupOutbox", StringComparison.Ordinal));
@@ -259,8 +261,9 @@ public sealed class MigrationUpgradeIntegrationTests(PostgresTestServer fixture)
             await using var seed = new NpgsqlCommand("""
                 insert into "StorageCleanupTargets"
                     ("Id","AccountId","StoragePartition","StorageKey","IsContainer","Purpose","CreatedOn")
-                values ('cleanup001','mainacct01','portable-store','files/pending.pdf',false,'CaveAssetRemoval',now());
+                values ('cleanup001','mainacct01','portable-store','files/pending.pdf',false,@purpose,now());
                 """, connection);
+            seed.Parameters.AddWithValue("purpose", purpose);
             await seed.ExecuteNonQueryAsync();
         }
 

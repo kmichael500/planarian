@@ -190,20 +190,22 @@ Cave snapshots; storage addresses remain private and never become revision wire 
 
 ### 3.5 Cleanup, Reset Account, and hard purge
 
-Expired **never-published** staged Files remain eligible for physical object deletion. Account Reset uses the same
-`StorageCleanupTarget` table with purpose `AccountReset` and retains its stronger retry/write-block semantics. During
-reset, pending `CaveAssetRemoval` addresses must be captured into Reset cleanup responsibility before those ordinary
-target rows are purged.
+Expired **never-published** staged Files remove their relational File row only after queuing
+`UnpublishedFileRemoval` responsibility in the same commit; physical deletion follows after commit. Account Reset uses
+the same `StorageCleanupTarget` table with purpose `AccountReset` and retains its stronger retry/write-block semantics.
+During reset, pending `CaveAssetRemoval` and `UnpublishedFileRemoval` addresses must be captured into Reset cleanup
+responsibility before those ordinary target rows are purged.
 
-Explicit hard Cave deletion and specialized import deletion still obey commit-before-external-delete ordering. Do not
-turn ordinary asset removal into a hard-history purge because published history already contains only metadata, not payload.
+Explicit hard Cave deletion and specialized import deletion queue `CaveAssetRemoval` responsibility with their
+relational/revision result and still obey commit-before-external-delete ordering. Do not turn ordinary asset removal into
+a hard-history purge because published history already contains only metadata, not payload.
 
 ### 3.6 Migration
 
 Create the normal EF migration for the shared cleanup table/purpose. Because the superseded retention design existed on
 the pre-release completion branch, the forward migration must convert existing `RetainedCaveFileObject` addresses into
 `CaveAssetRemoval` cleanup debt rather than dropping them. Preserve existing Reset Account cleanup debt. Migration ID
-collisions must not lose cleanup addresses, and downgrade must fail closed while asset cleanup debt is still pending.
+collisions must not lose cleanup addresses, and downgrade must fail closed while any ordinary File cleanup debt (`CaveAssetRemoval` or `UnpublishedFileRemoval`) is still pending.
 
 ### 3.7 Phase exit gate
 

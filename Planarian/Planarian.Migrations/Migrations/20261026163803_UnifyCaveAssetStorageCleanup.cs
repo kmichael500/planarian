@@ -107,15 +107,15 @@ namespace Planarian.Migrations.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Pending asset-removal targets are the only durable addresses for bytes awaiting
-            // deletion. Refuse to erase that cleanup debt during a downgrade.
+            // Ordinary File-cleanup targets are the only durable addresses for bytes awaiting
+            // deletion. Refuse to erase or reinterpret that cleanup debt during a downgrade.
             migrationBuilder.Sql("""
                 DO $$ BEGIN
                     IF EXISTS (
                         SELECT 1 FROM "StorageCleanupTargets"
-                        WHERE "Purpose" = 'CaveAssetRemoval'
+                        WHERE "Purpose" IN ('CaveAssetRemoval', 'UnpublishedFileRemoval')
                     ) THEN
-                        RAISE EXCEPTION 'Cannot downgrade with pending Cave asset storage cleanup';
+                        RAISE EXCEPTION 'Cannot downgrade with pending File storage cleanup';
                     END IF;
                 END $$;
                 """);
