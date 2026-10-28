@@ -225,10 +225,7 @@ Proposal versions are allowed to retain payload required to reproduce/review the
 staged File IDs; line-plot proposals retain exact proposed GeoJSON. Do not build a generic proposal-asset storage layer
 until a future line-plot-as-File migration actually needs it.
 
-`StorageCleanupTarget` is shared post-commit cleanup infrastructure, not a historical File table. Distinguish
-`CaveAssetRemoval` from `AccountReset`: failed Reset Account cleanup may block subsequent writes; failed ordinary asset
-cleanup must remain retryable without freezing unrelated account activity. Reset Account captures pending asset-removal
-addresses before purging their targets so cleanup responsibility is not lost.
+`StorageCleanupTarget` is shared post-commit cleanup infrastructure, not a historical File table. Published/hard-delete/import payload cleanup uses `CaveAssetRemoval`; never-published staged payload cleanup uses `UnpublishedFileRemoval`; Reset Account uses `AccountReset`. Failed Reset Account cleanup may block subsequent writes, while either ordinary File-cleanup purpose remains retryable without freezing unrelated account activity. Reset Account captures pending published and unpublished cleanup addresses before purging their targets so cleanup responsibility is not lost. Explicit targets created by one committed mutation are processed after commit in bounded batches; opportunistic retries of older debt remain separately bounded.
 
 ## 7. File editor semantics
 

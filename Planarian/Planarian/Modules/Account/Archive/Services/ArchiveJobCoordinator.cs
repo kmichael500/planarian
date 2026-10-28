@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Planarian.Model.Shared;
 using Planarian.Modules.Account.Archive.Models;
 using Planarian.Modules.Account.Model;
@@ -15,17 +17,21 @@ public class ArchiveJobCoordinator
     public const int MaxRetainedArchives = 5;
     public const string ArchivePrefix = "archives/";
     public const string TempArchivePrefix = "archives/temp/";
+    internal static readonly TimeSpan AbandonedTempArchiveMinimumAge = TimeSpan.FromDays(7);
 
     private readonly ConcurrentDictionary<string, ArchiveJobHandle> _jobs = new();
     private readonly HashSet<string> _resettingAccounts = new(StringComparer.Ordinal);
     private readonly object _accountMaintenanceGate = new();
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly AccountMaintenanceLockRepository _maintenance;
+    private readonly ILogger<ArchiveJobCoordinator> _logger;
 
-    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory, AccountMaintenanceLockRepository maintenance)
+    public ArchiveJobCoordinator(IServiceScopeFactory scopeFactory, AccountMaintenanceLockRepository maintenance,
+        ILogger<ArchiveJobCoordinator>? logger = null)
     {
         _scopeFactory = scopeFactory;
         _maintenance = maintenance;
+        _logger = logger ?? NullLogger<ArchiveJobCoordinator>.Instance;
     }
 
     public static string GetGroupName(string accountId) => $"archive-{accountId}";
@@ -51,8 +57,9 @@ public class ArchiveJobCoordinator
     public async Task<bool> StartArchiveJobAsync(string accountId, string accountContainerName,
         CancellationToken cancellationToken = default)
     {
-        var lease = await _maintenance.TryAcquireAsync(accountId, exclusive: false, cancellationToken);
-        if (lease is null) return false;
+        var archiveLease = await _maintenance.TryAcquireArchiveAsync(
+            accountId, cancellationToken);
+        if (archiveLease is null) return false;
 
         var jobHandle = new ArchiveJobHandle(accountId, accountContainerName, new CancellationTokenSource())
         {
@@ -70,14 +77,14 @@ public class ArchiveJobCoordinator
 
         if (jobHandle is null)
         {
-            await lease.DisposeAsync();
+            await archiveLease.DisposeAsync();
             return false;
         }
 
         _ = Task.Run(async () =>
         {
             try { await RunArchiveJob(jobHandle); }
-            finally { await lease.DisposeAsync(); }
+            finally { await archiveLease.DisposeAsync(); }
         }, CancellationToken.None);
         return true;
     }
@@ -137,6 +144,12 @@ public class ArchiveJobCoordinator
             var accountBlobContainerClient = await fileService.GetBlobContainerClient(
                 jobHandle.AccountContainerName,
                 createIfNotExists: true);
+            await CleanupAbandonedTempArchives(
+                fileService,
+                accountBlobContainerClient,
+                jobHandle.AccountContainerName,
+                jobHandle.ArchiveBlobKey,
+                CancellationToken.None);
             await using (var outputStream = await fileService.OpenBlobWriteStream(
                              accountBlobContainerClient,
                              jobHandle.ArchiveBlobKey,
@@ -187,14 +200,26 @@ public class ArchiveJobCoordinator
 
             jobHandle.CancellationTokenSource.Token.ThrowIfCancellationRequested();
 
+            var publishedTempBlobKey = jobHandle.ArchiveBlobKey;
             await PublishArchive(
                 accountBlobContainerClient,
-                jobHandle.ArchiveBlobKey,
+                publishedTempBlobKey,
                 finalArchiveBlobKey,
                 CancellationToken.None);
+
+            // The final archive is authoritative once the copy completes. Temporary/archive
+            // retention cleanup must not retroactively turn that successful export into a
+            // failed job merely because Azure cleanup is temporarily unavailable.
+            if (!await TryDeleteArchiveObjectAsync(
+                    fileService, publishedTempBlobKey, jobHandle.AccountContainerName, CancellationToken.None))
+            {
+                _logger.LogWarning(
+                    "Published archive {ArchiveKey} for account {AccountId}, but temporary archive {TempKey} could not be deleted; a later archive job will retry it",
+                    finalArchiveBlobKey, jobHandle.AccountId, publishedTempBlobKey);
+            }
             jobHandle.ArchiveBlobKey = null;
 
-            await PruneOldArchives(
+            await PruneOldArchivesBestEffort(
                 fileService,
                 accountBlobContainerClient,
                 jobHandle.AccountContainerName,
@@ -241,44 +266,133 @@ public class ArchiveJobCoordinator
         }
     }
 
-    private static async Task PruneOldArchives(
+    private async Task PruneOldArchivesBestEffort(
         FileService fileService,
         Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
         string accountContainerName,
         string currentArchiveBlobKey,
         CancellationToken cancellationToken)
     {
-        var existingArchives = new List<(string BlobKey, DateTimeOffset LastModified)>();
-
-        await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(prefix: "archives/", cancellationToken: cancellationToken))
+        List<(string BlobKey, DateTimeOffset LastModified)> existingArchives = [];
+        try
         {
-            if (string.Equals(blobItem.Name, currentArchiveBlobKey, StringComparison.Ordinal))
+            await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(
+                               prefix: ArchivePrefix, cancellationToken: cancellationToken))
             {
-                continue;
-            }
+                if (string.Equals(blobItem.Name, currentArchiveBlobKey, StringComparison.Ordinal) ||
+                    blobItem.Name.StartsWith(TempArchivePrefix, StringComparison.OrdinalIgnoreCase) ||
+                    !blobItem.Properties.LastModified.HasValue)
+                {
+                    continue;
+                }
 
-            if (blobItem.Name.StartsWith(TempArchivePrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
+                existingArchives.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
             }
-
-            if (!blobItem.Properties.LastModified.HasValue)
-            {
-                continue;
-            }
-
-            existingArchives.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Archive {ArchiveKey} was published, but existing archives could not be listed for pruning; a later archive job will retry",
+                currentArchiveBlobKey);
+            return;
         }
 
-        var archivesToDelete = existingArchives
+        var archivesToDelete = SelectArchivesToPrune(existingArchives);
+        var failures = await DeleteArchiveKeysBestEffortAsync(
+            archivesToDelete, key => fileService.DeleteFile(key, accountContainerName));
+        foreach (var failedKey in failures)
+        {
+            _logger.LogWarning(
+                "Archive {ArchiveKey} was published, but old archive {OldArchiveKey} could not be pruned; a later archive job will retry",
+                currentArchiveBlobKey, failedKey);
+        }
+    }
+
+    private async Task CleanupAbandonedTempArchives(
+        FileService fileService,
+        Azure.Storage.Blobs.BlobContainerClient accountBlobContainerClient,
+        string accountContainerName,
+        string currentTempArchiveBlobKey,
+        CancellationToken cancellationToken)
+    {
+        var tempArchives = new List<(string BlobKey, DateTimeOffset LastModified)>();
+        try
+        {
+            await foreach (var blobItem in accountBlobContainerClient.GetBlobsAsync(
+                               prefix: TempArchivePrefix, cancellationToken: cancellationToken))
+            {
+                if (blobItem.Properties.LastModified.HasValue)
+                    tempArchives.Add((blobItem.Name, blobItem.Properties.LastModified.Value));
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception,
+                "Unable to list abandoned temporary archives for account container {Container}; archive creation will continue",
+                accountContainerName);
+            return;
+        }
+
+        var abandonedKeys = SelectAbandonedTempArchives(
+            tempArchives, currentTempArchiveBlobKey, DateTimeOffset.UtcNow);
+        var failures = await DeleteArchiveKeysBestEffortAsync(
+            abandonedKeys, key => fileService.DeleteFile(key, accountContainerName));
+        foreach (var failedKey in failures)
+        {
+            _logger.LogWarning(
+                "Abandoned temporary archive {TempArchiveKey} could not be deleted from {Container}; a later archive job will retry",
+                failedKey, accountContainerName);
+        }
+    }
+
+    internal static IReadOnlyList<string> SelectArchivesToPrune(
+        IEnumerable<(string BlobKey, DateTimeOffset LastModified)> existingArchives) =>
+        existingArchives
             .OrderByDescending(x => x.LastModified)
+            .ThenByDescending(x => x.BlobKey, StringComparer.Ordinal)
             .Skip(MaxRetainedArchives - 1)
+            .Select(x => x.BlobKey)
             .ToList();
 
-        foreach (var archiveToDelete in archivesToDelete)
+    internal static IReadOnlyList<string> SelectAbandonedTempArchives(
+        IEnumerable<(string BlobKey, DateTimeOffset LastModified)> tempArchives,
+        string currentTempArchiveBlobKey, DateTimeOffset now) =>
+        tempArchives
+            .Where(item => !string.Equals(
+                               item.BlobKey, currentTempArchiveBlobKey, StringComparison.Ordinal) &&
+                           item.LastModified <= now - AbandonedTempArchiveMinimumAge)
+            .Select(item => item.BlobKey)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+    internal static async Task<IReadOnlyList<string>> DeleteArchiveKeysBestEffortAsync(
+        IEnumerable<string> blobKeys, Func<string, Task> deleteAsync)
+    {
+        var failures = new List<string>();
+        foreach (var key in blobKeys.Distinct(StringComparer.Ordinal))
         {
-            await fileService.DeleteFile(archiveToDelete.BlobKey, accountContainerName);
+            try
+            {
+                await deleteAsync(key);
+            }
+            catch
+            {
+                failures.Add(key);
+            }
         }
+
+        return failures;
+    }
+
+    private static async Task<bool> TryDeleteArchiveObjectAsync(
+        FileService fileService, string blobKey, string accountContainerName,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var failures = await DeleteArchiveKeysBestEffortAsync(
+            [blobKey], key => fileService.DeleteFile(key, accountContainerName));
+        return failures.Count == 0;
     }
 
     private static async Task PublishArchive(
@@ -294,7 +408,6 @@ public class ArchiveJobCoordinator
             tempBlobClient.Uri,
             cancellationToken: cancellationToken);
         await copyOperation.WaitForCompletionAsync(cancellationToken);
-        await tempBlobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
     private async Task CleanupPartialArchive(ArchiveJobHandle jobHandle)
@@ -306,7 +419,13 @@ public class ArchiveJobCoordinator
 
         using var scope = _scopeFactory.CreateScope();
         var fileService = scope.ServiceProvider.GetRequiredService<FileService>();
-        await fileService.DeleteFile(jobHandle.ArchiveBlobKey, jobHandle.ContainerName);
+        if (!await TryDeleteArchiveObjectAsync(
+                fileService, jobHandle.ArchiveBlobKey, jobHandle.ContainerName, CancellationToken.None))
+        {
+            _logger.LogWarning(
+                "Partial archive {ArchiveKey} for account {AccountId} could not be deleted; the next archive job will retry it",
+                jobHandle.ArchiveBlobKey, jobHandle.AccountId);
+        }
     }
 
     private static async Task<string> BuildArchiveFileName(AccountRepository accountRepository, string accountId)

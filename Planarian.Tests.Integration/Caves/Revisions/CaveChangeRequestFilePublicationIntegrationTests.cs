@@ -470,10 +470,10 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ApprovalCommitsDiscardedStagedFileCleanupBeforeBestEffortBlobDeletion(bool failBlobDelete)
+    public async Task ApprovalCommitsDiscardedStagedFileCleanupWithDurableObjectDebt(bool failBlobDelete)
     {
         await using var database = await fixture.CreateDatabaseAsync(
-            nameof(ApprovalCommitsDiscardedStagedFileCleanupBeforeBestEffortBlobDeletion) +
+            nameof(ApprovalCommitsDiscardedStagedFileCleanupWithDurableObjectDebt) +
             (failBlobDelete ? "_delete_failure" : "_delete_success"));
         var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
         var locationTag = await ReferenceTestData.AddTagAsync(database, tenant.AccountId,
@@ -561,7 +561,7 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
                 intent => intent.FileId == removedFileId);
         }
 
-        if (failBlobDelete) blobs.FailDelete(removedContainer, removedSourceKey);
+        blobs.FailDeletes = failBlobDelete;
 
         await using (var reviewer = await CaveTestActor.CreateAsync(database, tenant.AccountId, "reviewer", blobs))
         {
@@ -588,10 +588,37 @@ public sealed class CaveChangeRequestFilePublicationIntegrationTests(PostgresTes
             Assert.Contains(accepted.Files, file => file.Id == retainedFileId);
         }
 
-        if (failBlobDelete)
-            Assert.True(blobs.Contains(removedContainer, removedSourceKey));
-        else
+        string? cleanupId = null;
+        await using (var cleanup = database.CreateDbContext("verify-cleanup", tenant.AccountId))
+        {
+            var targets = await cleanup.StorageCleanupTargets.AsNoTracking()
+                .Where(row => row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval &&
+                              row.StoragePartition == removedContainer &&
+                              row.StorageKey == removedSourceKey)
+                .ToListAsync();
+            if (failBlobDelete)
+            {
+                cleanupId = Assert.Single(targets).Id;
+                Assert.True(blobs.Contains(removedContainer, removedSourceKey));
+            }
+            else
+            {
+                Assert.Empty(targets);
+                Assert.False(blobs.Contains(removedContainer, removedSourceKey));
+            }
+        }
+
+        if (cleanupId is not null)
+        {
+            blobs.FailDeletes = false;
+            await using (var retry = await CaveTestActor.CreateAsync(
+                             database, tenant.AccountId, "reviewer", blobs))
+                await retry.Services.Files.CleanupUnpublishedFileRemovalTargetsAsync([cleanupId], default);
+
+            await using var cleaned = database.CreateDbContext("verify-cleaned", tenant.AccountId);
+            Assert.False(await cleaned.StorageCleanupTargets.AnyAsync(row => row.Id == cleanupId));
             Assert.False(blobs.Contains(removedContainer, removedSourceKey));
+        }
 
         await using var audit = await CaveTestActor.CreateAsync(database, tenant.AccountId, "contributor", blobs);
         var historicalVersion = await audit.ChangeRequests.GetVersionAsync(requestId,

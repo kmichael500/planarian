@@ -83,7 +83,70 @@ public sealed class ImportCompatibilityEdgeTests(PostgresTestServer fixture) : I
             new CountyReferenceLockRepository(db, db.RequestUser))
             .ExecuteAsync(plan, "delete.csv");
         Assert.False(await db.Caves.IgnoreQueryFilters().AnyAsync(c => c.Id == t.CaveId));
-        Assert.Contains(result.BlobDeletes, b => b.BlobKey == "delete-after-commit" && b.BlobContainer == "test");
+        var cleanup = Assert.Single(await db.StorageCleanupTargets.AsNoTracking()
+            .Where(row => row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                          row.StoragePartition == "test" &&
+                          row.StorageKey == "delete-after-commit")
+            .ToListAsync());
+        Assert.Contains(cleanup.Id, result.StorageCleanupTargetIds);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task CaveSyncDeleteWithIncompleteStorageAddressRollsBackWithoutLosingCleanupResponsibility(
+        bool hasStorageKey, bool hasStoragePartition)
+    {
+        await using var database = await fixture.CreateDatabaseAsync(
+            $"{nameof(CaveSyncDeleteWithIncompleteStorageAddressRollsBackWithoutLosingCleanupResponsibility)}_" +
+            $"{hasStorageKey}_{hasStoragePartition}");
+        var tenant = await CaveTestDataFactory.CreatePublishedCaveAsync(database, 'a');
+        var testFile = await FileTestDataFactory.AddFileAsync(database, tenant);
+
+        string originalRevisionId;
+        int originalRevisionCount;
+        await using (var seed = database.CreateDbContext("a", tenant.AccountId))
+        {
+            var file = await seed.Files.SingleAsync(row => row.Id == testFile.FileId);
+            file.CaveId = tenant.CaveId;
+            file.BlobKey = hasStorageKey ? "partial-address" : null;
+            file.BlobContainer = hasStoragePartition ? "test" : null;
+            await seed.SaveChangesAsync();
+
+            originalRevisionId = (await seed.Caves.IgnoreQueryFilters()
+                .SingleAsync(cave => cave.Id == tenant.CaveId)).CurrentRevisionId!;
+            originalRevisionCount = await seed.CaveRevisions
+                .CountAsync(revision => revision.CaveId == tenant.CaveId);
+        }
+
+        await using var db = database.CreateDbContext("a", tenant.AccountId);
+        var planner = new CaveImportTestHarness(db, db.RequestUser);
+        await using var csv = ImportDryRunIntegrationTests.CsvStream(
+            ImportDryRunIntegrationTests.CaveHeader + "\n" +
+            "Replacement,Replacement County,REP,2,AA,,,,10,2,1,1,,,,,,,,false,,\n");
+        var plan = await planner.PlanAsync(csv, true);
+        var snapshots = new CavePublishedSnapshotRepository(db, db.RequestUser);
+        var executor = new CaveImportExecutionRepository(
+            db, db.RequestUser, snapshots,
+            new CaveBulkRevisionRepository(db, db.RequestUser),
+            new Planarian.Modules.Tags.Repositories.TagReferenceLockRepository(db, db.RequestUser),
+            new CountyReferenceLockRepository(db, db.RequestUser));
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            executor.ExecuteAsync(plan, "delete-partial-address.csv"));
+        Assert.Contains("incomplete object-storage address", failure.Message, StringComparison.Ordinal);
+
+        db.ChangeTracker.Clear();
+        Assert.True(await db.Caves.IgnoreQueryFilters().AnyAsync(cave => cave.Id == tenant.CaveId));
+        Assert.True(await db.Files.IgnoreQueryFilters().AnyAsync(file =>
+            file.Id == testFile.FileId && file.CaveId == tenant.CaveId));
+        Assert.False(await db.StorageCleanupTargets.AnyAsync());
+        Assert.Equal(originalRevisionId, await db.Caves.IgnoreQueryFilters()
+            .Where(cave => cave.Id == tenant.CaveId)
+            .Select(cave => cave.CurrentRevisionId)
+            .SingleAsync());
+        Assert.Equal(originalRevisionCount, await db.CaveRevisions
+            .CountAsync(revision => revision.CaveId == tenant.CaveId));
     }
 
     [Fact]

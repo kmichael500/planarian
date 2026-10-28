@@ -284,9 +284,9 @@ public sealed class CaveChangeRequestService
         await _files.RequireStoredObjectsAvailableAsync(publications.Select(publication =>
             new StorageObjectAddress(publication.StoragePartition, publication.StorageKey)), cancellationToken);
         var baseSnapshot = Deserialize(row.ProposalBaseRevision);
-        // Process only debt from earlier committed publications. New cleanup targets created by
+        // Process only debt from earlier committed removals. New cleanup targets created by
         // this approval are handled after the outer approval transaction commits below.
-        await _files.CleanupAssetRemovalTargetsAsync(cancellationToken: CancellationToken.None);
+        await _files.CleanupOrdinaryFileRemovalTargetsAsync(cancellationToken: CancellationToken.None);
         var approval = await _mutations.ExecuteOwnedTransactionAsync(async token =>
         {
             var saveResult = await _caveService.ApproveChangeRequestAsync(values,
@@ -298,18 +298,17 @@ public sealed class CaveChangeRequestService
                     .Except(baseSnapshot.LinePlots.Select(linePlot => linePlot.Id))
                     .ToHashSet(StringComparer.Ordinal),
                 ToPeoplePublicationContext(proposal), token);
-            var discardedObjects = await _requests.MarkApprovedAsync(requestId,
+            var discardedCleanupTargetIds = await _requests.MarkApprovedAsync(requestId,
                 expectedProposalVersionId, saveResult.Mutation, notes, token);
-            return (SaveResult: saveResult, DiscardedObjects: discardedObjects);
+            return (SaveResult: saveResult, DiscardedCleanupTargetIds: discardedCleanupTargetIds);
         }, cancellationToken);
         var publishedRevisionId = approval.SaveResult.Mutation.RevisionId;
 
         await _files.CleanupAssetRemovalTargetsAsync(
             approval.SaveResult.StorageCleanupTargetIds, CancellationToken.None);
 
-        foreach (var objectAddress in approval.DiscardedObjects)
-            await _files.DeleteObjectBestEffortAsync(
-                new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
+        await _files.CleanupUnpublishedFileRemovalTargetsAsync(
+            approval.DiscardedCleanupTargetIds, CancellationToken.None);
 
         if (string.IsNullOrWhiteSpace(publishedRevisionId))
             throw new InvalidOperationException("Approval completed without producing a published Cave revision.");
@@ -358,11 +357,9 @@ public sealed class CaveChangeRequestService
                 row.Request.CurrentProposalVersionId);
         if (string.IsNullOrWhiteSpace(notes))
             throw ApiExceptionDictionary.BadRequest("A reason is required to reject requested changes.");
-        var rejectedObjects = await _requests.RejectAsync(requestId, expectedProposalVersionId, notes.Trim(),
-            cancellationToken);
-        foreach (var objectAddress in rejectedObjects)
-            await _files.DeleteObjectBestEffortAsync(
-                new StorageObjectAddress(objectAddress.StoragePartition, objectAddress.StorageKey));
+        var cleanupTargetIds = await _requests.RejectAsync(
+            requestId, expectedProposalVersionId, notes.Trim(), cancellationToken);
+        await _files.CleanupUnpublishedFileRemovalTargetsAsync(cleanupTargetIds, CancellationToken.None);
         return new CaveChangeRequestDecisionVm(CaveChangeRequestDecisionResult.Rejected, requestId, null,
             row.CurrentRevision?.Id);
     }

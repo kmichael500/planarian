@@ -31,7 +31,7 @@ For ordinary published removal:
 - failed external deletion leaves durable, observable cleanup debt for retry;
 - ordinary asset-cleanup debt does not block unrelated account writes.
 
-`StorageCleanupTarget` is shared infrastructure for post-commit external cleanup, not a historical File locator. Immediate cleanup is followed by bounded opportunistic retries on later Cave/File authoring activity; ordinary asset-removal debt does not currently have a dedicated background relay. Account Reset uses the same table with purpose `AccountReset` and keeps its stronger write-block/retry semantics. Reset absorbs any pending asset-removal addresses before purging those targets.
+`StorageCleanupTarget` is shared infrastructure for post-commit external cleanup, not a historical File locator. Published payload cleanup uses `CaveAssetRemoval`; never-published staged payload cleanup uses `UnpublishedFileRemoval` after explicit discard, expiration, proposal rejection, or unused-staged-file approval cleanup. Immediate cleanup is followed by bounded opportunistic retries on later Cave/File authoring activity; ordinary File-cleanup debt does not currently have a dedicated background relay. Account Reset uses the same table with purpose `AccountReset` and keeps its stronger write-block/retry semantics. Reset absorbs pending published and unpublished File-cleanup addresses before purging those ordinary targets.
 
 Proposal persistence remains storage-specific for now: staged Files reference their exact staged object, while immutable proposal versions retain exact proposed line-plot GeoJSON. This is intentional; proposal payload convergence is deferred until line plots actually move into the File model.
 
@@ -49,7 +49,7 @@ Proposal persistence remains storage-specific for now: staged Files reference th
 ### Costs
 
 - Old published payloads are not recoverable from Planarian after successful removal cleanup.
-- External storage failures can leave cleanup debt until later authoring activity or another destructive workflow retries/assumes it; ordinary asset cleanup does not yet have a dedicated background relay.
+- External storage failures can leave cleanup debt until later authoring activity or another destructive workflow retries/assumes it; ordinary published/unpublished File cleanup does not yet have a dedicated background relay.
 - File and line-plot proposal persistence remains intentionally asymmetric until a future storage migration.
 
 ## Alternatives considered

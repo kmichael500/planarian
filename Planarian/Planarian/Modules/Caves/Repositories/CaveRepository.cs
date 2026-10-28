@@ -26,6 +26,8 @@ namespace Planarian.Modules.Caves.Repositories;
 
 public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbContext : PlanarianDbContextBase
 {
+    private const int CleanupLookupBatchSize = 500;
+
     public CaveRepository(TDbContext dbContext, RequestUser requestUser) : base(dbContext, requestUser)
     {
     }
@@ -1243,34 +1245,78 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         Planarian.Model.Database.Entities.RidgeWalker.File file, string caveId,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(RequestUser.AccountId) || file.AccountId != RequestUser.AccountId ||
-            file.CaveId != caveId)
-            throw new InvalidOperationException("The File is not a current File for this account/Cave.");
-        if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) return null;
-        if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
-            throw new InvalidOperationException("The File has an incomplete object-storage address.");
-
-        var existing = DbContext.StorageCleanupTargets.Local.FirstOrDefault(row =>
-            row.AccountId == RequestUser.AccountId && row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
-            !row.IsContainer && row.StoragePartition == file.BlobContainer && row.StorageKey == file.BlobKey)
-            ?? await DbContext.StorageCleanupTargets.SingleOrDefaultAsync(row =>
-                row.AccountId == RequestUser.AccountId && row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
-                !row.IsContainer && row.StoragePartition == file.BlobContainer && row.StorageKey == file.BlobKey,
-                cancellationToken);
-        if (existing is not null) return existing;
-
-        var target = new StorageCleanupTarget
-        {
-            AccountId = RequestUser.AccountId,
-            StoragePartition = file.BlobContainer,
-            StorageKey = file.BlobKey,
-            Purpose = StorageCleanupPurpose.CaveAssetRemoval
-        };
-        DbContext.StorageCleanupTargets.Add(target);
-        return target;
+        var targets = await QueuePublishedFileObjectCleanupsAsync([file], caveId, cancellationToken);
+        return targets.SingleOrDefault();
     }
 
-    public async Task<IReadOnlyList<StorageObjectAddress>> DeleteAggregateForHardDeleteAsync(
+    private async Task<IReadOnlyList<StorageCleanupTarget>> QueuePublishedFileObjectCleanupsAsync(
+        IEnumerable<Planarian.Model.Database.Entities.RidgeWalker.File> files,
+        string caveId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(RequestUser.AccountId))
+            throw new InvalidOperationException("An active account is required for published File cleanup.");
+
+        var candidates = new List<(string Partition, string Key)>();
+        foreach (var file in files)
+        {
+            if (file.AccountId != RequestUser.AccountId || file.CaveId != caveId)
+                throw new InvalidOperationException("The File is not a current File for this account/Cave.");
+            if (string.IsNullOrWhiteSpace(file.BlobKey) && string.IsNullOrWhiteSpace(file.BlobContainer)) continue;
+            if (string.IsNullOrWhiteSpace(file.BlobKey) || string.IsNullOrWhiteSpace(file.BlobContainer))
+                throw new InvalidOperationException("The File has an incomplete object-storage address.");
+            candidates.Add((file.BlobContainer, file.BlobKey));
+        }
+
+        var addresses = candidates.Distinct().ToList();
+        if (addresses.Count == 0) return [];
+
+        var existingByAddress = DbContext.StorageCleanupTargets.Local
+            .Where(row => row.AccountId == RequestUser.AccountId &&
+                          row.Purpose == StorageCleanupPurpose.CaveAssetRemoval && !row.IsContainer)
+            .ToDictionary(row => (row.StoragePartition, row.StorageKey));
+
+        foreach (var partition in addresses.GroupBy(address => address.Partition))
+        {
+            foreach (var keyChunk in partition.Select(address => address.Key)
+                         .Distinct().Chunk(CleanupLookupBatchSize))
+            {
+                var keys = keyChunk.ToArray();
+                var existing = await DbContext.StorageCleanupTargets
+                    .Where(row => row.AccountId == RequestUser.AccountId &&
+                                  row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                                  !row.IsContainer && row.StoragePartition == partition.Key &&
+                                  keys.Contains(row.StorageKey))
+                    .ToListAsync(cancellationToken);
+                foreach (var target in existing)
+                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
+            }
+        }
+
+        var targets = new List<StorageCleanupTarget>(addresses.Count);
+        foreach (var address in addresses)
+        {
+            if (existingByAddress.TryGetValue(address, out var existing))
+            {
+                targets.Add(existing);
+                continue;
+            }
+
+            var target = new StorageCleanupTarget
+            {
+                AccountId = RequestUser.AccountId,
+                StoragePartition = address.Partition,
+                StorageKey = address.Key,
+                Purpose = StorageCleanupPurpose.CaveAssetRemoval
+            };
+            DbContext.StorageCleanupTargets.Add(target);
+            existingByAddress.Add(address, target);
+            targets.Add(target);
+        }
+
+        return targets;
+    }
+
+    public async Task<IReadOnlyList<string>> DeleteAggregateForHardDeleteAsync(
         Cave entity, CancellationToken cancellationToken = default)
     {
         if (entity.AccountId != RequestUser.AccountId)
@@ -1304,6 +1350,9 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         await DeleteHardDeleteCaveAssociationsAsync(entity, cancellationToken);
 
         var files = entity.Files.ToList();
+        var cleanupTargets = await QueuePublishedFileObjectCleanupsAsync(
+            files, entity.Id, cancellationToken);
+
         DbContext.RemoveRange(entity.CavePermissions);
         await DeleteStagedFileReferencesAsync(files.Select(file => file.Id), cancellationToken);
         DbContext.RemoveRange(files);
@@ -1312,10 +1361,7 @@ public class CaveRepository<TDbContext> : RepositoryBase<TDbContext> where TDbCo
         DbContext.Remove(entity);
         await DbContext.SaveChangesAsync(cancellationToken);
 
-        return files
-            .Where(file => !string.IsNullOrWhiteSpace(file.BlobKey) && !string.IsNullOrWhiteSpace(file.BlobContainer))
-            .Select(file => new StorageObjectAddress(file.BlobContainer!, file.BlobKey!))
-            .Distinct().ToList();
+        return cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
     }
 
     private async Task DeleteHardDeleteCaveAssociationsAsync(Cave entity, CancellationToken cancellationToken)

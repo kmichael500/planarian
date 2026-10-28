@@ -15,8 +15,8 @@ using Planarian.Modules.Tags.Repositories;
 
 namespace Planarian.Modules.Import.Data;
 
-public sealed record DeferredImportBlobDelete(string? BlobKey, string? BlobContainer);
-public sealed record CaveImportExecutionResult(string ImportBatchId, IReadOnlyList<DeferredImportBlobDelete> BlobDeletes);
+public sealed record DeferredImportObjectCleanup(string? StorageKey, string? StoragePartition);
+public sealed record CaveImportExecutionResult(string ImportBatchId, IReadOnlyList<string> StorageCleanupTargetIds);
 
 public sealed class CaveImportExecutionRepository
 {
@@ -49,7 +49,8 @@ public sealed class CaveImportExecutionRepository
         if (plan.AccountId != _scope.AccountId)
             throw new InvalidOperationException("Cave import plan belongs to another account.");
 
-        var deferredBlobDeletes = new List<DeferredImportBlobDelete>();
+        var deferredObjectCleanup = new List<DeferredImportObjectCleanup>();
+        IReadOnlyList<string> cleanupTargetIds = [];
         string importBatchId;
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -97,7 +98,10 @@ public sealed class CaveImportExecutionRepository
 
             var changedCaves = plan.Caves.Where(c => c.Action is CaveImportAction.Insert or CaveImportAction.Update).ToList();
             await ReplaceChangedCaveTagsAsync(changedCaves, cancellationToken);
-            await DeleteCavesAsync(plan.Deletions.Select(d => d.CaveId).ToList(), deferredBlobDeletes, cancellationToken);
+            await DeleteCavesAsync(plan.Deletions.Select(d => d.CaveId).ToList(), deferredObjectCleanup, cancellationToken);
+            var cleanupTargets = await QueueDeletedFileCleanupTargetsAsync(deferredObjectCleanup, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            cleanupTargetIds = cleanupTargets.Select(target => target.Id).Distinct(StringComparer.Ordinal).ToList();
 
             var liveMutationIds = changedCaves.Select(c => c.Id).ToList();
             var after = liveMutationIds.Count == 0
@@ -122,7 +126,66 @@ public sealed class CaveImportExecutionRepository
             throw;
         }
 
-        return new CaveImportExecutionResult(importBatchId, deferredBlobDeletes.Distinct().ToList());
+        return new CaveImportExecutionResult(importBatchId, cleanupTargetIds);
+    }
+
+    private async Task<IReadOnlyList<StorageCleanupTarget>> QueueDeletedFileCleanupTargetsAsync(
+        IEnumerable<DeferredImportObjectCleanup> objectCleanup, CancellationToken cancellationToken)
+    {
+        var cleanup = objectCleanup.ToList();
+        if (cleanup.Any(item =>
+                string.IsNullOrWhiteSpace(item.StorageKey) !=
+                string.IsNullOrWhiteSpace(item.StoragePartition)))
+            throw new InvalidOperationException(
+                "A File selected for sync deletion has an incomplete object-storage address.");
+
+        var addresses = cleanup
+            .Where(item => !string.IsNullOrWhiteSpace(item.StorageKey))
+            .Select(item => (Partition: item.StoragePartition!, Key: item.StorageKey!))
+            .Distinct()
+            .ToList();
+        if (addresses.Count == 0) return [];
+
+        var existingByAddress = new Dictionary<(string Partition, string Key), StorageCleanupTarget>();
+        foreach (var partition in addresses.GroupBy(address => address.Partition))
+        {
+            foreach (var keyChunk in partition.Select(address => address.Key)
+                         .Distinct().Chunk(LookupBatchSize))
+            {
+                var keys = keyChunk.ToArray();
+                var existing = await _db.StorageCleanupTargets.IgnoreQueryFilters()
+                    .Where(row => row.AccountId == _scope.AccountId &&
+                                  row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+                                  !row.IsContainer && row.StoragePartition == partition.Key &&
+                                  keys.Contains(row.StorageKey))
+                    .ToListAsync(cancellationToken);
+                foreach (var target in existing)
+                    existingByAddress.TryAdd((target.StoragePartition, target.StorageKey), target);
+            }
+        }
+
+        var targets = new List<StorageCleanupTarget>(addresses.Count);
+        foreach (var address in addresses)
+        {
+            if (existingByAddress.TryGetValue(address, out var existing))
+            {
+                targets.Add(existing);
+                continue;
+            }
+
+            var target = new StorageCleanupTarget
+            {
+                AccountId = _scope.AccountId,
+                StoragePartition = address.Partition,
+                StorageKey = address.Key,
+                Purpose = StorageCleanupPurpose.CaveAssetRemoval
+            };
+            _db.StorageCleanupTargets.Add(target);
+            existingByAddress.Add(address, target);
+            targets.Add(target);
+        }
+
+        return targets;
     }
 
     private async Task RejectPendingRequestDeletionsAsync(CaveImportPlan plan,
@@ -336,7 +399,7 @@ public sealed class CaveImportExecutionRepository
         _ => throw new ArgumentOutOfRangeException(nameof(tag.Role))
     };
 
-    private async Task DeleteCavesAsync(IReadOnlyList<string> caveIds, ICollection<DeferredImportBlobDelete> deferredBlobDeletes, CancellationToken cancellationToken)
+    private async Task DeleteCavesAsync(IReadOnlyList<string> caveIds, ICollection<DeferredImportObjectCleanup> deferredObjectCleanup, CancellationToken cancellationToken)
     {
         foreach (var caveChunk in caveIds.Chunk(CaveBatchSize))
         {
@@ -345,7 +408,7 @@ public sealed class CaveImportExecutionRepository
             if (scopedIds.Count != caveChunk.Length) throw new ImportPlanConcurrencyException("A Cave disappeared while applying a sync deletion.");
             var files = await _db.Files.IgnoreQueryFilters().Where(f => f.CaveId != null && scopedIds.Contains(f.CaveId) && f.Cave != null && f.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(f => new { f.Id, f.BlobKey, f.BlobContainer }).ToListAsync(cancellationToken);
-            foreach (var file in files) deferredBlobDeletes.Add(new DeferredImportBlobDelete(file.BlobKey, file.BlobContainer));
+            foreach (var file in files) deferredObjectCleanup.Add(new DeferredImportObjectCleanup(file.BlobKey, file.BlobContainer));
             var entranceIds = await _db.Entrances.IgnoreQueryFilters().Where(e => scopedIds.Contains(e.CaveId) && e.Cave != null && e.Cave.AccountId == _scope.AccountId)
                 .AsNoTracking().Select(e => e.Id).ToListAsync(cancellationToken);
             foreach (var entranceChunk in entranceIds.Chunk(AssociationBatchSize))

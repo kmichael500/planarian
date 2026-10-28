@@ -209,11 +209,11 @@ Fields:
 - StoragePartition;
 - StorageKey;
 - IsContainer;
-- Purpose (`CaveAssetRemoval` or `AccountReset`).
+- Purpose (`CaveAssetRemoval`, `UnpublishedFileRemoval`, or `AccountReset`).
 
-Constraints/indexes distinguish purpose so the same address can safely move from ordinary asset cleanup responsibility into Reset Account cleanup responsibility inside one reset transaction.
+Constraints/indexes distinguish purpose so the same address can safely move from ordinary File cleanup responsibility into Reset Account cleanup responsibility inside one reset transaction.
 
-For ordinary File removal, a `CaveAssetRemoval` target is inserted in the same transaction that deletes the File and publishes the Cave revision. It is removed after post-commit deletion succeeds or the address is proven to belong to a live File and therefore must not be deleted. Failed deletion leaves the target for retry.
+For published File removal, hard Cave deletion, and sync-import deletion, a `CaveAssetRemoval` target is inserted in the same transaction that makes the live File unreachable. Never-published staged File discard/expiration/proposal cleanup uses `UnpublishedFileRemoval` with the same commit-before-external-delete ordering. A target is removed after post-commit deletion succeeds, the object is already absent, or the address is proven to belong to a live File and therefore must not be deleted. Failed deletion leaves the target for retry.
 
 `AccountReset` targets use the same persistence mechanism but have stronger operational semantics: pending Reset Account cleanup can block account writes until resolved. Ordinary asset cleanup does not.
 

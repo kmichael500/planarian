@@ -72,7 +72,7 @@ The uploaded extension is metadata, not part of object identity. The application
 stateDiagram-v2
     [*] --> Staged: upload once (CaveId null, ExpiresOn set)
     Staged --> Published: Save / proposal approval (same File ID and object address)
-    Staged --> Deleted: expires / abandoned before publication
+    Staged --> CleanupQueued: expires / abandoned / proposal discard
     Published --> CleanupQueued: ordinary revisioned removal
     CleanupQueued --> Deleted: post-commit object cleanup succeeds
     CleanupQueued --> CleanupQueued: external delete fails; durable retry remains
@@ -115,9 +115,11 @@ Ordinary revisioned removal is payload-destructive, but the order is fail-safe:
 
 If external deletion fails, the File is still correctly removed from current Cave state and revision history remains correct. The durable cleanup target stays for retry and the failure is logged as a structured warning. Ordinary `CaveAssetRemoval` debt does **not** trigger the account-wide write block used for failed Reset Account cleanup.
 
-Cleanup is attempted immediately after the owning publication commits. Older pending asset-removal debt is also retried in a **bounded** batch when later Cave/File authoring activity occurs. There is currently no dedicated background relay for ordinary asset-removal debt, so an inactive account can retain failed cleanup debt until later activity or another explicit destructive workflow (such as Reset Account) assumes responsibility. This is durable/retryable cleanup, not a guarantee of time-bounded physical deletion.
+Cleanup is attempted immediately after the owning relational mutation commits. Explicit targets created by that mutation are processed to completion in bounded target/reference-query batches; this matters for supported large sync imports and hard deletes with many Files. Older pending ordinary File-cleanup debt is retried separately in a **bounded** opportunistic batch when later Cave/File authoring activity occurs. There is currently no dedicated background relay for ordinary File cleanup, so an inactive account can retain failed cleanup debt until later activity or another explicit destructive workflow (such as Reset Account) assumes responsibility. This is durable/retryable cleanup, not a guarantee of time-bounded physical deletion.
 
-The historical revision still knows that the File existed and retains its historical filename/type metadata. It does not promise that the old bytes remain downloadable.
+Never-published staged Files use the same ordering with purpose `UnpublishedFileRemoval`. Explicit discard, expiration, proposal rejection, and unused staged Files discarded during approval queue the exact object address and remove the File row in the same relational commit; object deletion follows afterward. Provider failure leaves the cleanup target pending instead of losing responsibility for the object.
+
+The historical revision still knows that a published File existed and retains its historical filename/type metadata. It does not promise that the old bytes remain downloadable.
 
 ## StorageCleanupTarget
 
@@ -133,12 +135,13 @@ Relevant fields:
 
 Current purposes:
 
-- `CaveAssetRemoval` — ordinary removed File payload cleanup;
+- `CaveAssetRemoval` — published File payload cleanup, including hard Cave and sync-import deletion;
+- `UnpublishedFileRemoval` — never-published staged File cleanup after discard, expiration, or proposal cleanup;
 - `AccountReset` — stronger Reset Account cleanup debt.
 
-The purpose distinction matters. Reset Account cleanup can block subsequent account writes until the reset's external cleanup is resolved. Ordinary asset-removal debt is retryable but does not freeze unrelated writes.
+The purpose distinction matters. Reset Account cleanup can block subsequent account writes until the reset's external cleanup is resolved. Ordinary File cleanup debt is retryable but does not freeze unrelated writes.
 
-Reset Account also captures pending `CaveAssetRemoval` addresses before its relational purge and converts responsibility for them into its own reset cleanup targets. That prevents unresolved ordinary cleanup from being orphaned by account reset.
+Reset Account captures pending non-reset File-cleanup addresses before its relational purge and converts responsibility for them into its own reset cleanup targets. That prevents unresolved published or unpublished cleanup from being orphaned by account reset.
 
 ## Line-plot payload deletion
 
@@ -165,15 +168,15 @@ A proposal version records exact File intent. For `PublishStaged` Files:
 3. approval verifies the external object exists;
 4. approval relationally associates that File with the Cave;
 5. no copy occurs;
-6. unused/discarded staged objects may be cleaned after commit.
+6. unused/discarded staged objects are queued as `UnpublishedFileRemoval` cleanup inside the approval transaction and processed after commit.
 
-If approval removes a currently published File, its `CaveAssetRemoval` cleanup target is created inside the approval transaction but object deletion does not run until the **outer approval transaction has committed**.
+If approval removes a currently published File, its `CaveAssetRemoval` cleanup target is created inside the approval transaction but object deletion does not run until the **outer approval transaction has committed**. Rejection similarly commits request state, staged-File row removal, and unpublished cleanup responsibility before attempting object deletion.
 
 ## Other destructive paths
 
-Explicit Cave hard deletion, bulk-import deletion, account reset, abandoned staging, and archive cleanup have their own orchestration rules. They must all preserve the same fundamental ordering: do not destroy external bytes before the relational mutation that makes them unreachable has committed.
+Explicit Cave hard deletion and sync-import deletion commit `CaveAssetRemoval` targets with their relational/revision result, then process those targets after commit. Abandoned staging and proposal cleanup use `UnpublishedFileRemoval`. Account Reset folds both ordinary File-cleanup purposes into durable `AccountReset` responsibility before purging their original targets.
 
-Account Reset uses durable `StorageCleanupTarget` rows with purpose `AccountReset`. Some older specialized deletion paths still use post-commit best-effort external cleanup; their validation status is tracked in the [completion status ledger](../../CAVE_REVISIONS_COMPLETION_STATUS.md).
+Archive cleanup remains Azure-specific rather than using this File outbox, but follows the same safety direction: a completed final archive is not falsified by later temp/prune deletion failure. New-version replicas serialize per-account archive jobs, while cleanup of another job's abandoned temp object is age-gated for mixed-version deployment safety; later jobs retry stale temp and prune cleanup. All destructive paths preserve the fundamental ordering: do not destroy external bytes before the relational mutation that makes them unreachable has committed.
 
 ## Read the code in this order
 

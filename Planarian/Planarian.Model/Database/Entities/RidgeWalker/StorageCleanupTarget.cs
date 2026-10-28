@@ -9,7 +9,8 @@ namespace Planarian.Model.Database.Entities.RidgeWalker;
 public enum StorageCleanupPurpose
 {
     AccountReset,
-    CaveAssetRemoval
+    CaveAssetRemoval,
+    UnpublishedFileRemoval
 }
 
 /// <summary>

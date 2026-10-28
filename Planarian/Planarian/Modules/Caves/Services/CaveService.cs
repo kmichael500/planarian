@@ -1151,7 +1151,7 @@ public class CaveService : ServiceBase<CaveRepository>
 
     public async Task DeleteCave(string caveId, CancellationToken cancellationToken)
     {
-        var objectAddresses = await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(async _ =>
+        var cleanupTargetIds = await _caveMutationCoordinator.ExecuteOwnedTransactionAsync(async _ =>
         {
             await Repository.LockForHardDeleteAsync(caveId, cancellationToken);
             var entity = await Repository.GetAsync(caveId);
@@ -1165,19 +1165,18 @@ public class CaveService : ServiceBase<CaveRepository>
             var revisionPreparation = await _caveMutationCoordinator.PrepareExistingAsync(
                 entity.Id, entity.CurrentRevisionId, cancellationToken);
 
-            var deletedObjectAddresses = await Repository.DeleteAggregateForHardDeleteAsync(
+            var deletedCleanupTargetIds = await Repository.DeleteAggregateForHardDeleteAsync(
                 entity, cancellationToken);
 
             await _caveMutationCoordinator.PublishPreparedDeleteAsync(
                 revisionPreparation, CaveRevisionSource.ManagerEdit, cancellationToken: cancellationToken);
 
-            return deletedObjectAddresses;
+            return deletedCleanupTargetIds;
         }, cancellationToken);
 
-        // Object storage is outside PostgreSQL. Purge bytes only after the owned relational
-        // transaction has committed so a database rollback can never lose historical content.
-        foreach (var address in objectAddresses)
-            await _fileService.DeleteObjectBestEffortAsync(address);
+        // Object storage is outside PostgreSQL. The cleanup targets were committed with the
+        // hard delete so a post-commit provider failure remains durable and safely retryable.
+        await _fileService.CleanupAssetRemovalTargetsAsync(cleanupTargetIds, CancellationToken.None);
     }
 
     public async Task ArchiveCave(string caveId)

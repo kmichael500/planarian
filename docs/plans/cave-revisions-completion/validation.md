@@ -227,7 +227,7 @@ dotnet test Planarian.Tests.Integration/Planarian.Tests.Integration.csproj \
 
 The cleanup migration **does** transform pre-release branch data: existing Reset Account debt must remain `AccountReset`
 and existing retained File locators must become `CaveAssetRemoval` cleanup debt. Dedicated migration tests therefore must
-prove that conversion, including an old-row-ID collision, and prove downgrade fails closed while asset cleanup debt exists.
+prove that conversion, including an old-row-ID collision, and prove downgrade fails closed while published or unpublished ordinary File cleanup debt exists.
 Keep the empty/latest and **exact current merge-target (`main`)** upgrade contracts as the broader schema coverage.
 
 Keep historical compatibility coverage separate from the current-main-v32 upgrade/rollback regression.

@@ -117,10 +117,16 @@ public sealed class CaveImportMixedBatchIntegrationTests(PostgresTestServer fixt
         Assert.False(await verify.CaveGeoJsons.IgnoreQueryFilters().AnyAsync(row => row.Id == deleteAssets.LinePlotId));
         Assert.False(await verify.Favorites.IgnoreQueryFilters().AnyAsync(row => row.CaveId == deleted.CaveId));
         Assert.False(await verify.CavePermissions.IgnoreQueryFilters().AnyAsync(row => row.CaveId == deleted.CaveId));
-        Assert.Contains(execution.BlobDeletes,
-            blob => blob.BlobContainer == "test" && blob.BlobKey == deleteAssets.BlobKey);
-        Assert.DoesNotContain(execution.BlobDeletes,
-            blob => blob.BlobContainer == "test" && blob.BlobKey == updateAssets.BlobKey);
+        var cleanupTarget = Assert.Single(await verify.StorageCleanupTargets.AsNoTracking()
+            .Where(row => execution.StorageCleanupTargetIds.Contains(row.Id))
+            .ToListAsync());
+        Assert.Equal(StorageCleanupPurpose.CaveAssetRemoval, cleanupTarget.Purpose);
+        Assert.Equal("test", cleanupTarget.StoragePartition);
+        Assert.Equal(deleteAssets.BlobKey, cleanupTarget.StorageKey);
+        Assert.False(cleanupTarget.IsContainer);
+        Assert.False(await verify.StorageCleanupTargets.AsNoTracking().AnyAsync(row =>
+            row.Purpose == StorageCleanupPurpose.CaveAssetRemoval &&
+            row.StoragePartition == "test" && row.StorageKey == updateAssets.BlobKey));
 
         var batchRevisions = await verify.CaveRevisions
             .Where(row => row.ImportBatchId == execution.ImportBatchId)

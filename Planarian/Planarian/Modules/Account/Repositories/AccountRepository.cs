@@ -130,18 +130,29 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
     {
         if (string.IsNullOrWhiteSpace(RequestUser.AccountId)) throw ApiExceptionDictionary.NoAccount;
 
-        var live = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
-            .Where(file => file.AccountId == RequestUser.AccountId &&
-                           file.BlobContainer != null && file.BlobKey != null)
-            .Select(file => new AccountFileObjectAddress(file.BlobContainer!, file.BlobKey!))
+        var liveLocators = await DbContext.Files.IgnoreQueryFilters().AsNoTracking()
+            .Where(file => file.AccountId == RequestUser.AccountId)
+            .Select(file => new { file.BlobContainer, file.BlobKey })
             .ToListAsync(cancellationToken);
-        var pendingAssetCleanup = await DbContext.StorageCleanupTargets.IgnoreQueryFilters().AsNoTracking()
+        if (liveLocators.Any(file =>
+                string.IsNullOrWhiteSpace(file.BlobContainer) !=
+                string.IsNullOrWhiteSpace(file.BlobKey)))
+            throw ApiExceptionDictionary.Conflict(
+                "Cannot safely reset an account with a File that has an incomplete object-storage address.");
+
+        var live = liveLocators
+            .Where(file => !string.IsNullOrWhiteSpace(file.BlobContainer))
+            .Select(file => new AccountFileObjectAddress(file.BlobContainer!, file.BlobKey!))
+            .ToList();
+        var pendingFileCleanup = await DbContext.StorageCleanupTargets.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.AccountId == RequestUser.AccountId &&
-                          row.Purpose == StorageCleanupPurpose.CaveAssetRemoval && !row.IsContainer)
+                          (row.Purpose == StorageCleanupPurpose.CaveAssetRemoval ||
+                           row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval) &&
+                          !row.IsContainer)
             .Select(row => new AccountFileObjectAddress(row.StoragePartition, row.StorageKey))
             .ToListAsync(cancellationToken);
 
-        var addresses = live.Concat(pendingAssetCleanup).Distinct().ToList();
+        var addresses = live.Concat(pendingFileCleanup).Distinct().ToList();
 
         // The whole account container includes untracked archives/imports. Even a
         // foreign reference to a key absent from our File table makes deleting
@@ -267,7 +278,8 @@ public class AccountRepository<TDbContext> : RepositoryBase<TDbContext> where TD
         {
             deletedCount = await DeleteBatchAsync(DbContext.StorageCleanupTargets
                 .Where(row => row.AccountId == RequestUser.AccountId &&
-                              row.Purpose == StorageCleanupPurpose.CaveAssetRemoval)
+                              (row.Purpose == StorageCleanupPurpose.CaveAssetRemoval ||
+                               row.Purpose == StorageCleanupPurpose.UnpublishedFileRemoval))
                 .IgnoreQueryFilters(), batchSize, cancellationToken);
 
         } while (deletedCount == batchSize);

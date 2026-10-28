@@ -114,6 +114,12 @@ logged; later Cave/File authoring retries older debt in bounded batches. There i
 relay, so debt can remain while an account is inactive. Revision history keeps the File's stable ID and historical
 user-facing metadata, not its storage locator or removed bytes.
 
+Never-published Files use the same fail-safe ordering with a distinct `UnpublishedFileRemoval` cleanup purpose. Explicit
+discard, expiration, proposal rejection, and unused staged Files discarded during approval remove the relational File
+row and queue the exact object address before that relational result commits. External deletion happens afterward;
+provider failure leaves durable retryable debt instead of an untracked object. Later Cave/File authoring retries a
+bounded ordinary-cleanup batch, and Reset Account absorbs both unpublished and published File cleanup debt.
+
 Browser downloads for proposal Files use the same API-origin-aware, account-qualified URL construction as published
 File downloads. Request, version, revision, and staged-File access remains permission-filtered and tenant-qualified,
 including guessed and mismatched identifiers. Azure is the current object-storage adapter, but affected Cave/File
@@ -174,7 +180,8 @@ ordinary `CaveVm` reads or the revision API.
 - File history preserves attachment identity, editable filename stem (`Name`), immutable uploaded-file `Extension`, and
   captured file-type metadata without exposing object-storage locators in revision JSON. Ordinary published removal queues
   post-commit physical deletion; after successful cleanup the old bytes are not recoverable through Planarian.
-  Never-published staged bytes may expire or be discarded.
+  Never-published staged bytes may expire or be discarded; those relational removals queue durable
+  `UnpublishedFileRemoval` debt before external deletion is attempted.
 - Line-plot history preserves stable identity, historical name, and a deterministic content fingerprint, not the full
   GeoJSON payload. Immutable proposal versions retain exact proposed line-plot GeoJSON separately from published history.
 - A semantic no-op creates neither a published revision nor a proposal version.

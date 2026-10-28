@@ -3,8 +3,8 @@
 **Branch:** `feature/cave-revisions-completion`
 **Status:** **ACTIVE PRE-MERGE — VALIDATION REMAINING**
 **Ledger last refreshed:** 2026-10-27
-**Completion HEAD reviewed:** `f9ef92a337805a351a96a236b4ae6caa35e3cf7a`
-**Package refresh:** 2026-10-27; the `SaveChanges` tenant/ownership hardening package was validated as an uncommitted working tree on top of `f9ef92a337805a351a96a236b4ae6caa35e3cf7a`. Its exact pre-commit validation evidence is intentionally recorded below as working-tree evidence; earlier package evidence remains SHA-pinned below.
+**Completion HEAD reviewed:** `bb45e4a2` (`fix(import): align bulk import with authoring semantics`)
+**Package refresh:** 2026-10-27; the external-cleanup safety + production `AzureBlobObjectStorage` contract package was independently validated from `fca098d45ebb0dc0a2b65ee2ed75c63ad4f40cc5`, then reconciled against completion HEAD `bb45e4a2`, which adds the import-authoring parity package and shared Azurite fixture. The combined tree preserves durable published/unpublished File cleanup, cross-replica archive-job coordination with age-gated temp cleanup, import parity, and the automated real production-adapter contract against isolated Azurite. Exact package evidence is recorded under GAP-004/GAP-005 below; earlier evidence remains SHA-pinned where applicable.
 **Current `main` reviewed:** `e342691c82f1bb6549be903d3a8f94a5d2560ac2`
 **Migration validation refreshed:** 2026-10-26; the final current-main preservation fixture passes the migration + PostgreSQL-foundation suite **34/34** in the current working tree
 **Rollout-baseline validation refreshed:** 2026-10-26; the preservation census separately validates rollout against the complete v32 fixture; earlier merge-reconciliation evidence remains recorded below
@@ -54,7 +54,7 @@ No known Cave-revision implementation blocker remains in the current working tre
 
 The **P0 implementation/validation checklist is now complete in this package**. GAP-001 adds a strict current-main v32 database preservation census plus a separate revision-rollout preservation boundary; the package still needs to be included in the branch's final adversarial validation pass.
 
-The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, and current-main migration/rollout preservation. The remaining high-value risks are P1/P2 work outside the core publication machinery: production object-storage behavior, shared-interceptor compatibility, real-browser integration, archive generation/runtime behavior, account-switch cache isolation, and mixed-version deployment safety.
+The existing test suite is strongest around transactionality, concurrency, tenant isolation, import behavior, revision/proposal publication, destructive Reset behavior, authoring-field preservation, current-main migration/rollout preservation, shared-interceptor compatibility, durable external cleanup, and the production Azure Blob adapter against Azurite. The remaining high-value risks are P1/P2 work outside the core publication machinery: real-browser integration, archive generation/runtime behavior, account-switch cache isolation, mixed-version deployment/runtime safety, and live-provider/deployment boundaries that an emulator cannot prove.
 
 ## Reviewed scope size
 
@@ -94,10 +94,10 @@ These counts explain why the review treated this as a shared-system change rathe
 | File authoring in aggregate Cave editor | **DONE + VALIDATED** | Stage/add/edit/remove flows and unsaved-change behavior have frontend/integration coverage. |
 | Upload-once staged File lifecycle | **DONE + VALIDATED** | New content is written once; publication associates the existing object rather than copying to a new published key. |
 | Published Cave asset removal/history | **DONE + VALIDATED** | Files and line plots now share the same semantic contract: revision history retains lightweight identity/metadata while removed payloads are not deliberately retained as historical Cave content. File bytes use durable post-commit `CaveAssetRemoval` cleanup; `CaveGeoJson` deletion is transactional. |
-| Provider-neutral object storage abstraction | **DONE, PARTIAL VALIDATION** | Application logic uses `IObjectStorage` for the affected lifecycle. Service behavior is heavily tested with a fake, and a manual local Azurite smoke validated create-only collision handling plus snapshot-aware deletion. A committed automated Azurite contract suite is still missing. |
+| Provider-neutral object storage abstraction | **DONE + VALIDATED** | Application logic uses `IObjectStorage` for the affected lifecycle. Business behavior remains heavily tested with a deterministic fake, while the real production `AzureBlobObjectStorage` adapter has an automated isolated-Azurite contract covering byte/metadata round-trip, create-only immutability, missing/delete semantics, concurrent first-use, normalization, lazy-read disappearance, snapshot-inclusive delete, cancellation, and container recreation. Live Azure remains a deployment boundary. |
 | Line-plot aggregate authoring | **DONE + VALIDATED** | `CaveLinePlotAuthoringEditor` is the normal interactive authoring surface. The obsolete Cave-detail `CaveSpatialDataImport` / `GeoJsonSaveModal` path is removed; focused frontend coverage proves aggregate authoring and map rendering still work. |
 | Line plots in revision/proposal semantics | **DONE + VALIDATED** | Stable IDs, normalized content hash, metadata diffs, proposal exact GeoJSON payloads, deterministic snapshot behavior covered. |
-| Cave hard deletion / proposal blocking | **DONE + VALIDATED** | Core Cave deletion and unresolved-proposal blocking have dedicated integration coverage; hard-delete provider-failure retry remains tracked separately below. |
+| Cave hard deletion / proposal blocking | **DONE + VALIDATED** | Core Cave deletion and unresolved-proposal blocking have dedicated integration coverage, including durable cleanup debt and idempotent retry when post-commit object deletion fails. |
 | Bulk Cave/Entrance import rewrite | **DONE + VALIDATED** | Immutable plan/execute flow, preview/commit equivalence, dry run, rollback, tenant adversarial behavior, golden compatibility, and supported-scale test passed. |
 | Import performance architecture | **DONE + VALIDATED** | 10,000-Cave/Entrance workload passed; set-oriented/bounded architecture reviewed. |
 | Tenant isolation | **DONE + VALIDATED** | Fail-closed workflow filters, explicit account qualification when bypassing filters, adversarial foreign-account tests. |
@@ -160,7 +160,7 @@ Snapshot design is intentionally user/logical-state oriented:
 ## Architecture weaknesses / validation boundaries still present
 
 1. The global `SaveChangesInterceptor` remains high-blast-radius infrastructure, but its Cave/account-domain switch coverage is now mechanically classified and the ownership mechanisms have a real-PostgreSQL compatibility/tenant-isolation matrix. Legacy Trip/Lead/Project entities and explicitly global/system records remain deliberately outside the Cave-completion ownership contract.
-2. The production `AzureBlobObjectStorage` adapter has a passing manual local Azurite smoke for create-only collision handling, idempotent delete, and snapshot-aware deletion, but still lacks a committed automated Azurite contract suite; broader provider-level race/cancellation/content-metadata semantics remain a validation boundary.
+2. The production `AzureBlobObjectStorage` adapter now has an automated isolated-Azurite contract covering the relevant byte/metadata, immutable-create, missing/delete, concurrent first-use, normalization, lazy-read race, snapshot, cancellation, and container-recreation semantics. Azurite is still an emulator, so live Azure account policy, retention, networking, and service-specific behavior remain deployment boundaries.
 3. Browser/runtime and full archive-generation behavior are still under-tested end to end. Reset Account now has durable cleanup debt/retry semantics, but independent non-cooperating writers and live Azure behavior remain deployment audit boundaries rather than known application-contract defects.
 
 ## Code quality
@@ -461,10 +461,10 @@ cross-instance advisory shared/exclusive leases cover ordinary mutating HTTP
 requests, reset and background archive jobs. An additional preflight rejects
 foreign references to any bytes in the account container.
 
-**Deployment validation still needed:** no live Azure lifecycle smoke and no committed automated Azurite contract suite yet; the manual local Azurite smoke covers only the affected immutable-create/delete semantics. Independent actors that bypass HTTP and the archive coordinator are
+**Deployment validation still needed:** no live Azure lifecycle smoke has been run. The automated Azurite production-adapter contract materially improves provider evidence but cannot prove live-account policy, retention, networking, or Azure-service-specific behavior. Independent actors that bypass HTTP and the archive coordinator are
 not automatically fenced; an unrelated other-tenant writer could create an
 unsafe foreign reference after the last pre-delete check. Do not represent a
-passing disposable-Postgres/fake-object-storage suite as exhaustive proof.
+passing disposable-Postgres/Azurite/fake-storage suite as exhaustive proof.
 
 ## RISK-005 — Reset also removes server-side account archives
 
@@ -507,39 +507,42 @@ The current-main-v32 regressions prove upgrade to completion and downgrade to th
 
 The merged destructive-safety package includes a two-tenant integration scenario covering all 14 Cave/Entrance tag relationships, Files (staged, temporary, published and pending asset-cleanup debt), line plots, Favorites, revisions, proposal versions, review events, Counties, custom TagTypes, AccountStates, permissions, and stored archives. Successful Reset removes the intended Account A graph, preserves the intentionally retained account identity/members/feature settings, leaves Account B's graph and blobs unchanged, and is safe to retry. Broader independent-writer/live-provider boundaries remain tracked under RISK-004 rather than weakening this graph test.
 
-## GAP-004 — PARTIALLY RESOLVED — External-cleanup fault injection
+## GAP-004 — RESOLVED — External-cleanup fault injection
 
-**Priority: P1 for the remaining workflows**
+Published and unpublished File cleanup now use explicit durable post-commit responsibility rather than best-effort deletion after relational success:
 
-Reset Account now has direct post-commit provider-failure coverage, truthful partial-success semantics, persisted cleanup debt, and retry behavior. Ordinary published File removal now also has direct provider-failure coverage proving the Cave revision/File-row mutation commits first, `CaveAssetRemoval` debt survives failure, unrelated writes are not blocked, and retry deletes the object/target. Equivalent failure-injection evidence is still needed where applicable for:
+- ordinary published removal, hard Cave deletion, and sync-import Cave deletion queue `CaveAssetRemoval` targets in the same relational transaction that removes the live File/Cave state;
+- explicit unpublished-file deletion, expired staging, proposal rejection, and unused staged Files discarded during approval queue `UnpublishedFileRemoval` targets before their File rows commit as removed;
+- provider failure leaves the exact target pending while the relational/revision result remains truthful; successful/already-missing deletion acknowledges the target idempotently;
+- explicit cleanup targets created by the owning commit are all processed after commit in bounded target/reference-query batches; later Cave/File authoring retries only a small bounded batch of older ordinary cleanup debt, with a live-File-reference guard before deletion;
+- Reset Account explicitly absorbs both ordinary File-cleanup purposes into its stronger reset cleanup responsibility before purging the original targets;
+- sync import returns committed cleanup-target IDs, not transient blob-delete instructions;
+- cleanup-target acknowledgement detaches same-scope persisted tracked targets after set-based deletion so EF state cannot resurrect stale local debt, while unsaved Added debt is never detached;
+- the cleanup migration downgrade fails closed for both `CaveAssetRemoval` and `UnpublishedFileRemoval`.
 
-- hard Cave removal;
-- expired staged-file cleanup;
-- proposal cleanup;
-- archive pruning/partial archive cleanup.
+Archive cleanup remains Azure-specific but no longer falsifies a completed archive when temporary-object deletion or pruning fails. Archive jobs now acquire the shared maintenance lock plus a separate exclusive per-account archive-job lock on one PostgreSQL session/lease, so new-version replicas serialize per account without consuming two long-lived lock-pool connections. Abandoned temporary cleanup additionally requires a conservative seven-day age before deleting another job's temp key, so a rolling deployment cannot let a new replica delete an active temp object owned by an older replica that does not yet take the new archive-job lock. Per-object prune/delete failures are isolated and retried by later jobs. Full generated-archive/copy-state runtime validation remains separately open under GAP-010.
 
-Those remaining tests should prove relational truth is not falsified by a later storage failure and that cleanup debt is safe/retryable.
+Final validation on the reviewed working tree includes **40/40** focused cleanup/aggregate/import tests after the final scale hardening, **9/9** archive-cleanup/maintenance-lock tests, **2/2** Reset partial-locator fail-closed regressions, **37/37** migration/PostgreSQL-foundation tests, **417/417** backend unit tests, and **511/511** full PostgreSQL/PostGIS integration tests with no skips. The Release solution build succeeds with **0 warnings / 0 errors**, EF reports no pending model changes, and repository documentation validation plus `git diff --check` pass.
 
-## GAP-005 — Automated AzureBlobObjectStorage contract suite against Azurite
+## GAP-005 — RESOLVED — Automated AzureBlobObjectStorage contract suite against Azurite
 
-**Priority: P1**
+Business-level File tests appropriately continue to use `TestFileBlobStore : IObjectStorage` for deterministic workflow failure injection. The integrated package adds a real production-adapter contract that runs `AzureBlobObjectStorage` against the repository's isolated Azurite Testcontainer and covers:
 
-Business-level File tests appropriately use `TestFileBlobStore : IObjectStorage`. A manual local Azurite smoke now validates the production adapter's create-only collision behavior, idempotent deletion, and deletion of a base blob with snapshots, but there is still no committed automated adapter contract suite.
-
-The repository Docker environment already includes Azurite. Add an automated storage contract suite against real `AzureBlobObjectStorage` + Azurite covering:
-
-- Put then OpenRead returns identical bytes;
-- content type survives;
-- ETag / last-modified are populated consistently;
-- missing object returns the expected null/not-found semantics;
-- remove existing object;
-- remove missing object;
+- Create then OpenRead returns identical bytes and preserves content type, ETag, and last-modified metadata;
+- immutable create is provider-enforced and an accidental key reuse cannot overwrite existing bytes;
+- missing-object read/delete semantics and idempotent deletion;
 - concurrent first-use container creation;
 - normalized partition/container behavior;
-- object disappears between property lookup and stream opening;
-- cancellation behavior where meaningful.
+- object disappearance between metadata lookup and lazy stream opening;
+- base-blob deletion when snapshots exist;
+- canceled create without object publication;
+- container-cache invalidation and recreation after external container deletion.
 
-Also make the intended immutable-address assumption explicit. Either prove the application never reuses an immutable object key or make provider behavior reject accidental overwrite. Do not rely only on generated-ID improbability as protection against silent replacement.
+The standalone production-adapter contract passed **10/10**. After the external-cleanup package was adopted, the combined storage/cleanup/proposal/import/reset/archive/migration matrix passed **81/81** with no skips on the integrated working tree. The shared Azurite fixture is also used by the account File-import integration path, avoiding a second emulator harness.
+
+Final merge reconciliation against import-parity completion HEAD `bb45e4a2` found and corrected one stale mixed-batch test assertion that still expected the retired transient `BlobDeletes` result; the test now proves the committed `StorageCleanupTargetIds`/`CaveAssetRemoval` contract and that the updated Cave's live File is not queued. On the exact resolved merge tree, the Release solution build passed **0 warnings / 0 errors**, the focused mixed-batch regression passed **1/1**, the backend unit suite passed **424/424**, and the full PostgreSQL/PostGIS integration suite passed **542/542** with **0 skips**. Repository documentation validation, changed-file formatting, `git diff --check`, `docker compose config -q`, and EF pending-model validation also pass; EF reports no pending model changes.
+
+Azurite remains an emulator. Live Azure policy, retention, networking, account configuration, and service-specific behavior remain deployment-smoke boundaries rather than application-contract gaps.
 
 ## GAP-006 — RESOLVED — Global SaveChangesInterceptor compatibility matrix
 
@@ -663,7 +666,8 @@ Also test `ArchiveJobCoordinator`:
 - pruning retains the correct five;
 - current/newest archive cannot be pruned accidentally;
 - Account A cannot list/remove/download Account B archives;
-- interrupted/stale temporary archive behavior is defined.
+- interrupted/stale temporary archive behavior is defined;
+- mixed-version deployment is exercised for old/new concurrent archive generation: the GAP-004 age guard protects temp cleanup, but an older backend does not participate in the new archive-job advisory lock, so final-copy/name collision behavior still needs explicit runtime proof.
 
 ## GAP-011 — RESOLVED — Archive is a current-state export, not a disaster-recovery backup
 
@@ -773,15 +777,15 @@ The old `Planarian.Tests.EmailDelivery/Authentication/RequestThrottlePdfStreamTe
 
 ## P1 — Strongly recommended before merge because failures can be silent or cross-cutting
 
-- [ ] Remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows (GAP-004).
-- [ ] Azurite contract tests for production `AzureBlobObjectStorage`.
+- [x] External-cleanup failure/retry safety for hard Cave/File/staging/proposal/archive-cleanup workflows (GAP-004; full archive runtime remains GAP-010).
+- [x] Azurite contract tests for production `AzureBlobObjectStorage`.
 - [x] Global `SaveChangesInterceptor` operation/tenant compatibility matrix.
 - [ ] Small real-browser smoke suite, including WebKit for critical workflows.
 - [ ] Real-browser PDF.js custom-header/range/authentication test.
 - [ ] Old-client/missing-`ExpectedRevisionId` no-mutation regression.
 - [ ] Read-only GET/authoring-context no-side-effect contract plus fail-closed uninitialized-Cave coverage.
 - [ ] End-to-end archive `.tar.gz` generation/content validation.
-- [ ] Archive cancellation/failure/pruning/account-isolation tests.
+- [ ] Full end-to-end archive runtime cancellation/failure/pruning/account-isolation tests (GAP-010; cleanup-policy/lock failure semantics are covered under GAP-004).
 - [x] Explicit archive-vs-backup product contract (current-state export; full archive runtime validation remains GAP-010).
 - [x] Hidden/disabled feature-field preservation tests.
 - [ ] Account-switch/client-cache isolation validation.
@@ -850,18 +854,18 @@ Do not mark this branch merge-ready until every applicable item below is true or
 - [x] Post-commit storage failure has truthful user/API semantics (merged destructive-safety package).
 - [x] Fate of stored archives during reset is intentional and documented (merged destructive-safety package).
 - [x] Durable cleanup retry and cross-replica API/archive admission tested; independent write paths still need deployment audit.
-- [ ] Hard-delete/external-cleanup failure semantics are safe/retryable.
+- [x] Hard-delete/external-cleanup failure semantics are safe/retryable; full generated-archive runtime behavior remains tracked under GAP-010.
 
 ## Storage/File safety
 
-- [ ] Fake-storage business tests remain green.
-- [ ] Production object-storage adapter has at least one real Azurite contract suite.
+- [x] Fake-storage business tests for the affected cleanup workflows remain green in the focused and aggregate-cleanup regression suites.
+- [x] Production object-storage adapter has a real automated Azurite contract suite.
 - [x] Immutable Cave/File object creation is provider-enforced create-only; a retry/path bug cannot silently overwrite an existing object address, and failed create does not compensate-delete pre-existing bytes.
 - [ ] Staged/published/removed-history/expired File lifecycle remains mutually exclusive and proven.
 
 ## Cross-cutting compatibility
 
-- [ ] Global save-interceptor matrix is green or equivalent evidence exists.
+- [x] Global save-interceptor matrix is green or equivalent evidence exists.
 - [x] Hidden feature fields survive unrelated edits.
 - [ ] Account switching cannot reuse actionable foreign-account UI data.
 - [ ] Ordinary reads do not unexpectedly mutate durable state.
@@ -893,7 +897,7 @@ Specifically:
 - no live production/staging/development application database was inspected or modified;
 - disposable repository-owned PostgreSQL/PostGIS databases were used for integration/migration experiments;
 - no Azure production resources were modified;
-- real Azure Blob Storage behavior was not exercised; service tests used a fake object-storage boundary;
+- live Azure Blob Storage was not exercised; business workflows use a deterministic fake and the production adapter is validated separately against Azurite;
 - no real-browser end-to-end suite was run;
 - no full real account archive round-trip/restore was proven;
 - the synthetic migration preservation census now explicitly seeds and checks every current-main v32 model table; it is still synthetic data rather than a sanitized restored real-world database;
@@ -907,11 +911,9 @@ Do not begin with a broad refactor.
 
 Recommended next work order:
 
-1. add the production `AzureBlobObjectStorage` + Azurite contract suite;
-2. finish remaining external-cleanup fault injection for hard Cave/File/staging/archive workflows;
-3. add the small critical browser/PDF smoke suite;
-4. finish archive runtime validation and account-switch/cache isolation;
-5. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
+1. add the small critical browser/PDF smoke suite;
+2. finish full archive runtime validation and account-switch/cache isolation;
+3. run the final adversarial validation sequence and refresh this ledger against the resulting committed SHA.
 
 
 When working on Reset Account, do not assume the whole account container contains only current Cave Files. Current code also uses that container for account archives and import transport. Trace every producer/prefix before changing container cleanup behavior.
@@ -926,11 +928,10 @@ The branch's core architecture is not the reason it is blocked. The revision/pro
 
 Remaining merge risk is concentrated in:
 
-- real storage-provider behavior;
-- broad shared-interceptor compatibility;
+- live Azure/provider deployment behavior beyond the isolated Azurite contract;
 - real-browser integration;
-- archive generation/runtime behavior;
+- full archive generation/copy-state runtime behavior;
 - account-switch/client-cache isolation;
-- independent-writer/live-provider deployment boundaries around destructive cleanup.
+- independent-writer/live-provider deployment boundaries beyond the repository-owned cleanup contracts proven here.
 
 The P0 checklist is complete through the GAP-001 preservation-census package. Add the highest-value P1 safety tests and then perform one fresh adversarial pass rather than assuming the previous green suite proves the corrected branch.
